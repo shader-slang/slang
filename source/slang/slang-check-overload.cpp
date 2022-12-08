@@ -647,9 +647,6 @@ namespace Slang
             goto error;
 
         {
-            auto originalAppExpr = as<AppExprBase>(context.originalExpr);
-
-
             Expr* baseExpr;
             switch(candidate.flavor)
             {
@@ -659,7 +656,7 @@ namespace Slang
                     candidate.item,
                     context.baseExpr,
                     context.funcLoc,
-                    originalAppExpr ? originalAppExpr->functionExpr : nullptr);
+                    context.originalExpr);
                 break;
             case OverloadCandidate::Flavor::Expr:
             default:

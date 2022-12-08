@@ -36,7 +36,7 @@ namespace Slang
             switch (inst->getOp())
             {
             case kIROp_Call:
-            case kIROp_makeStruct:
+            case kIROp_MakeStruct:
                 {
                     // Remove void argument.
                     List<IRInst*> newArgs;
@@ -135,7 +135,7 @@ namespace Slang
             switch(inst->getOp())
             {
             case kIROp_Load:
-            case kIROp_getElement:
+            case kIROp_GetElement:
             case kIROp_GetOptionalValue:
             case kIROp_FieldExtract:
             case kIROp_GetTupleElement:

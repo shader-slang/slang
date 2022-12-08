@@ -224,7 +224,7 @@ namespace Slang
     }
 
     void EntryPoint::updateDependencyBasedHash(
-        DigestBuilder& builder,
+        DigestBuilder<MD5>& builder,
         SlangInt entryPointIndex)
     {
         // CompositeComponentType will have already hashed the relevant entry point's name
@@ -302,7 +302,7 @@ namespace Slang
     }
 
     void TypeConformance::updateDependencyBasedHash(
-        DigestBuilder& builder,
+        DigestBuilder<MD5>& builder,
         SlangInt entryPointIndex)
     {
         SLANG_UNUSED(entryPointIndex);
@@ -310,8 +310,8 @@ namespace Slang
         //TODO: Implement some kind of hashInto for Val then replace this
         auto subtypeWitness = m_subtypeWitness->toString();
 
-        builder.addToDigest(subtypeWitness);
-        builder.addToDigest(m_conformanceIdOverride);
+        builder.append(subtypeWitness);
+        builder.append(m_conformanceIdOverride);
     }
 
     List<Module*> const& TypeConformance::getModuleDependencies()

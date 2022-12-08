@@ -26,6 +26,7 @@ bool isComInterfaceType(IRType* type);
 
 
 IROp getTypeStyle(IROp op);
+IROp getTypeStyle(BaseType op);
 
 inline bool isScalarIntegerType(IRType* type)
 {

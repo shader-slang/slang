@@ -60,9 +60,34 @@ struct HoistConstantPass : InstPassBase
                 case kIROp_BitCast:
                 case kIROp_Lsh:
                 case kIROp_Rsh:
-                case kIROp_Construct:
-                case kIROp_makeVector:
+                case kIROp_MatrixReshape:
+                case kIROp_VectorReshape:
+                case kIROp_MakeVector:
                 case kIROp_MakeMatrix:
+                case kIROp_MakeMatrixFromScalar:
+                case kIROp_MakeVectorFromScalar:
+                case kIROp_MakeOptionalNone:
+                case kIROp_MakeOptionalValue:
+                case kIROp_MakeDifferentialPair:
+                case kIROp_MakeExistential:
+                case kIROp_ExtractExistentialType:
+                case kIROp_ExtractExistentialValue:
+                case kIROp_ExtractExistentialWitnessTable:
+                case kIROp_WrapExistential:
+                case kIROp_WitnessTableType:
+                case kIROp_AttributedType:
+                case kIROp_MatrixType:
+                case kIROp_OptionalHasValue:
+                case kIROp_GetOptionalValue:
+                case kIROp_IntCast:
+                case kIROp_FloatCast:
+                case kIROp_CastIntToFloat:
+                case kIROp_CastFloatToInt:
+                case kIROp_CastPtrToBool:
+                case kIROp_CastPtrToInt:
+                case kIROp_CastIntToPtr:
+                case kIROp_CastToVoid:
+                case kIROp_Reinterpret:
                 case kIROp_swizzle:
                 case kIROp_IntLit:
                 case kIROp_BoolLit:

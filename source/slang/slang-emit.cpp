@@ -53,6 +53,8 @@
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
+#include "slang-ir-string-hash.h"
+
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -358,33 +360,54 @@ Result linkAndOptimizeIR(
     // perform specialization of functions based on parameter
     // values that need to be compile-time constants.
     //
+    // Specialization passes and auto-diff passes runs in an iterative loop
+    // since each pass can enable the other pass to progress further.
+    for (;;)
+    {
+        bool changed = false;
 
-    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
-    if (!codeGenContext->isSpecializationDisabled())
-        specializeModule(irModule);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
+        dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
+        if (!codeGenContext->isSpecializationDisabled())
+            changed |= specializeModule(irModule);
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
 
-    applySparseConditionalConstantPropagation(irModule);
-    eliminateDeadCode(irModule);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    
+        // Inline calls to any functions marked with [__unsafeInlineEarly] again,
+        // since we may be missing out cases prevented by the functions that we just specialzied.
+        performMandatoryEarlyInlining(irModule);
+
+        dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
+        changed |= processAutodiffCalls(irModule, sink);
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
+
+        if (!changed)
+            break;
+    }
+
+    finalizeAutoDiffPass(irModule);
+
+    // If we have a target that is GPU like we use the string hashing mechanism
+    // but for that to work we need to inline such that calls (or returns) of strings
+    // boil down into getStringHash(stringLiteral)
+    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        // We could fail because
+        // 1) It's not inlinable for some reason (for example if it's recursive)
+        SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
+    }
 
     lowerReinterpret(targetRequest, irModule, sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
-    
-    // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-    // since we may be missing out cases prevented by the functions that we just specialzied.
-    performMandatoryEarlyInlining(irModule);
 
-    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
-    
-    processAutodiffCalls(irModule, sink);
+    simplifyIR(irModule);
 
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
-
-    validateIRModuleIfEnabled(codeGenContext, irModule);
-
-    applySparseConditionalConstantPropagation(irModule);
-    eliminateDeadCode(irModule);
+    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        // We could fail because (perhaps, somehow) end up with getStringHash that the operand is not a string literal
+        SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
+    }
 
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using

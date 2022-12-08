@@ -13,6 +13,6 @@ class DiagnosticSink;
 /// can be hoisted to global scope. This pass examines all local type defintions
 // and try to hoist them to global scope if the definition is no longer dependent on
 // the local context.
-void hoistLocalTypes(IRModule* module, DiagnosticSink* sink);
+void hoistLocalTypes(IRModule* module);
 
 } // namespace Slang

@@ -38,7 +38,7 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(IRParam* 
         // of the indexing operation is also
         // suitable for specialization.
         //
-        if (arg->getOp() == kIROp_getElement || arg->getOp() == kIROp_Load)
+        if (arg->getOp() == kIROp_GetElement || arg->getOp() == kIROp_Load)
         {
             auto base = arg->getOperand(0);
 
@@ -511,7 +511,7 @@ struct FunctionParameterSpecializationContext
             //
             ioInfo.key.vals.add(oldGlobalParam);
         }
-        else if( oldArg->getOp() == kIROp_getElement )
+        else if( oldArg->getOp() == kIROp_GetElement )
         {
             // This is the case where the `oldArg` is
             // in the form `oldBase[oldIndex]`
@@ -632,7 +632,7 @@ struct FunctionParameterSpecializationContext
             //
             return globalParam;
         }
-        else if( oldArg->getOp() == kIROp_getElement )
+        else if( oldArg->getOp() == kIROp_GetElement )
         {
             // This is the case where the argument is
             // in the form `oldBase[oldIndex]`.

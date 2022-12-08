@@ -276,7 +276,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_Call:
                 processCall(as<IRCall>(inst));
                 break;
-            case kIROp_getElementPtr:
+            case kIROp_GetElementPtr:
                 processGetElementPtr(as<IRGetElementPtr>(inst));
                 break;
             case kIROp_FieldAddress:

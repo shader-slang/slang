@@ -279,18 +279,20 @@ INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
 INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
 
 INST(Specialize, specialize, 2, 0)
-INST(lookup_interface_method, lookup_interface_method, 2, 0)
+INST(LookupWitness, lookupWitness, 2, 0)
 INST(GetSequentialID, GetSequentialID, 1, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
-INST(Construct, construct, 0, 0)
 INST(AllocObj, allocObj, 0, 0)
 
-INST(makeUInt64, makeUInt64, 2, 0)
-INST(makeVector, makeVector, 0, 0)
+INST(MakeUInt64, makeUInt64, 2, 0)
+INST(MakeVector, makeVector, 0, 0)
 INST(MakeMatrix, makeMatrix, 0, 0)
-INST(makeArray, makeArray, 0, 0)
-INST(makeStruct, makeStruct, 0, 0)
+INST(MakeMatrixFromScalar, makeMatrixFromScalar, 1, 0)
+INST(MatrixReshape, matrixReshape, 1, 0)
+INST(VectorReshape, vectorReshape, 1, 0)
+INST(MakeArray, makeArray, 0, 0)
+INST(MakeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
 INST(MakeResultValue, makeResultValue, 1, 0)
@@ -324,15 +326,15 @@ INST(Store, store, 2, 0)
 INST(FieldExtract, get_field, 2, 0)
 INST(FieldAddress, get_field_addr, 2, 0)
 
-INST(getElement, getElement, 2, 0)
-INST(getElementPtr, getElementPtr, 2, 0)
-INST(getAddr, getAddr, 1, 0)
+INST(GetElement, getElement, 2, 0)
+INST(GetElementPtr, getElementPtr, 2, 0)
+INST(GetAddr, getAddr, 1, 0)
 
 // Get an unowned NativeString from a String.
 INST(getNativeStr, getNativeStr, 1, 0)
 
 // Make String from a NativeString.
-INST(makeString, makeString, 1, 0)
+INST(MakeString, makeString, 1, 0)
 
 // Get a native ptr from a ComPtr or RefPtr
 INST(GetNativePtr, getNativePtr, 1, 0)
@@ -402,7 +404,7 @@ INST(MeshOutputRef, meshOutputRef, 2, 0)
 
 // Construct a vector from a scalar
 //
-// %dst = constructVectorFromScalar %T %N %val
+// %dst = MakeVectorFromScalar %T %N %val
 //
 // where
 // - `T` is a `Type`
@@ -410,7 +412,7 @@ INST(MeshOutputRef, meshOutputRef, 2, 0)
 // - `val` is a `T`
 // - dst is a `Vec<T,N>`
 //
-INST(constructVectorFromScalar, constructVectorFromScalar, 3, 0)
+INST(MakeVectorFromScalar, MakeVectorFromScalar, 3, 0)
 
 // A swizzle of a vector:
 //
@@ -577,6 +579,7 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(LayoutDecoration,                  layout,                 1, 0)
     INST(LoopControlDecoration,             loopControl,            1, 0)
+    INST(IntrinsicOpDecoration, intrinsicOp, 1, 0)
     /* TargetSpecificDecoration */
         INST(TargetDecoration,              target,                 1, 0)
         INST(TargetIntrinsicDecoration,     targetIntrinsic,        2, 0)
@@ -793,7 +796,15 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
+INST(IntCast, intCast, 1, 0)
+INST(FloatCast, floatCast, 1, 0)
+INST(CastIntToFloat, castIntToFloat, 1, 0)
+INST(CastFloatToInt, castFloatToInt, 1, 0)
 INST(CastPtrToBool, CastPtrToBool, 1, 0)
+INST(CastPtrToInt, CastPtrToInt, 1, 0)
+INST(CastIntToPtr, CastIntToPtr, 1, 0)
+INST(CastToVoid, castToVoid, 1, 0)
+
 INST(IsType, IsType, 3, 0)
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 INST(BackwardDifferentiate,                  BackwardDifferentiate,           1, 0)

@@ -4138,31 +4138,6 @@ namespace slang
         None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
     };
 
-    // A struct storing a single hash represented as a four element uint32_t array.
-    // This is intended to be used with the current MD5 hashing implementation.
-    struct Digest
-    {
-        uint32_t values[4] = { 0 };
-
-        bool operator==(const Digest& rhs)
-        {
-            return values[0] == rhs.values[0]
-                && values[1] == rhs.values[1]
-                && values[2] == rhs.values[2]
-                && values[3] == rhs.values[3];
-        }
-
-        bool operator!=(const Digest& rhs)
-        {
-            return !(*this == rhs);
-        }
-
-        uint32_t getHashCode()
-        {
-            return values[0];
-        }
-    };
-
         /** A session provides a scope for code that is loaded.
 
         A session can be used to load modules of Slang source code,
@@ -4464,7 +4439,7 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            Digest* outHash) = 0;
+            IBlob** outHash) = 0;
 
             /** Compute the hash code of this component type's contents as indicated by the file dependencies.
                 This hash is ideal when we need to confirm whether shader code changes have occurred. For example,
@@ -4477,7 +4452,7 @@ namespace slang
                 type that should ever be hashing its contents is Module as it represents all the code in a given
                 translation unit.
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(Digest* outHash) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(IBlob** outHash) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

@@ -874,6 +874,8 @@ struct ReverseDerivativePass : public InstPassBase
     //
     bool processReferencedFunctions(IRBuilder* builder)
     {
+        bool changed = false;
+
         List<IRInst*> autoDiffWorkList;
 
         for (;;)
@@ -925,6 +927,7 @@ struct ReverseDerivativePass : public InstPassBase
                             SLANG_ASSERT(diffFunc);
                             differentiateInst->replaceUsesWith(diffFunc);
                             differentiateInst->removeAndDeallocate();
+                            changed = true;
                         }
                         else
                         {
@@ -953,7 +956,7 @@ struct ReverseDerivativePass : public InstPassBase
             SLANG_RELEASE_ASSERT(backwardTranscriberStorage.followUpFunctionsToTranscribe.getCount() == 0);
 
         }
-        return true;
+        return changed;
     }
 
     // Checks decorators to see if the function should

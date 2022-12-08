@@ -44,7 +44,7 @@ struct ArtifactDescUtil
 
         /// True if is a CPU binary
     static bool isCpuBinary(const ArtifactDesc& desc);
-        /// True if is a GPU usable (can be passed to a driver/API and be used 
+        /// True if is a GPU usable (can be passed to a driver/API and be used)
     static bool isGpuUsable(const ArtifactDesc& desc);
 
         /// True if the desc holds textual information

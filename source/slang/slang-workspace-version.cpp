@@ -51,7 +51,11 @@ void Workspace::changeDoc(const String& path, LanguageServerProtocol::Range rang
         auto endOffset = doc->getOffset(line, col);
         auto originalText = doc->getText().getUnownedSlice();
         StringBuilder newText;
-        newText << originalText.head(startOffset) << text << originalText.tail(endOffset);
+        if (startOffset != -1)
+            newText << originalText.head(startOffset);
+        newText << text;
+        if (endOffset != -1)
+            newText << originalText.tail(endOffset);
         changeDoc(doc.Ptr(), newText.ProduceString());
     }
 }

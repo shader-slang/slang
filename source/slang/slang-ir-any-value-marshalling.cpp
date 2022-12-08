@@ -289,7 +289,7 @@ namespace Slang
                         {
                             srcVal = builder->emitBitCast(builder->getType(kIROp_UInt16Type), srcVal);
                         }
-                        srcVal = builder->emitConstructorInst(builder->getType(kIROp_UIntType), 1, &srcVal);
+                        srcVal = builder->emitCast(builder->getType(kIROp_UIntType), srcVal);
                         auto dstAddr = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,
@@ -340,7 +340,7 @@ namespace Slang
                 {
                     auto srcVal = builder->emitLoad(concreteVar);
                     auto uint64Val = builder->emitBitCast(builder->getUInt64Type(), srcVal);
-                    auto lowBits = builder->emitConstructorInst(builder->getUIntType(), 1, &uint64Val);
+                    auto lowBits = builder->emitCast(builder->getUIntType(), uint64Val);
                     auto shiftedBits = builder->emitShr(
                         builder->getUInt64Type(),
                         uint64Val,
@@ -468,11 +468,11 @@ namespace Slang
                         }
                         if (dataType->getOp() == kIROp_Int16Type)
                         {
-                            srcVal = builder->emitConstructorInst(builder->getType(kIROp_Int16Type), 1, &srcVal);
+                            srcVal = builder->emitCast(builder->getType(kIROp_Int16Type), srcVal);
                         }
                         else
                         {
-                            srcVal = builder->emitConstructorInst(builder->getType(kIROp_UInt16Type), 1, &srcVal);
+                            srcVal = builder->emitCast(builder->getType(kIROp_UInt16Type), srcVal);
                         }
                         if (dataType->getOp() == kIROp_HalfType)
                         {

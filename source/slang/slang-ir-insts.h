@@ -95,6 +95,19 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
     }
 };
 
+struct IRIntrinsicOpDecoration : IRDecoration
+{
+    enum { kOp = kIROp_IntrinsicOpDecoration };
+    IR_LEAF_ISA(IntrinsicOpDecoration)
+
+    IRIntLit* getIntrinsicOpOperand() { return cast<IRIntLit>(getOperand(0)); }
+
+    IROp getIntrinsicOp()
+    {
+        return (IROp)getIntrinsicOpOperand()->getValue();
+    }
+};
+
 struct IRGLSLOuterArrayDecoration : IRDecoration
 {
     enum { kOp = kIROp_GLSLOuterArrayDecoration };
@@ -720,7 +733,7 @@ struct IRLookupWitnessMethod : IRInst
     IRInst* getWitnessTable() { return witnessTable.get(); }
     IRInst* getRequirementKey() { return requirementKey.get(); }
 
-    IR_LEAF_ISA(lookup_interface_method)
+    IR_LEAF_ISA(LookupWitness)
 };
 
 // Returns the sequential ID of an RTTI object.
@@ -1604,14 +1617,14 @@ struct IRFieldAddress : IRInst
 
 struct IRGetElement : IRInst
 {
-    IR_LEAF_ISA(getElement);
+    IR_LEAF_ISA(GetElement);
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
 
 struct IRGetElementPtr : IRInst
 {
-    IR_LEAF_ISA(getElementPtr);
+    IR_LEAF_ISA(GetElementPtr);
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
@@ -1630,7 +1643,7 @@ struct IRGetManagedPtrWriteRef : IRInst
 
 struct IRGetAddress : IRInst
 {
-    IR_LEAF_ISA(getAddr);
+    IR_LEAF_ISA(GetAddr);
 };
 
 struct IRImageSubscript : IRInst
@@ -2686,10 +2699,16 @@ public:
         UInt            argCount,
         IRInst* const*  args);
 
-    IRInst* emitConstructorInst(
-        IRType*         type,
-        UInt            argCount,
-        IRInst* const* args);
+        /// Emits appropriate inst for constructing a default value of `type`.
+        /// If `fallback` is true, will emit `DefaultConstruct` inst on unknown types.
+        /// Otherwise, returns nullptr if we can't materialize the inst.
+    IRInst* emitDefaultConstruct(IRType* type, bool fallback = true);
+
+    IRInst* emitCast(
+        IRType* type,
+        IRInst* value);
+
+    IRInst* emitVectorReshape(IRType* type, IRInst* value);
 
     IRInst* emitMakeUInt64(IRInst* low, IRInst* high);
 

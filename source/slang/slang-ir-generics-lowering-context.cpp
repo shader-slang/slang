@@ -16,7 +16,7 @@ namespace Slang
         case kIROp_ThisType:
         case kIROp_AssociatedType:
         case kIROp_InterfaceType:
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
             return true;
         case kIROp_Specialize:
         {
@@ -288,7 +288,7 @@ namespace Slang
 
             return tupleType;
         }
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
         {
             auto lookupInterface = static_cast<IRLookupWitnessMethod*>(paramType);
             auto witnessTableType = as<IRWitnessTableType>(

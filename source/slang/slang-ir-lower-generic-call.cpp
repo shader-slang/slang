@@ -261,7 +261,7 @@ namespace Slang
                     return;
                 SLANG_UNEXPECTED("Nested generics specialization.");
             }
-            else if (loweredFunc->getOp() == kIROp_lookup_interface_method)
+            else if (loweredFunc->getOp() == kIROp_LookupWitness)
             {
                 lowerCallToInterfaceMethod(
                     callInst, cast<IRLookupWitnessMethod>(loweredFunc), specializeInst);

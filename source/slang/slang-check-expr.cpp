@@ -160,6 +160,7 @@ namespace Slang
             ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(openedType);
+            openedValue->originalExpr = expr;
 
             // The result of opening an existential is an l-value
             // if the original existential is an l-value.
@@ -502,7 +503,11 @@ namespace Slang
         auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
         addModifier(synthesizedDecl, toBeSynthesized);
 
-        return ConstructDeclRefExpr(makeDeclRef(synthesizedDecl), nullptr, originalExpr->loc, originalExpr);
+        return ConstructDeclRefExpr(
+            makeDeclRef(synthesizedDecl),
+            nullptr,
+            originalExpr ? originalExpr->loc : SourceLoc(),
+            originalExpr);
     }
 
     Expr* SemanticsVisitor::ConstructLookupResultExpr(
@@ -1925,6 +1930,10 @@ namespace Slang
                             if (backwardDiff && !getShared()->isBackwardDifferentiableFunc(funcDecl))
                             {
                                 getSink()->diagnose(forwardDiff, Diagnostics::functionNotMarkedAsDifferentiable, funcDecl, "backward");
+                            }
+                            if (!isEffectivelyStatic(funcDecl) && !isGlobalDecl(funcDecl))
+                            {
+                                getSink()->diagnose(forwardDiff, Diagnostics::nonStaticMemberFunctionNotAllowedAsDiffOperand, funcDecl);
                             }
                         }
                     }

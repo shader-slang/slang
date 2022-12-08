@@ -44,15 +44,16 @@ struct VOut_0
 
 void main()
 {
-    GIn_0 _S4 = GIn_0(_S1, F_0(_S2, _S3));
+    F_0 _S4 = { _S2, _S3 };
+    GIn_0 _S5 = { _S1, _S4 };
 
     VOut_0 vout_0;
-    vec3 _S5 = _S4.p0_0;
+    vec3 _S6 = _S5.p0_0;
 
-    float _S6 = F_get_0(_S4.field_0);
-    float _S7 = E_get_0();
+    float _S7 = F_get_0(_S5.field_0);
+    float _S8 = E_get_0();
 
-    vout_0.projPos_0 = vec4(_S5, _S6 + _S7);
+    vout_0.projPos_0 = vec4(_S6, _S7 + _S8);
     gl_Position = vout_0.projPos_0;
     return;
 }

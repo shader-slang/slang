@@ -193,6 +193,7 @@ struct ASTIterator
         void visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->originalExpr);
         }
 
         void visitDeclRefExpr(DeclRefExpr* expr)
@@ -436,6 +437,15 @@ void ASTIterator<CallbackFunc>::visitDecl(DeclBase* decl)
         for (auto member : container->members)
         {
             visitDecl(member);
+        }
+    }
+    for (auto modifier : decl->modifiers)
+    {
+        if (auto attr = as<Attribute>(modifier))
+        {
+            maybeDispatchCallback(attr);
+            for (auto arg : attr->args)
+                visitExpr(arg);
         }
     }
 }

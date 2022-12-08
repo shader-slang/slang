@@ -152,7 +152,7 @@ namespace Slang
             if (info->valueField)
             {
                 List<IRInst*> operands;
-                operands.add(builder->emitConstructorInst(info->valueType, 0, nullptr));
+                operands.add(builder->emitDefaultConstruct(info->valueType));
                 operands.add(inst->getErrorValue());
                 auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
                 inst->replaceUsesWith(makeStruct);

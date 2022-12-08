@@ -57,9 +57,9 @@ Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr)
 UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
 {
     if (as<ForwardDifferentiateExpr>(expr))
-        return UnownedStringSlice("fwd_diff");
+        return UnownedStringSlice("__fwd_diff");
     else if (as<BackwardDifferentiateExpr>(expr))
-        return UnownedStringSlice("bwd_diff");
+        return UnownedStringSlice("__bwd_diff");
     return UnownedStringSlice();
 }
 }
