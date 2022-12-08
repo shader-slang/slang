@@ -96,6 +96,13 @@ __generic<T: IDifferentiable>
 __intrinsic_op($(kIROp_MakeDifferentialPair))
 DifferentialPair<T> diffPair(T primal, T.Differential diff);
 
+__generic<T: IDifferentiable>
+[ForceInline]
+DifferentialPair<T> diffPair(T primal)
+{
+    return diffPair(primal, T.dzero());
+}
+
 [ForceInline]
 void updatePrimal<T : IDifferentiable>(inout DifferentialPair<T> p, T newPrimal)
 {
