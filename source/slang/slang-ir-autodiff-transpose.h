@@ -723,19 +723,19 @@ struct DiffTransposePass
                 // Special-case for when the swizzled output is a single element.
                 if (fwdSwizzleInst->getElementCount() == 1)
                 {
-                    constructArgs[targetIndex] = gradient.revGradInst;
+                    constructArgs[(Index)targetIndex] = gradient.revGradInst;
                 }
                 else
                 {
                     auto gradAtIndex = builder->emitElementExtract(elementType, gradient.revGradInst, builder->getIntValue(builder->getIntType(), sourceIndex));
-                    constructArgs[targetIndex] = gradAtIndex;
+                    constructArgs[(Index)targetIndex] = gradAtIndex;
                 }
             }
 
             simpleGradients.add(
                 RevGradient(
                     gradient.targetInst,
-                    builder->emitMakeVector(baseType, elementCount, constructArgs.getBuffer()),
+                    builder->emitMakeVector(baseType, (UInt)elementCount, constructArgs.getBuffer()),
                     gradient.fwdGradInst));
         }
 
