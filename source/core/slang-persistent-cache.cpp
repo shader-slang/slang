@@ -243,7 +243,7 @@ SlangResult PersistentCache::readIndex(const String& fileName, CacheIndex& outIn
 
     // Get file size.
     SLANG_RETURN_ON_FAIL(fs.seek(SeekOrigin::End, 0));
-    size_t fileSize = fs.getPosition();
+    size_t fileSize = (size_t)fs.getPosition();
     SLANG_RETURN_ON_FAIL(fs.seek(SeekOrigin::Start, 0));
 
     CacheIndexHeader header;
