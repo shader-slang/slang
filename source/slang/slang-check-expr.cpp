@@ -2136,9 +2136,9 @@ namespace Slang
                 type->paramTypes.add(derivType);
             }
         }
-
+        
         // Last parameter is the initial derivative of the original return type
-        type->paramTypes.add(originalType->resultType);
+        type->paramTypes.add(getDifferentialType(m_astBuilder, originalType->resultType, SourceLoc()));
 
         return type;
     }

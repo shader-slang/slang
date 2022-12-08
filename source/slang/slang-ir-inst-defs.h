@@ -735,7 +735,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// Used by the auto-diff pass to mark insts that compute
         /// a differential value.
-    INST(DifferentialInstDecoration, diffInstDecoration, 0, 0)
+    INST(DifferentialInstDecoration, diffInstDecoration, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.

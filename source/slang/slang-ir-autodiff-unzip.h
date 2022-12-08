@@ -83,15 +83,11 @@ struct DiffUnzipPass
 
             if (isDifferentialInst(child) || as<IRTerminatorInst>(child))
             {
-                auto newInst = cloneInst(&cloneEnv, &diffBuilder, child);
-                child->replaceUsesWith(newInst);
-                child->removeAndDeallocate();
+                child->insertAtEnd(diffBlock);
             }
             else
             {
-                auto newInst = cloneInst(&cloneEnv, &primalBuilder, child);
-                child->replaceUsesWith(newInst);
-                child->removeAndDeallocate();
+                child->insertAtEnd(primalBlock);
             }
 
             child = nextChild;

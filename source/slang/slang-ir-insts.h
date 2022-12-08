@@ -603,7 +603,11 @@ struct IRDifferentialInstDecoration : IRDecoration
     {
         kOp = kIROp_DifferentialInstDecoration
     };
+
+    IRUse primalType;
     IR_LEAF_ISA(DifferentialInstDecoration)
+
+    IRType* getPrimalType() { return as<IRType>(getOperand(0)); }
 };
 
 struct IRBackwardDifferentiableDecoration : IRDecoration
@@ -3370,7 +3374,12 @@ public:
 
     void markInstAsDifferential(IRInst* value)
     {
-        addDecoration(value, kIROp_DifferentialInstDecoration);
+        addDecoration(value, kIROp_DifferentialInstDecoration, nullptr);
+    }
+
+    void markInstAsDifferential(IRInst* value, IRType* primalType)
+    {
+        addDecoration(value, kIROp_DifferentialInstDecoration, primalType);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)
