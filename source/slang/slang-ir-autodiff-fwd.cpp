@@ -847,14 +847,15 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
                 if (!diffArg)
                     diffArg = getDifferentialZeroOfType(builder, primalType);
 
-            // If a pair type can be formed, this must be non-null.
-            SLANG_RELEASE_ASSERT(diffArg);
-            
-            auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
-            builder->markInstAsDifferential(diffPair, pairType);
+                // If a pair type can be formed, this must be non-null.
+                SLANG_RELEASE_ASSERT(diffArg);
+                
+                auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
+                builder->markInstAsDifferential(diffPair, pairType);
 
-            args.add(diffPair);
-            continue;
+                args.add(diffPair);
+                continue;
+            }
         }
         // Argument is not differentiable.
         // Add original/primal argument.

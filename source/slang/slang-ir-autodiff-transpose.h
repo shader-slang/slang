@@ -310,8 +310,8 @@ struct DiffTransposePass
             case kIROp_DifferentialPairGetDifferential:
                 return transposeGetDifferential(builder, as<IRDifferentialPairGetDifferential>(fwdInst), revValue);
             
-            case kIROp_Construct:
-                return transposeConstruct(builder, fwdInst, revValue);
+            case kIROp_MakeVector:
+                return transposeMakeVector(builder, fwdInst, revValue);
 
             default:
                 SLANG_ASSERT_FAILURE("Unhandled instruction");
@@ -420,24 +420,24 @@ struct DiffTransposePass
                             fwdGetDiff)));
     }
 
-    TranspositionResult transposeConstruct(IRBuilder* builder, IRInst* fwdConstruct, IRInst* revValue)
+    TranspositionResult transposeMakeVector(IRBuilder* builder, IRInst* fwdMakeVector, IRInst* revValue)
     {
         // For now, we support only vector types. Extend this to other built-in types if necessary.
-        SLANG_ASSERT(as<IRVectorType>(fwdConstruct->getDataType()));
+        SLANG_ASSERT(fwdMakeVector->getOp() == kIROp_MakeVector);
 
         List<RevGradient> gradients;
-        for (UIndex ii = 0; ii < fwdConstruct->getOperandCount(); ii++)
+        for (UIndex ii = 0; ii < fwdMakeVector->getOperandCount(); ii++)
         {
             auto gradAtIndex = builder->emitElementExtract(
-                fwdConstruct->getOperand(ii)->getDataType(),
+                fwdMakeVector->getOperand(ii)->getDataType(),
                 revValue,
                 builder->getIntValue(builder->getIntType(), ii));
 
             gradients.add(RevGradient(
                             RevGradient::Flavor::Simple,
-                            fwdConstruct->getOperand(ii),
+                            fwdMakeVector->getOperand(ii),
                             gradAtIndex,
-                            fwdConstruct));
+                            fwdMakeVector));
         }
 
         // (A = float3(X, Y, Z)) -> [(dX += dA), (dY += dA), (dZ += dA)]
@@ -529,7 +529,7 @@ struct DiffTransposePass
                 operands.add(inst);
             }
 
-            IRInst* newInst = builder->emitConstructorInst(targetType, operands.getCount(), operands.getBuffer());
+            IRInst* newInst = builder->emitMakeVector(targetType, operands.getCount(), operands.getBuffer());
             
             if (isDifferentialInst(inst))
                 builder->markInstAsDifferential(newInst);
@@ -735,7 +735,7 @@ struct DiffTransposePass
             simpleGradients.add(
                 RevGradient(
                     gradient.targetInst,
-                    builder->emitConstructorInst(baseType, elementCount, constructArgs.getBuffer()),
+                    builder->emitMakeVector(baseType, elementCount, constructArgs.getBuffer()),
                     gradient.fwdGradInst));
         }
 
