@@ -1778,7 +1778,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
-    case kIROp_MakeMatrixFromScalar:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
     case kIROp_CastFloatToInt:
@@ -1788,6 +1787,25 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         // Simple constructor call
         emitType(inst->getDataType());
         emitArgs(inst);
+        break;
+    case kIROp_MakeMatrixFromScalar:
+        {
+            emitType(inst->getDataType());
+            auto matrixType = as<IRMatrixType>(inst->getDataType());
+            SLANG_RELEASE_ASSERT(matrixType);
+            auto columnCount = as<IRIntLit>(matrixType->getColumnCount());
+            SLANG_RELEASE_ASSERT(columnCount);
+            auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+            SLANG_RELEASE_ASSERT(rowCount);
+            m_writer->emit("(");
+            for (IRIntegerValue i = 0; i < rowCount->getValue() * columnCount->getValue(); i++)
+            {
+                if (i != 0)
+                    m_writer->emit(", ");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+        }
         break;
     case kIROp_AllocObj:
         m_writer->emit("new ");

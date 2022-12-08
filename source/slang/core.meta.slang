@@ -93,7 +93,11 @@ interface __BuiltinArithmeticType : __BuiltinType
 /// A type that can be used for logical/bitwise operations
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType {}
+interface __BuiltinLogicalType : __BuiltinType
+{
+        /// Initialize from a 32-bit signed integer value.
+    __init(int value);
+}
 
 /// A type that logically has a sign (positive/negative/zero)
 [sealed]
