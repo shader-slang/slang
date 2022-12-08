@@ -223,14 +223,9 @@ namespace Slang
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
     }
 
-    void EntryPoint::updateDependencyBasedHash(
-        DigestBuilder<MD5>& builder,
-        SlangInt entryPointIndex)
+    void EntryPoint::buildHash(DigestBuilder<SHA1>& builder)
     {
-        // CompositeComponentType will have already hashed the relevant entry point's name
-        // and file path dependencies, so we immediately return.
         SLANG_UNUSED(builder);
-        SLANG_UNUSED(entryPointIndex);
     }
 
     List<Module*> const& EntryPoint::getModuleDependencies()
@@ -301,12 +296,8 @@ namespace Slang
         return Super::getInterface(guid);
     }
 
-    void TypeConformance::updateDependencyBasedHash(
-        DigestBuilder<MD5>& builder,
-        SlangInt entryPointIndex)
+    void TypeConformance::buildHash(DigestBuilder<SHA1>& builder)
     {
-        SLANG_UNUSED(entryPointIndex);
-
         //TODO: Implement some kind of hashInto for Val then replace this
         auto subtypeWitness = m_subtypeWitness->toString();
 

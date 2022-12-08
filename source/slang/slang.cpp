@@ -1320,9 +1320,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     return SLANG_OK;
 }
 
-void Linkage::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt targetIndex)
+void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
 {
     // Add the Slang compiler version to the hash
     auto version = String(getBuildTagString());
@@ -1346,20 +1344,14 @@ void Linkage::updateDependencyBasedHash(
     // Add the target specified by targetIndex
     auto targetReq = targets[targetIndex];
     builder.append(targetReq->getTarget());
+    builder.append(targetReq->getTargetProfile().raw);
     builder.append(targetReq->getTargetFlags());
     builder.append(targetReq->getFloatingPointMode());
     builder.append(targetReq->getLineDirectiveMode());
-    builder.append(targetReq->shouldDumpIntermediates());
     builder.append(targetReq->getForceGLSLScalarBufferLayout());
+    builder.append(targetReq->getDefaultMatrixLayoutMode());
+    builder.append(targetReq->shouldDumpIntermediates());
     builder.append(targetReq->shouldTrackLiveness());
-
-    auto targetProfile = targetReq->getTargetProfile();
-    builder.append(targetProfile.getStage());
-    builder.append(targetProfile.getVersion());
-    builder.append(targetProfile.getFamily());
-
-    auto targetProfileName = String(targetProfile.getName());
-    builder.append(targetProfileName);
 
     auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
     for (auto& capability : cookedCapabilities)
@@ -1367,8 +1359,24 @@ void Linkage::updateDependencyBasedHash(
         builder.append(capability);
     }
 
+    const PassThroughMode passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
+    const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
+
+    // Add prelude for the given downstream compiler.
+    ComPtr<ISlangBlob> prelude;
+    getGlobalSession()->getLanguagePrelude((SlangSourceLanguage)sourceLanguage, prelude.writeRef());
+    if (prelude)
+    {
+        builder.append(prelude);
+    }
+
+    // TODO: Downstream compilers (specifically dxc) can currently #include additional dependencies.
+    // This is currently the case for NVAPI headers included in the prelude.
+    // These dependencies are currently not picked up by the shader cache which is a significant issue.
+    // This can only be fixed by running the preprocessor in the slang compiler so dxc (or any other
+    // downstream compiler for that matter) isn't resolving any includes implicitly.
+
     // Add the downstream compiler version (if it exists) to the hash
-    auto passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
     auto downstreamCompiler = getSessionImpl()->getOrLoadDownstreamCompiler(passThroughMode, nullptr);
     if (downstreamCompiler)
     {
@@ -3229,64 +3237,14 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
     return Super::getInterface(guid);
 }
 
-void Module::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt entryPointIndex)
+void Module::buildHash(DigestBuilder<SHA1>& builder)
 {
-    // CompositeComponentType will have already hashed this Module's file
-    // dependencies.
-    SLANG_UNUSED(builder);
-    SLANG_UNUSED(entryPointIndex);
-}
-
-void Module::updateContentsBasedHash(DigestBuilder<MD5>& builder)
-{
-    auto filePathDependencies = getFilePathDependencies();
-
-    DigestBuilder<MD5> lastModifiedBuilder;
-    auto statFailed = false;
-    for (auto file : filePathDependencies)
+    for (SourceFile* sourceFile : getFileDependencies())
     {
-        struct stat fileStatus;
-        auto res = stat(file.getBuffer(), &fileStatus);
-        if (res != 0)
-        {
-            statFailed = true;
-            break;
-        }
-        lastModifiedBuilder.append(fileStatus.st_mtime);
+        // TODO: We want to lazily evaluate & cache the source file digest
+        SHA1::Digest digest = SHA1::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
+        builder.append(digest);
     }
-
-    MD5::Digest temp = lastModifiedBuilder.finalize();
-    if (statFailed || temp != lastModifiedDigest)
-    {
-        // Either a stat() call failed, or changes were made to at least one of the file dependencies,
-        // so we will need to re-generate the contents digest and save the new digest.
-        DigestBuilder<MD5> contentsBuilder;
-        for (auto file : filePathDependencies)
-        {
-            List<uint8_t> fileContents;
-            if (SLANG_FAILED(File::readAllBytes(file, fileContents)))
-            {
-                // Failure to read the file means this is a digest for the contents of a source
-                // file which does not live on disk.
-                contentsBuilder.append(file);
-            }
-            else
-            {
-                contentsBuilder.append(fileContents);
-            }
-        }
-        contentsDigest = contentsBuilder.finalize();
-        if (!statFailed)
-        {
-            // If no stat() calls failed, then we have a valid last modified digest and should
-            // update the one we have saved.
-            lastModifiedDigest = temp;
-        }
-    }
-
-    builder.append(contentsDigest);
 }
 
 void Module::addModuleDependency(Module* module)
@@ -3487,12 +3445,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
-SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
+SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
     slang::IBlob** outHash)
 {
-    DigestBuilder<MD5> builder;
+    DigestBuilder<SHA1> builder;
 
     // A note on enums that may be hashed in as part of the following two function calls:
     //
@@ -3500,16 +3458,8 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     // the compiler, part of hashing the linkage is hashing in the compiler version.
     // Consequently, any encoding differences as a result of different compiler versions
     // will already be reflected in the resulting hash.
-    getLinkage()->updateDependencyBasedHash(builder, targetIndex);
-    updateDependencyBasedHash(builder, entryPointIndex);
-
-    // Add file path dependencies to the hash - all child components
-    // will have file path dependencies that are a subset of this list.
-    auto fileDeps = getFilePathDependencies();
-    for (auto& file : fileDeps)
-    {
-        builder.append(file);
-    }
+    getLinkage()->buildHash(builder, targetIndex);
+    buildHash(builder);
 
     // Add the name and name override for the specified entry point
     // to the hash.
@@ -3520,14 +3470,6 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
     builder.append(entryPointNameOverride);
 
-    auto hash = builder.finalize().toBlob();
-    *outHash = hash.detach();
-}
-
-SLANG_NO_THROW void SLANG_MCALL ComponentType::computeContentsBasedHash(slang::IBlob** outHash)
-{
-    DigestBuilder<MD5> builder;
-    updateContentsBasedHash(builder);
     auto hash = builder.finalize().toBlob();
     *outHash = hash.detach();
 }
@@ -3864,25 +3806,13 @@ CompositeComponentType::CompositeComponentType(
     }
 }
 
-void CompositeComponentType::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt entryPointIndex)
+void CompositeComponentType::buildHash(DigestBuilder<SHA1>& builder)
 {
     auto componentCount = getChildComponentCount();
 
     for (Index i = 0; i < componentCount; ++i)
     {
-        getChildComponent(i)->updateDependencyBasedHash(builder, entryPointIndex);
-    }
-}
-
-void CompositeComponentType::updateContentsBasedHash(DigestBuilder<MD5>& builder)
-{
-    auto componentCount = getChildComponentCount();
-
-    for (Index i = 0; i < componentCount; ++i)
-    {
-        getChildComponent(i)->updateContentsBasedHash(builder);
+        getChildComponent(i)->buildHash(builder);
     }
 }
 
@@ -4365,9 +4295,7 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
-void SpecializedComponentType::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt entryPointIndex)
+void SpecializedComponentType::buildHash(DigestBuilder<SHA1>& builder)
 {
     auto specializationArgCount = getSpecializationArgCount();
     for (Index i = 0; i < specializationArgCount; ++i)
@@ -4377,7 +4305,7 @@ void SpecializedComponentType::updateDependencyBasedHash(
         builder.append(argString);
     }
 
-    getBaseComponentType()->updateDependencyBasedHash(builder, entryPointIndex);
+    getBaseComponentType()->buildHash(builder);
 }
 
 void SpecializedComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -4424,13 +4352,8 @@ void RenamedEntryPointComponentType::acceptVisitor(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
 }
 
-void RenamedEntryPointComponentType::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt entryPointIndex)
+void RenamedEntryPointComponentType::buildHash(DigestBuilder<SHA1>& builder)
 {
-    // CompositeComponentType will have already hashed the name override and file
-    // dependencies for this entry point.
-    SLANG_UNUSED(entryPointIndex);
     SLANG_UNUSED(builder);
 }
 

@@ -294,13 +294,12 @@ namespace Slang
             slang::IBlob**          outDiagnostics) SLANG_OVERRIDE;
 
             /// ComponentType is the only class inheriting from IComponentType that provides a
-            /// meaningful implementation for these two functions. All others should forward these
-            /// and implement updateDependencyBasedHash and updateASTBasedHash instead.
-        SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+            /// meaningful implementation for this function. All others should forward these and
+            /// implement `buildHash`.
+        SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE;
-        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::IBlob** outHash) SLANG_OVERRIDE;
 
             /// Get the linkage (aka "session" in the public API) for this component type.
         Linkage* getLinkage() { return m_linkage; }
@@ -311,14 +310,7 @@ namespace Slang
         TargetProgram* getTargetProgram(TargetRequest* target);
 
             /// Update the hash builder with the dependencies for this component type. 
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) = 0;
-
-            /// Update the hash builder with the source contents for this component type.
-            /// Module should be the only derived ComponentType class which has a meaningful
-            /// implementation; all others should do nothing.
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) = 0;
+        virtual void buildHash(DigestBuilder<SHA1>& builder) = 0;
 
             /// Get the number of entry points linked into this component type.
         virtual Index getEntryPointCount() = 0;
@@ -517,11 +509,7 @@ namespace Slang
             Linkage*                            linkage,
             List<RefPtr<ComponentType>> const&  childComponents);
 
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override;
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
         List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
         Index getChildComponentCount() { return m_childComponents.getCount(); }
@@ -599,14 +587,7 @@ namespace Slang
             List<SpecializationArg> const&  specializationArgs,
             DiagnosticSink*                 sink);
 
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override
-        {
-            SLANG_UNUSED(hashBuilder);
-        }
+        virtual void buildHash(DigestBuilder<SHA1>& builer) SLANG_OVERRIDE;
 
             /// Get the base (unspecialized) component type that is being specialized.
         RefPtr<ComponentType> getBaseComponentType() { return m_base; }
@@ -792,14 +773,7 @@ namespace Slang
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
             SLANG_OVERRIDE;
 
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override
-        {
-            SLANG_UNUSED(hashBuilder);
-        }
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
     private:
         RefPtr<ComponentType> m_base;
@@ -893,27 +867,15 @@ namespace Slang
             return Super::getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+        SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE
         {
-            return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
+            return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::IBlob** outHash) SLANG_OVERRIDE
-        {
-            return Super::computeContentsBasedHash(outHash);
-        }
-
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override
-        {
-            SLANG_UNUSED(hashBuilder);
-        }
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
@@ -1120,27 +1082,15 @@ namespace Slang
                 entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+        SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE
         {
-            return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
+            return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::IBlob** outHash) SLANG_OVERRIDE
-        {
-            return Super::computeContentsBasedHash(outHash);
-        }
-
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override
-        {
-            SLANG_UNUSED(hashBuilder);
-        }
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
         List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE;
@@ -1316,24 +1266,15 @@ namespace Slang
 
         //
 
-        SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+        SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE
         {
-            return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
+            return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::IBlob** outHash) SLANG_OVERRIDE
-        {
-            return Super::computeContentsBasedHash(outHash);
-        }
-
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override;
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
             /// Create a module (initially empty).
         Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);
@@ -1476,9 +1417,6 @@ namespace Slang
         // and m_mangledExportSymbols holds the NodeBase* values for each index. 
         StringSlicePool m_mangledExportPool;
         List<NodeBase*> m_mangledExportSymbols;
-
-        MD5::Digest lastModifiedDigest;
-        MD5::Digest contentsDigest;
     };
     typedef Module LoadedModule;
 
@@ -1770,12 +1708,10 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) override;
 
-        // Updates the supplied has builder with linkage-related information, which includes preprocessor
+        // Updates the supplied builder with linkage-related information, which includes preprocessor
         // defines, the compiler version, and other compiler options. This is then merged with the hash
         // produced for the program to produce a key that can be used with the shader cache.
-        void updateDependencyBasedHash(
-            DigestBuilder<MD5>& builder,
-            SlangInt targetIndex);
+        void buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex);
 
         void addTarget(
             slang::TargetDesc const& desc);
