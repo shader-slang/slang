@@ -519,7 +519,7 @@ struct DiffTransposePass
         case kIROp_VectorType:
         {
             // current type should be a scalar.
-            SLANG_ASSERT(!as<IRVectorType>(currentType->getDataType()));
+            SLANG_RELEASE_ASSERT(!as<IRVectorType>(currentType->getDataType()));
 
             auto targetVectorType = as<IRVectorType>(targetType);
             
