@@ -419,7 +419,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-include.h" />
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\open-gl\render-gl.h" />
-    <ClInclude Include="..\..\..\tools\gfx\persistent-shader-cache.h" />
     <ClInclude Include="..\..\..\tools\gfx\renderer-shared.h" />
     <ClInclude Include="..\..\..\tools\gfx\resource-desc-utils.h" />
     <ClInclude Include="..\..\..\tools\gfx\simple-render-pass-layout.h" />
@@ -530,7 +529,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClCompile Include="..\..\..\tools\gfx\immediate-renderer-base.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\nvapi\nvapi-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\open-gl\render-gl.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\persistent-shader-cache.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\render.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\renderer-shared.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\resource-desc-utils.cpp" />
