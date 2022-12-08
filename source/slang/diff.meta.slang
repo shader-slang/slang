@@ -92,6 +92,10 @@ struct DifferentialPair : IDifferentiable
     }
 };
 
+__generic<T: IDifferentiable>
+__intrinsic_op($(kIROp_MakeDifferentialPair))
+DifferentialPair<T> diffPair(T primal, T.Differential diff);
+
 [ForceInline]
 void updatePrimal<T : IDifferentiable>(inout DifferentialPair<T> p, T newPrimal)
 {
