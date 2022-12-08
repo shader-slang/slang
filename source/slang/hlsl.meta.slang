@@ -2715,7 +2715,7 @@ T mul(vector<T, N> x, vector<T, N> y)
 }
 
 // vector-matrix
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
@@ -2732,9 +2732,43 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
     }
     return result;
 }
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
+{
+    vector<T,M> result;
+    for( int j = 0; j < M; ++j )
+    {
+        T sum = T(0);
+        for( int i = 0; i < N; ++i )
+        {
+            sum += left[i] * right[i][j];
+        }
+        result[j] = sum;
+    }
+    return result;
+}
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
+{
+    vector<T,M> result;
+    for( int j = 0; j < M; ++j )
+    {
+        T sum = T(0);
+        for( int i = 0; i < N; ++i )
+        {
+            sum |= left[i] & right[i][j];
+        }
+        result[j] = sum;
+    }
+    return result;
+}
 
 // matrix-vector
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
@@ -2751,10 +2785,43 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
     }
     return result;
 }
-
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
+{
+    vector<T,N> result;
+    for( int i = 0; i < N; ++i )
+    {
+        T sum = T(0);
+        for( int j = 0; j < M; ++j )
+        {
+            sum += left[i][j] * right[j];
+        }
+        result[i] = sum;
+    }
+    return result;
+}
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
+{
+    vector<T,N> result;
+    for( int i = 0; i < N; ++i )
+    {
+        T sum = T(0);
+        for( int j = 0; j < M; ++j )
+        {
+            sum |= left[i][j] & right[j];
+        }
+        result[i] = sum;
+    }
+    return result;
+}
 
 // matrix-matrix
-__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int>
+__generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
@@ -2767,6 +2834,42 @@ matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
         for( int i = 0; i < N; ++i )
         {
             sum += left[r][i] * right[i][c];
+        }
+        result[r][c] = sum;
+    }
+    return result;
+}
+__generic<T : __BuiltinIntegerType, let R : int, let N : int, let C : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
+{
+    matrix<T,R,C> result;
+    for( int r = 0; r < R; ++r)
+    for( int c = 0; c < C; ++c)
+    {
+        T sum = T(0);
+        for( int i = 0; i < N; ++i )
+        {
+            sum += left[r][i] * right[i][c];
+        }
+        result[r][c] = sum;
+    }
+    return result;
+}
+__generic<T : __BuiltinLogicalType, let R : int, let N : int, let C : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
+{
+    matrix<T,R,C> result;
+    for( int r = 0; r < R; ++r)
+    for( int c = 0; c < C; ++c)
+    {
+        T sum = T(0);
+        for( int i = 0; i < N; ++i )
+        {
+            sum |= left[r][i] & right[i][c];
         }
         result[r][c] = sum;
     }
