@@ -192,7 +192,7 @@ namespace Slang
         UInt operandCount = inst->getOperandCount();
         for (UInt ii = 0; ii < operandCount; ++ii)
         {
-            validateIRInstOperand(context, inst, inst->getOperands() + ii);
+            validateIRInstOperand(context, inst, inst->getRawOperands() + ii);
         }
     }
 

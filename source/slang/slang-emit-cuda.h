@@ -78,7 +78,7 @@ protected:
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
-    virtual void emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual void emitCall(const HLSLIntrinsic* specOp, IRInst* inst, IROperandListBase operands, int numOperands, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitFunctionPreambleImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual String generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
 
@@ -104,7 +104,7 @@ protected:
 
     SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
-    void _emitInitializerList(IRType* elementType, IRUse* operands, Index operandCount);
+    void _emitInitializerList(IRType* elementType, IROperandListBase operands, Index operandCount);
     void _emitInitializerListValue(IRType* elementType, IRInst* value);
 
     void _emitGetHalfVectorElement(IRInst* baseInst, Index index, Index vecSize, const EmitOpInfo& inOuterPrec);

@@ -39,7 +39,7 @@ public:
     };
 
     virtual void useType(IRType* type);
-    virtual void emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec);
+    virtual void emitCall(const HLSLIntrinsic* specOp, IRInst* inst, IROperandListBase operands, int numOperands, const EmitOpInfo& inOuterPrec);
     virtual void emitTypeDefinition(IRType* type);
     virtual void emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
     

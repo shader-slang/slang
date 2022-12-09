@@ -1364,7 +1364,7 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* s
     SLANG_ASSERT(!"Unhandled");
 }
 
-void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
+void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, IROperandListBase operands, int numOperands, const EmitOpInfo& inOuterPrec)
 {
     typedef HLSLIntrinsic::Op Op;
 
@@ -1383,7 +1383,7 @@ void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const
                 writer->emit(_getTypeName(retType));
                 writer->emitChar('(');
 
-                emitOperand(operands[0].get(), getInfo(EmitOp::General));
+                emitOperand(operands[0], getInfo(EmitOp::General));
 
                 writer->emitChar(')');
                 return;
@@ -1476,7 +1476,7 @@ void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const
                 {
                     writer->emit(", ");
                 }
-                emitOperand(operands[i].get(), getInfo(EmitOp::General));
+                emitOperand(operands[i], getInfo(EmitOp::General));
             }
 
             writer->emitChar(')');
@@ -2207,7 +2207,7 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
         SLANG_ASSERT(argCount == 2 || argCount == 3);
 
         // If the first item is either a matrix or a vector, we use 'getAt' logic
-        IRType* targetType = args[0].get()->getDataType();
+        IRType* targetType = args[0]->getDataType();
         if (targetType->getOp() == kIROp_VectorType || targetType->getOp() == kIROp_MatrixType)
         {
             // Work out the intrinsic used
@@ -2249,9 +2249,9 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
             {
                 auto prec = getInfo(EmitOp::Postfix);
                 bool needCloseSubscript = maybeEmitParens(_outerPrec, prec);
-                emitOperand(args[0].get(), leftSide(_outerPrec, prec));
+                emitOperand(args[0], leftSide(_outerPrec, prec));
                 m_writer->emit("[");
-                emitOperand(args[1].get(), getInfo(EmitOp::General));
+                emitOperand(args[1], getInfo(EmitOp::General));
                 m_writer->emit("]");
                 maybeCloseParens(needCloseSubscript);
             };
@@ -2268,7 +2268,7 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
             if (argCount == 3)
             {
                 m_writer->emit(" = ");
-                emitOperand(args[2].get(), getInfo(EmitOp::General));
+                emitOperand(args[2], getInfo(EmitOp::General));
             }
         }
 

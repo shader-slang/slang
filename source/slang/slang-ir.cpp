@@ -108,6 +108,22 @@ namespace Slang
         return kIROps[kIROpCount].info;
     }
 
+    IRInst* unwrapAttributedOperand(IRInst* operand)
+    {
+        for (;;)
+        {
+            if (auto attrOp = as<IRAttributedOperand>(operand))
+            {
+                operand = attrOp->getRawOperand(0);
+            }
+            else
+            {
+                break;
+            }
+        }
+        return operand;
+    }
+
     IROp findIROp(const UnownedStringSlice& name)
     {
         for (auto ee : kIROps)
@@ -143,6 +159,20 @@ namespace Slang
             u = u->nextUse;
         }
 #endif
+    }
+
+    IRInst* IRUse::getUser() const
+    {
+        auto rawUser = getRawUser();
+        while (rawUser && rawUser->getOp() == kIROp_AttributedOperand)
+        {
+            SLANG_ASSERT(!rawUser->firstUse || rawUser->firstUse->nextUse == nullptr);
+            if (rawUser->firstUse)
+                rawUser = rawUser->firstUse->getRawUser();
+            else
+                rawUser = nullptr;
+        }
+        return rawUser;
     }
 
     void IRUse::init(IRInst* u, IRInst* v)
@@ -220,7 +250,7 @@ namespace Slang
 
     //
 
-    IRUse* IRInst::getOperands()
+    IRUse* IRInst::getRawOperands()
     {
         // We assume that *all* instructions are laid out
         // in memory such that their arguments come right
@@ -230,6 +260,11 @@ namespace Slang
         // this more robust.
 
         return (IRUse*)(this + 1);
+    }
+
+    IROperandListBase IRInst::getOperands()
+    {
+        return IROperandListBase((IRUse*)(this + 1), (IRUse*)(this + 1 + getOperandCount()));
     }
 
     IRDecoration* IRInst::findDecorationImpl(IROp decorationOp)
@@ -249,11 +284,11 @@ namespace Slang
         //
         // We will therefore define a range that ends at the end of the operand list ...
         //
-        IRUse* end = getOperands() + getOperandCount();
+        IRUse* end = getRawOperands() + getOperandCount();
         //
         // ... and begins after the last non-attribute operand.
         //
-        IRUse* cursor = getOperands();
+        IRUse* cursor = getRawOperands();
         while(cursor != end && !as<IRAttr>(cursor->get()))
             cursor++;
 
@@ -493,7 +528,7 @@ namespace Slang
         IRUse* end = nullptr;
         UInt stride = 1;
 
-        auto operands = terminator->getOperands();
+        auto operands = terminator->getRawOperands();
         switch (terminator->getOp())
         {
         case kIROp_Return:
@@ -653,7 +688,7 @@ namespace Slang
 
     IRBlock* IRBlock::SuccessorList::Iterator::operator*()
     {
-        return (IRBlock*)use->get();
+        return cast<IRBlock>(use->get());
     }
 
     UInt IRUnconditionalBranch::getArgCount()
@@ -672,7 +707,7 @@ namespace Slang
         }
     }
 
-    IRUse* IRUnconditionalBranch::getArgs()
+    IROperandListBase IRUnconditionalBranch::getArgs()
     {
         switch(getOp())
         {
@@ -690,7 +725,7 @@ namespace Slang
 
     IRInst* IRUnconditionalBranch::getArg(UInt index)
     {
-        return getArgs()[index].usedValue;
+        return getArgs()[index];
     }
 
     IRParam* IRGlobalValueWithParams::getFirstParam()
@@ -1478,7 +1513,7 @@ namespace Slang
         UInt operandCount = inst->getOperandCount();
         for (UInt ii = 0; ii < operandCount; ++ii)
         {
-            auto operand = inst->getOperand(ii);
+            auto operand = inst->getRawOperand(ii);
             if (!operand)
                 continue;
 
@@ -1556,7 +1591,7 @@ namespace Slang
             //
             for (UInt ii = 0; ii < operandCount; ++ii)
             {
-                auto operand = inst->getOperand(ii);
+                auto operand = inst->getRawOperand(ii);
                 if (!operand)
                     continue;
 
@@ -1660,7 +1695,7 @@ namespace Slang
 
         _maybeSetSourceLoc(inst);
 
-        auto operand = inst->getOperands();
+        auto operand = inst->getRawOperands();
 
         for( Int aa = 0; aa < fixedArgCount; ++aa )
         {
@@ -1870,8 +1905,8 @@ namespace Slang
         if(left.inst->operandCount != right.inst->operandCount) return false;
 
         auto argCount = left.inst->operandCount;
-        auto leftArgs = left.inst->getOperands();
-        auto rightArgs = right.inst->getOperands();
+        auto leftArgs = left.inst->getRawOperands();
+        auto rightArgs = right.inst->getRawOperands();
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             if(leftArgs[aa].get() != rightArgs[aa].get())
@@ -1888,7 +1923,7 @@ namespace Slang
         code = combineHash(code, Slang::getHashCode(inst->getOperandCount()));
 
         auto argCount = inst->getOperandCount();
-        auto args = inst->getOperands();
+        auto args = inst->getRawOperands();
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             code = combineHash(code, Slang::getHashCode(args[aa].get()));
@@ -2336,7 +2371,7 @@ namespace Slang
 
         // Don't link up as we may free (if we already have this key)
         {
-            IRUse* operand = inst->getOperands();
+            IRUse* operand = inst->getRawOperands();
             for (UInt ii = 0; ii < operandListCount; ++ii)
             {
                 UInt listOperandCount = listOperandCounts[ii];
@@ -2374,7 +2409,7 @@ namespace Slang
 
             _maybeSetSourceLoc(inst);
 
-            IRUse*const operands = inst->getOperands();
+            IRUse*const operands = inst->getRawOperands();
             for (UInt i = 0; i < operandCount; ++i)
             {
                 IRUse& operand = operands[i];
@@ -2426,7 +2461,7 @@ namespace Slang
 
         // Don't link up as we may free (if we already have this key)
         {
-            IRUse* operand = inst->getOperands();
+            IRUse* operand = inst->getRawOperands();
             for (UInt ii = 0; ii < operandListCount; ++ii)
             {
                 UInt listOperandCount = listOperandCounts[ii];
@@ -2464,7 +2499,7 @@ namespace Slang
 
             _maybeSetSourceLoc(inst);
 
-            IRUse*const operands = inst->getOperands();
+            IRUse*const operands = inst->getRawOperands();
             for (UInt i = 0; i < operandCount; ++i)
             {
                 IRUse& operand = operands[i];
@@ -3593,7 +3628,7 @@ namespace Slang
         {
             if( element < makeTuple->getOperandCount() )
             {
-                return makeTuple->getOperand(element);
+                return makeTuple->getRawOperand(element);
             }
         }
 
@@ -4940,7 +4975,7 @@ namespace Slang
             break;
         case kIROp_ComPtrType:
             return emitIntrinsicInst(
-                getNativePtrType((IRType*)valueType->getOperand(0)), kIROp_GetNativePtr, 1, &value);
+                getNativePtrType((IRType*)valueType->getRawOperand(0)), kIROp_GetNativePtr, 1, &value);
             break;
         default:
             SLANG_UNEXPECTED("invalid operand type for `getNativePtr`.");
@@ -4973,7 +5008,7 @@ namespace Slang
             break;
         case kIROp_ComPtrType:
             return emitIntrinsicInst(
-                getPtrType(getNativePtrType((IRType*)managedPtrType->getOperand(0))), kIROp_GetManagedPtrWriteRef, 1, &ptrToManagedPtr);
+                getPtrType(getNativePtrType((IRType*)managedPtrType->getRawOperand(0))), kIROp_GetManagedPtrWriteRef, 1, &ptrToManagedPtr);
             break;
         default:
             SLANG_UNEXPECTED("invalid operand type for `getNativePtr`.");
@@ -5457,6 +5492,9 @@ namespace Slang
         if(as<IRConstant>(inst))
             return true;
 
+        if (as<IRAttributedOperand>(inst))
+            return true;
+
         // We are going to have a general rule that
         // a type should be folded into its use site,
         // which improves output in most cases, but
@@ -5649,7 +5687,7 @@ namespace Slang
         if (inst->getOp() == kIROp_Call && argCount > 0)
         {
             dump(context, " ");
-            auto argVal = inst->getOperand(ii++);
+            auto argVal = inst->getRawOperand(ii++);
             dumpOperand(context, argVal);
         }
 
@@ -5660,7 +5698,7 @@ namespace Slang
             if (!first)
                 dump(context, ", ");
 
-            auto argVal = inst->getOperand(ii);
+            auto argVal = inst->getRawOperand(ii);
 
             dumpOperand(context, argVal);
 
@@ -5994,8 +6032,8 @@ namespace Slang
         // All the operands must be equal
         for (Index i = 0; i < operandCountA; ++i)
         {
-            IRInst* operandA = a->getOperand(i);
-            IRInst* operandB = b->getOperand(i);
+            IRInst* operandA = a->getRawOperand(i);
+            IRInst* operandB = b->getRawOperand(i);
 
             if (!_isTypeOperandEqual(operandA, operandB))
             {
@@ -6214,6 +6252,20 @@ namespace Slang
         return type;
     }
 
+    IRAttr* IRInst::findOperandAttribute(UInt operandIndex, IROp attrOp)
+    {
+        for (auto operand = as<IRAttributedOperand>(getRawOperand(operandIndex)); operand;
+             operand = as<IRAttributedOperand>(operand->getRawOperand(0)))
+        {
+            for (auto attr : operand->getAllAttrs())
+            {
+                if (attr->getOp() == attrOp)
+                    return attr;
+            }
+        }
+        return nullptr;
+    }
+
     void IRInst::replaceUsesWith(IRInst* other)
     {
         // Safety check: don't try to replace something with itself.
@@ -6421,7 +6473,7 @@ namespace Slang
         typeUse.clear();
         for( UInt aa = 0; aa < operandCount; ++aa )
         {
-            IRUse& use = getOperands()[aa];
+            IRUse& use = getRawOperands()[aa];
             use.clear();
         }
     }

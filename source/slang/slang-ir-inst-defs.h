@@ -29,6 +29,8 @@ INST(Nop, nop, 0, 0)
         INST(NativeStringType, NativeString, 0, 0)
     INST_RANGE(StringTypeBase, StringType, NativeStringType)
 
+    INST(AttributedOperand, AttributedOperand, 0, 0)
+
     INST(CapabilitySetType, CapabilitySet, 0, 0)
 
     INST(DynamicType, DynamicType, 0, 0)

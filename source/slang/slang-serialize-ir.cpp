@@ -285,7 +285,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
 
             for (int j = 0; j < numOperands; ++j)
             {
-                const Ser::InstIndex dstInstIndex = getInstIndex(srcInst->getOperand(j));
+                const Ser::InstIndex dstInstIndex = getInstIndex(srcInst->getRawOperand(j));
                 dstOperands[j] = dstInstIndex;
             }
         }
@@ -884,7 +884,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
             const Ser::InstIndex* srcOperandIndices;
             const int numOperands = data.getOperands(srcInst, &srcOperandIndices);
 
-            auto dstOperands = dstInst->getOperands();
+            auto dstOperands = dstInst->getRawOperands();
 
             for (int j = 0; j < numOperands; j++)
             {

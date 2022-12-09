@@ -5,7 +5,7 @@
 
 namespace Slang {
 
-void IntrinsicExpandContext::emit(IRCall* inst, IRUse* args, Int argCount, const UnownedStringSlice& intrinsicText)
+void IntrinsicExpandContext::emit(IRCall* inst, IROperandListBase args, Int argCount, const UnownedStringSlice& intrinsicText)
 {
     m_args = args;
     m_argCount = argCount;
@@ -233,7 +233,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             Index argIndex = d - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
             m_writer->emit("(");
-            m_emitter->emitOperand(m_args[argIndex].get(), getInfo(EmitOp::General));
+            m_emitter->emitOperand(m_args[argIndex], getInfo(EmitOp::General));
             m_writer->emit(")");
         }
         break;
@@ -274,7 +274,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
-            IRType* type = m_args[argIndex].get()->getDataType();
+            IRType* type = m_args[argIndex]->getDataType();
             if (auto baseTextureType = as<IRTextureType>(type))
             {
                 type = baseTextureType->getElementType();
@@ -290,7 +290,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
-            IRType* type = m_args[argIndex].get()->getDataType();
+            IRType* type = m_args[argIndex]->getDataType();
             if (auto baseTextureType = as<IRTextureType>(type))
             {
                 type = baseTextureType->getElementType();
@@ -322,7 +322,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // texturing operation.
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
-            auto textureArg = m_args[0].get();
+            auto textureArg = m_args[0];
 
             if (auto baseTextureSamplerType = as<IRTextureSamplerType>(textureArg->getDataType()))
             {
@@ -345,7 +345,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 // the next argument to be a sampler to pair with it.
                 //
                 SLANG_RELEASE_ASSERT(m_argCount >= 2);
-                auto samplerArg = m_args[1].get();
+                auto samplerArg = m_args[1];
 
                 // We will emit GLSL code to construct the corresponding combined texture/sampler
                 // type from the separate pieces.
@@ -452,7 +452,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // we don't need to do any casting there as half is coerced to float without a problem.
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
-            auto textureArg = m_args[0].get();
+            auto textureArg = m_args[0];
             if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
             {
                 auto elementType = baseTextureType->getElementType();
@@ -485,7 +485,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // shape.
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
-            auto textureArg = m_args[0].get();
+            auto textureArg = m_args[0];
             IRType* elementType  = nullptr;
 
             if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
@@ -535,7 +535,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
-            auto vectorArg = m_args[argIndex].get();
+            auto vectorArg = m_args[argIndex];
             if (auto vectorType = as<IRVectorType>(vectorArg->getDataType()))
             {
                 auto elementCount = getIntVal(vectorType->getElementCount());
@@ -558,7 +558,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
-            auto arg = m_args[argIndex].get();
+            auto arg = m_args[argIndex];
             IRIntegerValue elementCount = 1;
             IRType* elementType = arg->getDataType();
             if (auto vectorType = as<IRVectorType>(elementType))
@@ -615,7 +615,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             Index argIndex = 0;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
-            auto arg = m_args[argIndex].get();
+            auto arg = m_args[argIndex];
             if (arg->getOp() == kIROp_ImageSubscript)
             {
                 m_writer->emit("imageA");
@@ -640,7 +640,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             Index argIndex = 0;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
-            auto arg = m_args[argIndex].get();
+            auto arg = m_args[argIndex];
             if (arg->getOp() == kIROp_ImageSubscript)
             {
                 if (m_emitter->getSourceLanguage() == SourceLanguage::GLSL)
@@ -734,7 +734,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             {
                 Index argIndex = 0;
                 SLANG_RELEASE_ASSERT(m_argCount > argIndex);
-                auto arg = m_args[argIndex].get();
+                auto arg = m_args[argIndex];
                 auto argLoad = as<IRLoad>(arg);
                 SLANG_RELEASE_ASSERT(argLoad);
 
@@ -766,7 +766,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         {
             Index argIndex = 0;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
-            auto arg = m_args[argIndex].get();
+            auto arg = m_args[argIndex];
             auto argType = arg->getDataType();
 
             const char* str = "";

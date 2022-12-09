@@ -17,7 +17,7 @@ struct IntrinsicExpandContext
     {
     }
 
-    void emit(IRCall* inst, IRUse* args, Int argCount, const UnownedStringSlice& intrinsicText);
+    void emit(IRCall* inst, IROperandListBase args, Int argCount, const UnownedStringSlice& intrinsicText);
     
 protected:
     const char* _emitSpecial(const char* cursor);
@@ -25,7 +25,7 @@ protected:
     SourceWriter* m_writer;
     UnownedStringSlice m_text;
     IRCall* m_callInst;
-    IRUse* m_args = nullptr;
+    IROperandListBase m_args;
     Int m_argCount = 0;
     Index m_openParenCount = 0;
     CLikeSourceEmitter* m_emitter;

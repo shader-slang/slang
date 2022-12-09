@@ -111,7 +111,7 @@ bool allUsesLeadToLoads(IRInst* inst)
 {
     for (auto u = inst->firstUse; u; u = u->nextUse)
     {
-        auto user = u->getUser();
+        auto user = u->getRawUser();
         switch (user->getOp())
         {
         default:
@@ -122,11 +122,12 @@ bool allUsesLeadToLoads(IRInst* inst)
 
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_AttributedOperand:
             {
                 // Sanity check: the address being used should
                 // be the base-address operand, and not the field
                 // key or index (this should never be a problem).
-                if (u != &user->getOperands()[0])
+                if (u != &user->getRawOperands()[0])
                     return false;
 
                 if (!allUsesLeadToLoads(user))
@@ -177,7 +178,7 @@ bool isPromotableVar(
 
     for (auto u = var->firstUse; u; u = u->nextUse)
     {
-        auto user = u->getUser();
+        auto user = u->getRawUser();
         switch (user->getOp())
         {
         default:
@@ -213,11 +214,12 @@ bool isPromotableVar(
 
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_AttributedOperand:
             {
                 // Sanity check: the address being used should
                 // be the base-address operand, and not the field
                 // key or index (this should never be a problem).
-                if (u != &user->getOperands()[0])
+                if (u != &user->getRawOperands()[0])
                     return false;
 
                 if (!allUsesLeadToLoads(user))

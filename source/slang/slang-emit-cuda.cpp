@@ -436,7 +436,7 @@ void CUDASourceEmitter::emitGlobalRTTISymbolPrefix()
     m_writer->emit("__constant__ ");
 }
 
-void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
+void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, IROperandListBase operands, int numOperands, const EmitOpInfo& inOuterPrec)
 {
     switch (specOp->op)
     {
@@ -463,7 +463,7 @@ void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, cons
                         {
                             writer->emit(", ");
                         }
-                        emitOperand(operands[i].get(), getInfo(EmitOp::General));
+                        emitOperand(operands[i], getInfo(EmitOp::General));
                     }
 
                     writer->emitChar(')');
@@ -573,7 +573,7 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
                     {
                         // Handle if all are explicitly defined
                         IRType* elementType = matType->getElementType();                                        
-                        IRUse* operands = value->getOperands();
+                        auto operands = value->getOperands();
 
                         // Emit the braces for the Matrix struct, and the array of rows
                         m_writer->emit("{\n");
@@ -584,7 +584,7 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
                         {
                             if (i != 0) m_writer->emit(", ");
                             _emitInitializerList(elementType, operands, colCount);
-                            operands += colCount;
+                            operands = operands + colCount;
                         }
                         m_writer->dedent();
                         m_writer->emit("\n}");
@@ -603,7 +603,7 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
     emitOperand(value, getInfo(EmitOp::General));
 }
 
-void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operands, Index operandCount)
+void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IROperandListBase operands, Index operandCount)
 {
     m_writer->emit("{\n");
     m_writer->indent();
@@ -611,7 +611,7 @@ void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operand
     for (Index i = 0; i < operandCount; ++i)
     {
         if (i != 0) m_writer->emit(", ");
-        _emitInitializerListValue(elementType, operands[i].get());
+        _emitInitializerListValue(elementType, operands[i]);
     }
 
     m_writer->dedent();

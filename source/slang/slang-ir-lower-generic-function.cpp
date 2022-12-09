@@ -122,7 +122,7 @@ namespace Slang
             bool translated = false;
             for (UInt i = 0; i < funcType->getOperandCount(); i++)
             {
-                auto paramType = funcType->getOperand(i);
+                auto paramType = funcType->getRawOperand(i);
                 auto loweredParamType = sharedContext->lowerType(builder, paramType, typeMapping, nullptr);
                 translated = translated || (loweredParamType != paramType);
                 newOperands.add(loweredParamType);

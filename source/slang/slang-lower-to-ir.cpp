@@ -1603,7 +1603,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     // The `this` argument to the call will need to represent the
                     // appropriate field of our tagged union.
                     //
-                    IRType* caseThisType = (IRType*) irTaggedUnionType->getOperand(ii);
+                    IRType* caseThisType = (IRType*) irTaggedUnionType->getRawOperand(ii);
                     auto caseThisArg = subBuilder->emitExtractTaggedUnionPayload(
                         caseThisType,
                         irThisParam, caseTag);
@@ -1721,7 +1721,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // TODO: `IRTupleType` should really have `getElementCount()` and
         // `getElementType(index)` accessors.
         //
-        auto elementType = (IRType*) conjunctionTupleType->getOperand(indexInConjunction);
+        auto elementType = (IRType*) conjunctionTupleType->getRawOperand(indexInConjunction);
 
         // With the information we've extracted above, we now just need to
         // extract the appropriate element from the `(w_l, w_r)` tuple of
@@ -4147,7 +4147,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         auto existentialInfo = value.getExtractedExistentialValInfo();
         auto optType = lowerType(context, expr->type);
         SLANG_RELEASE_ASSERT(optType->getOp() == kIROp_OptionalType);
-        auto targetType = optType->getOperand(0);
+        auto targetType = optType->getRawOperand(0);
         auto witness = lowerSimpleVal(context, expr->witnessArg);
         auto builder = getBuilder();
         auto var = builder->emitVar(optType);
@@ -7497,7 +7497,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             for (UInt i = 0; i < value->getOperandCount(); i++)
             {
-                auto operand = value->getOperand(i);
+                auto operand = value->getRawOperand(i);
                 markInstsToClone(valuesToClone, parentBlock, operand);
             }
         }
@@ -8581,7 +8581,7 @@ static void _addFlattenedTupleArgs(
         auto elementCount = tupleVal->getOperandCount();
         for( UInt i = 0; i < elementCount; ++i )
         {
-            _addFlattenedTupleArgs(ioArgs, tupleVal->getOperand(i));
+            _addFlattenedTupleArgs(ioArgs, tupleVal->getRawOperand(i));
         }
     }
     //

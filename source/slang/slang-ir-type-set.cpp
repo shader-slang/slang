@@ -159,7 +159,7 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
 
                 for (Index i = 0; i < operandCount; ++i)
                 {
-                    cloneOperands[i] = cloneInst(inst->getOperand(i));
+                    cloneOperands[i] = cloneInst(inst->getRawOperand(i));
                 }
 
                 //clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
@@ -178,8 +178,8 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
                 clone = m_builder.emitIntrinsicInst(clonedType, inst->getOp(), operandCount, nullptr);
                 for (Index i = 0; i < operandCount; ++i)
                 {
-                    auto cloneOperand = cloneInst(inst->getOperand(i));
-                    clone->getOperands()[i].init(clone, cloneOperand);
+                    auto cloneOperand = cloneInst(inst->getRawOperand(i));
+                    clone->getRawOperands()[i].init(clone, cloneOperand);
                 }
             }
         }
@@ -276,7 +276,7 @@ static bool _hasNominalOperand(IRInst* inst)
 
     for (Index i = 0; i < operandCount; ++i)
     {
-        IRInst* operand = operands[i].get();
+        IRInst* operand = operands[i];
         if (isNominalOp(operand->getOp()))
         {
             return true;

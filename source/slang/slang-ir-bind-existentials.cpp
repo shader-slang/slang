@@ -267,7 +267,7 @@ struct BindExistentialSlots
     void replaceTypeUsingExistentialSlots(
         IRInst*         inst,
         UInt            slotOperandCount,
-        IRUse const*    slotArgs)
+        IROperandListBase slotArgs)
     {
         // We are going to alter the type of the
         // given `inst` based on information in
@@ -285,7 +285,7 @@ struct BindExistentialSlots
         //
         List<IRInst*> slotOperands;
         for(UInt ii = 0; ii < slotOperandCount; ++ii)
-            slotOperands.add(slotArgs[ii].get());
+            slotOperands.add(slotArgs[ii]);
 
         // We are going to create a proxy type that represents
         // the results of plugging all the information

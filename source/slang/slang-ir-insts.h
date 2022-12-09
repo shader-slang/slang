@@ -1571,7 +1571,7 @@ struct IRCall : IRInst
     IRInst* getCallee() { return getOperand(0); }
 
     UInt getArgCount() { return getOperandCount() - 1; }
-    IRUse* getArgs() { return getOperands() + 1; }
+    IROperandListBase getArgs() { return getOperands() + 1; }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
 };
 
@@ -1702,7 +1702,7 @@ struct IRUnconditionalBranch : IRTerminatorInst
     IRBlock* getTargetBlock() { return (IRBlock*)block.get(); }
 
     UInt getArgCount();
-    IRUse* getArgs();
+    IROperandListBase getArgs();
     IRInst* getArg(UInt index);
 
     IR_PARENT_ISA(UnconditionalBranch);
@@ -1809,7 +1809,7 @@ struct IRTryCall : IRTerminatorInst
     IRBlock* getFailureBlock() { return cast<IRBlock>(getOperand(1)); }
     IRInst* getCallee() { return getOperand(2); }
     UInt getArgCount() { return getOperandCount() - 3; }
-    IRUse* getArgs() { return getOperands() + 3; }
+    IROperandListBase getArgs() { return getOperands() + 3; }
     IRInst* getArg(UInt index) { return getOperand(index + 3); }
 };
 
@@ -2146,7 +2146,7 @@ struct IRWrapExistential : IRInst
 
     UInt getSlotOperandCount() { return getOperandCount() - 1; }
     IRInst* getSlotOperand(UInt index) { return getOperand(index + 1); }
-    IRUse* getSlotOperands() { return getOperands() + 1; }
+    IROperandListBase getSlotOperands() { return getOperands() + 1; }
 
     IR_LEAF_ISA(WrapExistential)
 };

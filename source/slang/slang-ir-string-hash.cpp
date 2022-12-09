@@ -71,7 +71,7 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder&
     IRInst* globalHashedInst = module->_allocateInst(kIROp_GlobalHashedStringLiterals, int(slicesCount));
     builder.addInst(globalHashedInst);
 
-    auto operands = globalHashedInst->getOperands();
+    auto operands = globalHashedInst->getRawOperands();
 
     for (Index i = 0; i < slicesCount; ++i)
     {

@@ -290,9 +290,9 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
             registerClonedValue(this, clonedValue, originalValue);
             for (UInt aa = 0; aa < argCount; ++aa)
             {
-                IRInst* originalArg = originalValue->getOperand(aa);
+                IRInst* originalArg = originalValue->getRawOperand(aa);
                 IRInst* clonedArg = cloneValue(this, originalArg);
-                clonedValue->getOperands()[aa].init(clonedValue, clonedArg);
+                clonedValue->getRawOperands()[aa].init(clonedValue, clonedArg);
             }
             cloneDecorationsAndChildren(this, clonedValue, originalValue);
 
@@ -671,7 +671,7 @@ IRInterfaceType* cloneInterfaceTypeImpl(
 
     for (UInt i = 0; i < originalInterface->getOperandCount(); i++)
     {
-        auto clonedKey = cloneValue(context, originalInterface->getOperand(i));
+        auto clonedKey = cloneValue(context, originalInterface->getRawOperand(i));
         clonedInterface->setOperand(i, clonedKey);
     }
     cloneSimpleGlobalValueImpl(context, originalInterface, originalValues, clonedInterface, false);
@@ -1182,9 +1182,9 @@ IRInst* cloneInst(
     context->builder = builder;
     for (UInt aa = 0; aa < argCount; ++aa)
     {
-        IRInst* originalArg = originalInst->getOperand(aa);
+        IRInst* originalArg = originalInst->getRawOperand(aa);
         IRInst* clonedArg = cloneValue(context, originalArg);
-        clonedInst->getOperands()[aa].init(clonedInst, clonedArg);
+        clonedInst->getRawOperands()[aa].init(clonedInst, clonedArg);
     }
     builder->addInst(clonedInst);
     context->builder = oldBuilder;

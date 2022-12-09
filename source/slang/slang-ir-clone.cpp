@@ -89,10 +89,10 @@ IRInst* cloneInstAndOperands(
     //
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
-        auto oldOperand = oldInst->getOperand(ii);
+        auto oldOperand = oldInst->getRawOperand(ii);
         auto newOperand = findCloneForOperand(env, oldOperand);
 
-        newInst->getOperands()[ii].init(newInst, newOperand);
+        newInst->getRawOperands()[ii].init(newInst, newOperand);
     }
 
     newInst->sourceLoc = oldInst->sourceLoc;

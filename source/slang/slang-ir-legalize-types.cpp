@@ -1836,7 +1836,7 @@ static LegalVal legalizeInst(
     bool anyComplex = false;
     for (UInt aa = 0; aa < argCount; ++aa)
     {
-        auto oldArg = inst->getOperand(aa);
+        auto oldArg = inst->getRawOperand(aa);
         auto legalArg = legalizeOperand(context, oldArg);
         legalArgs.add(legalArg);
 
@@ -3337,7 +3337,7 @@ struct IRTypeLegalizationPass
         Index operandCount = (Index) inst->getOperandCount();
         for( Index i = 0; i < operandCount; ++i )
         {
-            auto operand = inst->getOperand(i);
+            auto operand = inst->getRawOperand(i);
             if(!hasBeenAddedToWorkList(operand))
                 return;
         }

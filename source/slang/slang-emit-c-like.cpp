@@ -1294,8 +1294,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         if (auto targetIntrinsicDecoration = findBestTargetIntrinsicDecoration(funcValue))
         {         
             // Find the index of the original instruction, to see if it's multiply used.
-            IRUse* args = callInst->getArgs();
-            const Index paramIndex = Index(use - args);
+            IROperandListBase args = callInst->getArgs();
+            const Index paramIndex = Index(use - args.begin().getCursor());
             SLANG_ASSERT(paramIndex >= 0 && paramIndex < Index(callInst->getArgCount()));
 
             // Look through the slice to seeing how many times this parameters is used (signified via the $0...$9)
@@ -1457,13 +1457,13 @@ void CLikeSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerP
 void CLikeSourceEmitter::emitArgs(IRInst* inst)
 {
     UInt argCount = inst->getOperandCount();
-    IRUse* args = inst->getOperands();
+    IROperandListBase args = inst->getOperands();
 
     m_writer->emit("(");
     for(UInt aa = 0; aa < argCount; ++aa)
     {
         if(aa != 0) m_writer->emit(", ");
-        emitOperand(args[aa].get(), getInfo(EmitOp::General));
+        emitOperand(args[aa], getInfo(EmitOp::General));
     }
     m_writer->emit(")");
 }
@@ -1570,11 +1570,11 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
 {
     auto outerPrec = inOuterPrec;
 
-    IRUse* args = inst->getOperands();
+    IROperandListBase args = inst->getOperands();
     Index argCount = inst->getOperandCount();
 
     // First operand was the function to be called
-    args++;
+    ++args;
     argCount--;
 
     auto name = targetIntrinsic->getDefinition();
@@ -1591,11 +1591,11 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
         //
         if(name[0] == '.')
         {
-            emitOperand(args[0].get(), leftSide(outerPrec, prec));
+            emitOperand(args[0], leftSide(outerPrec, prec));
             m_writer->emit(".");
 
             name = UnownedStringSlice(name.begin() + 1, name.end());
-            args++;
+            ++args;
             argCount--;
         }
 
@@ -1604,7 +1604,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
         for (Index aa = 0; aa < argCount; ++aa)
         {
             if (aa != 0) m_writer->emit(", ");
-            emitOperand(args[aa].get(), getInfo(EmitOp::General));
+            emitOperand(args[aa], getInfo(EmitOp::General));
         }
         m_writer->emit(")");
 
@@ -1626,15 +1626,15 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
 
         Int argIndex = 0;
 
-        emitOperand(args[argIndex++].get(), leftSide(outerPrec, prec));
+        emitOperand(args[argIndex++], leftSide(outerPrec, prec));
         m_writer->emit("[");
-        emitOperand(args[argIndex++].get(), getInfo(EmitOp::General));
+        emitOperand(args[argIndex++], getInfo(EmitOp::General));
         m_writer->emit("]");
 
         if(argIndex < argCount)
         {
             m_writer->emit(" = ");
-            emitOperand(args[argIndex++].get(), getInfo(EmitOp::General));
+            emitOperand(args[argIndex++], getInfo(EmitOp::General));
         }
 
         maybeCloseParens(needClose);

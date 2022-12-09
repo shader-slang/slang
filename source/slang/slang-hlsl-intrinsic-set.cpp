@@ -164,7 +164,7 @@ void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRInst* inst, Index o
     }
 }
 
-void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRUse* inArgs, Index argCount, HLSLIntrinsic& out)
+void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IROperandListBase inArgs, Index argCount, HLSLIntrinsic& out)
 {
     returnType = m_typeSet->getType(returnType);
 
@@ -174,7 +174,7 @@ void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, I
 
         for (Index i = 0; i < argCount; ++i)
         {
-            auto operand = inArgs[i].get();
+            auto operand = inArgs[i];
             argTypes[i] = m_typeSet->getType(operand->getDataType());
         }
         _calcIntrinsic(op, returnType, argTypes, argCount, out);
@@ -186,7 +186,7 @@ void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, I
 
         for (Index i = 0; i < argCount; ++i)
         {
-            auto operand = inArgs[i].get();
+            auto operand = inArgs[i];
             argTypes[i] = m_typeSet->getType(operand->getDataType());
         }
         _calcIntrinsic(op, returnType, argTypes.getBuffer(), argCount, out);

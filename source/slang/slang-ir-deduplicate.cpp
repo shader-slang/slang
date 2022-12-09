@@ -96,7 +96,7 @@ namespace Slang
             use->set(newInst);
             // depending on the type of the user inst, we may need to rebuild and update the global
             // numbering cache.
-            if (isGloballyNumberedInst(use->getUser()))
+            if (isGloballyNumberedInst(use->getRawUser()))
             {
                 shouldUpdateGlobalNumberedCache = true;
             }

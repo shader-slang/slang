@@ -101,7 +101,8 @@ IROpInfo getIROpInfo(IROp op);
 struct IRUse
 {
     IRInst* get() const { return usedValue; }
-    IRInst* getUser() const { return user; }
+    IRInst* getRawUser() const { return user; }
+    IRInst* getUser() const;
 
     void init(IRInst* user, IRInst* usedValue);
     void set(IRInst* usedValue);
@@ -128,6 +129,9 @@ struct IRDecoration;
 struct IRRate;
 struct IRType;
 struct IRAttr;
+struct IRAttributedOperand;
+
+IRInst* unwrapAttributedOperand(IRInst* operand);
 
 // A double-linked list of instruction
 struct IRInstListBase
@@ -263,7 +267,7 @@ struct IROperandListBase
 
         IRInst* operator*() const
         {
-            return m_cursor->get();
+            return unwrapAttributedOperand(m_cursor->get());
         }
 
         IRUse* getCursor() const { return m_cursor; }
@@ -289,7 +293,42 @@ struct IROperandListBase
 
     IRInst* operator[](Int index) const
     {
+        return unwrapAttributedOperand(m_begin[index].get());
+    }
+
+    IRUse* getRawUse(Int index)
+    {
+        return m_begin + index;
+    }
+
+    IRInst* getRawOperandInst(Int index) const
+    {
         return m_begin[index].get();
+    }
+
+    IROperandListBase operator+(Int index) const
+    {
+        return IROperandListBase(Math::Min(m_end, m_begin + index), m_end);
+    }
+
+    IROperandListBase& operator+=(Int index)
+    {
+        m_begin = Math::Min(m_end, m_begin + index);
+        return *this;
+    }
+
+    IROperandListBase& operator++()
+    {
+        m_begin = Math::Min(m_end, m_begin + 1);
+        return *this;
+    }
+
+    // Postfix
+    IROperandListBase operator++(int)
+    {
+        auto old = *this;
+        m_begin = Math::Min(m_end, m_begin + 1);
+        return old;
     }
 
 protected:
@@ -325,7 +364,7 @@ public:
 
         T* operator*() const
         {
-            return (T*) m_cursor->get();
+            return (T*)unwrapAttributedOperand(m_cursor->get());
         }
     };
 
@@ -334,7 +373,7 @@ public:
 
     T* operator[](Int index) const
     {
-        return (T*) m_begin[index].get();
+        return (T*)unwrapAttributedOperand(m_begin[index].get());
     }
 };
 
@@ -633,20 +672,29 @@ struct IRInst
     // just a series of `IRUse` values representing
     // operands of the instruction.
 
-    IRUse*      getOperands();
+    IRUse* getRawOperands();
+
+    IROperandListBase getOperands();
 
     IRInst* getOperand(UInt index)
     {
         SLANG_ASSERT(index < getOperandCount());
-        return getOperands()[index].get();
+        return getOperands()[index];
+    }
+
+    IRInst* getRawOperand(UInt index)
+    {
+        SLANG_ASSERT(index < getOperandCount());
+        return getOperands().getRawOperandInst(index);
     }
 
     void setOperand(UInt index, IRInst* value)
     {
         SLANG_ASSERT(getOperands()[index].user != nullptr);
-        getOperands()[index].set(value);
+        getOperands().getRawUse(index)->set(value);
     }
 
+    IRAttr* findOperandAttribute(UInt operandIndex, IROp attrOp);
 
     //
 
@@ -861,6 +909,16 @@ SIMPLE_IR_TYPE(StringType, StringTypeBase)
 SIMPLE_IR_TYPE(NativeStringType, StringTypeBase)
 
 SIMPLE_IR_TYPE(DynamicType, Type)
+
+struct IRAttributedOperand : IRInst
+{
+    IR_LEAF_ISA(AttributedOperand);
+
+    IRInst* getBase()
+    {
+        return getOperand(0);
+    }
+};
 
 // True if types are equal
 // Note compares nominal types by name alone 
@@ -1639,8 +1697,8 @@ struct IRBindExistentialsTypeBase : IRType
 
     IRType* getBaseType() { return (IRType*) getOperand(0); }
     UInt getExistentialArgCount() { return getOperandCount() - 1; }
-    IRUse* getExistentialArgs() { return getOperands() + 1; }
-    IRInst* getExistentialArg(UInt index) { return getExistentialArgs()[index].get(); }
+    IROperandListBase getExistentialArgs() { return getOperands() + 1; }
+    IRInst* getExistentialArg(UInt index) { return getExistentialArgs()[index]; }
 };
 
 struct IRBindExistentialsType : IRBindExistentialsTypeBase

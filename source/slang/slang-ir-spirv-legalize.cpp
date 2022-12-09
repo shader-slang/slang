@@ -38,7 +38,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
-            auto user = use->getUser();
+            auto user = use->getRawUser();
 
             addToWorkList(user);
         }
@@ -170,7 +170,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 List<IRInst*> args;
                 for (UInt i = 0; i < inst->getArgCount(); i++)
                     args.add(inst->getArg(i));
-                auto newCall = builder.emitCallInst(qualPtrType, funcValue, args);
+                auto newCall = builder.emitCallInst(qualPtrType, inst->getRawOperand(0), args);
                 inst->replaceUsesWith(newCall);
                 inst->removeAndDeallocate();
                 addUsersToWorkList(newCall);

@@ -109,7 +109,7 @@ struct SpecializationContext
         UInt operandCount = inst->getOperandCount();
         for(UInt ii = 0; ii < operandCount; ++ii)
         {
-            IRInst* operand = inst->getOperand(ii);
+            IRInst* operand = inst->getRawOperand(ii);
             if(!isInstFullySpecialized(operand))
                 return false;
         }
@@ -164,7 +164,7 @@ struct SpecializationContext
     {
         for( auto use = inst->firstUse; use; use = use->nextUse )
         {
-            auto user = use->getUser();
+            auto user = use->getRawUser();
             
             addToWorkList(user);
         }
@@ -722,16 +722,16 @@ struct SpecializationContext
             bool shouldSkip = false;
             for (UInt i = 1; i < item->getOperandCount(); i++)
             {
-                if (item->getOperand(i) == nullptr)
+                if (item->getRawOperand(i) == nullptr)
                 {
                     shouldSkip = true;
                     break;
                 }
-                key.vals.add(item->getOperand(i));
+                key.vals.add(item->getRawOperand(i));
             }
             if (shouldSkip)
                 continue;
-            auto value = as<typename std::remove_pointer<typename TDict::ValueType>::type>(item->getOperand(0));
+            auto value = as<typename std::remove_pointer<typename TDict::ValueType>::type>(item->getRawOperand(0));
             SLANG_ASSERT(value);
             dict[key] = value;
         }
@@ -1314,7 +1314,7 @@ struct SpecializationContext
 
             for (UInt i = 0; i < curInst->getOperandCount(); ++i)
             {
-                auto operand = curInst->getOperand(i);
+                auto operand = curInst->getRawOperand(i);
                 if (processedInsts.Add(operand))
                 {
                     localWorkList.add(operand);
@@ -1479,7 +1479,7 @@ struct SpecializationContext
                     oldParam->getFullType(),
                     newParam,
                     oldWrapExistential->getSlotOperandCount(),
-                    oldWrapExistential->getSlotOperands());
+                    oldWrapExistential->getSlotOperands().begin().getCursor());
                 newBodyInsts.add(newWrapExistential);
                 replacementVal = newWrapExistential;
             }
@@ -2151,7 +2151,7 @@ struct SpecializationContext
             IRInst* wrappedElementType = builder.getBindExistentialsType(
                 baseElementType,
                 slotOperandCount,
-                type->getExistentialArgs());
+                type->getExistentialArgs().begin().getCursor());
 
             auto newPtrLikeType = builder.getType(
                 baseType->getOp(),
@@ -2212,7 +2212,7 @@ struct SpecializationContext
                     auto newFieldType = builder.getBindExistentialsType(
                         oldFieldType,
                         fieldSlotArgCount,
-                        fieldSlotArgs);
+                        fieldSlotArgs.begin().getCursor());
 
                     addToWorkList(newFieldType);
 

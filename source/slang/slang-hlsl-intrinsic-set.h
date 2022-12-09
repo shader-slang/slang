@@ -196,7 +196,7 @@ public:
 
     void calcIntrinsic(Op op, IRType* returnType, IRType*const* args, Index argsCount, HLSLIntrinsic& out);
     void calcIntrinsic(Op op, IRInst* inst, Index argsCount, HLSLIntrinsic& out);
-    void calcIntrinsic(Op op, IRType* returnType, IRUse* args, Index argCount, HLSLIntrinsic& out);
+    void calcIntrinsic(Op op, IRType* returnType, IROperandListBase args, Index argCount, HLSLIntrinsic& out);
     void  calcIntrinsic(Op op, IRInst* inst, HLSLIntrinsic& out) { calcIntrinsic(op, inst, Index(inst->getOperandCount()), out); }
 
     SlangResult makeIntrinsic(IRInst* inst, HLSLIntrinsic& out);
