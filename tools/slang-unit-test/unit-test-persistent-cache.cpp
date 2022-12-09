@@ -401,7 +401,7 @@ struct MultiThreadingTest : public PersistentCacheTest
 #undef ENABLE_LOGGING 
 #undef ENABLE_WRITE_TEST
 
-#ifdef LOGGING
+#ifdef ENABLE_LOGGING
 #define LOG(fmt, ...) printf(fmt, ##__VA_ARGS__); fflush(stdout);
 #else
 #define LOG(fmt, ...)
@@ -433,12 +433,12 @@ struct StressTest : public PersistentCacheTest
 
     List<Entry> entries;
 
-    std::atomic<uint32_t> iteration;
-    std::atomic<uint32_t> entriesWritten;
-    std::atomic<uint32_t> bytesWritten;
-    std::atomic<uint32_t> entriesRead;
-    std::atomic<uint32_t> bytesRead;
-    std::atomic<uint32_t> readSuccess;
+    std::atomic<uint32_t> iteration{0};
+    std::atomic<uint32_t> entriesWritten{0};
+    std::atomic<uint32_t> bytesWritten{0};
+    std::atomic<uint32_t> entriesRead{0};
+    std::atomic<uint32_t> bytesRead{0};
+    std::atomic<uint32_t> readSuccess{0};
     std::thread threads[kThreadCount];
 
     std::mutex mutex;

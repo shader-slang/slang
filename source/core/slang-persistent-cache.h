@@ -4,6 +4,8 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -69,9 +71,14 @@ private:
     SlangResult writeIndex(const String& fileName, const CacheIndex& index);
 
     String m_cacheDirectory;
-    Slang::LockFile m_lockFile;
     String m_lockFileName;
     String m_indexFileName;
+
+    // For exclusive locking we need both a mutex (acquired first)
+    // followed by a a file lock. The mutex is needed because on Linux
+    // the file lock is only locking between processes, not threads.
+    std::mutex m_mutex;
+    Slang::LockFile m_lockFile;
 
     Count m_maxEntryCount;
 

@@ -36,8 +36,9 @@ SlangResult PersistentCache::clear()
         return SLANG_E_CANNOT_OPEN;
     }
 
-    // Acquire the exclusive file lock.
-    LockFileGuard lock(m_lockFile);
+    // Acquire the exclusive lock.
+    std::lock_guard<std::mutex> mutexLock(m_mutex);
+    LockFileGuard fileLock(m_lockFile);
 
     struct Visitor : Path::Visitor
     {
@@ -84,8 +85,9 @@ SlangResult PersistentCache::readEntry(const Key& key, ISlangBlob** outData)
         return SLANG_E_CANNOT_OPEN;
     }
 
-    // Acquire the exclusive file lock.
-    LockFileGuard lock(m_lockFile);
+    // Acquire the exclusive lock.
+    std::lock_guard<std::mutex> mutexLock(m_mutex);
+    LockFileGuard fileLock(m_lockFile);
 
     // Return if index does not exist.
     if (!File::exists(m_indexFileName))
@@ -143,8 +145,9 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
         return SLANG_E_CANNOT_OPEN;
     }
 
-    // Acquire the exclusive file lock.
-    LockFileGuard lock(m_lockFile);
+    // Acquire the exclusive lock.
+    std::lock_guard<std::mutex> mutexLock(m_mutex);
+    LockFileGuard fileLock(m_lockFile);
 
     // Read the cache index.
     // We ignore any errors when reading the index and just write a new one.
@@ -206,8 +209,9 @@ SlangResult PersistentCache::initialize()
         return SLANG_E_CANNOT_OPEN;
     }
 
-    // Acquire the exclusive file lock.
-    LockFileGuard lock(m_lockFile);
+    // Acquire the exclusive lock.
+    std::lock_guard<std::mutex> mutexLock(m_mutex);
+    LockFileGuard fileLock(m_lockFile);
 
     CacheIndex cacheIndex;
     if (SLANG_SUCCEEDED(readIndex(m_indexFileName, cacheIndex)))
