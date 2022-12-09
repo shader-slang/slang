@@ -690,8 +690,8 @@ struct IRInst
 
     void setOperand(UInt index, IRInst* value)
     {
-        SLANG_ASSERT(getOperands()[index].user != nullptr);
-        getOperands().getRawUse(index)->set(value);
+        SLANG_ASSERT(getRawOperands()[index].user != nullptr);
+        getRawOperands()[index].set(value);
     }
 
     IRAttr* findOperandAttribute(UInt operandIndex, IROp attrOp);
