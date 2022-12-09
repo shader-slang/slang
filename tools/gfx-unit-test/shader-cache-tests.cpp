@@ -1252,92 +1252,93 @@ namespace gfx_test
         test.run();
     }
 
-    SLANG_UNIT_TEST(singleEntryShaderCacheD3D12)
+    SLANG_UNIT_TEST(shaderCacheSingleEntryD3D12)
     {
         runTestImpl(shaderCacheTestImpl<SingleEntryShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(singleEntryShaderCacheVulkan)
+    SLANG_UNIT_TEST(shaderCacheSingleEntryVulkan)
     {
         runTestImpl(shaderCacheTestImpl<SingleEntryShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
-    SLANG_UNIT_TEST(multipleEntryShaderCacheD3D12)
+    SLANG_UNIT_TEST(shaderCacheMultipleEntryD3D12)
     {
         runTestImpl(shaderCacheTestImpl<MultipleEntryShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(multipleEntryShaderCacheVulkan)
+    SLANG_UNIT_TEST(shaderCacheMultipleEntryVulkan)
     {
         runTestImpl(shaderCacheTestImpl<MultipleEntryShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
-    SLANG_UNIT_TEST(multipleEntryPointShaderCacheD3D12)
+    SLANG_UNIT_TEST(shaderCacheMultipleEntryPointD3D12)
     {
         runTestImpl(shaderCacheTestImpl<MultipleEntryPointShader>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(multipleEntryPointShaderCacheVulkan)
+    SLANG_UNIT_TEST(shaderCacheMultipleEntryPointVulkan)
     {
         runTestImpl(shaderCacheTestImpl<MultipleEntryPointShader>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
-    SLANG_UNIT_TEST(shaderFileImportsShaderCacheD3D12)
+    SLANG_UNIT_TEST(shaderCacheFileImportsD3D12)
     {
         runTestImpl(shaderCacheTestImpl<ShaderFileImportsShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(shaderFileImportsShaderCacheVulkan)
+    SLANG_UNIT_TEST(shaderCacheFileImportsVulkan)
     {
         runTestImpl(shaderCacheTestImpl<ShaderFileImportsShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
-    SLANG_UNIT_TEST(specializationArgsShaderCacheD3D12)
+    SLANG_UNIT_TEST(shaderCacheSpecializationArgsD3D12)
     {
         runTestImpl(shaderCacheTestImpl<SpecializationArgsEntries>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(specializationArgsShaderCacheVulkan)
+    SLANG_UNIT_TEST(shaderCacheSpecializationArgsVulkan)
     {
         runTestImpl(shaderCacheTestImpl<SpecializationArgsEntries>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 #if 0
-    SLANG_UNIT_TEST(cacheEvictionPolicyD3D12)
+    SLANG_UNIT_TEST(shaderCacheEvictionPolicyD3D12)
     {
         runTestImpl(shaderCacheTestImpl<CacheWithMaxEntryLimit>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(cacheEvictionPolicyVulkan)
+    SLANG_UNIT_TEST(shaderCacheEvictionPolicyVulkan)
     {
         runTestImpl(shaderCacheTestImpl<CacheWithMaxEntryLimit>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 #endif
-    SLANG_UNIT_TEST(graphicsShaderCacheD3D12)
+#if 0
+    SLANG_UNIT_TEST(shaderCacheGraphicsD3D12)
     {
         runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(graphicsShaderCacheVulkan)
+    SLANG_UNIT_TEST(shaderCacheGraphicsVulkan)
     {
         runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
-    SLANG_UNIT_TEST(splitGraphicsShaderCacheD3D12)
+    SLANG_UNIT_TEST(shaderCacheSplitGraphicsD3D12)
     {
         runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(splitGraphicsShaderCacheVulkan)
+    SLANG_UNIT_TEST(shaderCacheSplitGraphicsVulkan)
     {
         runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-
-    SLANG_UNIT_TEST(nonPhysicalFileDependenciesCacheEntryD3D12)
+#endif
+    SLANG_UNIT_TEST(shaderCacheNonPhysicalFileDependenciesD3D12)
     {
         runTestImpl(shaderCacheTestImpl<NonPhysicalFileDependencyEntry>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(nonPhysicalFileDependenciesCacheEntryVulkan)
+    SLANG_UNIT_TEST(shaderCacheNonPhysicalFileDependenciesVulkan)
     {
         runTestImpl(shaderCacheTestImpl<NonPhysicalFileDependencyEntry>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
