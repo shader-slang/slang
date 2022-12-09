@@ -564,42 +564,6 @@ struct DiffTransposePass
     void accumulateGradientsForLoad(IRBuilder* builder, IRLoad* revLoad)
     {
         return transposeInst(builder, revLoad);
-
-        /*
-        auto revPtr = revLoad->getPtr();
- 
-        // Assert that ptr type is of the form IRPtrTypeBase<IRDifferentialPairType<T>>
-        SLANG_ASSERT(as<IRPtrTypeBase>(revPtr->getDataType()));
-        SLANG_ASSERT(as<IRPtrTypeBase>(revPtr->getDataType())->getValueType()->getOp() == kIROp_DifferentialPairType);
-
-        auto paramPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(revPtr->getDataType())->getValueType());
-
-        // Gather gradients.
-        auto gradients = popRevGradients(revLoad);
-        if (gradients.getCount() == 0)
-        {
-            // Ignore.
-            return;
-        }
-        else
-        {
-            // Re-emit a load to get the _current_ value of revPtr.
-            auto revCurrGrad = builder->emitLoad(revPtr);
-
-            // Add the current value to the aggregation list.
-            gradients.add(
-                RevGradient(
-                    revLoad,
-                    revCurrGrad,
-                    nullptr));
-            
-            // Get the _total_ value.
-            auto aggregateGradient = emitAggregateValue(builder, paramPairType, gradients);
-
-            // Store this back into the pointer.
-            builder->emitStore(revPtr, aggregateGradient);
-        }
-        */
     }
 
     TranspositionResult transposeReturn(IRBuilder*, IRReturn* fwdReturn, IRInst* revValue)
