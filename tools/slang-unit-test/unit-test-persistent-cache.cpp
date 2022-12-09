@@ -14,7 +14,6 @@
 
 using namespace Slang;
 
-static const char* kCacheDirectory = "persistent-cache-test";
 static DefaultRandomGenerator rng(0xdeadbeef);
 
 inline ComPtr<ISlangBlob> createRandomBlob(size_t size)
@@ -46,9 +45,7 @@ struct PersistentCacheTest
     PersistentCacheTest(Count maxEntryCount = 0)
     {
         osFileSystem = OSFileSystem::getMutableSingleton();
-        ComPtr<ISlangBlob> pathBlob;
-        osFileSystem->getPath(PathKind::OperatingSystem, kCacheDirectory, pathBlob.writeRef());
-        cacheDirectory = String((const char*)pathBlob->getBufferPointer(), (const char*)pathBlob->getBufferPointer() + pathBlob->getBufferSize());
+        cacheDirectory = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/persistent-cache-test");
 
         removeCacheFiles();
 
@@ -564,8 +561,6 @@ struct StressTest : public PersistentCacheTest
     }
 };
 
-// skip tests
-#if 0
 SLANG_UNIT_TEST(persistentCacheBasic)
 {
     BasicTest test;
@@ -595,4 +590,3 @@ SLANG_UNIT_TEST(persistentCacheStress)
     StressTest test;
     test.run();
 }
-#endif

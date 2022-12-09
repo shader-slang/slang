@@ -12,13 +12,7 @@ using namespace Slang;
 
 SLANG_UNIT_TEST(lockFile)
 {
-    static String fileName;
-    Path::getCanonical(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file", fileName);
-
-    fprintf(stdout, "stdout: lock file fileName = %s\n", fileName.getBuffer());
-    fflush(stdout);
-    fprintf(stderr, "stderr: lock file fileName = %s\n", fileName.getBuffer());
-    fflush(stderr);
+    static String fileName = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file");
 
     // Open/close lock file.
     {

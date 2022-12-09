@@ -10,12 +10,11 @@ namespace Slang
 
 PersistentCache::PersistentCache(const Desc& desc)
 {
-    Path::getCanonical(String(desc.directory), m_cacheDirectory);
-    m_cacheDirectory = Path::simplify(m_cacheDirectory);
+    m_cacheDirectory = Path::simplify(desc.directory);
     Path::createDirectory(m_cacheDirectory);
 
-    Path::getCanonical(m_cacheDirectory + "/lock", m_lockFileName);
-    Path::getCanonical(m_cacheDirectory + "/index", m_indexFileName);
+    m_lockFileName = Path::simplify(m_cacheDirectory + "/lock");
+    m_indexFileName = Path::simplify(m_cacheDirectory + "/index");
 
     m_lockFile.open(m_lockFileName);
 
@@ -52,8 +51,7 @@ SlangResult PersistentCache::clear()
 
         void accept(Path::Type type, const UnownedStringSlice& fileName) SLANG_OVERRIDE
         {
-            String fullPath;
-            Path::getCanonical(directory + "/" + fileName, fullPath);
+            String fullPath = Path::simplify(directory + "/" + fileName);;
             if (type == Path::Type::File && lockFileName != fullPath)
             {
                 Path::remove(fullPath);
