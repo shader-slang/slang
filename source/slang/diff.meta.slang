@@ -92,24 +92,68 @@ struct DifferentialPair : IDifferentiable
     }
 };
 
-[ForceInline]
+__generic<T: IDifferentiable>
+__intrinsic_op($(kIROp_MakeDifferentialPair))
+DifferentialPair<T> diffPair(T primal, T.Differential diff);
+
+__generic<T: IDifferentiable>
+[__unsafeForceInlineEarly]
+DifferentialPair<T> diffPair(T primal)
+{
+    return diffPair(primal, T.dzero());
+}
+
+[__unsafeForceInlineEarly]
 void updatePrimal<T : IDifferentiable>(inout DifferentialPair<T> p, T newPrimal)
 {
     p = DifferentialPair<T>(newPrimal, p.d);
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 void updateDiff<T : IDifferentiable>(inout DifferentialPair<T> p, T.Differential newDiff)
 {
     p = DifferentialPair<T>(p.p, newDiff);
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 void updatePair<T : IDifferentiable>(inout DifferentialPair<T> p, T newPrimal, T.Differential newDiff)
 {
     p = DifferentialPair<T>(newPrimal, newDiff);
 }
 
+// vector-matrix
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[ForceInline]
+[ForwardDerivativeOf(mul)]
+DifferentialPair<vector<T, M>> mul(DifferentialPair<vector<T, N>> left, DifferentialPair<matrix<T, N, M>> right)
+{
+    let primal = mul(left.p, right.p);
+    let diff = mul(left.d, right.p) + mul(left.p, right.d);
+    return DifferentialPair<vector<T,M>>(primal, diff);
+}
+
+// matrix-vector
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[ForceInline]
+[ForwardDerivativeOf(mul)]
+DifferentialPair<vector<T,N>> mul(DifferentialPair<matrix<T,N,M>> left, DifferentialPair<vector<T,M>> right)
+{
+    let primal = mul(left.p, right.p);
+    let diff = mul(left.d, right.p) + mul(left.p, right.d);
+    return DifferentialPair<vector<T,N>>(primal, diff);
+}
+
+
+// matrix-matrix
+__generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
+[ForceInline]
+[ForwardDerivativeOf(mul)]
+DifferentialPair<matrix<T,R,C>> mul(DifferentialPair<matrix<T,R,N>> right, DifferentialPair<matrix<T,N,C>> left)
+{
+    let primal = mul(right.p, left.p);
+    let diff = mul(right.d, left.p) + mul(right.p, left.d);
+    return DifferentialPair<matrix<T,R,C>>(primal, diff);
+}
 
 #define VECTOR_MAP_D_UNARY(TYPE, COUNT, D_FUNC, VALUE) \
     vector<TYPE, COUNT> result; \
