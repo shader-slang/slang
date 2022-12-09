@@ -15,13 +15,16 @@ SLANG_UNIT_TEST(lockFile)
     static String fileName;
     Path::getCanonical(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file", fileName);
 
-    printf("lock file fileName = %s\n", fileName.getBuffer());
+    fprintf(stdout, "stdout: lock file fileName = %s\n", fileName.getBuffer());
+    fflush(stdout);
+    fprintf(stderr, "stderr: lock file fileName = %s\n", fileName.getBuffer());
+    fflush(stderr);
 
     // Open/close lock file.
     {
         LockFile file;
         SLANG_CHECK(file.isOpen() == false);
-        SLANG_CHECK(file.open(fileName) == SLANG_OK);
+        SLANG_CHECK_ABORT(file.open(fileName) == SLANG_OK);
         SLANG_CHECK(file.isOpen() == true);
         SLANG_CHECK(File::exists(fileName) == true);
         file.close();
