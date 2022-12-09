@@ -610,6 +610,20 @@ struct IRDifferentialInstDecoration : IRDecoration
     IRType* getPrimalType() { return as<IRType>(getOperand(0)); }
 };
 
+
+struct IRMixedDifferentialInstDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_MixedDifferentialInstDecoration
+    };
+
+    IRUse pairType;
+    IR_LEAF_ISA(MixedDifferentialInstDecoration)
+
+    IRType* getPairType() { return as<IRType>(getOperand(0)); }
+};
+
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -3375,6 +3389,16 @@ public:
     void markInstAsDifferential(IRInst* value)
     {
         addDecoration(value, kIROp_DifferentialInstDecoration, nullptr);
+    }
+
+    void markInstAsMixedDifferential(IRInst* value)
+    {
+        addDecoration(value, kIROp_MixedDifferentialInstDecoration, nullptr);
+    }
+
+    void markInstAsMixedDifferential(IRInst* value, IRType* pairType)
+    {
+        addDecoration(value, kIROp_MixedDifferentialInstDecoration, pairType);
     }
 
     void markInstAsDifferential(IRInst* value, IRType* primalType)

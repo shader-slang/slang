@@ -150,17 +150,25 @@ struct DiffTransposePass
         // Insert after the last block.
         builder.setInsertInto(revBlock);
 
-        List<IRInst*> ptrInsts;
+        // Move pointer & reference insts to the top of the reverse-mode block.
+        List<IRInst*> nonValueInsts;
         for (IRInst* child = fwdBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
         {
-            // If the instruction is pointer typed, move to top of new reverse-mode block
+            // If the instruction is pointer typed, it's not actually computing a value.
+            // 
             if (as<IRPtrTypeBase>(child->getDataType()))
-                ptrInsts.add(child);
+                nonValueInsts.add(child);
+            
+            // Slang doesn't support function values. So if we see a func-typed inst
+            // it's proabably a reference to a function.
+            // 
+            if (as<IRFuncType>(child->getDataType()))
+                nonValueInsts.add(child);
         }
 
-        for (auto ptrInst : ptrInsts)
+        for (auto inst : nonValueInsts)
         {
-            ptrInst->insertAtEnd(revBlock);
+            inst->insertAtEnd(revBlock);
         }
 
 
@@ -210,34 +218,6 @@ struct DiffTransposePass
         if (hasRevGradients(inst))
             gradients = popRevGradients(inst);
 
-        // Are we dealing with DifferentialPairType? 
-        if (as<IRDifferentialPairType>(inst->getDataType()))
-        {
-            // This will be a 'hybrid' primal-differential inst, 
-            // so we add a pair (primal_value, 0) as an additional
-            // gradient to represent the primal part of the computation.
-            // 
-            // Now, if the unzip pass has done it's job, the _only_ 
-            // case should be that inst is IRMakeDifferentialPair
-            // 
-            SLANG_ASSERT(as<IRMakeDifferentialPair>(inst));
-            auto primalType = as<IRDifferentialPairType>(inst->getDataType())->getValueType();
-            auto diffType = (IRType*)pairBuilder.getDiffTypeFromPairType(builder, as<IRDifferentialPairType>(inst->getDataType()));
-
-            auto primalInst = as<IRMakeDifferentialPair>(inst)->getPrimalValue();
-            auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, primalType);
-
-            // Must exist. 
-            SLANG_ASSERT(zeroMethod);
-            auto diffInst = builder->emitCallInst(diffType, zeroMethod, List<IRInst*>());
-            
-            gradients.add(
-                RevGradient(
-                    inst,
-                    builder->emitMakeDifferentialPair(inst->getDataType(), primalInst, diffInst),
-                    nullptr));
-        }
-        
         IRType* primalType = tryGetPrimalTypeFromDiffInst(inst);
 
         if (!primalType)
@@ -248,6 +228,14 @@ struct DiffTransposePass
                 auto returnPairType = as<IRDifferentialPairType>(
                     tryGetPrimalTypeFromDiffInst(returnInst->getVal()));
                 primalType = returnPairType->getValueType();
+            }
+            else if (auto loadInst = as<IRLoad>(inst))
+            {
+                // TODO: Unzip loads properly to avoid having to side-step this check for IRLoad
+                if (auto pairType = as<IRDifferentialPairType>(loadInst->getDataType()))
+                {
+                    primalType = pairType->getValueType();
+                }   
             }
         }
 
@@ -278,6 +266,116 @@ struct DiffTransposePass
             addRevGradientForFwdInst(gradient.targetInst, gradient);
         }
     }
+
+    TranspositionResult transposeCall(IRBuilder* builder, IRCall* fwdCall, IRInst* revValue)
+    {
+        auto fwdDiffCallee = as<IRForwardDifferentiate>(fwdCall->getCallee());
+
+        // If the callee is not a fwd-differentiate(fn), then there's only two
+        // cases. This is a call to something that doesn't need to be transposed
+        // or this is a user-written function calling something that isn't marked
+        // with IRForwardDifferentiate, but is handling differentials. 
+        // We currently do not handle the latter.
+        // However, if we see a callee with no parameters, we can just skip over.
+        // since there's nothing to backpropagate to.
+        // 
+        if (!fwdDiffCallee)
+        {
+            if (fwdCall->getArgCount() == 0)
+            {
+                return TranspositionResult(List<RevGradient>());
+            }
+            else
+            {
+                SLANG_UNIMPLEMENTED_X(
+                    "This case should only trigger on a user-defined fwd-mode function"
+                    " calling another user-defined function not marked with __fwd_diff()");
+            }
+        }
+
+        auto baseFn = fwdDiffCallee->getBaseFn();
+
+        List<IRInst*> args;
+        List<IRType*> argTypes;
+        List<bool> isArgPtrTyped;
+
+        for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
+        {
+            auto arg = fwdCall->getArg(ii);
+            
+            // If this isn't a ptr-type, make a var.
+            if (!as<IRPtrTypeBase>(arg->getDataType()) && as<IRDifferentialPairType>(arg->getDataType()))
+            {
+                auto pairType = as<IRDifferentialPairType>(arg->getDataType());
+
+                auto var = builder->emitVar(arg->getDataType());
+
+                SLANG_ASSERT(as<IRMakeDifferentialPair>(arg));
+
+                // Initialize this var to (arg.primal, 0).
+                builder->emitStore(
+                    var, 
+                    builder->emitMakeDifferentialPair(
+                        arg->getDataType(),
+                        as<IRMakeDifferentialPair>(arg)->getPrimalValue(),
+                        builder->emitCallInst(
+                            (IRType*)diffTypeContext.getDifferentialForType(builder, pairType->getValueType()),
+                            diffTypeContext.getZeroMethodForType(builder, pairType->getValueType()),
+                            List<IRInst*>())));
+                
+                args.add(var);
+                argTypes.add(builder->getInOutType(pairType));
+                isArgPtrTyped.add(false);
+            }
+            else
+            {
+                args.add(arg);
+                argTypes.add(arg->getDataType());
+                isArgPtrTyped.add(true);
+            }
+        }
+
+        args.add(revValue);
+        argTypes.add(revValue->getDataType());
+
+        auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
+        auto revCallee = builder->emitBackwardDifferentiateInst(
+            revFnType,
+            baseFn);
+
+        builder->emitCallInst(revFnType->getResultType(), revCallee, args);
+
+        List<RevGradient> gradients;
+        for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
+        {
+            // Is this arg relevant to auto-diff?
+            if (as<IRDifferentialPairType>(as<IRPtrTypeBase>(args[ii]->getDataType())->getValueType()))
+            {
+                // If this is ptr typed, ignore (the gradient will be accumulated on the pointer)
+                // automatically.
+                // 
+                if (!isArgPtrTyped[ii])
+                {
+                    auto diffArgType = (IRType*)diffTypeContext.getDifferentialForType(
+                        builder, 
+                        as<IRDifferentialPairType>(
+                            as<IRPtrTypeBase>(argTypes[ii])->getValueType())->getValueType());
+                    auto diffArgPtrType = builder->getPtrType(kIROp_PtrType, diffArgType);
+                    
+                    gradients.add(RevGradient(
+                        RevGradient::Flavor::Simple,
+                        fwdCall->getArg(ii),
+                        builder->emitLoad(
+                            builder->emitDifferentialPairAddressDifferential(
+                                diffArgPtrType,
+                                args[ii])), 
+                        nullptr));
+                }
+            }
+        }
+        
+        return TranspositionResult(gradients);
+    }
     
     TranspositionResult transposeInst(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
@@ -288,6 +386,9 @@ struct DiffTransposePass
             case kIROp_Mul:
             case kIROp_Sub:
                 return transposeArithmetic(builder, fwdInst, revValue);
+
+            case kIROp_Call:
+                return transposeCall(builder, as<IRCall>(fwdInst), revValue);
             
             case kIROp_swizzle:
                 return transposeSwizzle(builder, as<IRSwizzle>(fwdInst), revValue);
@@ -322,35 +423,49 @@ struct DiffTransposePass
     {
         auto revPtr = fwdLoad->getPtr();
 
+        auto primalType = tryGetPrimalTypeFromDiffInst(fwdLoad);
+        auto loadType = fwdLoad->getDataType();
+
+        List<RevGradient> gradients(RevGradient(
+            revPtr,
+            revValue,
+            nullptr));
+
         if (usedPtrs.contains(revPtr))
         {
             // Re-emit a load to get the _current_ value of revPtr.
             auto revCurrGrad = builder->emitLoad(revPtr);
 
             // Add the current value to the aggregation list.
-            List<RevGradient> gradients(
-                RevGradient(
-                    revCurrGrad,
-                    revValue,
-                    nullptr), 
-                RevGradient(
-                    revCurrGrad,
-                    revCurrGrad,
-                    nullptr));
-            
-            auto primalType = tryGetPrimalTypeFromDiffInst(fwdLoad);
-            // Get the _total_ value.
-            auto aggregateGradient = emitAggregateValue(builder, primalType, gradients);
-
-            // Store this back into the pointer.
-            builder->emitStore(revPtr, aggregateGradient);
+            gradients.add(RevGradient(
+                revPtr,
+                revCurrGrad,
+                nullptr));
         }
         else
         {
             usedPtrs.add(revPtr);
+        }
+        
+        // Get the _total_ value.
+        auto aggregateGradient = emitAggregateValue(
+            builder,
+            primalType,
+            gradients);
+        
+        if (as<IRDifferentialPairType>(loadType))
+        {
+            auto primalPtr = builder->emitDifferentialPairAddressPrimal(revPtr);
+            auto primalVal = builder->emitLoad(primalPtr);
 
-            // Store into pointer
-            builder->emitStore(revPtr, revValue);
+            auto pairVal = builder->emitMakeDifferentialPair(loadType, primalVal, aggregateGradient);
+
+            builder->emitStore(revPtr, pairVal);
+        }
+        else
+        {
+            // Store this back into the pointer.
+            builder->emitStore(revPtr, aggregateGradient);
         }
 
         return TranspositionResult(List<RevGradient>());
@@ -359,7 +474,6 @@ struct DiffTransposePass
 
     TranspositionResult transposeStore(IRBuilder* builder, IRStore* fwdStore, IRInst*)
     {
-        // (A = p.x) -> (p = float3(dA, 0, 0))
         return TranspositionResult(
                     List<RevGradient>(
                         RevGradient(
@@ -384,7 +498,6 @@ struct DiffTransposePass
     
     TranspositionResult transposeFieldExtract(IRBuilder*, IRFieldExtract* fwdExtract, IRInst* revValue)
     {
-        // (A = p.x) -> (p = float3(dA, 0, 0))
         return TranspositionResult(
                     List<RevGradient>(
                         RevGradient(
@@ -394,17 +507,19 @@ struct DiffTransposePass
                             fwdExtract)));
     }
 
-    TranspositionResult transposeMakePair(IRBuilder* builder, IRMakeDifferentialPair* fwdMakePair, IRInst* revValue)
+    TranspositionResult transposeMakePair(IRBuilder*, IRMakeDifferentialPair* fwdMakePair, IRInst* revValue)
     {
+        // Even though makePair returns a pair of (primal, differential)
+        // revValue will only contain the reverse-value for 'differential'
+        //
         // (P = (A, dA)) -> (dA += dP)
+        //
         return TranspositionResult(
                     List<RevGradient>(
                         RevGradient(
                             RevGradient::Flavor::Simple,
                             fwdMakePair->getDifferentialValue(), 
-                            builder->emitDifferentialPairGetDifferential(
-                                fwdMakePair->getDifferentialValue()->getDataType(),
-                                revValue),
+                            revValue,
                             fwdMakePair)));
     }
 
@@ -414,7 +529,7 @@ struct DiffTransposePass
         return TranspositionResult(
                     List<RevGradient>(
                         RevGradient(
-                            RevGradient::Flavor::GetDifferential,
+                            RevGradient::Flavor::Simple,
                             fwdGetDiff->getBase(),
                             revValue,
                             fwdGetDiff)));
@@ -448,6 +563,9 @@ struct DiffTransposePass
     // 
     void accumulateGradientsForLoad(IRBuilder* builder, IRLoad* revLoad)
     {
+        return transposeInst(builder, revLoad);
+
+        /*
         auto revPtr = revLoad->getPtr();
  
         // Assert that ptr type is of the form IRPtrTypeBase<IRDifferentialPairType<T>>
@@ -481,6 +599,7 @@ struct DiffTransposePass
             // Store this back into the pointer.
             builder->emitStore(revPtr, aggregateGradient);
         }
+        */
     }
 
     TranspositionResult transposeReturn(IRBuilder*, IRReturn* fwdReturn, IRInst* revValue)
@@ -488,16 +607,14 @@ struct DiffTransposePass
         // TODO: This check needs to be changed to something like: isRelevantDifferentialPair()
         if (as<IRDifferentialPairType>(fwdReturn->getVal()->getDataType()))
         {
-            // This is a subtle case, even though the returned value is returning
-            // a pair, we need to pretend that the primal value is not being returned
-            // since we only care about transposing differential computation.
-            // So we're going to assume there is an implicit GetDifferential()
-            // around the return value before returning.
+            // Simply pass on the gradient to the previous inst.
+            // (Even if the return value is pair typed, we only care about the differential part)
+            // So this will remain a 'simple' gradient.
             // 
             return TranspositionResult(
                         List<RevGradient>(
                             RevGradient(
-                                RevGradient::Flavor::GetDifferential,
+                                RevGradient::Flavor::Simple,
                                 fwdReturn->getVal(), 
                                 revValue,
                                 fwdReturn)));
@@ -856,6 +973,8 @@ struct DiffTransposePass
 
     IRInst* emitAggregateDifferentialPair(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> pairGradients)
     {
+        SLANG_UNEXPECTED("Should not run.");
+
         auto aggPairType = as<IRDifferentialPairType>(aggPrimalType);
         SLANG_ASSERT(aggPairType);
 
@@ -923,7 +1042,9 @@ struct DiffTransposePass
         // a differential pair is really a 'hybrid' primal-differential type.
         //
         if (as<IRDifferentialPairType>(aggPrimalType))
-            return emitAggregateDifferentialPair(builder, aggPrimalType, gradients);
+        {
+            SLANG_UNEXPECTED("Should not occur");
+        }
 
         // Process non-simple gradients into simple gradients.
         // TODO: This is where we can improve efficiency later.

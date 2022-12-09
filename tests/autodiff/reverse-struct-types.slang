@@ -9,27 +9,6 @@ struct A : IDifferentiable
 {
     float x;
     float y;
-
-    [__unsafeForceInlineEarly]
-    static Differential dzero()
-    {
-        Differential b = {0.0, float.dzero()};
-        return b;
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dadd(Differential a, Differential b)
-    {
-        Differential o = {a.x + b.x, 0.0};
-        return o;
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dmul(This a, Differential b)
-    {
-        Differential o = {a.x * b.x, 0.0};
-        return o;
-    }
 };
 
 typedef DifferentialPair<A> dpA;
@@ -56,7 +35,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         A.Differential dout = {1.0, 1.0};
         
         __bwd_diff(f)(dpa, dout);
-        outputBuffer[0] = dpa.d.x; // Expect: 10
+        outputBuffer[0] = dpa.d.x; // Expect: 7
         outputBuffer[1] = dpa.d.y; // Expect: 0
     }
 }

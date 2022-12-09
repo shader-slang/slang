@@ -15,6 +15,11 @@ bool isDifferentialInst(IRInst* inst)
     return inst->findDecoration<IRDifferentialInstDecoration>();
 }
 
+bool isMixedDifferentialInst(IRInst* inst)
+{
+    return inst->findDecoration<IRMixedDifferentialInstDecoration>();
+}
+
 struct DiffPropagationPass : InstPassBase
 {
     AutoDiffSharedContext*                  autodiffContext;
