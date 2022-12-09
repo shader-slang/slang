@@ -11,6 +11,7 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+#include <functional>
 
 using namespace Slang;
 
@@ -30,6 +31,46 @@ inline bool isBlobEqual(ISlangBlob* a, ISlangBlob* b)
         a->getBufferSize() == b->getBufferSize() &&
         ::memcmp(a->getBufferPointer(), b->getBufferPointer(), a->getBufferSize()) == 0;
 }
+
+class Barrier
+{
+public:
+    Barrier(size_t threadCount, std::function<void()> completionFunc = nullptr)
+        : m_threadCount(threadCount)
+        , m_waitCount(threadCount)
+        , m_completionFunc(completionFunc)
+    {}
+
+    Barrier(const Barrier& barrier) = delete;
+    Barrier& operator=(const Barrier& barrier) = delete;
+
+    void wait()
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+
+        auto generation = m_generation;
+
+        if (--m_waitCount == 0)
+        {
+            if (m_completionFunc) m_completionFunc();
+            ++m_generation;
+            m_waitCount = m_threadCount;
+            m_condition.notify_all();
+        }
+        else
+        {
+            m_condition.wait(lock, [this, generation] () { return generation != m_generation; });
+        }
+    }
+
+private:
+    size_t m_threadCount;
+    size_t m_waitCount;
+    size_t m_generation = 0;
+    std::function<void()> m_completionFunc;
+    std::mutex m_mutex;
+    std::condition_variable m_condition;
+};
 
 namespace Slang
 {
@@ -441,8 +482,12 @@ struct StressTest : public PersistentCacheTest
     std::atomic<uint32_t> readSuccess{0};
     std::thread threads[kThreadCount];
 
+    Barrier *read_barrier;
+    Barrier *write_barrier;
+
     std::mutex mutex;
     std::condition_variable conditionVariable;
+    uint32_t generation{0};
 
     StressTest() : PersistentCacheTest(kEntryCount - kEntryShortageCount) {}
 
@@ -458,6 +503,26 @@ struct StressTest : public PersistentCacheTest
         }
 
         auto startTime = std::chrono::high_resolution_clock::now();
+
+        Barrier read_barrier_(
+            kThreadCount,
+            []()
+            {
+                LOG("Read synchronized\n");
+            });
+        Barrier write_barrier_(
+            kThreadCount,
+            [this](){
+                LOG("Write synchronized\n");
+#ifndef ENABLE_WRITE_TEST
+                SLANG_CHECK(readSuccess == kEntryCount - kEntryShortageCount);
+                readSuccess.store(0);
+#endif
+                iteration += 1;
+            });
+
+        read_barrier = &read_barrier_;
+        write_barrier = &write_barrier_;
 
         for (uint32_t threadIndex = 0; threadIndex < kThreadCount; ++threadIndex)
         {
@@ -482,22 +547,10 @@ struct StressTest : public PersistentCacheTest
                             self->bytesWritten.fetch_add((uint32_t)entry.data->getBufferSize());
                         }
 
-                        LOG("Thread %u: ended writing\n", threadIndex);
+                        LOG("Thread %u: ended writing (iteration=%u)\n", threadIndex, self->iteration.load());
 
                         // Synchronize.
-                        {
-                            std::unique_lock<std::mutex> lock(self->mutex);
-                            if (self->entriesWritten == (self->iteration + 1) * kEntryCount)
-                            {
-                                self->conditionVariable.notify_all();
-                            }
-                            else
-                            {
-                                self->conditionVariable.wait(lock);
-                            }
-                        }
-
-                        LOG("Thread %u: synchronized\n", threadIndex);
+                        self->read_barrier->wait();
 
                         // Read from cache.
                         for (size_t i = 0; i < kBatchCount; ++i)
@@ -513,31 +566,15 @@ struct StressTest : public PersistentCacheTest
                             self->entriesRead.fetch_add(1);
                         }
 
-                        LOG("Thread %u: ended reading\n", threadIndex);
+                        LOG("Thread %u: ended reading (iteration=%u)\n", threadIndex, self->iteration.load());
 
                         // Synchronize.
-                        {
-                            std::unique_lock<std::mutex> lock(self->mutex);
-                            if (self->entriesRead == (self->iteration + 1) * kEntryCount)
-                            {
-#ifndef ENABLE_WRITE_TEST
-                                SLANG_CHECK(self->readSuccess == kEntryCount - kEntryShortageCount);
-#endif
-                                self->iteration++;
-                                self->readSuccess = 0;
-                                self->conditionVariable.notify_all();
-                            }
-                            else
-                            {
-                                self->conditionVariable.wait(lock);
-                            }
-                        }
-
-                        LOG("Thread %u: synchronized\n", threadIndex);
+                        self->write_barrier->wait();
 
                         // Terminate.
                         if (self->iteration >= kIterationCount)
                         {
+                            LOG("Thread %u: terminates\n", threadIndex);
                             return;
                         }
                     }

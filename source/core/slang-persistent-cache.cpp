@@ -224,7 +224,9 @@ SlangResult PersistentCache::initialize()
 
 String PersistentCache::getEntryFileName(const Key& key)
 {
-    return m_cacheDirectory + "/" + key.toString();
+    StringBuilder str;
+    str << m_cacheDirectory << "/" << key.toString();
+    return str;
 }
 
 struct CacheIndexHeader
@@ -241,7 +243,7 @@ static const uint32_t kVersion = 1;
 SlangResult PersistentCache::readIndex(const String& fileName, CacheIndex& outIndex)
 {
     FileStream fs;
-    SLANG_RETURN_ON_FAIL(fs.init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+    SLANG_RETURN_ON_FAIL(fs.init(fileName, FileMode::Open));
 
     // Get file size.
     SLANG_RETURN_ON_FAIL(fs.seek(SeekOrigin::End, 0));
@@ -270,7 +272,7 @@ SlangResult PersistentCache::readIndex(const String& fileName, CacheIndex& outIn
 SlangResult PersistentCache::writeIndex(const String& fileName, const CacheIndex& index)
 {
     FileStream fs;
-    SLANG_RETURN_ON_FAIL(fs.init(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
+    SLANG_RETURN_ON_FAIL(fs.init(fileName, FileMode::Create));
 
     CacheIndexHeader header;
     ::memcpy(header.magic, kMagic, 4);
