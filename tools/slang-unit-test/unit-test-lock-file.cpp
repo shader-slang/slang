@@ -10,11 +10,12 @@
 
 using namespace Slang;
 
-// skip tests
-#if 0
 SLANG_UNIT_TEST(lockFile)
 {
-    static const String fileName = "test_lock_file";
+    static String fileName;
+    Path::getCanonical(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file", fileName);
+
+    printf("lock file fileName = %s\n", fileName.getBuffer());
 
     // Open/close lock file.
     {
@@ -128,4 +129,3 @@ SLANG_UNIT_TEST(lockFile)
     File::remove(fileName);
     SLANG_CHECK(File::exists(fileName) == false);
 }
-#endif
