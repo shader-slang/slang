@@ -719,7 +719,7 @@ namespace Slang
 
         default:
             SLANG_UNEXPECTED("unhandled unconditional branch opcode");
-            UNREACHABLE_RETURN(0);
+            UNREACHABLE_RETURN(IROperandListBase());
         }
     }
 
