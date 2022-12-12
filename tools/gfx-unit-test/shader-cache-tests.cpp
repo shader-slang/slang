@@ -581,34 +581,33 @@ namespace gfx_test
         }
     };
 
-#if 0
     // Same gist as the multiple entry point compute shader but with a graphics
-    // shader file containing a vertex and fragment shader
-    struct Vertex
+    // shader file containing a vertex and fragment shader.
+    struct ShaderCacheTestGraphics : ShaderCacheTest
     {
-        float position[3];
-    };
+        struct Vertex
+        {
+            float position[3];
+        };
 
-    static const int kVertexCount = 3;
-    static const Vertex kVertexData[kVertexCount] =
-    {
-        { 0, 0, 0.5 },
-        { 1, 0, 0.5 },
-        { 0, 1, 0.5 },
-    };
+        static const int kVertexCount = 3;
+        const Vertex kVertexData[kVertexCount] =
+        {
+            { 0, 0, 0.5 },
+            { 1, 0, 0.5 },
+            { 0, 1, 0.5 },
+        };
 
-    struct GraphicsShaderCache : ShaderCacheTest
-    {
-        const int kWidth = 256;
-        const int kHeight = 256;
-        const Format format = Format::R32G32B32A32_FLOAT;
-
-        ComPtr<IShaderProgram> shaderProgram;
-        ComPtr<IRenderPassLayout> renderPass;
-        ComPtr<IFramebuffer> framebuffer;
+        static const int kWidth = 256;
+        static const int kHeight = 256;
+        static const Format format = Format::R32G32B32A32_FLOAT;
 
         ComPtr<IBufferResource> vertexBuffer;
         ComPtr<ITextureResource> colorBuffer;
+        ComPtr<IInputLayout> inputLayout;
+        ComPtr<IFramebufferLayout> framebufferLayout;
+        ComPtr<IRenderPassLayout> renderPass;
+        ComPtr<IFramebuffer> framebuffer;
 
         ComPtr<IBufferResource> createVertexBuffer(IDevice* device)
         {
@@ -638,13 +637,7 @@ namespace gfx_test
             return colorBuffer;
         }
 
-        void createShaderProgram()
-        {
-            slang::ProgramLayout* slangReflection;
-            GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "shader-cache-graphics", "vertexMain", "fragmentMain", slangReflection));
-        }
-
-        void createComputeResources()
+        void createGraphicsResources()
         {
             VertexStreamDesc vertexStreams[] = {
                 { sizeof(Vertex), InputSlotClass::PerVertex, 0 },
@@ -659,7 +652,7 @@ namespace gfx_test
             inputLayoutDesc.inputElements = inputElements;
             inputLayoutDesc.vertexStreamCount = SLANG_COUNT_OF(vertexStreams);
             inputLayoutDesc.vertexStreams = vertexStreams;
-            auto inputLayout = device->createInputLayout(inputLayoutDesc);
+            inputLayout = device->createInputLayout(inputLayoutDesc);
             SLANG_CHECK_ABORT(inputLayout != nullptr);
 
             vertexBuffer = createVertexBuffer(device);
@@ -672,17 +665,8 @@ namespace gfx_test
             IFramebufferLayout::Desc framebufferLayoutDesc;
             framebufferLayoutDesc.renderTargetCount = 1;
             framebufferLayoutDesc.renderTargets = &targetLayout;
-            ComPtr<gfx::IFramebufferLayout> framebufferLayout = device->createFramebufferLayout(framebufferLayoutDesc);
+            framebufferLayout = device->createFramebufferLayout(framebufferLayoutDesc);
             SLANG_CHECK_ABORT(framebufferLayout != nullptr);
-
-            GraphicsPipelineStateDesc pipelineDesc = {};
-            pipelineDesc.program = shaderProgram.get();
-            pipelineDesc.inputLayout = inputLayout;
-            pipelineDesc.framebufferLayout = framebufferLayout;
-            pipelineDesc.depthStencil.depthTestEnable = false;
-            pipelineDesc.depthStencil.depthWriteEnable = false;
-            GFX_CHECK_CALL_ABORT(
-                device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef()));
 
             IRenderPassLayout::Desc renderPassDesc = {};
             renderPassDesc.framebufferLayout = framebufferLayout;
@@ -710,7 +694,35 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
         }
 
-        void dispatchComputePipeline()
+        void freeGraphicsResources()
+        {
+            inputLayout = nullptr;
+            framebufferLayout = nullptr;
+            renderPass = nullptr;
+            framebuffer = nullptr;
+            vertexBuffer = nullptr;
+            colorBuffer = nullptr;
+            pipelineState = nullptr;
+        }
+
+        void createGraphicsPipeline()
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            slang::ProgramLayout* slangReflection;
+            GFX_CHECK_CALL_ABORT(
+                loadGraphicsProgram(device, shaderProgram, "shader-cache-graphics", "vertexMain", "fragmentMain", slangReflection));
+
+            GraphicsPipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            pipelineDesc.inputLayout = inputLayout;
+            pipelineDesc.framebufferLayout = framebufferLayout;
+            pipelineDesc.depthStencil.depthTestEnable = false;
+            pipelineDesc.depthStencil.depthWriteEnable = false;
+            GFX_CHECK_CALL_ABORT(
+                device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void dispatchGraphicsPipeline()
         {
             ComPtr<ITransientResourceHeap> transientHeap;
             ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -741,22 +753,44 @@ namespace gfx_test
             queue->waitOnHost();
         }
 
+        void runGraphicsPipeline()
+        {
+            createGraphicsResources();
+            createGraphicsPipeline();
+            dispatchGraphicsPipeline();
+            freeGraphicsResources();
+        }
+
         void runTests()
         {
-            generateNewDevice();
-            createShaderProgram();
-            createComputeResources();
-            dispatchComputePipeline();
+            // Cache is cold and we expect 2 misses (2 entry points).
+            runStep(
+                [this]()
+                {
+                    runGraphicsPipeline();
 
-            SLANG_CHECK(getStats().missCount == 2);
-            SLANG_CHECK(getStats().hitCount == 0);
-            SLANG_CHECK(getStats().entryCount == 2);
+                    SLANG_CHECK(getStats().missCount == 2);
+                    SLANG_CHECK(getStats().hitCount == 0);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );            
+
+            // Cache is hot and we expect 2 hits.
+            runStep(
+                [this]()
+                {
+                    runGraphicsPipeline();
+
+                    SLANG_CHECK(getStats().missCount == 0);
+                    SLANG_CHECK(getStats().hitCount == 2);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            ); 
         }
     };
-#endif
 
 #if 0
-    // Same as GraphicsShaderCache, but instead of having a singular file containing both a vertex and fragment shader, we
+    // Same as ShaderCacheTestGraphics, but instead of having a singular file containing both a vertex and fragment shader, we
     // now have two separate shader files, one containing the vertex shader and the other the fragment with the same
     // names, with the expectation that we should record cache misses for both fetches.
     //
@@ -768,7 +802,7 @@ namespace gfx_test
     //
     // We do not actively test geometry shaders here, but it is simply an extension of this test and should be expected
     // to behave similarly.
-    struct SplitGraphicsShader : GraphicsShaderCache
+    struct SplitGraphicsShader : ShaderCacheTestGraphics
     {
         void createShaderProgram()
         {
@@ -947,17 +981,17 @@ namespace gfx_test
     {
         runTest<ShaderCacheTestSpecialization>(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-#if 0
+
     SLANG_UNIT_TEST(shaderCacheGraphicsD3D12)
     {
-        runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTest<ShaderCacheTestGraphics>(unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
     SLANG_UNIT_TEST(shaderCacheGraphicsVulkan)
     {
-        runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTest<ShaderCacheTestGraphics>(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-
+#if 0
     SLANG_UNIT_TEST(shaderCacheSplitGraphicsD3D12)
     {
         runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::D3D12);
