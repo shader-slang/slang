@@ -317,7 +317,6 @@
     <None Include="..\..\..\tools\gfx-unit-test\compute-trivial.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
-    <None Include="..\..\..\tools\gfx-unit-test\multiple-entry-point-shader-cache-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shaders.slang" />
@@ -325,6 +324,8 @@
     <None Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\sampler-array.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\shader-cache-graphics.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-multiple-entry-points.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-specialization.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\split-graphics-fragment.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\split-graphics-vertex.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\swapchain-shader.slang" />
