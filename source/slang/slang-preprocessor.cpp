@@ -3048,15 +3048,15 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
         sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
         sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
+    }
 
-        // If we are running the preprocessor as part of compiling a
-        // specific module, then we must keep track of the file we've
-        // read as yet another file that the module will depend on.
-        //
-        if (auto handler = context->m_preprocessor->handler)
-        {
-            handler->handleFileDependency(sourceFile);
-        }
+    // If we are running the preprocessor as part of compiling a
+    // specific module, then we must keep track of the file we've
+    // read as yet another file that the module will depend on.
+    //
+    if (auto handler = context->m_preprocessor->handler)
+    {
+        handler->handleFileDependency(sourceFile);
     }
 
     // This is a new parse (even if it's a pre-existing source file), so create a new SourceView
