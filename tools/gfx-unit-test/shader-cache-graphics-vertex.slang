@@ -1,4 +1,4 @@
-// split-graphics-vertex.slang
+// shader-cache-graphics-vertex.slang
 
 // Per-vertex attributes to be assembled from bound vertex buffers.
 struct AssembledVertex

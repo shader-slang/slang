@@ -1,4 +1,4 @@
-// compute-smoke.slang
+// shader-cache-specialization.slang
 
 // This is a copy of `shader-object.slang` in `shader-object` example
 // for use by compute-smoke gfx unit test.

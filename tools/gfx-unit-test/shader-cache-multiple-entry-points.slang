@@ -1,3 +1,5 @@
+// shader-cache-multiple-entry-points.slang
+
 [shader("compute")]
 [numthreads(4, 1, 1)]
 void computeA(
