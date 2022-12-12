@@ -194,6 +194,7 @@ namespace gfx_test
     Slang::ComPtr<gfx::IDevice> createTestingDevice(
         UnitTestContext* context,
         Slang::RenderApiFlag::Enum api,
+        Slang::List<const char*> additionalSearchPaths,
         gfx::IDevice::ShaderCacheDesc shaderCache)
     {
         Slang::ComPtr<gfx::IDevice> device;
@@ -222,10 +223,13 @@ namespace gfx_test
             SLANG_IGNORE_TEST
         }
         deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
-        const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
-        deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
-        deviceDesc.slang.searchPaths = searchPaths;
-
+        Slang::List<const char*> searchPaths;
+        searchPaths.add("");
+        searchPaths.add("../../tools/gfx-unit-test");
+        searchPaths.add("tools/gfx-unit-test");
+        searchPaths.addRange(additionalSearchPaths);
+        deviceDesc.slang.searchPaths = searchPaths.getBuffer();
+        deviceDesc.slang.searchPathCount = (gfx::GfxCount)searchPaths.getCount();
         deviceDesc.shaderCache = shaderCache;
 
         gfx::D3D12DeviceExtendedDesc extDesc = {};
