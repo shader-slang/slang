@@ -3239,12 +3239,7 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 
 void Module::buildHash(DigestBuilder<SHA1>& builder)
 {
-    for (SourceFile* sourceFile : getFileDependencies())
-    {
-        // TODO: We want to lazily evaluate & cache the source file digest
-        SHA1::Digest digest = SHA1::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
-        builder.append(digest);
-    }
+    SLANG_UNUSED(builder);
 }
 
 void Module::addModuleDependency(Module* module)
@@ -3459,10 +3454,18 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     // Consequently, any encoding differences as a result of different compiler versions
     // will already be reflected in the resulting hash.
     getLinkage()->buildHash(builder, targetIndex);
+
+    // Enumerate all file dependencies and add them to the hash.
+    for (SourceFile* sourceFile : getFileDependencies())
+    {
+        // TODO: We want to lazily evaluate & cache the source file digest
+        SHA1::Digest digest = SHA1::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
+        builder.append(digest);
+    }
+
     buildHash(builder);
 
-    // Add the name and name override for the specified entry point
-    // to the hash.
+    // Add the name and name override for the specified entry point to the hash.
     auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
     builder.append(entryPointName);
     auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
