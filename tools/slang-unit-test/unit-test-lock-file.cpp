@@ -12,13 +12,13 @@ using namespace Slang;
 
 SLANG_UNIT_TEST(lockFile)
 {
-    static const String fileName = "test_lock_file";
+    static String fileName = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file");
 
     // Open/close lock file.
     {
         LockFile file;
         SLANG_CHECK(file.isOpen() == false);
-        SLANG_CHECK(file.open(fileName) == SLANG_OK);
+        SLANG_CHECK_ABORT(file.open(fileName) == SLANG_OK);
         SLANG_CHECK(file.isOpen() == true);
         SLANG_CHECK(File::exists(fileName) == true);
         file.close();

@@ -1,4 +1,4 @@
-// split-graphics-fragment.slang
+// shader-cache-graphics-fragment.slang
 
 // Output of the vertex shader, and input to the fragment shader.
 struct CoarseVertex

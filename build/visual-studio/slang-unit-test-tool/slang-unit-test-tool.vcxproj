@@ -296,6 +296,7 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-memory-arena.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-offset-container.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-path.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-persistent-cache.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-process.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-riff.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-rtti.cpp" />

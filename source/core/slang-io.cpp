@@ -682,7 +682,7 @@ namespace Slang
         WIN32_FIND_DATAW fileData;
 
         HANDLE findHandle = FindFirstFileW(searchPath.toWString(), &fileData);
-        if (!findHandle)
+        if (findHandle == INVALID_HANDLE_VALUE)
         {
             return SLANG_E_NOT_FOUND;
         }

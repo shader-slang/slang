@@ -266,9 +266,9 @@ namespace Slang
 
     private:
         LockFile(const LockFile&) = delete;
-        LockFile(LockFile&) = delete;
+        LockFile(LockFile&&) = delete;
         LockFile& operator=(const LockFile&) = delete;
-        LockFile& operator=(const LockFile&&) = delete;
+        LockFile& operator=(LockFile&&) = delete;
 
 #if SLANG_WINDOWS_FAMILY
         void* m_fileHandle;
@@ -276,6 +276,29 @@ namespace Slang
         int m_fileHandle;
 #endif
         bool m_isOpen;
+    };
+
+    class LockFileGuard
+    {
+    public:
+        LockFileGuard(LockFile& lockFile, LockFile::LockType lockType = LockFile::LockType::Exclusive)
+            : m_lockFile(lockFile)
+        {
+            m_lockFile.lock(lockType);
+        }
+
+        ~LockFileGuard()
+        {
+            m_lockFile.unlock();
+        }
+
+    private:
+        LockFileGuard(const LockFileGuard&) = delete;
+        LockFileGuard(LockFileGuard&&) = delete;
+        LockFileGuard& operator=(const LockFileGuard&) = delete;
+        LockFileGuard& operator=(LockFileGuard&&) = delete;
+
+        LockFile& m_lockFile;
     };
 
 }

@@ -4425,34 +4425,16 @@ namespace slang
             IBlob**     outCode,
             IBlob**     outDiagnostics = nullptr) = 0;
 
-            /** Compute the hash code of all dependencies for this component type. This generally means file path
-                dependencies but can also include the component's name or sub-components. The dependency-based
-                hash effectively represents all the files that may be included/imported by a component type along with
-                any non-code-specific that helps define a component. This can be useful to simply check for a component
-                type without needing to inspect the code. For example, a shader cache might key its entries using the
-                dependency-based hash in order to determine at a glance if a particular shader is present, with no
-                regard for the shader's contents.
+            /** Compute a hash for the entry point at `entryPointIndex` for the chosen `targetIndex`.
 
-                This function should only have a meaningful implementation in ComponentType. All other types derived from
-                ComponentType that also inherit from IComponentType should do nothing.
+            This computes a hash based on all the dependencies for this component type as well as the
+            target settings affecting the compiler backend. The computed hash is used as a key for caching
+            the output of the compiler backend to implement shader caching.
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
-            SlangInt entryPointIndex,
-            SlangInt targetIndex,
-            IBlob** outHash) = 0;
-
-            /** Compute the hash code of this component type's contents as indicated by the file dependencies.
-                This hash is ideal when we need to confirm whether shader code changes have occurred. For example,
-                a shader cache needs to be able to check when a cache entry contains out-of-date code, which can be
-                easily detected by comparing the contents-based hashes since they will directly reflect any change
-                to the shader's code.
-
-                This function should only have a meaningful implementation in ComponentType. All other types derived
-                from ComponentType that also inherit from IComponentType should do nothing. However, the only component
-                type that should ever be hashing its contents is Module as it represents all the code in a given
-                translation unit.
-            */
-        virtual SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(IBlob** outHash) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
+            SlangInt    entryPointIndex,
+            SlangInt    targetIndex,
+            IBlob**     outHash) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

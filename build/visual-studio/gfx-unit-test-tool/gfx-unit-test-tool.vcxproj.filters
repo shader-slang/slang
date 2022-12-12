@@ -121,9 +121,6 @@
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="..\..\..\tools\gfx-unit-test\multiple-entry-point-shader-cache-shader.slang">
-      <Filter>Source Files</Filter>
-    </None>
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang">
       <Filter>Source Files</Filter>
     </None>
@@ -142,13 +139,19 @@
     <None Include="..\..\..\tools\gfx-unit-test\sampler-array.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-graphics-fragment.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-graphics-vertex.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\shader-cache-graphics.slang">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="..\..\..\tools\gfx-unit-test\split-graphics-fragment.slang">
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-multiple-entry-points.slang">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="..\..\..\tools\gfx-unit-test\split-graphics-vertex.slang">
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-specialization.slang">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\swapchain-shader.slang">

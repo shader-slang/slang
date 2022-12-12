@@ -297,6 +297,7 @@
     <ClInclude Include="..\..\..\source\core\slang-memory-arena.h" />
     <ClInclude Include="..\..\..\source\core\slang-memory-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h" />
+    <ClInclude Include="..\..\..\source\core\slang-persistent-cache.h" />
     <ClInclude Include="..\..\..\source\core\slang-platform.h" />
     <ClInclude Include="..\..\..\source\core\slang-process-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-process.h" />
@@ -353,6 +354,7 @@
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-persistent-cache.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-process-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-random-generator.cpp" />
