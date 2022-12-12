@@ -590,14 +590,6 @@ namespace gfx_test
             float position[3];
         };
 
-        static const int kVertexCount = 3;
-        const Vertex kVertexData[kVertexCount] =
-        {
-            { 0, 0, 0.5 },
-            { 1, 0, 0.5 },
-            { 0, 1, 0.5 },
-        };
-
         static const int kWidth = 256;
         static const int kHeight = 256;
         static const Format format = Format::R32G32B32A32_FLOAT;
@@ -611,12 +603,18 @@ namespace gfx_test
 
         ComPtr<IBufferResource> createVertexBuffer(IDevice* device)
         {
+            const Vertex vertices[] = {
+                { 0, 0, 0.5 },
+                { 1, 0, 0.5 },
+                { 0, 1, 0.5 },
+            };
+
             IBufferResource::Desc vertexBufferDesc;
             vertexBufferDesc.type = IResource::Type::Buffer;
-            vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
+            vertexBufferDesc.sizeInBytes = sizeof(vertices);
             vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
             vertexBufferDesc.allowedStates = ResourceState::VertexBuffer;
-            ComPtr<IBufferResource> vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
+            ComPtr<IBufferResource> vertexBuffer = device->createBufferResource(vertexBufferDesc, vertices);
             SLANG_CHECK_ABORT(vertexBuffer != nullptr);
             return vertexBuffer;
         }
@@ -746,7 +744,7 @@ namespace gfx_test
             encoder->setVertexBuffer(0, vertexBuffer);
             encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
-            encoder->draw(kVertexCount);
+            encoder->draw(3);
             encoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
