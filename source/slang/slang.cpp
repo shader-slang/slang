@@ -1320,9 +1320,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     return SLANG_OK;
 }
 
-void Linkage::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt targetIndex)
+void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
 {
     // Add the Slang compiler version to the hash
     auto version = String(getBuildTagString());
@@ -1346,20 +1344,14 @@ void Linkage::updateDependencyBasedHash(
     // Add the target specified by targetIndex
     auto targetReq = targets[targetIndex];
     builder.append(targetReq->getTarget());
+    builder.append(targetReq->getTargetProfile().raw);
     builder.append(targetReq->getTargetFlags());
     builder.append(targetReq->getFloatingPointMode());
     builder.append(targetReq->getLineDirectiveMode());
-    builder.append(targetReq->shouldDumpIntermediates());
     builder.append(targetReq->getForceGLSLScalarBufferLayout());
+    builder.append(targetReq->getDefaultMatrixLayoutMode());
+    builder.append(targetReq->shouldDumpIntermediates());
     builder.append(targetReq->shouldTrackLiveness());
-
-    auto targetProfile = targetReq->getTargetProfile();
-    builder.append(targetProfile.getStage());
-    builder.append(targetProfile.getVersion());
-    builder.append(targetProfile.getFamily());
-
-    auto targetProfileName = String(targetProfile.getName());
-    builder.append(targetProfileName);
 
     auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
     for (auto& capability : cookedCapabilities)
@@ -1367,8 +1359,24 @@ void Linkage::updateDependencyBasedHash(
         builder.append(capability);
     }
 
+    const PassThroughMode passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
+    const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
+
+    // Add prelude for the given downstream compiler.
+    ComPtr<ISlangBlob> prelude;
+    getGlobalSession()->getLanguagePrelude((SlangSourceLanguage)sourceLanguage, prelude.writeRef());
+    if (prelude)
+    {
+        builder.append(prelude);
+    }
+
+    // TODO: Downstream compilers (specifically dxc) can currently #include additional dependencies.
+    // This is currently the case for NVAPI headers included in the prelude.
+    // These dependencies are currently not picked up by the shader cache which is a significant issue.
+    // This can only be fixed by running the preprocessor in the slang compiler so dxc (or any other
+    // downstream compiler for that matter) isn't resolving any includes implicitly.
+
     // Add the downstream compiler version (if it exists) to the hash
-    auto passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
     auto downstreamCompiler = getSessionImpl()->getOrLoadDownstreamCompiler(passThroughMode, nullptr);
     if (downstreamCompiler)
     {
@@ -1674,25 +1682,7 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
 {
     m_sourceFiles.add(sourceFile);
 
-    // We want to record that the compiled module has a dependency
-    // on the path of the source file, but we also need to account
-    // for cases where the user added a source string/blob without
-    // an associated path and/or wasn't from a file.
-
-    auto pathInfo = sourceFile->getPathInfo();
-    if (pathInfo.hasFoundPath())
-    {
-        getModule()->addFilePathDependency(pathInfo.foundPath);
-    }
-    else
-    {
-        // No path exists for this source, so we generate a new string to use as a
-        // fake path in the list of file path dependencies. This is needed to account
-        // for non-file-based dependencies later when shader files are being hashed for
-        // the shader cache.
-        auto sourceHash = MD5::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
-        getModule()->addFilePathDependency(sourceHash.toString());
-    }
+    getModule()->addFileDependency(sourceFile);
 }
 
 List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
@@ -1896,9 +1886,9 @@ protected:
     // by applications to decide when they need to "hot reload"
     // their shader code.
     //
-    void handleFileDependency(String const& path) SLANG_OVERRIDE
+    void handleFileDependency(SourceFile* sourceFile) SLANG_OVERRIDE
     {
-        m_module->addFilePathDependency(path);
+        m_module->addFileDependency(sourceFile);
     }
 
     // The second task that this handler deals with is detecting
@@ -3200,23 +3190,23 @@ void ModuleDependencyList::_addDependency(Module* module)
 }
 
 //
-// FilePathDependencyList
+// FileDependencyList
 //
 
-void FilePathDependencyList::addDependency(String const& path)
+void FileDependencyList::addDependency(SourceFile* sourceFile)
 {
-    if(m_filePathSet.Contains(path))
+    if(m_fileSet.Contains(sourceFile))
         return;
 
-    m_filePathList.add(path);
-    m_filePathSet.Add(path);
+    m_fileList.add(sourceFile);
+    m_fileSet.Add(sourceFile);
 }
 
-void FilePathDependencyList::addDependency(Module* module)
+void FileDependencyList::addDependency(Module* module)
 {
-    for(auto& path : module->getFilePathDependencyList())
+    for(SourceFile* sourceFile : module->getFileDependencyList())
     {
-        addDependency(path);
+        addDependency(sourceFile);
     }
 }
 
@@ -3247,75 +3237,20 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
     return Super::getInterface(guid);
 }
 
-void Module::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt entryPointIndex)
+void Module::buildHash(DigestBuilder<SHA1>& builder)
 {
-    // CompositeComponentType will have already hashed this Module's file
-    // dependencies.
     SLANG_UNUSED(builder);
-    SLANG_UNUSED(entryPointIndex);
-}
-
-void Module::updateContentsBasedHash(DigestBuilder<MD5>& builder)
-{
-    auto filePathDependencies = getFilePathDependencies();
-
-    DigestBuilder<MD5> lastModifiedBuilder;
-    auto statFailed = false;
-    for (auto file : filePathDependencies)
-    {
-        struct stat fileStatus;
-        auto res = stat(file.getBuffer(), &fileStatus);
-        if (res != 0)
-        {
-            statFailed = true;
-            break;
-        }
-        lastModifiedBuilder.append(fileStatus.st_mtime);
-    }
-
-    MD5::Digest temp = lastModifiedBuilder.finalize();
-    if (statFailed || temp != lastModifiedDigest)
-    {
-        // Either a stat() call failed, or changes were made to at least one of the file dependencies,
-        // so we will need to re-generate the contents digest and save the new digest.
-        DigestBuilder<MD5> contentsBuilder;
-        for (auto file : filePathDependencies)
-        {
-            List<uint8_t> fileContents;
-            if (SLANG_FAILED(File::readAllBytes(file, fileContents)))
-            {
-                // Failure to read the file means this is a digest for the contents of a source
-                // file which does not live on disk.
-                contentsBuilder.append(file);
-            }
-            else
-            {
-                contentsBuilder.append(fileContents);
-            }
-        }
-        contentsDigest = contentsBuilder.finalize();
-        if (!statFailed)
-        {
-            // If no stat() calls failed, then we have a valid last modified digest and should
-            // update the one we have saved.
-            lastModifiedDigest = temp;
-        }
-    }
-
-    builder.append(contentsDigest);
 }
 
 void Module::addModuleDependency(Module* module)
 {
     m_moduleDependencyList.addDependency(module);
-    m_filePathDependencyList.addDependency(module);
+    m_fileDependencyList.addDependency(module);
 }
 
-void Module::addFilePathDependency(String const& path)
+void Module::addFileDependency(SourceFile* sourceFile)
 {
-    m_filePathDependencyList.addDependency(path);
+    m_fileDependencyList.addDependency(sourceFile);
 }
 
 void Module::setModuleDecl(ModuleDecl* moduleDecl)
@@ -3505,12 +3440,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
-SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
+SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
     slang::IBlob** outHash)
 {
-    DigestBuilder<MD5> builder;
+    DigestBuilder<SHA1> builder;
 
     // A note on enums that may be hashed in as part of the following two function calls:
     //
@@ -3518,19 +3453,19 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     // the compiler, part of hashing the linkage is hashing in the compiler version.
     // Consequently, any encoding differences as a result of different compiler versions
     // will already be reflected in the resulting hash.
-    getLinkage()->updateDependencyBasedHash(builder, targetIndex);
-    updateDependencyBasedHash(builder, entryPointIndex);
+    getLinkage()->buildHash(builder, targetIndex);
 
-    // Add file path dependencies to the hash - all child components
-    // will have file path dependencies that are a subset of this list.
-    auto fileDeps = getFilePathDependencies();
-    for (auto& file : fileDeps)
+    // Enumerate all file dependencies and add them to the hash.
+    for (SourceFile* sourceFile : getFileDependencies())
     {
-        builder.append(file);
+        // TODO: We want to lazily evaluate & cache the source file digest
+        SHA1::Digest digest = SHA1::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
+        builder.append(digest);
     }
 
-    // Add the name and name override for the specified entry point
-    // to the hash.
+    buildHash(builder);
+
+    // Add the name and name override for the specified entry point to the hash.
     auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
     builder.append(entryPointName);
     auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
@@ -3538,14 +3473,6 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
     builder.append(entryPointNameOverride);
 
-    auto hash = builder.finalize().toBlob();
-    *outHash = hash.detach();
-}
-
-SLANG_NO_THROW void SLANG_MCALL ComponentType::computeContentsBasedHash(slang::IBlob** outHash)
-{
-    DigestBuilder<MD5> builder;
-    updateContentsBasedHash(builder);
     auto hash = builder.finalize().toBlob();
     *outHash = hash.detach();
 }
@@ -3864,9 +3791,9 @@ CompositeComponentType::CompositeComponentType(
         {
             m_moduleDependencyList.addDependency(module);
         }
-        for(auto filePath : child->getFilePathDependencies())
+        for(auto sourceFile : child->getFileDependencies())
         {
-            m_filePathDependencyList.addDependency(filePath);
+            m_fileDependencyList.addDependency(sourceFile);
         }
 
         auto childRequirementCount = child->getRequirementCount();
@@ -3882,25 +3809,13 @@ CompositeComponentType::CompositeComponentType(
     }
 }
 
-void CompositeComponentType::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt entryPointIndex)
+void CompositeComponentType::buildHash(DigestBuilder<SHA1>& builder)
 {
     auto componentCount = getChildComponentCount();
 
     for (Index i = 0; i < componentCount; ++i)
     {
-        getChildComponent(i)->updateDependencyBasedHash(builder, entryPointIndex);
-    }
-}
-
-void CompositeComponentType::updateContentsBasedHash(DigestBuilder<MD5>& builder)
-{
-    auto componentCount = getChildComponentCount();
-
-    for (Index i = 0; i < componentCount; ++i)
-    {
-        getChildComponent(i)->updateContentsBasedHash(builder);
+        getChildComponent(i)->buildHash(builder);
     }
 }
 
@@ -3959,9 +3874,9 @@ List<Module*> const& CompositeComponentType::getModuleDependencies()
     return m_moduleDependencyList.getModuleList();
 }
 
-List<String> const& CompositeComponentType::getFilePathDependencies()
+List<SourceFile*> const& CompositeComponentType::getFileDependencies()
 {
-    return m_filePathDependencyList.getFilePathList();
+    return m_fileDependencyList.getFileList();
 }
 
 void CompositeComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -4226,7 +4141,7 @@ SpecializedComponentType::SpecializedComponentType(
     // The starting point for our lists comes from the base component type.
     //
     m_moduleDependencies = base->getModuleDependencies();
-    m_filePathDependencies = base->getFilePathDependencies();
+    m_fileDependencies = base->getFileDependencies();
 
     Index baseRequirementCount = base->getRequirementCount();
     for( Index r = 0; r < baseRequirementCount; r++ )
@@ -4238,11 +4153,11 @@ SpecializedComponentType::SpecializedComponentType(
     // dependencies and requirements based on the modules that
     // were collected when looking at the specialization arguments.
 
-    // We want to avoid adding the same file path dependency more than once.
+    // We want to avoid adding the same file dependency more than once.
     //
-    HashSet<String> filePathDependencySet;
-    for(auto path : m_filePathDependencies)
-        filePathDependencySet.Add(path);
+    HashSet<SourceFile*> fileDependencySet;
+    for(SourceFile* sourceFile : m_fileDependencies)
+        fileDependencySet.Add(sourceFile);
 
     for(auto module : moduleCollector.m_modulesList)
     {
@@ -4259,7 +4174,7 @@ SpecializedComponentType::SpecializedComponentType(
         m_requirements.add(module);
 
         // The speciialized component type will also have a dependency
-        // on all the file paths that any of the modules involved in
+        // on all the files that any of the modules involved in
         // it depend on (including those that are required but not
         // yet linked in).
         //
@@ -4268,12 +4183,12 @@ SpecializedComponentType::SpecializedComponentType(
         // source files, so we want to include anything that could
         // affect the validity of generated code.
         //
-        for(auto path : module->getFilePathDependencies())
+        for(SourceFile* sourceFile : module->getFileDependencies())
         {
-            if(filePathDependencySet.Contains(path))
+            if(fileDependencySet.Contains(sourceFile))
                 continue;
-            filePathDependencySet.Add(path);
-            m_filePathDependencies.add(path);
+            fileDependencySet.Add(sourceFile);
+            m_fileDependencies.add(sourceFile);
         }
 
         // Finalyl we also add the module for the specialization arguments
@@ -4383,9 +4298,7 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
-void SpecializedComponentType::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt entryPointIndex)
+void SpecializedComponentType::buildHash(DigestBuilder<SHA1>& builder)
 {
     auto specializationArgCount = getSpecializationArgCount();
     for (Index i = 0; i < specializationArgCount; ++i)
@@ -4395,7 +4308,7 @@ void SpecializedComponentType::updateDependencyBasedHash(
         builder.append(argString);
     }
 
-    getBaseComponentType()->updateDependencyBasedHash(builder, entryPointIndex);
+    getBaseComponentType()->buildHash(builder);
 }
 
 void SpecializedComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -4442,13 +4355,8 @@ void RenamedEntryPointComponentType::acceptVisitor(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
 }
 
-void RenamedEntryPointComponentType::updateDependencyBasedHash(
-    DigestBuilder<MD5>& builder,
-    SlangInt entryPointIndex)
+void RenamedEntryPointComponentType::buildHash(DigestBuilder<SHA1>& builder)
 {
-    // CompositeComponentType will have already hashed the name override and file
-    // dependencies for this entry point.
-    SLANG_UNUSED(entryPointIndex);
     SLANG_UNUSED(builder);
 }
 
@@ -5144,14 +5052,15 @@ int EndToEndCompileRequest::getDependencyFileCount()
 {
     auto frontEndReq = getFrontEndReq();
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
-    return (int)program->getFilePathDependencies().getCount();
+    return (int)program->getFileDependencies().getCount();
 }
 
 char const* EndToEndCompileRequest::getDependencyFilePath(int index)
 {
     auto frontEndReq = getFrontEndReq();
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
-    return program->getFilePathDependencies()[index].begin();
+    SourceFile* sourceFile = program->getFileDependencies()[index];
+    return sourceFile->getPathInfo().hasFileFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
 }
 
 int EndToEndCompileRequest::getTranslationUnitCount()

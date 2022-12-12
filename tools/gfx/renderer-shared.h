@@ -4,8 +4,7 @@
 #include "slang-context.h"
 #include "core/slang-basic.h"
 #include "core/slang-com-object.h"
-
-#include "persistent-shader-cache.h"
+#include "core/slang-persistent-cache.h"
 
 #include "resource-desc-utils.h"
 
@@ -28,7 +27,7 @@ struct GfxGUID
     static const Slang::Guid IID_ITextureResource;
     static const Slang::Guid IID_IInputLayout;
     static const Slang::Guid IID_IDevice;
-    static const Slang::Guid IID_IShaderCacheStatistics;
+    static const Slang::Guid IID_IShaderCache;
     static const Slang::Guid IID_IShaderObjectLayout;
     static const Slang::Guid IID_IShaderObject;
     static const Slang::Guid IID_IRenderPassLayout;
@@ -1214,7 +1213,7 @@ public:
 
 // Renderer implementation shared by all platforms.
 // Responsible for shader compilation, specialization and caching.
-class RendererBase : public IDevice, public IShaderCacheStatistics, public Slang::ComObject
+class RendererBase : public IDevice, public IShaderCache, public Slang::ComObject
 {
     friend class ShaderObjectBase;
 public:
@@ -1354,27 +1353,21 @@ public:
         ShaderObjectLayoutBase* layout,
         IShaderObject** outObject) = 0;
 
+ public:
+    // IShaderCache interface
+    virtual SLANG_NO_THROW Result SLANG_MCALL clearShaderCache() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getShaderCacheStats(ShaderCacheStats* outStats) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Result SLANG_MCALL resetShaderCacheStats() SLANG_OVERRIDE;
+
 protected:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc);
 protected:
     Slang::List<Slang::String> m_features;
-
-public:
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheMissCount() override;
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() override;
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryDirtyCount() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL resetCacheStatistics() override;
-
-protected:
-    GfxCount shaderCacheMissCount = 0;
-    GfxCount shaderCacheHitCount = 0;
-    GfxCount shaderCacheEntryDirtyCount = 0;
-
 public:
     SlangContext slangContext;
     ShaderCache shaderCache;
 
-    RefPtr<PersistentShaderCache> persistentShaderCache = nullptr;
+    Slang::RefPtr<Slang::PersistentCache> persistentShaderCache;
 
     Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
     Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;

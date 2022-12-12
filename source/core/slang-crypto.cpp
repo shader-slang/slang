@@ -82,15 +82,19 @@ void MD5::update(const void* data, SlangInt size)
 
     saved_lo = m_lo;
     if ((m_lo = (saved_lo + size) & 0x1fffffff) < saved_lo)
+    {
         m_hi++;
+    }
     m_hi += (uint32_t)size >> 29;
 
     used = saved_lo & 0x3f;
 
-    if (used) {
+    if (used)
+    {
         available = 64 - used;
 
-        if (size < available) {
+        if (size < available)
+        {
             ::memcpy(&m_buffer[used], data, size);
             return;
         }
@@ -101,7 +105,8 @@ void MD5::update(const void* data, SlangInt size)
         processBlock(m_buffer, 64);
     }
 
-    if (size >= 64) {
+    if (size >= 64)
+    {
         data = processBlock(data, size & ~(SlangInt)0x3f);
         size &= 0x3f;
     }
@@ -119,7 +124,8 @@ MD5::Digest MD5::finalize()
 
     available = 64 - used;
 
-    if (available < 8) {
+    if (available < 8)
+    {
         ::memset(&m_buffer[used], 0, available);
         processBlock(m_buffer, 64);
         used = 0;

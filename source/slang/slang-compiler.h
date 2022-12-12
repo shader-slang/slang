@@ -197,6 +197,7 @@ namespace Slang
     };
 
         /// Tracks an ordered list of modules that something depends on.
+        /// TODO: Shader caching currently relies on this being in well defined order.
     struct ModuleDependencyList
     {
     public:
@@ -216,15 +217,16 @@ namespace Slang
         HashSet<Module*>    m_moduleSet;
     };
 
-        /// Tracks an unordered list of filesystem paths that something depends on
-    struct FilePathDependencyList
+        /// Tracks an unordered list of source files that something depends on
+        /// TODO: Shader caching currently relies on this being in well defined order.
+    struct FileDependencyList
     {
     public:
-            /// Get the list of paths that are depended on.
-        List<String> const& getFilePathList() { return m_filePathList; }
+            /// Get the list of files that are depended on.
+        List<SourceFile*> const& getFileList() { return m_fileList; }
 
-            /// Add a path to the list, if it is not already present
-        void addDependency(String const& path);
+            /// Add a file to the list, if it is not already present
+        void addDependency(SourceFile* sourceFile);
 
             /// Add all of the paths that `module` depends on to the list
         void addDependency(Module* module);
@@ -236,11 +238,11 @@ namespace Slang
         // multiple times from `getFilePathList`, but because
         // order isn't important, we could potentially do better
         // in terms of memory (at some cost in performance) by
-        // just sorting the `m_filePathList` every once in
+        // just sorting the `m_fileList` every once in
         // a while and then deduplicating.
 
-        List<String>    m_filePathList;
-        HashSet<String> m_filePathSet;
+        List<SourceFile*>    m_fileList;
+        HashSet<SourceFile*> m_fileSet;
     };
 
     class EntryPoint;
@@ -292,13 +294,12 @@ namespace Slang
             slang::IBlob**          outDiagnostics) SLANG_OVERRIDE;
 
             /// ComponentType is the only class inheriting from IComponentType that provides a
-            /// meaningful implementation for these two functions. All others should forward these
-            /// and implement updateDependencyBasedHash and updateASTBasedHash instead.
-        SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+            /// meaningful implementation for this function. All others should forward these and
+            /// implement `buildHash`.
+        SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE;
-        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::IBlob** outHash) SLANG_OVERRIDE;
 
             /// Get the linkage (aka "session" in the public API) for this component type.
         Linkage* getLinkage() { return m_linkage; }
@@ -309,14 +310,7 @@ namespace Slang
         TargetProgram* getTargetProgram(TargetRequest* target);
 
             /// Update the hash builder with the dependencies for this component type. 
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) = 0;
-
-            /// Update the hash builder with the source contents for this component type.
-            /// Module should be the only derived ComponentType class which has a meaningful
-            /// implementation; all others should do nothing.
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) = 0;
+        virtual void buildHash(DigestBuilder<SHA1>& builder) = 0;
 
             /// Get the number of entry points linked into this component type.
         virtual Index getEntryPointCount() = 0;
@@ -371,9 +365,9 @@ namespace Slang
             ///
         virtual List<Module*> const& getModuleDependencies() = 0;
 
-            /// Get the full list of filesystem paths this component type depends on.
+            /// Get the full list of source files this component type depends on.
             ///
-        virtual List<String> const& getFilePathDependencies() = 0;
+        virtual List<SourceFile*> const& getFileDependencies() = 0;
 
             /// Callback for use with `enumerateIRModules`
         typedef void (*EnumerateIRModulesCallback)(IRModule* irModule, void* userData);
@@ -515,11 +509,7 @@ namespace Slang
             Linkage*                            linkage,
             List<RefPtr<ComponentType>> const&  childComponents);
 
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override;
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
         List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
         Index getChildComponentCount() { return m_childComponents.getCount(); }
@@ -540,7 +530,7 @@ namespace Slang
         RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE;
 
         class CompositeSpecializationInfo : public SpecializationInfo
         {
@@ -584,7 +574,7 @@ namespace Slang
         List<ComponentType*> m_requirements;
 
         ModuleDependencyList m_moduleDependencyList;
-        FilePathDependencyList m_filePathDependencyList;
+        FileDependencyList m_fileDependencyList;
     };
 
         /// A component type created by specializing another component type.
@@ -597,14 +587,7 @@ namespace Slang
             List<SpecializationArg> const&  specializationArgs,
             DiagnosticSink*                 sink);
 
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override
-        {
-            SLANG_UNUSED(hashBuilder);
-        }
+        virtual void buildHash(DigestBuilder<SHA1>& builer) SLANG_OVERRIDE;
 
             /// Get the base (unspecialized) component type that is being specialized.
         RefPtr<ComponentType> getBaseComponentType() { return m_base; }
@@ -638,7 +621,7 @@ namespace Slang
         RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencies; }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencies; }
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE { return m_fileDependencies; }
 
                     /// Get a list of tagged-union types referenced by the specialization parameters.
         List<TaggedUnionType*> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
@@ -673,7 +656,7 @@ namespace Slang
         List<TaggedUnionType*> m_taggedUnionTypes;
 
         List<Module*> m_moduleDependencies;
-        List<String> m_filePathDependencies;
+        List<SourceFile*> m_fileDependencies;
         List<RefPtr<ComponentType>> m_requirements;
     };
 
@@ -748,9 +731,9 @@ namespace Slang
         {
             return m_base->getModuleDependencies();
         }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE
         {
-            return m_base->getFilePathDependencies();
+            return m_base->getFileDependencies();
         }
 
         SLANG_NO_THROW Index SLANG_MCALL getSpecializationParamCount() SLANG_OVERRIDE
@@ -790,14 +773,7 @@ namespace Slang
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
             SLANG_OVERRIDE;
 
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override
-        {
-            SLANG_UNUSED(hashBuilder);
-        }
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
     private:
         RefPtr<ComponentType> m_base;
@@ -891,27 +867,15 @@ namespace Slang
             return Super::getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+        SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE
         {
-            return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
+            return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::IBlob** outHash) SLANG_OVERRIDE
-        {
-            return Super::computeContentsBasedHash(outHash);
-        }
-
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override
-        {
-            SLANG_UNUSED(hashBuilder);
-        }
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
@@ -948,7 +912,7 @@ namespace Slang
             /// but may also include modules that are required by its generic type arguments.
             ///
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE; // { return getModule()->getModuleDependencies(); }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE; // { return getModule()->getFilePathDependencies(); }
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE; // { return getModule()->getFileDependencies(); }
 
             /// Create a dummy `EntryPoint` that is only usable for pass-through compilation.
         static RefPtr<EntryPoint> createDummyForPassThrough(
@@ -1118,30 +1082,18 @@ namespace Slang
                 entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+        SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE
         {
-            return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
+            return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::IBlob** outHash) SLANG_OVERRIDE
-        {
-            return Super::computeContentsBasedHash(outHash);
-        }
-
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override
-        {
-            SLANG_UNUSED(hashBuilder);
-        }
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE;
 
         SLANG_NO_THROW Index SLANG_MCALL getSpecializationParamCount() SLANG_OVERRIDE { return 0; }
 
@@ -1182,8 +1134,8 @@ namespace Slang
             DiagnosticSink* sink) SLANG_OVERRIDE;
     private:
         SubtypeWitness* m_subtypeWitness;
-        ModuleDependencyList m_moduleDependency;
-        FilePathDependencyList m_pathDependency;
+        ModuleDependencyList m_moduleDependencyList;
+        FileDependencyList m_fileDependencyList;
         List<RefPtr<Module>> m_requirements;
         HashSet<Module*> m_requirementSet;
         RefPtr<IRModule> m_irModule;
@@ -1314,24 +1266,15 @@ namespace Slang
 
         //
 
-        SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+        SLANG_NO_THROW void SLANG_MCALL getEntryPointHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE
         {
-            return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
+            return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::IBlob** outHash) SLANG_OVERRIDE
-        {
-            return Super::computeContentsBasedHash(outHash);
-        }
-
-        virtual void updateDependencyBasedHash(
-            DigestBuilder<MD5>& hashBuilder,
-            SlangInt entryPointIndex) override;
-
-        virtual void updateContentsBasedHash(DigestBuilder<MD5>& hashBuilder) override;
+        virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
             /// Create a module (initially empty).
         Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);
@@ -1345,14 +1288,14 @@ namespace Slang
             /// Get the list of other modules this module depends on
         List<Module*> const& getModuleDependencyList() { return m_moduleDependencyList.getModuleList(); }
 
-            /// Get the list of filesystem paths this module depends on
-        List<String> const& getFilePathDependencyList() { return m_filePathDependencyList.getFilePathList(); }
+            /// Get the list of files this module depends on
+        List<SourceFile*> const& getFileDependencyList() { return m_fileDependencyList.getFileList(); }
 
             /// Register a module that this module depends on
         void addModuleDependency(Module* module);
 
-            /// Register a filesystem path that this module depends on
-        void addFilePathDependency(String const& path);
+            /// Register a source file that this module depends on
+        void addFileDependency(SourceFile* sourceFile);
 
             /// Set the AST for this module.
             ///
@@ -1381,7 +1324,7 @@ namespace Slang
         RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencyList.getModuleList(); }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencyList.getFilePathList(); }
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE { return m_fileDependencyList.getFileList(); }
 
             /// Given a mangled name finds the exported NodeBase associated with this module.
             /// If not found returns nullptr.
@@ -1443,8 +1386,8 @@ namespace Slang
         // List of modules this module depends on
         ModuleDependencyList m_moduleDependencyList;
 
-        // List of filesystem paths this module depends on
-        FilePathDependencyList m_filePathDependencyList;
+        // List of source files this module depends on
+        FileDependencyList m_fileDependencyList;
 
         // Entry points that were defined in thsi module
         //
@@ -1474,9 +1417,6 @@ namespace Slang
         // and m_mangledExportSymbols holds the NodeBase* values for each index. 
         StringSlicePool m_mangledExportPool;
         List<NodeBase*> m_mangledExportSymbols;
-
-        MD5::Digest lastModifiedDigest;
-        MD5::Digest contentsDigest;
     };
     typedef Module LoadedModule;
 
@@ -1768,12 +1708,10 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) override;
 
-        // Updates the supplied has builder with linkage-related information, which includes preprocessor
+        // Updates the supplied builder with linkage-related information, which includes preprocessor
         // defines, the compiler version, and other compiler options. This is then merged with the hash
         // produced for the program to produce a key that can be used with the shader cache.
-        void updateDependencyBasedHash(
-            DigestBuilder<MD5>& builder,
-            SlangInt targetIndex);
+        void buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex);
 
         void addTarget(
             slang::TargetDesc const& desc);

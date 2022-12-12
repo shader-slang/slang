@@ -62,6 +62,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-path.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-persistent-cache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-process.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
