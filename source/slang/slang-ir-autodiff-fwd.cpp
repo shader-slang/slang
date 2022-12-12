@@ -615,7 +615,12 @@ InstPair ForwardDerivativeTranscriber::transcribeLoad(IRBuilder* builder, IRLoad
         // Special case load from an `out` param, which will not have corresponding `diff` and
         // `primal` insts yet.
         
+        // TODO: Could we move this load to _after_ DifferentialPairGetPrimal, 
+        // and DifferentialPairGetDifferential?
+        // 
         auto load = builder->emitLoad(primalPtr);
+        builder->markInstAsMixedDifferential(load, diffPairType);
+
         auto primalElement = builder->emitDifferentialPairGetPrimal(load);
         auto diffElement = builder->emitDifferentialPairGetDifferential(
             (IRType*)pairBuilder->getDiffTypeFromPairType(builder, diffPairType), load);
@@ -647,7 +652,7 @@ InstPair ForwardDerivativeTranscriber::transcribeStore(IRBuilder* builder, IRSto
         if (auto diffPairType = as<IRDifferentialPairType>(primalLocationPtrType->getValueType()))
         {
             auto valToStore = builder->emitMakeDifferentialPair(diffPairType, primalStoreVal, diffStoreVal);
-            builder->markInstAsDifferential(diffStoreVal, diffPairType);
+            builder->markInstAsMixedDifferential(diffStoreVal, diffPairType);
 
             auto store = builder->emitStore(primalStoreLocation, valToStore);
             return InstPair(store, nullptr);
@@ -690,6 +695,7 @@ InstPair ForwardDerivativeTranscriber::transcribeReturn(IRBuilder* builder, IRRe
         // Neither of these should be nullptr.
         SLANG_RELEASE_ASSERT(primalReturnVal && diffReturnVal);
         IRReturn* diffReturn = as<IRReturn>(builder->emitReturn(diffReturnVal));
+        builder->markInstAsMixedDifferential(diffReturn, nullptr);
 
         return InstPair(diffReturn, diffReturn);
     }
@@ -704,9 +710,11 @@ InstPair ForwardDerivativeTranscriber::transcribeReturn(IRBuilder* builder, IRRe
         SLANG_RELEASE_ASSERT(diffReturnVal);
 
         auto diffPair = builder->emitMakeDifferentialPair(pairType, primalReturnVal, diffReturnVal);
-        builder->markInstAsDifferential(diffPair, pairType);
+        builder->markInstAsMixedDifferential(diffPair, pairType);
 
         IRReturn* pairReturn = as<IRReturn>(builder->emitReturn(diffPair));
+        builder->markInstAsMixedDifferential(pairReturn, pairType);
+
         return InstPair(pairReturn, pairReturn);
     }
     else
@@ -804,7 +812,8 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
         // If the user has already provided an differentiated implementation, use that.
         diffCallee = derivativeReferenceDecor->getForwardDerivativeFunc();
     }
-    else if (primalCallee->findDecoration<IRForwardDifferentiableDecoration>())
+    else if (primalCallee->findDecoration<IRForwardDifferentiableDecoration>() ||
+        primalCallee->findDecoration<IRBackwardDifferentiableDecoration>())
     {
         // If the function is marked for auto-diff, push a `differentiate` inst for a follow up pass
         // to generate the implementation.
@@ -851,7 +860,7 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
                 SLANG_RELEASE_ASSERT(diffArg);
                 
                 auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
-                builder->markInstAsDifferential(diffPair, pairType);
+                builder->markInstAsMixedDifferential(diffPair, pairType);
 
                 args.add(diffPair);
                 continue;
@@ -875,7 +884,7 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
         diffReturnType,
         diffCallee,
         args);
-    builder->markInstAsDifferential(callInst, origCall->getFullType());
+    builder->markInstAsMixedDifferential(callInst, diffReturnType);
 
     if (diffReturnType->getOp() != kIROp_VoidType)
     {
@@ -1578,8 +1587,15 @@ IRInst* ForwardDerivativeTranscriber::transcribe(IRBuilder* builder, IRInst* ori
                     builder->addNameHintDecoration(pair.differential, sb.getUnownedSlice());
                 }
 
-                // Tag the differential inst using a decoration.
-                builder->markInstAsDifferential(pair.differential, as<IRType>(pair.primal->getDataType()));
+                // Tag the differential inst using a decoration (if it doesn't have one)
+                if (!pair.differential->findDecoration<IRDifferentialInstDecoration>() &&
+                    !pair.differential->findDecoration<IRMixedDifferentialInstDecoration>())
+                {
+                    // TODO: If the type is a 'relevant' pair type, need to mark it as mixed differential
+                    // instead.
+                    // 
+                    builder->markInstAsDifferential(pair.differential, as<IRType>(pair.primal->getDataType()));
+                }
 
                 break;
             }
