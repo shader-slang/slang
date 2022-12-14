@@ -1778,7 +1778,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
-    case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:
@@ -1822,6 +1821,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(")");
         break;
     case kIROp_MakeVectorFromScalar:
+    case kIROp_MatrixReshape:
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
     {
