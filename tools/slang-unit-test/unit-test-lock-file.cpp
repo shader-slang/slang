@@ -10,21 +10,25 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(lockFile)
+static const String fileName = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file");
+
+SLANG_UNIT_TEST(lockFileOpenClose)
 {
-    static String fileName = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file");
+    LockFile file;
+    SLANG_CHECK(file.isOpen() == false);
+    SLANG_CHECK_ABORT(file.open(fileName) == SLANG_OK);
+    SLANG_CHECK(file.isOpen() == true);
+    SLANG_CHECK(File::exists(fileName) == true);
+    file.close();
+    SLANG_CHECK(file.isOpen() == false);
 
-    // Open/close lock file.
-    {
-        LockFile file;
-        SLANG_CHECK(file.isOpen() == false);
-        SLANG_CHECK_ABORT(file.open(fileName) == SLANG_OK);
-        SLANG_CHECK(file.isOpen() == true);
-        SLANG_CHECK(File::exists(fileName) == true);
-        file.close();
-        SLANG_CHECK(file.isOpen() == false);
-    }
+    // Cleanup.
+    File::remove(fileName);
+    SLANG_CHECK(File::exists(fileName) == false);
+}
 
+SLANG_UNIT_TEST(lockFileSync)
+{
     // Test using multiple threads.
     {
         static std::atomic<uint32_t> lockCounter;
