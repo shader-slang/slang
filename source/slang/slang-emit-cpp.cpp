@@ -1178,6 +1178,7 @@ void CPPSourceEmitter::_emitInitDefinition(const UnownedStringSlice& funcName, c
     writer->emit("{ ");
 
     const Index paramCount = Index(funcType->getParamCount());
+    bool handled = false;
 
     if (IRVectorType* vecType = as<IRVectorType>(retType))
     {
@@ -1211,7 +1212,7 @@ void CPPSourceEmitter::_emitInitDefinition(const UnownedStringSlice& funcName, c
                     writer->emit(".");
                     writer->emit(elemNames[paramSubIndex]);
 
-                    paramSubIndex ++;
+                    paramSubIndex++;
 
                     if (paramSubIndex >= paramElementCount)
                     {
@@ -1226,9 +1227,51 @@ void CPPSourceEmitter::_emitInitDefinition(const UnownedStringSlice& funcName, c
                 }
             }
         }
+        handled = true;
     }
-    else
+    else if (IRMatrixType* matType = as<IRMatrixType>(retType))
     {
+        if (paramCount != 1)
+            goto fallback;
+
+        auto paramMat = as<IRMatrixType>(funcType->getParamType(0));
+        if (!paramMat)
+            goto fallback;
+
+        // We are constructing a matrix from a differently sized matrix.
+
+        Index rows = Index(getIntVal(matType->getRowCount()));
+        Index cols = Index(getIntVal(matType->getColumnCount()));
+        Index paramRows = Index(getIntVal(paramMat->getRowCount()));
+        Index paramCols = Index(getIntVal(paramMat->getColumnCount()));
+        char elementNames[] = { 'x', 'y', 'z', 'w' };
+
+        for (Index r = 0; r < rows; r++)
+        {
+            for (Index c = 0; c < cols; c++)
+            {
+                if (r != 0 || c != 0)
+                    writer->emit(", ");
+
+                if (r < paramRows && c < paramCols && c < 4)
+                {
+                    writer->emitRawText("a.rows[");
+                    writer->emit(r);
+                    writer->emitRawText("].");
+                    writer->emitChar(elementNames[c]);
+                }
+                else
+                {
+                    writer->emit("0");
+                }
+            }
+        }
+        handled = true;
+    }
+fallback:
+    if (!handled)
+    {
+        // Fallback default: just use all params to construct.
         for (Index i = 0; i < paramCount; ++i)
         {
             if (i > 0)

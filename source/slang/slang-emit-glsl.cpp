@@ -1475,6 +1475,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     switch (inst->getOp())
     {
         case kIROp_MakeVectorFromScalar:
+        case kIROp_MatrixReshape:
         {
             // Simple constructor call
             EmitOpInfo outerPrec = inOuterPrec;
