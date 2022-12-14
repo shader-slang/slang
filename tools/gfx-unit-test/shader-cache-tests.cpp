@@ -15,6 +15,10 @@ using namespace Slang;
 
 namespace gfx_test
 {
+    // Base class for shader cache tests.
+    // Slang currently does not allow reloading shaders from modified sources.
+    // Because of this, the tests recreate a GFX device for each test step,
+    // allowing to modify shader sources in between.
     struct ShaderCacheTest
     {
         UnitTestContext* context;
@@ -711,8 +715,7 @@ namespace gfx_test
         }
     };
 
-    // Same gist as the multiple entry point compute shader but with a graphics
-    // shader file containing a vertex and fragment shader.
+    // Similar to ShaderCacheTestEntryPoint but with a source file containing a vertex and fragment shader.
     struct ShaderCacheTestGraphics : ShaderCacheTest
     {
         struct Vertex
@@ -917,18 +920,7 @@ namespace gfx_test
         }
     };
 
-    // Same as ShaderCacheTestGraphics, but instead of having a singular file containing both a vertex and fragment shader, we
-    // now have two separate shader files, one containing the vertex shader and the other the fragment with the same
-    // names, with the expectation that we should record cache misses for both fetches.
-    //
-    // This test is intended to guard against the case where vertex/fragment/geometry shaders are split across
-    // multiple files with the same entry point name in each file and are loaded as three separate ComponentType objects.
-    // In this case, the current method for cache key generation will hash in the exact same modules, file dependencies,
-    // entry point names, and entry point name overrides, resulting in the same dependency hash being returned for all three
-    // and consequently, the wrong shader code being provided when the shaders are being created.
-    //
-    // We do not actively test geometry shaders here, but it is simply an extension of this test and should be expected
-    // to behave similarly.
+    // Similar to ShaderCacheTestGraphics but with two separate shader files for the vertex and fragment shaders.
     struct ShaderCacheTestGraphicsSplit : ShaderCacheTestGraphics
     {
         void createGraphicsPipeline()
