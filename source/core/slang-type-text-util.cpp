@@ -52,20 +52,21 @@ struct CompileTargetInfo
     const char* names;                  ///< Comma delimited list of names associated with the target. NOTE! First name is taken as the normal display name.
 };
 
+// Make sure to keep this table in sync with that in slang/slang-options.cpp getHelpText
 static const CompileTargetInfo s_compileTargetInfos[] = 
 {
     { SLANG_TARGET_UNKNOWN, "",                                                 "unknown"},
     { SLANG_TARGET_NONE,    "",                                                 "none"},
     { SLANG_HLSL,           "hlsl,fx",                                          "hlsl"},
     { SLANG_DXBC,           "dxbc",                                             "dxbc"},
-    { SLANG_DXBC_ASM,       "dxbc.asm",                                         "dxbc-asm,dxbc-assembly" },
+    { SLANG_DXBC_ASM,       "dxbc-asm",                                         "dxbc-asm,dxbc-assembly" },
     { SLANG_DXIL,           "dxil",                                             "dxil" },
-    { SLANG_DXIL_ASM,       "dxil.asm",                                         "dxil-asm,dxil-assembly" },
+    { SLANG_DXIL_ASM,       "dxil-asm",                                         "dxil-asm,dxil-assembly" },
     { SLANG_GLSL,           "glsl,vert,frag,geom,tesc,tese,comp",               "glsl" },
     { SLANG_GLSL_VULKAN,    "",                                                 "glsl-vulkan" },
     { SLANG_GLSL_VULKAN_ONE_DESC, "",                                           "glsl-vulkan-one-desc" },
     { SLANG_SPIRV,          "spv",                                              "spirv"},
-    { SLANG_SPIRV_ASM,      "spv.asm",                                          "spirv-asm,spirv-assembly" },
+    { SLANG_SPIRV_ASM,      "spv-asm",                                          "spirv-asm,spirv-assembly" },
     { SLANG_C_SOURCE,       "c",                                                "c" },
     { SLANG_CPP_SOURCE,     "cpp,c++,cxx",                                      "cpp,c++,cxx" },
     { SLANG_HOST_CPP_SOURCE, "cpp,c++,cxx",                                     "host-cpp,host-c++,host-cxx"},
