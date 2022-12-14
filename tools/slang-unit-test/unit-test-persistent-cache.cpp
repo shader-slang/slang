@@ -605,6 +605,11 @@ SLANG_UNIT_TEST(persistentCacheCorruption)
 
 SLANG_UNIT_TEST(persistentCacheStress)
 {
+    // aarch64 builds currently fail to run multi-threaded tests within the test-server.
+    // Tests work fine without the test-server, which is puzzling. For now we disable them.
+#if SLANG_PROCESSOR_ARM_64
+    SLANG_IGNORE_TEST
+#endif
     StressTest test;
     test.run();
 }

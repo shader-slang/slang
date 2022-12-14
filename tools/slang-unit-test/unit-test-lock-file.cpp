@@ -29,6 +29,12 @@ SLANG_UNIT_TEST(lockFileOpenClose)
 
 SLANG_UNIT_TEST(lockFileSync)
 {
+    // aarch64 builds currently fail to run multi-threaded tests within the test-server.
+    // Tests work fine without the test-server, which is puzzling. For now we disable them.
+#if SLANG_PROCESSOR_ARM_64
+    SLANG_IGNORE_TEST
+#endif
+
     // Test using multiple threads.
     {
         static std::atomic<uint32_t> lockCounter;
