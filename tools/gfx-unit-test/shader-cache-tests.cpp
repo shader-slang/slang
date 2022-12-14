@@ -15,7 +15,10 @@ using namespace Slang;
 
 namespace gfx_test
 {
-
+    // Base class for shader cache tests.
+    // Slang currently does not allow reloading shaders from modified sources.
+    // Because of this, the tests recreate a GFX device for each test step,
+    // allowing to modify shader sources in between.
     struct ShaderCacheTest
     {
         UnitTestContext* context;
@@ -31,6 +34,7 @@ namespace gfx_test
         ComPtr<IDevice> device;
         ComPtr<IShaderCache> shaderCache;
         ComPtr<IPipelineState> pipelineState;
+        ComPtr<IBufferResource> bufferResource;
         ComPtr<IResourceView> bufferView;
 
         String computeShaderA = String(
@@ -161,21 +165,21 @@ namespace gfx_test
             bufferDesc.defaultState = ResourceState::UnorderedAccess;
             bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-            ComPtr<IBufferResource> numbersBuffer;
             GFX_CHECK_CALL_ABORT(device->createBufferResource(
                 bufferDesc,
                 (void*)initialData,
-                numbersBuffer.writeRef()));
+                bufferResource.writeRef()));
 
             IResourceView::Desc viewDesc = {};
             viewDesc.type = IResourceView::Type::UnorderedAccess;
             viewDesc.format = Format::Unknown;
             GFX_CHECK_CALL_ABORT(
-                device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+                device->createBufferView(bufferResource, nullptr, viewDesc, bufferView.writeRef()));
         }
 
         void freeComputeResources()
         {
+            bufferResource = nullptr;
             bufferView = nullptr;
             pipelineState = nullptr;
         }
@@ -185,6 +189,17 @@ namespace gfx_test
             ComPtr<IShaderProgram> shaderProgram;
             slang::ProgramLayout* slangReflection;
             GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, moduleName, entryPointName, slangReflection));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void createComputePipeline(Slang::String shaderSource)
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            GFX_CHECK_CALL_ABORT(loadComputeProgramFromSource(device, shaderProgram, shaderSource));
 
             ComputePipelineStateDesc pipelineDesc = {};
             pipelineDesc.program = shaderProgram.get();
@@ -208,12 +223,9 @@ namespace gfx_test
 
             auto rootObject = encoder->bindPipeline(pipelineState);
 
+            // Bind buffer view to the entry point.
             ShaderCursor entryPointCursor(rootObject->getEntryPoint(0));
             entryPointCursor.getPath("buffer").setResource(bufferView);
-
-            // ShaderCursor rootCursor(rootObject);
-            // Bind buffer view to the entry point.
-            // rootCursor.getPath("buffer").setResource(bufferView);
 
             encoder->dispatchCompute(4, 1, 1);
             encoder->endEncoding();
@@ -222,12 +234,34 @@ namespace gfx_test
             queue->waitOnHost();
         }        
 
-        void runComputePipeline(const char* moduleName, const char* entryPointName)
+        bool checkOutput(const List<float>& expectedOutput)
+        {
+            ComPtr<ISlangBlob> bufferBlob;
+            device->readBufferResource(bufferResource, 0, 4 * sizeof(float), bufferBlob.writeRef());
+            SLANG_CHECK_ABORT(bufferBlob && bufferBlob->getBufferSize() == expectedOutput.getCount() * sizeof(float));
+            return ::memcmp(bufferBlob->getBufferPointer(), expectedOutput.getBuffer(), bufferBlob->getBufferSize()) == 0;
+        }
+
+        bool runComputePipeline(const char* moduleName, const char* entryPointName, const List<float>& expectedOutput)
         {
             createComputeResources();
             createComputePipeline(moduleName, entryPointName);
             dispatchComputePipeline();
+            bool hasExpectedOutput = checkOutput(expectedOutput);
+            SLANG_CHECK(hasExpectedOutput);
             freeComputeResources();
+            return hasExpectedOutput;
+        }
+
+        bool runComputePipeline(Slang::String shaderSource, const List<float>& expectedOutput)
+        {
+            createComputeResources();
+            createComputePipeline(shaderSource);
+            dispatchComputePipeline();
+            bool hasExpectedOutput = checkOutput(expectedOutput);
+            SLANG_CHECK(hasExpectedOutput);
+            freeComputeResources();
+            return hasExpectedOutput;
         }
 
         ShaderCacheStats getStats()
@@ -249,7 +283,7 @@ namespace gfx_test
     };
 
     // Basic shader cache test using 3 different shader files stored on disk.
-    struct ShaderCacheTestBasic : ShaderCacheTest
+    struct ShaderCacheSourceFile : ShaderCacheTest
     {
         void runTests()
         {
@@ -262,9 +296,9 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-tmp-a", "main");
-                    runComputePipeline("shader-cache-tmp-b", "main");
-                    runComputePipeline("shader-cache-tmp-c", "main");
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-a", "main", { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-b", "main", { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-c", "main", { 3.f, 4.f, 5.f, 6.f }));
 
                     SLANG_CHECK(getStats().missCount == 3);
                     SLANG_CHECK(getStats().hitCount == 0);
@@ -276,9 +310,9 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-tmp-a", "main");
-                    runComputePipeline("shader-cache-tmp-b", "main");
-                    runComputePipeline("shader-cache-tmp-c", "main");
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-a", "main", { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-b", "main", { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-c", "main", { 3.f, 4.f, 5.f, 6.f }));
 
                     SLANG_CHECK(getStats().missCount == 0);
                     SLANG_CHECK(getStats().hitCount == 3);
@@ -295,9 +329,9 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-tmp-a", "main");
-                    runComputePipeline("shader-cache-tmp-b", "main");
-                    runComputePipeline("shader-cache-tmp-c", "main");
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-b", "main", { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-c", "main", { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-a", "main", { 3.f, 4.f, 5.f, 6.f }));
 
                     SLANG_CHECK(getStats().missCount == 3);
                     SLANG_CHECK(getStats().hitCount == 0);
@@ -309,9 +343,9 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-tmp-a", "main");
-                    runComputePipeline("shader-cache-tmp-b", "main");
-                    runComputePipeline("shader-cache-tmp-c", "main");
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-b", "main", { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-c", "main", { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-a", "main", { 3.f, 4.f, 5.f, 6.f }));
 
                     SLANG_CHECK(getStats().missCount == 0);
                     SLANG_CHECK(getStats().hitCount == 3);
@@ -321,18 +355,18 @@ namespace gfx_test
         }
     };
 
-    // Test one shader file on disk with multiple entry points.
-    struct ShaderCacheTestEntryPoint : ShaderCacheTest
+    // Test caching of shaders that are compiled from source strings instead of files.
+    struct ShaderCacheTestSourceString : ShaderCacheTest
     {
         void runTests()
         {
-            // Cache is cold and we expect 3 misses, one for each entry point.
+            // Cache is cold and we expect 3 misses.
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-multiple-entry-points", "computeA");
-                    runComputePipeline("shader-cache-multiple-entry-points", "computeB");
-                    runComputePipeline("shader-cache-multiple-entry-points", "computeC");
+                    SLANG_CHECK(runComputePipeline(computeShaderA, { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline(computeShaderB, { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline(computeShaderC, { 3.f, 4.f, 5.f, 6.f }));
 
                     SLANG_CHECK(getStats().missCount == 3);
                     SLANG_CHECK(getStats().hitCount == 0);
@@ -344,9 +378,44 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-multiple-entry-points", "computeA");
-                    runComputePipeline("shader-cache-multiple-entry-points", "computeB");
-                    runComputePipeline("shader-cache-multiple-entry-points", "computeC");
+                    SLANG_CHECK(runComputePipeline(computeShaderA, { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline(computeShaderB, { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline(computeShaderC, { 3.f, 4.f, 5.f, 6.f }));
+
+                    SLANG_CHECK(getStats().missCount == 0);
+                    SLANG_CHECK(getStats().hitCount == 3);
+                    SLANG_CHECK(getStats().entryCount == 3);
+                }
+            );
+        }
+    };    
+
+    // Test one shader file on disk with multiple entry points.
+    struct ShaderCacheTestEntryPoint : ShaderCacheTest
+    {
+        void runTests()
+        {
+            // Cache is cold and we expect 3 misses, one for each entry point.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline("shader-cache-multiple-entry-points", "computeA", { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-multiple-entry-points", "computeB", { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-multiple-entry-points", "computeC", { 3.f, 4.f, 5.f, 6.f }));
+
+                    SLANG_CHECK(getStats().missCount == 3);
+                    SLANG_CHECK(getStats().hitCount == 0);
+                    SLANG_CHECK(getStats().entryCount == 3);
+                }
+            );
+
+            // Cache is hot and we expect 3 hits.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline("shader-cache-multiple-entry-points", "computeA", { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-multiple-entry-points", "computeB", { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-multiple-entry-points", "computeC", { 3.f, 4.f, 5.f, 6.f }));
 
                     SLANG_CHECK(getStats().missCount == 0);
                     SLANG_CHECK(getStats().hitCount == 3);
@@ -415,8 +484,8 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-tmp-import", "main");
-                    runComputePipeline("shader-cache-tmp-include", "main");
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-import", "main", { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-include", "main", { 1.f, 2.f, 3.f, 4.f }));
 
                     SLANG_CHECK(getStats().missCount == 2);
                     SLANG_CHECK(getStats().hitCount == 0);
@@ -428,8 +497,8 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-tmp-import", "main");
-                    runComputePipeline("shader-cache-tmp-include", "main");
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-import", "main", { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-include", "main", { 1.f, 2.f, 3.f, 4.f }));
 
                     SLANG_CHECK(getStats().missCount == 0);
                     SLANG_CHECK(getStats().hitCount == 2);
@@ -444,8 +513,8 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-tmp-import", "main");
-                    runComputePipeline("shader-cache-tmp-include", "main");
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-import", "main", { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-include", "main", { 2.f, 3.f, 4.f, 5.f }));
 
                     SLANG_CHECK(getStats().missCount == 2);
                     SLANG_CHECK(getStats().hitCount == 0);
@@ -457,8 +526,8 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("shader-cache-tmp-import", "main");
-                    runComputePipeline("shader-cache-tmp-include", "main");
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-import", "main", { 2.f, 3.f, 4.f, 5.f }));
+                    SLANG_CHECK(runComputePipeline("shader-cache-tmp-include", "main", { 2.f, 3.f, 4.f, 5.f }));
 
                     SLANG_CHECK(getStats().missCount == 0);
                     SLANG_CHECK(getStats().hitCount == 2);
@@ -486,28 +555,6 @@ namespace gfx_test
                 device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
         }        
 
-        void createAddTransformer(IShaderObject** transformer)
-        {
-            slang::TypeReflection* addTransformerType =
-                slangReflection->findTypeByName("AddTransformer");
-            GFX_CHECK_CALL_ABORT(device->createShaderObject(
-                addTransformerType, ShaderObjectContainerType::None, transformer));
-
-            float c = 1.0f;
-            ShaderCursor(*transformer).getPath("c").setData(&c, sizeof(float));
-        }
-
-        void createMulTransformer(IShaderObject** transformer)
-        {
-            slang::TypeReflection* mulTransformerType =
-                slangReflection->findTypeByName("MulTransformer");
-            GFX_CHECK_CALL_ABORT(device->createShaderObject(
-                mulTransformerType, ShaderObjectContainerType::None, transformer));
-
-            float c = 1.0f;
-            ShaderCursor(*transformer).getPath("c").setData(&c, sizeof(float));
-        }
-
         void dispatchComputePipeline(const char* transformerTypeName)
         {
             Slang::ComPtr<ITransientResourceHeap> transientHeap;
@@ -529,7 +576,7 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->createShaderObject(
                 transformerType, ShaderObjectContainerType::None, transformer.writeRef()));
 
-            float c = 1.0f;
+            float c = 5.f;
             ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));
 
             ShaderCursor entryPointCursor(rootObject->getEntryPoint(0));
@@ -543,12 +590,15 @@ namespace gfx_test
             queue->waitOnHost();
         }
 
-        void runComputePipeline(const char* transformerTypeName)
+        bool runComputePipeline(const char* transformerTypeName, const List<float>& expectedOutput)
         {
             createComputeResources();
             createComputePipeline();
             dispatchComputePipeline(transformerTypeName);
+            bool hasExpectedOutput = checkOutput(expectedOutput);
+            SLANG_CHECK(hasExpectedOutput);
             freeComputeResources();
+            return hasExpectedOutput;
         }        
 
         void runTests()
@@ -557,8 +607,8 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("AddTransformer");
-                    runComputePipeline("MulTransformer");
+                    SLANG_CHECK(runComputePipeline("AddTransformer", { 5.f, 6.f, 7.f, 8.f }));
+                    SLANG_CHECK(runComputePipeline("MulTransformer", { 0.f, 5.f, 10.f, 15.f }));
 
                     SLANG_CHECK(getStats().missCount == 2);
                     SLANG_CHECK(getStats().hitCount == 0);
@@ -570,8 +620,8 @@ namespace gfx_test
             runStep(
                 [this]()
                 {
-                    runComputePipeline("AddTransformer");
-                    runComputePipeline("MulTransformer");
+                    SLANG_CHECK(runComputePipeline("AddTransformer", { 5.f, 6.f, 7.f, 8.f }));
+                    SLANG_CHECK(runComputePipeline("MulTransformer", { 0.f, 5.f, 10.f, 15.f }));
 
                     SLANG_CHECK(getStats().missCount == 0);
                     SLANG_CHECK(getStats().hitCount == 2);
@@ -581,8 +631,91 @@ namespace gfx_test
         }
     };
 
-    // Same gist as the multiple entry point compute shader but with a graphics
-    // shader file containing a vertex and fragment shader.
+    struct ShaderCacheTestEviction : ShaderCacheTest
+    {
+        void runTests()
+        {
+            shaderCacheDesc.maxEntryCount = 2;
+
+            // Load shader A & B. Cache is cold and we expect 2 misses.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderA, { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline(computeShaderB, { 2.f, 3.f, 4.f, 5.f }));
+
+                    SLANG_CHECK(getStats().missCount == 2);
+                    SLANG_CHECK(getStats().hitCount == 0);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader A & B. Cache is hot and we expect 2 hits.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderA, { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline(computeShaderB, { 2.f, 3.f, 4.f, 5.f }));
+
+                    SLANG_CHECK(getStats().missCount == 0);
+                    SLANG_CHECK(getStats().hitCount == 2);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader C. Cache is cold and we expect 1 miss.
+            // This will evict the least frequently used entry (shader A).
+            // We expect 2 entries in the cache (shader B & C).
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderC, { 3.f, 4.f, 5.f, 6.f }));
+
+                    SLANG_CHECK(getStats().missCount == 1);
+                    SLANG_CHECK(getStats().hitCount == 0);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader C. Cache is hot and we expect 1 hit.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderC, { 3.f, 4.f, 5.f, 6.f }));
+
+                    SLANG_CHECK(getStats().missCount == 0);
+                    SLANG_CHECK(getStats().hitCount == 1);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader B. Cache is hot and we expect 1 hit.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderB, { 2.f, 3.f, 4.f, 5.f }));
+
+                    SLANG_CHECK(getStats().missCount == 0);
+                    SLANG_CHECK(getStats().hitCount == 1);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader A. Cache is cold and we expect 1 miss.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderA, { 1.f, 2.f, 3.f, 4.f }));
+
+                    SLANG_CHECK(getStats().missCount == 1);
+                    SLANG_CHECK(getStats().hitCount == 0);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+        }
+    };
+
+    // Similar to ShaderCacheTestEntryPoint but with a source file containing a vertex and fragment shader.
     struct ShaderCacheTestGraphics : ShaderCacheTest
     {
         struct Vertex
@@ -787,25 +920,13 @@ namespace gfx_test
         }
     };
 
-    // Same as ShaderCacheTestGraphics, but instead of having a singular file containing both a vertex and fragment shader, we
-    // now have two separate shader files, one containing the vertex shader and the other the fragment with the same
-    // names, with the expectation that we should record cache misses for both fetches.
-    //
-    // This test is intended to guard against the case where vertex/fragment/geometry shaders are split across
-    // multiple files with the same entry point name in each file and are loaded as three separate ComponentType objects.
-    // In this case, the current method for cache key generation will hash in the exact same modules, file dependencies,
-    // entry point names, and entry point name overrides, resulting in the same dependency hash being returned for all three
-    // and consequently, the wrong shader code being provided when the shaders are being created.
-    //
-    // We do not actively test geometry shaders here, but it is simply an extension of this test and should be expected
-    // to behave similarly.
+    // Similar to ShaderCacheTestGraphics but with two separate shader files for the vertex and fragment shaders.
     struct ShaderCacheTestGraphicsSplit : ShaderCacheTestGraphics
     {
         void createGraphicsPipeline()
         {
             ComPtr<slang::ISession> slangSession;
             GFX_CHECK_CALL_ABORT(device->getSlangSession(slangSession.writeRef()));
-
             slang::IModule* vertexModule = slangSession->loadModule("shader-cache-graphics-vertex");
             SLANG_CHECK_ABORT(vertexModule);
             slang::IModule* fragmentModule = slangSession->loadModule("shader-cache-graphics-fragment");
@@ -889,60 +1010,6 @@ namespace gfx_test
             );         }
     };
 
-    // Test caching of shaders that are compiled from source strings instead of files.
-    struct ShaderCacheTestSourceString : ShaderCacheTest
-    {
-        void createComputePipeline(Slang::String shaderSource)
-        {
-            ComPtr<IShaderProgram> shaderProgram;
-            GFX_CHECK_CALL_ABORT(loadComputeProgramFromSource(device, shaderProgram, shaderSource));
-
-            ComputePipelineStateDesc pipelineDesc = {};
-            pipelineDesc.program = shaderProgram.get();
-            GFX_CHECK_CALL_ABORT(
-                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
-        }
-
-        void runComputePipeline(Slang::String shaderSource)
-        {
-            createComputeResources();
-            createComputePipeline(shaderSource);
-            dispatchComputePipeline();
-            freeComputeResources();
-        }
-
-        void runTests()
-        {
-            // Cache is cold and we expect 3 misses.
-            runStep(
-                [this]()
-                {
-                    runComputePipeline(computeShaderA);
-                    runComputePipeline(computeShaderB);
-                    runComputePipeline(computeShaderC);
-
-                    SLANG_CHECK(getStats().missCount == 3);
-                    SLANG_CHECK(getStats().hitCount == 0);
-                    SLANG_CHECK(getStats().entryCount == 3);
-                }
-            );
-
-            // Cache is hot and we expect 3 hits.
-            runStep(
-                [this]()
-                {
-                    runComputePipeline(computeShaderA);
-                    runComputePipeline(computeShaderB);
-                    runComputePipeline(computeShaderC);
-
-                    SLANG_CHECK(getStats().missCount == 0);
-                    SLANG_CHECK(getStats().hitCount == 3);
-                    SLANG_CHECK(getStats().entryCount == 3);
-                }
-            );
-        }
-    };
-
     template<typename T>
     void runTest(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
     {
@@ -950,14 +1017,24 @@ namespace gfx_test
         test.run(context, api);
     }
 
-    SLANG_UNIT_TEST(shaderCacheBasicD3D12)
+    SLANG_UNIT_TEST(shaderCacheSourceFileD3D12)
     {
-        runTest<ShaderCacheTestBasic>(unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTest<ShaderCacheSourceFile>(unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(shaderCacheBasicVulkan)
+    SLANG_UNIT_TEST(shaderCacheSourceFileVulkan)
     {
-        runTest<ShaderCacheTestBasic>(unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTest<ShaderCacheSourceFile>(unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(shaderCacheSourceStringD3D12)
+    {
+        runTest<ShaderCacheTestSourceString>(unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(shaderCacheSourceStringVulkan)
+    {
+        runTest<ShaderCacheTestSourceString>(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
     SLANG_UNIT_TEST(shaderCacheEntryPointD3D12)
@@ -990,6 +1067,16 @@ namespace gfx_test
         runTest<ShaderCacheTestSpecialization>(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
+    SLANG_UNIT_TEST(shaderCacheEvictionD3D12)
+    {
+        runTest<ShaderCacheTestEviction>(unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(shaderCacheEvictionVulkan)
+    {
+        runTest<ShaderCacheTestEviction>(unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
     SLANG_UNIT_TEST(shaderCacheGraphicsD3D12)
     {
         runTest<ShaderCacheTestGraphics>(unitTestContext, Slang::RenderApiFlag::D3D12);
@@ -1008,15 +1095,5 @@ namespace gfx_test
     SLANG_UNIT_TEST(shaderCacheGraphicsSplitVulkan)
     {
         runTest<ShaderCacheTestGraphicsSplit>(unitTestContext, Slang::RenderApiFlag::Vulkan);
-    }
-
-    SLANG_UNIT_TEST(shaderCacheSourceStringD3D12)
-    {
-        runTest<ShaderCacheTestSourceString>(unitTestContext, Slang::RenderApiFlag::D3D12);
-    }
-
-    SLANG_UNIT_TEST(shaderCacheSourceStringVulkan)
-    {
-        runTest<ShaderCacheTestSourceString>(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }

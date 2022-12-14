@@ -33,7 +33,7 @@ interface ITransformer
 struct AddTransformer : ITransformer
 {
     float c;
-    float transform(float x) { return x + c + 10.0f; }
+    float transform(float x) { return x + c; }
 };
 
 // Represents a transform function f(x) = x * c.

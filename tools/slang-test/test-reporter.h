@@ -9,6 +9,8 @@
 #include "../../source/core/slang-dictionary.h"
 #include "tools/unit-test/slang-unit-test.h"
 
+#include <mutex>
+
 enum class TestOutputMode
 {
     Default = 0,   ///< Default mode is to write test results to the console
@@ -137,6 +139,8 @@ protected:
     int m_numFailResults;
 
     bool m_inTest;
+
+    std::recursive_mutex m_mutex;
 
     static TestReporter* s_reporter;
 };
