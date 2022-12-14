@@ -92,11 +92,14 @@ If you want any kind of preprocessor macros to be defined when compiling your co
 spAddPreprocessorDefine(request, "ENABLE_FOO", "1")
 ```
 
-Note that Slang currently doesn't provide an automatic definition like `__SLANG__` to identify the compiler, so you might want to do that manually, if you need to have files that are processed by Slang and other tools.
+Slang provides the following preprocessor definitions:
 
-```c++
-spAddPreprocessorDefine(request, "__SLANG__", "1")
-```
+- `__SLANG_COMPILER__` as `1`
+- `__SLANG__` as `1` when compiling in Slang mode and `0` when compiling in HLSL mode.
+- `__HLSL__` as `1` when compiling in HLSL mode and `0` when compiling in Slang mode.
+- `__HLSL_VERSION` as an integer representing the HLSL language version.
+
+Note that `__SLANG__` and `__HLSL__` are *always* defined, so best to use a truthiness check such as `#if __SLANG__` to guard code.
 
 ### Specify Input Code and Entry Points
 
