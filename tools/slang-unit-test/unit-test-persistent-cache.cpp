@@ -431,14 +431,6 @@ struct CorruptionTest : public PersistentCacheTest
     }
 };
 
-struct MultiThreadingTest : public PersistentCacheTest
-{
-    void run()
-    {
-    }
-};
-
-
 #undef ENABLE_LOGGING 
 #undef ENABLE_WRITE_TEST
 
@@ -485,10 +477,6 @@ struct StressTest : public PersistentCacheTest
     Barrier *read_barrier;
     Barrier *write_barrier;
 
-    std::mutex mutex;
-    std::condition_variable conditionVariable;
-    uint32_t generation{0};
-
     StressTest() : PersistentCacheTest(kEntryCount - kEntryShortageCount) {}
 
     void run()
@@ -527,59 +515,58 @@ struct StressTest : public PersistentCacheTest
         for (uint32_t threadIndex = 0; threadIndex < kThreadCount; ++threadIndex)
         {
             threads[threadIndex] = std::thread(
-                [](StressTest* self, uint32_t threadIndex)
+                [this, threadIndex]()
                 {
                     LOG("Thread %u: starting\n", threadIndex);
 
                     while (true)
                     {
                         // Write to cache.
-                        size_t startIndex = (self->iteration * kEntryCount + (threadIndex * kBatchCount)) % (kEntryCount * 2);
+                        size_t startIndex = (iteration * kEntryCount + (threadIndex * kBatchCount)) % (kEntryCount * 2);
                         for (size_t i = 0; i < kBatchCount; ++i)
                         {
-                            const Entry& entry = self->entries[startIndex + i];
+                            const Entry& entry = entries[startIndex + i];
 #ifdef ENABLE_WRITE_TEST
-                            self->osFileSystem->saveFileBlob(self->getEntryFileName(entry).getBuffer(), entry.data);
+                            osFileSystem->saveFileBlob(getEntryFileName(entry).getBuffer(), entry.data);
 #else
-                            self->writeEntry(entry);
+                            writeEntry(entry);
 #endif
-                            self->entriesWritten.fetch_add(1);
-                            self->bytesWritten.fetch_add((uint32_t)entry.data->getBufferSize());
+                            entriesWritten.fetch_add(1);
+                            bytesWritten.fetch_add((uint32_t)entry.data->getBufferSize());
                         }
 
-                        LOG("Thread %u: ended writing (iteration=%u)\n", threadIndex, self->iteration.load());
+                        LOG("Thread %u: ended writing (iteration=%u)\n", threadIndex, iteration.load());
 
                         // Synchronize.
-                        self->read_barrier->wait();
+                        read_barrier->wait();
 
                         // Read from cache.
                         for (size_t i = 0; i < kBatchCount; ++i)
                         {
-                            const Entry& entry = self->entries[startIndex + i];
+                            const Entry& entry = entries[startIndex + i];
 #ifndef ENABLE_WRITE_TEST
-                            if (self->readEntry(entry))
+                            if (readEntry(entry))
                             {
-                                self->readSuccess.fetch_add(1);
-                                self->bytesRead.fetch_add((uint32_t)entry.data->getBufferSize());
+                                readSuccess.fetch_add(1);
+                                bytesRead.fetch_add((uint32_t)entry.data->getBufferSize());
                             }
 #endif
-                            self->entriesRead.fetch_add(1);
+                            entriesRead.fetch_add(1);
                         }
 
-                        LOG("Thread %u: ended reading (iteration=%u)\n", threadIndex, self->iteration.load());
+                        LOG("Thread %u: ended reading (iteration=%u)\n", threadIndex, iteration.load());
 
                         // Synchronize.
-                        self->write_barrier->wait();
+                        write_barrier->wait();
 
                         // Terminate.
-                        if (self->iteration >= kIterationCount)
+                        if (iteration >= kIterationCount)
                         {
                             LOG("Thread %u: terminates\n", threadIndex);
                             return;
                         }
                     }
-                },
-                this, threadIndex);
+                });
         }
 
         for (auto& thread : threads)
@@ -613,12 +600,6 @@ SLANG_UNIT_TEST(persistentCacheEviction)
 SLANG_UNIT_TEST(persistentCacheCorruption)
 {
     CorruptionTest test;
-    test.run();
-}
-
-SLANG_UNIT_TEST(persistentCacheMultiThreading)
-{
-    MultiThreadingTest test;
     test.run();
 }
 
