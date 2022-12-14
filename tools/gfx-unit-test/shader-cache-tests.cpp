@@ -627,6 +627,90 @@ namespace gfx_test
         }
     };
 
+    struct ShaderCacheTestEviction : ShaderCacheTest
+    {
+        void runTests()
+        {
+            shaderCacheDesc.maxEntryCount = 2;
+
+            // Load shader A & B. Cache is cold and we expect 2 misses.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderA, { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline(computeShaderB, { 2.f, 3.f, 4.f, 5.f }));
+
+                    SLANG_CHECK(getStats().missCount == 2);
+                    SLANG_CHECK(getStats().hitCount == 0);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader A & B. Cache is hot and we expect 2 hits.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderA, { 1.f, 2.f, 3.f, 4.f }));
+                    SLANG_CHECK(runComputePipeline(computeShaderB, { 2.f, 3.f, 4.f, 5.f }));
+
+                    SLANG_CHECK(getStats().missCount == 0);
+                    SLANG_CHECK(getStats().hitCount == 2);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader C. Cache is cold and we expect 1 miss.
+            // This will evict the least frequently used entry (shader A).
+            // We expect 2 entries in the cache (shader B & C).
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderC, { 3.f, 4.f, 5.f, 6.f }));
+
+                    SLANG_CHECK(getStats().missCount == 1);
+                    SLANG_CHECK(getStats().hitCount == 0);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader C. Cache is hot and we expect 1 hit.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderC, { 3.f, 4.f, 5.f, 6.f }));
+
+                    SLANG_CHECK(getStats().missCount == 0);
+                    SLANG_CHECK(getStats().hitCount == 1);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader B. Cache is hot and we expect 1 hit.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderB, { 2.f, 3.f, 4.f, 5.f }));
+
+                    SLANG_CHECK(getStats().missCount == 0);
+                    SLANG_CHECK(getStats().hitCount == 1);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+
+            // Load shader A. Cache is cold and we expect 1 miss.
+            runStep(
+                [this]()
+                {
+                    SLANG_CHECK(runComputePipeline(computeShaderA, { 1.f, 2.f, 3.f, 4.f }));
+
+                    SLANG_CHECK(getStats().missCount == 1);
+                    SLANG_CHECK(getStats().hitCount == 0);
+                    SLANG_CHECK(getStats().entryCount == 2);
+                }
+            );
+        }
+    };
+
     // Same gist as the multiple entry point compute shader but with a graphics
     // shader file containing a vertex and fragment shader.
     struct ShaderCacheTestGraphics : ShaderCacheTest
@@ -989,6 +1073,16 @@ namespace gfx_test
     SLANG_UNIT_TEST(shaderCacheSpecializationVulkan)
     {
         runTest<ShaderCacheTestSpecialization>(unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(shaderCacheEvictionD3D12)
+    {
+        runTest<ShaderCacheTestEviction>(unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(shaderCacheEvictionVulkan)
+    {
+        runTest<ShaderCacheTestEviction>(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
     SLANG_UNIT_TEST(shaderCacheGraphicsD3D12)
