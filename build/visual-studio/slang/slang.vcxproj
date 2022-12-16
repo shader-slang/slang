@@ -523,6 +523,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-fwd.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-pairs.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-rev.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-unzip.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-bind-existentials.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp" />

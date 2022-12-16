@@ -1237,4 +1237,18 @@ bool constructSSA(IRModule* module)
     return changed;
 }
 
+bool constructSSA(IRInst* globalVal)
+{
+    switch (globalVal->getOp())
+    {
+    case kIROp_Func:
+    case kIROp_GlobalVar:
+        return constructSSA(globalVal->getModule(), (IRGlobalValueWithCode*)globalVal);
+
+    default:
+        break;
+    }
+    return false;
+}
+
 }

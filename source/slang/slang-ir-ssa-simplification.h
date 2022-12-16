@@ -4,8 +4,11 @@
 namespace Slang
 {
     struct IRModule;
+    struct IRGlobalValueWithCode;
 
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
     void simplifyIR(IRModule* module);
+
+    void simplifyFunc(IRGlobalValueWithCode* func);
 }

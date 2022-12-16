@@ -10,12 +10,12 @@
 namespace Slang
 {
 
-bool isDifferentialInst(IRInst* inst)
+inline bool isDifferentialInst(IRInst* inst)
 {
     return inst->findDecoration<IRDifferentialInstDecoration>();
 }
 
-bool isMixedDifferentialInst(IRInst* inst)
+inline bool isMixedDifferentialInst(IRInst* inst)
 {
     return inst->findDecoration<IRMixedDifferentialInstDecoration>();
 }

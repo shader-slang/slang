@@ -610,6 +610,17 @@ struct IRDifferentialInstDecoration : IRDecoration
     IRType* getPrimalType() { return as<IRType>(getOperand(0)); }
 };
 
+struct IRPrimalValueStructKeyDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_PrimalValueStructKeyDecoration
+    };
+
+    IR_LEAF_ISA(PrimalValueStructKeyDecoration)
+
+    IRStructKey* getStructKey() { return as<IRStructKey>(getOperand(0)); }
+};
 
 struct IRMixedDifferentialInstDecoration : IRDecoration
 {
@@ -2657,6 +2668,8 @@ public:
 
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
 
+    IRInst* addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key);
+
     // Add a differentiable type entry to the appropriate dictionary.
     IRInst* addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness);
 
@@ -2717,6 +2730,10 @@ public:
         /// If `fallback` is true, will emit `DefaultConstruct` inst on unknown types.
         /// Otherwise, returns nullptr if we can't materialize the inst.
     IRInst* emitDefaultConstruct(IRType* type, bool fallback = true);
+
+        /// Emits a raw `DefaultConstruct` opcode without attempting to fold/materialize
+        /// the inst.
+    IRInst* emitDefaultConstructRaw(IRType* type);
 
     IRInst* emitCast(
         IRType* type,

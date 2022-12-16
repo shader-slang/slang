@@ -7861,25 +7861,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return as<IRStringLit>(builder->getStringValue(stringLitExpr->value.getUnownedSlice()));
     }
 
-    IRInst* lowerFuncType(FunctionDeclBase* decl)
-    {
-        NestedContext nestedContextFuncType(this);
-        auto funcTypeBuilder = nestedContextFuncType.getBuilder();
-        auto funcTypeContext = nestedContextFuncType.getContext();
-
-        auto outerGenerics = emitOuterGenerics(funcTypeContext, decl, decl);
-
-        FuncDeclBaseTypeInfo info;
-        _lowerFuncDeclBaseTypeInfo(
-            funcTypeContext,
-            createDefaultSpecializedDeclRef(funcTypeContext, nullptr, decl),
-            info);
-
-        auto irFuncType = info.type;
-
-        return finishOuterGenerics(funcTypeBuilder, irFuncType, outerGenerics);
-    }
-
     bool isClassType(IRType* type)
     {
         if (auto specialize = as<IRSpecialize>(type))

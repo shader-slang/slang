@@ -1678,5 +1678,21 @@ bool applySparseConditionalConstantPropagation(
     return changed;
 }
 
+
+bool applySparseConditionalConstantPropagation(IRInst* func)
+{
+    SharedSCCPContext shared;
+    shared.module = func->getModule();
+    shared.sharedBuilder.init(shared.module);
+    shared.sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
+
+    SCCPContext globalContext;
+    globalContext.shared = &shared;
+    globalContext.code = nullptr;
+
+    // Run recursive SCCP passes on each child code block.
+    return applySparseConditionalConstantPropagationRec(globalContext, func);
+}
+
 }
 

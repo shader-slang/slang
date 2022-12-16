@@ -671,6 +671,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-rev.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-unzip.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

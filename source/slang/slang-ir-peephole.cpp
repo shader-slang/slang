@@ -241,15 +241,20 @@ struct PeepholeContext : InstPassBase
         }
     }
 
-    bool processModule()
+    bool processFunc(IRInst* func)
     {
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
         sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
 
         changed = false;
-        processAllInsts([this](IRInst* inst) { processInst(inst); });
+        processChildInsts(func, [this](IRInst* inst) { processInst(inst); });
         return changed;
+    }
+
+    bool processModule()
+    {
+        return processFunc(module->getModuleInst());
     }
 };
 
@@ -257,6 +262,12 @@ bool peepholeOptimize(IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
     return context.processModule();
+}
+
+bool peepholeOptimize(IRInst* func)
+{
+    PeepholeContext context = PeepholeContext(func->getModule());
+    return context.processFunc(func);
 }
 
 } // namespace Slang

@@ -5,7 +5,9 @@ namespace Slang
 {
     struct IRModule;
     struct IRCall;
+    struct IRInst;
 
         /// Apply peephole optimizations.
     bool peepholeOptimize(IRModule* module);
+    bool peepholeOptimize(IRInst* func);
 }

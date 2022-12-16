@@ -741,6 +741,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// BOTH a differential and a primal value.
     INST(MixedDifferentialInstDecoration, mixedDiffInstDecoration, 1, 0)
 
+        /// Used by the auto-diff pass to mark insts whose result is stored
+        /// in an intermediary struct for reuse in backward propagation phase.
+    INST(PrimalValueStructKeyDecoration, primalValueKey, 1, 0)
+
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.
     INST(DerivativeMemberDecoration, derivativeMemberDecoration, 1, 0)
