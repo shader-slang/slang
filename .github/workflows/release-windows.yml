@@ -15,7 +15,7 @@ jobs:
         configuration: ['Release']
         platform: ['Win32', 'x64', 'aarch64']
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v3
         with:
           submodules: 'true'
           fetch-depth: '0'
