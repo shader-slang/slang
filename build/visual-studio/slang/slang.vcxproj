@@ -447,6 +447,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-language-server-semantic-tokens.h" />
     <ClInclude Include="..\..\..\source\slang\slang-language-server.h" />
     <ClInclude Include="..\..\..\source\slang\slang-legalize-types.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-lookup-spirv.h" />
     <ClInclude Include="..\..\..\source\slang\slang-lookup.h" />
     <ClInclude Include="..\..\..\source\slang\slang-lower-to-ir.h" />
     <ClInclude Include="..\..\..\source\slang\slang-mangle.h" />
@@ -631,6 +632,8 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-language-server-semantic-tokens.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-language-server.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-legalize-types.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-lookup-glslstd450.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-lookup-spvop.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lower-to-ir.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-mangle.cpp" />

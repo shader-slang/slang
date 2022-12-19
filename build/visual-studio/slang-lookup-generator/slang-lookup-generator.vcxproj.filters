@@ -6,7 +6,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\tools\test-process\test-process-main.cpp">
+    <ClCompile Include="..\..\..\tools\slang-lookup-generator\lookup-generator-main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
