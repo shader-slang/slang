@@ -1273,7 +1273,7 @@ namespace Slang
         }
         else if( as<RaytracingAccelerationStructureType>(type) )
         {
-            return SLANG_BINDING_TYPE_RAY_TRACTING_ACCELERATION_STRUCTURE;
+            return SLANG_BINDING_TYPE_RAY_TRACING_ACCELERATION_STRUCTURE;
         }
         else if( auto untypedBufferType = as<UntypedBufferResourceType>(type) )
         {
