@@ -208,8 +208,9 @@ static void _cloneInstDecorationsAndChildren(
 
 // The public version of `cloneInstDecorationsAndChildren` is then
 // just a wrapper over the internal one that sets up a temporary
-// environment to use for the cloning process, so that we do
-// not leave any lasting changes in the user-provided `env`.
+// environment to use for the cloning process when `env->squashChildrenMapping` is false (default),
+// so that we do not leave any lasting changes in the user-provided `env` unless the caller
+// explicitly asks for it.
 //
 void cloneInstDecorationsAndChildren(
     IRCloneEnv*         env,
@@ -221,10 +222,17 @@ void cloneInstDecorationsAndChildren(
     SLANG_ASSERT(oldInst);
     SLANG_ASSERT(newInst);
 
+    IRCloneEnv* subEnv = nullptr;
     IRCloneEnv subEnvStorage;
-    auto subEnv = &subEnvStorage;
-    subEnv->parent = env;
-
+    if (env->squashChildrenMapping)
+    {
+        subEnv = env;
+    }
+    else
+    {
+        subEnv = &subEnvStorage;
+        subEnv->parent = env;
+    }
     _cloneInstDecorationsAndChildren(subEnv, sharedBuilder, oldInst, newInst);
 }
 

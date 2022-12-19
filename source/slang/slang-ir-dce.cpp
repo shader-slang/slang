@@ -103,18 +103,14 @@ struct DeadCodeEliminationContext
         return undefInst;
     }
 
-    // Given the basic infrastructrure above, let's
-    // dive into the task of actually finding all
-    // the live code in a module.
-    //
-    bool processModule()
+    bool processInst(IRInst* root)
     {
-        // First of all, we know that the root module instruction
+        // First of all, we know that the root instruction
         // should be considered as live, because otherwise
         // we'd end up eliminating it, so that is a
         // good place to start.
         //
-        markInstAsLive(module->getModuleInst());
+        markInstAsLive(root);
 
         // Ensure there is a global undef inst that is always alive.
         // This undef inst will be used to fill in weak-referencing uses
@@ -128,7 +124,7 @@ struct DeadCodeEliminationContext
         // processing entries off of our work list
         // until it goes dry.
         //
-        while( workList.getCount() )
+        while (workList.getCount())
         {
             auto inst = workList.getLast();
             workList.removeLast();
@@ -151,7 +147,7 @@ struct DeadCodeEliminationContext
             //
             markInstAsLive(inst->getFullType());
             UInt operandCount = inst->getOperandCount();
-            for( UInt ii = 0; ii < operandCount; ++ii )
+            for (UInt ii = 0; ii < operandCount; ++ii)
             {
                 // There are some type of operands that needs to be treated as
                 // "weak" references -- they can never hold things alive, and
@@ -182,9 +178,9 @@ struct DeadCodeEliminationContext
             // decision of whether a child (or decoration)
             // should be live when its parent is to a subroutine.
             //
-            for( auto child : inst->getDecorationsAndChildren() )
+            for (auto child : inst->getDecorationsAndChildren())
             {
-                if(shouldInstBeLiveIfParentIsLive(child))
+                if (shouldInstBeLiveIfParentIsLive(child))
                 {
                     // In this case, we know `inst` is live and
                     // its `child` should be live if its parent is,
@@ -203,7 +199,16 @@ struct DeadCodeEliminationContext
         // recursively and eliminate those that are "dead" by
         // virtue of not having been found live.
         //
-        return eliminateDeadInstsRec(module->getModuleInst());
+        return eliminateDeadInstsRec(root);
+    }
+
+    // Given the basic infrastructrure above, let's
+    // dive into the task of actually finding all
+    // the live code in a module.
+    //
+    bool processModule()
+    {
+        return processInst(module->getModuleInst());
     }
 
     bool eliminateDeadInstsRec(IRInst* inst)
@@ -419,6 +424,17 @@ bool eliminateDeadCode(
     context.options = options;
 
     return context.processModule();
+}
+
+bool eliminateDeadCode(
+    IRInst* root,
+    IRDeadCodeEliminationOptions const& options)
+{
+    DeadCodeEliminationContext context;
+    context.module = root->getModule();
+    context.options = options;
+
+    return context.processInst(root);
 }
 
 }

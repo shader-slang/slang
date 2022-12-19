@@ -24,6 +24,10 @@ namespace Slang
         IRModule*                           module,
         IRDeadCodeEliminationOptions const& options = IRDeadCodeEliminationOptions());
 
+    bool eliminateDeadCode(
+        IRInst* root,
+        IRDeadCodeEliminationOptions const& options = IRDeadCodeEliminationOptions());
+
     bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options);
 
     bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex);

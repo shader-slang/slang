@@ -3301,6 +3301,11 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitDefaultConstructRaw(IRType* type)
+    {
+        return emitIntrinsicInst(type, kIROp_DefaultConstruct, 0, nullptr);
+    }
+
     IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     {
         IRType* actualType = type;
@@ -3807,6 +3812,11 @@ namespace Slang
             slotArgs);
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key)
+    {
+        return addDecoration(target, kIROp_PrimalValueStructKeyDecoration, key);
     }
 
     RefPtr<IRModule> IRModule::create(Session* session)

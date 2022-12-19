@@ -6,6 +6,7 @@
 #include "slang-compiler.h"
 
 #include "slang-ir-autodiff.h"
+#include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-propagate.h"
 
 namespace Slang
@@ -51,7 +52,9 @@ struct DiffUnzipPass
         // Clone the entire function.
         // TODO: Maybe don't clone? The reverse-mode process seems to clone several times.
         // TODO: Looks like we get a copy of the decorations?
-        IRFunc* unzippedFunc = as<IRFunc>(cloneInst(&cloneEnv, builder, func));
+        IRCloneEnv subEnv;
+        subEnv.parent = &cloneEnv;
+        IRFunc* unzippedFunc = as<IRFunc>(cloneInst(&subEnv, builder, func));
 
         builder->setInsertInto(unzippedFunc);
 
@@ -85,6 +88,8 @@ struct DiffUnzipPass
         
         return unzippedFunc;
     }
+
+    IRGlobalValueWithCode* extractPrimalFunc(IRGlobalValueWithCode* func, IRGlobalValueWithCode* fwdFunc, IRInst*& intermediateType);
 
     bool isRelevantDifferentialPair(IRType* type)
     {

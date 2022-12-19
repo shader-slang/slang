@@ -89,12 +89,12 @@ namespace Slang
         }
 
         template <typename Func>
-        void processAllInsts(const Func& f)
+        void processChildInsts(IRInst* root, const Func& f)
         {
             workList.clear();
             workListSet.Clear();
 
-            addToWorkList(module->getModuleInst());
+            addToWorkList(root);
 
             while (workList.getCount() != 0)
             {
@@ -108,6 +108,13 @@ namespace Slang
                 }
             }
         }
+
+        template <typename Func>
+        void processAllInsts(const Func& f)
+        {
+            processChildInsts(module->getModuleInst(), f);
+        }
+
     };
 
 }

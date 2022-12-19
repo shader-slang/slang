@@ -33,6 +33,17 @@ inline bool isScalarIntegerType(IRType* type)
     return getTypeStyle(type->getOp()) == kIROp_IntType;
 }
 
+inline bool isChildInstOf(IRInst* inst, IRInst* parent)
+{
+    while (inst)
+    {
+        if (inst == parent)
+            return true;
+        inst = inst->getParent();
+    }
+    return false;
+}
+
 }
 
 #endif
