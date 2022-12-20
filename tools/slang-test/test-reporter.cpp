@@ -140,18 +140,25 @@ void TestReporter::addResult(TestResult result)
 {
     assert(m_inTest);
 
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     m_numCurrentResults++;
 }
 
 void TestReporter::addExecutionTime(double time)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
     m_currentInfo.executionTime = time;
 }
 
 void TestReporter::addResultWithLocation(TestResult result, const char* testText, const char* file, int line)
 {
     assert(m_inTest);
+
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
     m_numCurrentResults++;
 
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
@@ -505,8 +512,8 @@ void TestReporter::addTest(const String& testName, TestResult testResult)
 
 void TestReporter::message(TestMessageType type, const String& message)
 {
-    static std::mutex mutex;
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
     if (type == TestMessageType::Info)
     {
         if (m_isVerbose && canWriteStdError())

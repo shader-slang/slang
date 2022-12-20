@@ -1107,9 +1107,9 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // in pointers directly.
     //
     case kIROp_FieldAddress:
-    case kIROp_getElementPtr:
+    case kIROp_GetElementPtr:
     case kIROp_Specialize:
-    case kIROp_lookup_interface_method:
+    case kIROp_LookupWitness:
     case kIROp_GetValueFromBoundInterface:
         return true;
     }
@@ -1132,8 +1132,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // them to initializer lists, which aren't allowed in
     // general expression contexts.
     //
-    case kIROp_makeStruct:
-    case kIROp_makeArray:
+    case kIROp_MakeStruct:
+    case kIROp_MakeArray:
     case kIROp_swizzleSet:
         return false;
 
@@ -1697,7 +1697,7 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     handleRequiredCapabilities(funcValue);
 
     // Detect if this is a call into a COM interface method.
-    if (funcValue->getOp() == kIROp_lookup_interface_method)
+    if (funcValue->getOp() == kIROp_LookupWitness)
     {
         auto operand0Type = funcValue->getOperand(0)->getDataType();
         switch (operand0Type->getOp())
@@ -1776,19 +1776,42 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitSimpleValue(inst);
         break;
 
-    case kIROp_Construct:
-    case kIROp_makeVector:
+    case kIROp_MakeVector:
     case kIROp_MakeMatrix:
+    case kIROp_VectorReshape:
+    case kIROp_CastFloatToInt:
+    case kIROp_CastIntToFloat:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
         // Simple constructor call
         emitType(inst->getDataType());
         emitArgs(inst);
+        break;
+    case kIROp_MakeMatrixFromScalar:
+        {
+            emitType(inst->getDataType());
+            auto matrixType = as<IRMatrixType>(inst->getDataType());
+            SLANG_RELEASE_ASSERT(matrixType);
+            auto columnCount = as<IRIntLit>(matrixType->getColumnCount());
+            SLANG_RELEASE_ASSERT(columnCount);
+            auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+            SLANG_RELEASE_ASSERT(rowCount);
+            m_writer->emit("(");
+            for (IRIntegerValue i = 0; i < rowCount->getValue() * columnCount->getValue(); i++)
+            {
+                if (i != 0)
+                    m_writer->emit(", ");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+        }
         break;
     case kIROp_AllocObj:
         m_writer->emit("new ");
         m_writer->emit(getName(inst->getDataType()));
         m_writer->emit("()");
         break;
-    case kIROp_makeUInt64:
+    case kIROp_MakeUInt64:
         m_writer->emit("((");
         emitType(inst->getDataType());
         m_writer->emit("(");
@@ -1797,7 +1820,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(")");
         break;
-    case kIROp_constructVectorFromScalar:
+    case kIROp_MakeVectorFromScalar:
+    case kIROp_MatrixReshape:
+    case kIROp_CastPtrToInt:
+    case kIROp_CastIntToPtr:
     {
         // Simple constructor call
         auto prec = getInfo(EmitOp::Prefix);
@@ -1998,7 +2024,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("->getBuffer()");
             break;
         }
-    case kIROp_makeString:
+    case kIROp_MakeString:
         {
             m_writer->emit("String(");
             emitOperand(inst->getOperand(0), EmitOpInfo());
@@ -2039,8 +2065,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(".detach()");
         break;
     }
-    case kIROp_getElement:
-    case kIROp_getElementPtr:
+    case kIROp_GetElement:
+    case kIROp_GetElementPtr:
     case kIROp_ImageSubscript:
         // HACK: deal with translation of GLSL geometry shader input arrays.
         if(auto decoration = inst->getOperand(0)->findDecoration<IRGLSLOuterArrayDecoration>())
@@ -2057,7 +2083,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         else
         {
-            if (inst->getOp() == kIROp_getElementPtr && doesTargetSupportPtrTypes())
+            if (inst->getOp() == kIROp_GetElementPtr && doesTargetSupportPtrTypes())
             {
                 const auto info = getInfo(EmitOp::Prefix);
                 needClose = maybeEmitParens(outerPrec, info);
@@ -2147,8 +2173,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(getName(inst));
         break;
 
-    case kIROp_makeArray:
-    case kIROp_makeStruct:
+    case kIROp_MakeArray:
+    case kIROp_MakeStruct:
         {
             // TODO: initializer-list syntax may not always
             // be appropriate, depending on the context
@@ -2261,6 +2287,24 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(")");
         break;
     }
+    case kIROp_GetStringHash:
+    {
+        auto getStringHashInst = as<IRGetStringHash>(inst);
+        auto stringLit = getStringHashInst->getStringLit();
+
+        if (stringLit)
+        {
+            auto slice = stringLit->getStringSlice();
+            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
+        }
+        else
+        {
+            // Couldn't handle 
+            diagnoseUnhandledInst(inst);
+        }
+        break;
+    }
+
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -3458,7 +3502,7 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
-    case kIROp_lookup_interface_method:
+    case kIROp_LookupWitness:
     case kIROp_FieldExtract:
     case kIROp_FieldAddress:
     {

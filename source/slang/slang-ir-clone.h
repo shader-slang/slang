@@ -38,6 +38,9 @@ struct IRCloneEnv
 
         /// A parent environment to fall back to if `mapOldValToNew` doesn't contain a key.
     IRCloneEnv* parent = nullptr;
+
+        /// Should `mapOldValToNew` keep a copy of children's oldToNew mapping?
+    bool squashChildrenMapping = false;
 };
 
     /// Look up the replacement for `oldVal`, if any, registered in `env`.

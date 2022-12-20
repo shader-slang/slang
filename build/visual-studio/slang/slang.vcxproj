@@ -167,7 +167,9 @@
       <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
+      <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -187,7 +189,9 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x86\release\slang-glslang.d
       <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
+      <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -207,7 +211,9 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
       <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
+      <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -231,6 +237,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -255,6 +262,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x86\release\slang-glslang.d
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -279,6 +287,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -514,6 +523,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-fwd.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-pairs.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-rev.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-unzip.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-bind-existentials.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp" />

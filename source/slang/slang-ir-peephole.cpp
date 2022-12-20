@@ -59,7 +59,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_FieldExtract:
-            if (inst->getOperand(0)->getOp() == kIROp_makeStruct)
+            if (inst->getOperand(0)->getOp() == kIROp_MakeStruct)
             {
                 auto field = as<IRFieldExtract>(inst)->field.get();
                 Index fieldIndex = -1;
@@ -112,6 +112,9 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Reinterpret:
+        case kIROp_BitCast:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
             {
                 if (isTypeEqual(inst->getOperand(0)->getDataType(), inst->getDataType()))
                 {
@@ -197,7 +200,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_WitnessTable)
                 {
@@ -220,20 +223,38 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_DefaultConstruct:
+            {
+                IRBuilder builder(&sharedBuilderStorage);
+                builder.setInsertBefore(inst);
+                // See if we can replace the default construct inst with concrete values.
+                if (auto newCtor = builder.emitDefaultConstruct(inst->getFullType(), false))
+                {
+                    inst->replaceUsesWith(newCtor);
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            break;
         default:
             break;
         }
     }
 
-    bool processModule()
+    bool processFunc(IRInst* func)
     {
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
         sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
 
         changed = false;
-        processAllInsts([this](IRInst* inst) { processInst(inst); });
+        processChildInsts(func, [this](IRInst* inst) { processInst(inst); });
         return changed;
+    }
+
+    bool processModule()
+    {
+        return processFunc(module->getModuleInst());
     }
 };
 
@@ -241,6 +262,12 @@ bool peepholeOptimize(IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
     return context.processModule();
+}
+
+bool peepholeOptimize(IRInst* func)
+{
+    PeepholeContext context = PeepholeContext(func->getModule());
+    return context.processFunc(func);
 }
 
 } // namespace Slang

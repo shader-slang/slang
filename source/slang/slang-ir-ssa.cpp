@@ -120,7 +120,7 @@ bool allUsesLeadToLoads(IRInst* inst)
         case kIROp_Load:
             break;
 
-        case kIROp_getElementPtr:
+        case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             {
                 // Sanity check: the address being used should
@@ -211,7 +211,7 @@ bool isPromotableVar(
             }
             break;
 
-        case kIROp_getElementPtr:
+        case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             {
                 // Sanity check: the address being used should
@@ -280,7 +280,7 @@ IRVar* asPromotableVarAccessChain(
         return asPromotableVar(context, value);
 
     case kIROp_FieldAddress:
-    case kIROp_getElementPtr:
+    case kIROp_GetElementPtr:
         return asPromotableVarAccessChain(context, value->getOperand(0));
 
     default:
@@ -331,7 +331,7 @@ IRInst* applyAccessChain(
             return extractInst;
         }
 
-    case kIROp_getElementPtr:
+    case kIROp_GetElementPtr:
         {
             SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
@@ -878,7 +878,7 @@ void processBlock(
             }
             break;
 
-        case kIROp_getElementPtr:
+        case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             {
                 auto  ptrArg = ii->getOperand(0);
@@ -1235,6 +1235,20 @@ bool constructSSA(IRModule* module)
         changed |= constructSSA(module, ii);
     }
     return changed;
+}
+
+bool constructSSA(IRInst* globalVal)
+{
+    switch (globalVal->getOp())
+    {
+    case kIROp_Func:
+    case kIROp_GlobalVar:
+        return constructSSA(globalVal->getModule(), (IRGlobalValueWithCode*)globalVal);
+
+    default:
+        break;
+    }
+    return false;
 }
 
 }

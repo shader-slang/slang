@@ -1474,7 +1474,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
-        case kIROp_constructVectorFromScalar:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_MatrixReshape:
         {
             // Simple constructor call
             EmitOpInfo outerPrec = inOuterPrec;
@@ -1754,13 +1755,6 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             StringEscapeUtil::appendQuoted(handler, slice, buf);
 
             m_writer->emit(buf);
-
-            return true;
-        }
-        case kIROp_GetStringHash:
-        {
-            const UnownedStringSlice slice = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
-            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
 
             return true;
         }

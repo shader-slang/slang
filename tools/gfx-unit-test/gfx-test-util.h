@@ -77,6 +77,7 @@ namespace gfx_test
     Slang::ComPtr<gfx::IDevice> createTestingDevice(
         UnitTestContext* context,
         Slang::RenderApiFlag::Enum api,
+        Slang::List<const char*> additionalSearchPaths = {},
         gfx::IDevice::ShaderCacheDesc shaderCache = {});
 
     void initializeRenderDoc();
@@ -88,13 +89,14 @@ namespace gfx_test
         const ImplFunc& f,
         UnitTestContext* context,
         Slang::RenderApiFlag::Enum api,
+        Slang::List<const char*> searchPaths = {},
         gfx::IDevice::ShaderCacheDesc shaderCache = {})
     {
         if ((api & context->enabledApis) == 0)
         {
             SLANG_IGNORE_TEST
         }
-        auto device = createTestingDevice(context, api, shaderCache);
+        auto device = createTestingDevice(context, api, searchPaths, shaderCache);
         if (!device)
         {
             SLANG_IGNORE_TEST

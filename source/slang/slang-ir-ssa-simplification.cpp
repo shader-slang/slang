@@ -10,8 +10,6 @@
 
 namespace Slang
 {
-    struct IRModule;
-
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
     void simplifyIR(IRModule* module)
@@ -33,6 +31,29 @@ namespace Slang
             eliminateDeadCode(module);
 
             changed |= constructSSA(module);
+
+            iterationCounter++;
+        }
+    }
+
+    void simplifyFunc(IRGlobalValueWithCode* func)
+    {
+        bool changed = true;
+        const int kMaxIterations = 8;
+        int iterationCounter = 0;
+        while (changed && iterationCounter < kMaxIterations)
+        {
+            changed = false;
+            changed |= applySparseConditionalConstantPropagation(func);
+            changed |= peepholeOptimize(func);
+            changed |= simplifyCFG(func);
+
+            // Note: we disregard the `changed` state from dead code elimination pass since
+            // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
+            // DCE will always remove those nearly generated consts and always returns true here.
+            eliminateDeadCode(func);
+
+            changed |= constructSSA(func);
 
             iterationCounter++;
         }

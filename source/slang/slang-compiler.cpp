@@ -223,14 +223,9 @@ namespace Slang
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
     }
 
-    void EntryPoint::updateDependencyBasedHash(
-        DigestBuilder& builder,
-        SlangInt entryPointIndex)
+    void EntryPoint::buildHash(DigestBuilder<SHA1>& builder)
     {
-        // CompositeComponentType will have already hashed the relevant entry point's name
-        // and file path dependencies, so we immediately return.
         SLANG_UNUSED(builder);
-        SLANG_UNUSED(entryPointIndex);
     }
 
     List<Module*> const& EntryPoint::getModuleDependencies()
@@ -242,12 +237,12 @@ namespace Slang
         return empty;
     }
 
-    List<String> const& EntryPoint::getFilePathDependencies()
+    List<SourceFile*> const& EntryPoint::getFileDependencies()
     {
         if(auto module = getModule())
-            return getModule()->getFilePathDependencies();
+            return getModule()->getFileDependencies();
         
-        static List<String> empty;
+        static List<SourceFile*> empty;
         return empty;
     }
 
@@ -269,8 +264,8 @@ namespace Slang
         if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
         {
             auto declModule = getModule(declaredWitness->declRef.getDecl());
-            m_moduleDependency.addDependency(declModule);
-            m_pathDependency.addDependency(declModule);
+            m_moduleDependencyList.addDependency(declModule);
+            m_fileDependencyList.addDependency(declModule);
             if (m_requirementSet.Add(declModule))
             {
                 m_requirements.add(declModule);
@@ -301,12 +296,8 @@ namespace Slang
         return Super::getInterface(guid);
     }
 
-    void TypeConformance::updateDependencyBasedHash(
-        DigestBuilder& builder,
-        SlangInt entryPointIndex)
+    void TypeConformance::buildHash(DigestBuilder<SHA1>& builder)
     {
-        SLANG_UNUSED(entryPointIndex);
-
         //TODO: Implement some kind of hashInto for Val then replace this
         auto subtypeWitness = m_subtypeWitness->toString();
 
@@ -316,12 +307,12 @@ namespace Slang
 
     List<Module*> const& TypeConformance::getModuleDependencies()
     {
-        return m_moduleDependency.getModuleList();
+        return m_moduleDependencyList.getModuleList();
     }
 
-    List<String> const& TypeConformance::getFilePathDependencies()
+    List<SourceFile*> const& TypeConformance::getFileDependencies()
     {
-        return m_pathDependency.getFilePathList();
+        return m_fileDependencyList.getFileList();
     }
 
     Index TypeConformance::getRequirementCount() { return m_requirements.getCount(); }

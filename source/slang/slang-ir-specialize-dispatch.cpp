@@ -29,7 +29,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         case kIROp_Call:
             callInst = cast<IRCall>(inst);
             break;
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
             lookupInst = cast<IRLookupWitnessMethod>(inst);
             break;
         case kIROp_Return:
@@ -157,7 +157,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         }
         else
         {
-            auto defaultValue = builder->emitConstructorInst(callInst->getDataType(), 0, nullptr);
+            auto defaultValue = builder->emitDefaultConstruct(callInst->getDataType());
             builder->emitReturn(defaultValue);
         }
     }

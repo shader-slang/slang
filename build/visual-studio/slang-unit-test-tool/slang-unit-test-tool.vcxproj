@@ -167,7 +167,9 @@
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
+      <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -183,7 +185,9 @@
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
+      <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -199,7 +203,9 @@
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
+      <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -219,6 +225,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -239,6 +246,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -259,6 +267,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -276,8 +285,7 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-command-line-args.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-compression.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-digest-builder.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-digest-utils.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-crypto.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-file-system.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-type-by-name.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-free-list.cpp" />
@@ -285,10 +293,10 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json-native.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-lock-file.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-md5.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-memory-arena.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-offset-container.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-path.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-persistent-cache.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-process.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-riff.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-rtti.cpp" />

@@ -34,7 +34,7 @@ struct InliningPassBase
     {
     }
 
-        /// Consider all the call sites in the module for inliing
+        /// Consider all the call sites in the module for inlining
     bool considerAllCallSites()
     {
         return considerAllCallSitesRec(m_module->getModuleInst());
@@ -198,6 +198,9 @@ struct InliningPassBase
         //
         outCallSite.callee = calleeFunc;
 
+        if (callee->findDecoration<IRIntrinsicOpDecoration>())
+            return true;
+
         // At this point the `CallSiteInfo` is complete and
         // could be used for inlining, but we have additional
         // checks to make.
@@ -238,6 +241,27 @@ struct InliningPassBase
         SharedIRBuilder sharedBuilder(m_module);
         IRBuilder builder(sharedBuilder);
         builder.setInsertBefore(call);
+
+        // If callee is an intrinsic op, just issue that intrinsic and be done.
+        if (auto intrinsicOpDecor = callee->findDecoration<IRIntrinsicOpDecoration>())
+        {
+            List<IRInst*> args;
+            for (UInt i = 0; i < call->getArgCount(); i++)
+                args.add(call->getArg(i));
+            auto op = intrinsicOpDecor->getIntrinsicOp();
+            if (op == kIROp_Nop)
+            {
+                SLANG_RELEASE_ASSERT(call->getArgCount() >= 1);
+                call->replaceUsesWith(call->getArg(0));
+            }
+            else
+            {
+                auto newCall = builder.emitIntrinsicInst(call->getFullType(), op, args.getCount(), args.getBuffer());
+                call->replaceUsesWith(newCall);
+            }
+            call->removeAndDeallocate();
+            return;
+        }
 
         // If the callee is a generic function, then we will
         // need to include the substitution of generic parameters
@@ -506,6 +530,8 @@ struct MandatoryEarlyInliningPass : InliningPassBase
     {
         if(info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
             return true;
+        if (info.callee->findDecoration<IRIntrinsicOpDecoration>())
+            return true;
         return false;
     }
 };
@@ -515,6 +541,96 @@ void performMandatoryEarlyInlining(IRModule* module)
 {
     MandatoryEarlyInliningPass pass(module);
     pass.considerAllCallSites();
+}
+
+namespace { // anonymous
+
+// Inlines calls that involve String types
+struct StringInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    StringInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool doesTypeRequireInline(IRType* type)
+    {
+        // TODO(JS):
+        // I guess there is a question here about what type around string requires
+        // inlining. 
+        // For example if we had an array of strings etc.
+        // For now we just consider just basic string types.
+        const auto op = type->getOp();
+        switch (op)
+        {
+            case kIROp_StringType:
+            case kIROp_NativeStringType:
+            {
+                return true;
+            }
+            default: break;
+        }
+
+        return false;
+    }
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        auto callee = info.callee;
+
+        if (doesTypeRequireInline(callee->getResultType()))
+        {
+            return true;
+        }
+
+        const auto count = Count(callee->getParamCount());
+        for (Index i = 0; i < count; ++i)
+        {
+            if (doesTypeRequireInline(callee->getParamType(UInt(i))))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+};
+
+} // anonymous
+
+Result performStringInlining(IRModule* module, DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+
+    // TODO(JS): 
+    // This is perhaps not as efficient as might be desirable. 
+    // A more optimized version might not need to pass over all of the module
+    // to find new call sites. 
+    //
+    // Another problem here is recursion. Right now Slang compiler doesn't accept recursive input,
+    // but the Slang language is supposed to support recursion on targets that support it. 
+    // There are GPU targets that allow recursion such as CUDA.
+    //
+    // Another approach would be (when enabled) when inlining occurs, would be instead of continuing 
+    // *after*, to start the checks/inlining from where the inline took place. 
+    // 
+    while(true)
+    {
+        StringInliningPass pass(module);
+        if (pass.considerAllCallSites())
+        {
+            // If there was a change try inlining again
+            continue;
+        }
+     
+        // Done.
+        break;
+    }
+
+    
+
+    return SLANG_OK;
 }
 
 struct ForceInliningPass : InliningPassBase
@@ -528,7 +644,8 @@ struct ForceInliningPass : InliningPassBase
     bool shouldInline(CallSiteInfo const& info)
     {
         if (info.callee->findDecoration<IRForceInlineDecoration>() ||
-            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
+            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>()||
+            info.callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
         return false;
     }

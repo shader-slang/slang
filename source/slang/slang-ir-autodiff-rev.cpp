@@ -491,6 +491,98 @@ struct BackwardDiffTranscriber
         builder.emitBranch(firstBlock);
     }
 
+    void cleanUpUnusedPrimalIntermediate(IRInst* func, IRInst* primalFunc, IRInst* intermediateType)
+    {
+        IRStructType* structType = as<IRStructType>(intermediateType);
+        if (!structType)
+        {
+            auto genType = as<IRGeneric>(intermediateType);
+            structType = as<IRStructType>(findGenericReturnVal(genType));
+            SLANG_RELEASE_ASSERT(structType);
+        }
+
+        // Collect fields that are never fetched by reverse func.
+        OrderedHashSet<IRStructKey*> fieldsToCleanup;
+        for (auto children : structType->getChildren())
+        {
+            if (auto field = as<IRStructField>(children))
+            {
+                auto structKey = field->getKey();
+                bool usedByRevFunc = false;
+                for (auto use = structKey->firstUse; use; use = use->nextUse)
+                {
+                    if (isChildInstOf(use->getUser(), func))
+                    {
+                        usedByRevFunc = true;
+                        break;
+                    }
+                }
+                if (!usedByRevFunc)
+                {
+                    List<IRInst*> users;
+                    for (auto use = structKey->firstUse; use; use = use->nextUse)
+                    {
+                        users.add(use->getUser());
+                    }
+                    for (auto user : users)
+                    {
+                        if (!isChildInstOf(user, primalFunc))
+                            continue;
+                        if (auto addr = as<IRFieldAddress>(user))
+                        {
+                            if (addr->hasMoreThanOneUse())
+                                continue;
+                            if (addr->firstUse)
+                            {
+                                if (addr->firstUse->getUser()->getOp() == kIROp_Store)
+                                {
+                                    addr->firstUse->getUser()->removeAndDeallocate();
+                                }
+                                addr->removeAndDeallocate();
+                            }
+                        }
+                    }
+
+                    bool hasNonTrivialUse = false;
+                    for (auto use = structKey->firstUse; use; use = use->nextUse)
+                    {
+                        switch (use->getUser()->getOp())
+                        {
+                        case kIROp_PrimalValueStructKeyDecoration:
+                        case kIROp_StructField:
+                            continue;
+                        default:
+                            hasNonTrivialUse = true;
+                            break;
+                        }
+                    }
+                    if (!hasNonTrivialUse)
+                    {
+                        fieldsToCleanup.Add(structKey);
+                    }
+                }
+            }
+        }
+
+        // Actually remove fields from struct.
+        for (auto children : structType->getChildren())
+        {
+            if (auto field = as<IRStructField>(children))
+            {
+                if (fieldsToCleanup.Contains(field->getKey()))
+                {
+                    auto key = field->getKey();
+                    List<IRInst*> keyUsers;
+                    for (auto use = key->firstUse; use; use = use->nextUse)
+                        keyUsers.add(use->getUser());
+                    for (auto keyUser : keyUsers)
+                        keyUser->removeAndDeallocate();
+                    key->removeAndDeallocate();
+                }
+            }
+        }
+    }
+
     // Transcribe a function definition.
     InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
     {
@@ -511,18 +603,18 @@ struct BackwardDiffTranscriber
         this->makeParameterBlock(builder, as<IRFunc>(fwdDiffFunc));
         
         // This steps adds a decoration to instructions that are computing the differential.
-        diffPropagationPass->propagateDiffInstDecoration(builder, fwdDiffFunc);
+        // TODO: This is disabled for now because fwd-mode already adds differential decorations
+        // wherever need. We need to run this pass only for user-writted forward derivativecode.
+        // 
+        // diffPropagationPass->propagateDiffInstDecoration(builder, fwdDiffFunc);
 
         // Copy primal insts to the first block of the unzipped function, copy diff insts to the
         // second block of the unzipped function.
         // 
         IRFunc* unzippedFwdDiffFunc = diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
-        
+
         // Clone the primal blocks from unzippedFwdDiffFunc
         // to the reverse-mode function.
-        // TODO: This is the spot where we can make a decision to split
-        // the primal and differential into two different funcitons
-        // instead of two blocks in the same function.
         // 
         // Special care needs to be taken for the first block since it holds the parameters
         
@@ -544,6 +636,11 @@ struct BackwardDiffTranscriber
                 block->insertAtEnd(diffFunc);
         }
 
+        // Extracts the primal computations into its own func, and replace the primal insts
+        // with the intermediate results computed from the extracted func.
+        IRInst* intermediateType = nullptr;
+        auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(diffFunc, unzippedFwdDiffFunc, intermediateType);
+
         // Transpose the first block (parameter block)
         transcribeParameterBlock(builder, diffFunc);
 
@@ -559,6 +656,9 @@ struct BackwardDiffTranscriber
         tempDiffFunc->removeAndDeallocate();
         unzippedFwdDiffFunc->removeAndDeallocate();
         fwdDiffFunc->removeAndDeallocate();
+
+        eliminateDeadCode(diffFunc);
+        cleanUpUnusedPrimalIntermediate(diffFunc, extractedPrimalFunc, intermediateType);
 
         return InstPair(primalFunc, diffFunc);
     }
@@ -586,7 +686,7 @@ struct BackwardDiffTranscriber
             {
                 // Create inout version. 
                 auto inoutDiffPairType = builder->getInOutType(diffPairType);
-                auto newParam = builder->emitParam(inoutDiffPairType);
+                auto newParam = builder->emitParam(inoutDiffPairType); 
 
                 // Map the _load_ of the new parameter as the clone of the old one.
                 auto newParamLoad = builder->emitLoad(newParam);

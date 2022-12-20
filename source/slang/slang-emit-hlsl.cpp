@@ -433,8 +433,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
-        case kIROp_Construct:
-        case kIROp_makeVector:
+        case kIROp_MakeVector:
         case kIROp_MakeMatrix:
         {
             if (inst->getOperandCount() == 1)
@@ -563,13 +562,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             StringEscapeUtil::appendQuoted(handler, slice, buf);
 
             m_writer->emit(buf);
-
-            return true;
-        }
-        case kIROp_GetStringHash:
-        {
-            const UnownedStringSlice slice = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
-            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
 
             return true;
         }

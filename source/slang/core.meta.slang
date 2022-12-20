@@ -83,6 +83,7 @@ interface __BuiltinType {}
 /// A type that can be used for arithmetic operations
 [sealed]
 [builtin]
+[TreatAsDifferentiable]
 interface __BuiltinArithmeticType : __BuiltinType
 {
         /// Initialize from a 32-bit signed integer value.
@@ -92,7 +93,11 @@ interface __BuiltinArithmeticType : __BuiltinType
 /// A type that can be used for logical/bitwise operations
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType {}
+interface __BuiltinLogicalType : __BuiltinType
+{
+        /// Initialize from a 32-bit signed integer value.
+    __init(int value);
+}
 
 /// A type that logically has a sign (positive/negative/zero)
 [sealed]
@@ -140,6 +145,7 @@ interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 /// A type that uses a floating-point representation
 [sealed]
 [builtin]
+[TreatAsDifferentiable]
 interface __BuiltinFloatingPointType : __BuiltinRealType, IDifferentiable
 {
         /// Initialize from a 32-bit floating-point value.
@@ -201,7 +207,9 @@ extension __EnumType
     // interface, but right now the scoping for looking
     // up that type isn't working right.
     //
+    __intrinsic_op($(kIROp_IntCast))
     __init(int value);
+    __intrinsic_op($(kIROp_IntCast))
     __init(uint value);
 }
 
@@ -302,8 +310,13 @@ ${{{{
         ConversionCost conversionCost = getBaseTypeConversionCost(
             kBaseTypes[tt],
             kBaseTypes[ss]);
+
+        IROp intrinsicOpCode = getBaseTypeConversionOp(
+            kBaseTypes[tt],
+            kBaseTypes[ss]);
 }}}}
 
+    __intrinsic_op($(intrinsicOpCode))
     __implicit_conversion($(conversionCost))
     __init($(kBaseTypes[ss].name) value);
 
@@ -325,6 +338,7 @@ ${{{{
     case BaseType::UInt:
 }}}}
         __generic<T:__EnumType>
+        __intrinsic_op($(kIROp_IntCast))
         __init(T value);
 ${{{{
         break;
@@ -380,6 +394,7 @@ ${{{{
 }}}}
         __generic<T>
         [__readNone]
+        __intrinsic_op($(kIROp_CastToVoid))
         __init(T value)
         {}
 ${{{{
@@ -416,10 +431,10 @@ struct Ptr
     __intrinsic_op($(kIROp_BitCast))
     __init(Ptr<U> ptr);
 
-    __intrinsic_op($(kIROp_BitCast))
+    __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
 
-    __intrinsic_op($(kIROp_BitCast))
+    __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 
     __subscript(int index) -> T
@@ -436,7 +451,7 @@ struct Ptr
             __store(__getElementPtr(this, index), newValue);
         }
 
-        __intrinsic_op($(kIROp_getElementPtr))
+        __intrinsic_op($(kIROp_GetElementPtr))
         ref;
     }
 };
@@ -447,10 +462,10 @@ T __load<T>(Ptr<T> ptr);
 __intrinsic_op($(kIROp_Store))
 void __store<T>(Ptr<T> ptr, T val);
 
-__intrinsic_op($(kIROp_getElementPtr))
+__intrinsic_op($(kIROp_GetElementPtr))
 Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
 
-__intrinsic_op($(kIROp_getElementPtr))
+__intrinsic_op($(kIROp_GetElementPtr))
 Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
 
 __generic<T>
@@ -491,7 +506,7 @@ extension bool
 extension uint64_t
 {
     __generic<T>
-    __intrinsic_op($(kIROp_Construct))
+    __intrinsic_op($(kIROp_CastPtrToInt))
     __init(Ptr<T> ptr);
 
     static const uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
@@ -501,7 +516,7 @@ extension uint64_t
 extension int64_t
 {
     __generic<T>
-    __intrinsic_op($(kIROp_Construct))
+    __intrinsic_op($(kIROp_CastPtrToInt))
     __init(Ptr<T> ptr);
 
     static const int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
@@ -511,7 +526,7 @@ extension int64_t
 extension intptr_t
 {
     __generic<T>
-    __intrinsic_op($(kIROp_Construct))
+    __intrinsic_op($(kIROp_CastPtrToInt))
     __init(Ptr<T> ptr);
     static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
     static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
@@ -521,7 +536,7 @@ extension intptr_t
 extension uintptr_t
 {
     __generic<T>
-    __intrinsic_op($(kIROp_Construct))
+    __intrinsic_op($(kIROp_CastPtrToInt))
     __init(Ptr<T> ptr);
     static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
     static const uintptr_t minValue = 0z;
@@ -620,16 +635,22 @@ __intrinsic_type($(kIROp_StringType))
 struct String
 {
     __target_intrinsic(cpp)
+    __intrinsic_op($(kIROp_MakeString))
     __init(int val);
     __target_intrinsic(cpp)
+    __intrinsic_op($(kIROp_MakeString))
     __init(uint val);
     __target_intrinsic(cpp)
+    __intrinsic_op($(kIROp_MakeString))
     __init(int64_t val);
     __target_intrinsic(cpp)
+    __intrinsic_op($(kIROp_MakeString))
     __init(uint64_t val);
     __target_intrinsic(cpp)
+    __intrinsic_op($(kIROp_MakeString))
     __init(float val);
     __target_intrinsic(cpp)
+    __intrinsic_op($(kIROp_MakeString))
     __init(double val);
 
     __target_intrinsic(cpp)
@@ -745,11 +766,12 @@ struct vector
 
         /// Initialize a vector where all elements have the same scalar `value`.
     __implicit_conversion($(kConversionCost_ScalarToVector))
-    __intrinsic_op($(kIROp_constructVectorFromScalar))
+    __intrinsic_op($(kIROp_MakeVectorFromScalar))
     __init(T value);
 
         /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
+    __intrinsic_op(0)
     __init(vector<T,N> value);
 }
 
@@ -835,7 +857,7 @@ struct Vertices
     __subscript(uint index) -> T
     {
         // TODO: Ellie make sure these remains write only
-        __intrinsic_op($(kIROp_getElementPtr))
+        __intrinsic_op($(kIROp_GetElementPtr))
         ref;
     }
 };
@@ -848,7 +870,7 @@ struct Indices
     __subscript(uint index) -> T
     {
         // TODO: Ellie: It's illegal to not write out the whole primitive at once, should we use set over ref?
-        __intrinsic_op($(kIROp_getElementPtr))
+        __intrinsic_op($(kIROp_GetElementPtr))
         ref;
     }
 };
@@ -860,7 +882,7 @@ struct Primitives
 {
     __subscript(uint index) -> T
     {
-        __intrinsic_op($(kIROp_getElementPtr))
+        __intrinsic_op($(kIROp_GetElementPtr))
         ref;
     }
 };
@@ -871,22 +893,49 @@ struct Primitives
 
 __generic<T> __extension vector<T, 2>
 {
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, T y);
 }
 __generic<T> __extension vector<T, 3>
 {
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, T y, T z);
+
+    [__unsafeForceInlineEarly]
+    __intrinsic_op($(kIROp_MakeVector))
     __init(vector<T,2> xy, T z);
+
+    [__unsafeForceInlineEarly]
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,2> yz);
 }
 __generic<T> __extension vector<T, 4>
 {
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, T y, T z, T w);
+
+    [__unsafeForceInlineEarly]
+    __intrinsic_op($(kIROp_MakeVector))
     __init(vector<T,2> xy, T z, T w);
+
+    [__unsafeForceInlineEarly]
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,2> yz, T w);
+
+    [__unsafeForceInlineEarly]
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, T y, vector<T,2> zw);
+
+    [__unsafeForceInlineEarly]
+    __intrinsic_op($(kIROp_MakeVector))
     __init(vector<T,2> xy, vector<T,2> zw);
+
+    [__unsafeForceInlineEarly]
+    __intrinsic_op($(kIROp_MakeVector))
     __init(vector<T,3> xyz, T w);
+
+    [__unsafeForceInlineEarly]
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,3> yzw);
 }
 
@@ -915,16 +964,24 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
             auto cost = getBaseTypeConversionCost(
                 kBaseTypes[tt],
                 kBaseTypes[ff]);
+            auto op = getBaseTypeConversionOp(
+                kBaseTypes[tt],
+                kBaseTypes[ff]);
 
 			// Implicit conversion from a vector of the same
 			// size, but different element type.
             sb << "    __implicit_conversion(" << cost << ")\n";
+            sb << "    __intrinsic_op(" << int(op) << ")\n";
             sb << "    __init(vector<" << kBaseTypes[ff].name << ",N> value);\n";
 
 			// Constructor to make a vector from a scalar of another type.
-            cost += kConversionCost_ScalarToVector;
-            sb << "    __implicit_conversion(" << cost << ")\n";
-            sb << "    __init(" << kBaseTypes[ff].name << " value);\n";
+            if (cost != kConversionCost_Impossible)
+            {
+                cost += kConversionCost_ScalarToVector;
+                sb << "    __implicit_conversion(" << cost << ")\n";
+                sb << "    [__unsafeForceInlineEarly]\n";
+                sb << "    __init(" << kBaseTypes[ff].name << " value) { this = vector<" << kBaseTypes[tt].name << ",N>( " << kBaseTypes[tt].name << "(value)); }\n";
+            }
         }
     }
     sb << "}\n";
@@ -936,7 +993,7 @@ for( int C = 2; C <= 4; ++C )
     sb << "__generic<T> __extension matrix<T, " << R << "," << C << ">\n{\n";
 
     // initialize from R*C scalars
-    sb << "__init(";
+    sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
     for( int ii = 0; ii < R; ++ii )
     for( int jj = 0; jj < C; ++jj )
     {
@@ -946,7 +1003,7 @@ for( int C = 2; C <= 4; ++C )
     sb << ");\n";
 
     // Initialize from R C-vectors
-    sb << "__init(";
+    sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
     for (int ii = 0; ii < R; ++ii)
     {
         if(ii != 0) sb << ", ";
@@ -959,7 +1016,7 @@ for( int C = 2; C <= 4; ++C )
     for( int cc = C; cc <= 4; ++cc )
     {
         if(rr == R && cc == C) continue;
-        sb << "__init(matrix<T," << rr << "," << cc << "> value);\n";
+        sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << "> value);\n";
     }
     sb << "}\n";
 }
@@ -982,8 +1039,12 @@ ${{{{
             kBaseTypes[tt],
             kBaseTypes[ff]);
         auto fromType = kBaseTypes[ff].name;
+        auto op = getBaseTypeConversionOp(
+                kBaseTypes[tt],
+                kBaseTypes[ff]);
 }}}}
     __implicit_conversion($(cost))
+    __intrinsic_op($(op))
     __init(matrix<$(fromType),R,C> value);
 ${{{{
     }
@@ -1026,6 +1087,7 @@ extension matrix<T, R, C> : IDifferentiable
 {
     typedef matrix<T, R, C> Differential;
 
+    __intrinsic_op($(kIROp_MakeMatrixFromScalar))
     __init(T val);
 
     [__unsafeForceInlineEarly]
@@ -2061,7 +2123,7 @@ __intrinsic_op(0)
 __prefix Ptr<T> operator&(__ref T value);
 
 __generic<T>
-__intrinsic_op($(kIROp_getElementPtr))
+__intrinsic_op($(kIROp_GetElementPtr))
 Ptr<T> operator+(Ptr<T> value, int64_t offset);
 
 __generic<T>

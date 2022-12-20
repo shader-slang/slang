@@ -76,10 +76,57 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_IRem:
     case kIROp_FRem:
     case kIROp_Neg:
-    case kIROp_Construct:
-    case kIROp_makeVector:
-    case kIROp_makeArray:
+    case kIROp_Geq:
+    case kIROp_Leq:
+    case kIROp_Greater:
+    case kIROp_Less:
+    case kIROp_Neq:
+    case kIROp_Eql:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_Select:
+    case kIROp_MakeVectorFromScalar:
+    case kIROp_MakeVector:
     case kIROp_MakeMatrix:
+    case kIROp_MakeMatrixFromScalar:
+    case kIROp_MatrixReshape:
+    case kIROp_VectorReshape:
+    case kIROp_CastFloatToInt:
+    case kIROp_CastIntToFloat:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_CastIntToPtr:
+    case kIROp_CastPtrToInt:
+    case kIROp_CastPtrToBool:
+    case kIROp_Reinterpret:
+    case kIROp_BitCast:
+    case kIROp_MakeTuple:
+    case kIROp_MakeDifferentialPair:
+    case kIROp_MakeExistential:
+    case kIROp_MakeExistentialWithRTTI:
+    case kIROp_MakeOptionalNone:
+    case kIROp_MakeOptionalValue:
+    case kIROp_MakeResultError:
+    case kIROp_MakeResultValue:
+    case kIROp_MakeString:
+    case kIROp_MakeUInt64:
+    case kIROp_MakeArray:
+    case kIROp_swizzle:
+    case kIROp_GetElement:
+    case kIROp_FieldExtract:
+    case kIROp_ExtractExistentialType:
+    case kIROp_ExtractExistentialValue:
+    case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_WrapExistential:
+    case kIROp_GetResultError:
+    case kIROp_GetResultValue:
+    case kIROp_GetOptionalValue:
+    case kIROp_DifferentialPairGetDifferential:
+    case kIROp_DifferentialPairGetPrimal:
     // TODO: more cases
         return true;
 

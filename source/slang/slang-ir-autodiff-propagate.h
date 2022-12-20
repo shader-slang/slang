@@ -10,9 +10,14 @@
 namespace Slang
 {
 
-bool isDifferentialInst(IRInst* inst)
+inline bool isDifferentialInst(IRInst* inst)
 {
     return inst->findDecoration<IRDifferentialInstDecoration>();
+}
+
+inline bool isMixedDifferentialInst(IRInst* inst)
+{
+    return inst->findDecoration<IRMixedDifferentialInstDecoration>();
 }
 
 struct DiffPropagationPass : InstPassBase

@@ -1368,6 +1368,14 @@ Module* getModule(Decl* decl)
     return moduleDecl->module;
 }
 
+Decl* getParentDecl(Decl* decl)
+{
+    decl = decl->parentDecl;
+    while (as<GenericDecl>(decl))
+        decl = decl->parentDecl;
+    return decl;
+}
+
 static const ImageFormatInfo kImageFormatInfos[] =
 {
 #define SLANG_IMAGE_FORMAT_INFO(TYPE, COUNT, SIZE) SLANG_SCALAR_TYPE_##TYPE, uint8_t(COUNT), uint8_t(SIZE)

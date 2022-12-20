@@ -1712,15 +1712,10 @@ struct SlangDesc
 
 struct ShaderCacheDesc
 {
-    // The filename for the file the cache's state should be saved to or loaded from.
-    NativeString cacheFilename = "cache.txt";
-    // The root directory for the shader cache.
+    // The root directory for the shader cache. If not set, shader cache is disabled.
     NativeString shaderCachePath;
-    // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
-    // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
-    void* shaderCacheFileSystem = nullptr;
     // The maximum number of entries stored in the cache.
-    GfxCount entryCountLimit = 0;
+    GfxCount maxEntryCount = 0;
 };
 
 struct DeviceInteropHandles
@@ -1932,6 +1927,21 @@ interface IDevice
         TextureResourceDesc* desc, out Size outSize, out Size outAlignment);
 
     Result getTextureRowAlignment(out Size outAlignment);
+};
+
+struct ShaderCacheStats
+{
+    GfxCount hitCount;
+    GfxCount missCount;
+    GfxCount entryCount;
+};
+
+[COM("715bdf26-5135-11eb-AE93-02-42-AC-13-00-02")]
+interface IShaderCache
+{
+    Result clearShaderCache();
+    Result getShaderCacheStats(out ShaderCacheStats outStats);
+    Result resetShaderCacheStats();
 };
 
 #define SLANG_GFX_IMPORT [DllImport("gfx")]

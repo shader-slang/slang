@@ -136,7 +136,10 @@ struct SCCPContext
         case kIROp_BitXor:
         case kIROp_BitNot:
         case kIROp_BitCast:
-        case kIROp_Construct:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
         case kIROp_Select:
             return true;
         default:
@@ -284,7 +287,7 @@ struct SCCPContext
         break;                              \
     }
 
-    LatticeVal evalConstruct(IRType* type, LatticeVal v0)
+    LatticeVal evalCast(IRType* type, LatticeVal v0)
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
         auto irConstant = as<IRConstant>(v0.value);
@@ -838,18 +841,20 @@ struct SCCPContext
 
         switch (inst->getOp())
         {
-        case kIROp_Construct:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
             switch (inst->getOperandCount())
             {
-            case 0:
-                return evalDefaultConstruct(inst->getDataType());
-
             case 1:
-                return evalConstruct(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
+                return evalCast(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
 
             default:
                 return LatticeVal::getAny();
             }
+        case kIROp_DefaultConstruct:
+            return evalDefaultConstruct(inst->getDataType());
         case kIROp_Add:
             return evalAdd(
                 inst->getDataType(),
@@ -1671,6 +1676,22 @@ bool applySparseConditionalConstantPropagation(
     changed |= applySparseConditionalConstantPropagationRec(globalContext, module->getModuleInst());
 
     return changed;
+}
+
+
+bool applySparseConditionalConstantPropagation(IRInst* func)
+{
+    SharedSCCPContext shared;
+    shared.module = func->getModule();
+    shared.sharedBuilder.init(shared.module);
+    shared.sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
+
+    SCCPContext globalContext;
+    globalContext.shared = &shared;
+    globalContext.code = nullptr;
+
+    // Run recursive SCCP passes on each child code block.
+    return applySparseConditionalConstantPropagationRec(globalContext, func);
 }
 
 }

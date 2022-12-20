@@ -3,7 +3,7 @@
 #include "slang-compiler.h"
 #include "slang-ir.h"
 #include "slang-syntax.h"
-
+#include "slang-ir-util.h"
 #include "../core/slang-string-util.h"
 
 #define STRINGIZE(x) STRINGIZE2(x)
@@ -191,6 +191,29 @@ namespace Slang
         {
             return kConversionCost_GeneralConversion;
         }
+    }
+
+    IROp getBaseTypeConversionOp(
+        BaseTypeConversionInfo const& toInfo,
+        BaseTypeConversionInfo const& fromInfo)
+    {
+        if (toInfo.tag == fromInfo.tag)
+            return kIROp_Nop;
+
+        IROp intrinsicOpCode = kIROp_Nop;
+        auto toStyle = getTypeStyle(toInfo.tag);
+        auto fromStyle = getTypeStyle(fromInfo.tag);
+        if (toStyle == kIROp_BoolType) toStyle = kIROp_IntType;
+        if (fromStyle == kIROp_BoolType) fromStyle = kIROp_IntType;
+        if (toStyle == kIROp_IntType && fromStyle == kIROp_IntType)
+            intrinsicOpCode = kIROp_IntCast;
+        if (toStyle == kIROp_IntType && fromStyle == kIROp_FloatType)
+            intrinsicOpCode = kIROp_CastFloatToInt;
+        if (toStyle == kIROp_FloatType && fromStyle == kIROp_IntType)
+            intrinsicOpCode = kIROp_CastIntToFloat;
+        if (toStyle == kIROp_FloatType && fromStyle == kIROp_FloatType)
+            intrinsicOpCode = kIROp_FloatCast;
+        return intrinsicOpCode;
     }
 
     struct IntrinsicOpInfo { IROp opCode; char const* funcName; char const* opName; char const* interface; unsigned flags; };

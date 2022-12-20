@@ -1591,9 +1591,9 @@ struct SPIRVEmitContext
             return emitFieldAddress(parent, as<IRFieldAddress>(inst));
         case kIROp_FieldExtract:
             return emitFieldExtract(parent, as<IRFieldExtract>(inst));
-        case kIROp_getElementPtr:
+        case kIROp_GetElementPtr:
             return emitGetElementPtr(parent, as<IRGetElementPtr>(inst));
-        case kIROp_getElement:
+        case kIROp_GetElement:
             return emitGetElement(parent, as<IRGetElement>(inst));
         case kIROp_Load:
             return emitLoad(parent, as<IRLoad>(inst));
@@ -1601,7 +1601,13 @@ struct SPIRVEmitContext
             return emitStore(parent, as<IRStore>(inst));
         case kIROp_swizzle:
             return emitSwizzle(parent, as<IRSwizzle>(inst));
-        case kIROp_Construct:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+        case kIROp_MatrixReshape:
+        case kIROp_VectorReshape:
+            // TODO: break emitConstruct into separate functions for each opcode.
             return emitConstruct(parent, inst);
         case kIROp_BitCast:
             return emitInst(

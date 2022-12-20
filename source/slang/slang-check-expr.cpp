@@ -503,7 +503,11 @@ namespace Slang
         auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
         addModifier(synthesizedDecl, toBeSynthesized);
 
-        return ConstructDeclRefExpr(makeDeclRef(synthesizedDecl), nullptr, originalExpr->loc, originalExpr);
+        return ConstructDeclRefExpr(
+            makeDeclRef(synthesizedDecl),
+            nullptr,
+            originalExpr ? originalExpr->loc : SourceLoc(),
+            originalExpr);
     }
 
     Expr* SemanticsVisitor::ConstructLookupResultExpr(
@@ -1927,6 +1931,10 @@ namespace Slang
                             {
                                 getSink()->diagnose(forwardDiff, Diagnostics::functionNotMarkedAsDifferentiable, funcDecl, "backward");
                             }
+                            if (!isEffectivelyStatic(funcDecl) && !isGlobalDecl(funcDecl))
+                            {
+                                getSink()->diagnose(forwardDiff, Diagnostics::nonStaticMemberFunctionNotAllowedAsDiffOperand, funcDecl);
+                            }
                         }
                     }
                 }
@@ -2128,9 +2136,9 @@ namespace Slang
                 type->paramTypes.add(derivType);
             }
         }
-
+        
         // Last parameter is the initial derivative of the original return type
-        type->paramTypes.add(originalType->resultType);
+        type->paramTypes.add(getDifferentialType(m_astBuilder, originalType->resultType, SourceLoc()));
 
         return type;
     }

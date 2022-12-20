@@ -2052,25 +2052,6 @@ public:
         0xbe91ba6c, 0x784, 0x4308, { 0xa1, 0x0, 0x19, 0xc3, 0x66, 0x83, 0x44, 0xb2 } \
     }
 
-// These are exclusively used to track hit/miss counts for shader cache entries. Entry hit and
-// miss counts specifically indicate if the file containing relevant shader code was found in
-// the cache, while the general hit and miss counts indicate whether the file was both found and
-// up-to-date.
-class IShaderCacheStatistics : public ISlangUnknown
-{
-public:
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheMissCount() = 0;
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() = 0;
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryDirtyCount() = 0;
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL resetCacheStatistics() = 0;
-};
-
-#define SLANG_UUID_IShaderCacheStatistics                                                \
-    {                                                                                    \
-          0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
-    }
-
 struct AdapterLUID
 {
     uint8_t luid[16];
@@ -2225,15 +2206,10 @@ public:
 
     struct ShaderCacheDesc
     {
-        // The filename for the file the cache's state should be saved to or loaded from.
-        const char* cacheFilename = "cache.txt";
-        // The root directory for the shader cache.
+        // The root directory for the shader cache. If not set, shader cache is disabled.
         const char* shaderCachePath = nullptr;
-        // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
-        // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
-        ISlangFileSystem* shaderCacheFileSystem = nullptr;
         // The maximum number of entries stored in the cache. By default, there is no limit.
-        GfxCount entryCountLimit = 0;
+        GfxCount maxEntryCount = 0;
     };
 
     struct InteropHandles
@@ -2595,6 +2571,30 @@ public:
 #define SLANG_UUID_IDevice                                                               \
     {                                                                                    \
           0x715bdf26, 0x5135, 0x11eb, { 0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 } \
+    }
+
+struct ShaderCacheStats
+{
+    GfxCount hitCount;
+    GfxCount missCount;
+    GfxCount entryCount;
+};
+
+// These are exclusively used to track hit/miss counts for shader cache entries. Entry hit and
+// miss counts specifically indicate if the file containing relevant shader code was found in
+// the cache, while the general hit and miss counts indicate whether the file was both found and
+// up-to-date.
+class IShaderCache : public ISlangUnknown
+{
+public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL clearShaderCache() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getShaderCacheStats(ShaderCacheStats* outStats) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL resetShaderCacheStats() = 0;
+};
+
+#define SLANG_UUID_IShaderCache                                                          \
+    {                                                                                    \
+          0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
     }
 
 class IPipelineCreationAPIDispatcher : public ISlangUnknown
