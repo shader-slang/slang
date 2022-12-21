@@ -13,8 +13,6 @@ struct ForwardDerivativeTranscriber : AutoDiffTranscriberBase
     {
     }
 
-    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType) override;
-
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
     // If no primal name is available, returns a blank string.
     // 
@@ -75,14 +73,16 @@ struct ForwardDerivativeTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeWrapExistential(IRBuilder* builder, IRInst* origInst);
 
-    // Create an empty func to represent the transcribed func of `origFunc`.
-    InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc);
+    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType) override;
 
     // Transcribe a function definition.
     InstPair transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc);
 
     // Transcribe a generic definition
     InstPair transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric);
+
+    // Create an empty func to represent the transcribed func of `origFunc`.
+    virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
 
     virtual InstPair transcribeInstImpl(IRBuilder* builder, IRInst* origInst) override;
 

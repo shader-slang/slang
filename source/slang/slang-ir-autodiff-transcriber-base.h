@@ -77,8 +77,8 @@ struct AutoDiffTranscriberBase
 
     IRInst* maybeCloneForPrimalInst(IRBuilder* builder, IRInst* inst);
 
-    List<IRInterfaceRequirementEntry*> AutoDiffTranscriberBase::
-        findDifferentiableInterfaceLookupPath(IRInterfaceType* idiffType, IRInterfaceType* type);
+    List<IRInterfaceRequirementEntry*> findDifferentiableInterfaceLookupPath(
+        IRInterfaceType* idiffType, IRInterfaceType* type);
 
     InstPair transcribeExtractExistentialWitnessTable(IRBuilder* builder, IRInst* origInst);
 
