@@ -179,11 +179,6 @@ struct DifferentiableTypeConformanceContext
 
 };
 
-struct IAutoDiffTranscriber : public RefObject
-{
-    virtual InstPair transcribe(IRBuilder* builder, IRInst* originalInst) = 0;
-};
-
 struct DifferentialPairTypeBuilder
 {
     DifferentialPairTypeBuilder() = default;
