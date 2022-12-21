@@ -234,8 +234,6 @@ struct DifferentialPairTypeBuilder
 
 void stripAutoDiffDecorations(IRModule* module);
 
-IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey);
-
 bool isNoDiffType(IRType* paramType);
 
 IRInst* lookupForwardDerivativeReference(IRInst* primalFunction);

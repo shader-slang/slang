@@ -5,9 +5,7 @@
 
 namespace Slang
 {
-
-// TODO: Put into a nameless namespace.
-IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
+static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
     {
@@ -284,7 +282,6 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     return result;
 }
 
-
 AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
     : moduleInst(inModuleInst)
 {
@@ -338,8 +335,6 @@ IRStructKey* AutoDiffSharedContext::getIDifferentiableStructKeyAtIndex(UInt inde
     return nullptr;
 }
 
-
-
 void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 {
     parentFunc = func;
@@ -392,7 +387,6 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
     }
 }
 
-
 void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
     for (auto inst : parent->getChildren())
@@ -405,6 +399,8 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_ForwardDerivativeDecoration:
             case kIROp_DerivativeMemberDecoration:
             case kIROp_DifferentiableTypeDictionaryDecoration:
+            case kIROp_DifferentialInstDecoration:
+            case kIROp_MixedDifferentialInstDecoration:
                 decor->removeAndDeallocate();
                 break;
             default:
@@ -455,10 +451,8 @@ void stripNoDiffTypeAttribute(IRModule* module)
     pass.processModule();
 }
 
-
 struct AutoDiffPass : public InstPassBase
 {
-
     DiagnosticSink* getSink()
     {
         return sink;
@@ -472,7 +466,7 @@ struct AutoDiffPass : public InstPassBase
         IRBuilder builderStorage(this->autodiffContext->sharedBuilder);
         IRBuilder* builder = &builderStorage;
 
-        // Process all ForwardDifferentiate instructions (kIROp_ForwardDifferentiate), by 
+        // Process all ForwardDifferentiate and BackwardDifferentiate instructions by 
         // generating derivative code for the referenced function.
         //
         bool modified = processReferencedFunctions(builder);
@@ -480,8 +474,8 @@ struct AutoDiffPass : public InstPassBase
         return modified;
     }
 
-    // Recursively process instructions looking for JVP calls (kIROp_ForwardDifferentiate),
-    // then check that the referenced function is marked correctly for differentiation.
+    // Process all differentiate calls, and recursively generate code for forward and backward
+    // derivative functions.
     //
     bool processReferencedFunctions(IRBuilder* builder)
     {
@@ -515,7 +509,7 @@ struct AutoDiffPass : public InstPassBase
                     }
                 });
 
-            // Process collected `ForwardDifferentiate` insts and replace them with placeholders for
+            // Process collected differentiate insts and replace them with placeholders for
             // differentiated functions.
 
             for (auto differentiateInst : autoDiffWorkList)
@@ -544,6 +538,9 @@ struct AutoDiffPass : public InstPassBase
                 }
             }
 
+            // Run transcription logic to generate the body of forward/backward derivatives functions.
+            // While doing so, we may discover new functions to differentiate, so we keep running until
+            // the worklist goes dry.
             while (autodiffContext->followUpFunctionsToTranscribe.getCount() != 0)
             {
                 changed = true;
@@ -574,7 +571,7 @@ struct AutoDiffPass : public InstPassBase
         return hasChanges;
     }
 
-    IRStringLit* getForwardDerivativeFuncName(IRInst* func)
+    IRStringLit* getDerivativeFuncName(IRInst* func, const char* postFix)
     {
         IRBuilder builder(&sharedBuilderStorage);
         builder.setInsertBefore(func);
@@ -582,32 +579,24 @@ struct AutoDiffPass : public InstPassBase
         IRStringLit* name = nullptr;
         if (auto linkageDecoration = func->findDecoration<IRLinkageDecoration>())
         {
-            name = builder.getStringValue((String(linkageDecoration->getMangledName()) + "_fwd_diff").getUnownedSlice());
+            name = builder.getStringValue((String(linkageDecoration->getMangledName()) + postFix).getUnownedSlice());
         }
         else if (auto namehintDecoration = func->findDecoration<IRNameHintDecoration>())
         {
-            name = builder.getStringValue((String(namehintDecoration->getName()) + "_fwd_diff").getUnownedSlice());
+            name = builder.getStringValue((String(namehintDecoration->getName()) + postFix).getUnownedSlice());
         }
 
         return name;
     }
 
+    IRStringLit* getForwardDerivativeFuncName(IRInst* func)
+    {
+        return getDerivativeFuncName(func, "_fwd_diff");
+    }
+
     IRStringLit* getBackwardDerivativeFuncName(IRInst* func)
     {
-        IRBuilder builder(&sharedBuilderStorage);
-        builder.setInsertBefore(func);
-
-        IRStringLit* name = nullptr;
-        if (auto linkageDecoration = func->findDecoration<IRLinkageDecoration>())
-        {
-            name = builder.getStringValue((String(linkageDecoration->getMangledName()) + "_bwd_diff").getUnownedSlice());
-        }
-        else if (auto namehintDecoration = func->findDecoration<IRNameHintDecoration>())
-        {
-            name = builder.getStringValue((String(namehintDecoration->getName()) + "_bwd_diff").getUnownedSlice());
-        }
-
-        return name;
+        return getDerivativeFuncName(func, "_bwd_diff");
     }
 
     AutoDiffPass(AutoDiffSharedContext* context, DiagnosticSink* sink) :
@@ -697,6 +686,5 @@ bool finalizeAutoDiffPass(IRModule* module)
 
     return false;
 }
-
 
 }
