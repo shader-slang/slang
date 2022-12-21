@@ -27,8 +27,6 @@ struct BackwardDiffTranscriber : AutoDiffTranscriberBase
     Dictionary<IRInst*, IRInst*> primalToDiffPair;
     Dictionary<IRInst*, IRInst*> orginalToTranscribed;
 
-    Dictionary<InstPair, IRInst*> differentialPairTypes;
-
     // References to other passes that for reverse-mode transcription.
     ForwardDiffTranscriber* fwdDiffTranscriber;
     DiffTransposePass* diffTransposePass;

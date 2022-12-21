@@ -35,8 +35,6 @@ struct AutoDiffTranscriberBase
 
     SharedIRBuilder* sharedBuilder;
 
-    Dictionary<InstPair, IRInst*> differentialPairTypes;
-
     AutoDiffTranscriberBase(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
         : autoDiffSharedContext(shared)
         , differentiableTypeConformanceContext(shared)
