@@ -13,6 +13,39 @@
 
 namespace Slang
 {
+template<typename P, typename D>
+struct DiffInstPair
+{
+    P primal;
+    D differential;
+    DiffInstPair() = default;
+    DiffInstPair(P primal, D differential) : primal(primal), differential(differential)
+    {}
+    HashCode getHashCode() const
+    {
+        Hasher hasher;
+        hasher << primal << differential;
+        return hasher.getResult();
+    }
+    bool operator ==(const DiffInstPair& other) const
+    {
+        return primal == other.primal && differential == other.differential;
+    }
+};
+
+typedef DiffInstPair<IRInst*, IRInst*> InstPair;
+
+enum class FuncBodyTranscriptionTaskType
+{
+    Forward, Backward, Primal
+};
+
+struct FuncBodyTranscriptionTask
+{
+    FuncBodyTranscriptionTaskType type;
+    IRFunc* originalFunc;
+    IRFunc* resultFunc;
+};
 
 struct AutoDiffSharedContext
 {
@@ -58,6 +91,7 @@ struct AutoDiffSharedContext
     // 
     bool                                    isInterfaceAvailable = false;
 
+    List<FuncBodyTranscriptionTask>         followUpFunctionsToTranscribe;
 
     AutoDiffSharedContext(IRModuleInst* inModuleInst);
 
@@ -145,6 +179,11 @@ struct DifferentiableTypeConformanceContext
 
 };
 
+struct IAutoDiffTranscriber : public RefObject
+{
+    virtual InstPair transcribe(IRBuilder* builder, IRInst* originalInst) = 0;
+};
+
 struct DifferentialPairTypeBuilder
 {
     DifferentialPairTypeBuilder() = default;
@@ -198,6 +237,8 @@ void stripAutoDiffDecorations(IRModule* module);
 IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey);
 
 bool isNoDiffType(IRType* paramType);
+
+IRInst* lookupForwardDerivativeReference(IRInst* primalFunction);
 
 struct IRAutodiffPassOptions
 {

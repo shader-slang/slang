@@ -64,35 +64,6 @@ struct ExtractPrimalFuncContext
         return intermediateType;
     }
 
-    // Specialize `genericToSpecialize` with the generic parameters defined in `userGeneric`.
-    // For example:
-    // ```
-    // int f<T>(T a);
-    // ```
-    // will be extended into 
-    // ```
-    // struct IntermediateFor_f<T> { T t0; }
-    // int f_primal<T>(T a, IntermediateFor_f<T> imm);
-    // ```
-    // Given a user generic `f_primal<T>` and a used value parameterized on the same set of generic parameters
-    // `IntermediateFor_f`, `genericToSpecialize` constructs `IntermediateFor_f<T>` (using the parameter list
-    // from user generic).
-    //
-    IRInst* specializeWithGeneric(
-        IRBuilder& builder, IRInst* genericToSpecialize, IRGeneric* userGeneric)
-    {
-        List<IRInst*> genArgs;
-        for (auto param : userGeneric->getFirstBlock()->getParams())
-        {
-            genArgs.add(param);
-        }
-        return builder.emitSpecializeInst(
-            builder.getTypeKind(),
-            genericToSpecialize,
-            (UInt)genArgs.getCount(),
-            genArgs.getBuffer());
-    }
-
     IRInst* generatePrimalFuncType(
         IRGlobalValueWithCode* destFunc, IRGlobalValueWithCode* fwdFunc, IRInst*& outIntermediateType)
     {
@@ -505,8 +476,8 @@ IRGlobalValueWithCode* DiffUnzipPass::extractPrimalFunc(
     {
         innerFunc = as<IRFunc>(findGenericReturnVal(genFunc));
         builder.setInsertBefore(innerFunc);
-        specializedIntermediateType = context.specializeWithGeneric(builder, intermediateType, genFunc);
-        specializedPrimalFunc = context.specializeWithGeneric(builder, primalFunc, genFunc);
+        specializedIntermediateType = specializeWithGeneric(builder, intermediateType, genFunc);
+        specializedPrimalFunc = specializeWithGeneric(builder, primalFunc, genFunc);
     }
     SLANG_RELEASE_ASSERT(innerFunc);
 
