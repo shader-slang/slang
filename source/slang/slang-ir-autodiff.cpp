@@ -627,7 +627,7 @@ protected:
     // A transcriber object that handles the main job of 
     // processing instructions while maintaining state.
     //
-    ForwardDerivativeTranscriber forwardTranscriber;
+    ForwardDiffTranscriber forwardTranscriber;
 
     BackwardDiffTranscriber backwardTranscriber;
 

@@ -6,9 +6,9 @@
 namespace Slang
 {
 
-struct ForwardDerivativeTranscriber : AutoDiffTranscriberBase
+struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 {
-    ForwardDerivativeTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
+    ForwardDiffTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
         : AutoDiffTranscriberBase(shared, inSharedBuilder, inSink)
     {
     }

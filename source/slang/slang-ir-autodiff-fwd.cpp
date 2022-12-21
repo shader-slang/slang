@@ -11,7 +11,7 @@
 namespace Slang
 {
 
-IRFuncType* ForwardDerivativeTranscriber::differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
+IRFuncType* ForwardDiffTranscriber::differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
 {
     List<IRType*> newParameterTypes;
     IRType* diffReturnType;
@@ -41,7 +41,7 @@ IRFuncType* ForwardDerivativeTranscriber::differentiateFunctionType(IRBuilder* b
 // Returns "d<var-name>" to use as a name hint for variables and parameters.
 // If no primal name is available, returns a blank string.
 // 
-String ForwardDerivativeTranscriber::getJVPVarName(IRInst* origVar)
+String ForwardDiffTranscriber::getJVPVarName(IRInst* origVar)
 {
     if (auto namehintDecoration = origVar->findDecoration<IRNameHintDecoration>())
     {
@@ -51,7 +51,7 @@ String ForwardDerivativeTranscriber::getJVPVarName(IRInst* origVar)
     return String("");
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeVar(IRBuilder* builder, IRVar* origVar)
+InstPair ForwardDiffTranscriber::transcribeVar(IRBuilder* builder, IRVar* origVar)
 {
     if (IRType* diffType = differentiateType(builder, origVar->getDataType()->getValueType()))
     {
@@ -68,7 +68,7 @@ InstPair ForwardDerivativeTranscriber::transcribeVar(IRBuilder* builder, IRVar* 
     return InstPair(cloneInst(&cloneEnv, builder, origVar), nullptr);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeBinaryArith(IRBuilder* builder, IRInst* origArith)
+InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRInst* origArith)
 {
     SLANG_ASSERT(origArith->getOperandCount() == 2);
 
@@ -148,7 +148,7 @@ InstPair ForwardDerivativeTranscriber::transcribeBinaryArith(IRBuilder* builder,
     return InstPair(primalArith, nullptr);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeBinaryLogic(IRBuilder* builder, IRInst* origLogic)
+InstPair ForwardDiffTranscriber::transcribeBinaryLogic(IRBuilder* builder, IRInst* origLogic)
 {
     SLANG_ASSERT(origLogic->getOperandCount() == 2);
 
@@ -165,7 +165,7 @@ InstPair ForwardDerivativeTranscriber::transcribeBinaryLogic(IRBuilder* builder,
     SLANG_UNEXPECTED("Logical operation with non-boolean result");
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeLoad(IRBuilder* builder, IRLoad* origLoad)
+InstPair ForwardDiffTranscriber::transcribeLoad(IRBuilder* builder, IRLoad* origLoad)
 {
     auto origPtr = origLoad->getPtr();
     auto primalPtr = lookupPrimalInst(origPtr, nullptr);
@@ -198,7 +198,7 @@ InstPair ForwardDerivativeTranscriber::transcribeLoad(IRBuilder* builder, IRLoad
     return InstPair(primalLoad, diffLoad);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeStore(IRBuilder* builder, IRStore* origStore)
+InstPair ForwardDiffTranscriber::transcribeStore(IRBuilder* builder, IRStore* origStore)
 {
     IRInst* origStoreLocation = origStore->getPtr();
     IRInst* origStoreVal = origStore->getVal();
@@ -244,7 +244,7 @@ InstPair ForwardDerivativeTranscriber::transcribeStore(IRBuilder* builder, IRSto
 // instruction, we check to make sure that the nested instr is a constant
 // and then return nullptr. Literals do not need to be differentiated.
 //
-InstPair ForwardDerivativeTranscriber::transcribeConstruct(IRBuilder* builder, IRInst* origConstruct)
+InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst* origConstruct)
 {   
     IRInst* primalConstruct = cloneInst(&cloneEnv, builder, origConstruct);
     
@@ -290,7 +290,7 @@ InstPair ForwardDerivativeTranscriber::transcribeConstruct(IRBuilder* builder, I
 // an appropriate call list based on whichever parameters have differentials 
 // in the current transcription context.
 // 
-InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall* origCall)
+InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* origCall)
 {   
     
     IRInst* origCallee = origCall->getCallee();
@@ -414,7 +414,7 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
     }
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle)
+InstPair ForwardDiffTranscriber::transcribeSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle)
 {
     IRInst* primalSwizzle = cloneInst(&cloneEnv, builder, origSwizzle);
 
@@ -436,7 +436,7 @@ InstPair ForwardDerivativeTranscriber::transcribeSwizzle(IRBuilder* builder, IRS
     return InstPair(primalSwizzle, nullptr);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeByPassthrough(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeByPassthrough(IRBuilder* builder, IRInst* origInst)
 {
     IRInst* primalInst = cloneInst(&cloneEnv, builder, origInst);
 
@@ -465,7 +465,7 @@ InstPair ForwardDerivativeTranscriber::transcribeByPassthrough(IRBuilder* builde
             diffOperands.getBuffer()));
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeControlFlow(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRInst* origInst)
 {
     switch(origInst->getOp())
     {
@@ -530,7 +530,7 @@ InstPair ForwardDerivativeTranscriber::transcribeControlFlow(IRBuilder* builder,
     return InstPair(nullptr, nullptr);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeConst(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder* builder, IRInst* origInst)
 {
     switch(origInst->getOp())
     {
@@ -550,7 +550,7 @@ InstPair ForwardDerivativeTranscriber::transcribeConst(IRBuilder* builder, IRIns
     return InstPair(nullptr, nullptr);
 }
 
-IRInst* ForwardDerivativeTranscriber::findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
+IRInst* ForwardDiffTranscriber::findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
 {
     for (UInt i = 0; i < type->getOperandCount(); i++)
     {
@@ -563,7 +563,7 @@ IRInst* ForwardDerivativeTranscriber::findInterfaceRequirement(IRInterfaceType* 
     return nullptr;
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
+InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
 {
     auto primalBase = findOrTranscribePrimalInst(builder, origSpecialize->getBase());
     List<IRInst*> primalArgs;
@@ -632,7 +632,7 @@ InstPair ForwardDerivativeTranscriber::transcribeSpecialize(IRBuilder* builder, 
     }
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst)
+InstPair ForwardDiffTranscriber::transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst)
 {
     SLANG_ASSERT(as<IRFieldExtract>(originalInst) || as<IRFieldAddress>(originalInst));
 
@@ -671,7 +671,7 @@ InstPair ForwardDerivativeTranscriber::transcribeFieldExtract(IRBuilder* builder
     return InstPair(primalFieldExtract, diffFieldExtract);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr)
+InstPair ForwardDiffTranscriber::transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr)
 {
     SLANG_ASSERT(as<IRGetElement>(origGetElementPtr) || as<IRGetElementPtr>(origGetElementPtr));
 
@@ -706,7 +706,7 @@ InstPair ForwardDerivativeTranscriber::transcribeGetElement(IRBuilder* builder, 
     return InstPair(primalGetElementPtr, diffGetElementPtr);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* origLoop)
+InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* origLoop)
 {
     // The loop comes with three blocks.. we just need to transcribe each one
     // and assemble the new loop instruction.
@@ -744,7 +744,7 @@ InstPair ForwardDerivativeTranscriber::transcribeLoop(IRBuilder* builder, IRLoop
     return InstPair(diffLoop, diffLoop);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse)
+InstPair ForwardDiffTranscriber::transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse)
 {
     // IfElse Statements come with 4 blocks. We transcribe each block into it's
     // linear form, and then wire them up in the same way as the original if-else
@@ -788,7 +788,7 @@ InstPair ForwardDerivativeTranscriber::transcribeIfElse(IRBuilder* builder, IRIf
     return InstPair(diffLoop, diffLoop);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeMakeDifferentialPair(IRBuilder* builder, IRMakeDifferentialPair* origInst)
+InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(IRBuilder* builder, IRMakeDifferentialPair* origInst)
 {
     auto primalVal = findOrTranscribePrimalInst(builder, origInst->getPrimalValue());
     SLANG_ASSERT(primalVal);
@@ -808,7 +808,7 @@ InstPair ForwardDerivativeTranscriber::transcribeMakeDifferentialPair(IRBuilder*
     return InstPair(primalPair, diffPair);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeDifferentialPairGetElement(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeDifferentialPairGetElement(IRBuilder* builder, IRInst* origInst)
 {
     SLANG_ASSERT(
         origInst->getOp() == kIROp_DifferentialPairGetDifferential ||
@@ -832,7 +832,7 @@ InstPair ForwardDerivativeTranscriber::transcribeDifferentialPairGetElement(IRBu
     return InstPair(primalResult, diffResult);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeSingleOperandInst(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeSingleOperandInst(IRBuilder* builder, IRInst* origInst)
 {
     IRInst* origBase = origInst->getOperand(0);
     auto primalBase = findOrTranscribePrimalInst(builder, origBase);
@@ -860,7 +860,7 @@ InstPair ForwardDerivativeTranscriber::transcribeSingleOperandInst(IRBuilder* bu
     return InstPair(primalResult, diffResult);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeWrapExistential(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, IRInst* origInst)
 {
     auto primalType = (IRType*)findOrTranscribePrimalInst(builder, origInst->getDataType());
 
@@ -908,7 +908,7 @@ InstPair ForwardDerivativeTranscriber::transcribeWrapExistential(IRBuilder* buil
 }
 
 // Create an empty func to represent the transcribed func of `origFunc`.
-InstPair ForwardDerivativeTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
+InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
 {
     if (auto bwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
         return InstPair(origFunc, bwdDecor->getForwardDerivativeFunc());
@@ -957,7 +957,7 @@ InstPair ForwardDerivativeTranscriber::transcribeFuncHeader(IRBuilder* inBuilder
 }
 
 // Transcribe a function definition.
-InstPair ForwardDerivativeTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
+InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
 {
     IRBuilder builder(inBuilder->getSharedBuilder());
     builder.setInsertInto(diffFunc);
@@ -971,7 +971,7 @@ InstPair ForwardDerivativeTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFu
 }
 
 // Transcribe a generic definition
-InstPair ForwardDerivativeTranscriber::transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric)
+InstPair ForwardDiffTranscriber::transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric)
 {
     auto innerVal = findInnerMostGenericReturnVal(origGeneric);
     if (auto innerFunc = as<IRFunc>(innerVal))
@@ -1015,7 +1015,7 @@ InstPair ForwardDerivativeTranscriber::transcribeGeneric(IRBuilder* inBuilder, I
     return InstPair(primalGeneric, diffGeneric);
 }
 
-InstPair ForwardDerivativeTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* origInst)
 {
     // Handle common SSA-style operations
     switch (origInst->getOp())
