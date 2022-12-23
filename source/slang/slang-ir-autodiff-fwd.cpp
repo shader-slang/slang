@@ -519,6 +519,11 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
             // block to compute *both* primals and derivatives (i.e linearized block)
             SLANG_ASSERT(diffBranch);
 
+            // Since blocks always compute both primals and differentials, the branch
+            // instructions are also always mixed.
+            // 
+            builder->markInstAsMixedDifferential(diffBranch);
+
             return InstPair(diffBranch, diffBranch);
     }
 
@@ -633,6 +638,126 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
 }
 
 InstPair ForwardDiffTranscriber::transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst)
+{
+    auto primalWt = findOrTranscribePrimalInst(builder, lookupInst->getWitnessTable());
+    auto primalKey = findOrTranscribePrimalInst(builder, lookupInst->getRequirementKey());
+    auto primalType = findOrTranscribePrimalInst(builder, lookupInst->getFullType());
+    auto primal = (IRSpecialize*)builder->emitLookupInterfaceMethodInst((IRType*)primalType, primalWt, primalKey);
+
+    auto interfaceType = as<IRInterfaceType>(_unwrapAttributedType(as<IRWitnessTableTypeBase>(lookupInst->getWitnessTable()->getDataType())->getConformanceType()));
+    if (!interfaceType)
+    {
+        return InstPair(primal, nullptr);
+    }
+    auto dict = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
+    if (!dict)
+    {
+        return InstPair(primal, nullptr);
+    }
+
+    for (auto child : dict->getChildren())
+    {
+        if (auto item = as<IRForwardDifferentiableMethodRequirementDictionaryItem>(child))
+        {
+            if (item->getOperand(0) == lookupInst->getRequirementKey())
+            {
+                auto diffKey = item->getOperand(1);
+                if (auto diffType = findInterfaceRequirement(interfaceType, diffKey))
+                {
+                    auto diff = builder->emitLookupInterfaceMethodInst((IRType*)diffType, primalWt, diffKey);
+                    return InstPair(primal, diff);
+                }
+                break;
+            }
+        }
+    }
+    return InstPair(primal, nullptr);
+}
+
+// In differential computation, the 'default' differential value is always zero.
+// This is a consequence of differential computing being inherently linear. As a 
+// result, it's useful to have a method to generate zero literals of any (arithmetic) type.
+// The current implementation requires that types are defined linearly.
+// 
+IRInst* ForwardDerivativeTranscriber::getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType)
+{
+    if (auto diffType = differentiateType(builder, primalType))
+    {
+        switch (diffType->getOp())
+        {
+        case kIROp_DifferentialPairType:
+            return builder->emitMakeDifferentialPair(
+                diffType,
+                getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()),
+                getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()));
+        }
+        // Since primalType has a corresponding differential type, we can lookup the 
+        // definition for zero().
+        auto zeroMethod = differentiableTypeConformanceContext.getZeroMethodForType(builder, primalType);
+        if (!zeroMethod)
+        {
+            // if the differential type itself comes from a witness lookup, we can just lookup the
+            // zero method from the same witness table.
+            if (auto lookupInterface = as<IRLookupWitnessMethod>(diffType))
+            {
+                auto wt = lookupInterface->getWitnessTable();
+                zeroMethod = builder->emitLookupInterfaceMethodInst(builder->getFuncType(List<IRType*>(), diffType), wt, autoDiffSharedContext->zeroMethodStructKey);
+            }
+        }
+        SLANG_RELEASE_ASSERT(zeroMethod);
+
+        auto emptyArgList = List<IRInst*>();
+
+        auto callInst = builder->emitCallInst((IRType*)diffType, zeroMethod, emptyArgList);
+        builder->markInstAsDifferential(callInst, primalType);
+
+        return callInst;
+    }
+    else
+    {
+        if (isScalarIntegerType(primalType))
+        {
+            return builder->getIntValue(primalType, 0);
+        }
+
+        getSink()->diagnose(primalType->sourceLoc,
+            Diagnostics::internalCompilerError,
+            "could not generate zero value for given type");
+        return nullptr;
+    }
+}
+
+InstPair ForwardDerivativeTranscriber::transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
+{
+    IRBuilder subBuilder(builder->getSharedBuilder());
+    subBuilder.setInsertLoc(builder->getInsertLoc());
+    
+    IRInst* diffBlock = subBuilder.emitBlock();
+    subBuilder.markInstAsMixedDifferential(diffBlock);
+    
+    // Note: for blocks, we setup the mapping _before_
+    // processing the children since we could encounter
+    // a lookup while processing the children.
+    // 
+    mapPrimalInst(origBlock, diffBlock);
+    mapDifferentialInst(origBlock, diffBlock);
+
+    subBuilder.setInsertInto(diffBlock);
+
+    // First transcribe every parameter in the block.
+    for (auto param = origBlock->getFirstParam(); param; param = param->getNextParam())
+        this->transcribe(&subBuilder, param);
+
+    // Then, run through every instruction and use the transcriber to generate the appropriate
+    // derivative code.
+    //
+    for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
+        this->transcribe(&subBuilder, child);
+
+    return InstPair(diffBlock, diffBlock);
+}
+
+InstPair ForwardDerivativeTranscriber::transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst)
 {
     SLANG_ASSERT(as<IRFieldExtract>(originalInst) || as<IRFieldAddress>(originalInst));
 

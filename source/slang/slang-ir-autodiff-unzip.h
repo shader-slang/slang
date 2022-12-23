@@ -66,26 +66,42 @@ struct DiffUnzipPass
         // Ignore the first block (this is reserved for parameters), start
         // at the second block. (For now, we work with only a single block of insts)
         // TODO: expand to handle multi-block functions later.
+        IRBlock* firstBlock = unzippedFunc->getFirstBlock()->getNextBlock();
 
-        IRBlock* mainBlock = unzippedFunc->getFirstBlock()->getNextBlock();
+        List<IRBlock*> workList;
+        for (IRBlock* block = firstBlock; block; block = block->getNextBlock())
+        {
+            // Only need to unzip blocks with both differential and primal instructions.
+            if (block->findDecoration<IRMixedDifferentialInstDecoration>())
+            {
+                workList.add(block);
+            }
+        }
         
-        // Emit new blocks for split vesions of mainblock.
-        IRBlock* primalBlock = builder->emitBlock();
-        IRBlock* diffBlock = builder->emitBlock(); 
+        for (auto block : workList)
+        {
+            // Emit new blocks for split vesions.
+            IRBlock* primalBlock = builder->emitBlock();
+            IRBlock* diffBlock = builder->emitBlock(); 
 
-        // Mark the differential block as a differential inst.
-        builder->markInstAsDifferential(diffBlock);
+            // Mark the differential block as a differential inst 
+            // (and add a reference to the primal block)
+            builder->markInstAsDifferential(diffBlock, nullptr, primalBlock);
 
-        // Split the main block into two. This method should also emit
-        // a branch statement from primalBlock to diffBlock.
-        // TODO: extend this code to split multiple blocks
-        // 
-        splitBlock(mainBlock, primalBlock, diffBlock);
+            primalMap[block] = primalBlock;
+            diffMap[block] = diffBlock;
 
-        // Replace occurences of mainBlock with primalBlock
-        mainBlock->replaceUsesWith(primalBlock);
-        mainBlock->removeAndDeallocate();
-        
+            // Split the main block into two. This method should also emit
+            // a branch statement from primalBlock to diffBlock.
+            // TODO: extend this code to split multiple blocks
+            // 
+            splitBlock(block, primalBlock, diffBlock);
+
+            // Replace occurences of block with primalBlock
+            block->replaceUsesWith(primalBlock);
+            block->removeAndDeallocate();
+        }
+                
         return unzippedFunc;
     }
 
@@ -237,6 +253,44 @@ struct DiffUnzipPass
 
         return InstPair(nullptr, returnInst);
     }
+
+    InstPair splitControlFlow(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* branchInst)
+    {
+        switch (branchInst->getOp())
+        {
+        case kIROp_unconditionalBranch:
+            {
+                auto targetInst = as<IRUnconditionalBranch>(branchInst)->getTargetBlock();
+                
+                return InstPair(
+                    primalBuilder->emitBranch(as<IRBlock>(primalMap[targetInst])),
+                    diffBuilder->emitBranch(as<IRBlock>(diffMap[targetInst])));
+
+            }
+        
+        case kIROp_conditionalBranch:
+            {
+
+                auto trueBlock = as<IRConditionalBranch>(branchInst)->getTrueBlock();
+                auto falseBlock = as<IRConditionalBranch>(branchInst)->getFalseBlock();
+                auto condInst = as<IRConditionalBranch>(branchInst)->getCondition();
+
+                return InstPair(
+                    primalBuilder->emitBranch(
+                        condInst,
+                        as<IRBlock>(primalMap[trueBlock]),
+                        as<IRBlock>(primalMap[falseBlock])),
+                    diffBuilder->emitBranch(
+                        condInst,
+                        as<IRBlock>(diffMap[trueBlock]),
+                        as<IRBlock>(diffMap[falseBlock])));
+
+            }
+        
+        default:
+            SLANG_UNEXPECTED("Unhandled instruction");
+        }
+    }
     
     InstPair _splitMixedInst(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* inst)
     {
@@ -257,6 +311,10 @@ struct DiffUnzipPass
         case kIROp_Return:
             return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
 
+        case kIROp_unconditionalBranch:
+        case kIROp_conditionalBranch:
+            return splitControlFlow(primalBuilder, diffBuilder, inst);
+
         default:
             SLANG_ASSERT_FAILURE("Unhandled mixed diff inst");
         }
@@ -270,7 +328,7 @@ struct DiffUnzipPass
         diffMap[inst] = instPair.differential;
     }
 
-    void splitBlock(IRBlock* mainBlock, IRBlock* primalBlock, IRBlock* diffBlock)
+    void splitBlock(IRBlock* block, IRBlock* primalBlock, IRBlock* diffBlock)
     {
         // Make two builders for primal and differential blocks.
         IRBuilder primalBuilder;
@@ -282,7 +340,7 @@ struct DiffUnzipPass
         diffBuilder.setInsertInto(diffBlock);
 
         List<IRInst*> splitInsts;
-        for (auto child = mainBlock->getFirstChild(); child;)
+        for (auto child = block->getFirstChild(); child;)
         {
             IRInst* nextChild = child->getNextInst();
 
@@ -339,7 +397,7 @@ struct DiffUnzipPass
         }
 
         // Nothing should be left in the original block.
-        SLANG_ASSERT(mainBlock->getFirstChild() == nullptr);
+        SLANG_ASSERT(block->getFirstChild() == nullptr);
 
         // Branch from primal to differential block.
         // Functionally, the new blocks should produce the same output as the

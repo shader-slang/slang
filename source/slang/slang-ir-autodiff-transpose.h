@@ -54,6 +54,24 @@ struct DiffTransposePass
         Flavor flavor;
     };
 
+    struct BlockPredecessorEntry
+    {
+        // Previous block.
+        IRBlock*        prevBlock;
+
+        // Integer value corresponding to this predecessor.
+        IRIntegerValue* indexVal;
+    };
+
+    struct ControlFlowTranspositionInfo
+    {
+        // Variable used for recording control flow.
+        IRVar*                      controlVar;
+
+        // Info about all possible predecessor blocks.
+        Dictionary<IRBlock*, IRInst*> predEntries;
+    };
+
     DiffTransposePass(AutoDiffSharedContext* autodiffContext) : 
         autodiffContext(autodiffContext), pairBuilder(autodiffContext), diffTypeContext(autodiffContext)
     { }
@@ -117,6 +135,15 @@ struct DiffTransposePass
             workList.add(block);
         }
 
+        // Reverse the order of the blocks.
+        workList.reverse();
+        
+        // Emit empty rev-mode blocks for every fwd-mode block.
+        for (auto block : workList)
+        {
+            revBlockMap[block] = builder.emitBlock();
+        }
+
         // TODO: We *might* need a step here that 'sorts' the work list in reverse order starting with 'leaf'
         // differential blocks, and following the branches backwards.
         // The alternative is to make phi nodes and treat all intermediaries & their gradients as arguments.
@@ -129,7 +156,7 @@ struct DiffTransposePass
                 this->addRevGradientForFwdInst(returnInst, RevGradient(returnInst, transposeInfo.dOutInst, nullptr));
             }
 
-            IRBlock* revBlock = builder.emitBlock();
+            IRBlock* revBlock = revBlockMap[block];
             this->transposeBlock(block, revBlock);
 
             // TODO: This should only really be used for the transition from
@@ -376,6 +403,144 @@ struct DiffTransposePass
         
         return TranspositionResult(gradients);
     }
+
+    IRBlock* getPrimalBlock(IRBlock* fwdBlock)
+    {
+        if (auto fwdDiffDecoration = fwdBlock->findDecoration<IRDifferentialInstDecoration>())
+        {
+            return as<IRBlock>(fwdDiffDecoration->getPrimalInst());
+        }
+
+        return nullptr;
+    }
+    
+    IRInst* addPredecessorForBlock(IRBlock* block, IRBlock* predBlock)
+
+    {
+        if (!this->blockEntries.ContainsKey(block))
+        {
+            // We haven't encountered this block yet, create a var in the 
+            // associated primal block.
+            auto primalBlock = getPrimalBlock(block);
+
+            IRBuilder builder(this->autodiffContext->sharedBuilder);
+            builder.setInsertInto(primalBlock);
+            auto controlVar = builder.emitVar(builder.getUIntType());
+
+            ControlFlowTranspositionInfo info;
+            info.controlVar = controlVar;
+
+            this->blockEntries[block] = info;
+        }
+
+        auto info = this->blockEntries[block];
+
+        // Does precessor block already exist?
+        if (info.GetValue().predEntries.ContainsKey(predBlock))
+        {
+            return info.GetValue().predEntries[predBlock];
+        }
+
+        // Otherwise, create an entry..
+        auto uniqueIndex = info.GetValue().predEntries.Count();
+
+        IRBuilder builder(this->autodiffContext->sharedBuilder);
+        auto uniqueIndexLiteral = builder.getIntValue(builder.getUIntType(), uniqueIndex);
+
+        info.GetValue().predEntries[predBlock] = uniqueIndexLiteral;
+
+        return uniqueIndexLiteral;
+    }
+
+    IRVar* getControlVar(IRBlock* block)
+    {
+        return this->blockEntries[block].GetValue().controlVar;
+    }
+    
+    // Inserts a block between the branch from fwdPredecessorBlock to fwdBlock, which sets a control
+    // variable to a unique index.
+    //  
+    IRInst* insertPreludeForPredecessor(IRBlock* fwdBlock, IRBlock* fwdPredecessorBlock)
+    {
+        // Get associated primal blocks for both the differential blocks.
+        auto primalPredecessorBlock = getPrimalBlock(fwdPredecessorBlock);
+        SLANG_ASSERT(primalPredecessorBlock);
+
+        auto primalBlock = getPrimalBlock(fwdBlock);
+        SLANG_ASSERT(primalBlock);
+
+        // Add this block as a predecessor, and get an unique index (as an integer literal)
+        auto indexVal = addPredecessorForBlock(fwdBlock, fwdPredecessorBlock);
+
+        IRBuilder subBuilder(this->autodiffContext->sharedBuilder);
+        subBuilder.setInsertAfter(primalBlock);
+
+        IRInst* preludeBlock = subBuilder.emitBlock();
+        auto controlVar = getControlVar(fwdBlock);
+
+        subBuilder.emitStore(controlVar, indexVal);
+        subBuilder.emitBranch(primalBlock);
+
+        // Scan through uses of primalBlock to find the ones that are in
+        // primalPredecessorBlock, and replace them with branches to
+        // preludeBlock.
+        // 
+        for (auto use = primalBlock->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser()->getParent() == primalPredecessorBlock)
+            {
+                use->set(preludeBlock);
+            }
+        }
+
+        return indexVal;
+    }
+
+    TranspositionResult transposeBranch(IRBuilder* builder, IRInst* fwdInst)
+    {
+        auto fwdBlockInst = as<IRBlock>(fwdInst);
+
+        SLANG_ASSERT(fwdBlockInst);
+        
+
+        for (auto predecessor : fwdBlockInst->getPredecessors())
+        {
+            // Insert code into the *primal* version of the predecessor block
+            // to set the control variable to indexVal before branching.
+            // 
+            insertPreludeForPredecessor(fwdBlockInst, predecessor);
+        }
+
+        List<IRBlock*> revPredecessorBlocks;
+        List<IRInst*> indexVals;
+
+        for (auto blockEntry : this->blockEntries[fwdBlockInst].GetValue().predEntries)
+        {
+            revPredecessorBlocks.add(revBlockMap[blockEntry.Key]);
+            indexVals.add(blockEntry.Value);
+        }
+
+        auto predCount = revPredecessorBlocks.getCount();
+
+        if (predCount == 1)
+        {
+            builder->emitBranch(revPredecessorBlocks[0]);
+        }
+        else if (predCount == 2)
+        {
+            builder->emitBranch(
+                builder->emitEql(getControlVar(fwdBlockInst), indexVals[0]),
+                revPredecessorBlocks[0],
+                revPredecessorBlocks[1]);
+        }
+        else
+        {
+            // Implement this by branching repeatedly.
+            SLANG_UNIMPLEMENTED_X("More than 2 predecessors not currently implemented.");
+        }
+
+        return TranspositionResult();
+    }
     
     TranspositionResult transposeInst(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
@@ -413,6 +578,9 @@ struct DiffTransposePass
             
             case kIROp_MakeVector:
                 return transposeMakeVector(builder, fwdInst, revValue);
+
+            case kIROp_unconditionalBranch:
+                return transposeBranch(builder, fwdInst);
 
             default:
                 SLANG_ASSERT_FAILURE("Unhandled instruction");
@@ -470,7 +638,6 @@ struct DiffTransposePass
 
         return TranspositionResult(List<RevGradient>());
     }
-    
 
     TranspositionResult transposeStore(IRBuilder* builder, IRStore* fwdStore, IRInst*)
     {
@@ -935,71 +1102,6 @@ struct DiffTransposePass
                     nullptr);
     }
 
-    IRInst* emitAggregateDifferentialPair(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> pairGradients)
-    {
-        SLANG_UNEXPECTED("Should not run.");
-
-        auto aggPairType = as<IRDifferentialPairType>(aggPrimalType);
-        SLANG_ASSERT(aggPairType);
-
-        IRType* diffType = (IRType*)pairBuilder.getDiffTypeFromPairType(builder, aggPairType);
-
-        IRInst* primalInst = nullptr;
-        IRInst* diffInst = nullptr;
-
-        List<RevGradient> gradients;
-        for (auto gradient : pairGradients)
-        {
-            switch (gradient.flavor)
-            {
-            case RevGradient::Flavor::Simple:
-            {
-                // In this case, the gradient is a 'pair' already, but we need to treat the primal element 
-                // as if it didn't exist (we simply copy it over)
-                // If we already saw a pair, throw an error since we don't know how to combine to primals.
-                // (i.e. something went wrong prior to this step.)
-                // 
-                if (primalInst)
-                {
-                    SLANG_UNEXPECTED("Encountered multiple pair types in emitAggregateDifferentialPair");
-                }
-                
-                primalInst = builder->emitDifferentialPairGetPrimal(gradient.revGradInst);
-                gradients.add(
-                    RevGradient(
-                        RevGradient::Flavor::Simple,
-                        gradient.targetInst,
-                        builder->emitDifferentialPairGetDifferential(
-                            diffType,
-                            gradient.revGradInst),
-                        gradient.fwdGradInst));
-                break;
-            }
-
-            case RevGradient::Flavor::GetDifferential:
-            {
-                // In this case, the gradient is the result of transposing a GetDifferential
-                // so we have only the gradient part. Just add it to the list of gradients to aggregate
-                gradients.add(
-                    RevGradient(
-                        RevGradient::Flavor::Simple,
-                        gradient.targetInst,
-                        gradient.revGradInst,
-                        gradient.fwdGradInst));
-                break;
-            }
-            default:
-                SLANG_UNEXPECTED("Unexpected gradient flavor in emitAggregateDifferentialPair");
-            }
-        }
-
-        // Aggregate only the differentials
-        diffInst = emitAggregateValue(builder, aggPairType->getValueType(), gradients);
-
-        // Pack them back together.
-        return builder->emitMakeDifferentialPair(aggPrimalType, primalInst, diffInst);
-    }
-
     IRInst* emitAggregateValue(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
     {
         // If we're dealing with the differential-pair types, we need to use a different aggregation method, since
@@ -1138,17 +1240,21 @@ struct DiffTransposePass
         return gradientsMap.ContainsKey(fwdInst);
     }
 
-    AutoDiffSharedContext*                  autodiffContext;
+    AutoDiffSharedContext*                               autodiffContext;
 
-    DifferentiableTypeConformanceContext    diffTypeContext;
+    DifferentiableTypeConformanceContext                 diffTypeContext;
 
-    DifferentialPairTypeBuilder             pairBuilder;
+    DifferentialPairTypeBuilder                          pairBuilder;
 
-    Dictionary<IRInst*, List<RevGradient>>      gradientsMap;
+    Dictionary<IRInst*, List<RevGradient>>               gradientsMap;
 
-    Dictionary<IRInst*, IRInst*>*           primalsMap;
+    Dictionary<IRInst*, IRInst*>*                        primalsMap;
 
-    List<IRInst*>                           usedPtrs;
+    List<IRInst*>                                        usedPtrs;
+    
+    Dictionary<IRBlock*, ControlFlowTranspositionInfo>   blockEntries;
+
+    Dictionary<IRBlock*, IRBlock*>                       revBlockMap;
 };
 
 
