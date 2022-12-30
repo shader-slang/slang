@@ -598,8 +598,9 @@ InstPair AutoDiffTranscriberBase::transcribeBlock(IRBuilder* builder, IRBlock* o
 {
     IRBuilder subBuilder(builder->getSharedBuilder());
     subBuilder.setInsertLoc(builder->getInsertLoc());
-
+    
     IRInst* diffBlock = subBuilder.emitBlock();
+    subBuilder.markInstAsMixedDifferential(diffBlock);
 
     // Note: for blocks, we setup the mapping _before_
     // processing the children since we could encounter

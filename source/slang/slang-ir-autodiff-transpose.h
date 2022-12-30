@@ -108,6 +108,11 @@ struct DiffTransposePass
     {
         // Grab all differentiable type information.
         diffTypeContext.setFunc(revDiffFunc);
+        
+        // Note down terminal primal and terminal differential blocks
+        // since we need to link them up at the end.
+        auto terminalPrimalBlocks = getTerminalPrimalBlocks(revDiffFunc);
+        auto terminalDiffBlocks = getTerminalDiffBlocks(revDiffFunc);
 
         // Traverse all instructions/blocks in reverse (starting from the terminator inst)
         // look for insts/blocks marked with IRDifferentialInstDecoration,
@@ -142,11 +147,13 @@ struct DiffTransposePass
         for (auto block : workList)
         {
             revBlockMap[block] = builder.emitBlock();
+            builder.markInstAsDifferential(revBlockMap[block]);
         }
 
-        // TODO: We *might* need a step here that 'sorts' the work list in reverse order starting with 'leaf'
-        // differential blocks, and following the branches backwards.
-        // The alternative is to make phi nodes and treat all intermediaries & their gradients as arguments.
+        // Keep track of first diff block, since this is where 
+        // we'll emit temporary vars to hold per-block derivatives.
+        // 
+        firstRevDiffBlockMap[revDiffFunc] = revBlockMap[workList[0]];
 
         for (auto block : workList)
         {
@@ -158,24 +165,120 @@ struct DiffTransposePass
 
             IRBlock* revBlock = revBlockMap[block];
             this->transposeBlock(block, revBlock);
+        }
 
-            // TODO: This should only really be used for the transition from
-            // the 'last' primal block(s) to the first differential block.
-            // Transitions from differential blocks to 
-            block->replaceUsesWith(revBlock);
+        // Link the last differential fwd-mode block (which will be the first
+        // rev-mode block) as the successor to the last primal block.
+        // We assume that the original function is in single-return form
+        // So, there should be exactly 1 'last' block of each type.
+        // 
+        {
+            SLANG_ASSERT(terminalPrimalBlocks.getCount() == 1);
+            SLANG_ASSERT(terminalDiffBlocks.getCount() == 1);
+
+            auto terminalPrimalBlock = terminalPrimalBlocks[0];
+            auto terminalRevBlock = as<IRBlock>(revBlockMap[terminalDiffBlocks[0]]);
+
+            terminalPrimalBlock->getTerminator()->removeAndDeallocate();
+            
+            IRBuilder subBuilder(builder.getSharedBuilder());
+            subBuilder.setInsertInto(terminalPrimalBlock);
+
+            // There should be no parameters in the first reverse-mode block.
+            SLANG_ASSERT(terminalRevBlock->getFirstParam() == nullptr);
+
+            subBuilder.emitBranch(terminalRevBlock);
+        }
+
+        // Remove fwd-mode blocks.
+        for (auto block : workList)
+        {
             block->removeAndDeallocate();
         }
     }
 
-    // A[cond_inst] -> (B or C) -> D => D[cond_inst] -> (B_T -> C_T) -> A_T
+    // Fetch or create a gradient accumulator var
+    // corresponding to a inst. These are used to
+    // accumulate gradients across blocks.
+    //
+    IRVar* getOrCreateAccumulatorVar(IRInst* fwdInst)
+    {
+        // Check if we have a var already.
+        if (revAccumulatorVarMap.ContainsKey(fwdInst))
+            return revAccumulatorVarMap[fwdInst];
+        
+        IRBuilder tempVarBuilder(autodiffContext->sharedBuilder);
+        
+        IRBlock* firstDiffBlock = firstRevDiffBlockMap[as<IRFunc>(fwdInst->getParent()->getParent())];
+        tempVarBuilder.setInsertBefore(firstDiffBlock->getTerminator());
+        
+        auto primalType = tryGetPrimalTypeFromDiffInst(fwdInst);
+        auto diffType = fwdInst->getDataType();
 
+        auto zeroMethod = diffTypeContext.getZeroMethodForType(
+                &tempVarBuilder,
+                primalType);
+
+        SLANG_ASSERT(zeroMethod);
+
+        // Emit a var in the top-level differential block to hold the gradient, 
+        // and initialize it.
+        auto tempRevVar = tempVarBuilder.emitVar(diffType);
+        auto diffZero = tempVarBuilder.emitCallInst(
+            diffType,
+            zeroMethod,
+            List<IRInst*>());
+        tempVarBuilder.emitStore(tempRevVar, diffZero);
+
+        revAccumulatorVarMap[fwdInst] = tempRevVar;
+
+        return tempRevVar;
+    }
+
+    bool isInstUsedOutsideParentBlock(IRInst* inst)
+    {
+        auto currBlock = inst->getParent();
+
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser()->getParent() != currBlock)
+                return true;
+        }
+
+        return false;
+    }
+    
     void transposeBlock(IRBlock* fwdBlock, IRBlock* revBlock)
     {
         IRBuilder builder;
         builder.init(autodiffContext->sharedBuilder);
  
-        // Insert after the last block.
+        // Insert into our reverse block.
         builder.setInsertInto(revBlock);
+
+        // Check if this block has any 'outputs' (in the form of phi args
+        // sent to the successor bvock)
+        // 
+        if (auto branchInst = as<IRUnconditionalBranch>(fwdBlock->getTerminator()))
+        {
+            for (UIndex ii = 0; ii < branchInst->getArgCount(); ii++)
+            {
+                auto arg = branchInst->getArg(ii);
+                if (isDifferentialInst(arg))
+                {
+                    auto diffType = arg->getDataType();
+                    auto revParam = builder.emitParam(diffType);
+
+                    addRevGradientForFwdInst(
+                        arg, 
+                        RevGradient(
+                            RevGradient::Flavor::Simple,
+                            arg,
+                            revParam,
+                            nullptr));
+                }
+            }
+        }
 
         // Move pointer & reference insts to the top of the reverse-mode block.
         List<IRInst*> nonValueInsts;
@@ -205,7 +308,7 @@ struct DiffTransposePass
         // 
         for (IRInst* child = fwdBlock->getLastChild(); child; child = child->getPrevInst())
         {
-            if (as<IRDecoration>(child))
+            if (as<IRDecoration>(child) || as<IRParam>(child))
                 continue;
 
             transposeInst(&builder, child);
@@ -220,22 +323,78 @@ struct DiffTransposePass
         // 
         for (auto pair : gradientsMap)
         {
-            if (auto param = as<IRLoad>(pair.Key))
-                accumulateGradientsForLoad(&builder, param);
+            if (auto loadInst = as<IRLoad>(pair.Key))
+                accumulateGradientsForLoad(&builder, loadInst);
         }
 
-        // Emit a terminator inst.
-        // TODO: need a be a lot smarter here. For now, we assume a single differential
-        // block, so it should end in a return statement.
-        if (as<IRReturn>(fwdBlock->getTerminator()))
+        // Do the same thing with the phi parameters if the block.
+        List<IRInst*> phiParamRevGradInsts;
+        for (IRParam* param = fwdBlock->getFirstParam(); param; param = param->getNextParam())
         {
-            // Emit a void return.
-            builder.emitReturn();
+            if (hasRevGradients(param))
+            {
+                auto gradients = popRevGradients(param);
+
+                auto gradInst = emitAggregateValue(
+                    &builder,
+                    tryGetPrimalTypeFromDiffInst(param),
+                    gradients);
+                
+                phiParamRevGradInsts.add(gradInst);
+            }
         }
-        else
+
+        // Also handle any remaining gradients for insts that appear in prior blocks.
+        List<IRInst*> externInsts; // Holds insts in a different block, same function.
+        List<IRInst*> globalInsts; // Holds insts in the global scope.
+        for (auto pair : gradientsMap)
         {
-            SLANG_UNEXPECTED("Unhandled block terminator");
+            auto instParent = pair.Key->getParent();
+            if (instParent != fwdBlock)
+            {
+                if (instParent->getParent() == fwdBlock->getParent())
+                    externInsts.add(pair.Key);
+                
+                if (as<IRModuleInst>(instParent))
+                    globalInsts.add(pair.Key);
+            }
         }
+
+        for (auto externInst : externInsts)
+        {
+            auto primalType = tryGetPrimalTypeFromDiffInst(externInst);
+            SLANG_ASSERT(primalType);
+
+            if (auto accVar = getOrCreateAccumulatorVar(externInst))
+            {
+                // Accumulate all gradients, including our accumulator variable,
+                // into one inst.
+                //
+                auto gradients = popRevGradients(externInst);
+                gradients.add(RevGradient(externInst, builder.emitLoad(accVar), nullptr));
+
+                auto gradInst = emitAggregateValue(
+                    &builder,
+                    primalType,
+                    gradients);
+                
+                builder.emitStore(accVar, gradInst);
+            }
+        }
+
+        // For now, we're not going to handle global insts, and simply ignore them
+        // Eventually, we want to turn these into global writes.
+        // 
+        for (auto globalInst : globalInsts)
+        {
+            if (hasRevGradients(globalInst))
+                popRevGradients(globalInst);
+        }
+
+        // We _should_ be completely out of gradients to process at this point.
+        SLANG_ASSERT(gradientsMap.Count() == 0);
+
+        emitTerminator(&builder, fwdBlock, phiParamRevGradInsts);
     }
 
     void transposeInst(IRBuilder* builder, IRInst* inst)
@@ -269,13 +428,32 @@ struct DiffTransposePass
         if (!primalType)
         {
             // Check for special insts for which a reverse-mode gradient doesn't apply.
-            if(!as<IRStore>(inst))
+            if(!as<IRStore>(inst) && !as<IRTerminatorInst>(inst))
             {
                 SLANG_UNEXPECTED("Could not resolve primal type for diff inst");
             }
+
+            // If we still can't resolve a differential type, there shouldn't 
+            // be any gradients to aggregate.
+            // 
+            SLANG_ASSERT(gradients.getCount() == 0);
         }
 
-        // Emit the aggregate of all the gradients here. This will form the total derivative for this inst.
+        // Is this inst used in another differential block?
+        // Emit a function-scope accumulator variable, and include it's value.
+        // Also, we ignore this if it's a load since those are turned into stores
+        // on a per-block basis. (We should change this behaviour to treat loads like
+        // any other inst)
+        // 
+        if (isInstUsedOutsideParentBlock(inst) && !as<IRLoad>(inst))
+        {
+            auto accVar = getOrCreateAccumulatorVar(inst);
+            gradients.add(
+                RevGradient(inst, builder->emitLoad(accVar), nullptr));
+        }
+        
+        // Emit the aggregate of all the gradients here. 
+        // This will form the total derivative for this inst.
         auto revValue = emitAggregateValue(builder, primalType, gradients);
 
         auto transposeResult = transposeInst(builder, inst, revValue);
@@ -413,19 +591,49 @@ struct DiffTransposePass
 
         return nullptr;
     }
+
+    IRBlock* getFirstCodeBlock(IRGlobalValueWithCode* func)
+    {
+        return func->getFirstBlock()->getNextBlock();
+    }
+
+    List<IRBlock*> getTerminalPrimalBlocks(IRGlobalValueWithCode* func)
+    {
+        // 'Terminal' primal blocks are those that branch into a differential block.
+        List<IRBlock*> terminalPrimalBlocks;
+        for (auto block : func->getBlocks())
+            for (auto successor : block->getSuccessors())
+                if (!isDifferentialInst(block) && isDifferentialInst(successor))
+                    terminalPrimalBlocks.add(block);
+
+        return terminalPrimalBlocks;
+    }
+
+    List<IRBlock*> getTerminalDiffBlocks(IRGlobalValueWithCode* func)
+    {
+        // Terminal differential blocks are those with a return statement.
+        // Note that this method is designed to work with Fwd-Mode blocks, 
+        // and this logic will be different for Rev-Mode blocks.
+        // 
+        List<IRBlock*> terminalDiffBlocks;
+        for (auto block : func->getBlocks())
+            if (as<IRReturn>(block->getTerminator()))
+                terminalDiffBlocks.add(block);
+
+        return terminalDiffBlocks;
+    }
     
     IRInst* addPredecessorForBlock(IRBlock* block, IRBlock* predBlock)
-
     {
         if (!this->blockEntries.ContainsKey(block))
         {
-            // We haven't encountered this block yet, create a var in the 
-            // associated primal block.
-            auto primalBlock = getPrimalBlock(block);
+            // We haven't encountered this block yet, create a var for this in the 
+            // first code block.
+            auto firstCodeBlock = getFirstCodeBlock(block->getParent());
 
-            IRBuilder builder(this->autodiffContext->sharedBuilder);
-            builder.setInsertInto(primalBlock);
-            auto controlVar = builder.emitVar(builder.getUIntType());
+            IRBuilder subBuilder(this->autodiffContext->sharedBuilder);
+            subBuilder.setInsertBefore(firstCodeBlock->getTerminator());
+            auto controlVar = subBuilder.emitVar(subBuilder.getUIntType());
 
             ControlFlowTranspositionInfo info;
             info.controlVar = controlVar;
@@ -446,7 +654,7 @@ struct DiffTransposePass
 
         IRBuilder builder(this->autodiffContext->sharedBuilder);
         auto uniqueIndexLiteral = builder.getIntValue(builder.getUIntType(), uniqueIndex);
-
+        
         info.GetValue().predEntries[predBlock] = uniqueIndexLiteral;
 
         return uniqueIndexLiteral;
@@ -473,35 +681,63 @@ struct DiffTransposePass
         auto indexVal = addPredecessorForBlock(fwdBlock, fwdPredecessorBlock);
 
         IRBuilder subBuilder(this->autodiffContext->sharedBuilder);
-        subBuilder.setInsertAfter(primalBlock);
+        subBuilder.setInsertInto(primalPredecessorBlock->getParent());
 
         IRInst* preludeBlock = subBuilder.emitBlock();
-        auto controlVar = getControlVar(fwdBlock);
+        preludeBlock->insertAfter(primalPredecessorBlock);
 
+        // Copy over phi parameters.
+        List<IRInst*> phiParams;
+        for (auto param = primalBlock->getFirstParam(); param; param = param->getNextParam())
+        {
+            phiParams.add(subBuilder.emitParam(param->getDataType()));
+        }
+
+        auto controlVar = getControlVar(fwdBlock);
         subBuilder.emitStore(controlVar, indexVal);
-        subBuilder.emitBranch(primalBlock);
+
+        // Branch into the successor block using all the same phi parameters.
+        subBuilder.emitBranch(primalBlock, phiParams.getCount(), phiParams.getBuffer());
 
         // Scan through uses of primalBlock to find the ones that are in
         // primalPredecessorBlock, and replace them with branches to
         // preludeBlock.
         // 
+        List<IRUse*> relevantUses;
         for (auto use = primalBlock->firstUse; use; use = use->nextUse)
         {
             if (use->getUser()->getParent() == primalPredecessorBlock)
-            {
-                use->set(preludeBlock);
-            }
+                relevantUses.add(use);
         }
+
+        for (auto use : relevantUses)
+            use->set(preludeBlock);
 
         return indexVal;
     }
 
-    TranspositionResult transposeBranch(IRBuilder* builder, IRInst* fwdInst)
+    bool doesBlockHaveDifferentialPredecessors(IRBlock* fwdBlock)
     {
-        auto fwdBlockInst = as<IRBlock>(fwdInst);
+        for (auto block : fwdBlock->getPredecessors())
+        {
+            if (isDifferentialInst(block))
+            {
+                return true;
+            }
+        }
 
-        SLANG_ASSERT(fwdBlockInst);
-        
+        return false;
+    }
+
+    void emitTerminator(IRBuilder* builder, IRBlock* fwdBlockInst, List<IRInst*> phiParamGrads)
+    {
+        // If this block has no differential predecessors, add a return statement.
+        if (!doesBlockHaveDifferentialPredecessors(fwdBlockInst))
+        {
+            // Emit a void return.
+            builder->emitReturn();
+            return;
+        }
 
         for (auto predecessor : fwdBlockInst->getPredecessors())
         {
@@ -522,34 +758,120 @@ struct DiffTransposePass
 
         auto predCount = revPredecessorBlocks.getCount();
 
+        SLANG_ASSERT(predCount > 0);
+
+        List<IRBlock*> intermediateBranchBlocks;
+
+        IRBuilder branchBlockBuilder(builder->getSharedBuilder());
+        
+        branchBlockBuilder.setInsertInto(builder->getFunc());
+
+        // Make a block to unconditionally branch into predecessor-0 with the
+        // appropriate phi gradients.
+        // 
+        auto firstBranchBlock = branchBlockBuilder.emitBlock();
+        intermediateBranchBlocks.add(firstBranchBlock);
+
+        branchBlockBuilder.markInstAsDifferential(firstBranchBlock);
+        branchBlockBuilder.emitBranch(
+            revPredecessorBlocks[0],
+            phiParamGrads.getCount(),
+            phiParamGrads.getBuffer());
+
+        // Create a builder to insert loads and comparison insts to figure
+        // out which block to branch into based on the control vars.
+        // This builder is set up to emit into the last _primal_ block.
+        // 
+        IRBuilder booleanIndicatorBuilder(builder->getSharedBuilder());
+        auto terminalPrimalBlock = getTerminalPrimalBlocks(builder->getFunc())[0];
+
+        booleanIndicatorBuilder.setInsertBefore(terminalPrimalBlock->getTerminator());
+        
         if (predCount == 1)
         {
-            builder->emitBranch(revPredecessorBlocks[0]);
-        }
-        else if (predCount == 2)
-        {
-            builder->emitBranch(
-                builder->emitEql(getControlVar(fwdBlockInst), indexVals[0]),
-                revPredecessorBlocks[0],
-                revPredecessorBlocks[1]);
+            builder->emitBranch(firstBranchBlock);
         }
         else
         {
-            // Implement this by branching repeatedly.
-            SLANG_UNIMPLEMENTED_X("More than 2 predecessors not currently implemented.");
+            IRBuilder ladderBlockBuilder(builder->getSharedBuilder());
+            ladderBlockBuilder.setInsertInto(builder->getFunc());
+
+            // TODO: For now, we're trivially setting 'afterBlock' to 
+            // the first reverse block. This is not really optimal for the 
+            // restructuring passes since the 'then' and 'else' regions
+            // can have significant overlap.
+            // 
+            auto firstFwdDiffBlock = (*terminalPrimalBlock->getSuccessors().begin());
+            SLANG_ASSERT(firstFwdDiffBlock);
+
+            auto defaultAfterBlock = revBlockMap[firstFwdDiffBlock];
+
+            auto nextLadderBlock = firstBranchBlock;
+            for (Index ii = 0; ii < predCount - 1; ii++)
+            {
+                // Make the 'leaf' block. This just branches into
+                // predecessor-i+1 with the appropriate phi args.
+                // 
+                branchBlockBuilder.setInsertInto(branchBlockBuilder.getFunc());
+                
+                auto thisIndexBlock = branchBlockBuilder.emitBlock();
+                intermediateBranchBlocks.add(thisIndexBlock);
+
+                branchBlockBuilder.markInstAsDifferential(thisIndexBlock);
+                branchBlockBuilder.emitBranch(
+                    revPredecessorBlocks[ii+1],
+                    phiParamGrads.getCount(),
+                    phiParamGrads.getBuffer());
+
+                // Emit a boolean inst to represent whether we need to branch into
+                // block ii.
+                auto blockIndicatorInst = booleanIndicatorBuilder.emitEql(
+                        booleanIndicatorBuilder.emitLoad(getControlVar(fwdBlockInst)),
+                        indexVals[ii+1]);
+
+                // Create a block to branch between i+1 and the rest of the ladder so far
+                // (0 ... i)
+                //
+                auto upperLadderBlock = ladderBlockBuilder.emitBlock();
+                intermediateBranchBlocks.add(upperLadderBlock);
+
+                ladderBlockBuilder.markInstAsDifferential(upperLadderBlock);
+                ladderBlockBuilder.emitIfElse(
+                    blockIndicatorInst,
+                    thisIndexBlock,
+                    nextLadderBlock,
+                    defaultAfterBlock);
+                
+                nextLadderBlock = upperLadderBlock;
+            }
+
+            // Branch into the last ladder block.
+            builder->emitBranch(nextLadderBlock);
         }
 
-        return TranspositionResult();
+        // Insert all intermediate blocks in the order they were created, right after
+        // the current reverse block.
+        
+        auto revBlock = revBlockMap[fwdBlockInst];
+        SLANG_ASSERT(revBlock);
+
+        for (auto block : intermediateBranchBlocks)
+        {
+            block->insertAfter(revBlock);
+        }
+
+        return;
     }
     
     TranspositionResult transposeInst(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
+
         // Dispatch logic.
         switch(fwdInst->getOp())
         {
             case kIROp_Add:
             case kIROp_Mul:
-            case kIROp_Sub:
+            case kIROp_Sub: 
                 return transposeArithmetic(builder, fwdInst, revValue);
 
             case kIROp_Call:
@@ -578,9 +900,16 @@ struct DiffTransposePass
             
             case kIROp_MakeVector:
                 return transposeMakeVector(builder, fwdInst, revValue);
-
+            
             case kIROp_unconditionalBranch:
-                return transposeBranch(builder, fwdInst);
+            case kIROp_conditionalBranch:
+            case kIROp_ifElse:
+            case kIROp_loop:
+            {
+                // Ignore. transposeBlock() should take care of adding the
+                // appropriate branch instruction.
+                return TranspositionResult();
+            }
 
             default:
                 SLANG_ASSERT_FAILURE("Unhandled instruction");
@@ -1248,6 +1577,8 @@ struct DiffTransposePass
 
     Dictionary<IRInst*, List<RevGradient>>               gradientsMap;
 
+    Dictionary<IRInst*, IRVar*>                          revAccumulatorVarMap;
+
     Dictionary<IRInst*, IRInst*>*                        primalsMap;
 
     List<IRInst*>                                        usedPtrs;
@@ -1255,6 +1586,8 @@ struct DiffTransposePass
     Dictionary<IRBlock*, ControlFlowTranspositionInfo>   blockEntries;
 
     Dictionary<IRBlock*, IRBlock*>                       revBlockMap;
+
+    Dictionary<IRGlobalValueWithCode*, IRBlock*>         firstRevDiffBlockMap;
 };
 
 

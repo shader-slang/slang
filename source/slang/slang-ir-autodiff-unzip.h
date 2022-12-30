@@ -26,6 +26,13 @@ struct DiffUnzipPass
     Dictionary<IRInst*, IRInst*>            primalMap;
     Dictionary<IRInst*, IRInst*>            diffMap;
 
+    // First diff block.
+    // TODO: Can the same pass object can be used for multiple functions?
+    // might run into an issue here?
+    IRBlock*                                firstDiffBlock;
+
+    // Dictionary<IRBlock*, List<IRBlock*>>    
+
     DiffUnzipPass(AutoDiffSharedContext* autodiffContext) : 
         autodiffContext(autodiffContext), diffTypeContext(autodiffContext)
     { }
@@ -58,50 +65,70 @@ struct DiffUnzipPass
 
         builder->setInsertInto(unzippedFunc);
 
-        // Work *only* with two-block functions for now.
+        // Functions need to have at least two blocks at this point (one for parameters,
+        // and atleast one for code)
+        //
         SLANG_ASSERT(unzippedFunc->getFirstBlock() != nullptr);
         SLANG_ASSERT(unzippedFunc->getFirstBlock()->getNextBlock() != nullptr);
-        SLANG_ASSERT(unzippedFunc->getFirstBlock()->getNextBlock()->getNextBlock() == nullptr);
 
         // Ignore the first block (this is reserved for parameters), start
         // at the second block. (For now, we work with only a single block of insts)
         // TODO: expand to handle multi-block functions later.
         IRBlock* firstBlock = unzippedFunc->getFirstBlock()->getNextBlock();
 
-        List<IRBlock*> workList;
+        List<IRBlock*> mixedBlocks;
         for (IRBlock* block = firstBlock; block; block = block->getNextBlock())
         {
             // Only need to unzip blocks with both differential and primal instructions.
             if (block->findDecoration<IRMixedDifferentialInstDecoration>())
             {
-                workList.add(block);
+                mixedBlocks.add(block);
             }
         }
+
+        IRBlock* firstPrimalBlock = nullptr;
         
-        for (auto block : workList)
+        // Emit an empty primal block for every mixed block.
+        for (auto block : mixedBlocks)
         {
-            // Emit new blocks for split vesions.
             IRBlock* primalBlock = builder->emitBlock();
+            primalMap[block] = primalBlock;
+
+            if (block == firstBlock)
+                firstPrimalBlock = primalBlock;
+        }
+
+        // Emit an empty differential block for every mixed block.
+        for (auto block : mixedBlocks)
+        {
             IRBlock* diffBlock = builder->emitBlock(); 
+            diffMap[block] = diffBlock;
 
             // Mark the differential block as a differential inst 
             // (and add a reference to the primal block)
-            builder->markInstAsDifferential(diffBlock, nullptr, primalBlock);
+            builder->markInstAsDifferential(diffBlock, nullptr, primalMap[block]);
 
-            primalMap[block] = primalBlock;
-            diffMap[block] = diffBlock;
-
-            // Split the main block into two. This method should also emit
-            // a branch statement from primalBlock to diffBlock.
-            // TODO: extend this code to split multiple blocks
+            // Record the first differential (code) block,
+            // since we want all 'return' insts in primal blocks
+            // to be replaced with a brahcn into this block.
             // 
-            splitBlock(block, primalBlock, diffBlock);
-
-            // Replace occurences of block with primalBlock
-            block->replaceUsesWith(primalBlock);
-            block->removeAndDeallocate();
+            if (block == firstBlock)
+                this->firstDiffBlock = diffBlock;
         }
-                
+
+        // Split each block into two. 
+        for (auto block : mixedBlocks)
+        {
+            splitBlock(block, as<IRBlock>(primalMap[block]), as<IRBlock>(diffMap[block]));
+        }
+
+        // Swap the first block's occurences out for the first primal block.
+        firstBlock->replaceUsesWith(firstPrimalBlock);
+
+        // Remove old blocks.
+        for (auto block : mixedBlocks)
+            block->removeAndDeallocate();
+
         return unzippedFunc;
     }
 
@@ -237,10 +264,14 @@ struct DiffUnzipPass
         return InstPair(primalBuilder->emitVar(primalType), diffBuilder->emitVar(diffType));
     }
 
-    InstPair splitReturn(IRBuilder*, IRBuilder* diffBuilder, IRReturn* mixedReturn)
+    InstPair splitReturn(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRReturn* mixedReturn)
     {
         auto pairType = as<IRDifferentialPairType>(mixedReturn->getVal()->getDataType());
         auto primalType = pairType->getValueType();
+
+        // Check that we have an unambiguous 'first' differential block.
+        SLANG_ASSERT(firstDiffBlock);
+        auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
         
         auto pairVal = diffBuilder->emitMakeDifferentialPair(
             pairType,
@@ -251,7 +282,7 @@ struct DiffUnzipPass
         auto returnInst = diffBuilder->emitReturn(pairVal);
         diffBuilder->markInstAsDifferential(returnInst, primalType);
 
-        return InstPair(nullptr, returnInst);
+        return InstPair(primalBranch, returnInst);
     }
 
     InstPair splitControlFlow(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* branchInst)
@@ -260,17 +291,34 @@ struct DiffUnzipPass
         {
         case kIROp_unconditionalBranch:
             {
-                auto targetInst = as<IRUnconditionalBranch>(branchInst)->getTargetBlock();
+                auto uncondBranchInst = as<IRUnconditionalBranch>(branchInst);
+                auto targetBlock = uncondBranchInst->getTargetBlock();
+                
+                // Split args.
+                List<IRInst*> primalArgs;
+                List<IRInst*> diffArgs;
+                for (UIndex ii = 0; ii < uncondBranchInst->getArgCount(); ii++)
+                {
+                    if (isDifferentialInst(uncondBranchInst->getArg(ii)))
+                        diffArgs.add(uncondBranchInst->getArg(ii));
+                    else
+                        primalArgs.add(uncondBranchInst->getArg(ii));
+                }
                 
                 return InstPair(
-                    primalBuilder->emitBranch(as<IRBlock>(primalMap[targetInst])),
-                    diffBuilder->emitBranch(as<IRBlock>(diffMap[targetInst])));
+                    primalBuilder->emitBranch(
+                        as<IRBlock>(primalMap[targetBlock]),
+                        primalArgs.getCount(),
+                        primalArgs.getBuffer()),
+                    diffBuilder->emitBranch(
+                        as<IRBlock>(diffMap[targetBlock]),
+                        diffArgs.getCount(),
+                        diffArgs.getBuffer()));
 
             }
         
         case kIROp_conditionalBranch:
             {
-
                 auto trueBlock = as<IRConditionalBranch>(branchInst)->getTrueBlock();
                 auto falseBlock = as<IRConditionalBranch>(branchInst)->getFalseBlock();
                 auto condInst = as<IRConditionalBranch>(branchInst)->getCondition();
@@ -284,7 +332,26 @@ struct DiffUnzipPass
                         condInst,
                         as<IRBlock>(diffMap[trueBlock]),
                         as<IRBlock>(diffMap[falseBlock])));
+            }
+        
+        case kIROp_ifElse:
+            {
+                auto trueBlock = as<IRIfElse>(branchInst)->getTrueBlock();
+                auto falseBlock = as<IRIfElse>(branchInst)->getFalseBlock();
+                auto afterBlock = as<IRIfElse>(branchInst)->getAfterBlock();
+                auto condInst = as<IRIfElse>(branchInst)->getCondition();
 
+                return InstPair(
+                    primalBuilder->emitIfElse(
+                        condInst,
+                        as<IRBlock>(primalMap[trueBlock]),
+                        as<IRBlock>(primalMap[falseBlock]),
+                        as<IRBlock>(primalMap[afterBlock])),
+                    diffBuilder->emitIfElse(
+                        condInst,
+                        as<IRBlock>(diffMap[trueBlock]),
+                        as<IRBlock>(diffMap[falseBlock]),
+                        as<IRBlock>(diffMap[afterBlock])));
             }
         
         default:
@@ -313,7 +380,12 @@ struct DiffUnzipPass
 
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:
+        case kIROp_ifElse:
             return splitControlFlow(primalBuilder, diffBuilder, inst);
+        
+        case kIROp_Unreachable:
+            return InstPair(primalBuilder->emitUnreachable(),
+                diffBuilder->emitUnreachable());
 
         default:
             SLANG_ASSERT_FAILURE("Unhandled mixed diff inst");
@@ -346,6 +418,7 @@ struct DiffUnzipPass
 
             if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(child))
             {
+                // Replace GetDiff(A) with A.d
                 if (diffMap.ContainsKey(getDiffInst->getBase()))
                 {
                     getDiffInst->replaceUsesWith(lookupDiffInst(getDiffInst->getBase()));
@@ -354,9 +427,9 @@ struct DiffUnzipPass
                     continue;
                 }
             }
-
-            if (auto getPrimalInst = as<IRDifferentialPairGetPrimal>(child))
+            else if (auto getPrimalInst = as<IRDifferentialPairGetPrimal>(child))
             {
+                // Replace GetPrimal(A) with A.p
                 if (primalMap.ContainsKey(getPrimalInst->getBase()))
                 {
                     getPrimalInst->replaceUsesWith(lookupPrimalInst(getPrimalInst->getBase()));
@@ -402,7 +475,7 @@ struct DiffUnzipPass
         // Branch from primal to differential block.
         // Functionally, the new blocks should produce the same output as the
         // old block.
-        primalBuilder.emitBranch(diffBlock);
+        // primalBuilder.emitBranch(diffBlock);
     }
 };
 
