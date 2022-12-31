@@ -421,6 +421,32 @@ void stripAutoDiffDecorations(IRModule* module)
     stripAutoDiffDecorationsFromChildren(module->getModuleInst());
 }
 
+
+void stripBlockTypeDecorations(IRFunc* func)
+{
+    for (auto child : func->getChildren())
+    {
+        if (auto block = as<IRBlock>(child))
+        {
+            for (auto decor = block->getFirstDecoration(); decor; )
+            {
+                auto next = decor->getNextDecoration();
+                switch (decor->getOp())
+                {
+                case kIROp_DifferentialInstDecoration:
+                case kIROp_MixedDifferentialInstDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                default:
+                    break;
+                }
+                decor = next;
+            }
+        }
+    }
+}
+
+
 struct StripNoDiffTypeAttributePass : InstPassBase
 {
     StripNoDiffTypeAttributePass(IRModule* module) :
@@ -562,6 +588,12 @@ struct AutoDiffPass : public InstPassBase
                     default:
                         break;
                     }
+
+                    // Get rid of block-level decorations that are used to keep track of 
+                    // different block types. These don't work well with the IR simplification
+                    // passes since they don't expect decorations in blocks.
+                    // 
+                    stripBlockTypeDecorations(diffFunc);
                 }
             }
             if (!changed)
