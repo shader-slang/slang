@@ -510,7 +510,7 @@ struct AutoDiffPass : public InstPassBase
         {
             bool changed = false;
             List<IRInst*> autoDiffWorkList;
-            // Collect all `ForwardDifferentiate` insts from the module.
+            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the module.
             autoDiffWorkList.clear();
             processAllInsts([&](IRInst* inst)
                 {
@@ -567,6 +567,7 @@ struct AutoDiffPass : public InstPassBase
             // Run transcription logic to generate the body of forward/backward derivatives functions.
             // While doing so, we may discover new functions to differentiate, so we keep running until
             // the worklist goes dry.
+            List<IRFunc*> autodiffCleanupList;
             while (autodiffContext->followUpFunctionsToTranscribe.getCount() != 0)
             {
                 changed = true;
@@ -575,6 +576,14 @@ struct AutoDiffPass : public InstPassBase
                 {
                     auto diffFunc = as<IRFunc>(task.resultFunc);
                     SLANG_ASSERT(diffFunc);
+
+                    // We're running in to some situations where the follow-up task
+                    // has already been completed (diffFunc has been generated, processed,
+                    // and deallocated). Skip over these for now.
+                    // 
+                    if (!diffFunc->getDataType())
+                        continue;
+
                     auto primalFunc = as<IRFunc>(task.originalFunc);
                     SLANG_ASSERT(primalFunc);
                     switch (task.type)
@@ -589,17 +598,25 @@ struct AutoDiffPass : public InstPassBase
                         break;
                     }
 
-                    // Get rid of block-level decorations that are used to keep track of 
-                    // different block types. These don't work well with the IR simplification
-                    // passes since they don't expect decorations in blocks.
-                    // 
-                    stripBlockTypeDecorations(diffFunc);
+                    autodiffCleanupList.add(diffFunc);
                 }
             }
+
+            // Get rid of block-level decorations that are used to keep track of 
+            // different block types. These don't work well with the IR simplification
+            // passes since they don't expect decorations in blocks.
+            // 
+            for (auto diffFunc : autodiffCleanupList)
+                stripBlockTypeDecorations(diffFunc);
+
+            autodiffCleanupList.clear();
+
             if (!changed)
                 break;
             hasChanges |= changed;
         }
+
+
         return hasChanges;
     }
 

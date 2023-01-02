@@ -555,6 +555,7 @@ IRGlobalValueWithCode* DiffUnzipPass::extractPrimalFunc(
 
     // Run simplification to DCE unnecessary insts.
     eliminateDeadCode(innerFunc);
+    eliminateDeadCode(specializedPrimalFunc);
 
     return primalFunc;
 }
