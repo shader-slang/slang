@@ -120,6 +120,12 @@ template<typename T> void slang_use_obj(T&) {}
 #endif
 #endif
 
+#if defined(_MSC_VER)
+#   define SLANG_ATTR_PRINTF(string_index, varargs_index)
+#else
+#   define SLANG_ATTR_PRINTF(string_index, varargs_index) __attribute__((format(printf, string_index, varargs_index)))
+#endif
+
 #ifndef SLANG_RT_API
 #define SLANG_RT_API
 #endif

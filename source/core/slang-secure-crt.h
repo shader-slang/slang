@@ -47,6 +47,7 @@ inline size_t strnlen_s(const char * str, size_t numberOfElements)
 #endif
 }
 
+__attribute__((format(printf, 3, 4)))
 inline int sprintf_s(char * buffer, size_t sizeOfBuffer, const char * format, ...)
 {
 	va_list argptr;
@@ -56,6 +57,9 @@ inline int sprintf_s(char * buffer, size_t sizeOfBuffer, const char * format, ..
 	return rs;
 }
 
+// A patch was submitted to GCC wchar_t support in 2001, so I'm sure we can
+// enable this any day now...
+// __attribute__((format(wprintf, 3, 4)))
 inline int swprintf_s(wchar_t * buffer, size_t sizeOfBuffer, const wchar_t * format, ...)
 {
 	va_list argptr;
