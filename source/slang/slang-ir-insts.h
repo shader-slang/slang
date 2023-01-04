@@ -608,6 +608,7 @@ struct IRDifferentialInstDecoration : IRDecoration
     IR_LEAF_ISA(DifferentialInstDecoration)
 
     IRType* getPrimalType() { return as<IRType>(getOperand(0)); }
+    IRInst* getPrimalInst() { return as<IRInst>(getOperand(1)); }
 };
 
 struct IRPrimalValueStructKeyDecoration : IRDecoration
@@ -3421,6 +3422,11 @@ public:
     void markInstAsDifferential(IRInst* value, IRType* primalType)
     {
         addDecoration(value, kIROp_DifferentialInstDecoration, primalType);
+    }
+
+    void markInstAsDifferential(IRInst* value, IRType* primalType, IRInst* primalInst)
+    {
+        addDecoration(value, kIROp_DifferentialInstDecoration, primalType, primalInst);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

@@ -429,11 +429,6 @@ namespace Slang
                 block->insertAtEnd(diffFunc);
         }
 
-        // Extracts the primal computations into its own func, and replace the primal insts
-        // with the intermediate results computed from the extracted func.
-        IRInst* intermediateType = nullptr;
-        auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(diffFunc, unzippedFwdDiffFunc, intermediateType);
-
         // Transpose the first block (parameter block)
         transposeParameterBlock(builder, diffFunc);
 
@@ -445,7 +440,12 @@ namespace Slang
         DiffTransposePass::FuncTranspositionInfo info = {dOutParameter, nullptr};
         diffTransposePass->transposeDiffBlocksInFunc(diffFunc, info);
 
-        // Clean up by deallocating intermediate steps.
+        // Extracts the primal computations into its own func, and replace the primal insts
+        // with the intermediate results computed from the extracted func.
+        IRInst* intermediateType = nullptr;
+        auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(diffFunc, unzippedFwdDiffFunc, intermediateType);
+
+        // Clean up by deallocating intermediate versions.
         tempDiffFunc->removeAndDeallocate();
         unzippedFwdDiffFunc->removeAndDeallocate();
         fwdDiffFunc->removeAndDeallocate();

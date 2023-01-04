@@ -519,6 +519,11 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
             // block to compute *both* primals and derivatives (i.e linearized block)
             SLANG_ASSERT(diffBranch);
 
+            // Since blocks always compute both primals and differentials, the branch
+            // instructions are also always mixed.
+            // 
+            builder->markInstAsMixedDifferential(diffBranch);
+
             return InstPair(diffBranch, diffBranch);
     }
 
@@ -740,6 +745,7 @@ InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* orig
         kIROp_loop,
         diffLoopOperands.getCount(),
         diffLoopOperands.getBuffer());
+    builder->markInstAsMixedDifferential(diffLoop);
 
     return InstPair(diffLoop, diffLoop);
 }
@@ -779,13 +785,14 @@ InstPair ForwardDiffTranscriber::transcribeIfElse(IRBuilder* builder, IRIfElse* 
         diffIfElseArgs.add(primalOperand);
     }
 
-    IRInst* diffLoop = builder->emitIntrinsicInst(
+    IRInst* diffIfElse = builder->emitIntrinsicInst(
         nullptr,
         kIROp_ifElse,
         diffIfElseArgs.getCount(),
         diffIfElseArgs.getBuffer());
+    builder->markInstAsMixedDifferential(diffIfElse);
 
-    return InstPair(diffLoop, diffLoop);
+    return InstPair(diffIfElse, diffIfElse);
 }
 
 InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(IRBuilder* builder, IRMakeDifferentialPair* origInst)
@@ -963,9 +970,15 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
     builder.setInsertInto(diffFunc);
 
     differentiableTypeConformanceContext.setFunc(primalFunc);
+
     // Transcribe children from origFunc into diffFunc
     for (auto block = primalFunc->getFirstBlock(); block; block = block->getNextBlock())
         this->transcribe(&builder, block);
+
+    // Some of the transcribed blocks can appear 'out-of-order'. Although this 
+    // shouldn't be an issue, for consistency, we put them back in order.
+    for (auto block = primalFunc->getFirstBlock(); block; block = block->getNextBlock())
+        as<IRBlock>(lookupDiffInst(block))->insertAtEnd(diffFunc);
 
     return InstPair(primalFunc, diffFunc);
 }
@@ -1124,6 +1137,12 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         return trascribeNonDiffInst(builder, origInst);
     case kIROp_StructKey:
         return InstPair(origInst, nullptr);
+    case kIROp_Unreachable:
+    {
+        auto unreachInst = builder->emitUnreachable();
+        builder->markInstAsMixedDifferential(unreachInst);
+        return InstPair(unreachInst, nullptr);
+    }
 
     case kIROp_MakeExistentialWithRTTI:
         SLANG_UNEXPECTED("MakeExistentialWithRTTI inst is not expected in autodiff pass.");

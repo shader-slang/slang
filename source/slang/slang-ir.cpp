@@ -6623,6 +6623,10 @@ namespace Slang
         case kIROp_Reinterpret:
         case kIROp_GetNativePtr:
             return false;
+
+        case kIROp_ForwardDifferentiate:
+        case kIROp_BackwardDifferentiate:
+            return false;
         }
     }
 
