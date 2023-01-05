@@ -189,6 +189,7 @@ namespace gfx_test
             encoder->setVertexBuffer(0, vertexBuffer);
             encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
+            swapchain->acquireNextImage();
             encoder->draw(kVertexCount);
             encoder->endEncoding();
             commandBuffer->close();
