@@ -127,7 +127,7 @@ namespace gfx_test
             IBufferResource::Desc vertexBufferDesc;
             vertexBufferDesc.type = IResource::Type::Buffer;
             vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-            vertexBufferDesc.defaultState = ResourceState::ShaderResource;
+            vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
             vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
             SLANG_CHECK_ABORT(vertexBuffer != nullptr);
 
