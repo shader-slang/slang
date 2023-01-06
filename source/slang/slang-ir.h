@@ -1347,6 +1347,12 @@ struct IRDifferentialPairType : IRType
     IR_LEAF_ISA(DifferentialPairType)
 };
 
+struct IRBackwardDiffIntermediateContextType : IRType
+{
+    IRInst* getFunc() { return getOperand(0); }
+    IR_LEAF_ISA(BackwardDiffIntermediateContextType)
+};
+
 struct IRVectorType : IRType
 {
     IRType* getElementType() { return (IRType*)getOperand(0); }
@@ -1742,6 +1748,9 @@ struct IRGeneric : IRGlobalValueWithParams
 IRInst* findGenericReturnVal(IRGeneric* generic);
 // Recursively find the inner most generic return value.
 IRInst* findInnerMostGenericReturnVal(IRGeneric* generic);
+
+// Returns the generic return val if `inst` is a generic, otherwise returns `inst`.
+IRInst* getGenericReturnVal(IRInst* inst);
 
 // Find the generic container, if any, that this inst is contained in
 // Returns nullptr if there is no outer container.

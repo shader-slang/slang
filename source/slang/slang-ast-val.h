@@ -521,4 +521,19 @@ class BackwardDifferentiateVal : public DifferentiateVal
     SLANG_AST_CLASS(BackwardDifferentiateVal)
 };
 
+class BackwardDifferentiateIntermediateTypeVal : public DifferentiateVal
+{
+    SLANG_AST_CLASS(BackwardDifferentiateIntermediateTypeVal)
+};
+
+class BackwardDifferentiatePrimalVal : public DifferentiateVal
+{
+    SLANG_AST_CLASS(BackwardDifferentiatePrimalVal)
+};
+
+class BackwardDifferentiatePropagateVal : public DifferentiateVal
+{
+    SLANG_AST_CLASS(BackwardDifferentiatePropagateVal)
+};
+
 } // namespace Slang

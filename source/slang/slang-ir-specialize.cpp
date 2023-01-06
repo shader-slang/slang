@@ -403,7 +403,7 @@ struct SpecializationContext
                     // If the base is specialized, the JVP version must be also be a specialized
                     // generic.
                     //
-                    SLANG_ASSERT(specDiffFunc);
+                    SLANG_RELEASE_ASSERT(specDiffFunc);
 
                     // Build specialization arguments from specInst.
                     // Note that if we've reached this point, we can safely assume

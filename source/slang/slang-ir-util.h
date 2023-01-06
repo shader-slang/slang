@@ -61,6 +61,40 @@ inline bool isChildInstOf(IRInst* inst, IRInst* parent)
 IRInst* specializeWithGeneric(
     IRBuilder& builder, IRInst* genericToSpecialize, IRGeneric* userGeneric);
 
+IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecailize, IRInst* userGeneric);
+
+    // For a value inside a generic, create a standalone generic wrapping just the value, and replace the use of
+    // the original value with a specialization of the new generic using the current generic arguments if
+    // `replaceExistingValue` is true.
+    // For example, if we have
+    // ```
+    //     generic G { param T; v = x(T); f = y(v); return f; }
+    // ```
+    // hoistValueFromGeneric(G, v) turns the code into:
+    // ```
+    //     generic G1 { param T1; v1 = x(T); return v1; }
+    //     generic G { param T; v = specialize(G1, T); f = y(v); return f; }
+    // ```
+    // This function returns newly created generic inst.
+    // if `value` is not inside any generic, this function makes no change to IR, and returns `value`.
+IRInst* hoistValueFromGeneric(
+    IRBuilder& builder,
+    IRInst* value,
+    IRInst*& outSpecializedVal,
+    bool replaceExistingValue = false);
+
+// Clear dest and move all chidlren from src to dest.
+void moveInstChildren(IRInst* dest, IRInst* src);
+
+inline bool isGenericParam(IRInst* param)
+{
+    auto parent = param->getParent();
+    if (auto block = as<IRBlock>(parent))
+        parent = block->getParent();
+    if (as<IRGeneric>(parent))
+        return true;
+    return false;
+}
 
 inline IRInst* unwrapAttributedType(IRInst* type)
 {

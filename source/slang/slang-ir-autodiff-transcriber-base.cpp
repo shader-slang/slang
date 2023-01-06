@@ -259,7 +259,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     }
 
     case kIROp_FuncType:
-        return differentiateFunctionType(builder, as<IRFuncType>(primalType));
+        return differentiateFunctionType(builder, nullptr, as<IRFuncType>(primalType));
 
     case kIROp_OutType:
         if (auto diffValueType = differentiateType(builder, as<IROutType>(primalType)->getValueType()))
@@ -436,7 +436,7 @@ InstPair AutoDiffTranscriberBase::transcribeParam(IRBuilder* builder, IRParam* o
 {
     auto primalDataType = findOrTranscribePrimalInst(builder, origParam->getDataType());
     // Do not differentiate generic type (and witness table) parameters
-    if (as<IRTypeType>(primalDataType) || as<IRWitnessTableType>(primalDataType))
+    if (isGenericParam(origParam))
     {
         return InstPair(
             cloneInst(&cloneEnv, builder, origParam),

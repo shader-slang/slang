@@ -300,6 +300,11 @@ namespace Slang
         return as<IRParam>(getNextInst());
     }
 
+    IRParam* IRParam::getPrevParam()
+    {
+        return as<IRParam>(getPrevInst());
+    }
+
     // IRArrayTypeBase
 
     IRInst* IRArrayTypeBase::getElementCount()
@@ -2802,6 +2807,15 @@ namespace Slang
             operands);
     }
 
+    IRBackwardDiffIntermediateContextType* IRBuilder::getBackwardDiffIntermediateContextType(
+        IRInst* func)
+    {
+        return (IRBackwardDiffIntermediateContextType*)getType(
+            kIROp_BackwardDiffIntermediateContextType,
+            1,
+            &func);
+    }
+
     IRFuncType* IRBuilder::getFuncType(
         UInt            paramCount,
         IRType* const*  paramTypes,
@@ -3123,6 +3137,28 @@ namespace Slang
         auto inst = createInst<IRBackwardDifferentiate>(
             this,
             kIROp_BackwardDifferentiate,
+            type,
+            baseFn);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn)
+    {
+        auto inst = createInst<IRBackwardDifferentiatePrimal>(
+            this,
+            kIROp_BackwardDifferentiatePrimal,
+            type,
+            baseFn);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn)
+    {
+        auto inst = createInst<IRBackwardDifferentiatePropagate>(
+            this,
+            kIROp_BackwardDifferentiatePropagate,
             type,
             baseFn);
         addInst(inst);
@@ -6622,6 +6658,7 @@ namespace Slang
         case kIROp_UnpackAnyValue:
         case kIROp_Reinterpret:
         case kIROp_GetNativePtr:
+        case kIROp_BackwardDiffIntermediateContextType:
             return false;
 
         case kIROp_ForwardDifferentiate:
@@ -6904,6 +6941,16 @@ namespace Slang
         }
         return nullptr;
     }
+
+    IRInst* getGenericReturnVal(IRInst* inst)
+    {
+        if (auto gen = as<IRGeneric>(inst))
+        {
+            return findGenericReturnVal(gen);
+        }
+        return inst;
+    }
+
 } // namespace Slang
 
 #if SLANG_VC
@@ -6917,4 +6964,3 @@ SLANG_API const int SlangDebug__IROpStringLit = Slang::kIROp_StringLit;
 SLANG_API const int SlangDebug__IROpIntLit = Slang::kIROp_IntLit;
 #endif
 #endif
-
