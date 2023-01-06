@@ -404,7 +404,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
 
     if (auto nameHint = primalFunc->findDecoration<IRNameHintDecoration>())
     {
-        auto primalName = nameHint->getName() + "_primal";
+        auto primalName = String(nameHint->getName()) + "_primal";
         nameHint->setOperand(0, builder.getStringValue(primalName.getUnownedSlice()));
     }
 
