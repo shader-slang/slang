@@ -132,7 +132,7 @@ struct DiffUnzipPass
         return unzippedFunc;
     }
 
-    IRGlobalValueWithCode* extractPrimalFunc(IRGlobalValueWithCode* func, IRGlobalValueWithCode* fwdFunc, IRInst*& intermediateType);
+    IRFunc* extractPrimalFunc(IRFunc* func, IRFunc* fwdFunc, IRInst*& intermediateType);
 
     bool isRelevantDifferentialPair(IRType* type)
     {

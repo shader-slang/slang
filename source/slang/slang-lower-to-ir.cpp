@@ -1407,6 +1407,33 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(diff);
     }
 
+    LoweredValInfo visitBackwardDifferentiatePropagateVal(BackwardDifferentiatePropagateVal* val)
+    {
+        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        auto diff = getBuilder()->emitBackwardDifferentiatePropagateInst(getBuilder()->getTypeKind(), funcVal.val);
+        return LoweredValInfo::simple(diff);
+    }
+
+    LoweredValInfo visitBackwardDifferentiatePrimalVal(BackwardDifferentiatePrimalVal* val)
+    {
+        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        auto diff = getBuilder()->emitBackwardDifferentiatePrimalInst(getBuilder()->getTypeKind(), funcVal.val);
+        return LoweredValInfo::simple(diff);
+    }
+
+    LoweredValInfo visitBackwardDifferentiateIntermediateTypeVal(BackwardDifferentiateIntermediateTypeVal* val)
+    {
+        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        auto diff = getBuilder()->getBackwardDiffIntermediateContextType(funcVal.val);
+        return LoweredValInfo::simple(diff);
+    }
+
     LoweredValInfo visitDifferentialBottomSubtypeWitness(DifferentialBottomSubtypeWitness*)
     {
         return LoweredValInfo();
@@ -6816,9 +6843,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     context->irBuilder->addDecoration(
                         interfaceType, kIROp_DifferentiableMethodRequirementDictionaryDecoration);
         }
-        auto op = as<ForwardDerivativeRequirementDecl>(requirementDecl)
-                      ? kIROp_ForwardDifferentiableMethodRequirementDictionaryItem
-                      : kIROp_BackwardDifferentiableMethodRequirementDictionaryItem;
+        IROp op = kIROp_ForwardDifferentiableMethodRequirementDictionaryItem;
+        if (as<BackwardDerivativeRequirementDecl>(requirementDecl))
+        {
+            op = kIROp_BackwardDifferentiableMethodRequirementDictionaryItem;
+        }
+        else if (as<BackwardDerivativePropagateRequirementDecl>(requirementDecl))
+        {
+            op = kIROp_BackwardDifferentiablePropagateMethodRequirementDictionaryItem;
+        }
+        else if (as<BackwardDerivativePrimalRequirementDecl>(requirementDecl))
+        {
+            op = kIROp_BackwardDifferentiablePrimalMethodRequirementDictionaryItem;
+        }
+        else if (as<BackwardDerivativeIntermediateTypeRequirementDecl>(requirementDecl))
+        {
+            op = kIROp_BackwardDifferentiableIntermediateTypeRequirementDictionaryItem;
+        }
         IRInst* args[] = {originalKey, associatedKey};
         auto assoc = context->irBuilder->emitIntrinsicInst(nullptr, op, 2, args);
         assoc->insertAtEnd(decor);
@@ -8403,6 +8444,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitBackwardDerivativeIntermediateTypeRequirementDecl(BackwardDerivativeIntermediateTypeRequirementDecl* decl)
+    {
+        SLANG_UNUSED(decl);
+        return LoweredValInfo(getBuilder()->getTypeKind());
     }
 
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)

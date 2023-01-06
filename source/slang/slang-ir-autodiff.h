@@ -37,7 +37,7 @@ typedef DiffInstPair<IRInst*, IRInst*> InstPair;
 
 enum class FuncBodyTranscriptionTaskType
 {
-    Forward, Backward, Primal
+    Forward, BackwardPrimal, BackwardPropagate, Backward
 };
 
 struct FuncBodyTranscriptionTask

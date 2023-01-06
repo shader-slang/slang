@@ -11,8 +11,10 @@
 namespace Slang
 {
 
-IRFuncType* ForwardDiffTranscriber::differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
+IRFuncType* ForwardDiffTranscriber::differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType)
 {
+    SLANG_UNUSED(func);
+
     List<IRType*> newParameterTypes;
     IRType* diffReturnType;
 
@@ -330,7 +332,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         // If the function is marked for auto-diff, push a `differentiate` inst for a follow up pass
         // to generate the implementation.
         diffCallee = builder->emitForwardDifferentiateInst(
-            differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
+            differentiateFunctionType(
+                builder, primalCallee, as<IRFuncType>(primalCallee->getFullType())),
             primalCallee);
     }
 
@@ -615,8 +618,16 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
         {
             args.add(primalSpecialize->getArg(i));
         }
+
+        // A `ForwardDerivative` decoration on an inner func of a generic should always be a `specialize`.
+        auto diffBaseSpecialize = as<IRSpecialize>(diffBase);
+        SLANG_RELEASE_ASSERT(diffBaseSpecialize);
+
+        // Note: this assumes that the generic arguments to specialize the derivative is the same as the
+        // generic args to specialize the primal function. This is true for all of our stdlib functions,
+        // but we may need to rely on more general substitution logic here.
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+            builder->getTypeKind(), diffBaseSpecialize->getBase(), args.getCount(), args.getBuffer());
         return InstPair(primalSpecialize, diffSpecialize);
     }
     else if (auto diffDecor = genericInnerVal->findDecoration<IRForwardDifferentiableDecoration>())
@@ -933,6 +944,7 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
     SLANG_ASSERT(as<IRFuncType>(origFunc->getFullType()));
     IRType* diffFuncType = this->differentiateFunctionType(
         &builder,
+        origFunc,
         as<IRFuncType>(origFunc->getFullType()));
     diffFunc->setFullType(diffFuncType);
 
@@ -943,7 +955,17 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
         newNameSb << "s_fwd_" << originalName;
         builder.addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
     }
-    builder.addForwardDerivativeDecoration(origFunc, diffFunc);
+    
+    if (auto outerGen = findOuterGeneric(diffFunc))
+    {
+        auto specialized =
+            specializeWithGeneric(builder, outerGen, as<IRGeneric>(findOuterGeneric(origFunc)));
+        builder.addForwardDerivativeDecoration(origFunc, specialized);
+    }
+    else
+    {
+        builder.addForwardDerivativeDecoration(origFunc, diffFunc);
+    }
 
     // Mark the generated derivative function itself as differentiable.
     builder.addForwardDifferentiableDecoration(diffFunc);

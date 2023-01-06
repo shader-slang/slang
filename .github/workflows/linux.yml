@@ -20,6 +20,11 @@ jobs:
       with:
         submodules: 'true'
         fetch-depth: '0'
+    - uses: robinraju/release-downloader@v1.7
+      with:
+        latest: true
+        repository: "shader-slang/swiftshader"
+        fileName: "vk_swiftshader_linux_${{matrix.platform}}.zip"
     - name: build
       run: |
         CC=${{matrix.compiler}}

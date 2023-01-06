@@ -1,5 +1,6 @@
 #include "slang-ir-util.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-clone.h"
 
 namespace Slang
 {
@@ -141,6 +142,79 @@ IRInst* specializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecialize, I
         genericToSpecialize,
         (UInt)genArgs.getCount(),
         genArgs.getBuffer());
+}
+
+IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecailize, IRInst* userGeneric)
+{
+    if (auto gen = as<IRGeneric>(userGeneric))
+    {
+        if (auto toSpecialize = as<IRGeneric>(genericToSpecailize))
+        {
+            return specializeWithGeneric(builder, toSpecialize, gen);
+        }
+    }
+    return genericToSpecailize;
+}
+
+IRInst* hoistValueFromGeneric(IRBuilder& builder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
+{
+    auto outerGeneric = as<IRGeneric>(findOuterGeneric(value));
+    if (!outerGeneric) return value;
+
+    builder.setInsertBefore(outerGeneric);
+    auto newGeneric = builder.emitGeneric();
+    builder.setInsertInto(newGeneric);
+    builder.emitBlock();
+    IRInst* newResultVal = nullptr;
+
+    // Clone insts in outerGeneric up until `value`.
+    IRCloneEnv cloneEnv;
+    for (auto inst : outerGeneric->getFirstBlock()->getChildren())
+    {
+        auto newInst = cloneInst(&cloneEnv, &builder, inst);
+        if (inst == value)
+        {
+            builder.emitReturn(newInst);
+            newResultVal = newInst;
+            break;
+        }
+    }
+    SLANG_RELEASE_ASSERT(newResultVal);
+    if (newResultVal->getOp() == kIROp_Func)
+    {
+        IRBuilder subBuilder = builder;
+        IRInst* subOutSpecialized = nullptr;
+        auto genericFuncType = hoistValueFromGeneric(subBuilder, newResultVal->getFullType(), subOutSpecialized, false);
+        newGeneric->setFullType((IRType*)genericFuncType);
+    }
+    else
+    {
+        newGeneric->setFullType(builder.getTypeKind());
+    }
+    if (replaceExistingValue)
+    {
+        builder.setInsertBefore(value);
+        outSpecializedVal = specializeWithGeneric(builder, newGeneric, outerGeneric);
+        value->replaceUsesWith(outSpecializedVal);
+        value->removeAndDeallocate();
+    }
+    return newGeneric;
+}
+
+void moveInstChildren(IRInst* dest, IRInst* src)
+{
+    for (auto child = dest->getFirstDecorationOrChild(); child; )
+    {
+        auto next = child->getNextInst();
+        child->removeAndDeallocate();
+        child = next;
+    }
+    for (auto child = src->getFirstDecorationOrChild(); child; )
+    {
+        auto next = child->getNextInst();
+        child->insertAtEnd(dest);
+        child = next;
+    }
 }
 
 }

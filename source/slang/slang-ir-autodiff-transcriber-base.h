@@ -116,7 +116,7 @@ struct AutoDiffTranscriberBase
 
     IRType* _differentiateTypeImpl(IRBuilder* builder, IRType* origType);
 
-    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType) = 0;
+    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) = 0;
 
     // Create an empty func to represent the transcribed func of `origFunc`.
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) = 0;

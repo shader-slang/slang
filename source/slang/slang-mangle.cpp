@@ -521,6 +521,12 @@ namespace Slang
             emitRaw(context, "FwdReq_");
         else if (as<BackwardDerivativeRequirementDecl>(decl))
             emitRaw(context, "BwdReq_");
+        else if (as<BackwardDerivativePropagateRequirementDecl>(decl))
+            emitRaw(context, "BwdReq_Prop_");
+        else if (as<BackwardDerivativePrimalRequirementDecl>(decl))
+            emitRaw(context, "BwdReq_Primal_");
+        else if (as<BackwardDerivativeIntermediateTypeRequirementDecl>(decl))
+            emitRaw(context, "BwdReq_CtxType_");
         else
         {
             // TODO: handle other cases
