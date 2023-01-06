@@ -585,6 +585,38 @@ struct IRForwardDerivativeDecoration : IRDecoration
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRBackwardDerivativeIntermediateTypeDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BackwardDerivativeIntermediateTypeDecoration
+    };
+    IR_LEAF_ISA(BackwardDerivativeIntermediateTypeDecoration)
+
+    IRInst* getBackwardDerivativeIntermediateType() { return getOperand(0); }
+};
+
+struct IRBackwardDerivativePrimalDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BackwardDerivativePrimalDecoration
+    };
+    IR_LEAF_ISA(BackwardDerivativePrimalDecoration)
+
+    IRInst* getBackwardDerivativePrimalFunc() { return getOperand(0); }
+};
+
+struct IRBackwardDerivativePropagateDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BackwardDerivativePropagateDecoration
+    };
+    IR_LEAF_ISA(BackwardDerivativePropagateDecoration)
+
+    IRInst* getBackwardDerivativePropagateFunc() { return getOperand(0); }
+};
 
 struct IRBackwardDerivativeDecoration : IRDecoration
 {
@@ -681,7 +713,45 @@ struct IRForwardDifferentiate : IRInst
 };
 
 // An instruction that replaces the function symbol
-// with it's derivative function.
+// with its backward derivative primal function.
+// A backward derivative primal function is the first pass
+// of backward derivative computation. It performs the primal
+// computations and returns the intermediates that will be used
+// by the actual backward derivative function.
+struct IRBackwardDifferentiatePrimal : IRInst
+{
+    enum
+    {
+        kOp = kIROp_BackwardDifferentiatePrimal
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(BackwardDifferentiatePrimal)
+};
+
+// An instruction that replaces the function symbol with its backward derivative propagate function.
+// A backward derivative propagate function is the second pass of backward derivative computation. It uses the
+// intermediates computed in the bacward derivative primal function to perform the actual backward
+// derivative propagation.
+struct IRBackwardDifferentiatePropagate : IRInst
+{
+    enum
+    {
+        kOp = kIROp_BackwardDifferentiatePropagate
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(BackwardDifferentiatePropagate)
+};
+
+// An instruction that replaces the function symbol with its backward derivative function.
+// A backward derivative function is a concept that combines both passes of backward derivative
+// computation. This inst should only be produced by lower-to-ir, and will be replaced with calls to
+// the primal function followed by the propagate function in the auto-diff pass.
 struct IRBackwardDifferentiate : IRInst
 {
     enum
@@ -2556,6 +2626,8 @@ public:
         IRType* valueType,
         IRInst* witnessTable);
 
+    IRBackwardDiffIntermediateContextType* getBackwardDiffIntermediateContextType(IRInst* func);
+
     IRFuncType* getFuncType(
         UInt            paramCount,
         IRType* const*  paramTypes,
@@ -2664,6 +2736,8 @@ public:
 
     IRInst* emitForwardDifferentiateInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
+    IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
 
@@ -3399,9 +3473,24 @@ public:
         addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
     }
 
+    void addBackwardDerivativePrimalDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_BackwardDerivativePrimalDecoration, jvpFn);
+    }
+
+    void addBackwardDerivativePropagateDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_BackwardDerivativePropagateDecoration, jvpFn);
+    }
+
     void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
+    }
+
+    void addBackwardDerivativeIntermediateTypeDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_BackwardDerivativeIntermediateTypeDecoration, jvpFn);
     }
 
     void markInstAsDifferential(IRInst* value)

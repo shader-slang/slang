@@ -20,8 +20,10 @@ struct IRReverseDerivativePassOptions
     // Nothing for now..
 };
 
-struct BackwardDiffTranscriber : AutoDiffTranscriberBase
+struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 {
+    FuncBodyTranscriptionTaskType diffTaskType;
+
     // Map that stores the upper gradient given an IRInst*
     Dictionary<IRInst*, List<IRInst*>> upperGradients;
     Dictionary<IRInst*, IRInst*> primalToDiffPair;
@@ -38,8 +40,9 @@ struct BackwardDiffTranscriber : AutoDiffTranscriberBase
     DiffPropagationPass             diffPropagationPassStorage;
     DiffUnzipPass                   diffUnzipPassStorage;
 
-    BackwardDiffTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
+    BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType taskType, AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
         : AutoDiffTranscriberBase(shared, inSharedBuilder, inSink)
+        , diffTaskType(taskType)
         , diffTransposePassStorage(shared)
         , diffPropagationPassStorage(shared)
         , diffUnzipPassStorage(shared)
@@ -52,13 +55,8 @@ struct BackwardDiffTranscriber : AutoDiffTranscriberBase
     // If no primal name is available, returns a blank string.
     // 
     String makeDiffPairName(IRInst* origVar);
-
-    // In differential computation, the 'default' differential value is always zero.
-    // This is a consequence of differential computing being inherently linear. As a 
-    // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
-    // The current implementation requires that types are defined linearly.
-    // 
-    IRInst* getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType);
+        
+    IRFuncType* differentiateFunctionTypeImpl(IRBuilder* builder, IRFuncType* funcType, IRInst* intermediateType);
 
     InstPair transposeBlock(IRBuilder* builder, IRBlock* origBlock);
 
@@ -68,7 +66,7 @@ struct BackwardDiffTranscriber : AutoDiffTranscriberBase
     void cleanUpUnusedPrimalIntermediate(IRInst* func, IRInst* primalFunc, IRInst* intermediateType);
 
     // Transcribe a function definition.
-    InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc);
+    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) = 0;
 
     void transposeParameterBlock(IRBuilder* builder, IRFunc* diffFunc);
 
@@ -86,18 +84,113 @@ struct BackwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize);
 
-    // Create an empty func to represent the transcribed func of `origFunc`.
-    virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
+    void transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc, IRGlobalValueWithCode*& diffPrimalFunc);
 
-    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType) override;
+    InstPair transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc);
+
+    virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
 
     virtual InstPair transcribeInstImpl(IRBuilder* builder, IRInst* origInst) override;
 
+    virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) = 0;
+    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) = 0;
+
     virtual IROp getDifferentiableMethodDictionaryItemOp() override
     {
-        return kIROp_ForwardDifferentiableMethodRequirementDictionaryItem;
+        return kIROp_BackwardDifferentiableMethodRequirementDictionaryItem;
     }
 
+    virtual const char* getNamePrefix() = 0;
+};
+
+struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
+{
+    BackwardDiffPrimalTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
+        : BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType::BackwardPrimal, shared, inSharedBuilder, inSink)
+    { }
+
+    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
+    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) override;
+    virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) override
+    {
+        if (auto backDecor = originalFunc->findDecoration<IRBackwardDerivativePrimalDecoration>())
+        {
+            return backDecor->getBackwardDerivativePrimalFunc();
+        }
+        return nullptr;
+    }
+    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
+    {
+        builder->addBackwardDerivativePrimalDecoration(inst, diffFunc);
+    }
+    virtual const char* getNamePrefix() override
+    {
+        return "s_bwd_primal_";
+    }
+};
+
+struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
+{
+    BackwardDiffPropagateTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
+        : BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType::BackwardPropagate, shared, inSharedBuilder, inSink)
+    { }
+
+    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
+    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) override;
+    virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) override
+    {
+        if (auto backDecor = originalFunc->findDecoration<IRBackwardDerivativePropagateDecoration>())
+        {
+            return backDecor->getBackwardDerivativePropagateFunc();
+        }
+        return nullptr;
+    }
+    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
+    {
+        builder->addBackwardDerivativePropagateDecoration(inst, diffFunc);
+    }
+    virtual const char* getNamePrefix() override
+    {
+        return "s_bwd_prop_";
+    }
+};
+
+// A backward derivative function combines both primal + propagate functions and accepts no
+// intermediate value input.
+struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
+{
+    BackwardDiffTranscriber(
+        AutoDiffSharedContext* shared,
+        SharedIRBuilder* inSharedBuilder,
+        DiagnosticSink* inSink)
+        : BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType::Backward, shared, inSharedBuilder, inSink)
+    { }
+
+    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
+    virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
+    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) override
+    {
+        SLANG_UNUSED(builder);
+        // Don't need to do anything here, the body is generated in transcribeFuncHeader.
+        return InstPair(primalFunc, diffFunc);
+    }
+    virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) override
+    {
+        if (auto backDecor = originalFunc->findDecoration<IRBackwardDerivativeDecoration>())
+        {
+            return backDecor->getBackwardDerivativeFunc();
+        }
+        return nullptr;
+    }
+    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
+    {
+        builder->addBackwardDerivativeDecoration(inst, diffFunc);
+    }
+
+    virtual const char* getNamePrefix() override
+    {
+        return "s_bwd_";
+    }
 };
 
 }

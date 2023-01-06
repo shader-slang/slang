@@ -11,7 +11,7 @@
 
 namespace Slang
 {
-    IRFuncType* BackwardDiffTranscriber::differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
+    IRFuncType* BackwardDiffTranscriberBase::differentiateFunctionTypeImpl(IRBuilder* builder, IRFuncType* funcType, IRInst* intermeidateType)
     {
         List<IRType*> newParameterTypes;
         IRType* diffReturnType;
@@ -46,12 +46,53 @@ namespace Slang
 
         newParameterTypes.add(differentiateType(builder, funcType->getResultType()));
 
+        if (intermeidateType)
+        {
+            newParameterTypes.add((IRType*)intermeidateType);
+        }
+
         diffReturnType = builder->getVoidType();
 
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
+    
+    IRFuncType* BackwardDiffPrimalTranscriber::differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType)
+    {
+        auto intermediateType = builder->getBackwardDiffIntermediateContextType(func);
+        auto outType = builder->getOutType(intermediateType);
+        return differentiateFunctionTypeImpl(builder, funcType, outType);
+    }
 
-    InstPair BackwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* origInst)
+    InstPair BackwardDiffPrimalTranscriber::transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
+    {
+        SLANG_UNUSED(builder);
+        SLANG_UNUSED(diffFunc);
+        auto intermediateTypeDecor = primalFunc->findDecoration<IRBackwardDerivativeIntermediateTypeDecoration>();
+        SLANG_RELEASE_ASSERT(intermediateTypeDecor);
+        auto primalDecor = primalFunc->findDecoration<IRBackwardDerivativePrimalDecoration>();
+        return InstPair(primalFunc, primalDecor->getBackwardDerivativePrimalFunc());
+    }
+
+    IRFuncType* BackwardDiffPropagateTranscriber::differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType)
+    {
+        auto intermediateType = builder->getBackwardDiffIntermediateContextType(func);
+        return differentiateFunctionTypeImpl(builder, funcType, intermediateType);
+    }
+
+    IRFuncType* BackwardDiffTranscriber::differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType)
+    {
+        SLANG_UNUSED(func);
+        return differentiateFunctionTypeImpl(builder, funcType, nullptr);
+    }
+
+    InstPair BackwardDiffPropagateTranscriber::transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
+    {
+        IRGlobalValueWithCode* diffPrimalFunc = nullptr;
+        transcribeFuncImpl(builder, primalFunc, diffFunc, diffPrimalFunc);
+        return InstPair(primalFunc, diffFunc);
+    }
+
+    InstPair BackwardDiffTranscriberBase::transcribeInstImpl(IRBuilder* builder, IRInst* origInst)
     {
         switch (origInst->getOp())
         {
@@ -90,7 +131,7 @@ namespace Slang
     // Returns "dp<var-name>" to use as a name hint for parameters.
     // If no primal name is available, returns a blank string.
     // 
-    String BackwardDiffTranscriber::makeDiffPairName(IRInst* origVar)
+    String BackwardDiffTranscriberBase::makeDiffPairName(IRInst* origVar)
     {
         if (auto namehintDecoration = origVar->findDecoration<IRNameHintDecoration>())
         {
@@ -100,47 +141,7 @@ namespace Slang
         return String("");
     }
 
-
-    // In differential computation, the 'default' differential value is always zero.
-    // This is a consequence of differential computing being inherently linear. As a 
-    // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
-    // The current implementation requires that types are defined linearly.
-    // 
-    IRInst* BackwardDiffTranscriber::getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType)
-    {
-        if (auto diffType = differentiateType(builder, primalType))
-        {
-            switch (diffType->getOp())
-            {
-            case kIROp_DifferentialPairType:
-                return builder->emitMakeDifferentialPair(
-                    diffType,
-                    getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()),
-                    getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()));
-            }
-            // Since primalType has a corresponding differential type, we can lookup the 
-            // definition for zero().
-            auto zeroMethod = differentiableTypeConformanceContext.getZeroMethodForType(builder, primalType);
-            SLANG_ASSERT(zeroMethod);
-
-            auto emptyArgList = List<IRInst*>();
-            return builder->emitCallInst((IRType*)diffType, zeroMethod, emptyArgList);
-        }
-        else
-        {
-            if (isScalarIntegerType(primalType))
-            {
-                return builder->getIntValue(primalType, 0);
-            }
-
-            getSink()->diagnose(primalType->sourceLoc,
-                Diagnostics::internalCompilerError,
-                "could not generate zero value for given type");
-            return nullptr;
-        }
-    }
-
-    InstPair BackwardDiffTranscriber::transposeBlock(IRBuilder* builder, IRBlock* origBlock)
+    InstPair BackwardDiffTranscriberBase::transposeBlock(IRBuilder* builder, IRBlock* origBlock)
     {
         IRBuilder subBuilder(builder->getSharedBuilder());
         subBuilder.setInsertLoc(builder->getInsertLoc());
@@ -194,10 +195,10 @@ namespace Slang
     }
 
     // Create an empty func to represent the transcribed func of `origFunc`.
-    InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
+    InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc)
     {
-        if (auto bwdDecor = origFunc->findDecoration<IRBackwardDerivativeDecoration>())
-            return InstPair(origFunc, bwdDecor->getBackwardDerivativeFunc());
+        if (auto bwdDiffFunc = findExistingDiffFunc(origFunc))
+            return InstPair(origFunc, bwdDiffFunc);
 
         if (!isMarkedForBackwardDifferentiation(origFunc))
             return InstPair(nullptr, nullptr);
@@ -216,6 +217,7 @@ namespace Slang
         SLANG_ASSERT(as<IRFuncType>(origFunc->getFullType()));
         IRType* diffFuncType = this->differentiateFunctionType(
             &builder,
+            origFunc,
             as<IRFuncType>(origFunc->getFullType()));
         diffFunc->setFullType(diffFuncType);
 
@@ -226,7 +228,18 @@ namespace Slang
             newNameSb << "s_bwd_" << originalName;
             builder.addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
         }
-        builder.addBackwardDerivativeDecoration(origFunc, diffFunc);
+
+        if (auto outerGen = findOuterGeneric(diffFunc))
+        {
+            builder.setInsertBefore(origFunc);
+            auto specialized =
+                specializeWithGeneric(builder, outerGen, as<IRGeneric>(findOuterGeneric(origFunc)));
+            addExistingDiffFuncDecor(&builder, origFunc, specialized);
+        }
+        else
+        {
+            addExistingDiffFuncDecor(&builder, origFunc, diffFunc);
+        }
 
         // Mark the generated derivative function itself as differentiable.
         builder.addBackwardDifferentiableDecoration(diffFunc);
@@ -237,17 +250,61 @@ namespace Slang
             cloneDecoration(dictDecor, diffFunc);
         }
 
-        FuncBodyTranscriptionTask task;
-        task.originalFunc = primalFunc;
-        task.resultFunc = diffFunc;
-        task.type = FuncBodyTranscriptionTaskType::Backward;
-        autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);
-
         return InstPair(primalFunc, diffFunc);
     }
 
+    InstPair BackwardDiffTranscriberBase::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
+    {
+        auto result = transcribeFuncHeaderImpl(inBuilder, origFunc);
+
+        FuncBodyTranscriptionTask task;
+        task.originalFunc = as<IRFunc>(result.primal);
+        task.resultFunc = as<IRFunc>(result.differential);
+        task.type = diffTaskType;
+        if (task.resultFunc)
+        {
+            autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);
+        }
+        return result;
+    }
+
+    InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
+    {
+        auto header = transcribeFuncHeaderImpl(inBuilder, origFunc);
+        if (!header.differential)
+            return header;
+
+        IRBuilder builder(inBuilder->getSharedBuilder());
+        builder.setInsertInto(header.differential);
+        builder.emitBlock();
+        auto funcType = as<IRFuncType>(header.differential->getDataType());
+        List<IRInst*> args;
+        for (UInt i = 0; i < funcType->getParamCount(); i++)
+        {
+            auto paramType = funcType->getParamType(i);
+            args.add(builder.emitParam(paramType));
+        }
+        auto outerGeneric = findOuterGeneric(origFunc);
+        IRInst* specializedOriginalFunc = origFunc;
+        if (outerGeneric)
+        {
+            specializedOriginalFunc = maybeSpecializeWithGeneric(builder, outerGeneric, findOuterGeneric(header.differential));
+        }
+        auto intermediateType = builder.getBackwardDiffIntermediateContextType(specializedOriginalFunc);
+        auto intermediateVar = builder.emitVar(intermediateType);
+        auto primalFunc = builder.emitBackwardDifferentiatePrimalInst(builder.getTypeKind(), specializedOriginalFunc);
+        auto propagateFunc = builder.emitBackwardDifferentiatePropagateInst(builder.getTypeKind(), specializedOriginalFunc);
+        args.add(intermediateVar);
+        builder.emitCallInst(builder.getVoidType(), primalFunc, args);
+        args.removeLast();
+        args.add(builder.emitLoad(intermediateVar));
+        builder.emitCallInst(builder.getVoidType(), propagateFunc, args);
+        builder.emitReturn();
+        return header;
+    }
+
     // Puts parameters into their own block.
-    void BackwardDiffTranscriber::makeParameterBlock(IRBuilder* inBuilder, IRFunc* func)
+    void BackwardDiffTranscriberBase::makeParameterBlock(IRBuilder* inBuilder, IRFunc* func)
     {
         IRBuilder builder(inBuilder->getSharedBuilder());
 
@@ -282,7 +339,7 @@ namespace Slang
         builder.emitBranch(firstBlock);
     }
 
-    void BackwardDiffTranscriber::cleanUpUnusedPrimalIntermediate(IRInst* func, IRInst* primalFunc, IRInst* intermediateType)
+    void BackwardDiffTranscriberBase::cleanUpUnusedPrimalIntermediate(IRInst* func, IRInst* primalFunc, IRInst* intermediateType)
     {
         IRStructType* structType = as<IRStructType>(intermediateType);
         if (!structType)
@@ -375,22 +432,21 @@ namespace Slang
     }
 
     // Transcribe a function definition.
-    InstPair BackwardDiffTranscriber::transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
+    void BackwardDiffTranscriberBase::transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc, IRGlobalValueWithCode*& diffPrimalFunc)
     {
         SLANG_ASSERT(primalFunc);
-        SLANG_ASSERT(diffFunc);
+        SLANG_ASSERT(diffPropagateFunc);
         // Reverse-mode transcription uses 4 separate steps:
         // TODO(sai): Fill in documentation.
 
         // Generate a temporary forward derivative function as an intermediate step.
         IRBuilder tempBuilder = *builder;
-        tempBuilder.setInsertBefore(diffFunc);
-        IRFunc* fwdDiffFunc = as<IRFunc>(fwdDiffTranscriber->transcribeFuncHeader(&tempBuilder, (IRFunc*)primalFunc).differential);
+        tempBuilder.setInsertBefore(diffPropagateFunc);
+        IRFunc* fwdDiffFunc = as<IRFunc>(
+            fwdDiffTranscriber->transcribeFuncHeader(&tempBuilder, primalFunc).differential);
         SLANG_ASSERT(fwdDiffFunc);
 
-        // Transcribe the body of the primal function into it's linear (fwd-diff) form.
-        // TODO(sai): Handle the case when we already have a user-defined fwd-derivative function.
-        fwdDiffTranscriber->transcribeFunc(&tempBuilder, primalFunc, as<IRFunc>(fwdDiffFunc));
+        fwdDiffTranscriber->transcribeFunc(&tempBuilder, primalFunc, fwdDiffFunc);
         
         // Split first block into a paramter block.
         this->makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
@@ -416,7 +472,7 @@ namespace Slang
         // only blocks, and right now there's no provision in slang-ir-clone.h
         // for that.
         // 
-        builder->setInsertInto(diffFunc->getParent());
+        builder->setInsertInto(diffPropagateFunc->getParent());
         auto tempDiffFunc = as<IRFunc>(cloneInst(&cloneEnv, builder, unzippedFwdDiffFunc));
 
         // Move blocks to the diffFunc shell.
@@ -426,37 +482,63 @@ namespace Slang
                 workList.add(block);
             
             for (auto block : workList)
-                block->insertAtEnd(diffFunc);
+                block->insertAtEnd(diffPropagateFunc);
         }
 
         // Transpose the first block (parameter block)
-        transposeParameterBlock(builder, diffFunc);
+        transposeParameterBlock(builder, diffPropagateFunc);
 
-        builder->setInsertInto(diffFunc);
+        builder->setInsertInto(diffPropagateFunc);
 
-        auto dOutParameter = diffFunc->getLastParam();
+        auto dOutParameter = diffPropagateFunc->getLastParam()->getPrevParam();
 
         // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter) representing the 
         DiffTransposePass::FuncTranspositionInfo info = {dOutParameter, nullptr};
-        diffTransposePass->transposeDiffBlocksInFunc(diffFunc, info);
+        diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, info);
 
         // Extracts the primal computations into its own func, and replace the primal insts
         // with the intermediate results computed from the extracted func.
         IRInst* intermediateType = nullptr;
-        auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(diffFunc, unzippedFwdDiffFunc, intermediateType);
+        auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(diffPropagateFunc, unzippedFwdDiffFunc, intermediateType);
 
         // Clean up by deallocating intermediate versions.
         tempDiffFunc->removeAndDeallocate();
         unzippedFwdDiffFunc->removeAndDeallocate();
         fwdDiffFunc->removeAndDeallocate();
 
-        eliminateDeadCode(diffFunc);
-        cleanUpUnusedPrimalIntermediate(diffFunc, extractedPrimalFunc, intermediateType);
+        eliminateDeadCode(diffPropagateFunc);
+        cleanUpUnusedPrimalIntermediate(diffPropagateFunc, extractedPrimalFunc, intermediateType);
+        
+        // If primal function is nested in a generic, we want to create separate generics for all the associated things
+        // we have just created.
+        auto primalOuterGeneric = findOuterGeneric(primalFunc);
+        IRInst* specializedFunc = nullptr;
+        auto intermediateTypeGeneric = hoistValueFromGeneric(*builder, intermediateType, specializedFunc);
+        auto specializedIntermeidateType = maybeSpecializeWithGeneric(*builder, intermediateTypeGeneric, primalOuterGeneric);
+        builder->addBackwardDerivativeIntermediateTypeDecoration(primalFunc, specializedIntermeidateType);
 
-        return InstPair(primalFunc, diffFunc);
+        auto primalFuncGeneric = hoistValueFromGeneric(*builder, extractedPrimalFunc, specializedFunc);
+        builder->setInsertBefore(primalFunc);
+
+        if (auto existingDecor = primalFunc->findDecoration<IRBackwardDerivativePrimalDecoration>())
+        {
+            // If we already created a header for primal func, move the body into the existing primal func header.
+            auto existingPrimalHeader = existingDecor->getBackwardDerivativePrimalFunc();
+            if (auto spec = as<IRSpecialize>(existingPrimalHeader))
+                existingPrimalHeader = spec->getBase();
+            moveInstChildren(existingPrimalHeader, primalFuncGeneric);
+            primalFuncGeneric->replaceUsesWith(existingPrimalHeader);
+            primalFuncGeneric->removeAndDeallocate();
+        }
+        else
+        {
+            auto specializedBackwardPrimalFunc = maybeSpecializeWithGeneric(*builder, primalFuncGeneric, primalOuterGeneric);
+            builder->addBackwardDerivativePrimalDecoration(primalFunc, specializedBackwardPrimalFunc);
+        }
+        diffPrimalFunc = as<IRGlobalValueWithCode>(primalOuterGeneric);
     }
 
-    void BackwardDiffTranscriber::transposeParameterBlock(IRBuilder* builder, IRFunc* diffFunc)
+    void BackwardDiffTranscriberBase::transposeParameterBlock(IRBuilder* builder, IRFunc* diffFunc)
     {
         IRBlock* fwdDiffParameterBlock = diffFunc->getFirstBlock();
 
@@ -499,16 +581,19 @@ namespace Slang
         auto paramCount = as<IRFuncType>(diffFunc->getDataType())->getParamCount();
 
         // 2. Add a parameter for 'derivative of the output' (d_out). 
-        // The type is the last parameter type of the function.
+        // The type is the second last parameter type of the function.
         // 
-        auto dOutParamType = as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1);
+        auto dOutParamType = as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 2);
 
         SLANG_ASSERT(dOutParamType);
 
         builder->emitParam(dOutParamType);
+
+        // Add a parameter for intermediate val.
+        builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1));
     }
 
-    IRInst* BackwardDiffTranscriber::copyParam(IRBuilder* builder, IRParam* origParam)
+    IRInst* BackwardDiffTranscriberBase::copyParam(IRBuilder* builder, IRParam* origParam)
     {
         auto primalDataType = origParam->getDataType();
 
@@ -533,7 +618,7 @@ namespace Slang
         return cloneInst(&cloneEnv, builder, origParam);
     }
 
-    InstPair BackwardDiffTranscriber::copyBinaryArith(IRBuilder* builder, IRInst* origArith)
+    InstPair BackwardDiffTranscriberBase::copyBinaryArith(IRBuilder* builder, IRInst* origArith)
     {
         SLANG_ASSERT(origArith->getOperandCount() == 2);
 
@@ -577,7 +662,7 @@ namespace Slang
         return InstPair(newInst, nullptr);
     }
 
-    IRInst* BackwardDiffTranscriber::transposeBinaryArithBackward(IRBuilder* builder, IRInst* origArith, IRInst* grad)
+    IRInst* BackwardDiffTranscriberBase::transposeBinaryArithBackward(IRBuilder* builder, IRInst* origArith, IRInst* grad)
     {
         SLANG_ASSERT(origArith->getOperandCount() == 2);
 
@@ -645,7 +730,7 @@ namespace Slang
         return nullptr;
     }
 
-    InstPair BackwardDiffTranscriber::copyInst(IRBuilder* builder, IRInst* origInst)
+    InstPair BackwardDiffTranscriberBase::copyInst(IRBuilder* builder, IRInst* origInst)
     {
         // Handle common SSA-style operations
         switch (origInst->getOp())
@@ -670,7 +755,7 @@ namespace Slang
         return InstPair(nullptr, nullptr);
     }
 
-    IRInst* BackwardDiffTranscriber::transposeParamBackward(IRBuilder* builder, IRInst* param, IRInst* grad)
+    IRInst* BackwardDiffTranscriberBase::transposeParamBackward(IRBuilder* builder, IRInst* param, IRInst* grad)
     {
         IRInOutType* inoutParam = as<IRInOutType>(param->getDataType());
         auto pairType = as<IRDifferentialPairType>(inoutParam->getValueType());
@@ -687,7 +772,7 @@ namespace Slang
         return store;
     }
 
-    IRInst* BackwardDiffTranscriber::transposeInstBackward(IRBuilder* builder, IRInst* origInst, IRInst* grad)
+    IRInst* BackwardDiffTranscriberBase::transposeInstBackward(IRBuilder* builder, IRInst* origInst, IRInst* grad)
     {
         // Handle common SSA-style operations
         switch (origInst->getOp())
@@ -727,7 +812,7 @@ namespace Slang
         return nullptr;
     }
 
-    InstPair BackwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
+    InstPair BackwardDiffTranscriberBase::transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
     {
         auto primalBase = findOrTranscribePrimalInst(builder, origSpecialize->getBase());
         List<IRInst*> primalArgs;
@@ -739,8 +824,7 @@ namespace Slang
         auto primalSpecialize = (IRSpecialize*)builder->emitSpecializeInst(
             (IRType*)primalType, primalBase, primalArgs.getCount(), primalArgs.getBuffer());
 
-        IRInst* diffBase = nullptr;
-        if (instMapD.TryGetValue(origSpecialize->getBase(), diffBase))
+        if (auto diffBase = instMapD.TryGetValue(origSpecialize->getBase()))
         {
             List<IRInst*> args;
             for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
@@ -748,7 +832,7 @@ namespace Slang
                 args.add(primalSpecialize->getArg(i));
             }
             auto diffSpecialize = builder->emitSpecializeInst(
-                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+                builder->getTypeKind(), *diffBase, args.getCount(), args.getBuffer());
             return InstPair(primalSpecialize, diffSpecialize);
         }
 
@@ -757,25 +841,31 @@ namespace Slang
         // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
         // can be specialized, so we put a decoration on the IRSpecialize)
         //
-        if (auto backDecor = origSpecialize->findDecoration<IRBackwardDerivativeDecoration>())
+        if (auto derivativeFunc = findExistingDiffFunc(origSpecialize))
         {
-            auto derivativeFunc = backDecor->getBackwardDerivativeFunc();
-
             // Make sure this isn't itself a specialize .
             SLANG_RELEASE_ASSERT(!as<IRSpecialize>(derivativeFunc));
 
             return InstPair(primalSpecialize, derivativeFunc);
         }
-        else if (auto derivativeDecoration = genericInnerVal->findDecoration<IRBackwardDerivativeDecoration>())
+        else if (auto diffBase = findExistingDiffFunc(genericInnerVal))
         {
-            diffBase = derivativeDecoration->getBackwardDerivativeFunc();
             List<IRInst*> args;
             for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
             {
                 args.add(primalSpecialize->getArg(i));
             }
+
+            // A `BackwardDerivative` decoration on an inner func of a generic should always be a `specialize`.
+            auto diffBaseSpecialize = as<IRSpecialize>(diffBase);
+            SLANG_RELEASE_ASSERT(diffBaseSpecialize);
+
+            // Note: this assumes that the generic arguments to specialize the derivative is the same as the
+            // generic args to specialize the primal function. This is true for all of our stdlib functions,
+            // but we may need to rely on more general substitution logic here.
             auto diffSpecialize = builder->emitSpecializeInst(
-                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+                builder->getTypeKind(), diffBaseSpecialize->getBase(), args.getCount(), args.getBuffer());
+
             return InstPair(primalSpecialize, diffSpecialize);
         }
         else if (auto diffDecor = genericInnerVal->findDecoration<IRBackwardDifferentiableDecoration>())
@@ -785,9 +875,9 @@ namespace Slang
             {
                 args.add(primalSpecialize->getArg(i));
             }
-            diffBase = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
+            auto diffCallee = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
             auto diffSpecialize = builder->emitSpecializeInst(
-                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+                builder->getTypeKind(), diffCallee, args.getCount(), args.getBuffer());
             return InstPair(primalSpecialize, diffSpecialize);
         }
         else

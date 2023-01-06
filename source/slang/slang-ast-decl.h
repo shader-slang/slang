@@ -546,6 +546,21 @@ class BackwardDerivativeRequirementDecl : public DerivativeRequirementDecl
     SLANG_AST_CLASS(BackwardDerivativeRequirementDecl)
 };
 
+class BackwardDerivativePrimalRequirementDecl : public DerivativeRequirementDecl
+{
+    SLANG_AST_CLASS(BackwardDerivativePrimalRequirementDecl)
+};
+
+class BackwardDerivativePropagateRequirementDecl : public DerivativeRequirementDecl
+{
+    SLANG_AST_CLASS(BackwardDerivativePropagateRequirementDecl)
+};
+
+class BackwardDerivativeIntermediateTypeRequirementDecl : public DerivativeRequirementDecl
+{
+    SLANG_AST_CLASS(BackwardDerivativeIntermediateTypeRequirementDecl)
+};
+
 bool isInterfaceRequirement(Decl* decl);
 InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 
