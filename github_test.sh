@@ -30,11 +30,7 @@ TARGET=${PLATFORM}-${ARCHITECTURE}
 OUTPUTDIR=bin/${TARGET}/${CONFIGURATION}/
 
 if [ "${ARCHITECTURE}" == "x64" -a "${PLATFORM}" != "macosx" ]; then
-    LOCATION=$(curl -s https://api.github.com/repos/shader-slang/swiftshader/releases/latest \
-    | grep "tag_name" \
-    | awk '{print "https://github.com/shader-slang/swiftshader/releases/download/" substr($2, 2, length($2)-3) "/vk_swiftshader_linux_x64.zip"}')
-    curl -L -o libswiftshader.zip $LOCATION
-    unzip libswiftshader.zip -d $OUTPUTDIR
+    unzip vk_swiftshader_linux_x64.zip -d $OUTPUTDIR
 fi
 
 SLANG_TEST=${OUTPUTDIR}slang-test
