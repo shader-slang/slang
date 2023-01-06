@@ -16,15 +16,15 @@ jobs:
         compiler: ['gcc', 'clang']
         platform: ['x64'] 
     steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
     - uses: robinraju/release-downloader@v1.7
       with:
         latest: true
         repository: "shader-slang/swiftshader"
         fileName: "vk_swiftshader_linux_${{matrix.platform}}.zip"
-    - uses: actions/checkout@v3
-      with:
-        submodules: 'true'
-        fetch-depth: '0'
     - name: build
       run: |
         CC=${{matrix.compiler}}

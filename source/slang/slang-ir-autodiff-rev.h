@@ -99,8 +99,6 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     {
         return kIROp_BackwardDifferentiableMethodRequirementDictionaryItem;
     }
-
-    virtual const char* getNamePrefix() = 0;
 };
 
 struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
@@ -123,10 +121,6 @@ struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
     {
         builder->addBackwardDerivativePrimalDecoration(inst, diffFunc);
     }
-    virtual const char* getNamePrefix() override
-    {
-        return "s_bwd_primal_";
-    }
 };
 
 struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
@@ -148,10 +142,6 @@ struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
     virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
     {
         builder->addBackwardDerivativePropagateDecoration(inst, diffFunc);
-    }
-    virtual const char* getNamePrefix() override
-    {
-        return "s_bwd_prop_";
     }
 };
 
@@ -185,11 +175,6 @@ struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
     virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
     {
         builder->addBackwardDerivativeDecoration(inst, diffFunc);
-    }
-
-    virtual const char* getNamePrefix() override
-    {
-        return "s_bwd_";
     }
 };
 
