@@ -64,35 +64,6 @@ struct ExtractPrimalFuncContext
         return intermediateType;
     }
 
-    // Specialize `genericToSpecialize` with the generic parameters defined in `userGeneric`.
-    // For example:
-    // ```
-    // int f<T>(T a);
-    // ```
-    // will be extended into 
-    // ```
-    // struct IntermediateFor_f<T> { T t0; }
-    // int f_primal<T>(T a, IntermediateFor_f<T> imm);
-    // ```
-    // Given a user generic `f_primal<T>` and a used value parameterized on the same set of generic parameters
-    // `IntermediateFor_f`, `genericToSpecialize` constructs `IntermediateFor_f<T>` (using the parameter list
-    // from user generic).
-    //
-    IRInst* specializeWithGeneric(
-        IRBuilder& builder, IRInst* genericToSpecialize, IRGeneric* userGeneric)
-    {
-        List<IRInst*> genArgs;
-        for (auto param : userGeneric->getFirstBlock()->getParams())
-        {
-            genArgs.add(param);
-        }
-        return builder.emitSpecializeInst(
-            builder.getTypeKind(),
-            genericToSpecialize,
-            (UInt)genArgs.getCount(),
-            genArgs.getBuffer());
-    }
-
     IRInst* generatePrimalFuncType(
         IRGlobalValueWithCode* destFunc, IRGlobalValueWithCode* fwdFunc, IRInst*& outIntermediateType)
     {
@@ -120,7 +91,7 @@ struct ExtractPrimalFuncContext
         for (UInt i = 0; i < originalFuncType->getParamCount(); i++)
             paramTypes.add(originalFuncType->getParamType(i));
         paramTypes.add(builder.getInOutType((IRType*)outIntermediateType));
-        auto newFuncType = builder.getFuncType(paramTypes, originalFuncType->getResultType());
+        auto newFuncType = builder.getFuncType(paramTypes, builder.getVoidType());
         return newFuncType;
     }
 
@@ -129,6 +100,10 @@ struct ExtractPrimalFuncContext
         if (inst->findDecoration<IRDifferentialInstDecoration>() ||
             inst->findDecoration<IRMixedDifferentialInstDecoration>())
             return true;
+        
+        if (auto block = as<IRBlock>(inst->getParent()))
+            return isDiffInst(block);
+        
         return false;
     }
 
@@ -190,6 +165,7 @@ struct ExtractPrimalFuncContext
             case kIROp_DoubleType:
             case kIROp_VectorType:
             case kIROp_MatrixType:
+            case kIROp_BoolType:
             case kIROp_Param:
             case kIROp_Specialize:
             case kIROp_LookupWitness:
@@ -412,46 +388,75 @@ struct ExtractPrimalFuncContext
             genericMigrationContext.init(gen, as<IRGeneric>(spec->getBase()));
         }
 
+        List<IRBlock*> diffBlocksList;
+        List<IRBlock*> primalBlocksList;
+
         for (auto block : func->getBlocks())
         {
             if (block == paramBlock)
                 continue;
-            if (block->findDecoration<IRDifferentialInstDecoration>() ||
-                block->findDecoration<IRMixedDifferentialInstDecoration>())
-            {
-                if (block->getFirstParam() == nullptr)
-                {
-                    // If the block does not have any PHI nodes, just remove it and
-                    // replace all its uses with returnBlock.
-                    block->replaceUsesWith(returnBlock);
-                    block->removeAndDeallocate();
-                }
-                else
-                {
-                    // If the block has Phi nodes, we can't directly replace it with
-                    // `returnBlock`, but we can turn the block into a trivial branch
-                    // into `returnBlock` to safely preserve the invariants of Phi nodes.
-                    auto inst = block->getLastParam()->getNextInst();
-                    for (; inst; inst = inst->getNextInst())
-                        inst->removeAndDeallocate();
-                    builder.setInsertInto(block);
-                    builder.emitBranch(returnBlock);
-                }
-            }
+
+            if (isDiffInst(block))
+                diffBlocksList.add(block);
             else
+                primalBlocksList.add(block);
+        }
+        
+        // Go over primal blocks and store insts.
+        for (auto block : primalBlocksList)
+        {
+            // For primal insts, decide whether or not to store its result in
+            // output intermediary struct.
+            for (auto inst : block->getChildren())
             {
-                // For primal insts, decide whether or not to store its result in
-                // output intermediary struct.
-                for (auto inst : block->getChildren())
+                if (shouldStoreInst(inst))
                 {
-                    if (shouldStoreInst(inst))
-                    {
-                        builder.setInsertAfter(inst);
-                        storeInst(builder, inst, genericMigrationContext, outIntermediary);
-                    }
+                    builder.setInsertAfter(inst);
+                    storeInst(builder, inst, genericMigrationContext, outIntermediary);
                 }
             }
         }
+
+        // Go over differential blocks and complete
+        for (auto block : diffBlocksList)
+        {
+            
+            if (block->getFirstParam() == nullptr)
+            {
+                // If the block does not have any PHI nodes, just remove it and
+                // replace all its uses with returnBlock.
+
+                // TODO: This invalides the next block in the chain. Make a list first.
+                block->replaceUsesWith(returnBlock);
+                block->removeAndDeallocate();
+            }
+            else
+            {
+                // If the block has Phi nodes, we can't directly replace it with
+                // `returnBlock`, but we can turn the block into a trivial branch
+                // into `returnBlock` to safely preserve the invariants of Phi nodes.
+                auto inst = block->getLastParam()->getNextInst();
+                for (; inst;)
+                {
+                    auto nextInst = inst->getNextInst();
+                    inst->removeAndDeallocate();
+                    inst = nextInst;
+                }
+
+                builder.setInsertInto(block);
+                builder.emitBranch(returnBlock);
+            }
+        }
+
+        List<IRBlock*> unusedBlocks;
+        for (auto block : func->getBlocks())
+        {
+            if (!block->hasUses() && isDiffInst(block))
+                unusedBlocks.add(block);
+        }
+
+        for (auto block : unusedBlocks)
+            block->removeAndDeallocate();
 
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
         auto defVal = builder.emitDefaultConstructRaw((IRType*)intermediateType);
@@ -505,8 +510,8 @@ IRGlobalValueWithCode* DiffUnzipPass::extractPrimalFunc(
     {
         innerFunc = as<IRFunc>(findGenericReturnVal(genFunc));
         builder.setInsertBefore(innerFunc);
-        specializedIntermediateType = context.specializeWithGeneric(builder, intermediateType, genFunc);
-        specializedPrimalFunc = context.specializeWithGeneric(builder, primalFunc, genFunc);
+        specializedIntermediateType = specializeWithGeneric(builder, intermediateType, genFunc);
+        specializedPrimalFunc = specializeWithGeneric(builder, primalFunc, genFunc);
     }
     SLANG_RELEASE_ASSERT(innerFunc);
 
@@ -532,13 +537,17 @@ IRGlobalValueWithCode* DiffUnzipPass::extractPrimalFunc(
             if (auto structKeyDecor = inst->findDecoration<IRPrimalValueStructKeyDecoration>())
             {
                 builder.setInsertBefore(inst);
-                auto addr = builder.emitFieldAddress(builder.getPtrType(inst->getDataType()), intermediateVar, structKeyDecor->getStructKey());
+                auto addr = builder.emitFieldAddress(
+                    builder.getPtrType(inst->getDataType()),
+                    intermediateVar,
+                    structKeyDecor->getStructKey());
                 auto val = builder.emitLoad(addr);
                 inst->replaceUsesWith(val);
                 instsToRemove.add(inst);
             }
         }
     }
+
     for (auto inst : instsToRemove)
     {
         inst->removeAndDeallocate();
@@ -546,6 +555,7 @@ IRGlobalValueWithCode* DiffUnzipPass::extractPrimalFunc(
 
     // Run simplification to DCE unnecessary insts.
     eliminateDeadCode(innerFunc);
+    eliminateDeadCode(specializedPrimalFunc);
 
     return primalFunc;
 }

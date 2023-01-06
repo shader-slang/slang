@@ -44,6 +44,30 @@ inline bool isChildInstOf(IRInst* inst, IRInst* parent)
     return false;
 }
 
+    // Specialize `genericToSpecialize` with the generic parameters defined in `userGeneric`.
+    // For example:
+    // ```
+    // int f<T>(T a);
+    // ```
+    // will be extended into 
+    // ```
+    // struct IntermediateFor_f<T> { T t0; }
+    // int f_primal<T>(T a, IntermediateFor_f<T> imm);
+    // ```
+    // Given a user generic `f_primal<T>` and a used value parameterized on the same set of generic parameters
+    // `IntermediateFor_f`, `genericToSpecialize` constructs `IntermediateFor_f<T>` (using the parameter list
+    // from user generic).
+    //
+IRInst* specializeWithGeneric(
+    IRBuilder& builder, IRInst* genericToSpecialize, IRGeneric* userGeneric);
+
+
+inline IRInst* unwrapAttributedType(IRInst* type)
+{
+    while (auto attrType = as<IRAttributedType>(type))
+        type = attrType->getBaseType();
+    return type;
+}
 }
 
 #endif

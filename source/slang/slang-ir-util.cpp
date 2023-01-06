@@ -129,4 +129,18 @@ IROp getTypeStyle(BaseType op)
     }
 }
 
+IRInst* specializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecialize, IRGeneric* userGeneric)
+{
+    List<IRInst*> genArgs;
+    for (auto param : userGeneric->getFirstBlock()->getParams())
+    {
+        genArgs.add(param);
+    }
+    return builder.emitSpecializeInst(
+        builder.getTypeKind(),
+        genericToSpecialize,
+        (UInt)genArgs.getCount(),
+        genArgs.getBuffer());
+}
+
 }

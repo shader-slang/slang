@@ -5,9 +5,7 @@
 
 namespace Slang
 {
-
-// TODO: Put into a nameless namespace.
-IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
+static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
     {
@@ -39,6 +37,13 @@ bool isNoDiffType(IRType* paramType)
         }
     }
     return false;
+}
+
+IRInst* lookupForwardDerivativeReference(IRInst* primalFunction)
+{
+    if (auto jvpDefinition = primalFunction->findDecoration<IRForwardDerivativeDecoration>())
+        return jvpDefinition->getForwardDerivativeFunc();
+    return nullptr;
 }
 
 IRStructField* DifferentialPairTypeBuilder::findField(IRInst* type, IRStructKey* key)
@@ -277,7 +282,6 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     return result;
 }
 
-
 AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
     : moduleInst(inModuleInst)
 {
@@ -331,8 +335,6 @@ IRStructKey* AutoDiffSharedContext::getIDifferentiableStructKeyAtIndex(UInt inde
     return nullptr;
 }
 
-
-
 void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 {
     parentFunc = func;
@@ -385,7 +387,6 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
     }
 }
 
-
 void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
     for (auto inst : parent->getChildren())
@@ -398,6 +399,8 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_ForwardDerivativeDecoration:
             case kIROp_DerivativeMemberDecoration:
             case kIROp_DifferentiableTypeDictionaryDecoration:
+            case kIROp_DifferentialInstDecoration:
+            case kIROp_MixedDifferentialInstDecoration:
                 decor->removeAndDeallocate();
                 break;
             default:
@@ -417,6 +420,32 @@ void stripAutoDiffDecorations(IRModule* module)
 {
     stripAutoDiffDecorationsFromChildren(module->getModuleInst());
 }
+
+
+void stripBlockTypeDecorations(IRFunc* func)
+{
+    for (auto child : func->getChildren())
+    {
+        if (auto block = as<IRBlock>(child))
+        {
+            for (auto decor = block->getFirstDecoration(); decor; )
+            {
+                auto next = decor->getNextDecoration();
+                switch (decor->getOp())
+                {
+                case kIROp_DifferentialInstDecoration:
+                case kIROp_MixedDifferentialInstDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                default:
+                    break;
+                }
+                decor = next;
+            }
+        }
+    }
+}
+
 
 struct StripNoDiffTypeAttributePass : InstPassBase
 {
@@ -448,6 +477,210 @@ void stripNoDiffTypeAttribute(IRModule* module)
     pass.processModule();
 }
 
+struct AutoDiffPass : public InstPassBase
+{
+    DiagnosticSink* getSink()
+    {
+        return sink;
+    }
+
+    bool processModule()
+    {
+        // TODO(sai): Move this call.
+        forwardTranscriber.differentiableTypeConformanceContext.buildGlobalWitnessDictionary();
+
+        IRBuilder builderStorage(this->autodiffContext->sharedBuilder);
+        IRBuilder* builder = &builderStorage;
+
+        // Process all ForwardDifferentiate and BackwardDifferentiate instructions by 
+        // generating derivative code for the referenced function.
+        //
+        bool modified = processReferencedFunctions(builder);
+
+        return modified;
+    }
+
+    // Process all differentiate calls, and recursively generate code for forward and backward
+    // derivative functions.
+    //
+    bool processReferencedFunctions(IRBuilder* builder)
+    {
+        bool hasChanges = false;
+        for (;;)
+        {
+            bool changed = false;
+            List<IRInst*> autoDiffWorkList;
+            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the module.
+            autoDiffWorkList.clear();
+            processAllInsts([&](IRInst* inst)
+                {
+                    switch (inst->getOp())
+                    {
+                    case kIROp_ForwardDifferentiate:
+                    case kIROp_BackwardDifferentiate:
+                        // Only process now if the operand is a materialized function.
+                        switch (inst->getOperand(0)->getOp())
+                        {
+                        case kIROp_Func:
+                        case kIROp_Specialize:
+                        case kIROp_LookupWitness:
+                            autoDiffWorkList.add(inst);
+                            break;
+                        default:
+                            break;
+                        }
+                        break;
+                    default:
+                        break;
+                    }
+                });
+
+            // Process collected differentiate insts and replace them with placeholders for
+            // differentiated functions.
+
+            for (auto differentiateInst : autoDiffWorkList)
+            {
+                if (auto diffInst = as<IRForwardDifferentiate>(differentiateInst))
+                {
+                    IRBuilder subBuilder(*builder);
+                    subBuilder.setInsertBefore(differentiateInst);
+                    if (auto diffFunc = forwardTranscriber.transcribe(&subBuilder, diffInst->getBaseFn()))
+                    {
+                        differentiateInst->replaceUsesWith(diffFunc);
+                        differentiateInst->removeAndDeallocate();
+                        changed = true;
+                    }
+                }
+                else if (auto backDiffInst = as<IRBackwardDifferentiate>(differentiateInst))
+                {
+                    auto baseInst = backDiffInst->getBaseFn();
+                    if (auto diffFunc = backwardTranscriber.transcribe(builder, (IRFunc*)baseInst))
+                    {
+                        SLANG_ASSERT(diffFunc);
+                        differentiateInst->replaceUsesWith(diffFunc);
+                        differentiateInst->removeAndDeallocate();
+                        changed = true;
+                    }
+                }
+            }
+
+            // Run transcription logic to generate the body of forward/backward derivatives functions.
+            // While doing so, we may discover new functions to differentiate, so we keep running until
+            // the worklist goes dry.
+            List<IRFunc*> autodiffCleanupList;
+            while (autodiffContext->followUpFunctionsToTranscribe.getCount() != 0)
+            {
+                changed = true;
+                auto followUpWorkList = _Move(autodiffContext->followUpFunctionsToTranscribe);
+                for (auto task : followUpWorkList)
+                {
+                    auto diffFunc = as<IRFunc>(task.resultFunc);
+                    SLANG_ASSERT(diffFunc);
+
+                    // We're running in to some situations where the follow-up task
+                    // has already been completed (diffFunc has been generated, processed,
+                    // and deallocated). Skip over these for now.
+                    // 
+                    if (!diffFunc->getDataType())
+                        continue;
+
+                    auto primalFunc = as<IRFunc>(task.originalFunc);
+                    SLANG_ASSERT(primalFunc);
+                    switch (task.type)
+                    {
+                    case FuncBodyTranscriptionTaskType::Forward:
+                        forwardTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
+                        break;
+                    case FuncBodyTranscriptionTaskType::Backward:
+                        backwardTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
+                        break;
+                    default:
+                        break;
+                    }
+
+                    autodiffCleanupList.add(diffFunc);
+                }
+            }
+
+            // Get rid of block-level decorations that are used to keep track of 
+            // different block types. These don't work well with the IR simplification
+            // passes since they don't expect decorations in blocks.
+            // 
+            for (auto diffFunc : autodiffCleanupList)
+                stripBlockTypeDecorations(diffFunc);
+
+            autodiffCleanupList.clear();
+
+            if (!changed)
+                break;
+            hasChanges |= changed;
+        }
+
+
+        return hasChanges;
+    }
+
+    IRStringLit* getDerivativeFuncName(IRInst* func, const char* postFix)
+    {
+        IRBuilder builder(&sharedBuilderStorage);
+        builder.setInsertBefore(func);
+
+        IRStringLit* name = nullptr;
+        if (auto linkageDecoration = func->findDecoration<IRLinkageDecoration>())
+        {
+            name = builder.getStringValue((String(linkageDecoration->getMangledName()) + postFix).getUnownedSlice());
+        }
+        else if (auto namehintDecoration = func->findDecoration<IRNameHintDecoration>())
+        {
+            name = builder.getStringValue((String(namehintDecoration->getName()) + postFix).getUnownedSlice());
+        }
+
+        return name;
+    }
+
+    IRStringLit* getForwardDerivativeFuncName(IRInst* func)
+    {
+        return getDerivativeFuncName(func, "_fwd_diff");
+    }
+
+    IRStringLit* getBackwardDerivativeFuncName(IRInst* func)
+    {
+        return getDerivativeFuncName(func, "_bwd_diff");
+    }
+
+    AutoDiffPass(AutoDiffSharedContext* context, DiagnosticSink* sink) :
+        InstPassBase(context->moduleInst->getModule()),
+        sink(sink),
+        forwardTranscriber(context, context->sharedBuilder, sink),
+        backwardTranscriber(context, context->sharedBuilder, sink),
+        pairBuilderStorage(context),
+        autodiffContext(context)
+    {
+        forwardTranscriber.pairBuilder = &pairBuilderStorage;
+        backwardTranscriber.pairBuilder = &pairBuilderStorage;
+        backwardTranscriber.fwdDiffTranscriber = &forwardTranscriber;
+    }
+
+protected:
+    // A transcriber object that handles the main job of 
+    // processing instructions while maintaining state.
+    //
+    ForwardDiffTranscriber forwardTranscriber;
+
+    BackwardDiffTranscriber backwardTranscriber;
+
+    // Diagnostic object from the compile request for
+    // error messages.
+    DiagnosticSink* sink;
+
+    // Shared context.
+    AutoDiffSharedContext* autodiffContext;
+
+    // Builder for dealing with differential pair types.
+    DifferentialPairTypeBuilder     pairBuilderStorage;
+
+};
+
 bool processAutodiffCalls(
     IRModule*                           module,
     DiagnosticSink*                     sink,
@@ -468,11 +701,9 @@ bool processAutodiffCalls(
 
     autodiffContext.sharedBuilder = &sharedBuilder;
 
-    // Process forward derivative calls.
-    modified |= processForwardDerivativeCalls(&autodiffContext, sink);
+    AutoDiffPass pass(&autodiffContext, sink);
 
-    // Process reverse derivative calls.
-    modified |= processReverseDerivativeCalls(&autodiffContext, sink);
+    modified |= pass.processModule();
 
     return modified;
 }
@@ -504,6 +735,5 @@ bool finalizeAutoDiffPass(IRModule* module)
 
     return false;
 }
-
 
 }
