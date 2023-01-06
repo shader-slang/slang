@@ -45,7 +45,7 @@ namespace gfx_test
         GfxCount width = 500;
         GfxCount height = 500;
         static const int kSwapchainImageCount = 2;
-        const Format format = Format::R8G8B8A8_UNORM;
+        const Format desiredFormat = Format::R8G8B8A8_UNORM;
 
         void init(IDevice* device, UnitTestContext* context)
         {
@@ -96,7 +96,7 @@ namespace gfx_test
             queue = device->createCommandQueue(queueDesc);
 
             ISwapchain::Desc swapchainDesc = {};
-            swapchainDesc.format = Format::R8G8B8A8_UNORM;
+            swapchainDesc.format = desiredFormat;
             swapchainDesc.width = width;
             swapchainDesc.height = height;
             swapchainDesc.imageCount = kSwapchainImageCount;
@@ -127,7 +127,7 @@ namespace gfx_test
             IBufferResource::Desc vertexBufferDesc;
             vertexBufferDesc.type = IResource::Type::Buffer;
             vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-            vertexBufferDesc.defaultState = ResourceState::ShaderResource;
+            vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
             vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
             SLANG_CHECK_ABORT(vertexBuffer != nullptr);
 
@@ -141,7 +141,7 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "swapchain-shader", "vertexMain", "fragmentMain", slangReflection));
 
             IFramebufferLayout::TargetLayout targetLayout;
-            targetLayout.format = format;
+            targetLayout.format = swapchain->getDesc().format;
             targetLayout.sampleCount = 1;
 
             IFramebufferLayout::Desc framebufferLayoutDesc;
@@ -189,6 +189,7 @@ namespace gfx_test
             encoder->setVertexBuffer(0, vertexBuffer);
             encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
+            swapchain->acquireNextImage();
             encoder->draw(kVertexCount);
             encoder->endEncoding();
             commandBuffer->close();
