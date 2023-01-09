@@ -1,7 +1,7 @@
 Slang CUDA Target Support
 =========================
 
-Slang has preliminary support for producing CUDA source, and PTX binaries using (NVRTC)[https://docs.nvidia.com/cuda/nvrtc/index.html]. 
+Slang has preliminary support for producing CUDA source, and PTX binaries using [NVRTC](https://docs.nvidia.com/cuda/nvrtc/index.html). 
 
 NOTE! NVRTC is only available for 64-bit operating systems. On Windows Visual Studio make sure you are compiling for 'x64' and/or use 64 bit Slang binaries. 
 
@@ -143,7 +143,7 @@ In regular CUDA it is not possible to do a format conversion on an access to a C
 RWTexture2D<float2> rwt2D_2;
 ```
 
-The format names used are the same as for (GLSL layout format types)[https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)]. If no format is specified Slang will *assume* that the format is the same as the type specified. 
+The format names used are the same as for [GLSL layout format types](https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)). If no format is specified Slang will *assume* that the format is the same as the type specified. 
 
 Note that the format attribution is on variables/paramters/fields and not part of the type system. This means that if you have a scenario like...
 
