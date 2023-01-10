@@ -312,7 +312,7 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
             {
                 if (auto decor = intf->findDecoration<IRNameHintDecoration>())
                 {
-                    if (decor->getName() == "IDifferentiable")
+                    if (decor->getName() == toSlice("IDifferentiable"))
                     {
                         return globalInst;
                     }
