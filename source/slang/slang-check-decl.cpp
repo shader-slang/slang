@@ -5672,7 +5672,8 @@ namespace Slang
             {
                 // Requirement for backward derivative.
                 auto declRef = DeclRef<CallableDecl>(decl, createDefaultSubstitutions(m_astBuilder, this, decl));
-                auto diffFuncType = as<FuncType>(getBackwardDiffFuncType(getFuncType(m_astBuilder, declRef)));
+                auto originalFuncType = getFuncType(m_astBuilder, declRef);
+                auto diffFuncType = as<FuncType>(getBackwardDiffFuncType(originalFuncType));
                 {
                     auto reqDecl = m_astBuilder->create<BackwardDerivativeRequirementDecl>();
                     cloneModifiers(reqDecl, decl);
@@ -5704,8 +5705,8 @@ namespace Slang
                     auto reqDecl = m_astBuilder->create<BackwardDerivativePrimalRequirementDecl>();
                     cloneModifiers(reqDecl, decl);
                     FuncType* primalFuncType = m_astBuilder->create<FuncType>();
-                    primalFuncType->resultType = diffFuncType->resultType;
-                    primalFuncType->paramTypes.addRange(diffFuncType->paramTypes);
+                    primalFuncType->resultType = originalFuncType->resultType;
+                    primalFuncType->paramTypes.addRange(originalFuncType->paramTypes);
                     auto outType = m_astBuilder->getOutType(intermediateType);
                     primalFuncType->paramTypes.add(outType);
                     setFuncTypeIntoRequirementDecl(reqDecl, primalFuncType);

@@ -8,6 +8,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-propagate.h"
+#include "slang-ir-autodiff-transcriber-base.h"
 
 namespace Slang
 {
@@ -31,10 +32,10 @@ struct DiffUnzipPass
     // might run into an issue here?
     IRBlock*                                firstDiffBlock;
 
-    // Dictionary<IRBlock*, List<IRBlock*>>    
-
-    DiffUnzipPass(AutoDiffSharedContext* autodiffContext) : 
-        autodiffContext(autodiffContext), diffTypeContext(autodiffContext)
+    DiffUnzipPass(
+        AutoDiffSharedContext* autodiffContext)
+        : autodiffContext(autodiffContext)
+        , diffTypeContext(autodiffContext)
     { }
 
     IRInst* lookupPrimalInst(IRInst* inst)
@@ -71,9 +72,6 @@ struct DiffUnzipPass
         SLANG_ASSERT(unzippedFunc->getFirstBlock() != nullptr);
         SLANG_ASSERT(unzippedFunc->getFirstBlock()->getNextBlock() != nullptr);
 
-        // Ignore the first block (this is reserved for parameters), start
-        // at the second block. (For now, we work with only a single block of insts)
-        // TODO: expand to handle multi-block functions later.
         IRBlock* firstBlock = unzippedFunc->getFirstBlock()->getNextBlock();
 
         List<IRBlock*> mixedBlocks;
@@ -132,7 +130,7 @@ struct DiffUnzipPass
         return unzippedFunc;
     }
 
-    IRFunc* extractPrimalFunc(IRFunc* func, IRFunc* fwdFunc, IRInst*& intermediateType);
+    IRFunc* extractPrimalFunc(IRFunc* func, IRFunc* originalFunc, IRInst*& intermediateType);
 
     bool isRelevantDifferentialPair(IRType* type)
     {
@@ -160,6 +158,14 @@ struct DiffUnzipPass
         auto fwdCalleeType = as<IRFuncType>(fwdCallee->getDataType());
         auto baseFn = fwdCallee->getBaseFn();
 
+        auto primalFuncType = autodiffContext->transcriberSet.primalTranscriber->differentiateFunctionType(
+            primalBuilder, baseFn, as<IRFuncType>(baseFn->getDataType()));
+
+        auto intermediateVar = primalBuilder->emitVar(primalBuilder->getBackwardDiffIntermediateContextType(baseFn));
+        primalBuilder->addBackwardDerivativePrimalContextDecoration(intermediateVar, intermediateVar);
+
+        auto primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst(primalFuncType, baseFn);
+
         List<IRInst*> primalArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
@@ -174,6 +180,7 @@ struct DiffUnzipPass
                 primalArgs.add(arg);
             }
         }
+        primalArgs.add(intermediateVar);
 
         auto mixedDecoration = mixedCall->findDecoration<IRMixedDifferentialInstDecoration>();
         SLANG_ASSERT(mixedDecoration);
@@ -184,8 +191,9 @@ struct DiffUnzipPass
         auto primalType = fwdPairResultType->getValueType();
         auto diffType = (IRType*) diffTypeContext.getDifferentialForType(&globalBuilder, primalType);
 
-        auto primalVal = primalBuilder->emitCallInst(primalType, baseFn, primalArgs);
-        
+        auto primalVal = primalBuilder->emitCallInst(primalType, primalFn, primalArgs);
+        primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
+
         List<IRInst*> diffArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
@@ -215,6 +223,7 @@ struct DiffUnzipPass
         }
         
         auto newFwdCallee = diffBuilder->emitForwardDifferentiateInst(fwdCalleeType, baseFn);
+
         diffBuilder->markInstAsDifferential(newFwdCallee);
 
         auto diffPairVal = diffBuilder->emitCallInst(
@@ -222,6 +231,7 @@ struct DiffUnzipPass
             newFwdCallee,
             diffArgs);
         diffBuilder->markInstAsDifferential(diffPairVal, primalType);
+        diffBuilder->addBackwardDerivativePrimalContextDecoration(diffPairVal, intermediateVar);
 
         auto diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, diffPairVal);
         diffBuilder->markInstAsDifferential(diffVal, primalType);
@@ -272,7 +282,6 @@ struct DiffUnzipPass
         // Check that we have an unambiguous 'first' differential block.
         SLANG_ASSERT(firstDiffBlock);
         auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
-        
         auto pairVal = diffBuilder->emitMakeDifferentialPair(
             pairType,
             lookupPrimalInst(mixedReturn->getVal()),

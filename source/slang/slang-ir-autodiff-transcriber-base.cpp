@@ -390,7 +390,7 @@ IRType* AutoDiffTranscriberBase::differentiateExtractExistentialType(IRBuilder* 
     if (lookupKeyPath.getCount())
     {
         // `interfaceType` does conform to `IDifferentiable`.
-        outWitnessTable = builder->emitExtractExistentialWitnessTable(origType->getOperand(0));
+        outWitnessTable = builder->emitExtractExistentialWitnessTable(lookupPrimalInstIfExists(origType->getOperand(0)));
         for (auto node : lookupKeyPath)
         {
             outWitnessTable = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), outWitnessTable, node->getRequirementKey());

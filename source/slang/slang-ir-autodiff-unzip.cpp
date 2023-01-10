@@ -7,10 +7,12 @@ namespace Slang
 struct ExtractPrimalFuncContext
 {
     SharedIRBuilder* sharedBuilder;
+    AutoDiffTranscriberBase* backwardPrimalTranscriber;
 
-    void init(SharedIRBuilder* inSharedBuilder)
+    void init(SharedIRBuilder* inSharedBuilder, AutoDiffTranscriberBase* transcriber)
     {
         sharedBuilder = inSharedBuilder;
+        backwardPrimalTranscriber = transcriber;
     }
 
     IRInst* cloneGenericHeader(IRBuilder& builder, IRCloneEnv& cloneEnv, IRGeneric* gen)
@@ -65,14 +67,14 @@ struct ExtractPrimalFuncContext
     }
 
     IRInst* generatePrimalFuncType(
-        IRGlobalValueWithCode* destFunc, IRGlobalValueWithCode* fwdFunc, IRInst*& outIntermediateType)
+        IRGlobalValueWithCode* destFunc, IRGlobalValueWithCode* originalFunc, IRInst*& outIntermediateType)
     {
         IRBuilder builder(sharedBuilder);
         builder.setInsertBefore(destFunc);
         IRFuncType* originalFuncType = nullptr;
         outIntermediateType = createIntermediateType(destFunc);
 
-        originalFuncType = as<IRFuncType>(fwdFunc->getDataType());
+        originalFuncType = as<IRFuncType>(originalFunc->getDataType());
 
         SLANG_RELEASE_ASSERT(originalFuncType);
         List<IRType*> paramTypes;
@@ -231,55 +233,45 @@ struct ExtractPrimalFuncContext
         return true;
     }
 
+    IRStructField* addIntermediateContextField(IRInst* type, IRInst* intermediateOutput)
+    {
+        IRBuilder genTypeBuilder(sharedBuilder);
+        auto ptrStructType = as<IRPtrTypeBase>(intermediateOutput->getDataType());
+        SLANG_RELEASE_ASSERT(ptrStructType);
+        auto structType = as<IRStructType>(ptrStructType->getValueType());
+        genTypeBuilder.setInsertBefore(structType);
+        auto fieldType = type;
+        SLANG_RELEASE_ASSERT(structType);
+        auto structKey = genTypeBuilder.createStructKey();
+        genTypeBuilder.setInsertInto(structType);
+        return genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
+    }
+
     void storeInst(
         IRBuilder& builder,
         IRInst* inst,
         IRInst* intermediateOutput)
     {
-        IRBuilder genTypeBuilder(sharedBuilder);
-        auto ptrStructType = as<IRPtrTypeBase>(intermediateOutput->getDataType() );
-        SLANG_RELEASE_ASSERT(ptrStructType);
-        auto structType = as<IRStructType>(ptrStructType->getValueType());
-        genTypeBuilder.setInsertBefore(structType);
-        auto fieldType = inst->getDataType();
-        SLANG_RELEASE_ASSERT(structType);
-        auto structKey = genTypeBuilder.createStructKey();
+        auto field = addIntermediateContextField(inst->getDataType(), intermediateOutput);
+        auto key = field->getKey();
         if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
-            cloneDecoration(nameHint, structKey);
-        genTypeBuilder.setInsertInto(structType);
-        genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
-        builder.addPrimalValueStructKeyDecoration(inst, structKey);
+            cloneDecoration(nameHint, key);
+        builder.addPrimalValueStructKeyDecoration(inst, key);
         builder.emitStore(
             builder.emitFieldAddress(
-                builder.getPtrType(inst->getFullType()), intermediateOutput, structKey),
+                builder.getPtrType(inst->getFullType()), intermediateOutput, key),
             inst);
     }
 
-    IRFunc* turnUnzippedFuncIntoPrimalFunc(IRFunc* unzippedFunc, IRFunc* fwdFunc, IRInst*& outIntermediateType)
+    IRFunc* turnUnzippedFuncIntoPrimalFunc(IRFunc* unzippedFunc, IRFunc* originalFunc, IRInst*& outIntermediateType)
     {
-        // Note: this transformation assumes the original func has only one return.
-
         IRBuilder builder(sharedBuilder);
 
         IRFunc* func = unzippedFunc;
         IRInst* intermediateType = nullptr;
-        auto newFuncType = generatePrimalFuncType(unzippedFunc, fwdFunc, intermediateType);
+        auto newFuncType = generatePrimalFuncType(unzippedFunc, originalFunc, intermediateType);
         outIntermediateType = intermediateType;
         func->setFullType((IRType*)newFuncType);
-
-        // Go through all the insts and preserve the primal blocks.
-        // Create a return block to replace all branches into a non-primal block.
-        builder.setInsertInto(func);
-        auto returnBlock = builder.emitBlock();
-        for (auto block : func->getBlocks())
-        {
-            auto term = block->getTerminator();
-            if (auto ret = as<IRReturn>(term))
-            {
-                insertIntoReturnBlock(builder, ret);
-                break;
-            }
-        }
 
         auto paramBlock = func->getFirstBlock();
         builder.setInsertInto(paramBlock);
@@ -317,53 +309,76 @@ struct ExtractPrimalFuncContext
                     builder.setInsertAfter(inst);
                     storeInst(builder, inst, outIntermediary);
                 }
-            }
-        }
-
-        // Go over differential blocks and complete
-        for (auto block : diffBlocksList)
-        {
-            
-            if (block->getFirstParam() == nullptr)
-            {
-                // If the block does not have any PHI nodes, just remove it and
-                // replace all its uses with returnBlock.
-
-                // TODO: This invalides the next block in the chain. Make a list first.
-                block->replaceUsesWith(returnBlock);
-                block->removeAndDeallocate();
-            }
-            else
-            {
-                // If the block has Phi nodes, we can't directly replace it with
-                // `returnBlock`, but we can turn the block into a trivial branch
-                // into `returnBlock` to safely preserve the invariants of Phi nodes.
-                auto inst = block->getLastParam()->getNextInst();
-                for (; inst;)
+                else if (inst->getOp() == kIROp_Var)
                 {
-                    auto nextInst = inst->getNextInst();
-                    inst->removeAndDeallocate();
-                    inst = nextInst;
+                    // Always store intermediate context var.
+                    if (inst->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+                    {
+                        auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
+                        builder.setInsertBefore(inst);
+                        auto fieldAddr = builder.emitFieldAddress(
+                            inst->getFullType(), outIntermediary, field->getKey());
+                        inst->replaceUsesWith(fieldAddr);
+                        builder.addPrimalValueStructKeyDecoration(inst, field->getKey());
+                    }
                 }
-
-                builder.setInsertInto(block);
-                builder.emitBranch(returnBlock);
             }
         }
 
+        for (auto block : primalBlocksList)
+        {
+            auto term = block->getTerminator();
+            builder.setInsertBefore(term);
+            if (auto decor = term->findDecoration<IRBackwardDerivativePrimalReturnDecoration>())
+            {
+                builder.emitReturn(decor->getBackwardDerivativePrimalReturnValue());
+                term->removeAndDeallocate();
+            }
+        }
+       
         List<IRBlock*> unusedBlocks;
         for (auto block : func->getBlocks())
         {
-            if (!block->hasUses() && isDiffInst(block))
+            if (isDiffInst(block))
                 unusedBlocks.add(block);
         }
-
         for (auto block : unusedBlocks)
             block->removeAndDeallocate();
 
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
         auto defVal = builder.emitDefaultConstructRaw((IRType*)intermediateType);
         builder.emitStore(outIntermediary, defVal);
+
+        // The primal func will not have the result derivative param (second to last param), so we remove it.
+        auto resultDerivativeParam = func->getLastParam()->getPrevParam();
+        SLANG_RELEASE_ASSERT(!resultDerivativeParam->hasUses());
+        resultDerivativeParam->removeAndDeallocate();
+
+        // Finally, go through parameters and turn DifferentiablePair<T> back to T.
+        for (auto param : func->getParams())
+        {
+            IRInst* valueType = param->getDataType();
+            auto inoutType = as<IRPtrTypeBase>(param->getDataType());
+            if (inoutType) valueType = inoutType->getValueType();
+            auto diffPairType = as<IRDifferentialPairType>(valueType);
+            if (!diffPairType) continue;
+            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
+            auto originalValueType = diffPairType->getValueType();
+
+            // Create a local var to act as the old param.
+            auto tempVar = builder.emitVar(diffPairType);
+            param->replaceUsesWith(tempVar);
+            auto pairValue = builder.emitMakeDifferentialPair(
+                diffPairType,
+                param,
+                backwardPrimalTranscriber->getDifferentialZeroOfType(&builder, originalValueType));
+            builder.emitStore(tempVar, pairValue);
+
+            // Change the param type to original type.
+            param->setFullType(originalValueType);
+        }
+
         return unzippedFunc;
     }
 };
@@ -386,7 +401,7 @@ static void copyPrimalValueStructKeyDecorations(IRInst* inst, IRCloneEnv& cloneE
 }
 
 IRFunc* DiffUnzipPass::extractPrimalFunc(
-    IRFunc* func, IRFunc* fwdFunc, IRInst*& intermediateType)
+    IRFunc* func, IRFunc* originalFunc, IRInst*& intermediateType)
 {
     IRBuilder builder(this->autodiffContext->sharedBuilder);
     builder.setInsertBefore(func);
@@ -397,15 +412,19 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     auto clonedFunc = as<IRFunc>(cloneInst(&subEnv, &builder, func));
 
     ExtractPrimalFuncContext context;
-    context.init(autodiffContext->sharedBuilder);
+    context.init(autodiffContext->sharedBuilder, autodiffContext->transcriberSet.primalTranscriber);
 
     intermediateType = nullptr;
-    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, fwdFunc, intermediateType);
+    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, intermediateType);
 
     if (auto nameHint = primalFunc->findDecoration<IRNameHintDecoration>())
     {
-        auto primalName = String(nameHint->getName()) + "_primal";
-        nameHint->setOperand(0, builder.getStringValue(primalName.getUnownedSlice()));
+        nameHint->removeAndDeallocate();
+    }
+    if (auto originalNameHint = originalFunc->findDecoration<IRNameHintDecoration>())
+    {
+        auto primalName = String("s_bwd_primal_") + UnownedStringSlice(originalNameHint->getName());
+        builder.addNameHintDecoration(primalFunc, builder.getStringValue(primalName.getUnownedSlice()));
     }
 
     // Copy PrimalValueStructKey decorations from primal func.
@@ -429,9 +448,25 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                     builder.getPtrType(inst->getDataType()),
                     intermediateVar,
                     structKeyDecor->getStructKey());
-                auto val = builder.emitLoad(addr);
-                inst->replaceUsesWith(val);
+                if (inst->getOp() == kIROp_Var)
+                {
+                    // This is a var for intermediate context.
+                    inst->replaceUsesWith(addr);
+                }
+                else
+                {
+                    // Orindary value.
+                    auto val = builder.emitLoad(addr);
+                    inst->replaceUsesWith(val);
+                }
                 instsToRemove.add(inst);
+            }
+            else if (auto primalCtx = inst->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+            {
+                if (inst->getOp() == kIROp_Call)
+                {
+                    builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
+                }
             }
         }
     }

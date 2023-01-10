@@ -30,7 +30,6 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     Dictionary<IRInst*, IRInst*> orginalToTranscribed;
 
     // References to other passes that for reverse-mode transcription.
-    ForwardDiffTranscriber* fwdDiffTranscriber;
     DiffTransposePass* diffTransposePass;
     DiffPropagationPass* diffPropagationPass;
     DiffUnzipPass* diffUnzipPass;
@@ -40,7 +39,11 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     DiffPropagationPass             diffPropagationPassStorage;
     DiffUnzipPass                   diffUnzipPassStorage;
 
-    BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType taskType, AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
+    BackwardDiffTranscriberBase(
+        FuncBodyTranscriptionTaskType taskType,
+        AutoDiffSharedContext* shared,
+        SharedIRBuilder* inSharedBuilder,
+        DiagnosticSink* inSink)
         : AutoDiffTranscriberBase(shared, inSharedBuilder, inSink)
         , diffTaskType(taskType)
         , diffTransposePassStorage(shared)
@@ -49,7 +52,7 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
         , diffTransposePass(&diffTransposePassStorage)
         , diffPropagationPass(&diffPropagationPassStorage)
         , diffUnzipPass(&diffUnzipPassStorage)
-    { }
+    {}
 
     // Returns "dp<var-name>" to use as a name hint for parameters.
     // If no primal name is available, returns a blank string.
@@ -62,8 +65,6 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 
     // Puts parameters into their own block.
     void makeParameterBlock(IRBuilder* inBuilder, IRFunc* func);
-
-    void cleanUpUnusedPrimalIntermediate(IRInst* func, IRInst* primalFunc, IRInst* intermediateType);
 
     // Transcribe a function definition.
     virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) = 0;
@@ -103,8 +104,12 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 
 struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
 {
-    BackwardDiffPrimalTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
-        : BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType::BackwardPrimal, shared, inSharedBuilder, inSink)
+    BackwardDiffPrimalTranscriber(
+        AutoDiffSharedContext* shared,
+        SharedIRBuilder* inSharedBuilder,
+        DiagnosticSink* inSink)
+        : BackwardDiffTranscriberBase(
+              FuncBodyTranscriptionTaskType::BackwardPrimal, shared, inSharedBuilder, inSink)
     { }
 
     virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
@@ -125,8 +130,15 @@ struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
 
 struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
 {
-    BackwardDiffPropagateTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
-        : BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType::BackwardPropagate, shared, inSharedBuilder, inSink)
+    BackwardDiffPropagateTranscriber(
+        AutoDiffSharedContext* shared,
+        SharedIRBuilder* inSharedBuilder,
+        DiagnosticSink* inSink)
+        : BackwardDiffTranscriberBase(
+              FuncBodyTranscriptionTaskType::BackwardPropagate,
+              shared,
+              inSharedBuilder,
+              inSink)
     { }
 
     virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
@@ -153,7 +165,8 @@ struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
         AutoDiffSharedContext* shared,
         SharedIRBuilder* inSharedBuilder,
         DiagnosticSink* inSink)
-        : BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType::Backward, shared, inSharedBuilder, inSink)
+        : BackwardDiffTranscriberBase(
+              FuncBodyTranscriptionTaskType::Backward, shared, inSharedBuilder, inSink)
     { }
 
     virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
