@@ -387,6 +387,8 @@ Result linkAndOptimizeIR(
 
     finalizeAutoDiffPass(irModule);
 
+    finalizeSpecialization(irModule);
+
     // If we have a target that is GPU like we use the string hashing mechanism
     // but for that to work we need to inline such that calls (or returns) of strings
     // boil down into getStringHash(stringLiteral)

@@ -6526,7 +6526,7 @@ namespace Slang
         // By default, assume that we might have side effects,
         // to safely cover all the instructions we haven't had time to think about.
         default:
-            return true;
+            break;
 
         case kIROp_Call:
             {
@@ -6553,7 +6553,7 @@ namespace Slang
                     return false;
                 }
             }
-            return true;
+            break;
 
             // All of the cases for "global values" are side-effect-free.
         case kIROp_StructType:
@@ -6665,6 +6665,13 @@ namespace Slang
         case kIROp_BackwardDifferentiate:
             return false;
         }
+
+        // Check if the calle has been marked with a catch-all no-side-effect decoration.
+        if (findDecoration<IRNoSideEffectDecoration>())
+        {
+            return false;
+        }
+        return true;
     }
 
     IRModule* IRInst::getModule()
