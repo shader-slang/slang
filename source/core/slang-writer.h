@@ -16,6 +16,7 @@ namespace Slang
 class WriterHelper
 {
 public:
+    SLANG_ATTR_PRINTF(2, 3)
     SlangResult print(const char* format, ...);
     SlangResult put(const char* text);
     SlangResult put(const UnownedStringSlice& text);

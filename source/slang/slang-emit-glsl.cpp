@@ -2262,8 +2262,14 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
 {
     bool anyModifiers = false;
 
-    auto stage = layout->getStage();
-    auto isInput = layout->findOffsetAttr(LayoutResourceKind::VaryingInput) != nullptr;
+    Stage stage = Stage::Unknown;
+    bool isInput = false;
+
+    if (layout)
+    {
+        stage = layout->getStage();
+        isInput = layout->findOffsetAttr(LayoutResourceKind::VaryingInput) != nullptr;
+    }
 
     for (auto dd : varInst->getDecorations())
     {
@@ -2314,7 +2320,8 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
         // output everything with `flat` except for
         // fragment *outputs* (and maybe vertex inputs).
         //
-        if (layout && layout->getStage() == Stage::Fragment
+        if (layout 
+            && layout->getStage() == Stage::Fragment
             && layout->usesResourceKind(LayoutResourceKind::VaryingInput))
         {
             _maybeEmitGLSLFlatModifier(valueType);

@@ -60,6 +60,7 @@ INST(Nop, nop, 0, 0)
     INST(OptionalType, Optional, 1, 0)
 
     INST(DifferentialPairType, DiffPair, 1, 0)
+    INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, 0)
 
     /* BindExistentialsTypeBase */
 
@@ -731,6 +732,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(BackwardDifferentiableDecoration, backwardDifferentiable, 1, 0)
 
         /// Decorated function is marked for the reverse-mode differentiation pass.
+    INST(BackwardDerivativePrimalDecoration, backwardDiffPrimalReference, 1, 0)
+    INST(BackwardDerivativePropagateDecoration, backwardDiffPropagateReference, 1, 0)
+    INST(BackwardDerivativeIntermediateTypeDecoration, backwardDiffIntermediateTypeReference, 1, 0)
     INST(BackwardDerivativeDecoration, backwardDiffReference, 1, 0)
 
         /// Used by the auto-diff pass to mark insts that compute
@@ -815,8 +819,18 @@ INST(CastToVoid, castToVoid, 1, 0)
 
 INST(IsType, IsType, 3, 0)
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
-INST(BackwardDifferentiate,                  BackwardDifferentiate,           1, 0)
-INST(DifferentialEqualityTypeCast, DifferentialEqualityTypeCast, 1, 0)
+
+// Produces the primal computation of backward derivatives, will return an intermediate context for
+// backward derivative func.
+INST(BackwardDifferentiatePrimal,            BackwardDifferentiatePrimal,     1, 0)
+
+// Produces the actual backward derivative propagate function, using the intermediate context returned by the
+// primal func produced from `BackwardDifferentiatePrimal`.
+INST(BackwardDifferentiatePropagate,         BackwardDifferentiatePropagate,  1, 0)
+
+// Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
+// replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
+INST(BackwardDifferentiate, BackwardDifferentiate, 1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
@@ -875,6 +889,11 @@ INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 /* DifferentiableMethodRequirementDictionaryItem */
     INST(ForwardDifferentiableMethodRequirementDictionaryItem, DifferentiableMethodRequirementDictionaryItem, 0, 0)
     INST(BackwardDifferentiableMethodRequirementDictionaryItem, DifferentiableMethodRequirementDictionaryItem, 0, 0)
+    INST(BackwardDifferentiablePrimalMethodRequirementDictionaryItem, DifferentiablePrimalMethodRequirementDictionaryItem, 0, 0)
+    INST(BackwardDifferentiablePropagateMethodRequirementDictionaryItem, DifferentiablePropagateMethodRequirementDictionaryItem, 0, 0)
+    INST(BackwardDifferentiableIntermediateTypeRequirementDictionaryItem, DifferentiableIntermediateTypeRequirementDictionaryItem, 0, 0)
+
+
 INST_RANGE(DifferentiableMethodRequirementDictionaryItem, ForwardDifferentiableMethodRequirementDictionaryItem, BackwardDifferentiableMethodRequirementDictionaryItem)
 
 #undef PARENT
