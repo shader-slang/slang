@@ -81,6 +81,9 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     // Transcribe a generic definition
     InstPair transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric);
 
+    // Transcribe a function without marking the result as a decoration.
+    IRFunc* transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc);
+
     // Create an empty func to represent the transcribed func of `origFunc`.
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
 

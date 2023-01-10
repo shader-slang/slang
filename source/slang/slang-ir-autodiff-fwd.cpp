@@ -864,7 +864,7 @@ InstPair ForwardDiffTranscriber::transcribeSingleOperandInst(IRBuilder* builder,
 
     IRInst* diffResult = nullptr;
 
-    if (auto diffType = differentiateType(builder, primalType))
+    if (auto diffType = differentiateType(builder, origInst->getDataType()))
     {
         if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
         {
@@ -930,7 +930,33 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
 {
     if (auto bwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
         return InstPair(origFunc, bwdDecor->getForwardDerivativeFunc());
+    
+    auto diffFunc = transcribeFuncHeaderImpl(inBuilder, origFunc);
 
+    if (auto outerGen = findOuterGeneric(diffFunc))
+    {
+        IRBuilder subBuilder = *inBuilder;
+        subBuilder.setInsertBefore(origFunc);
+        auto specialized =
+            specializeWithGeneric(subBuilder, outerGen, as<IRGeneric>(findOuterGeneric(origFunc)));
+        subBuilder.addForwardDerivativeDecoration(origFunc, specialized);
+    }
+    else
+    {
+        inBuilder->addForwardDerivativeDecoration(origFunc, diffFunc);
+    }
+
+    FuncBodyTranscriptionTask task;
+    task.type = FuncBodyTranscriptionTaskType::Forward;
+    task.originalFunc = origFunc;
+    task.resultFunc = diffFunc;
+    autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);
+
+    return InstPair(origFunc, diffFunc);
+}
+
+IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc)
+{
     IRBuilder builder = *inBuilder;
 
     IRFunc* primalFunc = origFunc;
@@ -955,17 +981,6 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
         newNameSb << "s_fwd_" << originalName;
         builder.addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
     }
-    
-    if (auto outerGen = findOuterGeneric(diffFunc))
-    {
-        auto specialized =
-            specializeWithGeneric(builder, outerGen, as<IRGeneric>(findOuterGeneric(origFunc)));
-        builder.addForwardDerivativeDecoration(origFunc, specialized);
-    }
-    else
-    {
-        builder.addForwardDerivativeDecoration(origFunc, diffFunc);
-    }
 
     // Mark the generated derivative function itself as differentiable.
     builder.addForwardDifferentiableDecoration(diffFunc);
@@ -975,14 +990,7 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
     {
         cloneDecoration(dictDecor, diffFunc);
     }
-
-    FuncBodyTranscriptionTask task;
-    task.type = FuncBodyTranscriptionTaskType::Forward;
-    task.originalFunc = primalFunc;
-    task.resultFunc = diffFunc;
-    autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);
-
-    return InstPair(primalFunc, diffFunc);
+    return diffFunc;
 }
 
 // Transcribe a function definition.

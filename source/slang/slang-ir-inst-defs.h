@@ -645,6 +645,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A `[keepAlive]` decoration marks an instruction that should not be eliminated.
     INST(KeepAliveDecoration,              keepAlive,             0, 0)
 
+        /// A `[NoSideEffect]` decoration marks a callee to be side-effect free.
+    INST(NoSideEffectDecoration,           noSideEffect, 0, 0)
+
     INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
 
         /// A `[format(f)]` decoration specifies that the format of an image should be `f`
@@ -736,6 +739,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(BackwardDerivativePropagateDecoration, backwardDiffPropagateReference, 1, 0)
     INST(BackwardDerivativeIntermediateTypeDecoration, backwardDiffIntermediateTypeReference, 1, 0)
     INST(BackwardDerivativeDecoration, backwardDiffReference, 1, 0)
+
+    INST(BackwardDerivativePrimalContextDecoration, BackwardDerivativePrimalContextDecoration, 1, 0)
+    INST(BackwardDerivativePrimalReturnDecoration, BackwardDerivativePrimalReturnDecoration, 1, 0)
 
         /// Used by the auto-diff pass to mark insts that compute
         /// a differential value.

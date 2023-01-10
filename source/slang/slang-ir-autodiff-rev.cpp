@@ -60,7 +60,15 @@ namespace Slang
     {
         auto intermediateType = builder->getBackwardDiffIntermediateContextType(func);
         auto outType = builder->getOutType(intermediateType);
-        return differentiateFunctionTypeImpl(builder, funcType, outType);
+        List<IRType*> paramTypes;
+        for (UInt i = 0; i < funcType->getParamCount(); i++)
+        {
+            paramTypes.add(funcType->getParamType(i));
+        }
+        paramTypes.add(outType);
+        IRFuncType* primalFuncType = builder->getFuncType(
+            paramTypes, funcType->getResultType());
+        return primalFuncType;
     }
 
     InstPair BackwardDiffPrimalTranscriber::transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
@@ -210,8 +218,6 @@ namespace Slang
 
         differentiableTypeConformanceContext.setFunc(origFunc);
 
-        primalFunc = origFunc;
-
         auto diffFunc = builder.createFunc();
 
         SLANG_ASSERT(as<IRFuncType>(origFunc->getFullType()));
@@ -278,27 +284,65 @@ namespace Slang
         builder.setInsertInto(header.differential);
         builder.emitBlock();
         auto funcType = as<IRFuncType>(header.differential->getDataType());
-        List<IRInst*> args;
+        List<IRInst*> primalArgs, propagateArgs;
+        List<IRType*> primalTypes, propagateTypes;
         for (UInt i = 0; i < funcType->getParamCount(); i++)
         {
             auto paramType = funcType->getParamType(i);
-            args.add(builder.emitParam(paramType));
+            auto param = builder.emitParam(paramType);
+            if (i != funcType->getParamCount() - 1)
+            {
+                primalArgs.add(param);
+            }
+            propagateArgs.add(param);
+            propagateTypes.add(paramType);
         }
+
+        // Fetch primal values to use as arguments in primal func call.
+        for (auto& arg : primalArgs)
+        {
+            IRInst* valueType = arg->getDataType();
+            auto inoutType = as<IRPtrTypeBase>(arg->getDataType());
+            if (inoutType)
+            {
+                valueType = inoutType->getValueType();
+                arg = builder.emitLoad(arg);
+            }
+            auto diffPairType = as<IRDifferentialPairType>(valueType);
+            if (!diffPairType) continue;
+            arg = builder.emitDifferentialPairGetPrimal(arg);
+        }
+
+        for (auto& arg : primalArgs)
+        {
+            primalTypes.add(arg->getFullType());
+        }
+
         auto outerGeneric = findOuterGeneric(origFunc);
         IRInst* specializedOriginalFunc = origFunc;
         if (outerGeneric)
         {
             specializedOriginalFunc = maybeSpecializeWithGeneric(builder, outerGeneric, findOuterGeneric(header.differential));
         }
+
         auto intermediateType = builder.getBackwardDiffIntermediateContextType(specializedOriginalFunc);
         auto intermediateVar = builder.emitVar(intermediateType);
-        auto primalFunc = builder.emitBackwardDifferentiatePrimalInst(builder.getTypeKind(), specializedOriginalFunc);
-        auto propagateFunc = builder.emitBackwardDifferentiatePropagateInst(builder.getTypeKind(), specializedOriginalFunc);
-        args.add(intermediateVar);
-        builder.emitCallInst(builder.getVoidType(), primalFunc, args);
-        args.removeLast();
-        args.add(builder.emitLoad(intermediateVar));
-        builder.emitCallInst(builder.getVoidType(), propagateFunc, args);
+
+        auto origFuncType = as<IRFuncType>(origFunc->getDataType());
+        auto primalFuncType = builder.getFuncType(
+            primalTypes,
+            origFuncType->getResultType());
+        primalArgs.add(intermediateVar);
+        primalTypes.add(builder.getOutType(intermediateType));
+        auto primalFunc = builder.emitBackwardDifferentiatePrimalInst(primalFuncType, specializedOriginalFunc);
+        builder.emitCallInst(origFuncType->getResultType(), primalFunc, primalArgs);
+
+        propagateTypes.add(intermediateType);
+        propagateArgs.add(builder.emitLoad(intermediateVar));
+        auto propagateFuncType = builder.getFuncType(propagateTypes, builder.getVoidType());
+        auto propagateFunc = builder.emitBackwardDifferentiatePropagateInst(propagateFuncType, specializedOriginalFunc);
+        builder.emitCallInst(builder.getVoidType(), propagateFunc, propagateArgs);
+
         builder.emitReturn();
         return header;
     }
@@ -339,98 +383,6 @@ namespace Slang
         builder.emitBranch(firstBlock);
     }
 
-    void BackwardDiffTranscriberBase::cleanUpUnusedPrimalIntermediate(IRInst* func, IRInst* primalFunc, IRInst* intermediateType)
-    {
-        IRStructType* structType = as<IRStructType>(intermediateType);
-        if (!structType)
-        {
-            auto genType = as<IRGeneric>(intermediateType);
-            structType = as<IRStructType>(findGenericReturnVal(genType));
-            SLANG_RELEASE_ASSERT(structType);
-        }
-
-        // Collect fields that are never fetched by reverse func.
-        OrderedHashSet<IRStructKey*> fieldsToCleanup;
-        for (auto children : structType->getChildren())
-        {
-            if (auto field = as<IRStructField>(children))
-            {
-                auto structKey = field->getKey();
-                bool usedByRevFunc = false;
-                for (auto use = structKey->firstUse; use; use = use->nextUse)
-                {
-                    if (isChildInstOf(use->getUser(), func))
-                    {
-                        usedByRevFunc = true;
-                        break;
-                    }
-                }
-                if (!usedByRevFunc)
-                {
-                    List<IRInst*> users;
-                    for (auto use = structKey->firstUse; use; use = use->nextUse)
-                    {
-                        users.add(use->getUser());
-                    }
-                    for (auto user : users)
-                    {
-                        if (!isChildInstOf(user, primalFunc))
-                            continue;
-                        if (auto addr = as<IRFieldAddress>(user))
-                        {
-                            if (addr->hasMoreThanOneUse())
-                                continue;
-                            if (addr->firstUse)
-                            {
-                                if (addr->firstUse->getUser()->getOp() == kIROp_Store)
-                                {
-                                    addr->firstUse->getUser()->removeAndDeallocate();
-                                }
-                                addr->removeAndDeallocate();
-                            }
-                        }
-                    }
-
-                    bool hasNonTrivialUse = false;
-                    for (auto use = structKey->firstUse; use; use = use->nextUse)
-                    {
-                        switch (use->getUser()->getOp())
-                        {
-                        case kIROp_PrimalValueStructKeyDecoration:
-                        case kIROp_StructField:
-                            continue;
-                        default:
-                            hasNonTrivialUse = true;
-                            break;
-                        }
-                    }
-                    if (!hasNonTrivialUse)
-                    {
-                        fieldsToCleanup.Add(structKey);
-                    }
-                }
-            }
-        }
-
-        // Actually remove fields from struct.
-        for (auto children : structType->getChildren())
-        {
-            if (auto field = as<IRStructField>(children))
-            {
-                if (fieldsToCleanup.Contains(field->getKey()))
-                {
-                    auto key = field->getKey();
-                    List<IRInst*> keyUsers;
-                    for (auto use = key->firstUse; use; use = use->nextUse)
-                        keyUsers.add(use->getUser());
-                    for (auto keyUser : keyUsers)
-                        keyUser->removeAndDeallocate();
-                    key->removeAndDeallocate();
-                }
-            }
-        }
-    }
-
     // Transcribe a function definition.
     void BackwardDiffTranscriberBase::transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc, IRGlobalValueWithCode*& diffPrimalFunc)
     {
@@ -442,11 +394,11 @@ namespace Slang
         // Generate a temporary forward derivative function as an intermediate step.
         IRBuilder tempBuilder = *builder;
         tempBuilder.setInsertBefore(diffPropagateFunc);
-        IRFunc* fwdDiffFunc = as<IRFunc>(
-            fwdDiffTranscriber->transcribeFuncHeader(&tempBuilder, primalFunc).differential);
+        ForwardDiffTranscriber* fwdTranscriber = static_cast<ForwardDiffTranscriber*>(autoDiffSharedContext->transcriberSet.forwardTranscriber);
+        IRFunc* fwdDiffFunc = as<IRFunc>(fwdTranscriber->transcribeFuncHeaderImpl(&tempBuilder, primalFunc));
         SLANG_ASSERT(fwdDiffFunc);
 
-        fwdDiffTranscriber->transcribeFunc(&tempBuilder, primalFunc, fwdDiffFunc);
+        fwdTranscriber->transcribeFunc(&tempBuilder, primalFunc, fwdDiffFunc);
         
         // Split first block into a paramter block.
         this->makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
@@ -473,7 +425,8 @@ namespace Slang
         // for that.
         // 
         builder->setInsertInto(diffPropagateFunc->getParent());
-        auto tempDiffFunc = as<IRFunc>(cloneInst(&cloneEnv, builder, unzippedFwdDiffFunc));
+        IRCloneEnv subCloneEnv;
+        auto tempDiffFunc = as<IRFunc>(cloneInst(&subCloneEnv, builder, unzippedFwdDiffFunc));
 
         // Move blocks to the diffFunc shell.
         {
@@ -496,18 +449,18 @@ namespace Slang
         DiffTransposePass::FuncTranspositionInfo info = {dOutParameter, nullptr};
         diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, info);
 
+        eliminateDeadCode(diffPropagateFunc);
+
         // Extracts the primal computations into its own func, and replace the primal insts
         // with the intermediate results computed from the extracted func.
         IRInst* intermediateType = nullptr;
-        auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(diffPropagateFunc, unzippedFwdDiffFunc, intermediateType);
+        auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
+            diffPropagateFunc, primalFunc, intermediateType);
 
         // Clean up by deallocating intermediate versions.
         tempDiffFunc->removeAndDeallocate();
         unzippedFwdDiffFunc->removeAndDeallocate();
         fwdDiffFunc->removeAndDeallocate();
-
-        eliminateDeadCode(diffPropagateFunc);
-        cleanUpUnusedPrimalIntermediate(diffPropagateFunc, extractedPrimalFunc, intermediateType);
         
         // If primal function is nested in a generic, we want to create separate generics for all the associated things
         // we have just created.

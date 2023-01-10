@@ -2,6 +2,7 @@
 #include "slang-ir-autodiff-rev.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-pairs.h"
+#include "slang-ir-validate.h"
 
 namespace Slang
 {
@@ -410,6 +411,8 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_BackwardDerivativeIntermediateTypeDecoration:
             case kIROp_BackwardDerivativePropagateDecoration:
             case kIROp_BackwardDerivativePrimalDecoration:
+            case kIROp_BackwardDerivativePrimalContextDecoration:
+            case kIROp_BackwardDerivativePrimalReturnDecoration:
                 decor->removeAndDeallocate();
                 break;
             default:
@@ -721,6 +724,10 @@ struct AutoDiffPass : public InstPassBase
 
             autodiffCleanupList.clear();
 
+#if _DEBUG
+            validateIRModule(module, sink);
+#endif
+
             if (!changed)
                 break;
             hasChanges |= changed;
@@ -785,11 +792,14 @@ struct AutoDiffPass : public InstPassBase
 
         forwardTranscriber.pairBuilder = &pairBuilderStorage;
         backwardPrimalTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardPrimalTranscriber.fwdDiffTranscriber = &forwardTranscriber;
         backwardPropagateTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardPropagateTranscriber.fwdDiffTranscriber = &forwardTranscriber;
         backwardTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardTranscriber.fwdDiffTranscriber = &forwardTranscriber;
+
+        // Make the transcribers available to all sub passes via shared context.
+        context->transcriberSet.primalTranscriber = &backwardPrimalTranscriber;
+        context->transcriberSet.propagateTranscriber = &backwardPropagateTranscriber;
+        context->transcriberSet.forwardTranscriber = &forwardTranscriber;
+        context->transcriberSet.backwardTranscriber = &backwardTranscriber;
     }
 
 protected:

@@ -67,6 +67,8 @@ struct AutoDiffTranscriberBase
 
     IRInst* lookupPrimalInst(IRInst* origInst, IRInst* defaultInst);
 
+    IRInst* lookupPrimalInstIfExists(IRInst* origInst) { return lookupPrimalInst(origInst, origInst); }
+
     bool hasPrimalInst(IRInst* origInst);
 
     IRInst* findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst);
