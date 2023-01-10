@@ -308,10 +308,15 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
             // TODO: This seems like a particularly dangerous way to look for an interface.
             // See if we can lower IDifferentiable to a separate IR inst.
             //
-            if (globalInst->getOp() == kIROp_InterfaceType &&
-                as<IRInterfaceType>(globalInst)->findDecoration<IRNameHintDecoration>()->getName() == "IDifferentiable")
+            if (auto intf = as<IRInterfaceType>(globalInst))
             {
-                return globalInst;
+                if (auto decor = intf->findDecoration<IRNameHintDecoration>())
+                {
+                    if (decor->getName() == "IDifferentiable")
+                    {
+                        return globalInst;
+                    }
+                }
             }
         }
     }

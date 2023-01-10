@@ -1065,6 +1065,15 @@ struct LoadContext
             for (const auto& pair : context.m_fileToPathInfoMap)
             {
                 CacheFileSystem::PathInfo* pathInfo = pair.Value;
+
+                // TODO(JS): It's not 100% clear why we are ending up 
+                // with entries that don't have a unique identity.
+                // For now we ignore adding to the unique map, because 
+                // if we do we'll have multiple entries with the same key
+                if (pathInfo->m_uniqueIdentity.getLength() == 0)
+                {
+                    continue;
+                }
                 SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
                 dstUniqueMap.Add(pathInfo->m_uniqueIdentity, pathInfo);
             }
