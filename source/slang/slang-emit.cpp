@@ -54,7 +54,6 @@
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-string-hash.h"
-
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"

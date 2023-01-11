@@ -13,6 +13,39 @@
 namespace Slang
 {
 
+struct GenericChildrenMigrationContext
+{
+    IRCloneEnv cloneEnv;
+    IRGeneric* srcGeneric;
+    void init(IRGeneric* genericSrc, IRGeneric* genericDst)
+    {
+        srcGeneric = genericSrc;
+        if (!genericSrc)
+            return;
+        auto srcParam = genericSrc->getFirstBlock()->getFirstParam();
+        auto dstParam = genericDst->getFirstBlock()->getFirstParam();
+        while (srcParam && dstParam)
+        {
+            cloneEnv.mapOldValToNew[srcParam] = dstParam;
+            srcParam = srcParam->getNextParam();
+            dstParam = dstParam->getNextParam();
+        }
+        cloneEnv.mapOldValToNew[genericSrc] = genericDst;
+        cloneEnv.mapOldValToNew[genericSrc->getFirstBlock()] = genericDst->getFirstBlock();
+    }
+
+    IRInst* cloneInst(IRBuilder* builder, IRInst* src)
+    {
+        if (!srcGeneric)
+            return src;
+        if (findOuterGeneric(src) == srcGeneric)
+        {
+            return Slang::cloneInst(&cloneEnv, builder, src);
+        }
+        return src;
+    }
+};
+
 struct DiffUnzipPass
 {
     AutoDiffSharedContext*                  autodiffContext;
@@ -62,6 +95,7 @@ struct DiffUnzipPass
         // TODO: Looks like we get a copy of the decorations?
         IRCloneEnv subEnv;
         subEnv.parent = &cloneEnv;
+        builder->setInsertBefore(func);
         IRFunc* unzippedFunc = as<IRFunc>(cloneInst(&subEnv, builder, func));
 
         builder->setInsertInto(unzippedFunc);

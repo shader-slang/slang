@@ -85,9 +85,13 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 
     InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize);
 
+    IRFunc* generateNewForwardDerivativeForFunc(IRBuilder* builder, IRFunc* originalFunc, IRFunc* diffPropagateFunc);
+
     void transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc, IRGlobalValueWithCode*& diffPrimalFunc);
 
     InstPair transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc);
+
+    void addTranscribedFuncDecoration(IRBuilder& builder, IRFunc* origFunc, IRFunc* transcribedFunc);
 
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
 
@@ -173,8 +177,10 @@ struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
     virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) override
     {
-        SLANG_UNUSED(builder);
         // Don't need to do anything here, the body is generated in transcribeFuncHeader.
+
+        SLANG_UNUSED(builder);
+        addTranscribedFuncDecoration(*builder, primalFunc, diffFunc);
         return InstPair(primalFunc, diffFunc);
     }
     virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) override

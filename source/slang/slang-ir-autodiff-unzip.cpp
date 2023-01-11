@@ -4,6 +4,7 @@
 
 namespace Slang
 {
+
 struct ExtractPrimalFuncContext
 {
     SharedIRBuilder* sharedBuilder;
@@ -74,12 +75,15 @@ struct ExtractPrimalFuncContext
         IRFuncType* originalFuncType = nullptr;
         outIntermediateType = createIntermediateType(destFunc);
 
+        GenericChildrenMigrationContext migrationContext;
+        migrationContext.init(as<IRGeneric>(findOuterGeneric(originalFunc)), as<IRGeneric>(findOuterGeneric(destFunc)));
+
         originalFuncType = as<IRFuncType>(originalFunc->getDataType());
 
         SLANG_RELEASE_ASSERT(originalFuncType);
         List<IRType*> paramTypes;
         for (UInt i = 0; i < originalFuncType->getParamCount() - 1; i++)
-            paramTypes.add(originalFuncType->getParamType(i));
+            paramTypes.add((IRType*)migrationContext.cloneInst(&builder, originalFuncType->getParamType(i)));
         paramTypes.add(builder.getInOutType((IRType*)outIntermediateType));
         auto newFuncType = builder.getFuncType(paramTypes, builder.getVoidType());
         return newFuncType;
@@ -239,7 +243,10 @@ struct ExtractPrimalFuncContext
         auto ptrStructType = as<IRPtrTypeBase>(intermediateOutput->getDataType());
         SLANG_RELEASE_ASSERT(ptrStructType);
         auto structType = as<IRStructType>(ptrStructType->getValueType());
-        genTypeBuilder.setInsertBefore(structType);
+        if (auto outerGen = findOuterGeneric(structType))
+            genTypeBuilder.setInsertBefore(outerGen);
+        else
+            genTypeBuilder.setInsertBefore(structType);
         auto fieldType = type;
         SLANG_RELEASE_ASSERT(structType);
         auto structKey = genTypeBuilder.createStructKey();

@@ -257,4 +257,6 @@ bool processAutodiffCalls(
 
 bool finalizeAutoDiffPass(IRModule* module);
 
+void stripDerivativeDecorations(IRInst* inst);
+
 };

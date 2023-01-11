@@ -412,8 +412,14 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
     return SLANG_OK;
 }
 
+void supressIRValidationAtInsert();
+void resumeIRValidationAtInsert();
+
 SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* scope, String moduleName)
 {
+    supressIRValidationAtInsert();
+    struct ResumeValidationRAII { ~ResumeValidationRAII() { resumeIRValidationAtInsert(); } } raii;
+
     // Get the name of the module
     StringBuilder moduleFilename;
     moduleFilename << moduleName << ".slang-module";

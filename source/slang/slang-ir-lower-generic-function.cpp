@@ -48,6 +48,9 @@ namespace Slang
             IRCloneEnv cloneEnv;
             IRBuilder builder(sharedContext->sharedBuilderStorage);
             builder.setInsertBefore(genericParent);
+            // Do not clone func type (which would break IR def-use rules if we do it here)
+            // This is OK since we will lower the type immediately after the clone.
+            cloneEnv.mapOldValToNew[func->getFullType()] = builder.getTypeKind();
             auto loweredFunc = cast<IRFunc>(cloneInstAndOperands(&cloneEnv, &builder, func));
             auto loweredGenericType =
                 lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->getFullType()));

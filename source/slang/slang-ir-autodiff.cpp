@@ -393,6 +393,28 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
     }
 }
 
+void stripDerivativeDecorations(IRInst* inst)
+{
+    for (auto decor = inst->getFirstDecoration(); decor; )
+    {
+        auto next = decor->getNextDecoration();
+        switch (decor->getOp())
+        {
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_DerivativeMemberDecoration:
+        case kIROp_BackwardDerivativeDecoration:
+        case kIROp_BackwardDerivativeIntermediateTypeDecoration:
+        case kIROp_BackwardDerivativePropagateDecoration:
+        case kIROp_BackwardDerivativePrimalDecoration:
+            decor->removeAndDeallocate();
+            break;
+        default:
+            break;
+        }
+        decor = next;
+    }
+}
+
 void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
     for (auto inst : parent->getChildren())
@@ -702,7 +724,7 @@ struct AutoDiffPass : public InstPassBase
                         forwardTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
                         break;
                     case FuncBodyTranscriptionTaskType::BackwardPrimal:
-                        // Don't need to do anything, they will be filled by `backwardPropagateTranscriber`.
+                        backwardPrimalTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
                         break;
                     case FuncBodyTranscriptionTaskType::BackwardPropagate:
                         backwardPropagateTranscriber.transcribeFunc(builder, primalFunc, diffFunc);

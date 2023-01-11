@@ -29,7 +29,14 @@ namespace Slang
     {
         if (!condition)
         {
-            context->getSink()->diagnose(inst, Diagnostics::irValidationFailed, message);
+            if (context)
+            {
+                context->getSink()->diagnose(inst, Diagnostics::irValidationFailed, message);
+            }
+            else
+            {
+                SLANG_ASSERT_FAILURE("IR validation failed");
+            }
         }
     }
 
@@ -143,7 +150,10 @@ namespace Slang
                     // If `operandValue` precedes `inst`, then we should
                     // have already seen it, because we scan parent instructions
                     // in order.
-                    validate(context, context->seenInsts.Contains(operandValue),    inst, "def must come before use in same block");
+                    if (context)
+                    {
+                        validate(context, context->seenInsts.Contains(operandValue),    inst, "def must come before use in same block");
+                    }
                     return;
                 }
 
@@ -194,6 +204,34 @@ namespace Slang
         {
             validateIRInstOperand(context, inst, inst->getOperands() + ii);
         }
+    }
+
+    static bool _supressIRValidationAtInsert = false;
+    void supressIRValidationAtInsert()
+    {
+        _supressIRValidationAtInsert = true;
+    }
+    void resumeIRValidationAtInsert()
+    {
+        _supressIRValidationAtInsert = false;
+    }
+    void validateIRInstOperands(IRInst* inst)
+    {
+        if (_supressIRValidationAtInsert)
+            return;
+        switch (inst->getOp())
+        {
+        case kIROp_loop:
+        case kIROp_ifElse:
+        case kIROp_unconditionalBranch:
+        case kIROp_conditionalBranch:
+        case kIROp_Switch:
+            return;
+        default:
+            break;
+        }
+        
+        validateIRInstOperands(nullptr, inst);
     }
 
     void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)

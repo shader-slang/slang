@@ -2810,6 +2810,8 @@ namespace Slang
     IRBackwardDiffIntermediateContextType* IRBuilder::getBackwardDiffIntermediateContextType(
         IRInst* func)
     {
+        if (!func)
+            func = getVoidValue();
         return (IRBackwardDiffIntermediateContextType*)getType(
             kIROp_BackwardDiffIntermediateContextType,
             1,
@@ -6260,6 +6262,8 @@ namespace Slang
         return type;
     }
 
+    void validateIRInstOperands(IRInst*);
+
     void IRInst::replaceUsesWith(IRInst* other)
     {
         // Safety check: don't try to replace something with itself.
@@ -6377,6 +6381,10 @@ namespace Slang
         this->prev = inPrev;
         this->next = inNext;
         this->parent = inParent;
+        
+#if _DEBUG
+        validateIRInstOperands(this);
+#endif
     }
 
     void IRInst::insertAfter(IRInst* other)
