@@ -404,6 +404,8 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             collectedParam = builder.createParam(paramStructType);
         }
 
+        collectedParam->insertBefore(m_entryPoint.func);
+
         // No matter what, the global shader parameter should have the layout
         // information from the entry point attached to it, so that the
         // contained parameters will end up in the right place(s).

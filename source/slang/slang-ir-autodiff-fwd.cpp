@@ -64,17 +64,16 @@ InstPair ForwardDiffTranscriber::transcribeVar(IRBuilder* builder, IRVar* origVa
         if (diffNameHint.getLength() > 0)
             builder->addNameHintDecoration(diffVar, diffNameHint.getUnownedSlice());
 
-        return InstPair(cloneInst(&cloneEnv, builder, origVar), diffVar);
+        return InstPair(maybeCloneForPrimalInst(builder, origVar), diffVar);
     }
-
-    return InstPair(cloneInst(&cloneEnv, builder, origVar), nullptr);
+    return InstPair(maybeCloneForPrimalInst(builder, origVar), nullptr);
 }
 
 InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRInst* origArith)
 {
     SLANG_ASSERT(origArith->getOperandCount() == 2);
 
-    IRInst* primalArith = cloneInst(&cloneEnv, builder, origArith);
+    IRInst* primalArith = maybeCloneForPrimalInst(builder, origArith);
     
     auto origLeft = origArith->getOperand(0);
     auto origRight = origArith->getOperand(1);
@@ -160,7 +159,7 @@ InstPair ForwardDiffTranscriber::transcribeBinaryLogic(IRBuilder* builder, IRIns
         // Boolean operations are not differentiable. For the linearization
         // pass, we do not need to do anything but copy them over to the ne
         // function.
-        auto primalLogic = cloneInst(&cloneEnv, builder, origLogic);
+        auto primalLogic = maybeCloneForPrimalInst(builder, origLogic);
         return InstPair(primalLogic, nullptr);
     }
     
@@ -170,7 +169,7 @@ InstPair ForwardDiffTranscriber::transcribeBinaryLogic(IRBuilder* builder, IRIns
 InstPair ForwardDiffTranscriber::transcribeLoad(IRBuilder* builder, IRLoad* origLoad)
 {
     auto origPtr = origLoad->getPtr();
-    auto primalPtr = lookupPrimalInst(origPtr, nullptr);
+    auto primalPtr = lookupPrimalInst(builder, origPtr, nullptr);
     auto primalPtrValueType = as<IRPtrTypeBase>(primalPtr->getFullType())->getValueType();
 
     if (auto diffPairType = as<IRDifferentialPairType>(primalPtrValueType))
@@ -190,7 +189,7 @@ InstPair ForwardDiffTranscriber::transcribeLoad(IRBuilder* builder, IRLoad* orig
         return InstPair(primalElement, diffElement);
     }
 
-    auto primalLoad = cloneInst(&cloneEnv, builder, origLoad);
+    auto primalLoad = maybeCloneForPrimalInst(builder, origLoad);
     IRInst* diffLoad = nullptr;
     if (auto diffPtr = lookupDiffInst(origPtr, nullptr))
     {
@@ -204,9 +203,9 @@ InstPair ForwardDiffTranscriber::transcribeStore(IRBuilder* builder, IRStore* or
 {
     IRInst* origStoreLocation = origStore->getPtr();
     IRInst* origStoreVal = origStore->getVal();
-    auto primalStoreLocation = lookupPrimalInst(origStoreLocation, nullptr);
+    auto primalStoreLocation = lookupPrimalInst(builder, origStoreLocation, nullptr);
     auto diffStoreLocation = lookupDiffInst(origStoreLocation, nullptr);
-    auto primalStoreVal = lookupPrimalInst(origStoreVal, nullptr);
+    auto primalStoreVal = lookupPrimalInst(builder, origStoreVal, nullptr);
     auto diffStoreVal = lookupDiffInst(origStoreVal, nullptr);
 
     if (!diffStoreLocation)
@@ -222,7 +221,7 @@ InstPair ForwardDiffTranscriber::transcribeStore(IRBuilder* builder, IRStore* or
         }
     }
 
-    auto primalStore = cloneInst(&cloneEnv, builder, origStore);
+    auto primalStore = maybeCloneForPrimalInst(builder, origStore);
 
     IRInst* diffStore = nullptr;
 
@@ -248,7 +247,7 @@ InstPair ForwardDiffTranscriber::transcribeStore(IRBuilder* builder, IRStore* or
 //
 InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst* origConstruct)
 {   
-    IRInst* primalConstruct = cloneInst(&cloneEnv, builder, origConstruct);
+    IRInst* primalConstruct = maybeCloneForPrimalInst(builder, origConstruct);
     
     // Check if the output type can be differentiated. If it cannot be 
     // differentiated, don't differentiate the inst
@@ -340,7 +339,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     if (!diffCallee)
     {
         // The callee is non differentiable, just return primal value with null diff value.
-        IRInst* primalCall = cloneInst(&cloneEnv, builder, origCall);
+        IRInst* primalCall = maybeCloneForPrimalInst(builder, origCall);
         return InstPair(primalCall, nullptr);
     }
 
@@ -419,7 +418,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
 InstPair ForwardDiffTranscriber::transcribeSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle)
 {
-    IRInst* primalSwizzle = cloneInst(&cloneEnv, builder, origSwizzle);
+    IRInst* primalSwizzle = maybeCloneForPrimalInst(builder, origSwizzle);
 
     if (auto diffBase = lookupDiffInst(origSwizzle->getBase(), nullptr))
     {
@@ -441,7 +440,7 @@ InstPair ForwardDiffTranscriber::transcribeSwizzle(IRBuilder* builder, IRSwizzle
 
 InstPair ForwardDiffTranscriber::transcribeByPassthrough(IRBuilder* builder, IRInst* origInst)
 {
-    IRInst* primalInst = cloneInst(&cloneEnv, builder, origInst);
+    IRInst* primalInst = maybeCloneForPrimalInst(builder, origInst);
 
     UCount operandCount = origInst->getOperandCount();
 
@@ -462,7 +461,7 @@ InstPair ForwardDiffTranscriber::transcribeByPassthrough(IRBuilder* builder, IRI
     return InstPair(
         primalInst, 
         builder->emitIntrinsicInst(
-            differentiateType(builder, primalInst->getDataType()),
+            differentiateType(builder, origInst->getDataType()),
             origInst->getOp(),
             operandCount,
             diffOperands.getBuffer()));
@@ -481,10 +480,10 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
             for (UIndex ii = 0; ii < origBranch->getArgCount(); ii++)
             {
                 auto origArg = origBranch->getArg(ii);
-                auto primalArg = lookupPrimalInst(origArg);
+                auto primalArg = lookupPrimalInst(builder, origArg);
                 newArgs.add(primalArg);
 
-                if (differentiateType(builder, primalArg->getDataType()))
+                if (differentiateType(builder, origArg->getDataType()))
                 {
                     auto diffArg = lookupDiffInst(origArg, nullptr);
                     if (diffArg)
@@ -672,7 +671,7 @@ InstPair ForwardDiffTranscriber::transcribeFieldExtract(IRBuilder* builder, IRIn
 
     IRInst* diffFieldExtract = nullptr;
 
-    if (auto diffType = differentiateType(builder, primalType))
+    if (auto diffType = differentiateType(builder, originalInst->getDataType()))
     {
         if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
         {
@@ -706,7 +705,7 @@ InstPair ForwardDiffTranscriber::transcribeGetElement(IRBuilder* builder, IRInst
 
     IRInst* diffGetElementPtr = nullptr;
 
-    if (auto diffType = differentiateType(builder, primalType))
+    if (auto diffType = differentiateType(builder, origGetElementPtr->getDataType()))
     {
         if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
         {
@@ -820,7 +819,7 @@ InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(IRBuilder* build
     auto primalPair = builder->emitMakeDifferentialPair(
         tryGetDiffPairType(builder, primalVal->getDataType()), primalVal, diffPrimalVal);
     auto diffPair = builder->emitMakeDifferentialPair(
-        tryGetDiffPairType(builder, differentiateType(builder, primalVal->getDataType())),
+        tryGetDiffPairType(builder, differentiateType(builder, origInst->getPrimalValue()->getDataType())),
         primalDiffVal,
         diffDiffVal);
     return InstPair(primalPair, diffPair);
@@ -897,7 +896,7 @@ InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, I
 
     IRInst* diffResult = nullptr;
 
-    if (auto diffType = differentiateType(builder, primalType))
+    if (auto diffType = differentiateType(builder, origInst->getDataType()))
     {
         List<IRInst*> diffArgs;
         for (UInt i = 0; i < origInst->getOperandCount(); i++)

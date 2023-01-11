@@ -2129,7 +2129,7 @@ namespace Slang
                 {
                     derivType = outType->getValueType();
                 }
-                else if (!as<PtrTypeBase>(derivType))
+                else if (as<DifferentialPairType>(derivType))
                 {
                     derivType = m_astBuilder->getInOutType(derivType);
                 }

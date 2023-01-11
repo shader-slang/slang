@@ -37,4 +37,8 @@ namespace Slang
     void validateIRModuleIfEnabled(
         CodeGenContext* codeGenContext,
         IRModule*       module);
+
+    void disableIRValidationAtInsert();
+    void enableIRValidationAtInsert();
+
 }
