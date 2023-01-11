@@ -9,6 +9,7 @@
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-propagate.h"
 #include "slang-ir-autodiff-transcriber-base.h"
+#include "slang-ir-validate.h"
 
 namespace Slang
 {
@@ -265,7 +266,10 @@ struct DiffUnzipPass
             newFwdCallee,
             diffArgs);
         diffBuilder->markInstAsDifferential(diffPairVal, primalType);
+
+        disableIRValidationAtInsert();
         diffBuilder->addBackwardDerivativePrimalContextDecoration(diffPairVal, intermediateVar);
+        enableIRValidationAtInsert();
 
         auto diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, diffPairVal);
         diffBuilder->markInstAsDifferential(diffVal, primalType);
