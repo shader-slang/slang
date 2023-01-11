@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-validate.h"
 
 namespace Slang {
 
@@ -1195,7 +1196,6 @@ bool constructSSA(ConstructSSAContext* context)
     {
         var->removeAndDeallocate();
     }
-
     return true;
 }
 

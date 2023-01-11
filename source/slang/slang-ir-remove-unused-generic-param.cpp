@@ -22,30 +22,51 @@ struct RemoveUnusedGenericParamContext : InstPassBase
         {
             if (auto genInst = as<IRGeneric>(inst))
             {
+                auto returnVal = findGenericReturnVal(genInst);
+                switch (returnVal->getOp())
+                {
+                case kIROp_StructType:
+                case kIROp_ClassType:
+                    break;
+                case kIROp_Func:
+                case kIROp_FuncType:
+                default:
+                    // Don't simplify functions since this can break signature compatiblity with the
+                    // interface. For example, if we have
+                    // interface IFoo { void genFunc<T>(int x); }
+                    // We can't simplify this by removing `T` even when the function type here does not depend on T.
+                    continue;
+                }
+                if (returnVal->findDecoration<IRTargetIntrinsicDecoration>())
+                    continue;
+
                 List<UInt> paramToPreserve;
                 UInt id = 0;
+                List<IRInst*> paramsToRemove;
                 for (auto param : genInst->getParams())
                 {
                     if (param->hasUses())
                     {
                         paramToPreserve.add(id);
                     }
+                    else
+                    {
+                        paramsToRemove.add(param);
+                    }
                     id++;
                 }
-                if (paramToPreserve.getCount() == (Index)id)
+                if (paramsToRemove.getCount() == 0)
                     continue;
                 changed = true;
                 if (paramToPreserve.getCount() == 0)
                 {
                     // Special case: the generic return value is not dependent on the generic param,
                     // we can hoist to global scope safely.
-                    IRInst* returnVal = nullptr;
                     for (auto child = genInst->getFirstBlock()->getFirstOrdinaryInst(); child; )
                     {
                         auto next = child->getNextInst();
                         if (child->getOp() == kIROp_Return)
                         {
-                            returnVal = child->getOperand(0);
                             break;
                         }
                         child->insertBefore(genInst);
@@ -69,6 +90,9 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                 else
                 {
                     // General case: remove unnecessary specialization arguments.
+                    // Disabled this optimization for now since we still need to take care
+                    // of the type of the generic, or change other passes to not
+                    // use type info on a generic at all.
                     List<IRUse*> uses;
                     for (auto use = genInst->firstUse; use; use = use->nextUse)
                         uses.add(use);
@@ -92,6 +116,8 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                             specialize->removeAndDeallocate();
                         }
                     }
+                    for (auto param : paramsToRemove)
+                        param->removeAndDeallocate();
                 }
             }
         }

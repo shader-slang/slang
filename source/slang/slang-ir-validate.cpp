@@ -206,18 +206,18 @@ namespace Slang
         }
     }
 
-    static bool _supressIRValidationAtInsert = false;
-    void supressIRValidationAtInsert()
+    static thread_local bool _enableIRValidationAtInsert = false;
+    void disableIRValidationAtInsert()
     {
-        _supressIRValidationAtInsert = true;
+        _enableIRValidationAtInsert = false;
     }
-    void resumeIRValidationAtInsert()
+    void enableIRValidationAtInsert()
     {
-        _supressIRValidationAtInsert = false;
+        _enableIRValidationAtInsert = true;
     }
     void validateIRInstOperands(IRInst* inst)
     {
-        if (_supressIRValidationAtInsert)
+        if (!_enableIRValidationAtInsert)
             return;
         switch (inst->getOp())
         {
@@ -334,4 +334,5 @@ namespace Slang
         auto sink = codeGenContext->getSink();
         validateIRModule(module, sink);
     }
+
 }

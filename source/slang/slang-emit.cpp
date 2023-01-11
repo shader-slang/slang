@@ -377,7 +377,9 @@ Result linkAndOptimizeIR(
         performMandatoryEarlyInlining(irModule);
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
+        enableIRValidationAtInsert();
         changed |= processAutodiffCalls(irModule, sink);
+        disableIRValidationAtInsert();
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
         if (!changed)
@@ -1008,7 +1010,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             this,
             linkingAndOptimizationOptions,
             linkedIR));
-
+        
         auto irModule = linkedIR.module;
 
         metadata = linkedIR.metadata;
