@@ -85,7 +85,8 @@ struct ExtractPrimalFuncContext
         for (UInt i = 0; i < originalFuncType->getParamCount() - 1; i++)
             paramTypes.add((IRType*)migrationContext.cloneInst(&builder, originalFuncType->getParamType(i)));
         paramTypes.add(builder.getInOutType((IRType*)outIntermediateType));
-        auto newFuncType = builder.getFuncType(paramTypes, builder.getVoidType());
+        auto resultType = (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getResultType());
+        auto newFuncType = builder.getFuncType(paramTypes, resultType);
         return newFuncType;
     }
 
