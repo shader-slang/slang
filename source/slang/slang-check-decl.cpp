@@ -4811,18 +4811,18 @@ namespace Slang
         {
             if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
             {
-                if (auto existingModifier = calleeDeclRef->declRef.getDecl()->findModifier<typename TDerivativeAttr>())
+                if (auto existingModifier = calleeDeclRef->declRef.getDecl()->findModifier<TDerivativeAttr>())
                 {
                     // The primal function already has a `[*Derivative]` attribute, this is invalid.
                     visitor->getSink()->diagnose(
                         derivativeOfAttr,
                         Diagnostics::declAlreadyHasAttribute,
                         calleeDeclRef->declRef,
-                        getDerivativeAttrName<typename TDerivativeAttr>());
+                        getDerivativeAttrName<TDerivativeAttr>());
                     visitor->getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef->declRef.getDecl());
                 }
                 derivativeOfAttr->funcExpr = calleeDeclRef;
-                auto derivativeAttr = visitor->getASTBuilder()->create<typename TDerivativeAttr>();
+                auto derivativeAttr = visitor->getASTBuilder()->create<TDerivativeAttr>();
                 derivativeAttr->loc = derivativeOfAttr->loc;
                 auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
                 auto declRef =
