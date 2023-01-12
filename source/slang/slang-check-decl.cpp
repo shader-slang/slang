@@ -4806,11 +4806,11 @@ namespace Slang
 
     template <typename TDerivativeAttr, typename TDerivativeOfAttr>
     void checkDerivativeOfAttributeImpl(
-        SemanticsVisitor *visitor,
-        FunctionDeclBase *funcDecl,
-        TDerivativeOfAttr *derivativeOfAttr,
+        SemanticsVisitor* visitor,
+        FunctionDeclBase* funcDecl,
+        TDerivativeOfAttr* derivativeOfAttr,
         DeclAssociationKind assocKind,
-        const List<Expr *> &imaginaryArgsToOriginal)
+        const List<Expr*>& imaginaryArgsToOriginal)
     {
         auto invokeExpr = visitor->constructUncheckedInvokeExpr(derivativeOfAttr->funcExpr, imaginaryArgsToOriginal);
         auto resolved = visitor->ResolveInvoke(invokeExpr);
