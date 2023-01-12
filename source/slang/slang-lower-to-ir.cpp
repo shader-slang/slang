@@ -1162,14 +1162,23 @@ static void addLinkageDecoration(
     IRInst*                     inst,
     Decl*                       decl)
 {
-     String mangledName = getMangledName(context->astBuilder, decl);
+    const String mangledName = getMangledName(context->astBuilder, decl);
 
-     if (context->shared->m_obfuscateCode)
-     {
-         mangledName = getHashedName(mangledName.getUnownedSlice());
-     }
-
-    addLinkageDecoration(context, inst, decl, mangledName.getUnownedSlice());
+    // Obfuscate the mangled names if necessary.
+    // 
+    // Care is needed around stdlib as it is only compiled once and *without* obfuscation, 
+    // so any linkage name to stdlib *shouldn't* have obfuscation applied to it.
+    if (context->shared->m_obfuscateCode && 
+        !isFromStdLib(decl))
+    {
+        const auto obfuscatedName = getHashedName(mangledName.getUnownedSlice());
+    
+        addLinkageDecoration(context, inst, decl, obfuscatedName.getUnownedSlice());
+    }
+    else
+    {
+        addLinkageDecoration(context, inst, decl, mangledName.getUnownedSlice());
+    }
 }
 
 bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
@@ -6244,6 +6253,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: This approach doesn't really make sense for generic `extension` conformances.
         auto mangledName = getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
 
+        
         // A witness table may need to be generic, if the outer
         // declaration (either a type declaration or an `extension`)
         // is generic.
@@ -6270,6 +6280,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto irSubType = lowerType(subContext, subType);
         irWitnessTable->setOperand(0, irSubType);
+
+        // TODO(JS): 
+        // Should the mangled name take part in obfuscation if enabled?
 
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
 
