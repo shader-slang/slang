@@ -41,7 +41,7 @@ struct AutoDiffTranscriberBase
         , sharedBuilder(inSharedBuilder)
         , sink(inSink)
     {
-
+        cloneEnv.squashChildrenMapping = true;
     }
 
     DiagnosticSink* getSink();
@@ -61,13 +61,29 @@ struct AutoDiffTranscriberBase
 
     bool hasDifferentialInst(IRInst* origInst);
 
-    bool shouldUseOriginalAsPrimal(IRInst* origInst);
+    bool shouldUseOriginalAsPrimal(IRInst* currentParent, IRInst* origInst);
 
-    IRInst* lookupPrimalInst(IRInst* origInst);
+    IRInst* lookupPrimalInstImpl(IRInst* currentParent, IRInst* origInst);
 
-    IRInst* lookupPrimalInst(IRInst* origInst, IRInst* defaultInst);
+    IRInst* lookupPrimalInst(IRInst* currentParent, IRInst* origInst, IRInst* defaultInst);
 
-    bool hasPrimalInst(IRInst* origInst);
+    IRInst* lookupPrimalInstIfExists(IRBuilder* builder, IRInst* origInst)
+    {
+        return lookupPrimalInst(builder->getInsertLoc().getParent(), origInst, origInst);
+    }
+
+    IRInst* lookupPrimalInst(IRBuilder* builder, IRInst* origInst)
+    {
+        return lookupPrimalInstImpl(builder->getInsertLoc().getParent(), origInst);
+    }
+
+    IRInst* lookupPrimalInst(IRBuilder* builder, IRInst* origInst, IRInst* defaultInst)
+    {
+        return lookupPrimalInst(builder->getInsertLoc().getParent(), origInst, defaultInst);
+    }
+
+
+    bool hasPrimalInst(IRInst* currentParent, IRInst* origInst);
 
     IRInst* findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst);
 

@@ -155,12 +155,15 @@ struct DiffTransposePass
         // 
         firstRevDiffBlockMap[revDiffFunc] = revBlockMap[workList[0]];
 
+        IRInst* retVal = nullptr;
+
         for (auto block : workList)
         {
             // Set dOutParameter as the transpose gradient for the return inst, if any.
             if (auto returnInst = as<IRReturn>(block->getTerminator()))
             {
                 this->addRevGradientForFwdInst(returnInst, RevGradient(returnInst, transposeInfo.dOutInst, nullptr));
+                retVal = returnInst->getVal();
             }
 
             IRBlock* revBlock = revBlockMap[block];
@@ -187,7 +190,18 @@ struct DiffTransposePass
             // There should be no parameters in the first reverse-mode block.
             SLANG_ASSERT(terminalRevBlock->getFirstParam() == nullptr);
 
-            subBuilder.emitBranch(terminalRevBlock);
+            auto branch = subBuilder.emitBranch(terminalRevBlock);
+
+            if (!retVal)
+            {
+                retVal = subBuilder.getVoidValue();
+            }
+            else
+            {
+                auto makePair = cast<IRMakeDifferentialPair>(retVal);
+                retVal = makePair->getPrimalValue();
+            }
+            subBuilder.addBackwardDerivativePrimalReturnDecoration(branch, retVal);
         }
 
         // Remove fwd-mode blocks.
@@ -498,6 +512,10 @@ struct DiffTransposePass
             }
         }
 
+        // The call must have been decorated with the continuation context after splitting.
+        auto primalContextDecor = fwdCall->findDecoration<IRBackwardDerivativePrimalContextDecoration>();
+        SLANG_RELEASE_ASSERT(primalContextDecor);
+
         auto baseFn = fwdDiffCallee->getBaseFn();
 
         List<IRInst*> args;
@@ -543,8 +561,14 @@ struct DiffTransposePass
         args.add(revValue);
         argTypes.add(revValue->getDataType());
 
+        args.add(primalContextDecor->getBackwardDerivativePrimalContextVar());
+        argTypes.add(builder->getOutType(
+            as<IRPtrTypeBase>(
+                primalContextDecor->getBackwardDerivativePrimalContextVar()->getDataType())
+                ->getValueType()));
+
         auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
-        auto revCallee = builder->emitBackwardDifferentiateInst(
+        auto revCallee = builder->emitBackwardDifferentiatePropagateInst(
             revFnType,
             baseFn);
 

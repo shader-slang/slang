@@ -308,6 +308,7 @@ struct IRRequireGLSLExtensionDecoration : IRDecoration
 };
 
 IR_SIMPLE_DECORATION(ReadNoneDecoration)
+IR_SIMPLE_DECORATION(NoSideEffectDecoration)
 IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
@@ -605,6 +606,29 @@ struct IRBackwardDerivativePrimalDecoration : IRDecoration
     IR_LEAF_ISA(BackwardDerivativePrimalDecoration)
 
     IRInst* getBackwardDerivativePrimalFunc() { return getOperand(0); }
+};
+
+// Used to associate the restore context var to use in a call to splitted backward propgate function.
+struct IRBackwardDerivativePrimalContextDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BackwardDerivativePrimalContextDecoration
+    };
+    IR_LEAF_ISA(BackwardDerivativePrimalContextDecoration)
+
+    IRInst* getBackwardDerivativePrimalContextVar() { return getOperand(0); }
+};
+
+struct IRBackwardDerivativePrimalReturnDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BackwardDerivativePrimalReturnDecoration
+    };
+    IR_LEAF_ISA(BackwardDerivativePrimalReturnDecoration)
+
+    IRInst* getBackwardDerivativePrimalReturnValue() { return getOperand(0); }
 };
 
 struct IRBackwardDerivativePropagateDecoration : IRDecoration
@@ -3478,6 +3502,11 @@ public:
         addDecoration(value, kIROp_BackwardDerivativePrimalDecoration, jvpFn);
     }
 
+    void addBackwardDerivativePrimalReturnDecoration(IRInst* value, IRInst* retVal)
+    {
+        addDecoration(value, kIROp_BackwardDerivativePrimalReturnDecoration, retVal);
+    }
+
     void addBackwardDerivativePropagateDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_BackwardDerivativePropagateDecoration, jvpFn);
@@ -3491,6 +3520,11 @@ public:
     void addBackwardDerivativeIntermediateTypeDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_BackwardDerivativeIntermediateTypeDecoration, jvpFn);
+    }
+
+    void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)
+    {
+        addDecoration(value, kIROp_BackwardDerivativePrimalContextDecoration, ctx);
     }
 
     void markInstAsDifferential(IRInst* value)

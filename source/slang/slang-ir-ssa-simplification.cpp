@@ -7,6 +7,7 @@
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-hoist-constants.h"
+#include "slang-ir-remove-unused-generic-param.h"
 
 namespace Slang
 {
@@ -31,7 +32,7 @@ namespace Slang
             eliminateDeadCode(module);
 
             changed |= constructSSA(module);
-
+            changed |= removeUnusedGenericParam(module);
             iterationCounter++;
         }
     }

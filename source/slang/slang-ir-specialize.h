@@ -9,4 +9,6 @@ struct IRModule;
 bool specializeModule(
     IRModule*   module);
 
+void finalizeSpecialization(IRModule* module);
+
 }

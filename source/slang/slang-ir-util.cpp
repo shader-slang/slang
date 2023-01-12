@@ -156,11 +156,11 @@ IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecaili
     return genericToSpecailize;
 }
 
-IRInst* hoistValueFromGeneric(IRBuilder& builder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
+IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
 {
     auto outerGeneric = as<IRGeneric>(findOuterGeneric(value));
     if (!outerGeneric) return value;
-
+    IRBuilder builder = inBuilder;
     builder.setInsertBefore(outerGeneric);
     auto newGeneric = builder.emitGeneric();
     builder.setInsertInto(newGeneric);

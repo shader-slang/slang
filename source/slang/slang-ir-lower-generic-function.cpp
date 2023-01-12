@@ -48,9 +48,12 @@ namespace Slang
             IRCloneEnv cloneEnv;
             IRBuilder builder(sharedContext->sharedBuilderStorage);
             builder.setInsertBefore(genericParent);
+            // Do not clone func type (which would break IR def-use rules if we do it here)
+            // This is OK since we will lower the type immediately after the clone.
+            cloneEnv.mapOldValToNew[func->getFullType()] = builder.getTypeKind();
             auto loweredFunc = cast<IRFunc>(cloneInstAndOperands(&cloneEnv, &builder, func));
             auto loweredGenericType =
-                lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->getFullType()));
+                lowerGenericFuncType(&builder, genericParent, cast<IRFuncType>(func->getFullType()));
             SLANG_ASSERT(loweredGenericType);
             loweredFunc->setFullType(loweredGenericType);
             List<IRInst*> clonedParams;
@@ -90,7 +93,7 @@ namespace Slang
             return loweredFunc;
         }
 
-        IRType* lowerGenericFuncType(IRBuilder* builder, IRGeneric* genericVal)
+        IRType* lowerGenericFuncType(IRBuilder* builder, IRGeneric* genericVal, IRFuncType* funcType)
         {
             ShortList<IRInst*> genericParamTypes;
             Dictionary<IRInst*, IRInst*> typeMapping;
@@ -107,7 +110,7 @@ namespace Slang
 
             auto innerType = (IRFuncType*)lowerFuncType(
                 builder,
-                cast<IRFuncType>(findGenericReturnVal(genericVal)),
+                funcType,
                 typeMapping,
                 genericParamTypes.getArrayView().arrayView);
 
@@ -182,7 +185,10 @@ namespace Slang
                     }
                     else if (auto genericFuncType = as<IRGeneric>(requirementVal))
                     {
-                        loweredVal = lowerGenericFuncType(&builder, genericFuncType);
+                        loweredVal = lowerGenericFuncType(
+                            &builder,
+                            genericFuncType,
+                            cast<IRFuncType>(findGenericReturnVal(genericFuncType)));
                     }
                     else if (requirementVal->getOp() == kIROp_AssociatedType)
                     {

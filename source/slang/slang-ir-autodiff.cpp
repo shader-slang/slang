@@ -2,6 +2,7 @@
 #include "slang-ir-autodiff-rev.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-pairs.h"
+#include "slang-ir-validate.h"
 
 namespace Slang
 {
@@ -392,6 +393,28 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
     }
 }
 
+void stripDerivativeDecorations(IRInst* inst)
+{
+    for (auto decor = inst->getFirstDecoration(); decor; )
+    {
+        auto next = decor->getNextDecoration();
+        switch (decor->getOp())
+        {
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_DerivativeMemberDecoration:
+        case kIROp_BackwardDerivativeDecoration:
+        case kIROp_BackwardDerivativeIntermediateTypeDecoration:
+        case kIROp_BackwardDerivativePropagateDecoration:
+        case kIROp_BackwardDerivativePrimalDecoration:
+            decor->removeAndDeallocate();
+            break;
+        default:
+            break;
+        }
+        decor = next;
+    }
+}
+
 void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
     for (auto inst : parent->getChildren())
@@ -410,6 +433,8 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_BackwardDerivativeIntermediateTypeDecoration:
             case kIROp_BackwardDerivativePropagateDecoration:
             case kIROp_BackwardDerivativePrimalDecoration:
+            case kIROp_BackwardDerivativePrimalContextDecoration:
+            case kIROp_BackwardDerivativePrimalReturnDecoration:
                 decor->removeAndDeallocate();
                 break;
             default:
@@ -699,7 +724,7 @@ struct AutoDiffPass : public InstPassBase
                         forwardTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
                         break;
                     case FuncBodyTranscriptionTaskType::BackwardPrimal:
-                        // Don't need to do anything, they will be filled by `backwardPropagateTranscriber`.
+                        backwardPrimalTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
                         break;
                     case FuncBodyTranscriptionTaskType::BackwardPropagate:
                         backwardPropagateTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
@@ -720,6 +745,10 @@ struct AutoDiffPass : public InstPassBase
                 stripBlockTypeDecorations(diffFunc);
 
             autodiffCleanupList.clear();
+
+#if _DEBUG
+            validateIRModule(module, sink);
+#endif
 
             if (!changed)
                 break;
@@ -785,11 +814,14 @@ struct AutoDiffPass : public InstPassBase
 
         forwardTranscriber.pairBuilder = &pairBuilderStorage;
         backwardPrimalTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardPrimalTranscriber.fwdDiffTranscriber = &forwardTranscriber;
         backwardPropagateTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardPropagateTranscriber.fwdDiffTranscriber = &forwardTranscriber;
         backwardTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardTranscriber.fwdDiffTranscriber = &forwardTranscriber;
+
+        // Make the transcribers available to all sub passes via shared context.
+        context->transcriberSet.primalTranscriber = &backwardPrimalTranscriber;
+        context->transcriberSet.propagateTranscriber = &backwardPropagateTranscriber;
+        context->transcriberSet.forwardTranscriber = &forwardTranscriber;
+        context->transcriberSet.backwardTranscriber = &backwardTranscriber;
     }
 
 protected:

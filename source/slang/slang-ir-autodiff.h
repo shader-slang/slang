@@ -47,6 +47,16 @@ struct FuncBodyTranscriptionTask
     IRFunc* resultFunc;
 };
 
+struct AutoDiffTranscriberBase;
+
+struct DiffTranscriberSet
+{
+    AutoDiffTranscriberBase* forwardTranscriber = nullptr;
+    AutoDiffTranscriberBase* primalTranscriber = nullptr;
+    AutoDiffTranscriberBase* propagateTranscriber = nullptr;
+    AutoDiffTranscriberBase* backwardTranscriber = nullptr;
+};
+
 struct AutoDiffSharedContext
 {
     IRModuleInst* moduleInst = nullptr;
@@ -92,6 +102,8 @@ struct AutoDiffSharedContext
     bool                                    isInterfaceAvailable = false;
 
     List<FuncBodyTranscriptionTask>         followUpFunctionsToTranscribe;
+
+    DiffTranscriberSet transcriberSet;
 
     AutoDiffSharedContext(IRModuleInst* inModuleInst);
 
@@ -244,5 +256,7 @@ bool processAutodiffCalls(
     IRAutodiffPassOptions const&   options = IRAutodiffPassOptions());
 
 bool finalizeAutoDiffPass(IRModule* module);
+
+void stripDerivativeDecorations(IRInst* inst);
 
 };

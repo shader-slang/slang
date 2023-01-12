@@ -1511,6 +1511,10 @@ static LegalVal legalizeMakeStruct(
             List<IRInst*> args;
             for(UInt aa = 0; aa < argCount; ++aa)
             {
+                // Ignore none values.
+                if (legalArgs[aa].flavor == LegalVal::Flavor::none)
+                    continue;
+
                 // Note: we assume that all the arguments
                 // must be simple here, because otherwise
                 // the `struct` type with them as fields
@@ -1521,7 +1525,7 @@ static LegalVal legalizeMakeStruct(
             return LegalVal::simple(
                 builder->emitMakeStruct(
                     legalType.getSimple(),
-                    argCount,
+                    args.getCount(),
                     args.getBuffer()));
         }
 

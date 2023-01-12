@@ -54,7 +54,6 @@
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-string-hash.h"
-
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -378,7 +377,9 @@ Result linkAndOptimizeIR(
         performMandatoryEarlyInlining(irModule);
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
+        enableIRValidationAtInsert();
         changed |= processAutodiffCalls(irModule, sink);
+        disableIRValidationAtInsert();
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
         if (!changed)
@@ -386,6 +387,8 @@ Result linkAndOptimizeIR(
     }
 
     finalizeAutoDiffPass(irModule);
+
+    finalizeSpecialization(irModule);
 
     // If we have a target that is GPU like we use the string hashing mechanism
     // but for that to work we need to inline such that calls (or returns) of strings
@@ -1007,7 +1010,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             this,
             linkingAndOptimizationOptions,
             linkedIR));
-
+        
         auto irModule = linkedIR.module;
 
         metadata = linkedIR.metadata;
