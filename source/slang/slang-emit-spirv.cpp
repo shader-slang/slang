@@ -915,6 +915,7 @@ struct SPIRVEmitContext
             getSection(SpvLogicalSectionID::ExtIntInstImports),
             nullptr,
             SpvOpExtInstImport,
+            kResultID,
             UnownedStringSlice("GLSL.std.450"));
         return m_glsl450ExtInst;
     }
