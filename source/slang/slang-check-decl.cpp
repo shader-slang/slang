@@ -4796,14 +4796,21 @@ namespace Slang
         return imaginaryArguments;
     }
 
+    // This helper function is needed to workaround a gcc bug.
+    // Remove when we upgrade to a newer version of gcc.
+    template <typename T>
+    static T* _findModifier(Decl* decl)
+    {
+        return decl->findModifier<T>();
+    }
 
-    template<typename TDerivativeAttr, typename TDerivativeOfAttr>
+    template <typename TDerivativeAttr, typename TDerivativeOfAttr>
     void checkDerivativeOfAttributeImpl(
-        SemanticsVisitor* visitor,
-        FunctionDeclBase* funcDecl,
-        TDerivativeOfAttr* derivativeOfAttr,
+        SemanticsVisitor *visitor,
+        FunctionDeclBase *funcDecl,
+        TDerivativeOfAttr *derivativeOfAttr,
         DeclAssociationKind assocKind,
-        const List<Expr*>& imaginaryArgsToOriginal)
+        const List<Expr *> &imaginaryArgsToOriginal)
     {
         auto invokeExpr = visitor->constructUncheckedInvokeExpr(derivativeOfAttr->funcExpr, imaginaryArgsToOriginal);
         auto resolved = visitor->ResolveInvoke(invokeExpr);
@@ -4811,7 +4818,8 @@ namespace Slang
         {
             if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
             {
-                if (auto existingModifier = calleeDeclRef->declRef.getDecl()->findModifier<TDerivativeAttr>())
+                auto calleeDecl = calleeDeclRef->declRef.getDecl();
+                if (auto existingModifier = _findModifier<TDerivativeAttr>(calleeDecl))
                 {
                     // The primal function already has a `[*Derivative]` attribute, this is invalid.
                     visitor->getSink()->diagnose(
