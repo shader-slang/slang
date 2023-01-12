@@ -734,12 +734,13 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// generated derivative function.
     INST(BackwardDifferentiableDecoration, backwardDifferentiable, 1, 0)
 
-        /// Decorated function is marked for the reverse-mode differentiation pass.
+        /// Decorations to associate an original function with compiler generated backward derivative functions.
     INST(BackwardDerivativePrimalDecoration, backwardDiffPrimalReference, 1, 0)
     INST(BackwardDerivativePropagateDecoration, backwardDiffPropagateReference, 1, 0)
     INST(BackwardDerivativeIntermediateTypeDecoration, backwardDiffIntermediateTypeReference, 1, 0)
     INST(BackwardDerivativeDecoration, backwardDiffReference, 1, 0)
 
+    INST(UserDefinedBackwardDerivativeDecoration, userDefinedBackwardDiffReference, 1, 0)
     INST(BackwardDerivativePrimalContextDecoration, BackwardDerivativePrimalContextDecoration, 1, 0)
     INST(BackwardDerivativePrimalReturnDecoration, BackwardDerivativePrimalReturnDecoration, 1, 0)
 

@@ -1066,26 +1066,36 @@ class ForwardDifferentiableAttribute : public DifferentiableAttribute
     SLANG_AST_CLASS(ForwardDifferentiableAttribute)
 };
 
-    /// The `[ForwardDerivative(function)]` attribute specifies a custom function that should
-    /// be used as the derivative for the decorated function.
-class ForwardDerivativeAttribute : public DifferentiableAttribute
+class UserDefinedDerivativeAttribute : public DifferentiableAttribute
 {
-    SLANG_AST_CLASS(ForwardDerivativeAttribute)
+    SLANG_AST_CLASS(UserDefinedDerivativeAttribute)
 
     Expr* funcExpr;
+};
+
+    /// The `[ForwardDerivative(function)]` attribute specifies a custom function that should
+    /// be used as the derivative for the decorated function.
+class ForwardDerivativeAttribute : public UserDefinedDerivativeAttribute
+{
+    SLANG_AST_CLASS(ForwardDerivativeAttribute)
+};
+
+class DerivativeOfAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(DerivativeOfAttribute)
+
+    Expr* funcExpr;
+
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
     /// The `[ForwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
     /// derivative implementation for `primalFunction`.
     /// ForwardDerivativeOfAttribute inherits from DifferentiableAttribute because a derivative
     /// function itself is considered differentiable.
-class ForwardDerivativeOfAttribute : public DifferentiableAttribute
+class ForwardDerivativeOfAttribute : public DerivativeOfAttribute
 {
     SLANG_AST_CLASS(ForwardDerivativeOfAttribute)
-
-    Expr* funcExpr;
-
-    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
     /// The `[BackwardDifferentiable]` attribute indicates that a function can be backward-differentiated.
@@ -1096,21 +1106,16 @@ class BackwardDifferentiableAttribute : public DifferentiableAttribute
 
     /// The `[BackwardDerivative(function)]` attribute specifies a custom function that should
     /// be used as the backward-derivative for the decorated function.
-class BackwardDerivativeAttribute : public DifferentiableAttribute
+class BackwardDerivativeAttribute : public UserDefinedDerivativeAttribute
 {
     SLANG_AST_CLASS(BackwardDerivativeAttribute)
-    Expr* funcExpr;
 };
 
     /// The `[BackwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
     /// backward-derivative implementation for `primalFunction`.
-class BackwardDerivativeOfAttribute : public DifferentiableAttribute
+class BackwardDerivativeOfAttribute : public DerivativeOfAttribute
 {
     SLANG_AST_CLASS(BackwardDerivativeOfAttribute)
-
-    Expr* funcExpr;
-
-    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
     /// The `[NoDiffThis]` attribute is used to specify that the `this` parameter should not be
