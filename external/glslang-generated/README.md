@@ -54,7 +54,7 @@ For Visual Studio
 For gcc or clang (add -cc=clang)
 
 ```
-% premake gmake --build-glslang=true
+% premake gmake2 --build-glslang=true
 ```
 
 Then just build Slang as usual in visual studio, or from the linux command line for example

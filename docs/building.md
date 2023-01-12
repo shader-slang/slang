@@ -69,13 +69,13 @@ Supported `--arch` options are
 For Unix like targets that might have `clang` or `gcc` compilers available you can select which one via the `-cc` option. For example...
 
 ```
-% premake5 gmake --cc=clang --deps=true --arch=x64
+% premake5 gmake2 --cc=clang --deps=true --arch=x64
 ```
 
 or 
 
 ```
-% premake5 gmake --cc=gcc --deps=true --arch=x64
+% premake5 gmake2 --cc=gcc --deps=true --arch=x64
 ```
 
 If you want to build the [`glslang`](https://github.com/KhronosGroup/glslang) library that Slang uses, add the option `--build-glslang=true`.
@@ -126,7 +126,7 @@ On Linux we need to generate Makefiles using `premake`. Please read the `premake
 In the terminal go to the root directory of the slang source tree (ie the directory containing `slang.h`). Assuming `premake5` is in your `PATH` use  
 
 ```
-% premake5 gmake --deps=true --arch=x64
+% premake5 gmake2 --deps=true --arch=x64
 ```
 
 To create a release build use
@@ -144,13 +144,13 @@ Note that OSX isn't an official target.
 On Mac OSX to generate Makefiles or an XCode project we use `premake`. Please read the `premake` section for more details. 
 
 ```
-% premake5 gmake --deps=true --arch=x64
+% premake5 gmake2 --deps=true --arch=x64
 ```
 
 If you want to build `glslang` (necessary for Slang to output SPIR-V for example), then the additional `--build-glslang` option should be used
 
 ```
-% premake5 gmake --build-glslang=true --deps=true --arch=x64
+% premake5 gmake2 --build-glslang=true --deps=true --arch=x64
 ```
 
 To build for release you can use...
@@ -171,10 +171,10 @@ Then open the `slang.xcworkspace` project inside of Xcode and build.
 
 Note that Cygwin isn't an official target. 
 
-One issue with building on [Cygwin](https://cygwin.com/), is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake`. Here we use another approach - using the windows `premake` to create a Cygwin project. To do this use the command line...
+One issue with building on [Cygwin](https://cygwin.com/), is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake2`. Here we use another approach - using the windows `premake` to create a Cygwin project. To do this use the command line...
 
 ```
-% premake5 --target-detail=cygwin gmake --deps=true --arch=x64
+% premake5 --target-detail=cygwin gmake2 --deps=true --arch=x64
 ```
 
 ## Testing
