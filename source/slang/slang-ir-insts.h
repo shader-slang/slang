@@ -701,6 +701,15 @@ struct IRBackwardDifferentiableDecoration : IRDecoration
     IR_LEAF_ISA(BackwardDifferentiableDecoration)
 };
 
+struct IRUserDefinedBackwardDerivativeDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_UserDefinedBackwardDerivativeDecoration
+    };
+    IR_LEAF_ISA(UserDefinedBackwardDerivativeDecoration)
+};
+
 struct IRTreatAsDifferentiableDecoration : IRDecoration
 {
     enum
@@ -3495,6 +3504,11 @@ public:
     void addForwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
     {
         addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
+    }
+
+    void addUserDefinedBackwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
+    {
+        addDecoration(value, kIROp_UserDefinedBackwardDerivativeDecoration, fwdFunc);
     }
 
     void addBackwardDerivativePrimalDecoration(IRInst* value, IRInst* jvpFn)

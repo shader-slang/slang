@@ -8360,7 +8360,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         setGlobalValue(context, decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
-        if (auto attr = decl->findModifier<ForwardDerivativeAttribute>())
+        if (auto attr = decl->findModifier<UserDefinedDerivativeAttribute>())
         {
             // We need to lower the decl ref to the custom derivative function to IR.
             // The IR insts correspond to the decl ref is not part of the function we
@@ -8374,13 +8374,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto loweredVal = lowerRValueExpr(subContext, attr->funcExpr);
 
             SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-            IRInst* jvpFunc = loweredVal.val;
-            getBuilder()->addDecoration(irFunc, kIROp_ForwardDerivativeDecoration, jvpFunc);
+            IRInst* derivativeFunc = loweredVal.val;
+
+            if (as<ForwardDerivativeAttribute>(attr))
+                getBuilder()->addForwardDerivativeDecoration(irFunc, derivativeFunc);
+            else
+                getBuilder()->addUserDefinedBackwardDerivativeDecoration(irFunc, derivativeFunc);
 
             // Reset cursor.
             subContext->irBuilder->setInsertInto(irFunc);
         }
-        
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
@@ -8391,7 +8395,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the interface's type definition.
         auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
 
-        if (auto attr = decl->findModifier<ForwardDerivativeOfAttribute>())
+        if (auto attr = decl->findModifier<DerivativeOfAttribute>())
         {
             if (auto originalDeclRefExpr = as<DeclRefExpr>(attr->funcExpr))
             {
@@ -8412,9 +8416,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
                 originalSubBuilder->setInsertBefore(originalFuncVal);
                 auto derivativeFuncVal = lowerRValueExpr(originalSubContext, attr->backDeclRef);
-                originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                if (as<ForwardDerivativeOfAttribute>(attr))
+                {
+                    originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                    getBuilder()->addForwardDifferentiableDecoration(irFunc);
+                }
+                else
+                {
+                    originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                    getBuilder()->addForwardDifferentiableDecoration(irFunc);
+                    getBuilder()->addBackwardDifferentiableDecoration(irFunc);
+                }
             }
-            getBuilder()->addForwardDifferentiableDecoration(irFunc);
             subContext->irBuilder->setInsertInto(irFunc);
             finalVal->moveToEnd();
         }
