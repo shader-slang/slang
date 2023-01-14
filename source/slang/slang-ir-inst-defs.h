@@ -723,7 +723,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
 
-
         /// Decorated function is marked for the forward-mode differentiation pass.
     INST(ForwardDifferentiableDecoration, forwardDifferentiable, 0, 0)
 
