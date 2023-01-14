@@ -9102,8 +9102,23 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
 
+    // Next, attempt to promote local variables to SSA
+    // temporaries and do basic simplifications.
+    //
+    constructSSA(module);
+    simplifyCFG(module);
+    applySparseConditionalConstantPropagation(module);
+
     // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
+    //
+    // Note: We performed certain critical simplifications
+    // above, before this step, so that the body of functions
+    // subject to mandatory inlining can be simplified ahead
+    // of time. By simplifying the body before inlining it,
+    // we can make sure that things like superfluous temporaries
+    // are eliminated from the callee, and not copied into
+    // call sites.
     //
     performMandatoryEarlyInlining(module);
 

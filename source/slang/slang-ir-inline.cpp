@@ -393,6 +393,75 @@ struct InliningPassBase
         return clonedInst;
     }
 
+        /// Inline the body of the callee for `callSite`, for a callee that has only
+        /// a single basic block.
+        ///
+    void inlineSingleBlockFuncBody(
+        CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
+    {
+        auto call = callSite.call;
+        auto callee = callSite.callee;
+
+        // The callee had better have only a single basic block.
+        //
+        auto firstBlock = callee->getFirstBlock();
+        SLANG_ASSERT(!firstBlock->getNextBlock());
+
+        // We will loop over the instructions in the block and clone
+        // them into the same basic block as the `call`.
+        //
+        builder->setInsertBefore(call);
+
+        // Along the way, we will detect any `return` instruction,
+        // and remember the (clone of the) returned value.
+        //
+        IRInst* returnVal = nullptr;
+
+        for (auto inst : firstBlock->getChildren())
+        {
+            switch (inst->getOp())
+            {
+            default:
+                // In the common case we just clone the instruction as-is
+                _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                break;
+
+            case kIROp_Param:
+                // Parameters of the first block are the parameters of
+                // the function itself, so we skip them rather than
+                // clone them.
+                //
+                break;
+
+            case kIROp_Return:
+                // We expect to see only a single `return` instruction,
+                // and when we see it we note the value being returned.
+                //
+                SLANG_ASSERT(!returnVal);
+                returnVal = findCloneForOperand(env, inst->getOperand(0));
+                break;
+            }
+        }
+
+        // We are going to remove the original `call` now that the callee
+        // has been inlined, but before we do that we need to replace
+        // all uses of the `call` with whatever value was produced by the
+        // inlined body of the callee.
+        //
+        if (returnVal)
+        {
+            call->replaceUsesWith(returnVal);
+        }
+        else
+        {
+            call->replaceUsesWith(builder->getVoidValue());
+        }
+
+        // Once the `call` has no uses, we can safely remove it.
+        //
+        call->removeAndDeallocate();
+    }
+
         /// Inline the body of the callee for `callSite`.
     void inlineFuncBody(
         CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
@@ -400,11 +469,45 @@ struct InliningPassBase
         auto call = callSite.call;
         auto callee = callSite.callee;
 
-        // Break the basic block containing the call inst into two basic blocks.
+        // If the callee consists of a single basic block *and* that block
+        // ends with a `return` instruction, then we can apply a simple approach
+        // to inlining that is compatible with any call site (including those
+        // at the global scope).
+        //
+        auto firstBlock = callee->getFirstBlock();
+        SLANG_ASSERT(firstBlock);
+        if(!firstBlock->getNextBlock() && as<IRReturn>(firstBlock->getTerminator()))
+        {
+            inlineSingleBlockFuncBody(callSite, env, builder);
+            return;
+        }
+
+        // If the callee has any non-trivial control flow (multiple basic blocks
+        // and terminators other than `return`), we will need to split the control
+        // flow of the caller at the block that contains `call`.
+        //
+        // For any of this to work, we have to assume that the `call` appears
+        // in a basic block inside of a function (not, e.g., at the global scope).
+        //
         auto callerBlock = callSite.call->getParent();
-        builder->setInsertInto(callerBlock->getParent());
+        SLANG_ASSERT(as<IRBlock>(callerBlock));
+        auto callerFunc = callerBlock->getParent();
+        SLANG_ASSERT(callerFunc);
+
+        // As a fail-safe for release builds, if the above expectations are somehow
+        // *not* met, we will fall back to not inlining the call at all.
+        //
+        if (!callerFunc)
+        {
+            return;
+        }
+
+        // We will create a new basic block block in the parent function that
+        // will contain all the instructions that come *after* the `call`.
+        //
+        builder->setInsertInto(callerFunc);
         auto afterBlock = builder->createBlock();
-        
+
         // Many operations (e.g. `cloneInst`) has define-before-use assumptions on the IR.
         // It is important to make sure we keep the ordering of blocks by inserting the
         // second half of the basic block right after `callerBlock`.
