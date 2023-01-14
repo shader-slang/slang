@@ -6,6 +6,21 @@
 
 namespace Slang
 {
+
+bool isBackwardDifferentiableFunc(IRInst* func)
+{
+    for (auto decorations : func->getDecorations())
+    {
+        switch (decorations->getOp())
+        {
+        case kIROp_BackwardDifferentiableDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            return true;
+        }
+    }
+    return false;
+}
+
 static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
@@ -388,7 +403,7 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
     {
         if (auto pairType = as<IRDifferentialPairType>(globalInst))
         {
-            differentiableWitnessDictionary.Add(pairType->getValueType(), pairType->getWitness());
+            differentiableWitnessDictionary.AddIfNotExists(pairType->getValueType(), pairType->getWitness());
         }
     }
 }
@@ -406,6 +421,8 @@ void stripDerivativeDecorations(IRInst* inst)
         case kIROp_BackwardDerivativeIntermediateTypeDecoration:
         case kIROp_BackwardDerivativePropagateDecoration:
         case kIROp_BackwardDerivativePrimalDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+        case kIROp_AutoDiffOriginalValueDecoration:
             decor->removeAndDeallocate();
             break;
         default:
@@ -435,6 +452,8 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_BackwardDerivativePrimalDecoration:
             case kIROp_BackwardDerivativePrimalContextDecoration:
             case kIROp_BackwardDerivativePrimalReturnDecoration:
+            case kIROp_AutoDiffOriginalValueDecoration:
+            case kIROp_UserDefinedBackwardDerivativeDecoration:
                 decor->removeAndDeallocate();
                 break;
             default:
@@ -456,27 +475,26 @@ void stripAutoDiffDecorations(IRModule* module)
 }
 
 
-void stripBlockTypeDecorations(IRFunc* func)
+void stripTempDecorations(IRInst* inst)
 {
-    for (auto child : func->getChildren())
+    for (auto decor = inst->getFirstDecoration(); decor; )
     {
-        if (auto block = as<IRBlock>(child))
+        auto next = decor->getNextDecoration();
+        switch (decor->getOp())
         {
-            for (auto decor = block->getFirstDecoration(); decor; )
-            {
-                auto next = decor->getNextDecoration();
-                switch (decor->getOp())
-                {
-                case kIROp_DifferentialInstDecoration:
-                case kIROp_MixedDifferentialInstDecoration:
-                    decor->removeAndDeallocate();
-                    break;
-                default:
-                    break;
-                }
-                decor = next;
-            }
+        case kIROp_DifferentialInstDecoration:
+        case kIROp_MixedDifferentialInstDecoration:
+        case kIROp_AutoDiffOriginalValueDecoration:
+            decor->removeAndDeallocate();
+            break;
+        default:
+            break;
         }
+        decor = next;
+    }
+    for (auto child : inst->getChildren())
+    {
+        stripTempDecorations(child);
     }
 }
 
@@ -554,9 +572,7 @@ struct AutoDiffPass : public InstPassBase
             auto inner = findGenericReturnVal(baseGeneric);
             if (auto typeDecor = inner->findDecoration<IRBackwardDerivativeIntermediateTypeDecoration>())
             {
-                auto typeSpec = cast<IRSpecialize>(typeDecor->getBackwardDerivativeIntermediateType());
-                auto typeSpecBase = typeSpec->getBase();
-                return typeSpecBase;
+                return typeDecor->getBackwardDerivativeIntermediateType();
             }
         }
         else if (auto func = as<IRFunc>(base))
@@ -742,7 +758,7 @@ struct AutoDiffPass : public InstPassBase
             // passes since they don't expect decorations in blocks.
             // 
             for (auto diffFunc : autodiffCleanupList)
-                stripBlockTypeDecorations(diffFunc);
+                stripTempDecorations(diffFunc);
 
             autodiffCleanupList.clear();
 

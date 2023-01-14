@@ -8385,7 +8385,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContext->irBuilder->setInsertInto(irFunc);
         }
 
-        // For convenience, ensure that any additional global
+        // For convenience, ensure that any additional global\
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
         // of global values.

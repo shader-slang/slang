@@ -16,12 +16,6 @@ struct HoistLocalTypesContext
 
     void addToWorkList(IRInst* inst)
     {
-        for (auto ii = inst->getParent(); ii; ii = ii->getParent())
-        {
-            if (as<IRGeneric>(ii))
-                return;
-        }
-
         if (workListSet.Contains(inst))
             return;
 
@@ -29,19 +23,28 @@ struct HoistLocalTypesContext
         workListSet.Add(inst);
     }
 
-    void processInst(IRInst* inst)
+    bool processInst(IRInst* inst)
     {
         auto sharedBuilder = &sharedBuilderStorage;
         if (!as<IRType>(inst))
-            return;
+            return false;
         if (inst->getParent() == module->getModuleInst())
-            return;
+            return false;
+        switch (inst->getOp())
+        {
+        case kIROp_InterfaceType:
+        case kIROp_StructType:
+        case kIROp_ClassType:
+            return false;
+        default:
+            break;
+        }
         IRInstKey key = {inst};
         if (auto value = sharedBuilder->getGlobalValueNumberingMap().TryGetValue(key))
         {
             inst->replaceUsesWith(*value);
             inst->removeAndDeallocate();
-            return;
+            return true;
         }
         IRBuilder builder(sharedBuilder);
         builder.setInsertInto(module->getModuleInst());
@@ -67,7 +70,9 @@ struct HoistLocalTypesContext
             inst->transferDecorationsTo(newType);
             inst->replaceUsesWith(newType);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
     void processModule()
@@ -75,24 +80,31 @@ struct HoistLocalTypesContext
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
 
-        // Deduplicate equivalent types and build numbering map for global types.
-        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
-        addToWorkList(module->getModuleInst());
-
-        while (workList.getCount() != 0)
+        for (;;)
         {
-            IRInst* inst = workList.getLast();
+            bool changed = false;
+            // Deduplicate equivalent types and build numbering map for global types.
+            sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
-            workList.removeLast();
-            workListSet.Remove(inst);
+            addToWorkList(module->getModuleInst());
 
-            processInst(inst);
-
-            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            while (workList.getCount() != 0)
             {
-                addToWorkList(child);
+                IRInst* inst = workList.getLast();
+
+                workList.removeLast();
+                workListSet.Remove(inst);
+
+                changed |= processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                {
+                    addToWorkList(child);
+                }
             }
+
+            if (!changed)
+                break;
         }
     }
 };

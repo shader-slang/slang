@@ -566,6 +566,16 @@ struct IRSequentialIDDecoration : IRDecoration
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
+struct IRAutoDiffOriginalValueDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_AutoDiffOriginalValueDecoration
+    };
+    IR_LEAF_ISA(AutoDiffOriginalValueDecoration)
+    IRInst* getOriginalValue() { return getOperand(0); }
+};
+
 struct IRForwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -708,6 +718,7 @@ struct IRUserDefinedBackwardDerivativeDecoration : IRDecoration
         kOp = kIROp_UserDefinedBackwardDerivativeDecoration
     };
     IR_LEAF_ISA(UserDefinedBackwardDerivativeDecoration)
+    IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
 struct IRTreatAsDifferentiableDecoration : IRDecoration
@@ -3489,6 +3500,11 @@ public:
     void addForceInlineDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_ForceInlineDecoration);
+    }
+
+    void addAutoDiffOriginalValueDecoration(IRInst* value, IRInst* originalVal)
+    {
+        addDecoration(value, kIROp_AutoDiffOriginalValueDecoration, originalVal);
     }
 
     void addForwardDifferentiableDecoration(IRInst* value)

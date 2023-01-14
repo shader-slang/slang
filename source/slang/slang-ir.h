@@ -1758,6 +1758,9 @@ IRInst* findOuterGeneric(IRInst* inst);
 // Recursively find the outer most generic container.
 IRInst* findOuterMostGeneric(IRInst* inst);
 
+// Returns `inst` if it is not a generic, otherwise its outer generic.
+IRInst* maybeFindOuterGeneric(IRInst* inst);
+
 struct IRSpecialize;
 IRGeneric* findSpecializedGeneric(IRSpecialize* specialize);
 IRInst* findSpecializeReturnVal(IRSpecialize* specialize);

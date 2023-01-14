@@ -6918,6 +6918,8 @@ namespace Slang
         // has an associated derivative function.
         if (func->findModifier<BackwardDifferentiableAttribute>())
             return true;
+        if (func->findModifier<BackwardDerivativeAttribute>())
+            return true;
         for (auto assocDecl : getAssociatedDeclsForDecl(func))
         {
             switch (assocDecl.kind)
