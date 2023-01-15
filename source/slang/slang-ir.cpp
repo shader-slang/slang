@@ -6671,6 +6671,8 @@ namespace Slang
 
         case kIROp_ForwardDifferentiate:
         case kIROp_BackwardDifferentiate:
+        case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardDifferentiatePropagate:
             return false;
         }
 
@@ -6813,6 +6815,13 @@ namespace Slang
             inst = inst->getParent();
         }
         return nullptr;
+    }
+
+    IRInst* maybeFindOuterGeneric(IRInst* inst)
+    {
+        auto outerGeneric = findOuterGeneric(inst);
+        if (!outerGeneric) return inst;
+        return outerGeneric;
     }
 
     IRInst* findOuterMostGeneric(IRInst* inst)

@@ -252,6 +252,12 @@ struct ExtractPrimalFuncContext
         SLANG_RELEASE_ASSERT(structType);
         auto structKey = genTypeBuilder.createStructKey();
         genTypeBuilder.setInsertInto(structType);
+
+        if (isChildInstOf(fieldType->getParent(), structType->getParent()))
+        {
+            IRCloneEnv cloneEnv;
+            fieldType = cloneInst(&cloneEnv, &genTypeBuilder, fieldType);
+        }
         return genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
     }
 
@@ -452,19 +458,21 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
             if (auto structKeyDecor = inst->findDecoration<IRPrimalValueStructKeyDecoration>())
             {
                 builder.setInsertBefore(inst);
-                auto addr = builder.emitFieldAddress(
-                    builder.getPtrType(inst->getDataType()),
+                auto val = builder.emitFieldExtract(
+                    inst->getDataType(),
                     intermediateVar,
                     structKeyDecor->getStructKey());
                 if (inst->getOp() == kIROp_Var)
                 {
                     // This is a var for intermediate context.
-                    inst->replaceUsesWith(addr);
+                    auto tempVar =
+                        builder.emitVar(cast<IRPtrTypeBase>(inst->getFullType())->getValueType());
+                    builder.emitStore(tempVar, val);
+                    inst->replaceUsesWith(tempVar);
                 }
                 else
                 {
                     // Orindary value.
-                    auto val = builder.emitLoad(addr);
                     inst->replaceUsesWith(val);
                 }
                 instsToRemove.add(inst);

@@ -1221,6 +1221,26 @@ bool constructSSA(IRModule* module, IRInst* globalVal)
     case kIROp_GlobalVar:
         return constructSSA(module, (IRGlobalValueWithCode*)globalVal);
 
+    case kIROp_Generic:
+        {
+            // The above cases handle the actual code-bearing declarations
+            // that can contian basic blocks with local variables, but
+            // we would also like to perform SSA simplifications on
+            // *generic* functions, and so we will also process any
+            // instruction that is produced by an `IRGeneric`.
+            //
+            // TODO: At some point we may simply want to apply this pass
+            // recursively to *all* instructions, in order to make it
+            // robust to the presence of nested functions in general.
+
+            auto generic = cast<IRGeneric>(globalVal);
+            auto returnVal = findInnerMostGenericReturnVal(generic);
+            if(!returnVal)
+                return false;
+
+            return constructSSA(module, returnVal);
+        }
+
     default:
         break;
     }

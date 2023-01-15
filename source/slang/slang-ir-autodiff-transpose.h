@@ -468,6 +468,14 @@ struct DiffTransposePass
 
     void transposeInst(IRBuilder* builder, IRInst* inst)
     {
+        switch (inst->getOp())
+        {
+        case kIROp_ForwardDifferentiate:
+            return;
+        default:
+            break;
+        }
+
         // Look for gradient entries for this inst.
         List<RevGradient> gradients;
         if (hasRevGradients(inst))
@@ -575,14 +583,21 @@ struct DiffTransposePass
 
         List<IRInst*> args;
         List<IRType*> argTypes;
-        List<bool> isArgPtrTyped;
+        List<bool> argRequiresLoad;
+
+        auto getDiffPairType = [](IRType* type)
+        {
+            if (auto ptrType = as<IRPtrTypeBase>(type))
+                type = ptrType->getValueType();
+            return as<IRDifferentialPairType>(type);
+        };
 
         for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
         {
             auto arg = fwdCall->getArg(ii);
             
             // If this isn't a ptr-type, make a var.
-            if (!as<IRPtrTypeBase>(arg->getDataType()) && as<IRDifferentialPairType>(arg->getDataType()))
+            if (!as<IRPtrTypeBase>(arg->getDataType()) && getDiffPairType(arg->getDataType()))
             {
                 auto pairType = as<IRDifferentialPairType>(arg->getDataType());
 
@@ -603,24 +618,26 @@ struct DiffTransposePass
                 
                 args.add(var);
                 argTypes.add(builder->getInOutType(pairType));
-                isArgPtrTyped.add(false);
+                argRequiresLoad.add(true);
             }
             else
             {
                 args.add(arg);
                 argTypes.add(arg->getDataType());
-                isArgPtrTyped.add(true);
+                argRequiresLoad.add(false);
             }
         }
 
         args.add(revValue);
         argTypes.add(revValue->getDataType());
+        argRequiresLoad.add(false);
 
         args.add(primalContextDecor->getBackwardDerivativePrimalContextVar());
         argTypes.add(builder->getOutType(
             as<IRPtrTypeBase>(
                 primalContextDecor->getBackwardDerivativePrimalContextVar()->getDataType())
                 ->getValueType()));
+        argRequiresLoad.add(false);
 
         auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
         auto revCallee = builder->emitBackwardDifferentiatePropagateInst(
@@ -633,17 +650,16 @@ struct DiffTransposePass
         for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
         {
             // Is this arg relevant to auto-diff?
-            if (as<IRDifferentialPairType>(as<IRPtrTypeBase>(args[ii]->getDataType())->getValueType()))
+            if (auto diffPairType = getDiffPairType(args[ii]->getDataType()))
             {
                 // If this is ptr typed, ignore (the gradient will be accumulated on the pointer)
                 // automatically.
                 // 
-                if (!isArgPtrTyped[ii])
+                if (argRequiresLoad[ii])
                 {
                     auto diffArgType = (IRType*)diffTypeContext.getDifferentialForType(
                         builder, 
-                        as<IRDifferentialPairType>(
-                            as<IRPtrTypeBase>(argTypes[ii])->getValueType())->getValueType());
+                        diffPairType->getValueType());
                     auto diffArgPtrType = builder->getPtrType(kIROp_PtrType, diffArgType);
                     
                     gradients.add(RevGradient(
@@ -954,7 +970,6 @@ struct DiffTransposePass
     
     TranspositionResult transposeInst(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
-
         // Dispatch logic.
         switch(fwdInst->getOp())
         {
@@ -989,7 +1004,8 @@ struct DiffTransposePass
             
             case kIROp_MakeVector:
                 return transposeMakeVector(builder, fwdInst, revValue);
-            
+
+            case kIROp_Specialize:
             case kIROp_unconditionalBranch:
             case kIROp_conditionalBranch:
             case kIROp_ifElse:

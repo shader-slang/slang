@@ -143,6 +143,9 @@ IRInst* AutoDiffTranscriberBase::findOrTranscribePrimalInst(IRBuilder* builder, 
 
 IRInst* AutoDiffTranscriberBase::maybeCloneForPrimalInst(IRBuilder* builder, IRInst* inst)
 {
+    if (!inst)
+        return nullptr;
+
     IRInst* primal = lookupPrimalInst(builder, inst, nullptr);
     if (!primal)
     {
@@ -234,6 +237,13 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRInst* primalType)
 
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
 {
+    auto primalType = lookupPrimalInst(builder, origType, origType);
+    if (primalType->getOp() == kIROp_Param &&
+        primalType->getParent() && primalType->getParent()->getParent() &&
+        primalType->getParent()->getParent()->getOp() == kIROp_Generic)
+    {
+        return (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, origType);
+    }
     return (IRType*)transcribe(builder, origType);
 }
 
@@ -725,6 +735,8 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     builder.setInsertBefore(origGeneric);
 
     auto diffGeneric = builder.emitGeneric();
+    
+    mapDifferentialInst(origGeneric, diffGeneric);
 
     // Process type of generic. If the generic is a function, then it's type will also be a 
     // generic and this logic will transcribe that generic first before continuing with the 

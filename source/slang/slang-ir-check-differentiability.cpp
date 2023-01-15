@@ -71,6 +71,7 @@ public:
             {
             case kIROp_ForwardDerivativeDecoration:
             case kIROp_ForwardDifferentiableDecoration:
+            case kIROp_UserDefinedBackwardDerivativeDecoration:
             case kIROp_BackwardDerivativeDecoration:
             case kIROp_BackwardDifferentiableDecoration:
                 return true;
@@ -135,20 +136,6 @@ public:
             if (as<IRGeneric>(func))
             {
                 return differentiableFunctions.Contains(func);
-            }
-        }
-        return false;
-    }
-
-    bool isBackwardDifferentiableFunc(IRInst* func)
-    {
-        for (auto decorations : func->getDecorations())
-        {
-            switch (decorations->getOp())
-            {
-            case kIROp_BackwardDerivativeDecoration:
-            case kIROp_BackwardDifferentiableDecoration:
-                return true;
             }
         }
         return false;
