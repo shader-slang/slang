@@ -184,19 +184,43 @@ struct DiffUnzipPass
         return false;
     }
 
+    static IRInst* _getOriginalFunc(IRInst* call)
+    {
+        if (auto decor = call->findDecoration<IRAutoDiffOriginalValueDecoration>())
+            return decor->getOriginalValue();
+        return nullptr;
+    }
+
     InstPair splitCall(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRCall* mixedCall)
     {
         IRBuilder globalBuilder;
         globalBuilder.init(autodiffContext->sharedBuilder);
 
-        auto fwdCallee = as<IRForwardDifferentiate>(mixedCall->getCallee());
-        auto fwdCalleeType = as<IRFuncType>(fwdCallee->getDataType());
-        auto baseFn = fwdCallee->getBaseFn();
+        auto fwdCalleeType = mixedCall->getCallee()->getDataType();
+        auto baseFn = _getOriginalFunc(mixedCall);
+        SLANG_RELEASE_ASSERT(baseFn);
 
         auto primalFuncType = autodiffContext->transcriberSet.primalTranscriber->differentiateFunctionType(
             primalBuilder, baseFn, as<IRFuncType>(baseFn->getDataType()));
 
-        auto intermediateVar = primalBuilder->emitVar(primalBuilder->getBackwardDiffIntermediateContextType(baseFn));
+        IRInst* intermediateType = nullptr;
+
+        if (auto specialize = as<IRSpecialize>(baseFn))
+        {
+            auto func = findSpecializeReturnVal(specialize);
+            auto outerGen = findOuterGeneric(func);
+            intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(outerGen);
+            intermediateType = specializeWithGeneric(
+                *primalBuilder,
+                intermediateType,
+                as<IRGeneric>(findOuterGeneric(primalBuilder->getInsertLoc().getParent())));
+        }
+        else
+        {
+            intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(baseFn);
+        }
+
+        auto intermediateVar = primalBuilder->emitVar((IRType*)intermediateType);
         primalBuilder->addBackwardDerivativePrimalContextDecoration(intermediateVar, intermediateVar);
 
         auto primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst(primalFuncType, baseFn);
@@ -204,7 +228,7 @@ struct DiffUnzipPass
         List<IRInst*> primalArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
-            auto arg = mixedCall->getArg(0);
+            auto arg = mixedCall->getArg(ii);
 
             if (isRelevantDifferentialPair(arg->getDataType()))
             {
@@ -232,7 +256,7 @@ struct DiffUnzipPass
         List<IRInst*> diffArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
-            auto arg = mixedCall->getArg(0);
+            auto arg = mixedCall->getArg(ii);
 
             if (isRelevantDifferentialPair(arg->getDataType()))
             {

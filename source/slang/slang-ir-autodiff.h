@@ -259,4 +259,5 @@ bool finalizeAutoDiffPass(IRModule* module);
 
 void stripDerivativeDecorations(IRInst* inst);
 
+bool isBackwardDifferentiableFunc(IRInst* func);
 };

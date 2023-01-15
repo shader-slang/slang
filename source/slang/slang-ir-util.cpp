@@ -1,6 +1,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-dce.h"
 
 namespace Slang
 {
@@ -198,6 +199,7 @@ IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outS
         value->replaceUsesWith(outSpecializedVal);
         value->removeAndDeallocate();
     }
+    eliminateDeadCode(newGeneric);
     return newGeneric;
 }
 

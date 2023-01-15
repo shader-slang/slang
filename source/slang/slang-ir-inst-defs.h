@@ -726,6 +726,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Decorated function is marked for the forward-mode differentiation pass.
     INST(ForwardDifferentiableDecoration, forwardDifferentiable, 0, 0)
 
+        /// Decorates a auto-diff transcribed value with the original value that the inst is transcribed from.
+    INST(AutoDiffOriginalValueDecoration, AutoDiffOriginalValueDecoration, 1, 0)
+
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.
     INST(ForwardDerivativeDecoration, fwdDerivative, 1, 0)

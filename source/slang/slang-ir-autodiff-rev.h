@@ -87,7 +87,7 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 
     IRFunc* generateNewForwardDerivativeForFunc(IRBuilder* builder, IRFunc* originalFunc, IRFunc* diffPropagateFunc);
 
-    void transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc, IRGlobalValueWithCode*& diffPrimalFunc);
+    void transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc);
 
     InstPair transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc);
 
@@ -144,6 +144,11 @@ struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
               inSharedBuilder,
               inSink)
     { }
+    void generateTrivialDiffFuncFromUserDefinedDerivative(
+        IRBuilder* builder,
+        IRFunc* primalFunc,
+        IRFunc* diffPropFunc,
+        IRUserDefinedBackwardDerivativeDecoration* udfDecor);
 
     virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
     virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) override;
@@ -186,6 +191,10 @@ struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
     virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) override
     {
         if (auto backDecor = originalFunc->findDecoration<IRBackwardDerivativeDecoration>())
+        {
+            return backDecor->getBackwardDerivativeFunc();
+        }
+        if (auto backDecor = originalFunc->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
         {
             return backDecor->getBackwardDerivativeFunc();
         }

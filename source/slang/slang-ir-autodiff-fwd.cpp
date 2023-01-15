@@ -287,6 +287,33 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
     }
 }
 
+static bool _isDifferentiableFunc(IRInst* func)
+{
+    for (auto decor = func->getFirstDecoration(); decor; decor = decor->getNextDecoration())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_ForwardDifferentiableDecoration:
+        case kIROp_BackwardDerivativeDecoration:
+        case kIROp_BackwardDifferentiableDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            return true;
+        }
+    }
+    return false;
+}
+
+static IRFuncType* _getCalleeActualFuncType(IRInst* callee)
+{
+    auto type = callee->getFullType();
+    if (auto funcType = as<IRFuncType>(type))
+        return funcType;
+    if (auto specialize = as<IRSpecialize>(callee))
+        return as<IRFuncType>(findGenericReturnVal(as<IRGeneric>(specialize->getBase()))->getFullType());
+    return nullptr;
+}
+
 // Differentiating a call instruction here is primarily about generating
 // an appropriate call list based on whichever parameters have differentials 
 // in the current transcription context.
@@ -310,10 +337,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         return InstPair(nullptr, nullptr);
     }
 
-    // Since concrete functions are globals, the primal callee is the same
-    // as the original callee.
-    //
-    auto primalCallee = origCallee;
+    auto primalCallee = lookupPrimalInst(builder, origCallee, origCallee);
 
     IRInst* diffCallee = nullptr;
 
@@ -325,8 +349,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         // If the user has already provided an differentiated implementation, use that.
         diffCallee = derivativeReferenceDecor->getForwardDerivativeFunc();
     }
-    else if (primalCallee->findDecoration<IRForwardDifferentiableDecoration>() ||
-        primalCallee->findDecoration<IRBackwardDifferentiableDecoration>())
+    else if (_isDifferentiableFunc(primalCallee))
     {
         // If the function is marked for auto-diff, push a `differentiate` inst for a follow up pass
         // to generate the implementation.
@@ -343,7 +366,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         return InstPair(primalCall, nullptr);
     }
 
-    auto calleeType = as<IRFuncType>(diffCallee->getDataType());
+    auto calleeType = _getCalleeActualFuncType(diffCallee);
     SLANG_ASSERT(calleeType);
     SLANG_RELEASE_ASSERT(calleeType->getParamCount() == origCall->getArgCount());
 
@@ -399,6 +422,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         diffCallee,
         args);
     builder->markInstAsMixedDifferential(callInst, diffReturnType);
+    builder->addAutoDiffOriginalValueDecoration(callInst, primalCallee);
 
     if (diffReturnType->getOp() != kIROp_VoidType)
     {
@@ -629,7 +653,7 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
             builder->getTypeKind(), diffBaseSpecialize->getBase(), args.getCount(), args.getBuffer());
         return InstPair(primalSpecialize, diffSpecialize);
     }
-    else if (auto diffDecor = genericInnerVal->findDecoration<IRForwardDifferentiableDecoration>())
+    else if (_isDifferentiableFunc(genericInnerVal))
     {
         List<IRInst*> args;
         for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
@@ -927,8 +951,15 @@ InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, I
 // Create an empty func to represent the transcribed func of `origFunc`.
 InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
 {
-    if (auto bwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
-        return InstPair(origFunc, bwdDecor->getForwardDerivativeFunc());
+    if (auto fwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
+    {
+        // If we reach here, the function must have been used directly in a `call` inst, and therefore
+        // can't be a generic.
+        // Generic function are always referenced with `specialize` inst and the handling logic for
+        // custom derivatives is implemented in `transcribeSpecialize`.
+        SLANG_RELEASE_ASSERT(fwdDecor->getForwardDerivativeFunc()->getOp() == kIROp_Func);
+        return InstPair(origFunc, fwdDecor->getForwardDerivativeFunc());
+    }
     
     auto diffFunc = transcribeFuncHeaderImpl(inBuilder, origFunc);
 
@@ -1010,51 +1041,6 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
         as<IRBlock>(lookupDiffInst(block))->insertAtEnd(diffFunc);
 
     return InstPair(primalFunc, diffFunc);
-}
-
-// Transcribe a generic definition
-InstPair ForwardDiffTranscriber::transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric)
-{
-    auto innerVal = findInnerMostGenericReturnVal(origGeneric);
-    if (auto innerFunc = as<IRFunc>(innerVal))
-    {
-        differentiableTypeConformanceContext.setFunc(innerFunc);
-    }
-    else if (auto funcType = as<IRFuncType>(innerVal))
-    {
-    }
-    else
-    {
-        return InstPair(origGeneric, nullptr);
-    }
-
-    IRGeneric* primalGeneric = origGeneric;
-
-    IRBuilder builder(inBuilder->getSharedBuilder());
-    builder.setInsertBefore(origGeneric);
-
-    auto diffGeneric = builder.emitGeneric();
-
-    // Process type of generic. If the generic is a function, then it's type will also be a 
-    // generic and this logic will transcribe that generic first before continuing with the 
-    // function itself.
-    // 
-    auto primalType =  primalGeneric->getFullType();
-
-    IRType* diffType = nullptr;
-    if (primalType)
-    {
-        diffType = (IRType*) findOrTranscribeDiffInst(&builder, primalType);
-    }
-
-    diffGeneric->setFullType(diffType);
-
-    // Transcribe children from origFunc into diffFunc.
-    builder.setInsertInto(diffGeneric);
-    for (auto block = origGeneric->getFirstBlock(); block; block = block->getNextBlock())
-        this->transcribe(&builder, block);
-
-    return InstPair(primalGeneric, diffGeneric);
 }
 
 InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* origInst)
