@@ -798,7 +798,6 @@ InstPair ForwardDiffTranscriber::transcribeIfElse(IRBuilder* builder, IRIfElse* 
     SLANG_ASSERT(diffTrueBlock);
 
     // Transcribe 'false' block (condition block branches into this if true)
-    // TODO (sai): What happens if there's no false block?
     auto diffFalseBlock = findOrTranscribeDiffInst(builder, origIfElse->getFalseBlock());
     SLANG_ASSERT(diffFalseBlock);
 
