@@ -858,7 +858,8 @@ struct DiffTransposePass
         // Check for predecessors count.
         for (auto predecessor : fwdBlockInst->getPredecessors())
         {
-            fwdPredecesorBlocks.add(predecessor);
+            if (!fwdPredecesorBlocks.contains(predecessor))
+                fwdPredecesorBlocks.add(predecessor);
         }
 
         SLANG_ASSERT(fwdPredecesorBlocks.getCount() > 0);
@@ -915,7 +916,7 @@ struct DiffTransposePass
     {
         IRBlock* revBlock = revBlockMap[fwdBlockInst];
 
-        // If we already have a terminator, we've resolved it during
+        // If we already have a terminator, we've probably resolved it during
         // tryEmitTerminator()
         // 
         if (revBlock->getTerminator() != nullptr)
@@ -960,7 +961,63 @@ struct DiffTransposePass
                 }
                 
                 builder->emitIfElse(condition, revTrueBlock, revFalseBlock, revAfterBlock);
-                break;
+                return true;
+            }
+            case kIROp_Switch:
+            {
+                auto switchInst = as<IRSwitch>(terminatorInst);
+                
+                auto condition = switchInst->getCondition();
+                SLANG_ASSERT(!isDifferentialInst(condition));
+
+                // fwd origin block is the reverse 'break' block.
+                auto revAfterBlock = as<IRBlock>(
+                    revBlockMap[as<IRBlock>(switchInst->getParent())]);
+                
+                // Find regions for every branch, and find the reverse-mode 
+                // version of the each exit block.
+                Region* defaultRegion = regionMap[switchInst->getDefaultLabel()];
+                IRBlock* revDefaultBlock = revBlockMap[defaultRegion->exitBlock];
+
+                List<IRBlock*> revCaseBlocks;
+                for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii ++)
+                {
+                    Region* caseRegion = regionMap[switchInst->getCaseLabel(ii)];
+                    IRBlock* revCaseBlock = revBlockMap[caseRegion->exitBlock];
+                    revCaseBlocks.add(revCaseBlock);
+                }
+
+                // If we have phi derivatives to pass on, 
+                // we need to add dummy blocks to pass them using
+                // an unconditional branch.
+                // 
+                if (phiParamGrads.getCount() > 0)
+                {
+                    revDefaultBlock = insertPhiBlockBefore(revDefaultBlock, phiParamGrads);
+                    revDefaultBlock->insertAfter(revBlock);
+
+                    for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii ++)
+                    {
+                        revCaseBlocks[ii] = insertPhiBlockBefore(revCaseBlocks[ii], phiParamGrads);
+                        revCaseBlocks[ii]->insertAfter(revBlock);
+                    }
+                }
+                
+                List<IRInst*> revCaseArgs;
+                for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii ++)
+                {
+                    revCaseArgs.add(switchInst->getCaseValue(ii));
+                    revCaseArgs.add(revCaseBlocks[ii]);
+                }
+                
+                builder->emitSwitch(
+                    condition,
+                    revAfterBlock,
+                    revDefaultBlock,
+                    revCaseArgs.getCount(),
+                    revCaseArgs.getBuffer());
+
+                return true;
             }
             default:
                 SLANG_UNIMPLEMENTED_X("Unhandled control flow inst during transposition");
@@ -1010,6 +1067,7 @@ struct DiffTransposePass
             case kIROp_conditionalBranch:
             case kIROp_ifElse:
             case kIROp_loop:
+            case kIROp_Switch:
             {
                 // Ignore. transposeBlock() should take care of adding the
                 // appropriate branch instruction.

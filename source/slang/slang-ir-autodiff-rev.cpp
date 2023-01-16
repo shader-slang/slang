@@ -666,14 +666,15 @@ namespace Slang
 
         builder->setInsertInto(fwdDiffParameterBlock);
 
-        // 1. Turn fwd-diff versions of the parameters into reverse-diff versions by wrapping them as InOutType<>
-        for (auto child = fwdDiffParameterBlock->getFirstParam(); child;)
+        List<IRParam*> fwdParams;
+        for (auto child = fwdDiffParameterBlock->getFirstParam(); child; child = child->getNextParam())
         {
-            IRParam* nextChild = child->getNextParam();
+            fwdParams.add(child);
+        }
 
-            auto fwdParam = as<IRParam>(child);
-            SLANG_ASSERT(fwdParam);
-            
+        // 1. Turn fwd-diff versions of the parameters into reverse-diff versions by wrapping them as InOutType<>
+        for (auto fwdParam : fwdParams)
+        {   
             // TODO: Handle ptr<pair> types.
             if (auto diffPairType = as<IRDifferentialPairType>(fwdParam->getDataType()))
             {
@@ -690,10 +691,11 @@ namespace Slang
             else
             {
                 // Default case (parameter has nothing to do with differentiation)
-                // Do nothing.
+                // Simply move the parameter to the end.
+                //
+                fwdParam->removeFromParent();
+                fwdDiffParameterBlock->addParam(fwdParam);
             }
-
-            child = nextChild;
         }
 
         auto paramCount = as<IRFuncType>(diffFunc->getDataType())->getParamCount();
