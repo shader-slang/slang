@@ -223,6 +223,24 @@ DifferentialPair<vector<T, N>> __d_exp_vector(DifferentialPair<vector<T, N>> dpx
     VECTOR_MAP_D_UNARY(T, N, __d_exp, dpx);
 }
 
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDerivativeOf(exp)]
+void __d_exp(inout DifferentialPair<T> dpx, T.Differential dOut)
+{
+    dpx = diffPair(
+        dpx.p,
+        T.dmul(exp(dpx.p), dOut));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(exp)]
+void __d_exp_vector(inout DifferentialPair<vector<T, N>> dpx, vector<T, N>.Differential dOut)
+{
+    dpx = diffPair(
+        dpx.p,
+        vector<T, N>.dmul(exp(dpx.p), dOut));
+}
+
 // Absolute value
 
 __generic<T : __BuiltinFloatingPointType>

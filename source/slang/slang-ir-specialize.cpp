@@ -390,57 +390,61 @@ struct SpecializationContext
             auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
             if (genericReturnVal->findDecoration<IRTargetIntrinsicDecoration>())
             {
-                if (auto customDiffRef = genericReturnVal->findDecoration<IRForwardDerivativeDecoration>())
+                for (auto decor : genericReturnVal->getDecorations())
                 {
-                    // If we already have a diff func on this specialize, skip.
-                    if (auto specDiffRef = specInst->findDecoration<IRForwardDerivativeDecoration>())
+                    if (decor->getOp() == kIROp_ForwardDerivativeDecoration ||
+                        decor->getOp() == kIROp_UserDefinedBackwardDerivativeDecoration)
                     {
-                        return false;
+                        // If we already have a diff func on this specialize, skip.
+                        if (auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
+                        {
+                            return false;
+                        }
+
+                        auto specDiffFunc = as<IRSpecialize>(decor->getOperand(0));
+
+                        // If the base is specialized, the JVP version must be also be a specialized
+                        // generic.
+                        //
+                        SLANG_RELEASE_ASSERT(specDiffFunc);
+
+                        // Build specialization arguments from specInst.
+                        // Note that if we've reached this point, we can safely assume
+                        // that our args are fully specialized/concrete.
+                        //
+                        UCount argCount = specInst->getArgCount();
+                        List<IRInst*> args;
+                        for (UIndex ii = 0; ii < argCount; ii++)
+                            args.add(specInst->getArg(ii));
+
+                        IRBuilder builder(&sharedBuilderStorage);
+
+                        // Specialize the custom derivative function type with the original arguments.
+                        builder.setInsertInto(module);
+                        auto newDiffFuncType = builder.emitSpecializeInst(
+                            builder.getTypeKind(),
+                            specDiffFunc->getBase()->getDataType(),
+                            argCount,
+                            args.getBuffer());
+
+                        // Specialize the custom derivative function with the original arguments.
+                        builder.setInsertBefore(specInst);
+                        auto newDiffFunc = builder.emitSpecializeInst(
+                            (IRType*)newDiffFuncType,
+                            specDiffFunc->getBase(),
+                            argCount,
+                            args.getBuffer());
+
+                        // Add the new spec insts to the list so they get specialized with 
+                        // the usual logic.
+                        // 
+                        addToWorkList(newDiffFuncType);
+                        addToWorkList(newDiffFunc);
+
+                        builder.addDecoration(specInst, decor->getOp(), newDiffFunc);
+
+                        return true;
                     }
-
-                    auto specDiffFunc = as<IRSpecialize>(customDiffRef->getForwardDerivativeFunc());
-
-                    // If the base is specialized, the JVP version must be also be a specialized
-                    // generic.
-                    //
-                    SLANG_RELEASE_ASSERT(specDiffFunc);
-
-                    // Build specialization arguments from specInst.
-                    // Note that if we've reached this point, we can safely assume
-                    // that our args are fully specialized/concrete.
-                    //
-                    UCount argCount = specInst->getArgCount();
-                    List<IRInst*> args;
-                    for (UIndex ii = 0; ii < argCount; ii++)
-                        args.add(specInst->getArg(ii));
-
-                    IRBuilder builder(&sharedBuilderStorage);
-
-                    // Specialize the custom JVP function type with the original arguments.
-                    builder.setInsertInto(module);
-                    auto newDiffFuncType = builder.emitSpecializeInst(
-                        builder.getTypeKind(),
-                        specDiffFunc->getBase()->getDataType(),
-                        argCount,
-                        args.getBuffer());                    
-                    
-                    // Specialize the custom JVP function with the original arguments.
-                    builder.setInsertBefore(specInst);
-                    auto newDiffFunc = builder.emitSpecializeInst(
-                        (IRType*) newDiffFuncType,
-                        specDiffFunc->getBase(),
-                        argCount,
-                        args.getBuffer());
-
-                    // Add the new spec insts to the list so they get specialized with 
-                    // the usual logic.
-                    // 
-                    addToWorkList(newDiffFuncType);
-                    addToWorkList(newDiffFunc);
-
-                    builder.addForwardDerivativeDecoration(specInst, newDiffFunc);
-
-                    return true;
                 }
             }
             return false;

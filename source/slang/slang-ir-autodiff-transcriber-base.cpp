@@ -176,61 +176,56 @@ IRInst* AutoDiffTranscriberBase::maybeCloneForPrimalInst(IRBuilder* builder, IRI
 }
 
 // Get or construct `:IDifferentiable` conformance for a DifferentiablePair.
-IRWitnessTable* AutoDiffTranscriberBase::getDifferentialPairWitness(IRInst* inDiffPairType)
+IRWitnessTable* AutoDiffTranscriberBase::getDifferentialPairWitness(IRBuilder* builder, IRInst* inOriginalDiffPairType, IRInst* inPrimalDiffPairType)
 {
-    IRBuilder builder(sharedBuilder);
-    builder.setInsertInto(inDiffPairType->parent);
-    auto diffPairType = as<IRDifferentialPairType>(inDiffPairType);
-    SLANG_ASSERT(diffPairType);
-
-    auto table = builder.createWitnessTable(autoDiffSharedContext->differentiableInterfaceType, diffPairType);
-
     // Differentiate the pair type to get it's differential (which is itself a pair)
-    auto diffDiffPairType = differentiateType(&builder, diffPairType);
+    auto diffDiffPairType = differentiateType(builder, (IRType*)inOriginalDiffPairType);
+    
+    auto table = builder->createWitnessTable(autoDiffSharedContext->differentiableInterfaceType, (IRType*)inPrimalDiffPairType);
 
     // And place it in the synthesized witness table.
-    builder.createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, diffDiffPairType);
+    builder->createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, diffDiffPairType);
+
     // Omit the method synthesis here, since we can just intercept those directly at `getXXMethodForType`.
 
     // Record this in the context for future lookups
-    differentiableTypeConformanceContext.differentiableWitnessDictionary[diffPairType] = table;
+    differentiableTypeConformanceContext.differentiableWitnessDictionary[(IRType*)inOriginalDiffPairType] = table;
 
     return table;
 }
 
-IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRInst* primalType, IRInst* witness)
+IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness)
 {
-    IRBuilder builder(sharedBuilder);
-    builder.setInsertInto(primalType->parent);
-    return builder.getDifferentialPairType(
+    return builder->getDifferentialPairType(
         (IRType*)primalType,
         witness);
 }
 
-IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRInst* primalType)
+IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRInst* originalType)
 {
-    IRBuilder builder(sharedBuilder);
-    if (!primalType->next)
-        builder.setInsertInto(primalType->parent);
-    else
-        builder.setInsertBefore(primalType->next);
+    auto primalType = lookupPrimalInst(builder, originalType, nullptr);
+    SLANG_RELEASE_ASSERT(primalType);
 
-    IRInst* witness = as<IRWitnessTable>(
-        differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)primalType));
-
+    IRInst* witness = 
+        differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)originalType);
+    if (witness)
+    {
+        witness = lookupPrimalInst(builder, witness, nullptr);
+        SLANG_RELEASE_ASSERT(witness);
+    }
     if (!witness)
     {
         if (auto primalPairType = as<IRDifferentialPairType>(primalType))
         {
-            witness = getDifferentialPairWitness(primalPairType);
+            witness = getDifferentialPairWitness(builder, originalType, primalPairType);
         }
-        else if (auto extractExistential = as<IRExtractExistentialType>(primalType))
+        else if (auto extractExistential = as<IRExtractExistentialType>(originalType))
         {
-            differentiateExtractExistentialType(&builder, extractExistential, witness);
+            differentiateExtractExistentialType(builder, extractExistential, witness);
         }
     }
 
-    return builder.getDifferentialPairType(
+    return builder->getDifferentialPairType(
         (IRType*)primalType,
         witness);
 }
@@ -242,7 +237,8 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
         primalType->getParent() && primalType->getParent()->getParent() &&
         primalType->getParent()->getParent()->getOp() == kIROp_Generic)
     {
-        return (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, origType);
+        auto diffType = (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, origType);
+        return (IRType*)findOrTranscribePrimalInst(builder, diffType);
     }
     return (IRType*)transcribe(builder, origType);
 }
@@ -254,10 +250,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
             origType->getOp(),
             differentiateType(builder, ptrType->getValueType()));
 
-    // If there is an explicit primal version of this type in the local scope, load that
-    // otherwise use the original type. 
-    //
-    IRInst* primalType = lookupPrimalInst(builder, origType, origType);
+    auto primalType = maybeCloneForPrimalInst(builder, origType);
 
     // Special case certain compound types (PtrType, FuncType, etc..)
     // otherwise try to lookup a differential definition for the given type.
@@ -288,6 +281,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     {
         auto primalPairType = as<IRDifferentialPairType>(primalType);
         return getOrCreateDiffPairType(
+            builder,
             pairBuilder->getDiffTypeFromPairType(builder, primalPairType),
             pairBuilder->getDiffTypeWitnessFromPairType(builder, primalPairType));
     }
@@ -409,6 +403,44 @@ InstPair AutoDiffTranscriberBase::transcribeExtractExistentialWitnessTable(IRBui
     return InstPair(primalResult, nullptr);
 }
 
+void AutoDiffTranscriberBase::maybeMigrateDifferentiableDictionaryFromDerivativeFunc(IRBuilder* builder, IRInst* origFunc)
+{
+    auto decor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>();
+    if (decor)
+        return;
+    // A differentiable func must have `IRDifferentiableTypeDictionaryDecoration`, except it has a
+    // `IRUserDefinedBackwardDerivativeDecoration`.
+    auto udfDecor = origFunc->findDecoration<IRUserDefinedBackwardDerivativeDecoration>();
+    SLANG_RELEASE_ASSERT(udfDecor);
+    // We need to migrate the dictionary from the backward derivative func so we can properly
+    // differentiate the function header.
+    IRBuilder subBuilder = *builder;
+    subBuilder.setInsertBefore(origFunc);
+
+    auto derivative = udfDecor->getBackwardDerivativeFunc();
+    if (auto specialize = as<IRSpecialize>(derivative))
+    {
+        auto derivativeGeneric = cast<IRGeneric>(specialize->getBase());
+        GenericChildrenMigrationContext migrationContext;
+        migrationContext.init(derivativeGeneric, cast<IRGeneric>(findOuterGeneric(origFunc)), origFunc);
+        auto derivativeFunc = findGenericReturnVal(derivativeGeneric);
+        auto derivativeBlock = cast<IRBlock>(derivativeFunc->getParent());
+        for (auto dInst = derivativeBlock->getFirstOrdinaryInst(); dInst != derivativeFunc;
+             dInst = dInst->getNextInst())
+        {
+            migrationContext.cloneInst(&subBuilder, dInst);
+        }
+        auto udfDictDecor = derivativeFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>();
+        SLANG_RELEASE_ASSERT(udfDictDecor);
+        subBuilder.setInsertBefore(origFunc->getFirstDecorationOrChild());
+        migrationContext.cloneInst(&subBuilder, udfDictDecor);
+        eliminateDeadCode(origFunc->getParent());
+    }
+    else
+    {
+        cloneDecoration(udfDecor, origFunc);
+    }
+}
 
 IRType* AutoDiffTranscriberBase::differentiateExtractExistentialType(IRBuilder* builder, IRExtractExistentialType* origType, IRInst*& outWitnessTable)
 {
@@ -435,21 +467,21 @@ IRType* AutoDiffTranscriberBase::differentiateExtractExistentialType(IRBuilder* 
     return nullptr;
 }
 
-IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* primalType)
+IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* originalType)
 {
     // If this is a PtrType (out, inout, etc..), then create diff pair from
     // value type and re-apply the appropropriate PtrType wrapper.
     // 
-    if (auto origPtrType = as<IRPtrTypeBase>(primalType))
+    if (auto origPtrType = as<IRPtrTypeBase>(originalType))
     {
         if (auto diffPairValueType = tryGetDiffPairType(builder, origPtrType->getValueType()))
-            return builder->getPtrType(primalType->getOp(), diffPairValueType);
+            return builder->getPtrType(originalType->getOp(), diffPairValueType);
         else
             return nullptr;
     }
-    auto diffType = differentiateType(builder, primalType);
+    auto diffType = differentiateType(builder, originalType);
     if (diffType)
-        return (IRType*)getOrCreateDiffPairType(primalType);
+        return (IRType*)getOrCreateDiffPairType(builder, originalType);
     return nullptr;
 }
 
@@ -628,7 +660,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
     }
 }
 
-InstPair AutoDiffTranscriberBase::transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
+InstPair AutoDiffTranscriberBase::transcribeBlockImpl(IRBuilder* builder, IRBlock* origBlock, HashSet<IRInst*>& instsToSkip)
 {
     IRBuilder subBuilder(builder->getSharedBuilder());
     subBuilder.setInsertLoc(builder->getInsertLoc());
@@ -653,7 +685,14 @@ InstPair AutoDiffTranscriberBase::transcribeBlock(IRBuilder* builder, IRBlock* o
     // derivative code.
     //
     for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
+    {
+        if (instsToSkip.Contains(child))
+        {
+            continue;
+        }
+
         this->transcribe(&subBuilder, child);
+    }
 
     return InstPair(diffBlock, diffBlock);
 }
@@ -713,12 +752,63 @@ InstPair AutoDiffTranscriberBase::transcribeReturn(IRBuilder* builder, IRReturn*
     }
 }
 
+static void _markGenericChildrenWithoutRelaventUse(IRGeneric* origGeneric, HashSet<IRInst*>& outInstsToSkip)
+{
+    for (;;)
+    {
+        bool changed = false;
+        for (auto inst = origGeneric->getFirstBlock()->getFirstOrdinaryInst(); inst;
+            inst = inst->getNextInst())
+        {
+            // If an inst is only referenced by a UserDefinedDerivativeDecoration, we need to skip
+            // its transcription.
+            switch (inst->getOp())
+            {
+            case kIROp_Return:
+                continue;
+            default:
+                break;
+            }
+
+            bool hasRelaventUse = false;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                switch (use->getUser()->getOp())
+                {
+                case kIROp_UserDefinedBackwardDerivativeDecoration:
+                case kIROp_ForwardDerivativeDecoration:
+                case kIROp_BackwardDerivativeDecoration:
+                case kIROp_BackwardDerivativePrimalDecoration:
+                case kIROp_BackwardDerivativePropagateDecoration:
+                    break;
+                default:
+                    if (!outInstsToSkip.Contains(use->getUser()))
+                    {
+                        hasRelaventUse = true;
+                    }
+                    break;
+                }
+            }
+            if (!hasRelaventUse)
+            {
+                if (outInstsToSkip.Add(inst))
+                {
+                    changed = true;
+                }
+            }
+        }
+        if (!changed)
+            break;
+    }
+}
+
 // Transcribe a generic definition
 InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric)
 {
     auto innerVal = findInnerMostGenericReturnVal(origGeneric);
     if (auto innerFunc = as<IRFunc>(innerVal))
     {
+        maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, innerFunc);
         differentiableTypeConformanceContext.setFunc(innerFunc);
     }
     else if (auto funcType = as<IRFuncType>(innerVal))
@@ -752,10 +842,14 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
 
     diffGeneric->setFullType(diffType);
 
+    HashSet<IRInst*> instsToSkip;
+    _markGenericChildrenWithoutRelaventUse(origGeneric, instsToSkip);
+
     // Transcribe children from origFunc into diffFunc.
     builder.setInsertInto(diffGeneric);
-    for (auto block = origGeneric->getFirstBlock(); block; block = block->getNextBlock())
-        this->transcribe(&builder, block);
+    auto transcribedBlock = transcribeBlockImpl(&builder, origGeneric->getFirstBlock(), instsToSkip);
+    mapPrimalInst(origGeneric->getFirstBlock(), transcribedBlock.primal);
+    mapDifferentialInst(origGeneric->getFirstBlock(), transcribedBlock.differential);
 
     return InstPair(primalGeneric, diffGeneric);
 }

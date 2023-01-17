@@ -314,10 +314,14 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
         {
             if (inst->findDecoration<IRForwardDerivativeDecoration>())
                 return true;
+            if (inst->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
+                return true;
             if (auto genInst = as<IRGeneric>(inst))
             {
                 auto inner = findInnerMostGenericReturnVal(genInst);
                 if (inner->findDecoration<IRForwardDerivativeDecoration>())
+                    return true;
+                if (inner->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
                     return true;
             }
         }
