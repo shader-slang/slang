@@ -124,15 +124,22 @@ struct DiffPairLoweringPass : InstPassBase
                 }
             });
 
+        OrderedDictionary<IRInst*, IRInst*> pendingReplacements;
         processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRDifferentialPairType* inst)
             {
                 if (auto loweredType = lowerPairType(builder, inst))
                 {
-                    inst->replaceUsesWith(loweredType);
-                    inst->removeAndDeallocate();
+                    pendingReplacements.Add(inst, loweredType);
                     modified = true;
                 }
             });
+        for (auto replacement : pendingReplacements)
+        {
+            replacement.Key->replaceUsesWith(replacement.Value);
+            replacement.Key->removeAndDeallocate();
+        }
+        autodiffContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
+
         return modified;
     }
 
