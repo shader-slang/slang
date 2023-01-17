@@ -438,8 +438,24 @@ namespace Slang
                 getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->keywordName);
             }
         }
-        else if (as<OutputControlPointsAttribute>(attr) ||
-            as<SPIRVInstructionOpAttribute>(attr))
+        else if (auto opAttr = as<SPIRVInstructionOpAttribute>(attr))
+        {
+            auto sink = getSink();
+            const auto argsCount = opAttr->args.getCount();
+            if (argsCount < 1 || argsCount > 2)
+            {
+                sink->diagnose(attr, Diagnostics::attributeArgumentCountMismatch, attr->keywordName, "1...2", argsCount);
+            }
+            else if (!as<IntegerLiteralExpr>(opAttr->args[0]))
+            {
+                sink->diagnose(attr, Diagnostics::attributeExpectedIntArg, attr->keywordName, 0);
+            }
+            else if (argsCount > 1 && !as<StringLiteralExpr>(opAttr->args[1]))
+            {
+                sink->diagnose(attr, Diagnostics::attributeExpectedStringArg, attr->keywordName, 1);
+            }
+        }
+        else if (as<OutputControlPointsAttribute>(attr))
         {
             // Let it go thru iff single integral attribute
             if (!hasIntArgs(attr, 1))
