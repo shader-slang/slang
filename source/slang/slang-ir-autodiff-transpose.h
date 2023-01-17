@@ -140,8 +140,8 @@ struct DiffTransposePass
         auto terminalPrimalBlocks = getTerminalPrimalBlocks(revDiffFunc);
         auto terminalDiffBlocks = getTerminalDiffBlocks(revDiffFunc);
 
-        // Add a top-level null region entry for the terminal diff block.
-        regionMap[terminalDiffBlocks[0]] = nullptr;
+        // Add a top-level region for the terminal diff block.
+        addRegion(terminalDiffBlocks[0]);
 
         buildAfterBlockMap(revDiffFunc);
 
@@ -201,9 +201,13 @@ struct DiffTransposePass
             this->transposeBlock(block, revBlock);
         }
 
-        // Some blocks may not have their control flow
-        // insts completed. Do them now that we have 
-        // more information.
+        // Some blocks may be waiting on
+        // region information to complete their
+        // control flow instructions.
+        // 
+        propagateAllRegions();
+
+        // Then complete the pending blocks.
         // 
         for (auto pendingBlockInfo : pendingBlocks)
         {
@@ -801,34 +805,157 @@ struct DiffTransposePass
     // the point of convergence (fwdConvBlock) back to the point of 
     // divergence, along one specific path (fwdExitBlock)
     // 
-    void pushRegion(IRBlock* fwdConvBlock, IRBlock* fwdExitBlock)
+    void addRegion(IRBlock* fwdExitBlock)
     {
         SLANG_ASSERT(!regionMap.ContainsKey(fwdExitBlock));
-        SLANG_ASSERT(regionMap.ContainsKey(fwdConvBlock));
 
-        Region* newRegion = new Region(fwdExitBlock, regionMap[fwdConvBlock]);
+        Region* newRegion = new Region(fwdExitBlock, nullptr);
         regions.add(newRegion);
 
         regionMap[fwdExitBlock] = newRegion;
+    }
+
+    bool isBlockConverging(IRBlock* block)
+    {
+        HashSet<IRBlock*> predecessors;
+
+        for (auto predecessor : block->getPredecessors())
+            predecessors.Add(predecessor);
+
+        return (predecessors.Count() > 1);
+    }
+
+    bool isBlockDiverging(IRBlock* block)
+    {
+        HashSet<IRBlock*> successsors;
+
+        for (auto successsor : block->getSuccessors())
+            successsors.Add(successsor);
+
+        return (successsors.Count() > 1);
+    }
+
+    bool setRegion(IRBlock* block, Region* region)
+    {
+        if (regionMap.ContainsKey(block)
+            && regionMap[block] == region)
+            return false;
+
+        regionMap[block] = region;
+        return true;
+    }
+
+    // 
+    void propagateAllRegions()
+    {
+        // Load up the starting block of every region into
+        // initial worklist.
+        // 
+        List<IRBlock*> workList;
+        HashSet<IRBlock*> workSet;
+        for (auto region : regions)
+        {
+            workList.add(region->exitBlock);
+            workSet.Add(region->exitBlock);
+        }
+
+        // Not necessary, but makes propagation much more efficient if
+        // the blocks are all in order.
+        // 
+        workList.reverse();
+
+        // Keep propagating from initial work list to predecessors
+        // Add blocks to work list if their region assignment has changed
+        // Add the beginning blocks for complete regions if region parent has changed.
+        // 
+        while (workList.getCount() > 0)
+        {
+            auto block = workList.getLast();
+            workList.removeLast();
+            workSet.Remove(block);
+            
+            HashSet<IRBlock*> predecessors;
+
+            for (auto predecessor : block->getPredecessors())
+            {
+                if (!isDifferentialInst(predecessor))
+                    continue;
+
+                if (predecessors.Contains(predecessor))
+                    continue;
+                
+                if (propagateRegion(block, predecessor))
+                {
+                    if (!workSet.Contains(predecessor))
+                    {
+                        workList.add(predecessor);
+                        workSet.Add(predecessor);
+                    }
+
+                    Region* predRegion = regionMap[predecessor];
+
+                    if (predRegion->isComplete() && 
+                        predRegion->originBlock != predecessor)
+                    {
+                        if (!workSet.Contains(predRegion->originBlock))
+                        {
+                            workList.add(predRegion->originBlock);
+                            workSet.Add(predRegion->originBlock);
+                        }
+                    }
+                }
+
+                predecessors.Add(predecessor);
+            }
+        }
     }
 
     // If we have a conditional-branch from fwdBlock to fwdNextBlock
     // complete the region, and remove from stack
     // otherwise, copy the region over.
     // 
-    void propagateRegion(IRBlock* fwdNextBlock, IRBlock* fwdBlock)
+    bool propagateRegion(IRBlock* fwdNextBlock, IRBlock* fwdBlock)
     {
-        if (as<IRConditionalBranch>(fwdBlock->getTerminator()))
-        {
-            Region* currentRegion = regionMap[fwdNextBlock];
-            currentRegion->finish(fwdNextBlock);
+        // Nothing to propagate.
+        Region* currentRegion = regionMap[fwdNextBlock];
+        if (!currentRegion)
+            return false;
 
-            regionMap[fwdBlock] = currentRegion->parent;
-        }
-        else if (as<IRUnconditionalBranch>(fwdBlock->getTerminator()) ||
-            as<IRReturn>(fwdBlock->getTerminator()))
+        if (isBlockDiverging(fwdBlock))
         {
-            regionMap[fwdBlock] = regionMap[fwdNextBlock];
+            // Trivial case.. the region between fwdBlock and fwdNextBlock
+            // is empty. Copy the region from fwdNextBlock n
+            // 
+            if (isBlockConverging(fwdNextBlock))
+                return setRegion(fwdBlock, currentRegion);
+
+            if (!currentRegion->isComplete())
+                currentRegion->finish(fwdNextBlock);
+            
+            return setRegion(fwdBlock, currentRegion->parent);
+        }
+        else if (isBlockConverging(fwdNextBlock))
+        {
+            // fwdNextBlock has multiple predecessors.
+            // Set fwdNextBlock's region as the parent of 
+            // fwdBlock's region (if not already set)
+            // 
+            Region* blockRegion = regionMap[fwdBlock];
+
+            // We expect predecessors of a converging block to have a 
+            // region already set by tryEmitTerminator()
+            SLANG_ASSERT(blockRegion);
+
+            Region* nextBlockRegion = regionMap[fwdNextBlock];
+            if (blockRegion->parent == nextBlockRegion)
+                return false;
+            
+            blockRegion->parent = nextBlockRegion;
+            return true;
+        }
+        else
+        {
+            return setRegion(fwdBlock, regionMap[fwdNextBlock]);
         }
     }
 
@@ -875,7 +1002,7 @@ struct DiffTransposePass
                 phiParamGrads.getCount(),
                 phiParamGrads.getBuffer());
 
-            propagateRegion(fwdBlockInst, fwdPredecesorBlocks[0]);
+            // propagateRegion(fwdBlockInst, fwdPredecesorBlocks[0]);
             return true;
         }
 
@@ -905,7 +1032,7 @@ struct DiffTransposePass
                 if (getAfterBlock(predecessor) == fwdBlockInst)
                     continue;
 
-                pushRegion(fwdBlockInst, predecessor);
+                addRegion(predecessor);
             }
         }
 

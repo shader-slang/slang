@@ -66,6 +66,26 @@ struct DiffUnzipPass
     // might run into an issue here?
     IRBlock*                                firstDiffBlock;
 
+    struct BlockIndex
+    {
+        IRParam*    param;
+        BlockIndex* parent;
+        IRLoop*     targetLoop;
+
+        BlockIndex() : param(nullptr), parent(nullptr), targetLoop(nullptr)
+        { }
+
+        BlockIndex(IRParam* param, BlockIndex* parent, IRLoop* targetLoop) : 
+            param(param),
+            parent(parent),
+            targetLoop(targetLoop)
+        { }
+    };
+
+    // Keep track of indexed blocks and their corresponding index heirarchy.
+    Dictionary<IRBlock*, BlockIndex*>          blockIndexMap;
+
+
     DiffUnzipPass(
         AutoDiffSharedContext* autodiffContext)
         : autodiffContext(autodiffContext)
@@ -356,6 +376,98 @@ struct DiffUnzipPass
         return InstPair(primalBranch, returnInst);
     }
 
+    bool isBlockIndexed(IRBlock* block)
+    {
+        return blockIndexMap.ContainsKey(block) && blockIndexMap[block] != nullptr;
+    }
+
+    void pushNewIndex(IRBlock* block, IRLoop* targetLoop)
+    {
+        BlockIndex* newIndex = nullptr;
+
+        // Push a new phi parameter.
+        IRBuilder builder(autodiffContext->sharedBuilder);
+        builder.setInsertInto(block);
+        auto indexPhiParam = builder.emitParam(builder.getUIntType());
+
+        // If the block already has an index, grab a 
+        if (isBlockIndexed(block))
+        {
+            newIndex = new BlockIndex(indexPhiParam, blockIndexMap[block], targetLoop);
+        }
+        else
+        {
+            newIndex = new BlockIndex(indexPhiParam, nullptr, targetLoop);
+        }
+
+        blockIndexMap[block] = newIndex;
+    }
+
+    bool propagateIndices(IRBlock* srcBlock, IRBlock* nextBlock)
+    {
+        // TODO: Make region propagation robust to out-of-order blocks.
+        // TODO: Make index propagation robust to out-of-order blocks.
+        // TODO: Unzip terminator insts _before_ all other insts.
+
+        BlockIndex* currIndex = nullptr;
+
+        // We've looped back to an already processed block.
+        // No more need to propagate.
+        // 
+        if (isBlockIndexed(nextBlock))
+            return false;
+
+        if (isBlockIndexed(srcBlock))
+            currIndex = blockIndexMap[srcBlock];
+        
+        IRBuilder builder(autodiffContext->sharedBuilder);
+        builder.setInsertInto(nextBlock);
+        
+        List<IRParam*> indexParams;
+        while (currIndex)
+        {
+            pushNewIndex(nextBlock, currIndex->targetLoop);
+        }
+    }
+
+    // Splitting a loop is one of the trickiest parts of the unzip pass.
+    // Thus far, we've been dealing with blocks that are only run once, so we 
+    // could arbitrarily move intermediate instructions to other blocks since they are
+    // generated and consumed at-most one time.
+    // 
+    // Intermediate instructions in a loop can take on a different value each iteration
+    // and thus need to be stored explicitly to an array.
+    // 
+    // We also need to ascertain an upper limit on the iteration count. 
+    // With very few exceptions, this is a fundamental requirement.
+    // 
+    InstPair splitLoop(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRLoop* mixedLoop)
+    {
+        
+        auto breakBlock = mixedLoop->getBreakBlock();
+        auto continueBlock = mixedLoop->getContinueBlock();
+        auto nextBlock = mixedLoop->getTargetBlock();
+
+        auto currBlock = mixedLoop->getParent();
+
+        // Propagate indices as usual to the next block.
+        // propagateIndices(primalMap[currBlock->getParent()], primalMap[nextBlock]);
+        // propagateIndices(diffMap[currBlock->getParent()], diffMap[nextBlock]);
+
+        // Push a new index.
+        
+
+        return InstPair(
+            primalBuilder->emitLoop(
+                as<IRBlock>(primalMap[nextBlock]),
+                as<IRBlock>(primalMap[breakBlock]),
+                as<IRBlock>(primalMap[continueBlock])),
+            diffBuilder->emitLoop(
+                as<IRBlock>(diffMap[nextBlock]),
+                as<IRBlock>(diffMap[breakBlock]),
+                as<IRBlock>(diffMap[continueBlock])));
+    }
+
     InstPair splitControlFlow(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* branchInst)
     {
         switch (branchInst->getOp())
@@ -458,6 +570,9 @@ struct DiffUnzipPass
                         diffCaseArgs.getCount(),
                         diffCaseArgs.getBuffer()));
             }
+        
+        case kIROp_loop:
+            return splitLoop(primalBuilder, diffBuilder, as<IRLoop>(branchInst));
         
         default:
             SLANG_UNEXPECTED("Unhandled instruction");
