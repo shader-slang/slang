@@ -720,14 +720,27 @@ struct SpecializationContext
             if (!item) continue;
             IRSimpleSpecializationKey key;
             bool shouldSkip = false;
-            for (UInt i = 1; i < item->getOperandCount(); i++)
+            for (UInt i = 0; i < item->getOperandCount(); i++)
             {
                 if (item->getOperand(i) == nullptr)
                 {
                     shouldSkip = true;
                     break;
                 }
-                key.vals.add(item->getOperand(i));
+                if (item->getOperand(i)->getParent() == nullptr)
+                {
+                    shouldSkip = true;
+                    break;
+                }
+                if (item->getOperand(i)->getOp() == kIROp_undefined)
+                {
+                    shouldSkip = true;
+                    break;
+                }
+                if (i > 0)
+                {
+                    key.vals.add(item->getOperand(i));
+                }
             }
             if (shouldSkip)
                 continue;
@@ -768,10 +781,19 @@ struct SpecializationContext
         builder.setInsertInto(dictInst);
         for (auto kv : dict)
         {
-            List<IRInst*> args;
-            args.add(kv.Value);
-            args.addRange(kv.Key.vals);
-            builder.emitIntrinsicInst(nullptr, kIROp_SpecializationDictionaryItem, args.getCount(), args.getBuffer());
+            if (!kv.Value->parent)
+                continue;
+            for (auto keyVal : kv.Key.vals)
+            {
+                if (!keyVal->parent) goto next;
+            }
+            {
+                List<IRInst*> args;
+                args.add(kv.Value);
+                args.addRange(kv.Key.vals);
+                builder.emitIntrinsicInst(nullptr, kIROp_SpecializationDictionaryItem, args.getCount(), args.getBuffer());
+            }
+        next:;
         }
     }
     void writeSpecializationDictionaries()
@@ -2312,6 +2334,27 @@ bool specializeModule(
     return context.changed;
 }
 
+void finalizeSpecialization(IRModule* module)
+{
+    for (auto inst : module->getModuleInst()->getChildren())
+    {
+        for (auto decor = inst->getFirstDecoration(); decor; )
+        {
+            auto next = decor->getNextDecoration();
+            switch (decor->getOp())
+            {
+            case kIROp_ExistentialFuncSpecializationDictionary:
+            case kIROp_ExistentialTypeSpecializationDictionary:
+            case kIROp_GenericSpecializationDictionary:
+                decor->removeAndDeallocate();
+                break;
+            default:
+                break;
+            }
+            decor = next;
+        }
+    }
+}
 
 IRInst* specializeGenericImpl(
     IRGeneric*              genericVal,

@@ -2810,6 +2810,8 @@ namespace Slang
     IRBackwardDiffIntermediateContextType* IRBuilder::getBackwardDiffIntermediateContextType(
         IRInst* func)
     {
+        if (!func)
+            func = getVoidValue();
         return (IRBackwardDiffIntermediateContextType*)getType(
             kIROp_BackwardDiffIntermediateContextType,
             1,
@@ -6260,6 +6262,8 @@ namespace Slang
         return type;
     }
 
+    void validateIRInstOperands(IRInst*);
+
     void IRInst::replaceUsesWith(IRInst* other)
     {
         // Safety check: don't try to replace something with itself.
@@ -6377,6 +6381,10 @@ namespace Slang
         this->prev = inPrev;
         this->next = inNext;
         this->parent = inParent;
+        
+#if _DEBUG
+        validateIRInstOperands(this);
+#endif
     }
 
     void IRInst::insertAfter(IRInst* other)
@@ -6526,7 +6534,7 @@ namespace Slang
         // By default, assume that we might have side effects,
         // to safely cover all the instructions we haven't had time to think about.
         default:
-            return true;
+            break;
 
         case kIROp_Call:
             {
@@ -6553,7 +6561,7 @@ namespace Slang
                     return false;
                 }
             }
-            return true;
+            break;
 
             // All of the cases for "global values" are side-effect-free.
         case kIROp_StructType:
@@ -6663,8 +6671,17 @@ namespace Slang
 
         case kIROp_ForwardDifferentiate:
         case kIROp_BackwardDifferentiate:
+        case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardDifferentiatePropagate:
             return false;
         }
+
+        // Check if the calle has been marked with a catch-all no-side-effect decoration.
+        if (findDecoration<IRNoSideEffectDecoration>())
+        {
+            return false;
+        }
+        return true;
     }
 
     IRModule* IRInst::getModule()
@@ -6798,6 +6815,13 @@ namespace Slang
             inst = inst->getParent();
         }
         return nullptr;
+    }
+
+    IRInst* maybeFindOuterGeneric(IRInst* inst)
+    {
+        auto outerGeneric = findOuterGeneric(inst);
+        if (!outerGeneric) return inst;
+        return outerGeneric;
     }
 
     IRInst* findOuterMostGeneric(IRInst* inst)

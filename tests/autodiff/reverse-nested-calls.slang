@@ -10,7 +10,8 @@ typedef float.Differential dfloat;
 [BackwardDifferentiable]
 float g(float y)
 {
-    return 4.0f * y;
+    float result = 2.0f * y;
+    return result * result;
 }
 
 [BackwardDifferentiable]
@@ -25,5 +26,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     dpfloat dpa = dpfloat(1.0, 0.0);
 
     __bwd_diff(f)(dpa, 1.0f);
-    outputBuffer[0] = dpa.d; // Expect: 24.0
+    outputBuffer[0] = dpa.d; // Expect: 96.0
 }

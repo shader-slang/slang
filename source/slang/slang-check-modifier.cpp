@@ -613,7 +613,7 @@ namespace Slang
 
             hitObjectAttributesAttr->location = (int32_t)val->value;
         }
-        else if (auto forwardDerivativeAttr = as<ForwardDerivativeAttribute>(attr))
+        else if (auto derivativeAttr = as<UserDefinedDerivativeAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             SLANG_ASSERT(as<Decl>(attrTarget));
@@ -633,9 +633,9 @@ namespace Slang
             // 
             // Set type to null to indicate that this needs expr needs to be further resolved.
             diffExpr->type.type = nullptr;
-            forwardDerivativeAttr->funcExpr = diffExpr;
+            derivativeAttr->funcExpr = diffExpr;
         }
-        else if (auto forwardDerivativeOfAttr = as<ForwardDerivativeOfAttribute>(attr))
+        else if (auto derivativeOfAttr = as<DerivativeOfAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             SLANG_ASSERT(as<Decl>(attrTarget));
@@ -648,7 +648,7 @@ namespace Slang
                 getSink()->diagnose(primalFunc, Slang::Diagnostics::invalidCustomDerivative, as<Decl>(attrTarget));
                 return false;
             }
-            forwardDerivativeOfAttr->funcExpr = primalFunc;
+            derivativeOfAttr->funcExpr = primalFunc;
         }
         else if (auto comInterfaceAttr = as<ComInterfaceAttribute>(attr))
         {

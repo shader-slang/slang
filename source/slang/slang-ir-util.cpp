@@ -1,6 +1,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-dce.h"
 
 namespace Slang
 {
@@ -156,11 +157,11 @@ IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecaili
     return genericToSpecailize;
 }
 
-IRInst* hoistValueFromGeneric(IRBuilder& builder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
+IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
 {
     auto outerGeneric = as<IRGeneric>(findOuterGeneric(value));
     if (!outerGeneric) return value;
-
+    IRBuilder builder = inBuilder;
     builder.setInsertBefore(outerGeneric);
     auto newGeneric = builder.emitGeneric();
     builder.setInsertInto(newGeneric);
@@ -198,6 +199,7 @@ IRInst* hoistValueFromGeneric(IRBuilder& builder, IRInst* value, IRInst*& outSpe
         value->replaceUsesWith(outSpecializedVal);
         value->removeAndDeallocate();
     }
+    eliminateDeadCode(newGeneric);
     return newGeneric;
 }
 

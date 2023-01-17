@@ -403,6 +403,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-peephole.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-remove-unused-generic-param.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-sccp.h" />
@@ -579,6 +580,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-peephole.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-remove-unused-generic-param.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-sccp.cpp" />

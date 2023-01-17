@@ -75,36 +75,38 @@ bool AutoDiffTranscriberBase::hasDifferentialInst(IRInst* origInst)
     return instMapD.ContainsKey(origInst);
 }
 
-bool AutoDiffTranscriberBase::shouldUseOriginalAsPrimal(IRInst* origInst)
+bool AutoDiffTranscriberBase::shouldUseOriginalAsPrimal(IRInst* currentParent, IRInst* origInst)
 {
     if (as<IRGlobalValueWithCode>(origInst))
         return true;
     if (origInst->parent && origInst->parent->getOp() == kIROp_Module)
         return true;
+    if (isChildInstOf(currentParent, origInst->getParent()))
+        return true;
     return false;
 }
 
-IRInst* AutoDiffTranscriberBase::lookupPrimalInst(IRInst* origInst)
+IRInst* AutoDiffTranscriberBase::lookupPrimalInstImpl(IRInst* currentParent, IRInst* origInst)
 {
     if (!origInst)
         return nullptr;
-    if (shouldUseOriginalAsPrimal(origInst))
+    if (shouldUseOriginalAsPrimal(currentParent, origInst))
         return origInst;
     return cloneEnv.mapOldValToNew[origInst];
 }
 
-IRInst* AutoDiffTranscriberBase::lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
+IRInst* AutoDiffTranscriberBase::lookupPrimalInst(IRInst* currentParent, IRInst* origInst, IRInst* defaultInst)
 {
     if (!origInst)
         return nullptr;
-    return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
+    return (hasPrimalInst(currentParent, origInst)) ? lookupPrimalInstImpl(currentParent, origInst) : defaultInst;
 }
 
-bool AutoDiffTranscriberBase::hasPrimalInst(IRInst* origInst)
+bool AutoDiffTranscriberBase::hasPrimalInst(IRInst* currentParent, IRInst* origInst)
 {
     if (!origInst)
         return false;
-    if (shouldUseOriginalAsPrimal(origInst))
+    if (shouldUseOriginalAsPrimal(currentParent, origInst))
         return true;
     return cloneEnv.mapOldValToNew.ContainsKey(origInst);
 }
@@ -124,26 +126,51 @@ IRInst* AutoDiffTranscriberBase::findOrTranscribePrimalInst(IRBuilder* builder, 
 {
     if (!origInst)
         return origInst;
+    
+    auto currentParent = builder->getInsertLoc().getParent();
 
-    if (shouldUseOriginalAsPrimal(origInst))
+    if (shouldUseOriginalAsPrimal(currentParent, origInst))
         return origInst;
 
-    if (!hasPrimalInst(origInst))
+    if (!hasPrimalInst(currentParent, origInst))
     {
         transcribe(builder, origInst);
-        SLANG_ASSERT(hasPrimalInst(origInst));
+        SLANG_ASSERT(hasPrimalInst(currentParent, origInst));
     }
 
-    return lookupPrimalInst(origInst);
+    return lookupPrimalInstImpl(currentParent, origInst);
 }
 
 IRInst* AutoDiffTranscriberBase::maybeCloneForPrimalInst(IRBuilder* builder, IRInst* inst)
 {
-    IRInst* primal = lookupPrimalInst(inst, inst);
+    if (!inst)
+        return nullptr;
 
-    if (primal == inst &&
-        !isChildInstOf(builder->getInsertLoc().getParent(), inst->getParent()))
-        primal = cloneInst(&cloneEnv, builder, inst);
+    IRInst* primal = lookupPrimalInst(builder, inst, nullptr);
+    if (!primal)
+    {
+        IRInst* type = inst->getFullType();
+        if (type)
+        {
+            type = maybeCloneForPrimalInst(builder, type);
+        }
+        List<IRInst*> operands;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto operand = maybeCloneForPrimalInst(builder, inst->getOperand(i));
+            operands.add(operand);
+        }
+        auto cloneResult = builder->emitIntrinsicInst(
+            (IRType*)type, inst->getOp(), operands.getCount(), operands.getBuffer());
+        IRBuilder subBuilder = *builder;
+        subBuilder.setInsertInto(cloneResult);
+        for (auto child : inst->getDecorationsAndChildren())
+        {
+            maybeCloneForPrimalInst(&subBuilder, child);
+        }
+        cloneEnv.mapOldValToNew[inst] = cloneResult;
+        return cloneResult;
+    }
 
     return primal;
 }
@@ -210,6 +237,13 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRInst* primalType)
 
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
 {
+    auto primalType = lookupPrimalInst(builder, origType, origType);
+    if (primalType->getOp() == kIROp_Param &&
+        primalType->getParent() && primalType->getParent()->getParent() &&
+        primalType->getParent()->getParent()->getOp() == kIROp_Generic)
+    {
+        return (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, origType);
+    }
     return (IRType*)transcribe(builder, origType);
 }
 
@@ -223,7 +257,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     // If there is an explicit primal version of this type in the local scope, load that
     // otherwise use the original type. 
     //
-    IRInst* primalType = lookupPrimalInst(origType, origType);
+    IRInst* primalType = lookupPrimalInst(builder, origType, origType);
 
     // Special case certain compound types (PtrType, FuncType, etc..)
     // otherwise try to lookup a differential definition for the given type.
@@ -390,7 +424,7 @@ IRType* AutoDiffTranscriberBase::differentiateExtractExistentialType(IRBuilder* 
     if (lookupKeyPath.getCount())
     {
         // `interfaceType` does conform to `IDifferentiable`.
-        outWitnessTable = builder->emitExtractExistentialWitnessTable(origType->getOperand(0));
+        outWitnessTable = builder->emitExtractExistentialWitnessTable(lookupPrimalInstIfExists(builder, origType->getOperand(0)));
         for (auto node : lookupKeyPath)
         {
             outWitnessTable = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), outWitnessTable, node->getRequirementKey());
@@ -701,6 +735,8 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     builder.setInsertBefore(origGeneric);
 
     auto diffGeneric = builder.emitGeneric();
+    
+    mapDifferentialInst(origGeneric, diffGeneric);
 
     // Process type of generic. If the generic is a function, then it's type will also be a 
     // generic and this logic will transcribe that generic first before continuing with the 
@@ -731,7 +767,7 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
     //
     if (auto diffInst = lookupDiffInst(origInst, nullptr))
     {
-        SLANG_ASSERT(lookupPrimalInst(origInst)); // Consistency check.
+        SLANG_ASSERT(lookupPrimalInst(builder, origInst)); // Consistency check.
         return diffInst;
     }
 

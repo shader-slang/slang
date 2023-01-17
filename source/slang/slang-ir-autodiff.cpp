@@ -2,9 +2,25 @@
 #include "slang-ir-autodiff-rev.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-pairs.h"
+#include "slang-ir-validate.h"
 
 namespace Slang
 {
+
+bool isBackwardDifferentiableFunc(IRInst* func)
+{
+    for (auto decorations : func->getDecorations())
+    {
+        switch (decorations->getOp())
+        {
+        case kIROp_BackwardDifferentiableDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            return true;
+        }
+    }
+    return false;
+}
+
 static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
@@ -308,10 +324,15 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
             // TODO: This seems like a particularly dangerous way to look for an interface.
             // See if we can lower IDifferentiable to a separate IR inst.
             //
-            if (globalInst->getOp() == kIROp_InterfaceType &&
-                as<IRInterfaceType>(globalInst)->findDecoration<IRNameHintDecoration>()->getName() == "IDifferentiable")
+            if (auto intf = as<IRInterfaceType>(globalInst))
             {
-                return globalInst;
+                if (auto decor = intf->findDecoration<IRNameHintDecoration>())
+                {
+                    if (decor->getName() == toSlice("IDifferentiable"))
+                    {
+                        return globalInst;
+                    }
+                }
             }
         }
     }
@@ -382,8 +403,32 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
     {
         if (auto pairType = as<IRDifferentialPairType>(globalInst))
         {
-            differentiableWitnessDictionary.Add(pairType->getValueType(), pairType->getWitness());
+            differentiableWitnessDictionary.AddIfNotExists(pairType->getValueType(), pairType->getWitness());
         }
+    }
+}
+
+void stripDerivativeDecorations(IRInst* inst)
+{
+    for (auto decor = inst->getFirstDecoration(); decor; )
+    {
+        auto next = decor->getNextDecoration();
+        switch (decor->getOp())
+        {
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_DerivativeMemberDecoration:
+        case kIROp_BackwardDerivativeDecoration:
+        case kIROp_BackwardDerivativeIntermediateTypeDecoration:
+        case kIROp_BackwardDerivativePropagateDecoration:
+        case kIROp_BackwardDerivativePrimalDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+        case kIROp_AutoDiffOriginalValueDecoration:
+            decor->removeAndDeallocate();
+            break;
+        default:
+            break;
+        }
+        decor = next;
     }
 }
 
@@ -405,6 +450,10 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_BackwardDerivativeIntermediateTypeDecoration:
             case kIROp_BackwardDerivativePropagateDecoration:
             case kIROp_BackwardDerivativePrimalDecoration:
+            case kIROp_BackwardDerivativePrimalContextDecoration:
+            case kIROp_BackwardDerivativePrimalReturnDecoration:
+            case kIROp_AutoDiffOriginalValueDecoration:
+            case kIROp_UserDefinedBackwardDerivativeDecoration:
                 decor->removeAndDeallocate();
                 break;
             default:
@@ -426,27 +475,26 @@ void stripAutoDiffDecorations(IRModule* module)
 }
 
 
-void stripBlockTypeDecorations(IRFunc* func)
+void stripTempDecorations(IRInst* inst)
 {
-    for (auto child : func->getChildren())
+    for (auto decor = inst->getFirstDecoration(); decor; )
     {
-        if (auto block = as<IRBlock>(child))
+        auto next = decor->getNextDecoration();
+        switch (decor->getOp())
         {
-            for (auto decor = block->getFirstDecoration(); decor; )
-            {
-                auto next = decor->getNextDecoration();
-                switch (decor->getOp())
-                {
-                case kIROp_DifferentialInstDecoration:
-                case kIROp_MixedDifferentialInstDecoration:
-                    decor->removeAndDeallocate();
-                    break;
-                default:
-                    break;
-                }
-                decor = next;
-            }
+        case kIROp_DifferentialInstDecoration:
+        case kIROp_MixedDifferentialInstDecoration:
+        case kIROp_AutoDiffOriginalValueDecoration:
+            decor->removeAndDeallocate();
+            break;
+        default:
+            break;
         }
+        decor = next;
+    }
+    for (auto child : inst->getChildren())
+    {
+        stripTempDecorations(child);
     }
 }
 
@@ -524,9 +572,7 @@ struct AutoDiffPass : public InstPassBase
             auto inner = findGenericReturnVal(baseGeneric);
             if (auto typeDecor = inner->findDecoration<IRBackwardDerivativeIntermediateTypeDecoration>())
             {
-                auto typeSpec = cast<IRSpecialize>(typeDecor->getBackwardDerivativeIntermediateType());
-                auto typeSpecBase = typeSpec->getBase();
-                return typeSpecBase;
+                return typeDecor->getBackwardDerivativeIntermediateType();
             }
         }
         else if (auto func = as<IRFunc>(base))
@@ -694,7 +740,7 @@ struct AutoDiffPass : public InstPassBase
                         forwardTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
                         break;
                     case FuncBodyTranscriptionTaskType::BackwardPrimal:
-                        // Don't need to do anything, they will be filled by `backwardPropagateTranscriber`.
+                        backwardPrimalTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
                         break;
                     case FuncBodyTranscriptionTaskType::BackwardPropagate:
                         backwardPropagateTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
@@ -712,9 +758,13 @@ struct AutoDiffPass : public InstPassBase
             // passes since they don't expect decorations in blocks.
             // 
             for (auto diffFunc : autodiffCleanupList)
-                stripBlockTypeDecorations(diffFunc);
+                stripTempDecorations(diffFunc);
 
             autodiffCleanupList.clear();
+
+#if _DEBUG
+            validateIRModule(module, sink);
+#endif
 
             if (!changed)
                 break;
@@ -780,11 +830,14 @@ struct AutoDiffPass : public InstPassBase
 
         forwardTranscriber.pairBuilder = &pairBuilderStorage;
         backwardPrimalTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardPrimalTranscriber.fwdDiffTranscriber = &forwardTranscriber;
         backwardPropagateTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardPropagateTranscriber.fwdDiffTranscriber = &forwardTranscriber;
         backwardTranscriber.pairBuilder = &pairBuilderStorage;
-        backwardTranscriber.fwdDiffTranscriber = &forwardTranscriber;
+
+        // Make the transcribers available to all sub passes via shared context.
+        context->transcriberSet.primalTranscriber = &backwardPrimalTranscriber;
+        context->transcriberSet.propagateTranscriber = &backwardPropagateTranscriber;
+        context->transcriberSet.forwardTranscriber = &forwardTranscriber;
+        context->transcriberSet.backwardTranscriber = &backwardTranscriber;
     }
 
 protected:

@@ -1162,14 +1162,23 @@ static void addLinkageDecoration(
     IRInst*                     inst,
     Decl*                       decl)
 {
-     String mangledName = getMangledName(context->astBuilder, decl);
+    const String mangledName = getMangledName(context->astBuilder, decl);
 
-     if (context->shared->m_obfuscateCode)
-     {
-         mangledName = getHashedName(mangledName.getUnownedSlice());
-     }
-
-    addLinkageDecoration(context, inst, decl, mangledName.getUnownedSlice());
+    // Obfuscate the mangled names if necessary.
+    // 
+    // Care is needed around stdlib as it is only compiled once and *without* obfuscation, 
+    // so any linkage name to stdlib *shouldn't* have obfuscation applied to it.
+    if (context->shared->m_obfuscateCode && 
+        !isFromStdLib(decl))
+    {
+        const auto obfuscatedName = getHashedName(mangledName.getUnownedSlice());
+    
+        addLinkageDecoration(context, inst, decl, obfuscatedName.getUnownedSlice());
+    }
+    else
+    {
+        addLinkageDecoration(context, inst, decl, mangledName.getUnownedSlice());
+    }
 }
 
 bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
@@ -6244,6 +6253,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: This approach doesn't really make sense for generic `extension` conformances.
         auto mangledName = getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
 
+        
         // A witness table may need to be generic, if the outer
         // declaration (either a type declaration or an `extension`)
         // is generic.
@@ -6270,6 +6280,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto irSubType = lowerType(subContext, subType);
         irWitnessTable->setOperand(0, irSubType);
+
+        // TODO(JS): 
+        // Should the mangled name take part in obfuscation if enabled?
 
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
 
@@ -8347,7 +8360,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         setGlobalValue(context, decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
-        if (auto attr = decl->findModifier<ForwardDerivativeAttribute>())
+        if (auto attr = decl->findModifier<UserDefinedDerivativeAttribute>())
         {
             // We need to lower the decl ref to the custom derivative function to IR.
             // The IR insts correspond to the decl ref is not part of the function we
@@ -8361,13 +8374,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto loweredVal = lowerRValueExpr(subContext, attr->funcExpr);
 
             SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-            IRInst* jvpFunc = loweredVal.val;
-            getBuilder()->addDecoration(irFunc, kIROp_ForwardDerivativeDecoration, jvpFunc);
+            IRInst* derivativeFunc = loweredVal.val;
+
+            if (as<ForwardDerivativeAttribute>(attr))
+                getBuilder()->addForwardDerivativeDecoration(irFunc, derivativeFunc);
+            else
+                getBuilder()->addUserDefinedBackwardDerivativeDecoration(irFunc, derivativeFunc);
 
             // Reset cursor.
             subContext->irBuilder->setInsertInto(irFunc);
         }
-        
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
@@ -8378,7 +8395,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the interface's type definition.
         auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
 
-        if (auto attr = decl->findModifier<ForwardDerivativeOfAttribute>())
+        if (auto attr = decl->findModifier<DerivativeOfAttribute>())
         {
             if (auto originalDeclRefExpr = as<DeclRefExpr>(attr->funcExpr))
             {
@@ -8399,9 +8416,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
                 originalSubBuilder->setInsertBefore(originalFuncVal);
                 auto derivativeFuncVal = lowerRValueExpr(originalSubContext, attr->backDeclRef);
-                originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                if (as<ForwardDerivativeOfAttribute>(attr))
+                {
+                    originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                    getBuilder()->addForwardDifferentiableDecoration(irFunc);
+                }
+                else
+                {
+                    originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                    getBuilder()->addForwardDifferentiableDecoration(irFunc);
+                    getBuilder()->addBackwardDifferentiableDecoration(irFunc);
+                }
             }
-            getBuilder()->addForwardDifferentiableDecoration(irFunc);
             subContext->irBuilder->setInsertInto(irFunc);
             finalVal->moveToEnd();
         }
@@ -9076,8 +9102,23 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
 
+    // Next, attempt to promote local variables to SSA
+    // temporaries and do basic simplifications.
+    //
+    constructSSA(module);
+    simplifyCFG(module);
+    applySparseConditionalConstantPropagation(module);
+
     // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
+    //
+    // Note: We performed certain critical simplifications
+    // above, before this step, so that the body of functions
+    // subject to mandatory inlining can be simplified ahead
+    // of time. By simplifying the body before inlining it,
+    // we can make sure that things like superfluous temporaries
+    // are eliminated from the callee, and not copied into
+    // call sites.
     //
     performMandatoryEarlyInlining(module);
 

@@ -102,6 +102,7 @@ inline IRInst* unwrapAttributedType(IRInst* type)
         type = attrType->getBaseType();
     return type;
 }
+
 }
 
 #endif
