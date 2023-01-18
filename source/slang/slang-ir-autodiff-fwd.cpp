@@ -880,10 +880,12 @@ InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(IRBuilder* build
     auto diffDiffVal = findOrTranscribeDiffInst(builder, origInst->getDifferentialValue());
     SLANG_ASSERT(diffDiffVal);
 
+    auto primalPairType = findOrTranscribePrimalInst(builder, origInst->getFullType());
+    auto diffPairType = findOrTranscribeDiffInst(builder, origInst->getFullType());
     auto primalPair = builder->emitMakeDifferentialPair(
-        tryGetDiffPairType(builder, primalVal->getDataType()), primalVal, diffPrimalVal);
+        (IRType*)primalPairType, primalVal, diffPrimalVal);
     auto diffPair = builder->emitMakeDifferentialPair(
-        tryGetDiffPairType(builder, differentiateType(builder, origInst->getPrimalValue()->getDataType())),
+        (IRType*)diffPairType,
         primalDiffVal,
         diffDiffVal);
     return InstPair(primalPair, diffPair);
@@ -901,7 +903,9 @@ InstPair ForwardDiffTranscriber::transcribeDifferentialPairGetElement(IRBuilder*
     auto diffVal = findOrTranscribeDiffInst(builder, origInst->getOperand(0));
     SLANG_ASSERT(diffVal);
 
-    auto primalResult = builder->emitIntrinsicInst(origInst->getFullType(), origInst->getOp(), 1, &primalVal);
+    auto primalType = findOrTranscribePrimalInst(builder, origInst->getFullType());
+
+    auto primalResult = builder->emitIntrinsicInst((IRType*)primalType, origInst->getOp(), 1, &primalVal);
 
     auto diffValPairType = as<IRDifferentialPairType>(diffVal->getDataType());
     IRInst* diffResultType = nullptr;

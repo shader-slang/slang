@@ -76,7 +76,7 @@ struct ExtractPrimalFuncContext
         outIntermediateType = createIntermediateType(destFunc);
 
         GenericChildrenMigrationContext migrationContext;
-        migrationContext.init(as<IRGeneric>(findOuterGeneric(originalFunc)), as<IRGeneric>(findOuterGeneric(destFunc)));
+        migrationContext.init(as<IRGeneric>(findOuterGeneric(originalFunc)), as<IRGeneric>(findOuterGeneric(destFunc)), destFunc);
 
         originalFuncType = as<IRFuncType>(originalFunc->getDataType());
 

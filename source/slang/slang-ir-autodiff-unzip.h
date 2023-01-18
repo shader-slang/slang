@@ -14,39 +14,6 @@
 namespace Slang
 {
 
-struct GenericChildrenMigrationContext
-{
-    IRCloneEnv cloneEnv;
-    IRGeneric* srcGeneric;
-    void init(IRGeneric* genericSrc, IRGeneric* genericDst)
-    {
-        srcGeneric = genericSrc;
-        if (!genericSrc)
-            return;
-        auto srcParam = genericSrc->getFirstBlock()->getFirstParam();
-        auto dstParam = genericDst->getFirstBlock()->getFirstParam();
-        while (srcParam && dstParam)
-        {
-            cloneEnv.mapOldValToNew[srcParam] = dstParam;
-            srcParam = srcParam->getNextParam();
-            dstParam = dstParam->getNextParam();
-        }
-        cloneEnv.mapOldValToNew[genericSrc] = genericDst;
-        cloneEnv.mapOldValToNew[genericSrc->getFirstBlock()] = genericDst->getFirstBlock();
-    }
-
-    IRInst* cloneInst(IRBuilder* builder, IRInst* src)
-    {
-        if (!srcGeneric)
-            return src;
-        if (findOuterGeneric(src) == srcGeneric)
-        {
-            return Slang::cloneInst(&cloneEnv, builder, src);
-        }
-        return src;
-    }
-};
-
 struct DiffUnzipPass
 {
     AutoDiffSharedContext*                  autodiffContext;
@@ -210,10 +177,14 @@ struct DiffUnzipPass
             auto func = findSpecializeReturnVal(specialize);
             auto outerGen = findOuterGeneric(func);
             intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(outerGen);
-            intermediateType = specializeWithGeneric(
-                *primalBuilder,
+            List<IRInst*> args;
+            for (UInt i = 0; i < specialize->getArgCount(); i++)
+                args.add(specialize->getArg(i));
+            intermediateType = primalBuilder->emitSpecializeInst(
+                primalBuilder->getTypeKind(),
                 intermediateType,
-                as<IRGeneric>(findOuterGeneric(primalBuilder->getInsertLoc().getParent())));
+                args.getCount(),
+                args.getBuffer());
         }
         else
         {
