@@ -8,7 +8,7 @@
                 "optional" : true,
                 "packages" : 
                 {
-                    "windows-x86_64" : { "type" : "url", "path" : "slang-llvm-13.x-33-win64.zip" },
+                    "windows-x86_64" : { "type" : "url", "path" : "slang-llvm-13.x-33-win64.zip" }, 
                     "windows-x86" : { "type": "url", "path" : "slang-llvm-13.x-33-win32.zip" },
                     "linux-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-33-linux-x86_64-release.zip" },
                     "macosx-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-33-macosx-x86_64-release.zip" }
