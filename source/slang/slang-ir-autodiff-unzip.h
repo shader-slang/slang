@@ -425,6 +425,40 @@ struct DiffUnzipPass
                         as<IRBlock>(diffMap[afterBlock])));
             }
         
+        case kIROp_Switch:
+            {
+                auto switchInst = as<IRSwitch>(branchInst);
+                auto breakBlock = switchInst->getBreakLabel();
+                auto defaultBlock = switchInst->getDefaultLabel();
+                auto condInst = switchInst->getCondition();
+
+                List<IRInst*> primalCaseArgs;
+                List<IRInst*> diffCaseArgs;
+
+                for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii ++)
+                {
+                    primalCaseArgs.add(switchInst->getCaseValue(ii));
+                    diffCaseArgs.add(switchInst->getCaseValue(ii));
+
+                    primalCaseArgs.add(primalMap[switchInst->getCaseLabel(ii)]);
+                    diffCaseArgs.add(diffMap[switchInst->getCaseLabel(ii)]);
+                }
+
+                return InstPair(
+                    primalBuilder->emitSwitch(
+                        condInst,
+                        as<IRBlock>(primalMap[breakBlock]),
+                        as<IRBlock>(primalMap[defaultBlock]),
+                        primalCaseArgs.getCount(),
+                        primalCaseArgs.getBuffer()),
+                    diffBuilder->emitSwitch(
+                        condInst,
+                        as<IRBlock>(diffMap[breakBlock]),
+                        as<IRBlock>(diffMap[defaultBlock]),
+                        diffCaseArgs.getCount(),
+                        diffCaseArgs.getBuffer()));
+            }
+        
         default:
             SLANG_UNEXPECTED("Unhandled instruction");
         }
@@ -452,6 +486,8 @@ struct DiffUnzipPass
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:
         case kIROp_ifElse:
+        case kIROp_Switch:
+        case kIROp_loop:
             return splitControlFlow(primalBuilder, diffBuilder, inst);
         
         case kIROp_Unreachable:
