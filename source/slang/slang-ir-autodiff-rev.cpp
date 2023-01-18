@@ -36,7 +36,7 @@ namespace Slang
             }
             else
             {
-                if (auto diffPairType = tryGetDiffPairType(builder, primalType))
+                if (auto diffPairType = tryGetDiffPairType(builder, origType))
                 {
                     auto inoutDiffPairType = builder->getPtrType(kIROp_InOutType, diffPairType);
                     newParameterTypes.add(inoutDiffPairType);
@@ -311,6 +311,7 @@ namespace Slang
 
         IRFunc* primalFunc = origFunc;
 
+        maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
         differentiableTypeConformanceContext.setFunc(origFunc);
 
         auto diffFunc = builder.createFunc();
@@ -337,7 +338,8 @@ namespace Slang
         // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
         if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
         {
-            cloneDecoration(dictDecor, diffFunc);
+            builder.setInsertBefore(diffFunc->getFirstDecorationOrChild());
+            cloneInst(&cloneEnv, &builder, dictDecor);
         }
 
         return InstPair(primalFunc, diffFunc);
@@ -526,7 +528,7 @@ namespace Slang
             auto diffOuterGeneric = as<IRGeneric>(findOuterGeneric(diffPropagateFunc));
             SLANG_RELEASE_ASSERT(diffOuterGeneric);
 
-            migrationContext.init(fwdParentGeneric, diffOuterGeneric);
+            migrationContext.init(fwdParentGeneric, diffOuterGeneric, diffPropagateFunc);
             auto inst = fwdParentGeneric->getFirstBlock()->getFirstOrdinaryInst();
             builder->setInsertBefore(diffPropagateFunc);
             while (inst)
@@ -580,24 +582,12 @@ namespace Slang
         // 
         IRFunc* unzippedFwdDiffFunc = diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
 
-        // Clone the primal blocks from unzippedFwdDiffFunc
-        // to the reverse-mode function.
-        // 
-        // Special care needs to be taken for the first block since it holds the parameters
-        
-        // Clone all blocks into a temporary diff func.
-        // We're using a temporary sice we don't want to clone decorations, 
-        // only blocks, and right now there's no provision in slang-ir-clone.h
-        // for that.
-        // 
+       
+        // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
         builder->setInsertInto(diffPropagateFunc->getParent());
-        IRCloneEnv subCloneEnv;
-        auto tempDiffFunc = as<IRFunc>(cloneInst(&subCloneEnv, builder, unzippedFwdDiffFunc));
-
-        // Move blocks to the diffFunc shell.
         {
             List<IRBlock*> workList;
-            for (auto block = tempDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
+            for (auto block = unzippedFwdDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
                 workList.add(block);
             
             for (auto block : workList)
@@ -623,9 +613,7 @@ namespace Slang
         auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
             diffPropagateFunc, primalFunc, intermediateType);
 
-        // Clean up by deallocating intermediate versions.
-        tempDiffFunc->removeAndDeallocate();
-        unzippedFwdDiffFunc->removeAndDeallocate();
+        // Clean up by deallocating the tempoarary forward derivative func.
         fwdDiffFunc->removeAndDeallocate();
         
         // If primal function is nested in a generic, we want to create separate generics for all the associated things
@@ -666,14 +654,15 @@ namespace Slang
 
         builder->setInsertInto(fwdDiffParameterBlock);
 
-        // 1. Turn fwd-diff versions of the parameters into reverse-diff versions by wrapping them as InOutType<>
-        for (auto child = fwdDiffParameterBlock->getFirstParam(); child;)
+        List<IRParam*> fwdParams;
+        for (auto child = fwdDiffParameterBlock->getFirstParam(); child; child = child->getNextParam())
         {
-            IRParam* nextChild = child->getNextParam();
+            fwdParams.add(child);
+        }
 
-            auto fwdParam = as<IRParam>(child);
-            SLANG_ASSERT(fwdParam);
-            
+        // 1. Turn fwd-diff versions of the parameters into reverse-diff versions by wrapping them as InOutType<>
+        for (auto fwdParam : fwdParams)
+        {   
             // TODO: Handle ptr<pair> types.
             if (auto diffPairType = as<IRDifferentialPairType>(fwdParam->getDataType()))
             {
@@ -690,10 +679,11 @@ namespace Slang
             else
             {
                 // Default case (parameter has nothing to do with differentiation)
-                // Do nothing.
+                // Simply move the parameter to the end.
+                //
+                fwdParam->removeFromParent();
+                fwdDiffParameterBlock->addParam(fwdParam);
             }
-
-            child = nextChild;
         }
 
         auto paramCount = as<IRFuncType>(diffFunc->getDataType())->getParamCount();

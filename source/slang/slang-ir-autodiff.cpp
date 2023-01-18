@@ -31,11 +31,11 @@ static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requi
                 return entry->getSatisfyingVal();
         }
     }
-    else if (auto witnessTableParam = as<IRParam>(witness))
+    else
     {
         return builder->emitLookupInterfaceMethodInst(
             builder->getTypeKind(),
-            witnessTableParam,
+            witness,
             requirementKey);
     }
     return nullptr;

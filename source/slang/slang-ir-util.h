@@ -8,6 +8,29 @@
 
 namespace Slang
 {
+struct GenericChildrenMigrationContextImpl;
+struct IRCloneEnv;
+
+// A helper class to clone children insts to a different generic parent that has equivalent set of
+// generic parameters. The clone will take care of substitution of equivalent generic parameters and
+// intermediate values between the two generic parents.
+struct GenericChildrenMigrationContext : public RefObject
+{
+private:
+    GenericChildrenMigrationContextImpl* impl;
+
+public:
+    IRCloneEnv* getCloneEnv();
+
+    GenericChildrenMigrationContext();
+    ~GenericChildrenMigrationContext();
+
+    void init(IRGeneric* genericSrc, IRGeneric* genericDst, IRInst* insertBefore);
+
+    IRInst* deduplicate(IRInst* value);
+
+    IRInst* cloneInst(IRBuilder* builder, IRInst* src);
+};
 
 bool isPtrToClassType(IRInst* type);
 

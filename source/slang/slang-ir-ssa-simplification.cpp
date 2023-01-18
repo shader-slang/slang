@@ -7,6 +7,7 @@
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-hoist-constants.h"
+#include "slang-ir-deduplicate-generic-children.h"
 #include "slang-ir-remove-unused-generic-param.h"
 
 namespace Slang
@@ -22,6 +23,7 @@ namespace Slang
         {
             changed = false;
             changed |= hoistConstants(module);
+            changed |= deduplicateGenericChildren(module);
             changed |= applySparseConditionalConstantPropagation(module);
             changed |= peepholeOptimize(module);
             changed |= simplifyCFG(module);

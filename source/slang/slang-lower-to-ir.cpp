@@ -7894,21 +7894,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
-    IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib)
+    IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
     {
-        attrib->args.getCount();
-        SLANG_ASSERT(attrib->args.getCount() ==1);
-        Expr* expr = attrib->args[0];
+        SLANG_ASSERT(attrib->args.getCount() > index);
+        Expr* expr = attrib->args[index];
         auto intLitExpr = as<IntegerLiteralExpr>(expr);
         SLANG_ASSERT(intLitExpr);
         return as<IRIntLit>(builder->getIntValue(builder->getIntType(), intLitExpr->value));
     }
 
-    IRStringLit* _getStringLitFromAttribute(IRBuilder* builder, Attribute* attrib)
+    IRStringLit* _getStringLitFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
     {
-        attrib->args.getCount();
-        SLANG_ASSERT(attrib->args.getCount() == 1);
-        Expr* expr = attrib->args[0];
+        SLANG_ASSERT(attrib->args.getCount() > index);
+        Expr* expr = attrib->args[index];
 
         auto stringLitExpr = as<StringLiteralExpr>(expr);
         SLANG_ASSERT(stringLitExpr);
@@ -8332,8 +8330,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (auto attr = decl->findModifier<SPIRVInstructionOpAttribute>())
         {
-            IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
-            getBuilder()->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit);
+            auto builder = getBuilder();
+            IRIntLit* intLit = _getIntLitFromAttribute(builder, attr, 0);
+
+            IRStringLit* setStringLit = nullptr;
+            if (attr->args.getCount() > 1)
+            {
+                IRStringLit* checkSetStringLit = _getStringLitFromAttribute(builder, attr, 1);
+                if (checkSetStringLit && checkSetStringLit->getStringSlice().getLength() > 0)
+                {
+                    setStringLit = checkSetStringLit;
+                }
+            }
+
+            // If it has a `set` defined, set it on the decoration
+            if (setStringLit)
+            {
+                builder->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit, setStringLit);
+            }
+            else
+            {
+                builder->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit);
+            }
         }
 
         if (decl->findModifier<UnsafeForceInlineEarlyAttribute>())

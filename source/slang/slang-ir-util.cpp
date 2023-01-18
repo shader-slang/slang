@@ -219,4 +219,120 @@ void moveInstChildren(IRInst* dest, IRInst* src)
     }
 }
 
+struct GenericChildrenMigrationContextImpl
+{
+    IRCloneEnv cloneEnv;
+    IRGeneric* srcGeneric;
+    IRGeneric* dstGeneric;
+    Dictionary<IRInstKey, IRInst*> deduplicateMap;
+
+    void init(IRGeneric* genericSrc, IRGeneric* genericDst, IRInst* insertBefore)
+    {
+        srcGeneric = genericSrc;
+        dstGeneric = genericDst;
+
+        if (!genericSrc)
+            return;
+        auto srcParam = genericSrc->getFirstBlock()->getFirstParam();
+        auto dstParam = genericDst->getFirstBlock()->getFirstParam();
+        while (srcParam && dstParam)
+        {
+            cloneEnv.mapOldValToNew[srcParam] = dstParam;
+            srcParam = srcParam->getNextParam();
+            dstParam = dstParam->getNextParam();
+        }
+        cloneEnv.mapOldValToNew[genericSrc] = genericDst;
+        cloneEnv.mapOldValToNew[genericSrc->getFirstBlock()] = genericDst->getFirstBlock();
+
+        if (insertBefore)
+        {
+            for (auto inst = genericDst->getFirstBlock()->getFirstOrdinaryInst();
+                inst && inst != insertBefore;
+                inst = inst->getNextInst())
+            {
+                IRInstKey key = { inst };
+                deduplicateMap.AddIfNotExists(key, inst);
+            }
+        }
+    }
+
+    IRInst* deduplicate(IRInst* value)
+    {
+        if (!value) return nullptr;
+        if (value->getParent() != dstGeneric->getFirstBlock())
+            return value;
+        switch (value->getOp())
+        {
+        case kIROp_Param:
+        case kIROp_StructType:
+        case kIROp_StructKey:
+        case kIROp_InterfaceType:
+        case kIROp_ClassType:
+        case kIROp_Func:
+        case kIROp_Generic:
+            return value;
+        default:
+            break;
+        }
+        if (as<IRConstant>(value))
+            return value;
+
+        for (UInt i = 0; i < value->getOperandCount(); i++)
+        {
+            value->setOperand(i, deduplicate(value->getOperand(i)));
+        }
+        value->setFullType((IRType*)deduplicate(value->getFullType()));
+        IRInstKey key = { value };
+        if (auto newValue = deduplicateMap.TryGetValue(key))
+            return *newValue;
+        deduplicateMap[key] = value;
+        return value;
+    }
+
+    IRInst* cloneInst(IRBuilder* builder, IRInst* src)
+    {
+        if (!srcGeneric)
+            return src;
+        if (findOuterGeneric(src) == srcGeneric)
+        {
+            auto cloned = Slang::cloneInst(&cloneEnv, builder, src);
+            auto deduplicated = deduplicate(cloned);
+            if (deduplicated != cloned)
+                cloneEnv.mapOldValToNew[src] = deduplicated;
+            return deduplicated;
+        }
+        return src;
+    }
+};
+
+GenericChildrenMigrationContext::GenericChildrenMigrationContext()
+{
+    impl = new GenericChildrenMigrationContextImpl();
+}
+
+GenericChildrenMigrationContext::~GenericChildrenMigrationContext()
+{
+    delete impl;
+}
+
+IRCloneEnv* GenericChildrenMigrationContext::getCloneEnv()
+{
+    return &impl->cloneEnv;
+}
+
+void GenericChildrenMigrationContext::init(IRGeneric* genericSrc, IRGeneric* genericDst, IRInst* insertBefore)
+{
+    impl->init(genericSrc, genericDst, insertBefore);
+}
+
+IRInst* GenericChildrenMigrationContext::deduplicate(IRInst* value)
+{
+    return impl->deduplicate(value);
+}
+
+IRInst* GenericChildrenMigrationContext::cloneInst(IRBuilder* builder, IRInst* src)
+{
+    return impl->cloneInst(builder, src);
+}
+
 }
