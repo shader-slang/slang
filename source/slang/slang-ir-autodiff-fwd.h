@@ -65,6 +65,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse);
 
+    InstPair transcribeSwitch(IRBuilder* builder, IRSwitch* origSwitch);
+
     InstPair transcribeMakeDifferentialPair(IRBuilder* builder, IRMakeDifferentialPair* origInst);
 
     InstPair transcribeDifferentialPairGetElement(IRBuilder* builder, IRInst* origInst);

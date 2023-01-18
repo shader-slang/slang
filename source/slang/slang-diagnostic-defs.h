@@ -321,6 +321,9 @@ DIAGNOSTIC(31005, Error, expectedSingleStringArg, "attribute '$0' expects a sing
 
 DIAGNOSTIC(31006, Error, attributeFunctionNotFound, "Could not find function '$0' for attribute'$1'")
 
+DIAGNOSTIC(31007, Error, attributeExpectedIntArg, "attribute '$0' expects argument $1 to be int")
+DIAGNOSTIC(31008, Error, attributeExpectedStringArg, "attribute '$0' expects argument $1 to be string")
+
 DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31101, Error, unknownImageFormatName, "unknown image format '$0'")
 DIAGNOSTIC(31101, Error, unknownDiagnosticName, "unknown diagnostic '$0'")

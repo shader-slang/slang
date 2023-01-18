@@ -1999,6 +1999,22 @@ void GLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 
         m_writer->emit("spirv_instruction(id = ");
         emitSimpleValue(decoration->getOperand(0));
+
+        if (decoration->getOperandCount() >= 2)
+        {
+            if (auto stringLit = as<IRStringLit>(decoration->getOperand(1)))
+            {
+                m_writer->emit(toSlice(", set = "));
+
+                auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
+
+                StringBuilder buf;
+                StringEscapeUtil::appendQuoted(handler, stringLit->getStringSlice(), buf);
+            
+                m_writer->emitRawTextSpan(buf.begin(), buf.end());
+            }
+        }
+
         m_writer->emit(")\n");
     }
     else

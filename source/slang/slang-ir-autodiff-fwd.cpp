@@ -784,6 +784,47 @@ InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* orig
     return InstPair(diffLoop, diffLoop);
 }
 
+InstPair ForwardDiffTranscriber::transcribeSwitch(IRBuilder* builder, IRSwitch* origSwitch)
+{
+    // Transcribe condition (primal only, conditions do not produce differentials)
+    auto primalCondition = findOrTranscribePrimalInst(builder, origSwitch->getCondition());
+    SLANG_ASSERT(primalCondition);
+    
+    // Transcribe 'default' block
+    IRBlock* diffDefaultBlock = as<IRBlock>(
+        findOrTranscribeDiffInst(builder, origSwitch->getDefaultLabel()));
+    SLANG_ASSERT(diffDefaultBlock);
+
+    // Transcribe 'default' block
+    IRBlock* diffBreakBlock = as<IRBlock>(
+        findOrTranscribeDiffInst(builder, origSwitch->getBreakLabel()));
+    SLANG_ASSERT(diffBreakBlock);
+
+    // Transcribe all other operands
+    List<IRInst*> diffCaseValuesAndLabels;
+    for (UIndex ii = 0; ii < origSwitch->getCaseCount(); ii ++)
+    {
+        auto primalCaseValue = findOrTranscribePrimalInst(builder, origSwitch->getCaseValue(ii));
+        SLANG_ASSERT(primalCaseValue);
+
+        auto diffCaseBlock = findOrTranscribeDiffInst(builder, origSwitch->getCaseLabel(ii));
+        SLANG_ASSERT(diffCaseBlock);
+
+        diffCaseValuesAndLabels.add(primalCaseValue);
+        diffCaseValuesAndLabels.add(diffCaseBlock);
+    }
+
+    auto diffSwitchInst = builder->emitSwitch(
+        primalCondition,
+        diffBreakBlock,
+        diffDefaultBlock, 
+        diffCaseValuesAndLabels.getCount(),
+        diffCaseValuesAndLabels.getBuffer());
+    builder->markInstAsMixedDifferential(diffSwitchInst);
+
+    return InstPair(diffSwitchInst, diffSwitchInst);
+}
+
 InstPair ForwardDiffTranscriber::transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse)
 {
     // IfElse Statements come with 4 blocks. We transcribe each block into it's
@@ -1127,6 +1168,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_ifElse:
         return transcribeIfElse(builder, as<IRIfElse>(origInst));
+    
+    case kIROp_Switch:
+        return transcribeSwitch(builder, as<IRSwitch>(origInst));
 
     case kIROp_MakeDifferentialPair:
         return transcribeMakeDifferentialPair(builder, as<IRMakeDifferentialPair>(origInst));
