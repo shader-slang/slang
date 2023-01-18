@@ -2801,7 +2801,7 @@ __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
 __attributeTarget(FuncDecl)
-attribute_syntax [vk_spirv_instruction(op : int, set : String)]     : SPIRVInstructionOpAttribute;
+attribute_syntax [vk_spirv_instruction(op : int, set : String = "")]     : SPIRVInstructionOpAttribute;
 
 // Statement Attributes
 

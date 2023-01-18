@@ -8333,9 +8333,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto builder = getBuilder();
             IRIntLit* intLit = _getIntLitFromAttribute(builder, attr, 0);
 
+            IRStringLit* setStringLit = nullptr;
             if (attr->args.getCount() > 1)
             {
-                IRStringLit* setStringLit = _getStringLitFromAttribute(builder, attr, 1);
+                IRStringLit* checkSetStringLit = _getStringLitFromAttribute(builder, attr, 1);
+                if (checkSetStringLit && checkSetStringLit->getStringSlice().getLength() > 0)
+                {
+                    setStringLit = checkSetStringLit;
+                }
+            }
+
+            // If it has a `set` defined, set it on the decoration
+            if (setStringLit)
+            {
                 builder->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit, setStringLit);
             }
             else
