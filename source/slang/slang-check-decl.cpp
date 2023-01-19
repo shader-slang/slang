@@ -6894,38 +6894,34 @@ namespace Slang
 
     bool SharedSemanticsContext::isDifferentiableFunc(FunctionDeclBase* func)
     {
-        // A function is differentiable if it is marked as differentiable, or it
-        // has an associated derivative function.
-        if (func->findModifier<DifferentiableAttribute>())
-            return true;
-        for (auto assocDecl : getAssociatedDeclsForDecl(func))
-        {
-            switch (assocDecl.kind)
-            {
-            case DeclAssociationKind::ForwardDerivativeFunc:
-            case DeclAssociationKind::BackwardDerivativeFunc:
-                return true;
-            default:
-                break;
-            }
-        }
-        return false;
+        return getFuncDifferentiableLevel(func) != FunctionDifferentiableLevel::None;
     }
 
     bool SharedSemanticsContext::isBackwardDifferentiableFunc(FunctionDeclBase* func)
     {
-        // A function is differentiable if it is marked as differentiable, or it
-        // has an associated derivative function.
+        return getFuncDifferentiableLevel(func) == FunctionDifferentiableLevel::Backward;
+    }
+
+    FunctionDifferentiableLevel SharedSemanticsContext::getFuncDifferentiableLevel(FunctionDeclBase* func)
+    {
         if (func->findModifier<BackwardDifferentiableAttribute>())
-            return true;
+            return FunctionDifferentiableLevel::Backward;
         if (func->findModifier<BackwardDerivativeAttribute>())
-            return true;
+            return FunctionDifferentiableLevel::Backward;
+
+        FunctionDifferentiableLevel diffLevel = FunctionDifferentiableLevel::None;
+        if (func->findModifier<DifferentiableAttribute>())
+            diffLevel = FunctionDifferentiableLevel::Forward;
+
         for (auto assocDecl : getAssociatedDeclsForDecl(func))
         {
             switch (assocDecl.kind)
             {
             case DeclAssociationKind::BackwardDerivativeFunc:
-                return true;
+                return FunctionDifferentiableLevel::Backward;
+            case DeclAssociationKind::ForwardDerivativeFunc:
+                diffLevel = FunctionDifferentiableLevel::Forward;
+                break;
             default:
                 break;
             }
@@ -6937,12 +6933,12 @@ namespace Slang
             case BuiltinRequirementKind::DAddFunc:
             case BuiltinRequirementKind::DMulFunc:
             case BuiltinRequirementKind::DZeroFunc:
-                return true;
+                return FunctionDifferentiableLevel::Backward;
             default:
                 break;
             }
         }
-        return false;
+        return diffLevel;
     }
 
     List<ExtensionDecl*> const& getCandidateExtensions(

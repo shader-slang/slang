@@ -1967,6 +1967,10 @@ namespace Slang
 
         if (m_parentDifferentiableAttr)
         {
+            FunctionDifferentiableLevel callerDiffLevel = FunctionDifferentiableLevel::None;
+            if (m_parentFunc)
+                callerDiffLevel = getShared()->getFuncDifferentiableLevel(m_parentFunc);
+
             if (auto checkedInvokeExpr = as<InvokeExpr>(checkedExpr))
             {
                 // Register types for final resolved invoke arguments again.
@@ -1978,7 +1982,8 @@ namespace Slang
                 {
                     if (auto calleeDecl = as<FunctionDeclBase>(calleeExpr->declRef.getDecl()))
                     {
-                        if (getShared()->isDifferentiableFunc(calleeDecl))
+                        auto calleeDiffLevel = getShared()->getFuncDifferentiableLevel(calleeDecl);
+                        if (calleeDiffLevel >= callerDiffLevel)
                         {
                             if (!m_treatAsDifferentiableExpr)
                             {
