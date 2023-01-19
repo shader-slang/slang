@@ -11,7 +11,6 @@ float f(float x)
     return x * x;
 }
 
-// error: function does not return a differentiable value.
 [BackwardDifferentiable]
 float g(float x)
 {
