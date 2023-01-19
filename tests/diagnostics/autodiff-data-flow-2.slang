@@ -18,7 +18,7 @@ float g(float x)
     float val = f(x + 1); // Error: f must also be backward-differentiable
     return val;
 }
-/*
+
 [BackwardDifferentiable]
 float h(float x)
 {
@@ -27,4 +27,3 @@ float h(float x)
     val = no_diff(f(x + 1));
     return val;
 }
-*/
