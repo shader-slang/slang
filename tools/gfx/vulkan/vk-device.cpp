@@ -621,6 +621,26 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         {
             deviceExtensions.add(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME);
         }
+        if (extensionNames.Contains(VK_NVX_BINARY_IMPORT_EXTENSION_NAME))
+        {
+            deviceExtensions.add(VK_NVX_BINARY_IMPORT_EXTENSION_NAME);
+            m_features.add("nvx-binary-import");
+        }
+        if (extensionNames.Contains(VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME))
+        {
+            deviceExtensions.add(VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME);
+            m_features.add("nvx-image-view-handle");
+        }
+        if (extensionNames.Contains(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME))
+        {
+            deviceExtensions.add(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+            m_features.add("push-descriptor");
+        }
+        if (extensionNames.Contains(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME))
+        {
+            deviceExtensions.add(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
+            m_features.add("barycentrics");
+        }
     }
     if (m_api.m_module->isSoftware())
     {
