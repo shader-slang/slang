@@ -9,6 +9,7 @@
 #include "slang-ir-hoist-constants.h"
 #include "slang-ir-deduplicate-generic-children.h"
 #include "slang-ir-remove-unused-generic-param.h"
+#include "slang-ir-redundancy-removal.h"
 
 namespace Slang
 {
@@ -26,6 +27,7 @@ namespace Slang
             changed |= deduplicateGenericChildren(module);
             changed |= applySparseConditionalConstantPropagation(module);
             changed |= peepholeOptimize(module);
+            changed |= removeRedundancy(module);
             changed |= simplifyCFG(module);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
@@ -49,6 +51,7 @@ namespace Slang
             changed = false;
             changed |= applySparseConditionalConstantPropagation(func);
             changed |= peepholeOptimize(func);
+            changed |= removeRedundancyInFunc(func);
             changed |= simplifyCFG(func);
 
             // Note: we disregard the `changed` state from dead code elimination pass since

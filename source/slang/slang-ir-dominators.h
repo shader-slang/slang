@@ -7,6 +7,7 @@ namespace Slang
 {
     struct IRBlock;
     struct IRGlobalValueWithCode;
+    struct IRInst;
 
     /// The computed dominator tree for an IR control flow graph.
     struct IRDominatorTree : public RefObject
@@ -21,6 +22,8 @@ namespace Slang
         /// through B must first pass through A.
         ///
         bool dominates(IRBlock* dominator, IRBlock* dominated);
+
+        bool dominates(IRInst* dominator, IRInst* dominated);
 
         /// Does the first block properly dominate the second?
         ///

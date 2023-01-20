@@ -1061,6 +1061,10 @@ struct DiffTransposePass
             
             case kIROp_MakeVector:
                 return transposeMakeVector(builder, fwdInst, revValue);
+            case kIROp_MakeStruct:
+                return transposeMakeStruct(builder, fwdInst, revValue);
+            case kIROp_MakeArray:
+                return transposeMakeArray(builder, fwdInst, revValue);
 
             case kIROp_Specialize:
             case kIROp_unconditionalBranch:
@@ -1215,6 +1219,55 @@ struct DiffTransposePass
         }
 
         // (A = float3(X, Y, Z)) -> [(dX += dA), (dY += dA), (dZ += dA)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeStruct(IRBuilder* builder, IRInst* fwdMakeStruct, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto structType = cast<IRStructType>(fwdMakeStruct->getFullType());
+        UInt ii = 0;
+        for (auto field : structType->getFields())
+        {
+            auto gradAtField = builder->emitFieldExtract(
+                field->getFieldType(),
+                revValue,
+                field->getKey());
+            SLANG_RELEASE_ASSERT(ii < fwdMakeStruct->getOperandCount());
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeStruct->getOperand(ii),
+                gradAtField,
+                fwdMakeStruct));
+            ii++;
+        }
+
+        // (A = MakeStruct(F1, F2, F3)) -> [(dF1 += dA.F1), (dF2 += dA.F2), (dF3 += dA.F3)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeArray(IRBuilder* builder, IRInst* fwdMakeArray, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto arrayType = cast<IRArrayType>(fwdMakeArray->getFullType());
+        auto arraySize = cast<IRIntLit>(arrayType->getElementCount());
+
+        for (UInt ii = 0; ii < (UInt)arraySize->getValue(); ii++)
+        {
+            auto gradAtField = builder->emitElementExtract(
+                arrayType->getElementType(),
+                revValue,
+                builder->getIntValue(builder->getIntType(), ii));
+            SLANG_RELEASE_ASSERT(ii < fwdMakeArray->getOperandCount());
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeArray->getOperand(ii),
+                gradAtField,
+                fwdMakeArray));
+            ii++;
+        }
+
+        // (A = MakeArray(F1, F2, F3)) -> [(dF1 += dA.F1), (dF2 += dA.F2), (dF3 += dA.F3)]
         return TranspositionResult(gradients);
     }
 

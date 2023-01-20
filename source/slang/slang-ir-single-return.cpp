@@ -91,4 +91,20 @@ void convertFuncToSingleReturnForm(IRModule* irModule, IRGlobalValueWithCode* fu
     context.processFunc(func);
 }
 
+bool isSingleReturnFunc(IRGlobalValueWithCode* func)
+{
+    int returnCount = 0;
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() == kIROp_Return)
+            {
+                returnCount++;
+            }
+        }
+    }
+    return returnCount <= 1;
+}
+
 } // namespace Slang

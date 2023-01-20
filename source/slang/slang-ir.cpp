@@ -1982,7 +1982,6 @@ namespace Slang
                 return getStringSlice() == rhs->getStringSlice();
             }
             case kIROp_VoidLit:
-            case kIROp_DifferentialBottomValue:
             {
                 return true;
             }
@@ -2025,7 +2024,6 @@ namespace Slang
                 return combineHash(code, Slang::getHashCode(slice.begin(), slice.getLength()));
             }
             case kIROp_VoidLit:
-            case kIROp_DifferentialBottomValue:
             {
                 return code;
             }
@@ -2108,14 +2106,6 @@ namespace Slang
                 irValue = static_cast<IRConstant*>(
                     _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
                 irValue->value.ptrVal = keyInst.value.ptrVal;
-                break;
-            }
-            case kIROp_DifferentialBottomValue:
-            {
-                const size_t instSize = prefixSize + sizeof(void*);
-                irValue = static_cast<IRConstant*>(
-                    _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
-                irValue->value.ptrVal = nullptr;
                 break;
             }
             case kIROp_StringLit:

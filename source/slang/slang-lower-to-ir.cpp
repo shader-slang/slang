@@ -9157,7 +9157,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     checkForMissingReturns(module, compileRequest->getSink());
 
     // Check for invalid differentiable function body.
-    checkAutoDiffUsages(module, compileRequest->getSink());
+    checkAutoDiffUsages(sharedBuilder, module, compileRequest->getSink());
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
