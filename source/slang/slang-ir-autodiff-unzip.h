@@ -66,24 +66,69 @@ struct DiffUnzipPass
     // might run into an issue here?
     IRBlock*                                firstDiffBlock;
 
-    struct BlockIndex
+    struct IndexedRegion
     {
-        IRParam*    param;
-        BlockIndex* parent;
-        IRLoop*     targetLoop;
+        // Parent indexed region (for nested loops)
+        IndexedRegion* parent           = nullptr;
 
-        BlockIndex() : param(nullptr), parent(nullptr), targetLoop(nullptr)
+        // Intializer block for the index.
+        IRBlock*       initBlock        = nullptr;
+
+        // Index 'starts' at the first loop block (included)
+        IRBlock*       firstBlock       = nullptr;
+
+        // Index stops at the break block (not included)
+        IRBlock*       breakBlock       = nullptr;
+
+        // After lowering, store references to the count
+        // variables associated with this region
+        //
+        IRVar*         primalCountVar   = nullptr;
+        IRVar*         diffCountVar     = nullptr;
+
+        enum CountStatus
+        {
+            Unresolved,
+            Dynamic,
+            Static
+        };
+
+        CountStatus    status           = CountStatus::Unresolved;
+
+        // Inferred maximum number of iterations.
+        Count          maxIters         = -1;
+
+        IndexedRegion() : 
+            parent(nullptr),
+            initBlock(nullptr),
+            firstBlock(nullptr),
+            breakBlock(nullptr),
+            primalCountVar(nullptr),
+            diffCountVar(nullptr),
+            status(CountStatus::Unresolved),
+            maxIters(-1)
         { }
 
-        BlockIndex(IRParam* param, BlockIndex* parent, IRLoop* targetLoop) : 
-            param(param),
+        IndexedRegion(
+            IndexedRegion* parent,
+            IRBlock* initBlock,
+            IRBlock* firstBlock,
+            IRBlock* breakBlock) : 
             parent(parent),
-            targetLoop(targetLoop)
+            initBlock(initBlock),
+            firstBlock(firstBlock),
+            breakBlock(breakBlock),
+            primalCountVar(nullptr),
+            diffCountVar(nullptr),
+            status(CountStatus::Unresolved),
+            maxIters(-1)
         { }
     };
 
     // Keep track of indexed blocks and their corresponding index heirarchy.
-    Dictionary<IRBlock*, BlockIndex*>          blockIndexMap;
+    Dictionary<IRBlock*, IndexedRegion*>          indexRegionMap;
+
+    List<IndexedRegion*>                          indexRegions;
 
 
     DiffUnzipPass(
@@ -169,20 +214,264 @@ struct DiffUnzipPass
                 this->firstDiffBlock = diffBlock;
         }
 
+        // We're going to split the terminator insts (control-flow) of each block
+        // _before_ everything else. This is because some blocks can end up
+        // being inside a loop, and affect the instruction splitting logic for
+        // ordinary insts.
+        // 
+        /*{
+            IRBuilder primalBuilder;
+            primalBuilder.init(autodiffContext->sharedBuilder);
+            
+            IRBuilder diffBuilder;
+            diffBuilder.init(autodiffContext->sharedBuilder);
+            
+            for (auto block : mixedBlocks)
+            {
+                auto terminator = block->getTerminator();
+
+                primalBuilder.setInsertInto(as<IRBlock>(primalMap[block]));
+                diffBuilder.setInsertInto(as<IRBlock>(diffMap[block]));
+
+                splitMixedInst(&primalBuilder, &diffBuilder, terminator);
+            }
+        }*/
+
         // Split each block into two. 
         for (auto block : mixedBlocks)
         {
             splitBlock(block, as<IRBlock>(primalMap[block]), as<IRBlock>(diffMap[block]));
         }
 
+        // Propagate indexed region information.
+        propagateAllIndexRegions();
+
+        // Try to infer maximum counts for all regions.
+        // (only regions whose intermediates are used outside their region
+        // require a maximum count, so we may see some unresolved regions
+        // without any issues)
+        // 
+        for (auto region : indexRegions)
+        {
+            tryInferMaxIndex(region);
+        }
+
+        // Emit counter variables and other supporting
+        // instructions for all regions.
+        // 
+        lowerIndexedRegions();
+
+        // Process intermediate insts in indexed blocks
+        // into array loads/stores.
+        // 
+        for (auto block : mixedBlocks)
+        {
+            auto primalBlock = primalMap[block];
+            
+            if (isBlockIndexed(block))
+            {
+                processIndexedFwdBlock(block);
+            }
+        }
+
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
+
+        cleanupIndexRegionInfo();
 
         // Remove old blocks.
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
 
         return unzippedFunc;
+    }
+
+    IRBlock* getInitializerBlock(IndexedRegion* region)
+    {
+        return region->initBlock;
+    }
+
+    IRBlock* getUpdateBlock(IndexedRegion* region)
+    {
+        return region->firstBlock;
+    }
+    
+    void tryInferMaxIndex(IndexedRegion* region)
+    {
+        if (region->status != IndexedRegion::CountStatus::Unresolved)
+            return;
+        
+        // We're going to fix this at a some random number
+        // for now, and then add some basic inference + user-defined decoration
+        // 
+        region->maxIters = 5;
+        region->status = IndexedRegion::CountStatus::Static;
+    }
+
+    void lowerIndexedRegions()
+    {
+        IRBuilder builder(autodiffContext->sharedBuilder);
+
+        for (auto region : indexRegions)
+        {
+
+            IRBlock* initializerBlock = getInitializerBlock(region);
+            
+            builder.setInsertInto(primalMap[initializerBlock]);
+            region->primalCountVar = builder.emitVar(builder.getUIntType());
+
+            builder.setInsertInto(diffMap[initializerBlock]);
+            region->diffCountVar = builder.emitVar(builder.getUIntType());
+            
+            IRBlock* updateBlock = getUpdateBlock(region);
+            
+            {
+                // TODO: Figure out if the counter update needs to go before or after
+                // the rest of the update block.
+                // 
+                builder.setInsertInto(primalMap[updateBlock]);
+
+                auto counterVal = builder.emitLoad(region->primalCountVar);
+                auto incCounterVal = builder.emitAdd(
+                    builder.getUIntType(), 
+                    counterVal,
+                    builder.getIntValue(builder.getUIntType(), 0));
+
+                builder.emitStore(region->primalCountVar, incCounterVal);
+            }
+
+            {
+                builder.setInsertInto(diffMap[updateBlock]);
+
+                auto counterVal = builder.emitLoad(region->diffCountVar);
+                auto incCounterVal = builder.emitAdd(
+                    builder.getUIntType(), 
+                    counterVal,
+                    builder.getIntValue(builder.getUIntType(), 0));
+
+                builder.emitStore(region->diffCountVar, incCounterVal);
+            }
+
+        }
+    }
+
+    void processIndexedFwdBlock(IRBlock* fwdBlock)
+    {
+        if (!isBlockIndexed(fwdBlock))
+            return;
+        
+        // Grab first primal block.
+        auto firstPrimalBlock = fwdBlock->getParent()->getFirstBlock()->getNextBlock();
+        
+        // Scan through instructions and identify those that are used
+        // outside the local block.
+        //
+        IRBlock* primalBlock = as<IRBlock>(primalMap[fwdBlock]);
+
+        List<IRInst*> primalInsts;
+        for (auto child = primalBlock->getFirstChild(); child; child = child->getNextInst())
+            primalInsts.add(child);
+
+        IRBuilder builder(autodiffContext->sharedBuilder);
+
+        // Build list of indices that this block is affected by.
+        List<IndexedRegion*> regions;
+        {
+            IndexedRegion* region = indexRegionMap[fwdBlock];
+            for (; region; region = region->parent)
+                regions.add(region);
+        }
+        
+        for (auto inst : primalInsts)
+        {
+            // 1. Check if we need to store inst (is it used in a differential block?)
+
+            bool shouldStore = false;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+
+                if (isDifferentialInst(useBlock))
+                {
+                    shouldStore = true;
+                }
+            }
+
+            if (!shouldStore) continue;
+
+            // 2. Emit an array to top-level to allocate space.
+            
+            builder.setInsertInto(firstPrimalBlock);
+
+            IRType* arrayType = inst->getDataType();
+
+            for (auto region : regions)
+            {
+                SLANG_ASSERT(region->status == IndexedRegion::CountStatus::Static);
+                SLANG_ASSERT(region->maxIters >= 0);
+
+                arrayType = builder.getArrayType(
+                    arrayType,
+                    builder.getIntValue(
+                        builder.getUIntType(),
+                        region->maxIters));
+            }
+
+            // Reverse the list since the indices needs to be 
+            // emitted in reverse order.
+            // 
+            regions.reverse();
+            
+            auto storageVar = builder.emitVar(arrayType);
+
+            // 3. Store current value into the array and replace uses with a load.
+            {
+                builder.setInsertAfter(inst);
+                
+                IRInst* storeAddr = storageVar;
+                IRType* currType = storageVar->getDataType();
+
+                for (auto region : regions)
+                {
+                    currType = as<IRArrayType>(currType)->getElementType();
+
+                    storeAddr = builder.emitElementAddress(
+                        currType,
+                        storeAddr, 
+                        region->primalCountVar);
+                }
+
+                builder.emitStore(storeAddr, inst);
+            }
+
+            // 4. Replace uses in differential blocks with loads from the array.
+            {
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                {
+                    IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+
+                    if (isDifferentialInst(useBlock))
+                    {
+                        builder.setInsertBefore(use->getUser());
+
+                        IRInst* loadAddr = storageVar;
+                        IRType* currType = storageVar->getDataType();
+
+                        for (auto region : regions)
+                        {
+                            currType = as<IRArrayType>(currType)->getElementType();
+
+                            loadAddr = builder.emitElementAddress(
+                                currType,
+                                loadAddr, 
+                                region->diffCountVar);
+                        }
+
+                        use->set(builder.emitLoad(loadAddr));
+                    }
+                }
+            }
+        }
     }
 
     IRFunc* extractPrimalFunc(IRFunc* func, IRFunc* originalFunc, IRInst*& intermediateType);
@@ -378,56 +667,153 @@ struct DiffUnzipPass
 
     bool isBlockIndexed(IRBlock* block)
     {
-        return blockIndexMap.ContainsKey(block) && blockIndexMap[block] != nullptr;
+        return indexRegionMap.ContainsKey(block) && indexRegionMap[block] != nullptr;
     }
 
-    void pushNewIndex(IRBlock* block, IRLoop* targetLoop)
+    void addNewIndex(IRLoop* targetLoop)
     {
-        BlockIndex* newIndex = nullptr;
-
-        // Push a new phi parameter.
-        IRBuilder builder(autodiffContext->sharedBuilder);
-        builder.setInsertInto(block);
-        auto indexPhiParam = builder.emitParam(builder.getUIntType());
-
-        // If the block already has an index, grab a 
-        if (isBlockIndexed(block))
-        {
-            newIndex = new BlockIndex(indexPhiParam, blockIndexMap[block], targetLoop);
-        }
-        else
-        {
-            newIndex = new BlockIndex(indexPhiParam, nullptr, targetLoop);
-        }
-
-        blockIndexMap[block] = newIndex;
+        // Create indexed region without a parent for now. 
+        // The parent will be filled in during propagation.
+        // 
+        IndexedRegion* region = new IndexedRegion(
+            nullptr,
+            targetLoop->getTargetBlock(),
+            targetLoop->getContinueBlock(),
+            targetLoop->getBreakBlock());
+        
+        indexRegionMap[targetLoop->getContinueBlock()] = region;
     }
 
-    bool propagateIndices(IRBlock* srcBlock, IRBlock* nextBlock)
+    // Deallocate regions
+    void cleanupIndexRegionInfo()
     {
-        // TODO: Make region propagation robust to out-of-order blocks.
-        // TODO: Make index propagation robust to out-of-order blocks.
+        for (auto region : indexRegions)
+        {
+            delete region;
+        }
+
+        indexRegions.clear();
+        indexRegionMap.Clear();
+    }
+
+    void propagateAllIndexRegions()
+    {
         // TODO: Unzip terminator insts _before_ all other insts.
 
-        BlockIndex* currIndex = nullptr;
-
-        // We've looped back to an already processed block.
-        // No more need to propagate.
+        // Load up the starting block of every region into
+        // initial worklist.
         // 
-        if (isBlockIndexed(nextBlock))
+        List<IRBlock*> workList;
+        HashSet<IRBlock*> workSet;
+        for (auto region : indexRegions)
+        {
+            workList.add(region->firstBlock);
+            workSet.Add(region->firstBlock);
+        }
+
+        // Keep propagating from initial work list to predecessors
+        // Add blocks to work list if their region assignment has changed
+        // Add the beginning blocks for complete regions if region parent has changed.
+        // 
+        while (workList.getCount() > 0)
+        {
+            auto block = workList.getLast();
+            workList.removeLast();
+            workSet.Remove(block);
+            
+            HashSet<IRBlock*> successors;
+
+            for (auto successor : block->getPredecessors())
+            {
+                if (!isDifferentialInst(successor))
+                    continue;
+
+                if (successors.Contains(successor))
+                    continue;
+                
+                if (propagateIndexRegion(block, successor))
+                {
+                    if (!workSet.Contains(successor))
+                    {
+                        workList.add(successor);
+                        workSet.Add(successor);
+                    }
+
+                    // Do we have an index region for the successor, which is
+                    // also the starting block of that region?
+                    // Then the change might have been the addition of 
+                    // a parent node. Add the break block so the
+                    // change can be propagated further.
+                    // 
+                    if (isBlockIndexed(successor))
+                    {
+                        IndexedRegion* succRegion = indexRegionMap[successor];
+                        if (succRegion->firstBlock == successor)
+                        {
+                            if (!workSet.Contains(succRegion->breakBlock))
+                            {
+                                workList.add(succRegion->breakBlock);
+                                workSet.Add(succRegion->breakBlock);
+                            }
+                        }
+                    }
+                }
+
+                successors.Add(successor);
+            }
+        }
+    }
+
+    bool setIndexRegion(IRBlock* block, IndexedRegion* region)
+    {
+        if (!region) return false;
+
+        if (indexRegionMap.ContainsKey(block)
+            && indexRegionMap[block] == region)
             return false;
 
-        if (isBlockIndexed(srcBlock))
-            currIndex = blockIndexMap[srcBlock];
+        indexRegionMap[block] = region;
+        return true;
+    }
+
+    bool propagateIndexRegion(IRBlock* srcBlock, IRBlock* nextBlock)
+    {
+        // Is the current region indexed? 
+        // If not, there's nothing to propagate
+        //
+        if (!isBlockIndexed(srcBlock))
+            return false;
         
-        IRBuilder builder(autodiffContext->sharedBuilder);
-        builder.setInsertInto(nextBlock);
+        IndexedRegion* region = indexRegionMap[srcBlock];
         
-        List<IRParam*> indexParams;
-        while (currIndex)
+        // If the target's index is already resolved, 
+        // check if it's a sub-region.
+        // 
+        if (isBlockIndexed(nextBlock))
         {
-            pushNewIndex(nextBlock, currIndex->targetLoop);
+            IndexedRegion* nextRegion = indexRegionMap[nextBlock];
+
+            // If we're at the first block of a region, 
+            // set current region as continue-region's
+            // parent.
+            //
+            if (nextBlock == nextRegion->firstBlock)
+            {
+                nextRegion->parent = region;
+                return true;
+            }
+
+            return false;
         }
+
+        // If we're at the break block, move up to the parent index.
+        if (nextBlock == region->breakBlock)
+            return setIndexRegion(nextBlock, region->parent);
+
+        // If none of the special cases hit, copy the 
+        // current region to the next block.
+        // 
+        return setIndexRegion(nextBlock, region);
     }
 
     // Splitting a loop is one of the trickiest parts of the unzip pass.
@@ -448,14 +834,8 @@ struct DiffUnzipPass
         auto continueBlock = mixedLoop->getContinueBlock();
         auto nextBlock = mixedLoop->getTargetBlock();
 
-        auto currBlock = mixedLoop->getParent();
-
-        // Propagate indices as usual to the next block.
-        // propagateIndices(primalMap[currBlock->getParent()], primalMap[nextBlock]);
-        // propagateIndices(diffMap[currBlock->getParent()], diffMap[nextBlock]);
-
         // Push a new index.
-        
+        addNewIndex(mixedLoop);
 
         return InstPair(
             primalBuilder->emitLoop(
