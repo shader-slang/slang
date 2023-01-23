@@ -5,9 +5,8 @@
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-util.h"
 #include "slang-ir-inst-pass-base.h"
-
+#include "slang-ir-ssa-simplification.h"
 #include "slang-ir-autodiff-fwd.h"
-
 
 namespace Slang
 {
@@ -502,6 +501,17 @@ namespace Slang
         stripDerivativeDecorations(primalFunc);
         eliminateDeadCode(primalOuterParent);
 
+        // Perform preparation and simplification.
+        differentiableTypeConformanceContext.setFunc(primalFunc);
+        if (SLANG_FAILED(eliminateAddressInsts(
+                builder->getSharedBuilder(),
+                differentiableTypeConformanceContext,
+                primalFunc,
+                sink)))
+            return nullptr;
+
+        simplifyFunc(primalFunc);
+
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
@@ -567,7 +577,9 @@ namespace Slang
         }
 
         auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, primalFunc, diffPropagateFunc);
-        
+        if (!fwdDiffFunc)
+            return;
+
         // Split first block into a paramter block.
         this->makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
         

@@ -1,7 +1,10 @@
 #include "slang-ir-autodiff.h"
+#include "slang-ir-address-analysis.h"
 #include "slang-ir-autodiff-rev.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-pairs.h"
+#include "slang-ir-single-return.h"
+#include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
 
 namespace Slang

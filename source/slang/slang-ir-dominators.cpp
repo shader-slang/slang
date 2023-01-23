@@ -86,6 +86,31 @@ bool IRDominatorTree::dominates(IRBlock* dominator, IRBlock* dominated)
     return properlyDominates(dominator, dominated);
 }
 
+bool IRDominatorTree::dominates(IRInst* dominator, IRInst* dominated)
+{
+    auto dominatorBlock = as<IRBlock>(dominator);
+    if (!dominatorBlock)
+        dominatorBlock = as<IRBlock>(dominator->getParent());
+
+    auto dominatedBlock = as<IRBlock>(dominated);
+    if (!dominatedBlock)
+        dominatedBlock = as<IRBlock>(dominated->getParent());
+
+    if (dominatorBlock == dominatedBlock)
+    {
+        for (auto inst = dominator; inst; inst = inst->getNextInst())
+        {
+            if (inst == dominated)
+                return true;
+        }
+        return false;
+    }
+    else
+    {
+        return dominates(dominatorBlock, dominatedBlock);
+    }
+}
+
 IRBlock* IRDominatorTree::getImmediateDominator(IRBlock* block)
 {
     // An unreachable block has no immediate dominator.

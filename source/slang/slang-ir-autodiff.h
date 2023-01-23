@@ -260,4 +260,11 @@ bool finalizeAutoDiffPass(IRModule* module);
 void stripDerivativeDecorations(IRInst* inst);
 
 bool isBackwardDifferentiableFunc(IRInst* func);
+
+SlangResult eliminateAddressInsts(
+    SharedIRBuilder* sharedBuilder,
+    DifferentiableTypeConformanceContext& diffContext,
+    IRFunc* func,
+    DiagnosticSink* sink);
+
 };

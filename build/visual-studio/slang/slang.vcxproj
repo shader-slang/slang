@@ -340,6 +340,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-intrinsic-expand.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-address-analysis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-marshalling.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-fwd.h" />
@@ -404,6 +405,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-peephole.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-redundancy-removal.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-remove-unused-generic-param.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure.h" />
@@ -521,8 +523,10 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-glsl-extension-tracker.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-intrinsic-expand.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-address-analysis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-marshalling.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-augment-make-existential.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-addr-inst-elimination.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-fwd.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-pairs.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-rev.cpp" />
@@ -582,6 +586,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-peephole.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-redundancy-removal.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-remove-unused-generic-param.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure.cpp" />

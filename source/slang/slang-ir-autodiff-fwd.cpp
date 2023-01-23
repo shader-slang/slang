@@ -1130,6 +1130,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_VectorReshape:
     case kIROp_IntCast:
     case kIROp_FloatCast:
+    case kIROp_MakeStruct:
+    case kIROp_MakeArray:
         return transcribeConstruct(builder, origInst);
 
     case kIROp_LookupWitness:
