@@ -219,12 +219,20 @@ void moveInstChildren(IRInst* dest, IRInst* src)
     }
 }
 
+String dumpIRToString(IRInst* root)
+{
+    StringBuilder sb;
+    StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
+    dumpIR(root, IRDumpOptions(), nullptr, &writer);
+    return sb.ToString();
+}
+
 struct GenericChildrenMigrationContextImpl
 {
     IRCloneEnv cloneEnv;
     IRGeneric* srcGeneric;
     IRGeneric* dstGeneric;
-    Dictionary<IRInstKey, IRInst*> deduplicateMap;
+    DeduplicateContext deduplicateContext;
 
     void init(IRGeneric* genericSrc, IRGeneric* genericDst, IRInst* insertBefore)
     {
@@ -251,42 +259,34 @@ struct GenericChildrenMigrationContextImpl
                 inst = inst->getNextInst())
             {
                 IRInstKey key = { inst };
-                deduplicateMap.AddIfNotExists(key, inst);
+                deduplicateContext.deduplicateMap.AddIfNotExists(key, inst);
             }
         }
     }
 
     IRInst* deduplicate(IRInst* value)
     {
-        if (!value) return nullptr;
-        if (value->getParent() != dstGeneric->getFirstBlock())
-            return value;
-        switch (value->getOp())
-        {
-        case kIROp_Param:
-        case kIROp_StructType:
-        case kIROp_StructKey:
-        case kIROp_InterfaceType:
-        case kIROp_ClassType:
-        case kIROp_Func:
-        case kIROp_Generic:
-            return value;
-        default:
-            break;
-        }
-        if (as<IRConstant>(value))
-            return value;
-
-        for (UInt i = 0; i < value->getOperandCount(); i++)
-        {
-            value->setOperand(i, deduplicate(value->getOperand(i)));
-        }
-        value->setFullType((IRType*)deduplicate(value->getFullType()));
-        IRInstKey key = { value };
-        if (auto newValue = deduplicateMap.TryGetValue(key))
-            return *newValue;
-        deduplicateMap[key] = value;
-        return value;
+        return deduplicateContext.deduplicate(value, [this](IRInst* inst)
+            {
+                if (inst->getParent() != dstGeneric->getFirstBlock())
+                    return false;
+                switch (inst->getOp())
+                {
+                case kIROp_Param:
+                case kIROp_StructType:
+                case kIROp_StructKey:
+                case kIROp_InterfaceType:
+                case kIROp_ClassType:
+                case kIROp_Func:
+                case kIROp_Generic:
+                    return false;
+                default:
+                    break;
+                }
+                if (as<IRConstant>(inst))
+                    return false;
+                return true;
+            });
     }
 
     IRInst* cloneInst(IRBuilder* builder, IRInst* src)

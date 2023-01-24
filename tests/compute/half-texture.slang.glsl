@@ -21,20 +21,23 @@ layout(std430, binding = 0) buffer _S1 {
     int _data[];
 } outputBuffer_0;
 
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;void main()
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
+void main()
 {
     ivec2 pos_0 = ivec2(gl_GlobalInvocationID.xy);
     const float _S2 = 1.00000000000000000000 / 3.00000000000000000000;
-    ivec2 pos2_0 = ivec2(3 - pos_0.y, 3 - pos_0.x);
+    int _S3 = pos_0.y;
+    int _S4 = pos_0.x;
+    ivec2 pos2_0 = ivec2(3 - _S3, 3 - _S4);
 
     float16_t h_0 = (float16_t(imageLoad((halfTexture_0), ivec2((uvec2(pos2_0)))).x));
     f16vec2 h2_0 = (f16vec2(imageLoad((halfTexture2_0), ivec2((uvec2(pos2_0)))).xy));
     f16vec4 h4_0 = (f16vec4(imageLoad((halfTexture4_0), ivec2((uvec2(pos2_0))))));
-	imageStore((halfTexture_0), ivec2((uvec2(pos_0))), f16vec4(h2_0.x + h2_0.y, float16_t(0), float16_t(0), float16_t(0)));
-	imageStore((halfTexture2_0), ivec2((uvec2(pos_0))), f16vec4(h4_0.xy, float16_t(0), float16_t(0)));
-	imageStore((halfTexture4_0), ivec2((uvec2(pos_0))), f16vec4(h2_0, h_0, h_0));
+    imageStore((halfTexture_0), ivec2((uvec2(pos_0))), f16vec4(h2_0.x + h2_0.y, float16_t(0), float16_t(0), float16_t(0)));
+    imageStore((halfTexture2_0), ivec2((uvec2(pos_0))), f16vec4(h4_0.xy, float16_t(0), float16_t(0)));
+    imageStore((halfTexture4_0), ivec2((uvec2(pos_0))), f16vec4(h2_0, h_0, h_0));
 
-    int index_0 = pos_0.x + pos_0.y * 4;
+    int index_0 = _S4 + _S3 * 4;
     ((outputBuffer_0)._data[(uint(index_0))]) = index_0;
 
     return;
