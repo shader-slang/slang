@@ -263,6 +263,11 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
 {
     auto& out = m_builder;
 
+    if (callableDecl->hasModifier<HLSLStaticModifier>())
+    {
+        out << "static ";
+    }
+
     List<ASTPrinter::Part> parts;
    
     ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
