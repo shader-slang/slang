@@ -23,6 +23,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     // 
     String makeDiffPairName(IRInst* origVar);
 
+    InstPair transcribeUndefined(IRBuilder* builder, IRInst* origInst);
+
     InstPair transcribeVar(IRBuilder* builder, IRVar* origVar);
 
     InstPair transcribeBinaryArith(IRBuilder* builder, IRInst* origArith);
@@ -60,6 +62,10 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     InstPair transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst);
 
     InstPair transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr);
+
+    InstPair transcribeUpdateField(IRBuilder* builder, IRInst* originalInst);
+
+    InstPair transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst);
 
     InstPair transcribeLoop(IRBuilder* builder, IRLoop* origLoop);
 

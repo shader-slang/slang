@@ -115,9 +115,12 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_MakeString:
     case kIROp_MakeUInt64:
     case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
     case kIROp_swizzle:
     case kIROp_GetElement:
     case kIROp_FieldExtract:
+    case kIROp_UpdateField:
+    case kIROp_UpdateElement:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:

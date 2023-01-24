@@ -3308,7 +3308,6 @@ namespace Slang
             synth.popScope();
             if (!assignStmt)
                 return nullptr;
-            forStmt->statement = assignStmt;
             return forStmt;
         }
 
@@ -4962,6 +4961,7 @@ namespace Slang
                 auto thisType = calcThisType(parentDeclRef);
                 maybeRegisterDifferentiableType(m_astBuilder, thisType);
             }
+            completeDifferentiableTypeDictionary();
             m_parentDifferentiableAttr = oldAttr;
         }
 

@@ -624,6 +624,20 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
                 getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()),
                 getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()));
         }
+
+        if (auto arrayType = as<IRArrayType>(primalType))
+        {
+            auto diffElementType =
+                (IRType*)differentiableTypeConformanceContext.getDifferentialForType(
+                    builder, arrayType->getElementType());
+            SLANG_RELEASE_ASSERT(diffElementType);
+            auto diffArrayType = builder->getArrayType(diffElementType, arrayType->getElementCount());
+            auto diffElementZero = getDifferentialZeroOfType(builder, arrayType->getElementType());
+            auto result = builder->emitMakeArrayFromElement(diffArrayType, diffElementZero);
+            builder->markInstAsDifferential(result, primalType);
+            return result;
+        }
+
         // Since primalType has a corresponding differential type, we can lookup the 
         // definition for zero().
         auto zeroMethod = differentiableTypeConformanceContext.getZeroMethodForType(builder, primalType);

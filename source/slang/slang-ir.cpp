@@ -1810,6 +1810,24 @@ namespace Slang
     }
 
     template<typename T>
+    static T* createInst(
+        IRBuilder* builder,
+        IROp            op,
+        IRType* type,
+        IRInst* arg1,
+        IRInst* arg2,
+        IRInst* arg3)
+    {
+        IRInst* args[] = { arg1, arg2, arg3 };
+        return createInstImpl<T>(
+            builder,
+            op,
+            type,
+            3,
+            &args[0]);
+    }
+
+    template<typename T>
     static T* createInstWithTrailingArgs(
         IRBuilder*      builder,
         IROp            op,
@@ -3768,6 +3786,13 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeArray, argCount, args);
     }
 
+    IRInst* IRBuilder::emitMakeArrayFromElement(
+        IRType* type,
+        IRInst* element)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeArrayFromElement, 1, &element);
+    }
+
     IRInst* IRBuilder::emitMakeStruct(
         IRType*         type,
         UInt            argCount,
@@ -4341,6 +4366,34 @@ namespace Slang
             type,
             basePtr,
             index);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement)
+    {
+        auto inst = createInst<IRUpdateElement>(
+            this,
+            kIROp_UpdateElement,
+            base->getFullType(),
+            base,
+            index,
+            newElement);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitUpdateField(IRInst* base, IRInst* fieldKey, IRInst* newFieldVal)
+    {
+        auto inst = createInst<IRUpdateField>(
+            this,
+            kIROp_UpdateField,
+            base->getFullType(),
+            base,
+            fieldKey,
+            newFieldVal);
 
         addInst(inst);
         return inst;
@@ -6545,11 +6598,7 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
-                auto callee = getResolvedInstForDecorations(call->getCallee());
-                if(callee->findDecoration<IRReadNoneDecoration>())
-                {
-                    return false;
-                }
+                return !isPureFunctionalCall(call);
             }
             break;
 
@@ -6592,6 +6641,7 @@ namespace Slang
         case kIROp_MatrixReshape:
         case kIROp_VectorReshape:
         case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
         case kIROp_MakeStruct:
         case kIROp_MakeString:
         case kIROp_getNativeStr:
@@ -6612,6 +6662,8 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
+        case kIROp_UpdateElement:
+        case kIROp_UpdateField:
         case kIROp_MeshOutputRef:
         case kIROp_MakeVectorFromScalar:
         case kIROp_swizzle:

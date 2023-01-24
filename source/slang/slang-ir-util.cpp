@@ -227,6 +227,31 @@ String dumpIRToString(IRInst* root)
     return sb.ToString();
 }
 
+bool isPureFunctionalCall(IRCall* call)
+{
+    auto callee = getResolvedInstForDecorations(call->getCallee());
+    if (callee->findDecoration<IRReadNoneDecoration>())
+    {
+        return true;
+    }
+    if (callee->findDecoration<IRNoSideEffectDecoration>())
+    {
+        // If the function has no side effect and is not writing to any outputs,
+        // we can safely treat the call as a normal inst.
+        bool hasOutArg = false;
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            if (as<IRPtrTypeBase>(call->getArg(i)->getDataType()))
+            {
+                hasOutArg = true;
+                break;
+            }
+        }
+        return !hasOutArg;
+    }
+    return false;
+}
+
 struct GenericChildrenMigrationContextImpl
 {
     IRCloneEnv cloneEnv;
