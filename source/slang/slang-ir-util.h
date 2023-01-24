@@ -5,6 +5,7 @@
 // This file contains utility functions for operating with Slang IR.
 //
 #include "slang-ir.h"
+#include "slang-ir-insts.h"
 
 namespace Slang
 {
@@ -30,6 +31,32 @@ public:
     IRInst* deduplicate(IRInst* value);
 
     IRInst* cloneInst(IRBuilder* builder, IRInst* src);
+};
+
+
+struct DeduplicateContext
+{
+    Dictionary<IRInstKey, IRInst*> deduplicateMap;
+
+    template<typename TFunc>
+    IRInst* deduplicate(IRInst* value, const TFunc& shouldDeduplicate)
+    {
+        if (!value) return nullptr;
+        if (!shouldDeduplicate(value))
+            return value;
+        IRInstKey key = { value };
+        if (auto newValue = deduplicateMap.TryGetValue(key))
+            return *newValue;
+        for (UInt i = 0; i < value->getOperandCount(); i++)
+        {
+            value->setOperand(i, deduplicate(value->getOperand(i), shouldDeduplicate));
+        }
+        value->setFullType((IRType*)deduplicate(value->getFullType(), shouldDeduplicate));
+        if (auto newValue = deduplicateMap.TryGetValue(key))
+            return *newValue;
+        deduplicateMap[key] = value;
+        return value;
+    }
 };
 
 bool isPtrToClassType(IRInst* type);
@@ -125,6 +152,8 @@ inline IRInst* unwrapAttributedType(IRInst* type)
         type = attrType->getBaseType();
     return type;
 }
+
+String dumpIRToString(IRInst* root);
 
 }
 

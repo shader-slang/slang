@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/autodiff-data-flow-2.slang(18): error 41020: derivative cannot be propagated through call to non-backward-differentiable function `f`, use 'no_diff' to clarify intention.
+    float val = f(x + 1); // Error: f must also be backward-differentiable
+                 ^
+}
+standard output = {
+}
