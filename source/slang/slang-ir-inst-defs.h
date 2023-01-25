@@ -747,6 +747,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(BackwardDerivativePrimalContextDecoration, BackwardDerivativePrimalContextDecoration, 1, 0)
     INST(BackwardDerivativePrimalReturnDecoration, BackwardDerivativePrimalReturnDecoration, 1, 0)
 
+    INST(LoopCounterDecoration, loopCounterDecoration, 0, 0)
+
         /// Used by the auto-diff pass to mark insts that compute
         /// a differential value.
     INST(DifferentialInstDecoration, diffInstDecoration, 1, 0)

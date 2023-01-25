@@ -3,6 +3,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-autodiff-cfg-norm.h"
 #include "slang-ir-util.h"
 #include "slang-ir-inst-pass-base.h"
 
@@ -14,7 +15,7 @@ namespace Slang
     IRFuncType* BackwardDiffTranscriberBase::differentiateFunctionTypeImpl(IRBuilder* builder, IRFuncType* funcType, IRInst* intermeidateType)
     {
         List<IRType*> newParameterTypes;
-        IRType* diffReturnType;
+        IRType* diffReturnType; 
 
         for (UIndex i = 0; i < funcType->getParamCount(); i++)
         {
@@ -564,7 +565,15 @@ namespace Slang
             tempBuilder.setInsertBefore(diffPropagateFunc);
         }
 
-        auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, primalFunc, diffPropagateFunc);
+        // Normalize the CFG of the primal func before starting the reverse-mode pass.
+        IRCloneEnv cfgNormCloneEnv;
+        builder->setInsertAfter(primalFunc);
+        auto normalizedPrimalFunc = as<IRFunc>(cloneInst(&cfgNormCloneEnv, builder, primalFunc));
+
+        IRCFGNormalizationPass cfgPass = {this->getSink()};
+        normalizeCFG(normalizedPrimalFunc);
+
+        auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, normalizedPrimalFunc, diffPropagateFunc);
         
         // Split first block into a paramter block.
         this->makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));

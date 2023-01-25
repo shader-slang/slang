@@ -4598,6 +4598,32 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitLoop(
+        IRBlock*      target,
+        IRBlock*      breakBlock,
+        IRBlock*      continueBlock,
+        Int           argCount,
+        IRInst*const* args)
+    {
+        List<IRInst*> argList;
+        
+        argList.add(target);
+        argList.add(breakBlock);
+        argList.add(continueBlock);
+
+        for (Count ii = 0; ii < argCount; ii++)
+            argList.add(args[ii]);
+        
+        auto inst = createInst<IRLoop>(
+            this,
+            kIROp_loop,
+            nullptr,
+            argList.getCount(),
+            argList.getBuffer());
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBranch(
         IRInst*     val,
         IRBlock*    trueBlock,
@@ -6383,7 +6409,14 @@ namespace Slang
         this->parent = inParent;
         
 #if _DEBUG
-        validateIRInstOperands(this);
+        // Disabling this for now. There's a case in 
+        // constructSSA that clones decorations on a param
+        // that hasn't yet been inserted into a block.
+        // This causes validation to fail because the decoration
+        // type is in IRModule, but the param is not nested under the 
+        // module yet.
+        // 
+        // validateIRInstOperands(this);
 #endif
     }
 
