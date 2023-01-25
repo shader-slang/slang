@@ -187,29 +187,6 @@ struct DiffUnzipPass
                 this->firstDiffBlock = diffBlock;
         }
 
-        // We're going to split the terminator insts (control-flow) of each block
-        // _before_ everything else. This is because some blocks can end up
-        // being inside a loop, and affect the instruction splitting logic for
-        // ordinary insts.
-        // 
-        /*{
-            IRBuilder primalBuilder;
-            primalBuilder.init(autodiffContext->sharedBuilder);
-            
-            IRBuilder diffBuilder;
-            diffBuilder.init(autodiffContext->sharedBuilder);
-            
-            for (auto block : mixedBlocks)
-            {
-                auto terminator = block->getTerminator();
-
-                primalBuilder.setInsertInto(as<IRBlock>(primalMap[block]));
-                diffBuilder.setInsertInto(as<IRBlock>(diffMap[block]));
-
-                splitMixedInst(&primalBuilder, &diffBuilder, terminator);
-            }
-        }*/
-
         // Split each block into two. 
         for (auto block : mixedBlocks)
         {
