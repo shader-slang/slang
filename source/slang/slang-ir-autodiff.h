@@ -175,20 +175,40 @@ struct DifferentiableTypeConformanceContext
         case kIROp_DoubleType:
         case kIROp_VectorType:
             return origType;
+        case kIROp_ArrayType:
+        {
+            auto diffElementType = (IRType*)getDifferentialForType(
+                builder, as<IRArrayType>(origType)->getElementType());
+            if (!diffElementType)
+                return nullptr;
+            return builder->getArrayType(
+                diffElementType,
+                as<IRArrayType>(origType)->getElementCount());
         }
-        return lookUpInterfaceMethod(builder, origType, sharedContext->differentialAssocTypeStructKey);
+        default:
+            return lookUpInterfaceMethod(builder, origType, sharedContext->differentialAssocTypeStructKey);
+        }
     }
 
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
-        return lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);
+        auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);
+        if (result && !result->findDecoration<IRNoSideEffectDecoration>())
+        {
+            builder->addDecoration(result, kIROp_NoSideEffectDecoration);
+        }
+        return result;
     }
 
     IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
     {
-        return lookUpInterfaceMethod(builder, origType, sharedContext->addMethodStructKey);
+        auto result = lookUpInterfaceMethod(builder, origType, sharedContext->addMethodStructKey);
+        if (result && !result->findDecoration<IRNoSideEffectDecoration>())
+        {
+            builder->addDecoration(result, kIROp_NoSideEffectDecoration);
+        }
+        return result;
     }
-
 };
 
 struct DifferentialPairTypeBuilder
@@ -261,10 +281,6 @@ void stripDerivativeDecorations(IRInst* inst);
 
 bool isBackwardDifferentiableFunc(IRInst* func);
 
-SlangResult eliminateAddressInsts(
-    SharedIRBuilder* sharedBuilder,
-    DifferentiableTypeConformanceContext& diffContext,
-    IRFunc* func,
-    DiagnosticSink* sink);
+bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
 
 };

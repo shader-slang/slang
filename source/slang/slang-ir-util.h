@@ -155,6 +155,9 @@ inline IRInst* unwrapAttributedType(IRInst* type)
 
 String dumpIRToString(IRInst* root);
 
+// Returns whether a call insts can be treated as a pure functional inst
+// (no writes to memory, no side effects).
+bool isPureFunctionalCall(IRCall* callInst);
 }
 
 #endif

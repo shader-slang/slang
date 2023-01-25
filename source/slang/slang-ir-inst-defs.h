@@ -293,6 +293,7 @@ INST(MakeMatrixFromScalar, makeMatrixFromScalar, 1, 0)
 INST(MatrixReshape, matrixReshape, 1, 0)
 INST(VectorReshape, vectorReshape, 1, 0)
 INST(MakeArray, makeArray, 0, 0)
+INST(MakeArrayFromElement, makeArrayFromElement, 1, 0)
 INST(MakeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
@@ -309,6 +310,9 @@ INST(Call, call, 1, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
+
+INST(UpdateElement, updateElement, 3, 0)
+INST(UpdateField, updateField, 3, 0)
 
 INST(PackAnyValue, packAnyValue, 1, 0)
 INST(UnpackAnyValue, unpackAnyValue, 1, 0)

@@ -2185,6 +2185,36 @@ struct IRDifferentialPairGetPrimal : IRInst
     IRInst* getBase() { return getOperand(0); }
 };
 
+struct IRUpdateElement : IRInst
+{
+    IR_LEAF_ISA(UpdateElement)
+
+    IRInst* getOldValue() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+    IRInst* getElementValue() { return getOperand(2); }
+    IRInst* getPrimalElementType()
+    {
+        if (getOperandCount() != 4)
+            return nullptr;
+        return getOperand(3);
+    }
+};
+
+struct IRUpdateField : IRInst
+{
+    IR_LEAF_ISA(UpdateField)
+
+    IRInst* getOldValue() { return getOperand(0); }
+    IRInst* getFieldKey() { return getOperand(1); }
+    IRInst* getElementValue() { return getOperand(2); }
+    IRInst* getPrimalElementType()
+    {
+        if (getOperandCount() != 4)
+            return nullptr;
+        return getOperand(3);
+    }
+};
+
 // Constructs an `Result<T,E>` value from an error code.
 struct IRMakeResultError : IRInst
 {
@@ -2925,6 +2955,10 @@ public:
         UInt            argCount,
         IRInst* const* args);
 
+    IRInst* emitMakeArrayFromElement(
+        IRType* type,
+        IRInst* element);
+
     IRInst* emitMakeStruct(
         IRType*         type,
         UInt            argCount,
@@ -3138,6 +3172,9 @@ public:
         IRType*     type,
         IRInst*    basePtr,
         IRInst*    index);
+
+    IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
+    IRInst* emitUpdateField(IRInst* base, IRInst* fieldKey, IRInst* newFieldVal);
 
     IRInst* emitGetAddress(
         IRType* type,

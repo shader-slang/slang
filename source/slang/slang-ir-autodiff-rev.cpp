@@ -501,15 +501,7 @@ namespace Slang
         stripDerivativeDecorations(primalFunc);
         eliminateDeadCode(primalOuterParent);
 
-        // Perform preparation and simplification.
-        differentiableTypeConformanceContext.setFunc(primalFunc);
-        if (SLANG_FAILED(eliminateAddressInsts(
-                builder->getSharedBuilder(),
-                differentiableTypeConformanceContext,
-                primalFunc,
-                sink)))
-            return nullptr;
-
+        // Perform simplification.
         simplifyFunc(primalFunc);
 
         // Forward transcribe the clone of the original func.

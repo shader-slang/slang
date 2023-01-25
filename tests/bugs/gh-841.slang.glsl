@@ -1,5 +1,7 @@
 //TEST_IGNORE_FILE:
 #version 450
+layout(row_major) uniform;
+layout(row_major) buffer;
 
 layout(location = 0)
 out vec4 _S1;
@@ -10,26 +12,18 @@ in vec4 _S2;
 flat layout(location = 1)
 in uint _S3;
 
-struct RasterVertex_0
-{
-    vec4 c_0;
-    uint u_0;
-};
 
 void main()
 {
-    RasterVertex_0 _S4 = RasterVertex_0(_S2, _S3);
-    vec4 result_0 = _S4.c_0;
-
-    vec4 result_1;
-    if((_S4.u_0 & uint(1))!=0)
+    vec4 result_0;
+    if((_S3 & 1U) != 0U)
     {
-        result_1 = result_0 + 1.0;
+        result_0 = _S2 + 1.00000000000000000000;
     }
     else
     {
-        result_1 = result_0;
+        result_0 = _S2;
     }
-    _S1 = result_1;
+    _S1 = result_0;
     return;
 }

@@ -37,6 +37,8 @@ struct RedundancyRemovalContext
                     case kIROp_FieldAddress:
                     case kIROp_GetElement:
                     case kIROp_GetElementPtr:
+                    case kIROp_UpdateElement:
+                    case kIROp_UpdateField:
                     case kIROp_LookupWitness:
                     case kIROp_Specialize:
                     case kIROp_OptionalHasValue:
@@ -46,6 +48,7 @@ struct RedundancyRemovalContext
                     case kIROp_GetTupleElement:
                     case kIROp_MakeStruct:
                     case kIROp_MakeArray:
+                    case kIROp_MakeArrayFromElement:
                     case kIROp_MakeVector:
                     case kIROp_MakeMatrix:
                     case kIROp_MakeMatrixFromScalar:
@@ -75,6 +78,8 @@ struct RedundancyRemovalContext
                     case kIROp_Neq:
                     case kIROp_Eql:
                         return true;
+                    case kIROp_Call:
+                        return isPureFunctionalCall(as<IRCall>(inst));
                     default:
                         return false;
                     }

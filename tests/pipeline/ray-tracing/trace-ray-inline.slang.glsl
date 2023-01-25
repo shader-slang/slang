@@ -67,14 +67,6 @@ void myMiss_0(inout MyRayPayload_0 payload_4)
     return;
 }
 
-struct RayDesc_0
-{
-    vec3 Origin_0;
-    float TMin_0;
-    vec3 Direction_0;
-    float TMax_0;
-};
-
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
@@ -84,9 +76,7 @@ void main()
     MyRayPayload_0 payload_5;
     MyRayPayload_0 _S2 = { -1 };
     payload_5 = _S2;
-
-    RayDesc_0 ray_0 = { C_0._data.origin_0, C_0._data.tMin_0, C_0._data.direction_0, C_0._data.tMax_0 };
-    rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0._data.rayFlags_0 | 512), (C_0._data.instanceMask_0), (ray_0.Origin_0), (ray_0.TMin_0), (ray_0.Direction_0), (ray_0.TMax_0));
+    rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0._data.rayFlags_0 | 512), (C_0._data.instanceMask_0), (C_0._data.origin_0), (C_0._data.tMin_0), (C_0._data.direction_0), (C_0._data.tMax_0));
 
     MyProceduralHitAttrs_0 committedProceduralAttrs_0;
 

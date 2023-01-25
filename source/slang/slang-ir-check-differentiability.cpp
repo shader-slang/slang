@@ -2,40 +2,32 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-single-return.h"
+#include "slang-ir-addr-inst-elimination.h"
 
 namespace Slang
 {
-bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst)
+IRInst* getSpecializedVal(IRInst* inst)
 {
-    HashSet<IRInst*> processedSet;
-    while (auto ptrType = as<IRPtrTypeBase>(typeInst))
+    int loopLimit = 1024;
+    while (inst && inst->getOp() == kIROp_Specialize)
     {
-        typeInst = ptrType->getValueType();
-        if (!processedSet.Add(typeInst))
-            return false;
+        inst = as<IRSpecialize>(inst)->getBase();
+        loopLimit--;
+        if (loopLimit == 0)
+            return inst;
     }
-    if (!typeInst)
-        return false;
-    switch (typeInst->getOp())
-    {
-    case kIROp_FloatType:
-    case kIROp_DifferentialPairType:
-        return true;
-    default:
-        break;
-    }
-    if (context.lookUpConformanceForType(typeInst))
-        return true;
-    // Look for equivalent types.
-    for (auto type : context.differentiableWitnessDictionary)
-    {
-        if (isTypeEqual(type.Key, (IRType*)typeInst))
-        {
-            context.differentiableWitnessDictionary[(IRType*)typeInst] = type.Value;
-            return true;
-        }
-    }
-    return false;
+    return inst;
+}
+
+IRInst* getLeafFunc(IRInst* func)
+{
+    func = getSpecializedVal(func);
+    if (!func)
+        return nullptr;
+    if (auto genericFunc = as<IRGeneric>(func))
+        return findInnerMostGenericReturnVal(genericFunc);
+    return func;
 }
 
 struct CheckDifferentiabilityPassContext : public InstPassBase
@@ -54,29 +46,6 @@ public:
     CheckDifferentiabilityPassContext(SharedIRBuilder* inSharedBuilder, IRModule* inModule, DiagnosticSink* inSink)
         : InstPassBase(inModule), sharedBuilder(inSharedBuilder), sink(inSink), sharedContext(inModule->getModuleInst())
     {}
-
-    IRInst* getSpecializedVal(IRInst* inst)
-    {
-        int loopLimit = 1024;
-        while (inst && inst->getOp() == kIROp_Specialize)
-        {
-            inst = as<IRSpecialize>(inst)->getBase();
-            loopLimit--;
-            if (loopLimit == 0)
-                return inst;
-        }
-        return inst;
-    }
-
-    IRInst* getLeafFunc(IRInst* func)
-    {
-        func = getSpecializedVal(func);
-        if (!func)
-            return nullptr;
-        if (auto genericFunc = as<IRGeneric>(func))
-            return findInnerMostGenericReturnVal(genericFunc);
-        return func;
-    }
 
     bool _isFuncMarkedForAutoDiff(IRInst* func)
     {
@@ -219,6 +188,30 @@ public:
         }
         return false;
     }
+
+    struct AutoDiffAddressConversionPolicy : public AddressConversionPolicy
+    {
+        DifferentiableTypeConformanceContext* diffTypeContext;
+
+        virtual bool shouldConvertAddrInst(IRInst* addrInst) override
+        {
+            if (isDifferentiableType(*diffTypeContext, addrInst->getDataType()))
+                return true;
+            return false;
+        }
+    };
+
+    SlangResult prepareFuncForAutoDiff(DifferentiableTypeConformanceContext& diffTypeContext, IRFunc* func)
+    {
+        if (!isSingleReturnFunc(func))
+        {
+            convertFuncToSingleReturnForm(func->getModule(), func);
+        }
+        AutoDiffAddressConversionPolicy cvtPolicty;
+        cvtPolicty.diffTypeContext = &diffTypeContext;
+        return eliminateAddressInsts(sharedBuilder, &cvtPolicty, func, sink);
+    }
+
     void processFunc(IRGlobalValueWithCode* funcInst)
     {
         if (!_isFuncMarkedForAutoDiff(funcInst))
@@ -232,7 +225,7 @@ public:
         {
             if (auto func = as<IRFunc>(funcInst))
             {
-                if (SLANG_FAILED(eliminateAddressInsts(sharedBuilder, diffTypeContext, func, sink)))
+                if (SLANG_FAILED(prepareFuncForAutoDiff(diffTypeContext, func)))
                     return;
             }
         }

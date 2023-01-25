@@ -185,6 +185,7 @@ struct ExtractPrimalFuncContext
         case kIROp_MakeStruct:
         case kIROp_MakeTuple:
         case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
         case kIROp_MakeDifferentialPair:
         case kIROp_MakeOptionalNone:
         case kIROp_MakeOptionalValue:
@@ -194,6 +195,8 @@ struct ExtractPrimalFuncContext
         case kIROp_GetElement:
         case kIROp_FieldExtract:
         case kIROp_swizzle:
+        case kIROp_UpdateElement:
+        case kIROp_UpdateField:
         case kIROp_OptionalHasValue:
         case kIROp_GetOptionalValue:
         case kIROp_MatrixReshape:
