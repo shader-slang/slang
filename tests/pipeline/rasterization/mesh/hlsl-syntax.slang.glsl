@@ -12,19 +12,14 @@ out gl_MeshPerVertexEXT
     vec4 gl_Position;
 } gl_MeshVerticesEXT[3];
 
-struct Vertex_0
-{
-    vec4 pos_0;
-    vec3 color_0;
-};
 
 void foo_0(uint _S2)
 {
     if(_S2 < 3U)
     {
-        Vertex_0 _S3 = { vec4(positions_0[_S2], 0.00000000000000000000, 1.00000000000000000000), colors_0[_S2] };
-        gl_MeshVerticesEXT[_S2].gl_Position = _S3.pos_0;
-        _S1[_S2] = _S3.color_0;
+        vec3 _S3 = colors_0[_S2];
+        gl_MeshVerticesEXT[_S2].gl_Position = vec4(positions_0[_S2], 0.00000000000000000000, 1.00000000000000000000);
+        _S1[_S2] = _S3;
     }
     else
     {

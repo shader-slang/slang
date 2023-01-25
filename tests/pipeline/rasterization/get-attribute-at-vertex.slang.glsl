@@ -14,7 +14,6 @@ out vec4 _S2;
 
 void main()
 {
-    uvec2 _S3 = uvec2(0U, 0U);
     _S2 = gl_BaryCoordNV.x * ((_S1)[(0U)]) + gl_BaryCoordNV.y * ((_S1)[(1U)]) + gl_BaryCoordNV.z * ((_S1)[(2U)]);
     return;
 }
