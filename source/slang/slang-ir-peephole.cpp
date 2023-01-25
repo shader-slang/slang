@@ -159,7 +159,7 @@ struct PeepholeContext : InstPassBase
                         {
                             IRInst* arg = nullptr;
                             if (i < (IRIntegerValue)oldVal->getOperandCount())
-                                arg = oldVal->getOperand(i);
+                                arg = oldVal->getOperand((UInt)i);
                             else if (oldVal->getOperandCount() != 0)
                                 arg = oldVal->getOperand(0);
                             else
