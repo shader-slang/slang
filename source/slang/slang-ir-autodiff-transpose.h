@@ -268,14 +268,8 @@ struct DiffTransposePass
                     
                     auto firstLoopBlock = loop->getTargetBlock();
                     auto breakBlock = loop->getBreakBlock();
-                    IRBlock* preBreakBlock = getUniquePredecessor(breakBlock);
 
                     auto condBlock = getOrCreateTopLevelCondition(loop);
-                    
-                    // if the CFG is reversible, there must be a unique block
-                    // between condBlock and breakBlock (the preBreak block)
-                    // 
-                    SLANG_ASSERT(preBreakBlock != condBlock);
 
                     auto ifElse = as<IRIfElse>(condBlock->getTerminator());
 
