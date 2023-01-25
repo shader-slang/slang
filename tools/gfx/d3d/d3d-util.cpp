@@ -4,6 +4,7 @@
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <dxgi1_4.h>
+#include <dxgidebug.h>
 
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
@@ -834,6 +835,38 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
     default:
         return D3D12_RESOURCE_STATE_COMMON;
     }
+}
+
+/* static */SlangResult D3DUtil::reportLiveObjects()
+{
+    static IDXGIDebug* dxgiDebug = nullptr;
+
+    if (!dxgiDebug)
+    {
+        HMODULE debugModule = LoadLibraryA("dxgidebug.dll");
+        if (debugModule != INVALID_HANDLE_VALUE)
+        {
+            auto fun = reinterpret_cast<decltype(&DXGIGetDebugInterface)>(GetProcAddress(debugModule, "DXGIGetDebugInterface"));
+            if (fun)
+            {
+                fun(__uuidof(IDXGIDebug), (void**)&dxgiDebug);
+            }
+        }
+    }
+
+    if (dxgiDebug)
+    {
+        const GUID DXGI_DEBUG_ALL_ = { 0xe48ae283, 0xda80, 0x490b, { 0x87, 0xe6,  0x43,  0xe9,  0xa9,  0xcf,  0xda,  0x8 } };
+        dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL_, DXGI_DEBUG_RLO_ALL);
+        return SLANG_OK;
+    }
+
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+Result SLANG_MCALL reportD3DLiveObjects()
+{
+    return D3DUtil::reportLiveObjects();
 }
 
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)

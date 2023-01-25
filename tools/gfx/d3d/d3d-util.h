@@ -122,6 +122,8 @@ class D3DUtil
     static uint32_t getSubresourceMipLevel(uint32_t subresourceIndex, uint32_t mipLevelCount);
 
     static D3D12_RESOURCE_STATES getResourceState(ResourceState state);
+
+    static SlangResult reportLiveObjects();
 };
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
