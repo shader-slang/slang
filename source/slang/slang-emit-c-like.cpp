@@ -1087,7 +1087,6 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // Never fold these, because their result cannot be computed
     // as a sub-expression (they must be emitted as a declaration
     // or statement).
-    case kIROp_UpdateField:
     case kIROp_UpdateElement:
     case kIROp_DefaultConstruct:
         return false;
@@ -2487,43 +2486,45 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             auto ii = (IRUpdateElement*)inst;
             auto subscriptOuter = getInfo(EmitOp::General);
             auto subscriptPrec = getInfo(EmitOp::Postfix);
-            auto arraySize = as<IRIntLit>(as<IRArrayType>(inst->getDataType())->getElementCount());
-            SLANG_RELEASE_ASSERT(arraySize);
             emitInstResultDecl(inst);
-            m_writer->emit("{");
-            for (UInt i = 0; i < (UInt)arraySize->getValue(); i++)
+            if (auto arrayType = as<IRArrayType>(inst->getDataType()))
             {
-                if (i > 0)
-                    m_writer->emit(", ");
-                emitOperand(ii->getOldValue(), leftSide(subscriptOuter, subscriptPrec));
-                m_writer->emit("[");
-                m_writer->emit(i);
-                m_writer->emit("]");
+                auto arraySize = as<IRIntLit>(arrayType->getElementCount());
+                SLANG_RELEASE_ASSERT(arraySize);
+                m_writer->emit("{");
+                for (UInt i = 0; i < (UInt)arraySize->getValue(); i++)
+                {
+                    if (i > 0)
+                        m_writer->emit(", ");
+                    emitOperand(ii->getOldValue(), leftSide(subscriptOuter, subscriptPrec));
+                    m_writer->emit("[");
+                    m_writer->emit(i);
+                    m_writer->emit("]");
+                }
+                m_writer->emit("}");
             }
-
-            m_writer->emit("}");
+            else
+            {
+                emitOperand(ii->getOldValue(), getInfo(EmitOp::General));
+            }
             m_writer->emit(";\n");
 
             emitOperand(ii, leftSide(subscriptOuter, subscriptPrec));
-            m_writer->emit("[");
-            emitOperand(ii->getIndex(), getInfo(EmitOp::General));
-            m_writer->emit("] = ");
-            emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
-            m_writer->emit(";\n");
-        }
-        break;
-    case kIROp_UpdateField:
-        {
-            auto ii = (IRUpdateField*)inst;
-            emitInstResultDecl(inst);
-            emitOperand(ii->getOldValue(), getInfo(EmitOp::General));
-            m_writer->emit(";\n");
-
-            auto subscriptOuter = getInfo(EmitOp::General);
-            auto subscriptPrec = getInfo(EmitOp::Postfix);
-            emitOperand(ii, leftSide(subscriptOuter, subscriptPrec));
-            m_writer->emit(".");
-            m_writer->emit(getName(ii->getFieldKey()));
+            for (UInt i = 0; i < ii->getAccessKeyCount(); i++)
+            {
+                auto key = ii->getAccessKey(i);
+                if (as<IRStructKey>(key))
+                {
+                    m_writer->emit(".");
+                    m_writer->emit(getName(key));
+                }
+                else
+                {
+                    m_writer->emit("[");
+                    emitOperand(key, getInfo(EmitOp::General));
+                    m_writer->emit("]");
+                }
+            }
             m_writer->emit(" = ");
             emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
             m_writer->emit(";\n");

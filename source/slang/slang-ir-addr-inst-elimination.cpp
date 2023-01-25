@@ -36,72 +36,29 @@ struct AddressInstEliminationContext
 
     void storeValue(IRBuilder& builder, IRInst* addr, IRInst* val)
     {
-        List<IRInst*> baseAddrs;
+        List<IRInst*> accessChain;
 
         for (auto inst = addr; inst;)
         {
             switch (inst->getOp())
             {
             default:
-                baseAddrs.add(inst);
+                accessChain.add(inst);
                 goto endLoop;
             case kIROp_GetElementPtr:
             case kIROp_FieldAddress:
-                baseAddrs.add(inst);
+                accessChain.add(inst->getOperand(1));
                 inst = inst->getOperand(0);
                 break;
             }
         }
     endLoop:;
-        List<IRInst*> values;
-        values.setCount(baseAddrs.getCount());
-        if (values.getCount() > 1)
-        {
-            IRInst* currentVal = builder.emitLoad(baseAddrs.getLast());
-            values.getLast() = currentVal;
-            for (Index i = baseAddrs.getCount() - 2; i >= 1; i--)
-            {
-                auto inst = baseAddrs[i];
-                switch (inst->getOp())
-                {
-                default:
-                    sink->diagnose(inst->sourceLoc, Diagnostics::unsupportedUseOfLValueForAutoDiff);
-                    return;
-                case kIROp_GetElementPtr:
-                case kIROp_FieldAddress:
-                {
-                    IRInst* args[] = { currentVal, inst->getOperand(1) };
-                    currentVal = builder.emitIntrinsicInst(
-                        cast<IRPtrTypeBase>(inst->getFullType())->getValueType(),
-                        (inst->getOp() == kIROp_GetElementPtr ? kIROp_GetElement : kIROp_FieldExtract),
-                        2,
-                        args);
-                    values[i] = currentVal;
-                }
-                break;
-                }
-            }
-        }
-        values[0] = val;
-        for (Index i = 1; i < values.getCount(); i++)
-        {
-            auto inst = baseAddrs[i - 1];
-            switch (inst->getOp())
-            {
-            case kIROp_GetElementPtr:
-            case kIROp_FieldAddress:
-            {
-                IRInst* args[] = {values[i], inst->getOperand(1), values[i - 1]};
-                values[i] = builder.emitIntrinsicInst(
-                    values[i]->getFullType(),
-                    (inst->getOp() == kIROp_GetElementPtr ? kIROp_UpdateElement : kIROp_UpdateField),
-                    3,
-                    args);
-            }
-            break;
-            }
-        }
-        builder.emitStore(baseAddrs.getLast(), values.getLast());
+        auto lastAddr = accessChain.getLast();
+        auto lastVal = builder.emitLoad(lastAddr);
+        accessChain.removeLast();
+        accessChain.reverse();
+        auto update = builder.emitUpdateElement(lastVal, accessChain, val);
+        builder.emitStore(lastAddr, update);
     }
 
     void transformLoadAddr(IRUse* use)

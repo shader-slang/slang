@@ -7,6 +7,9 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-autodiff-fwd.h"
+#include "slang-ir-single-return.h"
+#include "slang-ir-addr-inst-elimination.h"
+#include "slang-ir-eliminate-multilevel-break.h"
 
 namespace Slang
 {
@@ -483,6 +486,39 @@ namespace Slang
         builder.emitBranch(firstBlock);
     }
 
+    struct AutoDiffAddressConversionPolicy : public AddressConversionPolicy
+    {
+        DifferentiableTypeConformanceContext* diffTypeContext;
+
+        virtual bool shouldConvertAddrInst(IRInst* addrInst) override
+        {
+            if (isDifferentiableType(*diffTypeContext, addrInst->getDataType()))
+                return true;
+            return false;
+        }
+    };
+
+    SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func)
+    {
+        DifferentiableTypeConformanceContext diffTypeContext(autoDiffSharedContext);
+        diffTypeContext.setFunc(func);
+
+        if (!isSingleReturnFunc(func))
+        {
+            convertFuncToSingleReturnForm(func->getModule(), func);
+        }
+        eliminateMultiLevelBreakForFunc(func->getModule(), func);
+
+        AutoDiffAddressConversionPolicy cvtPolicty;
+        cvtPolicty.diffTypeContext = &diffTypeContext;
+        auto result = eliminateAddressInsts(sharedBuilder, &cvtPolicty, func, sink);
+        if (SLANG_SUCCEEDED(result))
+        {
+            simplifyFunc(func);
+        }
+        return result;
+    }
+
     // Create a copy of originalFunc's forward derivative in the same generic context (if any) of
     // `diffPropagateFunc`.
     IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
@@ -501,8 +537,10 @@ namespace Slang
         stripDerivativeDecorations(primalFunc);
         eliminateDeadCode(primalOuterParent);
 
-        // Perform simplification.
-        simplifyFunc(primalFunc);
+        // Perform required transformations and simplifications on the original func to make it
+        // reversible.
+        if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
+            return diffPropagateFunc;
 
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(

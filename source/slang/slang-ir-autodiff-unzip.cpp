@@ -196,7 +196,6 @@ struct ExtractPrimalFuncContext
         case kIROp_FieldExtract:
         case kIROp_swizzle:
         case kIROp_UpdateElement:
-        case kIROp_UpdateField:
         case kIROp_OptionalHasValue:
         case kIROp_GetOptionalValue:
         case kIROp_MatrixReshape:

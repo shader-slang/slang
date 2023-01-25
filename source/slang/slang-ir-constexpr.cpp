@@ -119,7 +119,6 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_swizzle:
     case kIROp_GetElement:
     case kIROp_FieldExtract:
-    case kIROp_UpdateField:
     case kIROp_UpdateElement:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:

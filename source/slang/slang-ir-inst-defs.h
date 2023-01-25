@@ -311,8 +311,7 @@ INST(Call, call, 1, 0)
 INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
 
-INST(UpdateElement, updateElement, 3, 0)
-INST(UpdateField, updateField, 3, 0)
+INST(UpdateElement, updateElement, 2, 0)
 
 INST(PackAnyValue, packAnyValue, 1, 0)
 INST(UnpackAnyValue, unpackAnyValue, 1, 0)
@@ -761,6 +760,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Used by the auto-diff pass to mark insts whose result is stored
         /// in an intermediary struct for reuse in backward propagation phase.
     INST(PrimalValueStructKeyDecoration, primalValueKey, 1, 0)
+
+        /// Used by the auto-diff pass to mark the primal element type of an
+        /// forward-differentiated updateElement inst.
+    INST(PrimalElementTypeDecoration, primalElementType, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.

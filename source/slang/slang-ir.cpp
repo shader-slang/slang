@@ -3872,6 +3872,11 @@ namespace Slang
         return addDecoration(target, kIROp_PrimalValueStructKeyDecoration, key);
     }
 
+    IRInst* IRBuilder::addPrimalElementTypeDecoration(IRInst* target, IRInst* type)
+    {
+        return addDecoration(target, kIROp_PrimalElementTypeDecoration, type);
+    }
+
     RefPtr<IRModule> IRModule::create(Session* session)
     {
         RefPtr<IRModule> module = new IRModule(session);
@@ -4355,6 +4360,66 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitElementExtract(
+        IRInst* base,
+        IRInst* index)
+    {
+        IRType* type = nullptr;
+        if (auto arrayType = as<IRArrayType>(base->getDataType()))
+        {
+            type = arrayType->getElementType();
+        }
+        else if (auto vectorType = as<IRVectorType>(base->getDataType()))
+        {
+            type = vectorType->getElementType();
+        }
+        else if (auto matrixType = as<IRMatrixType>(base->getDataType()))
+        {
+            type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+        }
+        SLANG_RELEASE_ASSERT(type);
+        auto inst = createInst<IRFieldAddress>(
+            this,
+            kIROp_GetElement,
+            type,
+            base,
+            index);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitElementExtract(
+        IRType* type,
+        IRInst* base,
+        const ArrayView<IRInst*>& accessChain)
+    {
+        for (auto access : accessChain)
+        {
+            IRType* resultType = nullptr;
+            if (auto structKey = as<IRStructKey>(access))
+            {
+                auto structType = as<IRStructType>(base->getDataType());
+                SLANG_RELEASE_ASSERT(structType);
+                for (auto field : structType->getFields())
+                {
+                    if (field->getKey() == structKey)
+                    {
+                        resultType = field->getFieldType();
+                        break;
+                    }
+                }
+                SLANG_RELEASE_ASSERT(resultType);
+                base = emitFieldExtract(resultType, base, structKey);
+            }
+            else
+            {
+                base = emitElementExtract(base, access);
+            }
+        }
+        return base;
+    }
+
     IRInst* IRBuilder::emitElementAddress(
         IRType*     type,
         IRInst*    basePtr,
@@ -4378,23 +4443,21 @@ namespace Slang
             kIROp_UpdateElement,
             base->getFullType(),
             base,
-            index,
-            newElement);
+            newElement,
+            index);
 
         addInst(inst);
         return inst;
     }
 
-    IRInst* IRBuilder::emitUpdateField(IRInst* base, IRInst* fieldKey, IRInst* newFieldVal)
+    IRInst* IRBuilder::emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement)
     {
-        auto inst = createInst<IRUpdateField>(
-            this,
-            kIROp_UpdateField,
-            base->getFullType(),
-            base,
-            fieldKey,
-            newFieldVal);
-
+        List<IRInst*> args;
+        args.add(base);
+        args.add(newElement);
+        args.addRange(accessChain);
+        auto inst = createInst<IRUpdateElement>(
+            this, kIROp_UpdateElement, base->getFullType(), (Int)args.getCount(), args.getBuffer());
         addInst(inst);
         return inst;
     }
@@ -6663,7 +6726,6 @@ namespace Slang
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
         case kIROp_UpdateElement:
-        case kIROp_UpdateField:
         case kIROp_MeshOutputRef:
         case kIROp_MakeVectorFromScalar:
         case kIROp_swizzle:

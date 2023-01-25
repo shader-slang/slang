@@ -63,8 +63,6 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr);
 
-    InstPair transcribeUpdateField(IRBuilder* builder, IRInst* originalInst);
-
     InstPair transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst);
 
     InstPair transcribeLoop(IRBuilder* builder, IRLoop* origLoop);
