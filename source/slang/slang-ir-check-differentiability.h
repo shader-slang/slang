@@ -7,8 +7,9 @@ namespace Slang
 {
 struct IRModule;
 class DiagnosticSink;
+struct SharedIRBuilder;
 
 // Check all auto diff usages are valid.
-void checkAutoDiffUsages(IRModule* module, DiagnosticSink* sink);
+void checkAutoDiffUsages(SharedIRBuilder* sharedBuilder, IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang

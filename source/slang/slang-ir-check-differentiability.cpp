@@ -2,44 +2,50 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-single-return.h"
+#include "slang-ir-addr-inst-elimination.h"
 
 namespace Slang
 {
+IRInst* getSpecializedVal(IRInst* inst)
+{
+    int loopLimit = 1024;
+    while (inst && inst->getOp() == kIROp_Specialize)
+    {
+        inst = as<IRSpecialize>(inst)->getBase();
+        loopLimit--;
+        if (loopLimit == 0)
+            return inst;
+    }
+    return inst;
+}
+
+IRInst* getLeafFunc(IRInst* func)
+{
+    func = getSpecializedVal(func);
+    if (!func)
+        return nullptr;
+    if (auto genericFunc = as<IRGeneric>(func))
+        return findInnerMostGenericReturnVal(genericFunc);
+    return func;
+}
 
 struct CheckDifferentiabilityPassContext : public InstPassBase
 {
 public:
     DiagnosticSink* sink;
     AutoDiffSharedContext sharedContext;
+    SharedIRBuilder* sharedBuilder;
 
-    HashSet<IRInst*> differentiableFunctions;
+    enum DifferentiableLevel
+    {
+        Forward, Backward
+    };
+    Dictionary<IRInst*, DifferentiableLevel> differentiableFunctions;
 
-    CheckDifferentiabilityPassContext(IRModule* inModule, DiagnosticSink* inSink)
-        : InstPassBase(inModule), sink(inSink), sharedContext(inModule->getModuleInst())
+    CheckDifferentiabilityPassContext(SharedIRBuilder* inSharedBuilder, IRModule* inModule, DiagnosticSink* inSink)
+        : InstPassBase(inModule), sharedBuilder(inSharedBuilder), sink(inSink), sharedContext(inModule->getModuleInst())
     {}
-
-    IRInst* getSpecializedVal(IRInst* inst)
-    {
-        int loopLimit = 1024;
-        while (inst && inst->getOp() == kIROp_Specialize)
-        {
-            inst = as<IRSpecialize>(inst)->getBase();
-            loopLimit--;
-            if (loopLimit == 0)
-                return inst;
-        }
-        return inst;
-    }
-
-    IRInst* getLeafFunc(IRInst* func)
-    {
-        func = getSpecializedVal(func);
-        if (!func)
-            return nullptr;
-        if (auto genericFunc = as<IRGeneric>(func))
-            return findInnerMostGenericReturnVal(genericFunc);
-        return func;
-    }
 
     bool _isFuncMarkedForAutoDiff(IRInst* func)
     {
@@ -59,7 +65,7 @@ public:
     }
 
 
-    bool _isDifferentiableFuncImpl(IRInst* func)
+    bool _isDifferentiableFuncImpl(IRInst* func, DifferentiableLevel level)
     {
         func = getLeafFunc(func);
         if (!func)
@@ -71,32 +77,41 @@ public:
             {
             case kIROp_ForwardDerivativeDecoration:
             case kIROp_ForwardDifferentiableDecoration:
+                if (level == DifferentiableLevel::Forward)
+                    return true;
+                break;
             case kIROp_UserDefinedBackwardDerivativeDecoration:
             case kIROp_BackwardDerivativeDecoration:
             case kIROp_BackwardDifferentiableDecoration:
                 return true;
+            default:
+                break;
             }
         }
         return false;
     }
 
-    bool isDifferentiableFunc(IRInst* func)
+    bool isDifferentiableFunc(IRInst* func, DifferentiableLevel level)
     {
-        switch (func->getOp())
+        if (level == DifferentiableLevel::Forward)
         {
-        case kIROp_ForwardDifferentiate:
-        case kIROp_BackwardDifferentiate:
-            return true;
-        default:
-            break;
+            switch (func->getOp())
+            {
+            case kIROp_ForwardDifferentiate:
+            case kIROp_BackwardDifferentiate:
+                return true;
+            default:
+                break;
+            }
         }
 
-        func = getSpecializedVal(func);
+        func = getLeafFunc(func);
         if (!func)
             return false;
 
-        if (differentiableFunctions.Contains(func))
-            return true;
+        
+        if (auto existingLevel = differentiableFunctions.TryGetValue(func))
+            return *existingLevel >= level;
 
         if (func->findDecoration<IRTreatAsDifferentiableDecoration>())
             return true;
@@ -125,7 +140,10 @@ public:
                 {
                     if (entry->getOperand(0) == lookupInterfaceMethod->getRequirementKey())
                     {
-                        return true;
+                        if (as<IRBackwardDifferentiableMethodRequirementDictionaryItem>(child) && level == DifferentiableLevel::Backward)
+                            return true;
+                        if (as<IRForwardDifferentiableMethodRequirementDictionaryItem>(child) && level == DifferentiableLevel::Forward)
+                            return true;
                     }
                 }
             }
@@ -135,40 +153,11 @@ public:
         {
             if (as<IRGeneric>(func))
             {
-                return differentiableFunctions.Contains(func);
-            }
-        }
-        return false;
-    }
-
-    bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst)
-    {
-        HashSet<IRInst*> processedSet;
-        while (auto ptrType = as<IRPtrTypeBase>(typeInst))
-        {
-            typeInst = ptrType->getValueType();
-            if (!processedSet.Add(typeInst))
-                return false;
-        }
-        if (!typeInst)
-            return false;
-        switch (typeInst->getOp())
-        {
-        case kIROp_FloatType:
-        case kIROp_DifferentialPairType:
-            return true;
-        default:
-            break;
-        }
-        if (context.lookUpConformanceForType(typeInst))
-            return true;
-        // Look for equivalent types.
-        for (auto type : context.differentiableWitnessDictionary)
-        {
-            if (isTypeEqual(type.Key, (IRType*)typeInst))
-            {
-                context.differentiableWitnessDictionary[(IRType*)typeInst] = type.Value;
-                return true;
+                if (auto existingLevel = differentiableFunctions.TryGetValue(func))
+                {
+                    if (*existingLevel >= level)
+                        return true;
+                }
             }
         }
         return false;
@@ -199,6 +188,30 @@ public:
         }
         return false;
     }
+
+    struct AutoDiffAddressConversionPolicy : public AddressConversionPolicy
+    {
+        DifferentiableTypeConformanceContext* diffTypeContext;
+
+        virtual bool shouldConvertAddrInst(IRInst* addrInst) override
+        {
+            if (isDifferentiableType(*diffTypeContext, addrInst->getDataType()))
+                return true;
+            return false;
+        }
+    };
+
+    SlangResult prepareFuncForAutoDiff(DifferentiableTypeConformanceContext& diffTypeContext, IRFunc* func)
+    {
+        if (!isSingleReturnFunc(func))
+        {
+            convertFuncToSingleReturnForm(func->getModule(), func);
+        }
+        AutoDiffAddressConversionPolicy cvtPolicty;
+        cvtPolicty.diffTypeContext = &diffTypeContext;
+        return eliminateAddressInsts(sharedBuilder, &cvtPolicty, func, sink);
+    }
+
     void processFunc(IRGlobalValueWithCode* funcInst)
     {
         if (!_isFuncMarkedForAutoDiff(funcInst))
@@ -208,6 +221,14 @@ public:
 
         DifferentiableTypeConformanceContext diffTypeContext(&sharedContext);
         diffTypeContext.setFunc(funcInst);
+        if (isBackwardDifferentiableFunc(funcInst) && !funcInst->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
+        {
+            if (auto func = as<IRFunc>(funcInst))
+            {
+                if (SLANG_FAILED(prepareFuncForAutoDiff(diffTypeContext, func)))
+                    return;
+            }
+        }
 
         HashSet<IRInst*> produceDiffSet;
         HashSet<IRInst*> expectDiffSet;
@@ -235,6 +256,10 @@ public:
         if (differentiableInputs == 0)
             sink->diagnose(funcInst, Diagnostics::differentiableFuncMustHaveInput);
 
+        DifferentiableLevel requiredDiffLevel = DifferentiableLevel::Forward;
+        if (isBackwardDifferentiableFunc(funcInst))
+            requiredDiffLevel = DifferentiableLevel::Backward;
+
         auto isInstProducingDiff = [&](IRInst* inst) -> bool
         {
             switch (inst->getOp())
@@ -242,7 +267,7 @@ public:
             case kIROp_FloatLit:
                 return true;
             case kIROp_Call:
-                return inst->findDecoration<IRTreatAsDifferentiableDecoration>() || isDifferentiableFunc(as<IRCall>(inst)->getCallee());
+                return inst->findDecoration<IRTreatAsDifferentiableDecoration>() || isDifferentiableFunc(as<IRCall>(inst)->getCallee(), requiredDiffLevel);
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination address.
                 // Just assume it is producing diff.
@@ -310,7 +335,7 @@ public:
                     switch (inst->getOp())
                     {
                     case kIROp_Call:
-                        if (isDifferentiableFunc(as<IRCall>(inst)->getCallee()))
+                        if (isDifferentiableFunc(as<IRCall>(inst)->getCallee(), requiredDiffLevel))
                         {
                             addToExpectDiffWorkList(inst);
                         }
@@ -349,7 +374,11 @@ public:
             {
                 if (auto call = as<IRCall>(inst))
                 {
-                    sink->diagnose(inst, Diagnostics::lossOfDerivativeDueToCallOfNonDifferentiableFunction, getLeafFunc(call->getCallee()));
+                    sink->diagnose(
+                        inst,
+                        Diagnostics::lossOfDerivativeDueToCallOfNonDifferentiableFunction,
+                        getLeafFunc(call->getCallee()),
+                        requiredDiffLevel == DifferentiableLevel::Forward ? "forward" : "backward");
                 }
             }
             switch (inst->getOp())
@@ -395,22 +424,30 @@ public:
     void processModule()
     {
         // Collect set of differentiable functions.
-        HashSet<UnownedStringSlice> differentiableSymbolNames;
+        HashSet<UnownedStringSlice> fwdDifferentiableSymbolNames, bwdDifferentiableSymbolNames;
         for (auto inst : module->getGlobalInsts())
         {
-            if (_isDifferentiableFuncImpl(inst))
+            if (_isDifferentiableFuncImpl(inst, DifferentiableLevel::Backward))
             {
                 if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
-                    differentiableSymbolNames.Add(linkageDecor->getMangledName());
-                differentiableFunctions.Add(inst);
+                    bwdDifferentiableSymbolNames.Add(linkageDecor->getMangledName());
+                differentiableFunctions.Add(inst, DifferentiableLevel::Backward);
+            }
+            else if (_isDifferentiableFuncImpl(inst, DifferentiableLevel::Forward))
+            {
+                if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
+                    fwdDifferentiableSymbolNames.Add(linkageDecor->getMangledName());
+                differentiableFunctions.Add(inst, DifferentiableLevel::Forward);
             }
         }
         for (auto inst : module->getGlobalInsts())
         {
             if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
             {
-                if (differentiableSymbolNames.Contains(linkageDecor->getMangledName()))
-                    differentiableFunctions.Add(inst);
+                if (bwdDifferentiableSymbolNames.Contains(linkageDecor->getMangledName()))
+                    differentiableFunctions[inst] = DifferentiableLevel::Backward;
+                else if (fwdDifferentiableSymbolNames.Contains(linkageDecor->getMangledName()))
+                    differentiableFunctions.AddIfNotExists(inst, DifferentiableLevel::Forward);
             }
         }
 
@@ -432,9 +469,9 @@ public:
     }
 };
 
-void checkAutoDiffUsages(IRModule* module, DiagnosticSink* sink)
+void checkAutoDiffUsages(SharedIRBuilder* sharedBuilder, IRModule* module, DiagnosticSink* sink)
 {
-    CheckDifferentiabilityPassContext context(module, sink);
+    CheckDifferentiabilityPassContext context(sharedBuilder, module, sink);
     context.processModule();
 }
 

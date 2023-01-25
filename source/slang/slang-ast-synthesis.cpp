@@ -29,8 +29,11 @@ Expr* ASTSynthesizer::emitPostfixExpr(UnownedStringSlice operatorToken, Expr* ba
 
 ForStmt* ASTSynthesizer::emitFor(Expr* initVal, Expr* finalVal, VarDecl* &outIndexVar)
 {
+    auto parentStmt = getCurrentScope().m_parentSeqStmt;
+    auto seqStmt = m_builder->create<SeqStmt>();
     auto scopeDecl = pushVarScope()->containerDecl;
     auto stmt = m_builder->create<ForStmt>();
+    stmt->statement = seqStmt;
     stmt->scopeDecl = (ScopeDecl*)scopeDecl;
     auto declStmt = emitVarDeclStmt(nullptr, m_namePool->getName("S_synth_loop_index"), initVal);
     stmt->initialStatement = declStmt;
@@ -38,7 +41,8 @@ ForStmt* ASTSynthesizer::emitFor(Expr* initVal, Expr* finalVal, VarDecl* &outInd
     auto predicateExpr = emitBinaryExpr(UnownedStringSlice("<"), emitVarExpr(outIndexVar), finalVal);
     stmt->predicateExpression = predicateExpr;
     stmt->sideEffectExpression = emitPrefixExpr(UnownedStringSlice("++"), emitVarExpr(outIndexVar));
-    getCurrentScope().m_parentSeqStmt->stmts.add(stmt);
+    parentStmt->stmts.add(stmt);
+    m_scopeStack.getLast().m_parentSeqStmt = seqStmt;
     return stmt;
 }
 

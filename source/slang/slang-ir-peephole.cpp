@@ -69,7 +69,7 @@ struct PeepholeContext : InstPassBase
                     Index i = 0;
                     for (auto sfield : structType->getFields())
                     {
-                        if (sfield == field)
+                        if (sfield->getKey() == field)
                         {
                             fieldIndex = i;
                             break;
@@ -79,6 +79,142 @@ struct PeepholeContext : InstPassBase
                     if (fieldIndex != -1 && fieldIndex < (Index)inst->getOperand(0)->getOperandCount())
                     {
                         inst->replaceUsesWith(inst->getOperand(0)->getOperand((UInt)fieldIndex));
+                        inst->removeAndDeallocate();
+                        changed = true;
+                    }
+                }
+            }
+            else if (auto updateField = as<IRUpdateField>(inst->getOperand(0)))
+            {
+                if (inst->getOperand(1) == updateField->getFieldKey())
+                {
+                    inst->replaceUsesWith(updateField->getElementValue());
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+                else
+                {
+                    inst->setOperand(0, updateField->getOldValue());
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_GetElement:
+            if (inst->getOperand(0)->getOp() == kIROp_MakeArray)
+            {
+                auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
+                if (!index)
+                    break;
+                auto opCount = inst->getOperand(0)->getOperandCount();
+                if ((UInt)index->getValue() < opCount)
+                {
+                    inst->replaceUsesWith(inst->getOperand(0)->getOperand((UInt)index->getValue()));
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            else if (inst->getOperand(0)->getOp() == kIROp_MakeArrayFromElement)
+            {
+                inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                inst->removeAndDeallocate();
+                changed = true;
+            }
+            else if (auto updateElement = as<IRUpdateElement>(inst->getOperand(0)))
+            {
+                if (inst->getOperand(1) == updateElement->getIndex())
+                {
+                    inst->replaceUsesWith(updateElement->getElementValue());
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+                else if (auto constIndex1 = as<IRIntLit>(inst->getOperand(1)))
+                {
+                    if (auto constIndex2 = as<IRIntLit>(updateElement->getIndex()))
+                    {
+                        // If we can determine that the indices does not match,
+                        // then reduce the original value operand to before the update.
+                        if (constIndex1->getValue() != constIndex2->getValue())
+                        {
+                            inst->setOperand(0, updateElement->getOldValue());
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_UpdateElement:
+            {
+                if (auto constIndex = as<IRIntLit>(inst->getOperand(1)))
+                {
+                    auto oldVal = inst->getOperand(0);
+                    if (oldVal->getOp() == kIROp_MakeArray ||
+                        oldVal->getOp() == kIROp_MakeArrayFromElement)
+                    {
+                        auto arrayType = as<IRArrayType>(inst->getDataType());
+                        if (!arrayType) break;
+                        auto arraySize = as<IRIntLit>(arrayType->getElementCount());
+                        if (!arraySize) break;
+                        List<IRInst*> args;
+                        for (IRIntegerValue i = 0; i < arraySize->getValue(); i++)
+                        {
+                            IRInst* arg = nullptr;
+                            if (i < (IRIntegerValue)oldVal->getOperandCount())
+                                arg = oldVal->getOperand((UInt)i);
+                            else if (oldVal->getOperandCount() != 0)
+                                arg = oldVal->getOperand(0);
+                            else
+                                break;
+                            if (i == (IRIntegerValue)constIndex->getValue())
+                                arg = inst->getOperand(2);
+                            args.add(arg);
+                        }
+                        if (args.getCount() == arraySize->getValue())
+                        {
+                            IRBuilder builder(&sharedBuilderStorage);
+                            builder.setInsertBefore(inst);
+                            auto makeArray = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
+                            inst->replaceUsesWith(makeArray);
+                            inst->removeAndDeallocate();
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_UpdateField:
+            {
+                auto oldVal = inst->getOperand(0);
+                if (oldVal->getOp() == kIROp_MakeStruct)
+                {
+                    auto structType = as<IRStructType>(inst->getDataType());
+                    if (!structType) break;
+                    List<IRInst*> args;
+                    UInt i = 0;
+                    bool isValid = true;
+                    for (auto field : structType->getFields())
+                    {
+                        IRInst* arg = nullptr;
+                        if (i < oldVal->getOperandCount())
+                            arg = oldVal->getOperand(i);
+                        if (field->getKey() == inst->getOperand(1))
+                            arg = inst->getOperand(2);
+                        if (arg)
+                        {
+                            args.add(arg);
+                        }
+                        else
+                        {
+                            isValid = false;
+                            break;
+                        }
+                        i++;
+                    }
+                    if (isValid)
+                    {
+                        IRBuilder builder(&sharedBuilderStorage);
+                        builder.setInsertBefore(inst);
+                        auto makeStruct = builder.emitMakeStruct(structType, (UInt)args.getCount(), args.getBuffer());
+                        inst->replaceUsesWith(makeStruct);
                         inst->removeAndDeallocate();
                         changed = true;
                     }
@@ -246,10 +382,17 @@ struct PeepholeContext : InstPassBase
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
         sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
-
-        changed = false;
-        processChildInsts(func, [this](IRInst* inst) { processInst(inst); });
-        return changed;
+        bool result = false;
+        for (;;)
+        {
+            changed = false;
+            processChildInsts(func, [this](IRInst* inst) { processInst(inst); });
+            if (changed)
+                result = true;
+            else
+                break;
+        }
+        return result;
     }
 
     bool processModule()

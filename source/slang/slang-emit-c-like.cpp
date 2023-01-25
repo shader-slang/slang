@@ -1087,6 +1087,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // Never fold these, because their result cannot be computed
     // as a sub-expression (they must be emitted as a declaration
     // or statement).
+    case kIROp_UpdateField:
+    case kIROp_UpdateElement:
     case kIROp_DefaultConstruct:
         return false;
 
@@ -1135,6 +1137,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_MakeStruct:
     case kIROp_MakeArray:
     case kIROp_swizzleSet:
+    case kIROp_MakeArrayFromElement:
         return false;
 
     }
@@ -2190,7 +2193,24 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(" }");
         }
         break;
+    case kIROp_MakeArrayFromElement:
+        {
+            // TODO: initializer-list syntax may not always
+            // be appropriate, depending on the context
+            // of the expression.
 
+            m_writer->emit("{ ");
+            UInt argCount =
+                (UInt)cast<IRIntLit>(cast<IRArrayType>(inst->getDataType())->getElementCount())
+                    ->getValue();
+            for (UInt aa = 0; aa < argCount; ++aa)
+            {
+                if (aa != 0) m_writer->emit(", ");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            }
+            m_writer->emit(" }");
+        }
+        break;
     case kIROp_BitCast:
         {
             // Note: we are currently emitting casts as plain old
@@ -2458,6 +2478,54 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
             m_writer->emit(" = ");
             emitOperand(ii->getSource(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+        }
+        break;
+
+    case kIROp_UpdateElement:
+        {
+            auto ii = (IRUpdateElement*)inst;
+            auto subscriptOuter = getInfo(EmitOp::General);
+            auto subscriptPrec = getInfo(EmitOp::Postfix);
+            auto arraySize = as<IRIntLit>(as<IRArrayType>(inst->getDataType())->getElementCount());
+            SLANG_RELEASE_ASSERT(arraySize);
+            emitInstResultDecl(inst);
+            m_writer->emit("{");
+            for (UInt i = 0; i < (UInt)arraySize->getValue(); i++)
+            {
+                if (i > 0)
+                    m_writer->emit(", ");
+                emitOperand(ii->getOldValue(), leftSide(subscriptOuter, subscriptPrec));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("]");
+            }
+
+            m_writer->emit("}");
+            m_writer->emit(";\n");
+
+            emitOperand(ii, leftSide(subscriptOuter, subscriptPrec));
+            m_writer->emit("[");
+            emitOperand(ii->getIndex(), getInfo(EmitOp::General));
+            m_writer->emit("] = ");
+            emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+        }
+        break;
+    case kIROp_UpdateField:
+        {
+            auto ii = (IRUpdateField*)inst;
+            emitInstResultDecl(inst);
+            emitOperand(ii->getOldValue(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+
+            auto subscriptOuter = getInfo(EmitOp::General);
+            auto subscriptPrec = getInfo(EmitOp::Postfix);
+            emitOperand(ii, leftSide(subscriptOuter, subscriptPrec));
+            m_writer->emit(".");
+            m_writer->emit(getName(ii->getFieldKey()));
+            m_writer->emit(" = ");
+            emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
             m_writer->emit(";\n");
         }
         break;

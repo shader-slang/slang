@@ -631,21 +631,12 @@ struct DiffTransposePass
         auto primalType = tryGetPrimalTypeFromDiffInst(fwdInst);
         auto diffType = fwdInst->getDataType();
 
-        auto zeroMethod = diffTypeContext.getZeroMethodForType(
-                &tempVarBuilder,
-                primalType);
-
-        SLANG_ASSERT(zeroMethod);
+        auto zero = emitDZeroOfDiffInstType(&tempVarBuilder, primalType);
 
         // Emit a var in the top-level differential block to hold the gradient, 
         // and initialize it.
         auto tempRevVar = tempVarBuilder.emitVar(diffType);
-        auto diffZero = tempVarBuilder.emitCallInst(
-            diffType,
-            zeroMethod,
-            List<IRInst*>());
-        tempVarBuilder.emitStore(tempRevVar, diffZero);
-
+        tempVarBuilder.emitStore(tempRevVar, zero);
         revAccumulatorVarMap[fwdInst] = tempRevVar;
 
         return tempRevVar;
@@ -829,15 +820,6 @@ struct DiffTransposePass
         // Record any phi gradients for the CFG reversal pass.
         phiGradsMap[fwdBlock] = phiParamRevGradInsts;
 
-        /*
-        if (!tryEmitTerminator(&builder, fwdBlock, phiParamRevGradInsts))
-        {
-            // If we couldn't emit a terminator right away, defer for later.
-            pendingBlocks.add(PendingBlockTerminatorEntry(
-                fwdBlock,
-                phiParamRevGradInsts));
-        }
-        */
     }
 
     void transposeInst(IRBuilder* builder, IRInst* inst)
@@ -1199,6 +1181,9 @@ struct DiffTransposePass
             case kIROp_FieldExtract:
                 return transposeFieldExtract(builder, as<IRFieldExtract>(fwdInst), revValue);
 
+            case kIROp_GetElement:
+                return transposeGetElement(builder, as<IRGetElement>(fwdInst), revValue);
+
             case kIROp_Return:
                 return transposeReturn(builder, as<IRReturn>(fwdInst), revValue);
             
@@ -1216,6 +1201,18 @@ struct DiffTransposePass
             
             case kIROp_MakeVector:
                 return transposeMakeVector(builder, fwdInst, revValue);
+            case kIROp_MakeStruct:
+                return transposeMakeStruct(builder, fwdInst, revValue);
+            case kIROp_MakeArray:
+                return transposeMakeArray(builder, fwdInst, revValue);
+            case kIROp_MakeArrayFromElement:
+                return transposeMakeArrayFromElement(builder, fwdInst, revValue);
+
+            case kIROp_UpdateElement:
+                return transposeUpdateElement(builder, fwdInst, revValue);
+
+            case kIROp_UpdateField:
+                return transposeUpdateField(builder, fwdInst, revValue);
 
             case kIROp_Specialize:
             case kIROp_unconditionalBranch:
@@ -1321,6 +1318,17 @@ struct DiffTransposePass
                             fwdExtract)));
     }
 
+    TranspositionResult transposeGetElement(IRBuilder*, IRGetElement* fwdGetElement, IRInst* revValue)
+    {
+        return TranspositionResult(
+            List<RevGradient>(
+                RevGradient(
+                    RevGradient::Flavor::GetElement,
+                    fwdGetElement->getBase(),
+                    revValue,
+                    fwdGetElement)));
+    }
+
     TranspositionResult transposeMakePair(IRBuilder*, IRMakeDifferentialPair* fwdMakePair, IRInst* revValue)
     {
         // Even though makePair returns a pair of (primal, differential)
@@ -1370,6 +1378,136 @@ struct DiffTransposePass
         }
 
         // (A = float3(X, Y, Z)) -> [(dX += dA), (dY += dA), (dZ += dA)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeStruct(IRBuilder* builder, IRInst* fwdMakeStruct, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto structType = cast<IRStructType>(fwdMakeStruct->getFullType());
+        UInt ii = 0;
+        for (auto field : structType->getFields())
+        {
+            auto gradAtField = builder->emitFieldExtract(
+                field->getFieldType(),
+                revValue,
+                field->getKey());
+            SLANG_RELEASE_ASSERT(ii < fwdMakeStruct->getOperandCount());
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeStruct->getOperand(ii),
+                gradAtField,
+                fwdMakeStruct));
+            ii++;
+        }
+
+        // (A = MakeStruct(F1, F2, F3)) -> [(dF1 += dA.F1), (dF2 += dA.F2), (dF3 += dA.F3)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeArray(IRBuilder* builder, IRInst* fwdMakeArray, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto arrayType = cast<IRArrayType>(fwdMakeArray->getFullType());
+
+        for (UInt ii = 0; ii < fwdMakeArray->getOperandCount(); ii++)
+        {
+            auto gradAtField = builder->emitElementExtract(
+                arrayType->getElementType(),
+                revValue,
+                builder->getIntValue(builder->getIntType(), ii));
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeArray->getOperand(ii),
+                gradAtField,
+                fwdMakeArray));
+        }
+
+        // (A = MakeArray(F1, F2, F3)) -> [(dF1 += dA.F1), (dF2 += dA.F2), (dF3 += dA.F3)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeArrayFromElement(IRBuilder* builder, IRInst* fwdMakeArrayFromElement, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto arrayType = cast<IRArrayType>(fwdMakeArrayFromElement->getFullType());
+        auto arraySize = cast<IRIntLit>(arrayType->getElementCount());
+        SLANG_RELEASE_ASSERT(arraySize);
+        // TODO: if arraySize is a generic value, we can't statically expand things here.
+        // In that case we probably need another opcode e.g. `Sum(arrayValue)` that can be expand
+        // later in the pipeline when `arrayValue` becomes a known value.
+        for (UInt ii = 0; ii < (UInt)arraySize->getValue(); ii++)
+        {
+            auto gradAtField = builder->emitElementExtract(
+                arrayType->getElementType(),
+                revValue,
+                builder->getIntValue(builder->getIntType(), ii));
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeArrayFromElement->getOperand(0),
+                gradAtField,
+                fwdMakeArrayFromElement));
+        }
+
+        // (A = MakeArrayFromElement(E)) -> [(dE += dA.F1), (dE += dA.F2), (dE += dA.F3)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeUpdateElement(IRBuilder* builder, IRInst* fwdUpdate, IRInst* revValue)
+    {
+        auto updateInst = as<IRUpdateElement>(fwdUpdate);
+
+        List<RevGradient> gradients;
+        auto arrayType = cast<IRArrayType>(fwdUpdate->getFullType());
+        auto revElement = builder->emitElementExtract(arrayType->getElementType(), revValue, updateInst->getIndex());
+        gradients.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            updateInst->getElementValue(),
+            revElement,
+            fwdUpdate));
+
+        auto primalElementType = updateInst->getPrimalElementType();
+        auto diffZero = emitDZeroOfDiffInstType(builder, (IRType*)primalElementType);
+        SLANG_ASSERT(diffZero);
+        auto revRest = builder->emitUpdateElement(
+            revValue,
+            updateInst->getIndex(),
+            diffZero);
+        gradients.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            updateInst->getOldValue(),
+            revRest,
+            fwdUpdate));
+        // (A = UpdateElement(arr, index, V)) -> [(dV += dA[index], d_arr += UpdateElement(revValue, index, 0)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeUpdateField(IRBuilder* builder, IRInst* fwdUpdate, IRInst* revValue)
+    {
+        auto updateInst = as<IRUpdateField>(fwdUpdate);
+
+        List<RevGradient> gradients;
+        IRType* fieldType = updateInst->getElementValue()->getFullType();
+        auto revElement = builder->emitFieldExtract(fieldType, revValue, updateInst->getFieldKey());
+        gradients.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            updateInst->getElementValue(),
+            revElement,
+            fwdUpdate));
+        
+        auto primalElementType = updateInst->getPrimalElementType();
+        auto diffZero = emitDZeroOfDiffInstType(builder, (IRType*)primalElementType);
+        SLANG_ASSERT(diffZero);
+        auto revRest = builder->emitUpdateField(
+            revValue,
+            updateInst->getFieldKey(),
+            diffZero);
+        gradients.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            updateInst->getOldValue(),
+            revRest,
+            fwdUpdate));
+        // (A = UpdateField(s, fieldKey, V)) -> [(dV += dA.fieldKey, d_s += UpdateField(revValue, fieldKey, 0)]
         return TranspositionResult(gradients);
     }
 
@@ -1650,10 +1788,79 @@ struct DiffTransposePass
             case RevGradient::Flavor::FieldExtract:
                 return materializeFieldExtractGradients(builder, aggPrimalType, gradients);
 
+            case RevGradient::Flavor::GetElement:
+                return materializeGetElementGradients(builder, aggPrimalType, gradients);
+
             default:
                 SLANG_ASSERT_FAILURE("Unhandled gradient flavor for materialization");
         }
     }
+
+    RevGradient materializeGetElementGradients(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
+    {
+        // Setup a temporary variable to aggregate gradients.
+        // TODO: We can extend this later to grab an existing ptr to allow aggregation of
+        // gradients across blocks without constructing new variables.
+        // Looking up an existing pointer could also allow chained accesses like x.a.b[1] to directly
+        // write into the specific sub-field that is affected without constructing intermediate vars.
+        // 
+        auto revGradVar = builder->emitVar(
+            (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
+
+        // Initialize with T.dzero()
+        auto zeroValueInst = emitDZeroOfDiffInstType(builder, aggPrimalType);
+
+        builder->emitStore(revGradVar, zeroValueInst);
+
+        OrderedDictionary<IRInst*, List<RevGradient>> bucketedGradients;
+        for (auto gradient : gradients)
+        {
+            // Grab the element affected by this gradient.
+            auto getElementInst = as<IRGetElement>(gradient.fwdGradInst);
+            SLANG_ASSERT(getElementInst);
+
+            auto index = getElementInst->getIndex();
+            SLANG_ASSERT(index);
+
+            if (!bucketedGradients.ContainsKey(index))
+            {
+                bucketedGradients[index] = List<RevGradient>();
+            }
+
+            bucketedGradients[index].GetValue().add(RevGradient(
+                RevGradient::Flavor::Simple,
+                gradient.targetInst,
+                gradient.revGradInst,
+                gradient.fwdGradInst
+            ));
+
+        }
+
+        for (auto pair : bucketedGradients)
+        {
+            auto subGrads = pair.Value;
+
+            auto primalType = tryGetPrimalTypeFromDiffInst(subGrads[0].fwdGradInst);
+
+            SLANG_ASSERT(primalType);
+
+            // Construct address to this field in revGradVar.
+            auto revGradTargetAddress = builder->emitElementAddress(
+                builder->getPtrType(subGrads[0].revGradInst->getDataType()),
+                revGradVar,
+                pair.Key);
+
+            builder->emitStore(revGradTargetAddress, emitAggregateValue(builder, primalType, subGrads));
+        }
+
+        // Load the entire var and return it.
+        return RevGradient(
+            RevGradient::Flavor::Simple,
+            gradients[0].targetInst,
+            builder->emitLoad(revGradVar),
+            nullptr);
+    }
+
 
     RevGradient materializeFieldExtractGradients(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
     {
@@ -1671,7 +1878,7 @@ struct DiffTransposePass
 
         builder->emitStore(revGradVar, zeroValueInst);
 
-        Dictionary<IRStructKey*, List<RevGradient>> bucketedGradients;
+        OrderedDictionary<IRStructKey*, List<RevGradient>> bucketedGradients;
         for (auto gradient : gradients)
         {
             // Grab the field affected by this gradient.
@@ -1703,7 +1910,7 @@ struct DiffTransposePass
 
             SLANG_ASSERT(primalType);
     
-            // Consruct address to this field in revGradVar.
+            // Construct address to this field in revGradVar.
             auto revGradTargetAddress = builder->emitFieldAddress(
                 builder->getPtrType(subGrads[0].revGradInst->getDataType()),
                 revGradVar,
@@ -1836,6 +2043,14 @@ struct DiffTransposePass
 
     IRInst* emitDZeroOfDiffInstType(IRBuilder* builder, IRType* primalType)
     {
+        if (auto arrayType = as<IRArrayType>(primalType))
+        {
+            auto diffElementType = (IRType*)diffTypeContext.getDifferentialForType(builder, arrayType->getElementType());
+            SLANG_RELEASE_ASSERT(diffElementType);
+            auto diffArrayType = builder->getArrayType(diffElementType, arrayType->getElementCount());
+            auto diffElementZero = emitDZeroOfDiffInstType(builder, arrayType->getElementType());
+            return builder->emitMakeArrayFromElement(diffArrayType, diffElementZero);
+        }
         auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, primalType);
 
         // Should exist.
@@ -1849,6 +2064,30 @@ struct DiffTransposePass
 
     IRInst* emitDAddOfDiffInstType(IRBuilder* builder, IRType* primalType, IRInst* op1, IRInst* op2)
     {
+        if (auto arrayType = as<IRArrayType>(primalType))
+        {
+            auto diffElementType = (IRType*)diffTypeContext.getDifferentialForType(builder, arrayType->getElementType());
+            SLANG_RELEASE_ASSERT(diffElementType);
+            auto arraySize = arrayType->getElementCount();
+            if (auto constArraySize = as<IRIntLit>(arraySize))
+            {
+                List<IRInst*> args;
+                for (IRIntegerValue i = 0; i < constArraySize->getValue(); i++)
+                {
+                    auto index = builder->getIntValue(builder->getIntType(), i);
+                    auto op1Val = builder->emitElementExtract(diffElementType, op1, index);
+                    auto op2Val = builder->emitElementExtract(diffElementType, op2, index);
+                    args.add(emitDAddOfDiffInstType(builder, arrayType->getElementType(), op1Val, op2Val));
+                }
+                auto diffArrayType = builder->getArrayType(diffElementType, arrayType->getElementCount());
+                return builder->emitMakeArray(diffArrayType, (UInt)args.getCount(), args.getBuffer());
+            }
+            else
+            {
+                // TODO: insert a runtime loop here.
+                SLANG_UNIMPLEMENTED_X("dadd of dynamic array.");
+            }
+        }
         auto addMethod = diffTypeContext.getAddMethodForType(builder, primalType);
 
         // Should exist.

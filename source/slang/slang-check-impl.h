@@ -11,7 +11,12 @@
 
 namespace Slang
 {
-    
+    enum class FunctionDifferentiableLevel
+    {
+        None,
+        Forward,
+        Backward
+    };
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);
@@ -292,7 +297,8 @@ namespace Slang
 
         bool isDifferentiableFunc(FunctionDeclBase* func);
         bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
-
+        FunctionDifferentiableLevel getFuncDifferentiableLevel(FunctionDeclBase* func);
+        
     private:
             /// Mapping from type declarations to the known extensiosn that apply to them
         Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -754,6 +760,8 @@ namespace Slang
         /// describing the relationship.
         ///
         void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
+        void maybeRegisterDifferentiableTypeRecursive(ASTBuilder* builder, Type* type, ValSet& workingSet);
+        void completeDifferentiableTypeDictionary();
 
         // Construct the differential for 'type', if it exists.
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);

@@ -19,11 +19,13 @@ void main()
 {
     beginInvocationInterlockARB();
 
-    vec4 _S3 = (imageLoad((entryPointParams_texture_0), ivec2((uvec2(_S1.xy)))));
-    imageStore((entryPointParams_texture_0), ivec2((uvec2(_S1.xy))), _S3 + _S1);
+    vec2 _S3 = _S1.xy;
+
+    vec4 _S4 = (imageLoad((entryPointParams_texture_0), ivec2((uvec2(_S3)))));
+    imageStore((entryPointParams_texture_0), ivec2((uvec2(_S3))), _S4 + _S1);
 
     endInvocationInterlockARB();
 
-    _S2 = _S3;
+    _S2 = _S4;
     return;
 }

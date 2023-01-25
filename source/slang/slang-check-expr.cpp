@@ -922,7 +922,6 @@ namespace Slang
         }
     }
 
-
     void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type)
     {
         if (!builder->isDifferentiableInterfaceAvailable())
@@ -961,6 +960,80 @@ namespace Slang
             return;
         }
     }
+
+    void SemanticsVisitor::maybeRegisterDifferentiableTypeRecursive(ASTBuilder* builder, Type* type, ValSet& workingSet)
+    {
+        if (workingSet.contains(type))
+            return;
+
+        if (!builder->isDifferentiableInterfaceAvailable())
+        {
+            return;
+        }
+
+        if (!m_parentDifferentiableAttr)
+        {
+            return;
+        }
+
+        workingSet.add(type);
+
+        // Check for special cases such as PtrTypeBase<T> or Array<T>
+        // This could potentially be handled later by simply defining extensions
+        // for Ptr<T:IDifferentiable> etc..
+        //
+        if (auto ptrType = as<PtrTypeBase>(type))
+        {
+            maybeRegisterDifferentiableTypeRecursive(builder, ptrType->getValueType(), workingSet);
+            return;
+        }
+
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            maybeRegisterDifferentiableTypeRecursive(builder, arrayType->baseType, workingSet);
+            return;
+        }
+
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto subtypeWitness = as<SubtypeWitness>(
+                tryGetInterfaceConformanceWitness(type, getASTBuilder()->getDifferentiableInterface())))
+            {
+                registerDifferentiableType((DeclRefType*)type, subtypeWitness);
+                if (auto aggTypeDeclRef = declRefType->declRef.as<AggTypeDecl>())
+                {
+                    foreachDirectOrExtensionMemberOfType<InheritanceDecl>(this, aggTypeDeclRef, [&](DeclRef<InheritanceDecl> member)
+                        {
+                            auto subType = m_astBuilder->getOrCreateDeclRefType(member.getDecl(), nullptr);
+                            maybeRegisterDifferentiableTypeRecursive(m_astBuilder, subType, workingSet);
+                        });
+                    foreachDirectOrExtensionMemberOfType<VarDeclBase>(this, aggTypeDeclRef, [&](DeclRef<VarDeclBase> member)
+                        {
+                            auto fieldType = getType(m_astBuilder, member);
+                            maybeRegisterDifferentiableTypeRecursive(m_astBuilder, fieldType, workingSet);
+                        });
+                }
+            }
+            return;
+        }
+    }
+
+    void SemanticsVisitor::completeDifferentiableTypeDictionary()
+    {
+        ValSet workingSet;
+        for (auto type : m_parentDifferentiableAttr->m_mapTypeToIDifferentiableWitness)
+        {
+            if (auto aggTypeDeclRef = type.Key.as<AggTypeDecl>())
+            {
+                maybeRegisterDifferentiableTypeRecursive(
+                    m_astBuilder,
+                    m_astBuilder->getOrCreateDeclRefType(
+                        aggTypeDeclRef.getDecl(), aggTypeDeclRef.substitutions),
+                    workingSet);
+            }
+        }
+    }
+
 
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
     {
@@ -1967,6 +2040,10 @@ namespace Slang
 
         if (m_parentDifferentiableAttr)
         {
+            FunctionDifferentiableLevel callerDiffLevel = FunctionDifferentiableLevel::None;
+            if (m_parentFunc)
+                callerDiffLevel = getShared()->getFuncDifferentiableLevel(m_parentFunc);
+
             if (auto checkedInvokeExpr = as<InvokeExpr>(checkedExpr))
             {
                 // Register types for final resolved invoke arguments again.
@@ -1978,7 +2055,8 @@ namespace Slang
                 {
                     if (auto calleeDecl = as<FunctionDeclBase>(calleeExpr->declRef.getDecl()))
                     {
-                        if (getShared()->isDifferentiableFunc(calleeDecl))
+                        auto calleeDiffLevel = getShared()->getFuncDifferentiableLevel(calleeDecl);
+                        if (calleeDiffLevel >= callerDiffLevel)
                         {
                             if (!m_treatAsDifferentiableExpr)
                             {

@@ -96,12 +96,14 @@ struct AutoDiffTranscriberBase
 
     InstPair transcribeExtractExistentialWitnessTable(IRBuilder* builder, IRInst* origInst);
 
+    void maybeMigrateDifferentiableDictionaryFromDerivativeFunc(IRBuilder* builder, IRInst* origFunc);
+
     // Get or construct `:IDifferentiable` conformance for a DifferentiablePair.
-    IRWitnessTable* getDifferentialPairWitness(IRInst* inDiffPairType);
+    IRWitnessTable* getDifferentialPairWitness(IRBuilder* builder, IRInst* inOriginalDiffPairType, IRInst* inPrimalDiffPairType);
 
-    IRType* getOrCreateDiffPairType(IRInst* primalType, IRInst* witness);
+    IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness);
 
-    IRType* getOrCreateDiffPairType(IRInst* primalType);
+    IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* originalType);
 
     IRType* differentiateType(IRBuilder* builder, IRType* origType);
 
@@ -121,7 +123,13 @@ struct AutoDiffTranscriberBase
 
     InstPair transcribeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* lookupInst);
 
-    InstPair transcribeBlock(IRBuilder* builder, IRBlock* origBlock);
+    InstPair transcribeBlockImpl(IRBuilder* builder, IRBlock* origBlock, HashSet<IRInst*>& instsToSkip);
+
+    InstPair transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
+    {
+        HashSet<IRInst*> emptySet;
+        return transcribeBlockImpl(builder, origBlock, emptySet);
+    }
 
     // Transcribe a generic definition
     InstPair transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric);

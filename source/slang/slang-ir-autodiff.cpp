@@ -1,7 +1,10 @@
 #include "slang-ir-autodiff.h"
+#include "slang-ir-address-analysis.h"
 #include "slang-ir-autodiff-rev.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-pairs.h"
+#include "slang-ir-single-return.h"
+#include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
 
 namespace Slang
@@ -31,11 +34,11 @@ static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requi
                 return entry->getSatisfyingVal();
         }
     }
-    else if (auto witnessTableParam = as<IRParam>(witness))
+    else
     {
         return builder->emitLookupInterfaceMethodInst(
             builder->getTypeKind(),
-            witnessTableParam,
+            witness,
             requirementKey);
     }
     return nullptr;
@@ -527,6 +530,46 @@ void stripNoDiffTypeAttribute(IRModule* module)
 {
     StripNoDiffTypeAttributePass pass(module);
     pass.processModule();
+}
+
+bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst)
+{
+    HashSet<IRInst*> processedSet;
+    for (;typeInst;)
+    {
+        if (as<IRArrayTypeBase>(typeInst) || as<IRPtrTypeBase>(typeInst))
+        {
+            typeInst = typeInst->getOperand(0);
+            if (!processedSet.Add(typeInst))
+                return false;
+        }
+        else
+        {
+            break;
+        }
+    }
+    if (!typeInst)
+        return false;
+    switch (typeInst->getOp())
+    {
+    case kIROp_FloatType:
+    case kIROp_DifferentialPairType:
+        return true;
+    default:
+        break;
+    }
+    if (context.lookUpConformanceForType(typeInst))
+        return true;
+    // Look for equivalent types.
+    for (auto type : context.differentiableWitnessDictionary)
+    {
+        if (isTypeEqual(type.Key, (IRType*)typeInst))
+        {
+            context.differentiableWitnessDictionary[(IRType*)typeInst] = type.Value;
+            return true;
+        }
+    }
+    return false;
 }
 
 struct AutoDiffPass : public InstPassBase
