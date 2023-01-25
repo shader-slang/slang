@@ -21,6 +21,8 @@ Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters);
 Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters);
 Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters);
 
+Result SLANG_MCALL reportD3DLiveObjects();
+
 static bool debugLayerEnabled = false;
 bool isGfxDebugLayerEnabled() { return debugLayerEnabled; }
 
@@ -362,6 +364,15 @@ extern "C"
         debugDevice->baseObject = innerDevice;
         returnComPtr(outDevice, debugDevice);
         return resultCode;
+    }
+
+    SLANG_GFX_API SlangResult SLANG_MCALL
+        gfxReportLiveObjects()
+    {
+#if SLANG_WINDOWS_FAMILY
+        SLANG_RETURN_ON_FAIL(reportD3DLiveObjects());
+#endif
+        return SLANG_OK;
     }
 
     SLANG_GFX_API SlangResult SLANG_MCALL gfxSetDebugCallback(IDebugCallback* callback)

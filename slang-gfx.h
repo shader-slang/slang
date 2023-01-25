@@ -2641,6 +2641,10 @@ extern "C"
     SLANG_GFX_API SlangResult SLANG_MCALL
         gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
+    /// Reports current set of live objects in gfx.
+    /// Currently this only calls D3D's ReportLiveObjects.
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxReportLiveObjects();
+
     /// Sets a callback for receiving debug messages.
     /// The layer does not hold a strong reference to the callback object.
     /// The user is responsible for holding the callback object alive.
