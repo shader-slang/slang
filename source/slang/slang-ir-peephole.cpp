@@ -77,7 +77,7 @@ struct PeepholeContext : InstPassBase
                 {
                     IRBuilder builder(&sharedBuilderStorage);
                     builder.setInsertBefore(inst);
-                    auto newValue = builder.emitElementExtract(inst->getDataType(), updateInst->getElementValue(), remainingKeys);
+                    auto newValue = builder.emitElementExtract(updateInst->getElementValue(), remainingKeys);
                     inst->replaceUsesWith(newValue);
                     inst->removeAndDeallocate();
                     return true;
@@ -87,7 +87,7 @@ struct PeepholeContext : InstPassBase
             {
                 IRBuilder builder(&sharedBuilderStorage);
                 builder.setInsertBefore(inst);
-                auto newInst = builder.emitElementExtract(inst->getDataType(), updateInst->getOldValue(), chainKey.getArrayView());
+                auto newInst = builder.emitElementExtract(updateInst->getOldValue(), chainKey.getArrayView());
                 inst->replaceUsesWith(newInst);
                 inst->removeAndDeallocate();
                 return true;

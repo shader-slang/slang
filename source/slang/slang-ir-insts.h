@@ -3153,7 +3153,6 @@ public:
         IRInst* index);
 
     IRInst* emitElementExtract(
-        IRType* type,
         IRInst* base,
         const ArrayView<IRInst*>& accessChain);
 

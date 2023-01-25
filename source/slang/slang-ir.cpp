@@ -4390,7 +4390,6 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitElementExtract(
-        IRType* type,
         IRInst* base,
         const ArrayView<IRInst*>& accessChain)
     {

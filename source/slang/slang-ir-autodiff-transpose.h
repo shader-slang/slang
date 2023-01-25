@@ -1309,9 +1309,8 @@ struct DiffTransposePass
         auto updateInst = as<IRUpdateElement>(fwdUpdate);
 
         List<RevGradient> gradients;
-        IRType* diffElementType = updateInst->getElementValue()->getDataType();
         auto accessChain = updateInst->getAccessChain();
-        auto revElement = builder->emitElementExtract(diffElementType, revValue, accessChain.getArrayView());
+        auto revElement = builder->emitElementExtract(revValue, accessChain.getArrayView());
         gradients.add(RevGradient(
             RevGradient::Flavor::Simple,
             updateInst->getElementValue(),
