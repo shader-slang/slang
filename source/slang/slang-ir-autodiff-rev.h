@@ -100,9 +100,9 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) = 0;
     virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) = 0;
 
-    virtual IROp getDifferentiableMethodDictionaryItemOp() override
+    virtual IROp getInterfaceRequirementDerivativeDecorationOp() override
     {
-        return kIROp_BackwardDifferentiableMethodRequirementDictionaryItem;
+        return kIROp_BackwardDerivativeDecoration;
     }
 };
 
@@ -129,6 +129,10 @@ struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
     virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
     {
         builder->addBackwardDerivativePrimalDecoration(inst, diffFunc);
+    }
+    virtual IROp getInterfaceRequirementDerivativeDecorationOp() override
+    {
+        return kIROp_BackwardDerivativePrimalDecoration;
     }
 };
 
@@ -163,6 +167,10 @@ struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
     virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
     {
         builder->addBackwardDerivativePropagateDecoration(inst, diffFunc);
+    }
+    virtual IROp getInterfaceRequirementDerivativeDecorationOp() override
+    {
+        return kIROp_BackwardDerivativePropagateDecoration;
     }
 };
 

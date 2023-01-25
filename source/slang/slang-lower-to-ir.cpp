@@ -6846,36 +6846,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(assocType);
     }
 
-    void insertRequirementKeyAssociation(IRInterfaceType* interfaceType, Decl* requirementDecl, IRInst* originalKey, IRInst* associatedKey)
+    void insertRequirementKeyAssociation(Decl* requirementDecl, IRInst* originalKey, IRInst* associatedKey)
     {
-        auto decor = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
-        if (!decor)
-        {
-            decor =
-                (IRDifferentiableMethodRequirementDictionaryDecoration*)
-                    context->irBuilder->addDecoration(
-                        interfaceType, kIROp_DifferentiableMethodRequirementDictionaryDecoration);
-        }
-        IROp op = kIROp_ForwardDifferentiableMethodRequirementDictionaryItem;
+        IROp op = kIROp_Nop;
         if (as<BackwardDerivativeRequirementDecl>(requirementDecl))
         {
-            op = kIROp_BackwardDifferentiableMethodRequirementDictionaryItem;
+            op = kIROp_BackwardDerivativeDecoration;
         }
         else if (as<BackwardDerivativePropagateRequirementDecl>(requirementDecl))
         {
-            op = kIROp_BackwardDifferentiablePropagateMethodRequirementDictionaryItem;
+            op = kIROp_BackwardDerivativePropagateDecoration;
         }
         else if (as<BackwardDerivativePrimalRequirementDecl>(requirementDecl))
         {
-            op = kIROp_BackwardDifferentiablePrimalMethodRequirementDictionaryItem;
+            op = kIROp_BackwardDerivativePrimalDecoration;
         }
-        else if (as<BackwardDerivativeIntermediateTypeRequirementDecl>(requirementDecl))
+        else if (as<ForwardDerivativeRequirementDecl>(requirementDecl))
         {
-            op = kIROp_BackwardDifferentiableIntermediateTypeRequirementDictionaryItem;
+            op = kIROp_ForwardDerivativeDecoration;
         }
-        IRInst* args[] = {originalKey, associatedKey};
-        auto assoc = context->irBuilder->emitIntrinsicInst(nullptr, op, 2, args);
-        assoc->insertAtEnd(decor);
+        else
+        {
+            return;
+        }
+        context->irBuilder->addDecoration(originalKey, op, associatedKey);
     }
 
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
@@ -7005,7 +6999,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
                     {
                         auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
-                        insertRequirementKeyAssociation(irInterface, diffDecl->referencedDecl, requirementKey, diffKey);
+                        insertRequirementKeyAssociation(diffDecl->referencedDecl, requirementKey, diffKey);
                     }
                 }
                 // Add lowered requirement entry to current decl mapping to prevent

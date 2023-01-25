@@ -147,7 +147,7 @@ struct AutoDiffTranscriberBase
 
     virtual InstPair transcribeInstImpl(IRBuilder* builder, IRInst* origInst) = 0;
 
-    virtual IROp getDifferentiableMethodDictionaryItemOp() = 0;
+    virtual IROp getInterfaceRequirementDerivativeDecorationOp() = 0;
 };
 
 }

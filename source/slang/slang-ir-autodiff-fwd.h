@@ -97,9 +97,9 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     virtual InstPair transcribeInstImpl(IRBuilder* builder, IRInst* origInst) override;
 
-    virtual IROp getDifferentiableMethodDictionaryItemOp() override
+    virtual IROp getInterfaceRequirementDerivativeDecorationOp() override
     {
-        return kIROp_ForwardDifferentiableMethodRequirementDictionaryItem;
+        return kIROp_ForwardDerivativeDecoration;
     }
 
 };
