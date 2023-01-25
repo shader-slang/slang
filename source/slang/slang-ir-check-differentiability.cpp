@@ -131,22 +131,10 @@ public:
                 return true;
             if (sharedContext.differentiableInterfaceType && interfaceType == sharedContext.differentiableInterfaceType)
                 return true;
-            auto dictDecor = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
-            if (!dictDecor)
-                return false;
-            for (auto child : dictDecor->getChildren())
-            {
-                if (auto entry = as<IRDifferentiableMethodRequirementDictionaryItem>(child))
-                {
-                    if (entry->getOperand(0) == lookupInterfaceMethod->getRequirementKey())
-                    {
-                        if (as<IRBackwardDifferentiableMethodRequirementDictionaryItem>(child) && level == DifferentiableLevel::Backward)
-                            return true;
-                        if (as<IRForwardDifferentiableMethodRequirementDictionaryItem>(child) && level == DifferentiableLevel::Forward)
-                            return true;
-                    }
-                }
-            }
+            if (lookupInterfaceMethod->getRequirementKey()->findDecoration<IRBackwardDerivativeDecoration>())
+                return true;
+            if (lookupInterfaceMethod->getRequirementKey()->findDecoration<IRForwardDerivativeDecoration>())
+                return level == DifferentiableLevel::Forward;
         }
 
         for (; func; func = func->parent)
