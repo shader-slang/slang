@@ -2,8 +2,6 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
-#include "slang-ir-single-return.h"
-#include "slang-ir-addr-inst-elimination.h"
 
 namespace Slang
 {
@@ -177,29 +175,6 @@ public:
         return false;
     }
 
-    struct AutoDiffAddressConversionPolicy : public AddressConversionPolicy
-    {
-        DifferentiableTypeConformanceContext* diffTypeContext;
-
-        virtual bool shouldConvertAddrInst(IRInst* addrInst) override
-        {
-            if (isDifferentiableType(*diffTypeContext, addrInst->getDataType()))
-                return true;
-            return false;
-        }
-    };
-
-    SlangResult prepareFuncForAutoDiff(DifferentiableTypeConformanceContext& diffTypeContext, IRFunc* func)
-    {
-        if (!isSingleReturnFunc(func))
-        {
-            convertFuncToSingleReturnForm(func->getModule(), func);
-        }
-        AutoDiffAddressConversionPolicy cvtPolicty;
-        cvtPolicty.diffTypeContext = &diffTypeContext;
-        return eliminateAddressInsts(sharedBuilder, &cvtPolicty, func, sink);
-    }
-
     void processFunc(IRGlobalValueWithCode* funcInst)
     {
         if (!_isFuncMarkedForAutoDiff(funcInst))
@@ -209,14 +184,6 @@ public:
 
         DifferentiableTypeConformanceContext diffTypeContext(&sharedContext);
         diffTypeContext.setFunc(funcInst);
-        if (isBackwardDifferentiableFunc(funcInst) && !funcInst->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
-        {
-            if (auto func = as<IRFunc>(funcInst))
-            {
-                if (SLANG_FAILED(prepareFuncForAutoDiff(diffTypeContext, func)))
-                    return;
-            }
-        }
 
         HashSet<IRInst*> produceDiffSet;
         HashSet<IRInst*> expectDiffSet;

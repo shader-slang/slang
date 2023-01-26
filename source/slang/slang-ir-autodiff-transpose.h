@@ -1065,9 +1065,6 @@ struct DiffTransposePass
             case kIROp_UpdateElement:
                 return transposeUpdateElement(builder, fwdInst, revValue);
 
-            case kIROp_UpdateField:
-                return transposeUpdateField(builder, fwdInst, revValue);
-
             case kIROp_Specialize:
             case kIROp_unconditionalBranch:
             case kIROp_conditionalBranch:
@@ -1312,20 +1309,22 @@ struct DiffTransposePass
         auto updateInst = as<IRUpdateElement>(fwdUpdate);
 
         List<RevGradient> gradients;
-        auto arrayType = cast<IRArrayType>(fwdUpdate->getFullType());
-        auto revElement = builder->emitElementExtract(arrayType->getElementType(), revValue, updateInst->getIndex());
+        auto accessChain = updateInst->getAccessChain();
+        auto revElement = builder->emitElementExtract(revValue, accessChain.getArrayView());
         gradients.add(RevGradient(
             RevGradient::Flavor::Simple,
             updateInst->getElementValue(),
             revElement,
             fwdUpdate));
 
-        auto primalElementType = updateInst->getPrimalElementType();
-        auto diffZero = emitDZeroOfDiffInstType(builder, (IRType*)primalElementType);
+        auto primalElementTypeDecor = updateInst->findDecoration<IRPrimalElementTypeDecoration>();
+        SLANG_RELEASE_ASSERT(primalElementTypeDecor);
+
+        auto diffZero = emitDZeroOfDiffInstType(builder, (IRType*)primalElementTypeDecor->getPrimalElementType());
         SLANG_ASSERT(diffZero);
         auto revRest = builder->emitUpdateElement(
             revValue,
-            updateInst->getIndex(),
+            accessChain,
             diffZero);
         gradients.add(RevGradient(
             RevGradient::Flavor::Simple,
@@ -1333,35 +1332,6 @@ struct DiffTransposePass
             revRest,
             fwdUpdate));
         // (A = UpdateElement(arr, index, V)) -> [(dV += dA[index], d_arr += UpdateElement(revValue, index, 0)]
-        return TranspositionResult(gradients);
-    }
-
-    TranspositionResult transposeUpdateField(IRBuilder* builder, IRInst* fwdUpdate, IRInst* revValue)
-    {
-        auto updateInst = as<IRUpdateField>(fwdUpdate);
-
-        List<RevGradient> gradients;
-        IRType* fieldType = updateInst->getElementValue()->getFullType();
-        auto revElement = builder->emitFieldExtract(fieldType, revValue, updateInst->getFieldKey());
-        gradients.add(RevGradient(
-            RevGradient::Flavor::Simple,
-            updateInst->getElementValue(),
-            revElement,
-            fwdUpdate));
-        
-        auto primalElementType = updateInst->getPrimalElementType();
-        auto diffZero = emitDZeroOfDiffInstType(builder, (IRType*)primalElementType);
-        SLANG_ASSERT(diffZero);
-        auto revRest = builder->emitUpdateField(
-            revValue,
-            updateInst->getFieldKey(),
-            diffZero);
-        gradients.add(RevGradient(
-            RevGradient::Flavor::Simple,
-            updateInst->getOldValue(),
-            revRest,
-            fwdUpdate));
-        // (A = UpdateField(s, fieldKey, V)) -> [(dV += dA.fieldKey, d_s += UpdateField(revValue, fieldKey, 0)]
         return TranspositionResult(gradients);
     }
 

@@ -85,6 +85,8 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 
     InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize);
 
+    SlangResult prepareFuncForBackwardDiff(IRFunc* func);
+
     IRFunc* generateNewForwardDerivativeForFunc(IRBuilder* builder, IRFunc* originalFunc, IRFunc* diffPropagateFunc);
 
     void transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc);
