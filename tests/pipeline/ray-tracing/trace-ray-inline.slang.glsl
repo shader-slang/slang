@@ -70,12 +70,11 @@ void myMiss_0(inout MyRayPayload_0 payload_4)
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
+
     rayQueryEXT query_0;
 
     MyRayPayload_0 payload_5;
-
     MyRayPayload_0 _S2 = { -1 };
-
     payload_5 = _S2;
     rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0._data.rayFlags_0 | 512), (C_0._data.instanceMask_0), (C_0._data.origin_0), (C_0._data.tMin_0), (C_0._data.direction_0), (C_0._data.tMax_0));
 
@@ -88,7 +87,6 @@ void main()
 
         if(!_S3)
         {
-
             break;
         }
         uint _S4 = (rayQueryGetIntersectionTypeEXT((query_0), false));
@@ -105,7 +103,6 @@ void main()
 
                 candidateProceduralAttrs_0 = _S5;
                 float tHit_1;
-
                 tHit_1 = 0.00000000000000000000;
                 bool _S6 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
 
@@ -119,13 +116,10 @@ void main()
                         MyProceduralHitAttrs_0 _S8 = candidateProceduralAttrs_0;
                         if(C_0._data.shouldStopAtFirstHit_0 != 0U)
                         {
-
                             rayQueryTerminateEXT(query_0);
-
                         }
                         else
                         {
-
                         }
 
                         committedProceduralAttrs_1 = _S8;
@@ -158,19 +152,14 @@ void main()
                     rayQueryConfirmIntersectionEXT(query_0);
                     if(C_0._data.shouldStopAtFirstHit_0 != 0U)
                     {
-
                         rayQueryTerminateEXT(query_0);
-
                     }
                     else
                     {
-
                     }
-
                 }
                 else
                 {
-
                 }
 
                 committedProceduralAttrs_1 = committedProceduralAttrs_0;
@@ -196,25 +185,21 @@ void main()
     {
     case 1U:
         {
-
             myTriangleClosestHit_0(payload_5);
             break;
         }
     case 2U:
         {
-
             myProceduralClosestHit_0(payload_5, committedProceduralAttrs_0);
             break;
         }
     case 0U:
         {
-
             myMiss_0(payload_5);
             break;
         }
     default:
         {
-
             break;
         }
     }
