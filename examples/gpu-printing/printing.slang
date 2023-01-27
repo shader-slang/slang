@@ -284,6 +284,9 @@ void println<A : IPrintable, B : IPrintable, C : IPrintable>(
 // starts with an allocation function that does the behind-the-scenes
 // work.
 //
+// Note: We use the name `printf_` here because `printf` clashes with
+// HLSL's printf.
+//
 
 uint _beginPrintf(String format, uint wordCount)
 {
@@ -340,14 +343,14 @@ extension String : IPrintf
 
 
 // A `printf()` with no format arguments can just call back to `_beginPrintf()`
-void printf(String format)
+void printf_(String format)
 {
     _beginPrintf(format, 0);
 }
 
 // The `printf()` cases with one or more format arguments are all quite similar.
 
-void printf<A : IPrintf>(String format, A a)
+void printf_<A : IPrintf>(String format, A a)
 {
     // We need to compute the words required by each format argument
     // and sum them up.
@@ -366,7 +369,7 @@ void printf<A : IPrintf>(String format, A a)
     a.writePrintfWords(gPrintBuffer, wordOffset); wordOffset += aCount;
 }
 
-void printf<A : IPrintf, B : IPrintf>(String format, A a, B b)
+void printf_<A : IPrintf, B : IPrintf>(String format, A a, B b)
 {
     uint wordCount = 0;
     uint aCount = a.getPrintfWordCount(); wordCount += aCount;

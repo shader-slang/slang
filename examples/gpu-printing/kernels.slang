@@ -34,5 +34,5 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // The second facility supported by `printing.slang` is a C-style
     // `printf()` function.
     //
-    printf("printf from thread 0x%x\n", tid.x);
+    printf_("printf from thread 0x%x\n", tid.x);
 }
