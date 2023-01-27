@@ -321,7 +321,9 @@ namespace Slang
             /// does not match deallocation size (due variable sized string payload).
         void operator delete(void* p)
         {
-            delete(p);
+            if (!p) return;
+            StringRepresentation* str = (StringRepresentation*) p;
+            ::operator delete(p, sizeof(StringRepresentation) + str->capacity + 1);
         }        
     };
 
