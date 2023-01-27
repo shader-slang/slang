@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 #include <vector>
 
 #if SLANG_WINDOWS_FAMILY
@@ -51,6 +52,24 @@ int initializeVulkanDevice(VulkanAPI& api)
     if (!api.vkCreateInstance)
         return -1;
 
+    // Enable validation layer if available.
+    std::vector<const char*> layers;
+#ifdef ENABLE_VALIDATION_LAYER
+    uint32_t propertyCount;
+    if (api.vkEnumerateInstanceLayerProperties(&propertyCount, nullptr) != 0)
+        return -1;
+    std::vector< VkLayerProperties> properties(propertyCount);
+    if (api.vkEnumerateInstanceLayerProperties(&propertyCount, properties.data()) != 0)
+        return -1;
+    for (const auto& p : properties)
+    {
+        if (strcmp(p.layerName, "VK_LAYER_KHRONOS_validation") == 0)
+        {
+            layers.push_back("VK_LAYER_KHRONOS_validation");
+        }
+    }
+#endif
+
     // Create Vulkan Instance.
     VkApplicationInfo applicationInfo = {VK_STRUCTURE_TYPE_APPLICATION_INFO};
     applicationInfo.pApplicationName = "slang-hello-world";
@@ -66,10 +85,6 @@ int initializeVulkanDevice(VulkanAPI& api)
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
     instanceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(instanceExtensions);
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
-    std::vector<const char*> layers;
-#ifdef ENABLE_VALIDATION_LAYER
-    layers.push_back("VK_LAYER_KHRONOS_validation");
-#endif
     if (layers.size())
     {
         instanceCreateInfo.ppEnabledLayerNames = &layers[0];

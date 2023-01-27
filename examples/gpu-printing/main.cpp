@@ -6,6 +6,7 @@
 using Slang::ComPtr;
 
 #include "slang-gfx.h"
+#include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
 #include "source/core/slang-basic.h"
 using namespace gfx;
@@ -101,18 +102,19 @@ Result execute()
 
     size_t printBufferSize = 4 * 1024; // use a small-ish (4KB) buffer for print output
 
-    IBufferResource::Desc printBufferDesc;
+    IBufferResource::Desc printBufferDesc = {};
     printBufferDesc.type = IResource::Type::Buffer;
     printBufferDesc.sizeInBytes = printBufferSize;
     printBufferDesc.elementSize = sizeof(uint32_t);
     printBufferDesc.defaultState = ResourceState::UnorderedAccess;
     printBufferDesc.allowedStates = ResourceStateSet(
         ResourceState::CopySource, ResourceState::CopyDestination, ResourceState::UnorderedAccess);
-    printBufferDesc.memoryType = MemoryType::ReadBack;
+    printBufferDesc.memoryType = MemoryType::DeviceLocal;
     auto printBuffer = gDevice->createBufferResource(printBufferDesc);
 
-    IResourceView::Desc printBufferViewDesc;
+    IResourceView::Desc printBufferViewDesc = {};
     printBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
+    printBufferViewDesc.format = Format::Unknown;
     auto printBufferView = gDevice->createBufferView(printBuffer, nullptr, printBufferViewDesc);
 
     ITransientResourceHeap::Desc transientResourceHeapDesc = {};
@@ -124,11 +126,13 @@ Result execute()
     auto commandBuffer = transientHeap->createCommandBuffer();
     auto encoder = commandBuffer->encodeComputeCommands();
     auto rootShaderObject = encoder->bindPipeline(gPipelineState);
+    auto cursor = ShaderCursor(rootShaderObject);
+    cursor["gPrintBuffer"].setResource(printBufferView);
     encoder->dispatchCompute(1, 1, 1);
+    encoder->bufferBarrier(printBuffer, ResourceState::UnorderedAccess, ResourceState::CopySource);
     encoder->endEncoding();
     commandBuffer->close();
     queue->executeCommandBuffer(commandBuffer);
-    // TODO: need to copy from the print buffer to a staging buffer...
 
     ComPtr<ISlangBlob> blob;
     gDevice->readBufferResource(printBuffer, 0, printBufferSize, blob.writeRef());
