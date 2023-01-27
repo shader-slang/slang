@@ -921,6 +921,45 @@ struct PhiEliminationContext
         oldBranch->removeAndDeallocate();
     }
 
+    bool canLoadBeFoldedAtInst(IRInst* load, IRInst* useSite)
+    {
+        if (load->getParent() != useSite->getParent())
+            return false;
+
+        auto addr = load->getOperand(0);
+        switch (addr->getOp())
+        {
+        case kIROp_Var:
+        case kIROp_Param:
+            break;
+        default:
+            return false;
+        }
+        for (auto inst = load; inst; inst = inst->getNextInst())
+        {
+            if (inst == useSite)
+            {
+                return true;
+            }
+            switch (inst->getOp())
+            {
+            case kIROp_Store:
+            case kIROp_GetElementPtr:
+            case kIROp_FieldAddress:
+                if (inst->getOperand(0) == addr)
+                    return false;
+                break;
+            default:
+                if (inst->mightHaveSideEffects())
+                    return false;
+                break;
+            }
+        }
+        // Should never reach here if useSite appears after inst.
+        // Return false to be safe.
+        return false;
+    }
+
     // The most subtle bit of logic, which relies on the data structures
     // we have built so far, is the way we attempt to perform assignments
     // that have become ready.
@@ -974,10 +1013,10 @@ struct PhiEliminationContext
             {
                 // If we are trying to emit a store directly after a load from the same var,
                 // skip the store.
+                SLANG_ASSERT(m_builder.getInsertLoc().getMode() == IRInsertLoc::Mode::Before);
                 auto srcLoad = as<IRLoad>(*srcArg.currentValPtr);
                 if (srcLoad && srcLoad->getOperand(0) == dstParam.temp &&
-                    srcLoad->getNextInst() == m_builder.getInsertLoc().getInst() &&
-                    m_builder.getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+                    canLoadBeFoldedAtInst(srcLoad, m_builder.getInsertLoc().getInst()))
                 {
                 }
                 else

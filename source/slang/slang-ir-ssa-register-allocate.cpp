@@ -152,6 +152,15 @@ struct RegisterAllocateContext
 
     bool canCoalesce(IRInst* inst1, IRInst* inst2)
     {
+        // If two insts are Phis from the same block, don't coalesce.
+        // This logic should not be needed in most cases because params from the same block should
+        // always interfere anyways. However if a param is never used for for
+        // some reason not DCE'd out, we don't want it to share the same register as another
+        // param to avoid problems during phi elimination.
+        if (inst1->getParent() == inst2->getParent() && inst1->getOp() == kIROp_Param &&
+            inst2->getOp() == kIROp_Param)
+            return false;
+
         // If two insts are coming from two separate user defined names, don't coalesce them into
         // the same register.
         auto name1 = inst1->findDecoration<IRNameHintDecoration>();
@@ -164,6 +173,7 @@ struct RegisterAllocateContext
             return true;
         if (name1->getName() != name2->getName())
             return false;
+
         return true;
     }
 
