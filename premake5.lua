@@ -192,10 +192,18 @@ newoption {
 }
 
 newoption {
-    trigger = "full-debug-validation",
+    trigger     = "full-debug-validation",
     description = "(Optional) If true will enable full IR validation in debug build. (SLOW!)",
-    value = "bool",
-    default = "false",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
+newoption {
+    trigger     = "enable-asan",
+    description = "(Optional) If true will enable ASAN (address santizier).",
+    value       = "bool",
+    default     = "false",
     allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
@@ -213,6 +221,7 @@ skipSourceGeneration = (_OPTIONS["skip-source-generation"] == "true")
 deployLLVM = (_OPTIONS["deploy-slang-llvm"] == "true")
 deployGLSLang = (_OPTIONS["deploy-slang-glslang"] == "true")
 fullDebugValidation = (_OPTIONS["full-debug-validation"] == "true")
+enableAsan = (_OPTIONS["enable-asan"] == "true")
 
 -- If stdlib embedding is enabled, disable stdlib source embedding by default
 disableStdlibSource = enableEmbedStdLib
@@ -571,6 +580,18 @@ function baseSlangProject(name, sourceDir)
     if not not sourceDir then
         addSourceDir(sourceDir)
     end
+
+    --
+    -- Enable ASAN (address sanitizer) if requested.
+    --
+
+    if enableAsan then
+        if (targetInfo.isWindows) then
+            buildoptions { "/fsanitize=address" }
+            flags { "NoIncrementalLink" }
+        end
+    end
+
 end
 
 
@@ -992,7 +1013,6 @@ tool "gfx"
         addSourceDir "tools/gfx/d3d"
         addSourceDir "tools/gfx/d3d11"
         addSourceDir "tools/gfx/d3d12"
-        flags { "FatalWarnings" }
     elseif targetInfo.os == "mingw" or targetInfo.os == "cygwin" then
         -- Don't support any render techs...
     elseif os.target() == "macosx" then
