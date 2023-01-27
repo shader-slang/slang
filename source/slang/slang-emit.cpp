@@ -811,10 +811,17 @@ Result linkAndOptimizeIR(
     lowerBitCast(targetRequest, irModule);
     simplifyIR(irModule);
 
+    eliminateMultiLevelBreak(irModule);
+
+    // As a late step, we need to take the SSA-form IR and move things *out*
+    // of SSA form, by eliminating all "phi nodes" (block parameters) and
+    // introducing explicit temporaries instead. Doing this at the IR level
+    // means that subsequent emit logic doesn't need to contend with the
+    // complexities of blocks with parameters.
+    //
     {
         // Get the liveness mode.
         const LivenessMode livenessMode = codeGenContext->shouldTrackLiveness() ? LivenessMode::Enabled : LivenessMode::Disabled;
-        
         //
         // Downstream targets may benefit from having live-range information for
         // local variables, and our IR currently encodes a reasonably good version
@@ -830,22 +837,11 @@ Result linkAndOptimizeIR(
             LivenessUtil::addVariableRangeStarts(irModule, livenessMode);
         }
 
-        eliminateMultiLevelBreak(irModule);
-
-        // As a late step, we need to take the SSA-form IR and move things *out*
-        // of SSA form, by eliminating all "phi nodes" (block parameters) and
-        // introducing explicit temporaries instead. Doing this at the IR level
-        // means that subsequent emit logic doesn't need to contend with the
-        // complexities of blocks with parameters.
-        //
-
-        {
-            // We only want to accumulate locations if liveness tracking is enabled.
-            eliminatePhis(livenessMode, irModule);
+        // We only want to accumulate locations if liveness tracking is enabled.
+        eliminatePhis(livenessMode, irModule);
 #if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
+        dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
-        }
 
         // If liveness is enabled add liveness ranges based on the accumulated liveness locations
 

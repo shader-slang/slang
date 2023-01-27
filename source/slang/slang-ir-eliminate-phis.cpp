@@ -1,5 +1,6 @@
 // slang-ir-eliminate-phis.cpp
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-ssa-register-allocate.h"
 
 // This file implements a pass to take code in the Slang IR out out SSA form
 // by eliminating all "phi nodes."
@@ -107,8 +108,13 @@ struct PhiEliminationContext
     //
     void eliminatePhisInFunc(IRGlobalValueWithCode* func)
     {
+        // Perform initialization and register allocation
+        // for Phi parameters and other insts that benefit from
+        // converting to memory.
         initializePerFuncState(func);
 
+        // First, we eliminate all the phi instructions (params)
+        // using the result of register allocation.
         // The first block in a function is always the entry block,
         // and its parameters are different than those of the other blocks;
         // they represent the parameters of the *function*. We therefore
@@ -124,6 +130,71 @@ struct PhiEliminationContext
 
             eliminatePhisInBlock(block);
         }
+
+        // Next, convert the definition of other ordinary insts to assignments.
+        convertInstDefToRegisterAssignment();
+
+        // Finally, replaces the uses of other ordinary insts to loads from registers.
+        replaceInstUseWithRegisterLoad();
+    }
+
+    void convertInstDefToRegisterAssignment()
+    {
+        IRBuilder builder(m_sharedBuilder);
+
+        for (auto instAlloc : m_registerAllocation.mapInstToRegister)
+        {
+            auto inst = instAlloc.Key;
+            IRInst* registerVar = nullptr;
+            m_mapRegToTempVar.TryGetValue(instAlloc.Value, registerVar);
+            SLANG_RELEASE_ASSERT(registerVar);
+
+            switch (inst->getOp())
+            {
+            case kIROp_Param:
+                continue;
+            case kIROp_UpdateElement:
+                {
+                    auto updateInst = as<IRUpdateElement>(inst);
+                    builder.setInsertBefore(updateInst);
+                    RefPtr<RegisterInfo> oldReg;
+                    m_registerAllocation.mapInstToRegister.TryGetValue(updateInst->getOldValue(), oldReg);
+                    // If the original value is not assigned to the same register as this inst,
+                    // we need to insert a copy.
+                    if (instAlloc.Value != oldReg)
+                    {
+                        builder.emitStore(registerVar, updateInst->getOldValue());
+                    }
+                    // Perform update on the register var.
+                    auto elementAddr = builder.emitElementAddress(registerVar, updateInst->getAccessChain().getArrayView());
+                    builder.emitStore(elementAddr, updateInst->getElementValue());
+                }
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    void replaceInstUseWithRegisterLoad()
+    {
+        IRBuilder builder(m_sharedBuilder);
+
+        for (auto instAlloc : m_registerAllocation.mapInstToRegister)
+        {
+            auto inst = instAlloc.Key;
+            IRInst* registerVar = nullptr;
+            m_mapRegToTempVar.TryGetValue(instAlloc.Value, registerVar);
+            SLANG_RELEASE_ASSERT(registerVar);
+            while (auto use = inst->firstUse)
+            {
+                auto user = use->getUser();
+                m_builder.setInsertBefore(user);
+                auto newVal = m_builder.emitLoad(registerVar);
+                use->set(newVal);
+            }
+            inst->removeAndDeallocate();
+        }
     }
 
     // In order to facilitate breaking things down into subroutines, we use a
@@ -132,6 +203,8 @@ struct PhiEliminationContext
     //
     IRGlobalValueWithCode* m_func = nullptr;
     RefPtr<IRDominatorTree> m_dominatorTree;
+    RegisterAllocationResult m_registerAllocation;
+    Dictionary<RegisterInfo*, IRInst*> m_mapRegToTempVar;
 
     // Because we use the same `PhiEliminationContext` to process all of
     // the functions in a module, we need to set up these per-function
@@ -141,6 +214,83 @@ struct PhiEliminationContext
     {
         m_func = func;
         m_dominatorTree = nullptr;
+        m_registerAllocation = allocateRegistersForFunc(func, m_dominatorTree);
+        m_mapRegToTempVar = createTempVarForInsts(func);
+    }
+
+    Dictionary<RegisterInfo*, IRInst*> createTempVarForInsts(IRGlobalValueWithCode* func)
+    {
+        Dictionary<RegisterInfo*, IRInst*> mapRegToVar;
+        for (auto& regList : m_registerAllocation.mapTypeToRegisterList)
+        {
+            auto type = regList.Key;
+            for (auto reg : regList.Value)
+            {
+                // Find the common dominator for all the insts, and determine the latest insertion
+                // point of the tempVar inst.
+                IRBlock* dom = nullptr;
+                IRInst* insertionPoint = nullptr;
+                for (auto inst : reg->insts)
+                {
+                    // Determine where the temp register var should be inserted if
+                    // it represents only `inst`.
+                    IRBlock* thisDom = as<IRBlock>(inst->getParent());
+                    IRInst* thisInsertionPoint = inst;
+                    if (inst->getOp() == kIROp_Param)
+                    {
+                        thisDom = getDominatorTree()->getImmediateDominator(thisDom);
+                        thisInsertionPoint = thisDom->getTerminator();
+                    }
+
+                    // Push the insertionPoint early enough to dominate `thisInsertionPoint`.
+                    if (dom == nullptr)
+                    {
+                        dom = thisDom;
+                        insertionPoint = thisInsertionPoint;
+                    }
+                    else
+                    {
+                        auto domTree = getDominatorTree();
+                        while (!domTree->dominates(dom, thisDom) && dom != func->getFirstBlock())
+                        {
+                            dom = domTree->getImmediateDominator(dom);
+                            insertionPoint = dom->getTerminator();
+                        }
+                    }
+                    // Move insertion point to before thisInsertionPoint.
+                    if (dom == thisDom)
+                    {
+                        bool isInsertionPointBeforeCurrentInst = false;
+                        for (auto current = insertionPoint; current; current = current->getNextInst())
+                        {
+                            if (current == thisInsertionPoint)
+                            {
+                                isInsertionPointBeforeCurrentInst = true;
+                                break;
+                            }
+                        }
+                        if (!isInsertionPointBeforeCurrentInst)
+                            insertionPoint = thisInsertionPoint;
+                    }
+                }
+                SLANG_ASSERT(dom);
+                SLANG_ASSERT(insertionPoint && insertionPoint->getParent() == dom);
+                m_builder.setInsertBefore(insertionPoint);
+
+                // Note that the `emitVar` operation expects to be passed the
+                // type *stored* in the variable, but the IR `var` instruction
+                // itself will have a pointer type. Thus if `param` has type
+                // `T`, then `temp` will have type `T*`.
+                //
+                auto temp = m_builder.emitVar(type);
+                for (auto inst : reg->insts)
+                {
+                    inst->transferDecorationsTo(temp);
+                }
+                mapRegToVar[reg] = temp;
+            }
+        }
+        return mapRegToVar;
     }
 
     // The dominator tree for the function is computed on demand and
@@ -177,7 +327,7 @@ struct PhiEliminationContext
         // 1. Create a temporary corresponding to each of the
         // parameters of `block`.
         //
-        createTempsForParams(block);
+        collectPhiInfoForParams(block);
         //
         // 2. For each predecessor of `block`, eliminate the arguments
         // it passes, by assigning them to the temporaries.
@@ -188,6 +338,7 @@ struct PhiEliminationContext
         // loads from the temporaries.
         //
         replaceParamUsesWithTemps();
+
     }
 
     // We need to record information about the parameters and the temporaries
@@ -216,7 +367,7 @@ struct PhiEliminationContext
     //
     Dictionary<IRInst*, Index> mapParamToIndex;
 
-    void createTempsForParams(IRBlock* block)
+    void collectPhiInfoForParams(IRBlock* block)
     {
         // The temporaries used to replace the parameters of `block`
         // must be read-able any where that the parameters were accessible.
@@ -277,18 +428,30 @@ struct PhiEliminationContext
             Index paramIndex = paramCounter++;
             mapParamToIndex.Add(param, paramIndex);
 
-            // Note that the `emitVar` operation expects to be passed the
-            // type *stored* in the variable, but the IR `var` instruction
-            // itself will have a pointer type. Thus if `param` has type
-            // `T`, then `temp` will have type `T*`.
-            //
-            auto temp = m_builder.emitVar(param->getDataType());
-            //
-            // Because we will be eliminating the paramter, we can transfer
-            // any decorations that were added to it (notably any name hint)
-            // to the temporary that will replace it.
-            //
-            param->transferDecorationsTo(temp);
+            IRInst* temp = nullptr;
+
+            // Have we already allocated a register for this inst?
+            // If so we use the var for that register.
+            if (auto registerInfo = m_registerAllocation.mapInstToRegister.TryGetValue(param))
+            {
+                m_mapRegToTempVar.TryGetValue(registerInfo->get(), temp);
+            }
+
+            if (!temp)
+            {
+                // Note that the `emitVar` operation expects to be passed the
+                // type *stored* in the variable, but the IR `var` instruction
+                // itself will have a pointer type. Thus if `param` has type
+                // `T`, then `temp` will have type `T*`.
+                //
+                temp = m_builder.emitVar(param->getDataType());
+                //
+                // Because we will be eliminating the paramter, we can transfer
+                // any decorations that were added to it (notably any name hint)
+                // to the temporary that will replace it.
+                //
+                param->transferDecorationsTo(temp);
+            }
 
             // The other main auxilliary sxtructure is used to track
             // both per-parameter information (which we can fill in
@@ -300,7 +463,7 @@ struct PhiEliminationContext
             PhiInfo phiInfo;
             auto& paramInfo = phiInfo.param;
             paramInfo.param = param;
-            paramInfo.temp = temp;
+            paramInfo.temp = cast<IRVar>(temp);
             phiInfos.add(phiInfo);
         }
     }
@@ -809,7 +972,18 @@ struct PhiEliminationContext
             //
             if ((*srcArg.currentValPtr)->getOp() != kIROp_undefined)
             {
-                m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+                // If we are trying to emit a store directly after a load from the same var,
+                // skip the store.
+                auto srcLoad = as<IRLoad>(*srcArg.currentValPtr);
+                if (srcLoad && srcLoad->getOperand(0) == dstParam.temp &&
+                    srcLoad->getNextInst() == m_builder.getInsertLoc().getInst() &&
+                    m_builder.getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+                {
+                }
+                else
+                {
+                    m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+                }
             }
 
             //

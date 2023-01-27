@@ -4378,7 +4378,7 @@ namespace Slang
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
         }
         SLANG_RELEASE_ASSERT(type);
-        auto inst = createInst<IRFieldAddress>(
+        auto inst = createInst<IRGetElement>(
             this,
             kIROp_GetElement,
             type,
@@ -4433,6 +4433,67 @@ namespace Slang
 
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::emitElementAddress(
+        IRInst* basePtr,
+        IRInst* index)
+    {
+        IRType* type = nullptr;
+        auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType());
+        if (auto arrayType = as<IRArrayType>(basePtrType->getValueType()))
+        {
+            type = arrayType->getElementType();
+        }
+        else if (auto vectorType = as<IRVectorType>(basePtrType->getValueType()))
+        {
+            type = vectorType->getElementType();
+        }
+        else if (auto matrixType = as<IRMatrixType>(basePtrType->getValueType()))
+        {
+            type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+        }
+        SLANG_RELEASE_ASSERT(type);
+        auto inst = createInst<IRGetElementPtr>(
+            this,
+            kIROp_GetElementPtr,
+            getPtrType(type),
+            basePtr,
+            index);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain)
+    {
+        for (auto access : accessChain)
+        {
+            auto basePtrType = cast<IRPtrTypeBase>(basePtr->getDataType());
+            IRType* resultType = nullptr;
+            if (auto structKey = as<IRStructKey>(access))
+            {
+                auto structType = as<IRStructType>(basePtrType->getValueType());
+                SLANG_RELEASE_ASSERT(structType);
+                for (auto field : structType->getFields())
+                {
+                    if (field->getKey() == structKey)
+                    {
+                        resultType = field->getFieldType();
+                        break;
+                    }
+                }
+                SLANG_RELEASE_ASSERT(resultType);
+                basePtr = emitFieldAddress(getPtrType(resultType), basePtr, structKey);
+            }
+            else
+            {
+                basePtr = emitElementAddress(basePtr, access);
+            }
+        }
+        return basePtr;
     }
 
     IRInst* IRBuilder::emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement)
