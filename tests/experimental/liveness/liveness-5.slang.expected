@@ -78,7 +78,6 @@ int calcThing_0(int offset_0)
     }
     else
     {
-        total_0 = total_0;
     }
     return total_0;
 }

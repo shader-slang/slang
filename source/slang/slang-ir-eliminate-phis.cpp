@@ -338,7 +338,6 @@ struct PhiEliminationContext
         // loads from the temporaries.
         //
         replaceParamUsesWithTemps();
-
     }
 
     // We need to record information about the parameters and the temporaries
