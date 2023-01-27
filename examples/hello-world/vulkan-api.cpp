@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 #include <vector>
 
 #if SLANG_WINDOWS_FAMILY
