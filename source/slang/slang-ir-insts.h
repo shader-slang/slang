@@ -3161,6 +3161,14 @@ public:
         IRInst*    basePtr,
         IRInst*    index);
 
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        IRInst* index);
+
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain);
+
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement);
 

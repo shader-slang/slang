@@ -65,16 +65,14 @@ uint calcValue_0(hitObjectNV hit_0)
     else
     {
         bool _S7 = (hitObjectIsMissNV((hit_0)));
-        uint r_3;
         if(_S7)
         {
-            r_3 = 1U;
+            r_0 = 1U;
         }
         else
         {
-            r_3 = 0U;
+            r_0 = 0U;
         }
-        r_0 = r_3;
     }
     return r_0;
 }
@@ -96,13 +94,13 @@ void main()
     RayDesc_0 _S11 = ray_2;
     hitObjectNV hitObj_0;
     hitObjectRecordHitWithIndexNV(hitObj_0, scene_0, int(uint(idx_0)), int(uint(idx_0 * 2)), int(uint(idx_0 * 3)), 0U, 0U, _S11.Origin_0, _S11.TMin_0, _S11.Direction_0, _S11.TMax_0, (0));
-    uint r_4 = calcValue_0(hitObj_0);
+    uint r_3 = calcValue_0(hitObj_0);
     RayDesc_0 _S12 = ray_2;
     hitObjectNV hitObj_1;
     hitObjectRecordHitNV(hitObj_1, scene_0, int(uint(idx_0)), int(uint(idx_0 * 3)), int(uint(idx_0 * 2)), 0U, 0U, 4U, _S12.Origin_0, _S12.TMin_0, _S12.Direction_0, _S12.TMax_0, (0));
     uint _S13 = calcValue_0(hitObj_1);
-    uint r_5 = r_4 + _S13;
-    ((outputBuffer_0)._data[(uint(idx_0))]) = r_5;
+    uint r_4 = r_3 + _S13;
+    ((outputBuffer_0)._data[(uint(idx_0))]) = r_4;
     return;
 }
 
