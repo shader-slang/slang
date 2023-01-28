@@ -24,7 +24,7 @@ bool isBackwardDifferentiableFunc(IRInst* func)
     return false;
 }
 
-static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
+static IRInst* _lookupWitness(AutoDiffSharedContext* sharedContext, IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
     {
@@ -33,6 +33,13 @@ static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requi
             if (entry->getRequirementKey() == requirementKey)
                 return entry->getSatisfyingVal();
         }
+    }
+    else if (auto arrayWitness = as<IRArrayDifferentiableWitness>(witness))
+    {
+        SLANG_RELEASE_ASSERT(requirementKey == sharedContext->differentialAssocTypeStructKey);
+
+        auto innerResult = _lookupWitness(sharedContext, builder, arrayWitness->getBaseWitness(), requirementKey);
+        return builder->getArrayType((IRType*)innerResult, as<IRArrayType>(arrayWitness->getArrayType())->getElementCount());
     }
     else
     {
@@ -264,13 +271,13 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
 IRInst* DifferentialPairTypeBuilder::getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairType* type)
 {
     auto witnessTable = type->getWitness();
-    return _lookupWitness(builder, witnessTable, sharedContext->differentialAssocTypeStructKey);
+    return _lookupWitness(sharedContext, builder, witnessTable, sharedContext->differentialAssocTypeStructKey);
 }
 
 IRInst* DifferentialPairTypeBuilder::getDiffTypeWitnessFromPairType(IRBuilder* builder, IRDifferentialPairType* type)
 {
     auto witnessTable = type->getWitness();
-    return _lookupWitness(builder, witnessTable, sharedContext->differentialAssocTypeWitnessStructKey);
+    return _lookupWitness(sharedContext, builder, witnessTable, sharedContext->differentialAssocTypeWitnessStructKey);
 }
 
 IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
@@ -395,7 +402,7 @@ IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* b
 {
     if (auto conformance = lookUpConformanceForType(origType))
     {
-        return _lookupWitness(builder, conformance, key);
+        return _lookupWitness(sharedContext, builder, conformance, key);
     }
     return nullptr;
 }
@@ -534,32 +541,9 @@ void stripNoDiffTypeAttribute(IRModule* module)
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst)
 {
-    HashSet<IRInst*> processedSet;
-    for (;typeInst;)
-    {
-        if (as<IRArrayTypeBase>(typeInst) || as<IRPtrTypeBase>(typeInst))
-        {
-            typeInst = typeInst->getOperand(0);
-            if (!processedSet.Add(typeInst))
-                return false;
-        }
-        else
-        {
-            break;
-        }
-    }
-    if (!typeInst)
-        return false;
-    switch (typeInst->getOp())
-    {
-    case kIROp_FloatType:
-    case kIROp_DifferentialPairType:
+    if (context.isDifferentiableType((IRType*)typeInst))
         return true;
-    default:
-        break;
-    }
-    if (context.lookUpConformanceForType(typeInst))
-        return true;
+
     // Look for equivalent types.
     for (auto type : context.differentiableWitnessDictionary)
     {

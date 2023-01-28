@@ -366,6 +366,24 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+// A witness that `array<T:IDifferentiable, N> : IDifferentiable`.
+class ArrayDifferentiableSubtypeWitness : public SubtypeWitness
+{
+    SLANG_AST_CLASS(ArrayDifferentiableSubtypeWitness)
+    SubtypeWitness* baseWitness;
+    ArrayDifferentiableSubtypeWitness(Type* inSub, Type* inSup)
+    {
+        sub = inSub;
+        sup = inSup;
+    }
+
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    void _toTextOverride(StringBuilder& out);
+    HashCode _getHashCodeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 // A witness that `sub : sup`, because `sub` is a tagged union
 // of the form `A | B | C | ...` and each of `A : sup`,
 // `B : sup`, `C : sup`, etc.
@@ -397,24 +415,6 @@ class ThisTypeSubtypeWitness : public SubtypeWitness
 class DynamicSubtypeWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(DynamicSubtypeWitness)
-};
-
-    /// A witness of the fact that any type can be viewed as a subtype of DifferentialBottom.
-class DifferentialBottomSubtypeWitness : public SubtypeWitness
-{
-    SLANG_AST_CLASS(DifferentialBottomSubtypeWitness)
-
-    DifferentialBottomSubtypeWitness(Type* inSub, Type* inSup)
-    {
-        sub = inSub;
-        sup = inSup;
-    }
-
-    // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
-    void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
     /// A witness that `T : L & R` because `T : L` and `T : R`

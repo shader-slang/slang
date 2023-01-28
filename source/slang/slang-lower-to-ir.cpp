@@ -1443,11 +1443,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(diff);
     }
 
-    LoweredValInfo visitDifferentialBottomSubtypeWitness(DifferentialBottomSubtypeWitness*)
-    {
-        return LoweredValInfo();
-    }
-
     LoweredValInfo visitTaggedUnionSubtypeWitness(
         TaggedUnionSubtypeWitness* val)
     {
@@ -1993,6 +1988,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
+    }
+
+    LoweredValInfo visitArrayDifferentiableSubtypeWitness(ArrayDifferentiableSubtypeWitness* witness)
+    {
+        auto supType = lowerType(context, witness->sup);
+        auto witnessTableType = getBuilder()->getWitnessTableType(supType);
+        auto subType = lowerType(context, witness->sub);
+        auto subwitness = lowerVal(context, witness->baseWitness);
+        return LoweredValInfo::simple(getBuilder()->emitArrayDifferentiableWitness(witnessTableType, subType, subwitness.val));
     }
 
     LoweredValInfo visitTaggedUnionType(TaggedUnionType* type)

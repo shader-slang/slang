@@ -545,6 +545,45 @@ Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBu
 }
 
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayDifferentiableSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+bool ArrayDifferentiableSubtypeWitness::_equalsValOverride(Val* val)
+{
+    if (auto arrayWitness = as<ArrayDifferentiableSubtypeWitness>(val))
+    {
+        return sub->equalsVal(arrayWitness->sub);
+    }
+    return false;
+}
+
+void ArrayDifferentiableSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ArrayDifferentiableWitness(") << sub << toSlice(")");
+}
+
+HashCode ArrayDifferentiableSubtypeWitness::_getHashCodeOverride()
+{
+    return sub->getHashCode();
+}
+
+Val* ArrayDifferentiableSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+
+    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
+    auto substBase = as<SubtypeWitness>(baseWitness->substituteImpl(astBuilder, subst, &diff));
+
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    ArrayDifferentiableSubtypeWitness* substValue = astBuilder->create<ArrayDifferentiableSubtypeWitness>(substSub, substSup);
+    substValue->baseWitness = substBase;
+    return substValue;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TaggedUnionSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 bool TaggedUnionSubtypeWitness::_equalsValOverride(Val* val)
@@ -615,41 +654,6 @@ Val* TaggedUnionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, 
     substWitness->sub = substSub;
     substWitness->sup = substSup;
     substWitness->caseWitnesses.swapWith(substCaseWitnesses);
-    return substWitness;
-}
-
-bool DifferentialBottomSubtypeWitness::_equalsValOverride(Val* val)
-{
-    auto otherDiffBottomWitness = as<DifferentialBottomSubtypeWitness>(val);
-    if (!otherDiffBottomWitness)
-        return false;
-
-    return otherDiffBottomWitness->sub && otherDiffBottomWitness->sub->equals(sub);
-}
-
-void DifferentialBottomSubtypeWitness::_toTextOverride(StringBuilder& out)
-{
-    out << "DifferentialBottomSubtypeWitness(" << sub << ")";
-}
-
-HashCode DifferentialBottomSubtypeWitness::_getHashCodeOverride()
-{
-    return combineHash(3892, sub->getHashCode());
-}
-
-Val* DifferentialBottomSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
-{
-    int diff = 0;
-
-    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
-    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
-    if (!diff)
-        return this;
-
-    *ioDiff += diff;
-
-    DifferentialBottomSubtypeWitness* substWitness =
-        astBuilder->create<DifferentialBottomSubtypeWitness>(substSub, substSup);
     return substWitness;
 }
 

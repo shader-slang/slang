@@ -898,6 +898,16 @@ namespace Slang
             Expr*    fromExpr,
             ConversionCost* outCost);
 
+            /// Try coerce T[n].Differential to T.Differential[n].
+        bool _coerceArrayOfDifferential(
+            Type* toType,
+            Expr** outToExpr,
+            Type* fromType,
+            Expr* fromExpr,
+            ConversionCost* outCost);
+
+        Type* tryCoerceTypeToArrayOfDifferential(Type* fromType);
+
             /// Check whether implicit type coercion from `fromType` to `toType` is possible.
             ///
             /// If conversion is possible, returns `true` and sets `outCost` to the cost
@@ -1371,7 +1381,11 @@ namespace Slang
                 // i.e. if (A & B) subtype C because A subtype C, then we use AndTypeLeft to represent
                 // that relationship.
                 AndTypeLeftFlavor,
-                AndTypeRightFlavor
+                AndTypeRightFlavor,
+
+                // Describes a relationship through array type.
+                // If T:Differentiable, then Array<T> : IDifferentiable.
+                ArrayTypeFlavor
             };
 
             Flavor flavor = DeclFlavor;

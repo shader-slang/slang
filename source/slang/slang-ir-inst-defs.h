@@ -249,6 +249,7 @@ INST(GlobalConstant, globalConstant, 0, 0)
 INST(StructKey, key, 0, 0)
 INST(GlobalGenericParam, global_generic_param, 0, 0)
 INST(WitnessTable, witness_table, 0, 0)
+INST(ArrayDifferentiableWitness, ArrayDifferentiableWitness, 2, 0)
 
 INST(GlobalHashedStringLiterals, global_hashed_string_literals, 0, 0)
 

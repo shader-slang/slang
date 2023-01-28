@@ -1754,7 +1754,13 @@ namespace Slang
                 subscriptExpr,
                 rowType);
         }
-
+        else if (auto newArrayType = as<ArrayExpressionType>(tryCoerceTypeToArrayOfDifferential(baseExpr->type)))
+        {
+            baseExpr->type = newArrayType;
+            return CheckSimpleSubscriptExpr(
+                subscriptExpr,
+                newArrayType->baseType);
+        }
         // Default behavior is to look at all available `__subscript`
         // declarations on the type and try to call one of them.
 
@@ -2146,12 +2152,28 @@ namespace Slang
 
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = m_astBuilder->getDifferentiableInterface();
+        auto differentiableInterfaceType = m_astBuilder->getOrCreateDeclRefType(differentiableInterface, nullptr);
 
-        auto conformanceWitness = as<Witness>(tryGetInterfaceConformanceWitness(primalType, differentiableInterface));
+        Type* innerType = primalType;
+        List<ArrayExpressionType*> arrayTypes;
+        while (auto arrType = as<ArrayExpressionType>(innerType))
+        {
+            innerType = arrType->baseType;
+            arrayTypes.add(arrType);
+        }
+        SubtypeWitness* conformanceWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(innerType, differentiableInterface));
         // Check if the provided type inherits from IDifferentiable.
         // If not, return the original type.
         if (conformanceWitness)
+        {
+            for (Index i = arrayTypes.getCount() - 1; i >= 0; i--)
+            {
+                auto arrWitness = m_astBuilder->getOrCreate<ArrayDifferentiableSubtypeWitness>(arrayTypes[i], differentiableInterfaceType);
+                arrWitness->baseWitness = conformanceWitness;
+                conformanceWitness = arrWitness;
+            }
             return m_astBuilder->getDifferentialPairType(primalType, conformanceWitness);
+        }
         else
             return primalType;
     }
@@ -2200,15 +2222,24 @@ namespace Slang
 
         for (UInt i = 0; i < originalType->getParamCount(); i++)
         {
-            if (auto derivType = _toDifferentialParamType(originalType->getParamType(i)))
+            if (auto outType = as<OutType>(originalType->getParamType(i)))
             {
-                // Using inout type on all the derivative parameters
-                if (auto outType = as<OutType>(derivType))
+                auto diffElementType =
+                    tryGetDifferentialType(m_astBuilder, outType->getValueType());
+                if (diffElementType)
                 {
-                    derivType = outType->getValueType();
+                    type->paramTypes.add(diffElementType);
                 }
-                else if (as<DifferentialPairType>(derivType))
+                else
                 {
+                    continue;
+                }
+            }
+            else if (auto derivType = _toDifferentialParamType(originalType->getParamType(i)))
+            {
+                if (as<DifferentialPairType>(derivType))
+                {
+                    // Using inout type on all the derivative parameters
                     derivType = m_astBuilder->getInOutType(derivType);
                 }
                 type->paramTypes.add(derivType);
@@ -2216,7 +2247,9 @@ namespace Slang
         }
         
         // Last parameter is the initial derivative of the original return type
-        type->paramTypes.add(getDifferentialType(m_astBuilder, originalType->resultType, SourceLoc()));
+        auto dOutType = tryGetDifferentialType(m_astBuilder, originalType->resultType);
+        if (dOutType)
+            type->paramTypes.add(dOutType);
 
         return type;
     }
