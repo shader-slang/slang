@@ -507,9 +507,12 @@ namespace Slang
                 Val* baseWitness;
                 if (_isDeclaredSubtype(arrayType->baseType, arrayType->baseType, superTypeDeclRef, &baseWitness, nullptr))
                 {
-                    auto witness = m_astBuilder->create<ArrayDifferentiableSubtypeWitness>(arrayType, m_astBuilder->getDiffInterfaceType());
-                    witness->baseWitness = as<SubtypeWitness>(baseWitness);
-                    *outWitness = witness;
+                    if (outWitness)
+                    {
+                        auto witness = m_astBuilder->create<ArrayDifferentiableSubtypeWitness>(arrayType, m_astBuilder->getDiffInterfaceType());
+                        witness->baseWitness = as<SubtypeWitness>(baseWitness);
+                        *outWitness = witness;
+                    }
                     return true;
                 }
             }

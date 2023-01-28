@@ -1754,13 +1754,7 @@ namespace Slang
                 subscriptExpr,
                 rowType);
         }
-        else if (auto newArrayType = as<ArrayExpressionType>(tryCoerceTypeToArrayOfDifferential(baseExpr->type)))
-        {
-            baseExpr->type = newArrayType;
-            return CheckSimpleSubscriptExpr(
-                subscriptExpr,
-                newArrayType->baseType);
-        }
+
         // Default behavior is to look at all available `__subscript`
         // declarations on the type and try to call one of them.
 

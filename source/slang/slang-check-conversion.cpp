@@ -603,56 +603,6 @@ namespace Slang
         }
     }
 
-    bool SemanticsVisitor::_coerceArrayOfDifferential(
-        Type* toType,
-        Expr** outToExpr,
-        Type* fromType,
-        Expr* fromExpr,
-        ConversionCost* outCost)
-    {
-        SLANG_UNUSED(outCost);
-
-        auto toArrayType = as<ArrayExpressionType>(toType);
-        if (!toArrayType)
-            return false;
-        
-        auto newFromType = tryCoerceTypeToArrayOfDifferential(fromType);
-        auto fromArrayType = as<ArrayExpressionType>(newFromType);
-        if (!fromArrayType)
-            return false;
-        if (!toArrayType->arrayLength->equalsVal(fromArrayType->arrayLength))
-            return false;
-        if (!toArrayType->baseType->equals(fromArrayType->baseType))
-            return false;
-        if (outToExpr)
-            *outToExpr = fromExpr;
-        return true;
-    }
-
-    Type* SemanticsVisitor::tryCoerceTypeToArrayOfDifferential(Type* fromType)
-    {
-        auto declRefType = as<DeclRefType>(fromType);
-        if (!declRefType)
-            return fromType;
-        auto builtinReq = declRefType->declRef.getDecl()->findModifier<BuiltinRequirementModifier>();
-        if (!builtinReq || builtinReq->kind != BuiltinRequirementKind::DifferentialType)
-            return fromType;
-        auto differentialInterfaceDecl = as<InterfaceDecl>(declRefType->declRef.getDecl()->parentDecl);
-        SLANG_RELEASE_ASSERT(differentialInterfaceDecl);
-        auto thisSubst = findThisTypeSubstitution(
-            declRefType->declRef.substitutions, differentialInterfaceDecl);
-        if (!thisSubst)
-            return fromType;
-        auto baseArrayType = as<ArrayExpressionType>(thisSubst->witness->sub);
-        if (!baseArrayType)
-            return fromType;
-        auto diffElementType = tryGetDifferentialType(m_astBuilder, baseArrayType->baseType);
-        if (!diffElementType)
-            return fromType;
-        diffElementType = tryCoerceTypeToArrayOfDifferential(diffElementType);
-        return m_astBuilder->getArrayType(diffElementType, baseArrayType->arrayLength);
-    }
-
     bool SemanticsVisitor::_coerce(
         Type*    toType,
         Expr**   outToExpr,
@@ -906,12 +856,6 @@ namespace Slang
 
             if(outCost)
                 *outCost = subCost + kConversionCost_ImplicitDereference;
-            return true;
-        }
-
-        // T[n].Differential ==> T.Differential[n].
-        if (_coerceArrayOfDifferential(toType, outToExpr, fromType, fromExpr, outCost))
-        {
             return true;
         }
 
