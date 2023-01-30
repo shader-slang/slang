@@ -510,6 +510,9 @@ namespace Slang
         }
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
 
+        IRCFGNormalizationPass cfgPass = {this->getSink()};
+        normalizeCFG(func);
+
         AutoDiffAddressConversionPolicy cvtPolicty;
         cvtPolicty.diffTypeContext = &diffTypeContext;
         auto result = eliminateAddressInsts(sharedBuilder, &cvtPolicty, func, sink);
@@ -607,15 +610,7 @@ namespace Slang
             tempBuilder.setInsertBefore(diffPropagateFunc);
         }
 
-        // Normalize the CFG of the primal func before starting the reverse-mode pass.
-        IRCloneEnv cfgNormCloneEnv;
-        builder->setInsertAfter(primalFunc);
-        auto normalizedPrimalFunc = as<IRFunc>(cloneInst(&cfgNormCloneEnv, builder, primalFunc));
-
-        IRCFGNormalizationPass cfgPass = {this->getSink()};
-        normalizeCFG(normalizedPrimalFunc);
-
-        auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, normalizedPrimalFunc, diffPropagateFunc);
+        auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, primalFunc, diffPropagateFunc);
         if (!fwdDiffFunc)
             return;
 
