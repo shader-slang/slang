@@ -1422,8 +1422,8 @@ struct DiffTransposePass
             else
             {
                 SLANG_RELEASE_ASSERT(row);
-                UInt rowIndex = ii / row->getValue();
-                UInt colIndex = ii % row->getValue();
+                UInt rowIndex = ii / (UInt)row->getValue();
+                UInt colIndex = ii % (UInt)row->getValue();
                 if (!rowVectorType)
                     rowVectorType = builder->getVectorType(matrixType->getElementType(), colCount);
                 auto revRow = builder->emitElementExtract(
