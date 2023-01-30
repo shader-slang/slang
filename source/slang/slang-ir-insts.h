@@ -663,6 +663,15 @@ struct IRBackwardDerivativeDecoration : IRDecoration
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRLoopCounterDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_LoopCounterDecoration
+    };
+    IR_LEAF_ISA(LoopCounterDecoration)
+};
+
 struct IRDifferentialInstDecoration : IRDecoration
 {
     enum
@@ -3243,6 +3252,13 @@ public:
         IRBlock*    target,
         IRBlock*    breakBlock,
         IRBlock*    continueBlock);
+    
+    IRInst* emitLoop(
+        IRBlock*      target,
+        IRBlock*      breakBlock,
+        IRBlock*      continueBlock,
+        Int           argCount,
+        IRInst*const* args);
 
     IRInst* emitBranch(
         IRInst*    val,
@@ -3588,6 +3604,11 @@ public:
     void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalContextDecoration, ctx);
+    }
+
+    void addLoopCounterDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_LoopCounterDecoration);
     }
 
     void markInstAsDifferential(IRInst* value)

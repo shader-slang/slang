@@ -7,6 +7,7 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-autodiff-fwd.h"
+#include "slang-ir-autodiff-cfg-norm.h"
 
 namespace Slang
 {
@@ -96,37 +97,384 @@ struct DiffTransposePass
             fwdBlock(fwdBlock), phiGrads(phiGrads)
         {}
     };
-    
-    struct Region
+
+    bool isBlockLastInRegion(IRBlock* block, List<IRBlock*> endBlocks)
     {
-        IRBlock* exitBlock;
-        IRBlock* originBlock;
-
-        Region* parent;
-
-        Region() : 
-            exitBlock(nullptr),
-            originBlock(nullptr),
-            parent(nullptr)
-        { }
-
-        Region(IRBlock* exitBlock, Region* parent) : 
-            exitBlock(exitBlock),
-            originBlock(nullptr),
-            parent(parent)
-        { }
-
-        void finish(IRBlock* block)
+        if (auto branchInst = as<IRUnconditionalBranch>(block->getTerminator()))
         {
-            SLANG_ASSERT(!this->originBlock);
-            this->originBlock = block;
+            if (endBlocks.contains(branchInst->getTargetBlock()))
+                return true;
+            else
+                return false;
+        }
+        else if (as<IRReturn>(block->getTerminator()))
+        {
+            return true;
         }
 
-        bool isComplete()
-        {
-            return (this->originBlock != nullptr);
-        }
+        return false;
+    }
+
+    List<IRInst*> getPhiGrads(IRBlock* block)
+    {
+        if (!phiGradsMap.ContainsKey(block))
+            return List<IRInst*>();
+        
+        return phiGradsMap[block];
+    }
+
+    struct RegionEntryPoint
+    {
+        IRBlock* revEntry;
+        IRBlock* fwdEndPoint;
+        bool isTrivial;
+
+        RegionEntryPoint(IRBlock* revEntry, IRBlock* fwdEndPoint) :
+            revEntry(revEntry),
+            fwdEndPoint(fwdEndPoint),
+            isTrivial(false)
+        { }
+
+        RegionEntryPoint(IRBlock* revEntry, IRBlock* fwdEndPoint, bool isTrivial) :
+            revEntry(revEntry),
+            fwdEndPoint(fwdEndPoint),
+            isTrivial(isTrivial)
+        { }
     };
+
+    IRBlock* getUniquePredecessor(IRBlock* block)
+    {
+        HashSet<IRBlock*> predecessorSet;
+        for (auto predecessor : block->getPredecessors())
+            predecessorSet.Add(predecessor);
+        
+        SLANG_ASSERT(predecessorSet.Count() == 1);
+
+        return (*predecessorSet.begin());
+    }
+
+    RegionEntryPoint reverseCFGRegion(IRBlock* block, List<IRBlock*> endBlocks)
+    {
+        IRBlock* revBlock = revBlockMap[block];
+
+        if (endBlocks.contains(block))
+        {
+            return RegionEntryPoint(revBlock, block, true);
+        }
+
+        // We shouldn't already have a terminator for this block
+        SLANG_ASSERT(revBlock->getTerminator() == nullptr);
+
+        IRBuilder builder(autodiffContext->sharedBuilder);
+
+        auto currentBlock = block;
+        while (!isBlockLastInRegion(currentBlock, endBlocks))
+        {
+            auto terminator = currentBlock->getTerminator();
+            switch(terminator->getOp())
+            {
+                case kIROp_Return:
+                    return RegionEntryPoint(revBlockMap[currentBlock], nullptr);
+
+                case kIROp_unconditionalBranch:
+                {
+                    auto branchInst = as<IRUnconditionalBranch>(terminator);
+                    auto nextBlock = as<IRBlock>(branchInst->getTargetBlock());
+                    IRBlock* nextRevBlock = revBlockMap[nextBlock];
+                    IRBlock* currRevBlock = revBlockMap[currentBlock];
+
+                    SLANG_ASSERT(nextRevBlock->getTerminator() == nullptr);
+                    builder.setInsertInto(nextRevBlock);
+
+                    builder.emitBranch(currRevBlock,
+                        getPhiGrads(nextBlock).getCount(),
+                        getPhiGrads(nextBlock).getBuffer());
+                    
+
+                    currentBlock = nextBlock;
+                    break;
+                }
+
+                case kIROp_ifElse:
+                {
+                    auto ifElse = as<IRIfElse>(terminator);
+                    
+                    auto trueBlock = ifElse->getTrueBlock();
+                    auto falseBlock = ifElse->getFalseBlock();
+                    auto afterBlock = ifElse->getAfterBlock();
+
+                    auto revTrueRegionInfo = reverseCFGRegion(
+                        trueBlock,
+                        List<IRBlock*>(afterBlock));
+                    auto revFalseRegionInfo = reverseCFGRegion(
+                        falseBlock,
+                        List<IRBlock*>(afterBlock));
+                    //bool isTrueTrivial = (trueBlock == afterBlock);
+                    //bool isFalseTrivial = (falseBlock == afterBlock);
+
+                    IRBlock* revCondBlock = revBlockMap[afterBlock];
+                    SLANG_ASSERT(revCondBlock->getTerminator() == nullptr);
+
+
+                    IRBlock* revTrueEntryBlock = revTrueRegionInfo.revEntry;
+                    IRBlock* revFalseEntryBlock = revFalseRegionInfo.revEntry;
+
+                    IRBlock* revTrueExitBlock = revBlockMap[trueBlock];
+                    IRBlock* revFalseExitBlock = revBlockMap[falseBlock];
+
+                    auto phiGrads = getPhiGrads(afterBlock);
+                    if (phiGrads.getCount() > 0)
+                    {
+                        revTrueEntryBlock = insertPhiBlockBefore(revTrueEntryBlock, phiGrads);
+                        revFalseEntryBlock = insertPhiBlockBefore(revFalseEntryBlock, phiGrads);
+                    }
+
+                    IRBlock* revAfterBlock = revBlockMap[currentBlock];
+                    
+                    builder.setInsertInto(revCondBlock);
+                    builder.emitIfElse(
+                        ifElse->getCondition(),
+                        revTrueEntryBlock,
+                        revFalseEntryBlock,
+                        revAfterBlock);
+                    
+                    if (!revTrueRegionInfo.isTrivial)
+                    {
+                        builder.setInsertInto(revTrueExitBlock);
+                        SLANG_ASSERT(revTrueExitBlock->getTerminator() == nullptr);
+                        builder.emitBranch(
+                            revAfterBlock,
+                            getPhiGrads(trueBlock).getCount(),
+                            getPhiGrads(trueBlock).getBuffer());
+                    }
+
+                    if (!revFalseRegionInfo.isTrivial)
+                    {
+                        builder.setInsertInto(revFalseExitBlock);
+                        SLANG_ASSERT(revFalseExitBlock->getTerminator() == nullptr);
+                        builder.emitBranch(
+                            revAfterBlock,
+                            getPhiGrads(falseBlock).getCount(),
+                            getPhiGrads(falseBlock).getBuffer());
+                    }
+
+                    currentBlock = afterBlock;
+                    break;
+                }
+
+                case kIROp_loop:
+                {
+                    auto loop = as<IRLoop>(terminator);
+                    
+                    auto firstLoopBlock = loop->getTargetBlock();
+                    auto breakBlock = loop->getBreakBlock();
+
+                    auto condBlock = getOrCreateTopLevelCondition(loop);
+
+                    auto ifElse = as<IRIfElse>(condBlock->getTerminator());
+
+                    auto trueBlock = ifElse->getTrueBlock();
+                    auto falseBlock = ifElse->getFalseBlock();
+
+                    auto trueRegionInfo = reverseCFGRegion(
+                        trueBlock,
+                        List<IRBlock*>(breakBlock, condBlock));
+
+                    auto falseRegionInfo = reverseCFGRegion(
+                        falseBlock,
+                        List<IRBlock*>(breakBlock, condBlock));
+
+                    auto preCondRegionInfo = reverseCFGRegion(
+                        firstLoopBlock,
+                        List<IRBlock*>(condBlock));
+
+                    // assume loop[next] -> cond can be a region and reverse it.
+                    // assume cond[false] -> break can be a region and reverse it.
+                    // assume cond[true] -> cond can be a region and reverse it.
+                    // rev-loop = rev[break]
+                    // rev-cond = rev[cond]
+                    // rev-cond[true] -> entry of (cond[true] -> cond)
+                    // rev-cond[false] -> entry of (loop[next] -> cond)
+                    // exit of (cond[false]->break) branches into rev-cond
+                    // rev-loop[next] -> entry of (cond[false] -> break)
+                    // exit of (cond[true] -> cond) branches into rev-cond
+                    // exit of (loop[next] -> cond) branches into rev[loop] (rev-break)
+
+                    // For now, we'll assume the loop is always on the 'true' side
+                    // If this assert fails, add in the case where the loop
+                    // may be on the 'false' side.
+                    // 
+                    SLANG_RELEASE_ASSERT(trueRegionInfo.fwdEndPoint == condBlock);
+
+                    auto revTrueBlock = trueRegionInfo.revEntry;
+                    auto revFalseBlock = (preCondRegionInfo.isTrivial) ? 
+                        revBlockMap[currentBlock] : preCondRegionInfo.revEntry;
+                    
+                    // The block that will become target of the new loop inst
+                    // (the old false-region) This _could_ be the condition itself
+                    // 
+                    IRBlock* revPreCondBlock = (falseRegionInfo.isTrivial) ? 
+                        revBlockMap[condBlock] : falseRegionInfo.revEntry;
+                    
+                    // Old cond block remains new cond block.
+                    IRBlock* revCondBlock = revBlockMap[condBlock];
+
+                    // Old cond block becomes new pre-break block.
+                    IRBlock* revBreakBlock = revBlockMap[currentBlock];
+
+                    // Old true-side starting block becomes loop end block.
+                    IRBlock* revLoopEndBlock = revBlockMap[trueBlock];
+                    builder.setInsertInto(revLoopEndBlock);
+                    builder.emitBranch(
+                        revCondBlock,
+                        getPhiGrads(trueBlock).getCount(),
+                        getPhiGrads(trueBlock).getBuffer());
+                    
+                    // Old false-side starting block becomes end block 
+                    // for the new pre-cond region (which could be empty)
+                    // 
+                    IRBlock* revPreCondEndBlock = revBlockMap[falseBlock];
+                    if (!falseRegionInfo.isTrivial)
+                    {
+                        builder.setInsertInto(revPreCondEndBlock);
+                        builder.emitBranch(
+                            revCondBlock,
+                            getPhiGrads(falseBlock).getCount(),
+                            getPhiGrads(falseBlock).getBuffer());
+                    }
+
+                    IRBlock* revBreakRegionExitBlock = revBlockMap[firstLoopBlock];
+                    if (!preCondRegionInfo.isTrivial)
+                    {
+                        builder.setInsertInto(revBreakRegionExitBlock);
+                        builder.emitBranch(
+                            revBreakBlock,
+                            getPhiGrads(firstLoopBlock).getCount(),
+                            getPhiGrads(firstLoopBlock).getBuffer());
+                    }
+
+                    // Emit condition into the new cond block.
+                    builder.setInsertInto(revCondBlock);
+                    builder.emitIfElse(
+                        ifElse->getCondition(),
+                        revTrueBlock,
+                        revFalseBlock,
+                        revLoopEndBlock);
+                    
+                    // Emit loop into rev-version of the break block.
+                    auto revLoopBlock = revBlockMap[breakBlock];
+                    builder.setInsertInto(revLoopBlock);
+                    builder.emitLoop(
+                        revPreCondBlock,
+                        revBreakBlock,
+                        revLoopEndBlock,
+                        getPhiGrads(breakBlock).getCount(),
+                        getPhiGrads(breakBlock).getBuffer());
+
+                    currentBlock = breakBlock;
+                    break;
+                }
+
+                case kIROp_Switch:
+                {
+                    auto switchInst = as<IRSwitch>(terminator);
+
+                    auto breakBlock = switchInst->getBreakLabel();
+
+                    IRBlock* revBreakBlock = revBlockMap[currentBlock];
+
+                    // Reverse each case label
+                    List<IRInst*> reverseSwitchArgs;
+                    Dictionary<IRBlock*, IRBlock*> reverseLabelEntryBlocks;
+
+                    for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii++)
+                    {
+                        reverseSwitchArgs.add(switchInst->getCaseValue(ii));
+
+                        auto caseLabel = switchInst->getCaseLabel(ii);
+                        if (!reverseLabelEntryBlocks.ContainsKey(caseLabel))
+                        {
+                            auto labelRegionInfo = reverseCFGRegion(
+                                caseLabel,
+                                List<IRBlock*>(breakBlock));
+
+                            // Handle this case eventually.
+                            SLANG_ASSERT(!labelRegionInfo.isTrivial);
+
+                            // Wire the exit to the break block
+                            IRBlock* revLabelExit = revBlockMap[caseLabel];
+                            SLANG_ASSERT(revLabelExit->getTerminator() == nullptr);
+
+                            builder.setInsertInto(revLabelExit);
+                            builder.emitBranch(revBreakBlock);
+                            
+                            reverseLabelEntryBlocks[caseLabel] = labelRegionInfo.revEntry;
+                            reverseSwitchArgs.add(labelRegionInfo.revEntry);
+                        }
+                        else
+                        {
+                            reverseSwitchArgs.add(reverseLabelEntryBlocks[caseLabel]);
+                        }
+                    }
+                    
+                    auto defaultRegionInfo = reverseCFGRegion(
+                        switchInst->getDefaultLabel(),
+                        List<IRBlock*>(breakBlock));
+                    SLANG_ASSERT(!defaultRegionInfo.isTrivial);
+                    
+                    auto revDefaultRegionEntry = defaultRegionInfo.revEntry;
+
+                    builder.setInsertInto(revBlockMap[switchInst->getDefaultLabel()]);
+                    builder.emitBranch(revBreakBlock);
+
+                    auto phiGrads = getPhiGrads(breakBlock);
+                    if (phiGrads.getCount() > 0)
+                    {
+                        for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii++)
+                        {
+                            reverseSwitchArgs[ii * 2 + 1] =
+                                insertPhiBlockBefore(as<IRBlock>(reverseSwitchArgs[ii * 2 + 1]), phiGrads);
+                        }
+                        revDefaultRegionEntry =
+                                insertPhiBlockBefore(as<IRBlock>(revDefaultRegionEntry), phiGrads);
+                    }
+
+                    auto revSwitchBlock = revBlockMap[breakBlock];
+                    builder.setInsertInto(revSwitchBlock);
+                    builder.emitSwitch(
+                        switchInst->getCondition(),
+                        revBreakBlock,
+                        revDefaultRegionEntry,
+                        reverseSwitchArgs.getCount(),
+                        reverseSwitchArgs.getBuffer());
+
+                    currentBlock = breakBlock;
+                    break;
+                }
+
+            }
+        }
+
+        if (auto branchInst = as<IRUnconditionalBranch>(currentBlock->getTerminator()))
+        {
+            return RegionEntryPoint(
+                revBlockMap[currentBlock],
+                branchInst->getTargetBlock(),
+                false);
+        }
+        else if (auto returnInst = as<IRReturn>(currentBlock->getTerminator()))
+        {
+            return RegionEntryPoint(
+                revBlockMap[currentBlock],
+                nullptr,
+                true);
+        }
+        else
+        {
+            // Regions should _really_ not end on a conditional branch (I think)
+            SLANG_UNEXPECTED("Unexpected: Region ended on a conditional branch");
+        }
+    }
 
     void transposeDiffBlocksInFunc(
         IRFunc* revDiffFunc,
@@ -139,11 +487,6 @@ struct DiffTransposePass
         // since we need to link them up at the end.
         auto terminalPrimalBlocks = getTerminalPrimalBlocks(revDiffFunc);
         auto terminalDiffBlocks = getTerminalDiffBlocks(revDiffFunc);
-
-        // Add a top-level null region entry for the terminal diff block.
-        regionMap[terminalDiffBlocks[0]] = nullptr;
-
-        buildAfterBlockMap(revDiffFunc);
 
         // Traverse all instructions/blocks in reverse (starting from the terminator inst)
         // look for insts/blocks marked with IRDifferentialInstDecoration,
@@ -184,7 +527,7 @@ struct DiffTransposePass
         // Keep track of first diff block, since this is where 
         // we'll emit temporary vars to hold per-block derivatives.
         // 
-        firstRevDiffBlockMap[revDiffFunc] = revBlockMap[workList[0]];
+        firstRevDiffBlockMap[revDiffFunc] = revBlockMap[terminalDiffBlocks[0]];
 
         IRInst* retVal = nullptr;
 
@@ -201,17 +544,14 @@ struct DiffTransposePass
             this->transposeBlock(block, revBlock);
         }
 
-        // Some blocks may not have their control flow
-        // insts completed. Do them now that we have 
-        // more information.
+        // At this point all insts have been transposed, but the blocks
+        // have no control flow.
+        // reverseCFG will use fwd-mode blocks as reference, and 
+        // wire the corresponding rev-mode blocks in reverse.
         // 
-        for (auto pendingBlockInfo : pendingBlocks)
-        {
-            builder.setInsertInto(revBlockMap[pendingBlockInfo.fwdBlock]);
-            completeEmitTerminator(&builder, pendingBlockInfo.fwdBlock, pendingBlockInfo.phiGrads);
-        }
-
-        pendingBlocks.clear();
+        auto branchInst = as<IRUnconditionalBranch>(terminalPrimalBlocks[0]->getTerminator());
+        auto firstFwdDiffBlock = branchInst->getTargetBlock();
+        reverseCFGRegion(firstFwdDiffBlock, List<IRBlock*>());
 
         // Link the last differential fwd-mode block (which will be the first
         // rev-mode block) as the successor to the last primal block.
@@ -223,7 +563,7 @@ struct DiffTransposePass
             SLANG_ASSERT(terminalDiffBlocks.getCount() == 1);
 
             auto terminalPrimalBlock = terminalPrimalBlocks[0];
-            auto terminalRevBlock = as<IRBlock>(revBlockMap[terminalDiffBlocks[0]]);
+            auto firstRevBlock = as<IRBlock>(revBlockMap[terminalDiffBlocks[0]]);
 
             terminalPrimalBlock->getTerminator()->removeAndDeallocate();
             
@@ -231,9 +571,9 @@ struct DiffTransposePass
             subBuilder.setInsertInto(terminalPrimalBlock);
 
             // There should be no parameters in the first reverse-mode block.
-            SLANG_ASSERT(terminalRevBlock->getFirstParam() == nullptr);
+            SLANG_ASSERT(firstRevBlock->getFirstParam() == nullptr);
 
-            auto branch = subBuilder.emitBranch(terminalRevBlock);
+            auto branch = subBuilder.emitBranch(firstRevBlock);
 
             if (!retVal)
             {
@@ -247,13 +587,20 @@ struct DiffTransposePass
             subBuilder.addBackwardDerivativePrimalReturnDecoration(branch, retVal);
         }
 
+        // At this point, the only block left without terminator insts
+        // should be the last one. Add a void return to complete it.
+        // 
+        IRBlock* lastRevBlock = revBlockMap[firstFwdDiffBlock];
+        SLANG_ASSERT(lastRevBlock->getTerminator() == nullptr);
+
+        builder.setInsertInto(lastRevBlock);
+        builder.emitReturn();
+
         // Remove fwd-mode blocks.
         for (auto block : workList)
         {
             block->removeAndDeallocate();
         }
-
-        cleanupRegionInfo();
     }
 
     // Fetch or create a gradient accumulator var
@@ -385,6 +732,17 @@ struct DiffTransposePass
         List<IRInst*> phiParamRevGradInsts;
         for (IRParam* param = fwdBlock->getFirstParam(); param; param = param->getNextParam())
         {
+            // This param might be used outside this block.
+            // If so, add/get an accumulator.
+            // 
+            if (isInstUsedOutsideParentBlock(param))
+            {
+                auto accVar = getOrCreateAccumulatorVar(param);
+                addRevGradientForFwdInst(
+                    param, 
+                    RevGradient(param, builder.emitLoad(accVar), nullptr));
+            }
+            
             if (hasRevGradients(param))
             {
                 auto gradients = popRevGradients(param);
@@ -395,6 +753,11 @@ struct DiffTransposePass
                     gradients);
                 
                 phiParamRevGradInsts.add(gradInst);
+            }
+            else
+            {
+                phiParamRevGradInsts.add(
+                    emitDZeroOfDiffInstType(&builder, tryGetPrimalTypeFromDiffInst(param)));
             }
         }
 
@@ -448,13 +811,9 @@ struct DiffTransposePass
         // We _should_ be completely out of gradients to process at this point.
         SLANG_ASSERT(gradientsMap.Count() == 0);
 
-        if (!tryEmitTerminator(&builder, fwdBlock, phiParamRevGradInsts))
-        {
-            // If we couldn't emit a terminator right away, defer for later.
-            pendingBlocks.add(PendingBlockTerminatorEntry(
-                fwdBlock,
-                phiParamRevGradInsts));
-        }
+        // Record any phi gradients for the CFG reversal pass.
+        phiGradsMap[fwdBlock] = phiParamRevGradInsts;
+
     }
 
     void transposeInst(IRBuilder* builder, IRInst* inst)
@@ -465,6 +824,15 @@ struct DiffTransposePass
             return;
         default:
             break;
+        }
+
+        // Some special instructions simply need to be copied over.
+        // These do not deal with differentials.
+        // 
+        if (inst->findDecoration<IRLoopCounterDecoration>())
+        {
+            inst->insertAtEnd(builder->getBlock());
+            return;
         }
 
         // Look for gradient entries for this inst.
@@ -786,234 +1154,6 @@ struct DiffTransposePass
             phiArgs.getBuffer());
         
         return phiBlock;
-    }
-
-    // Create a region to track control flow from the
-    // the point of convergence (fwdConvBlock) back to the point of 
-    // divergence, along one specific path (fwdExitBlock)
-    // 
-    void pushRegion(IRBlock* fwdConvBlock, IRBlock* fwdExitBlock)
-    {
-        SLANG_ASSERT(!regionMap.ContainsKey(fwdExitBlock));
-        SLANG_ASSERT(regionMap.ContainsKey(fwdConvBlock));
-
-        Region* newRegion = new Region(fwdExitBlock, regionMap[fwdConvBlock]);
-        regions.add(newRegion);
-
-        regionMap[fwdExitBlock] = newRegion;
-    }
-
-    // If we have a conditional-branch from fwdBlock to fwdNextBlock
-    // complete the region, and remove from stack
-    // otherwise, copy the region over.
-    // 
-    void propagateRegion(IRBlock* fwdNextBlock, IRBlock* fwdBlock)
-    {
-        if (as<IRConditionalBranch>(fwdBlock->getTerminator()))
-        {
-            Region* currentRegion = regionMap[fwdNextBlock];
-            currentRegion->finish(fwdNextBlock);
-
-            regionMap[fwdBlock] = currentRegion->parent;
-        }
-        else if (as<IRUnconditionalBranch>(fwdBlock->getTerminator()) ||
-            as<IRReturn>(fwdBlock->getTerminator()))
-        {
-            regionMap[fwdBlock] = regionMap[fwdNextBlock];
-        }
-    }
-
-    // Deallocate regions
-    void cleanupRegionInfo()
-    {
-        for (auto region : regions)
-        {
-            delete region;
-        }
-
-        regions.clear();
-        regionMap.Clear();
-    }
-
-    bool tryEmitTerminator(IRBuilder* builder, IRBlock* fwdBlockInst, List<IRInst*> phiParamGrads)
-    {
-        // If this block has no differential predecessors, add a return statement.
-        if (!doesBlockHaveDifferentialPredecessors(fwdBlockInst))
-        {
-            // Emit a void return.
-            builder->emitReturn();
-            return true;
-        }
-
-        List<IRBlock*> fwdPredecesorBlocks;
-        // Check for predecessors count.
-        for (auto predecessor : fwdBlockInst->getPredecessors())
-        {
-            if (!fwdPredecesorBlocks.contains(predecessor))
-                fwdPredecesorBlocks.add(predecessor);
-        }
-
-        SLANG_ASSERT(fwdPredecesorBlocks.getCount() > 0);
-
-        // If we have just one, we simply need the reverse-mode block to
-        // branch into the reverse-mode version of the predecessor block.
-        // (along with the appropriate phi args)
-        // 
-        if (fwdPredecesorBlocks.getCount() == 1)
-        {
-            builder->emitBranch(
-                revBlockMap[fwdPredecesorBlocks[0]],
-                phiParamGrads.getCount(),
-                phiParamGrads.getBuffer());
-
-            propagateRegion(fwdBlockInst, fwdPredecesorBlocks[0]);
-            return true;
-        }
-
-        // If we have more than one, then control flow 'converges' at this point.
-        // By convention, this block must be the after block for _some_ conditional
-        // control flow statement.
-        // If not, we are dealing with an inconsistent graph.
-        // 
-        // Rather than actually emitting the terminator here, we're going to 
-        // defer to a pass after all the blocks have been transposed. 
-        // This is because, while we know that this block is the point of convergence
-        // we don't know which predecessor belong to which side of the branch.
-        // We will instead create 'regions' to track each predecessor for every
-        // branch, and by the time all blocks are seen at-least once, we should have
-        // resolved the 'start' points for every predecessor.
-        // 
-
-        if (fwdPredecesorBlocks.getCount() > 1)
-        {
-            SLANG_ASSERT(afterBlockMap.ContainsKey(fwdBlockInst));
-            
-            for (auto predecessor : fwdPredecesorBlocks)
-            {
-                // Trivial case when the predecessor itself is the point
-                // of divergence.
-                // 
-                if (getAfterBlock(predecessor) == fwdBlockInst)
-                    continue;
-
-                pushRegion(fwdBlockInst, predecessor);
-            }
-        }
-
-        return false;
-    }
-
-    bool completeEmitTerminator(IRBuilder* builder, IRBlock* fwdBlockInst, List<IRInst*> phiParamGrads)
-    {
-        IRBlock* revBlock = revBlockMap[fwdBlockInst];
-
-        // If we already have a terminator, we've probably resolved it during
-        // tryEmitTerminator()
-        // 
-        if (revBlock->getTerminator() != nullptr)
-            return true;
-
-        auto terminatorInst = as<IRInst>(afterBlockMap[fwdBlockInst]);
-        switch (terminatorInst->getOp())
-        {
-            case kIROp_ifElse:
-            {
-                auto ifElseInst = as<IRIfElse>(terminatorInst);
-                
-                auto condition = ifElseInst->getCondition();
-                SLANG_ASSERT(!isDifferentialInst(condition));
-
-                // fwd origin block is the reverse 'after' block.
-                auto revAfterBlock = as<IRBlock>(
-                    revBlockMap[as<IRBlock>(ifElseInst->getParent())]);
-                
-                // Find region, and find the reverse-mode version of the 
-                // exit block.
-                Region* trueRegion = regionMap[ifElseInst->getTrueBlock()];
-                IRBlock* revTrueBlock = revBlockMap[trueRegion->exitBlock];
-
-                Region* falseRegion = regionMap[ifElseInst->getFalseBlock()];
-                IRBlock* revFalseBlock = revBlockMap[falseRegion->exitBlock];
-
-                // If we have phi derivatives to pass on, 
-                // we need to add dummy blocks to pass them using
-                // an unconditional branch.
-                // 
-                if (phiParamGrads.getCount() > 0)
-                {
-                    revTrueBlock = insertPhiBlockBefore(revTrueBlock, phiParamGrads);
-                    revFalseBlock = insertPhiBlockBefore(revFalseBlock, phiParamGrads);
-
-                    // Putting the phi blocks just after our current reverse-mode block
-                    // is not necessary. Just to make intermediate IR easier to follow.
-                    //
-                    revTrueBlock->insertAfter(revBlock);
-                    revFalseBlock->insertAfter(revBlock);
-                }
-                
-                builder->emitIfElse(condition, revTrueBlock, revFalseBlock, revAfterBlock);
-                return true;
-            }
-            case kIROp_Switch:
-            {
-                auto switchInst = as<IRSwitch>(terminatorInst);
-                
-                auto condition = switchInst->getCondition();
-                SLANG_ASSERT(!isDifferentialInst(condition));
-
-                // fwd origin block is the reverse 'break' block.
-                auto revAfterBlock = as<IRBlock>(
-                    revBlockMap[as<IRBlock>(switchInst->getParent())]);
-                
-                // Find regions for every branch, and find the reverse-mode 
-                // version of the each exit block.
-                Region* defaultRegion = regionMap[switchInst->getDefaultLabel()];
-                IRBlock* revDefaultBlock = revBlockMap[defaultRegion->exitBlock];
-
-                List<IRBlock*> revCaseBlocks;
-                for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii ++)
-                {
-                    Region* caseRegion = regionMap[switchInst->getCaseLabel(ii)];
-                    IRBlock* revCaseBlock = revBlockMap[caseRegion->exitBlock];
-                    revCaseBlocks.add(revCaseBlock);
-                }
-
-                // If we have phi derivatives to pass on, 
-                // we need to add dummy blocks to pass them using
-                // an unconditional branch.
-                // 
-                if (phiParamGrads.getCount() > 0)
-                {
-                    revDefaultBlock = insertPhiBlockBefore(revDefaultBlock, phiParamGrads);
-                    revDefaultBlock->insertAfter(revBlock);
-
-                    for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii ++)
-                    {
-                        revCaseBlocks[ii] = insertPhiBlockBefore(revCaseBlocks[ii], phiParamGrads);
-                        revCaseBlocks[ii]->insertAfter(revBlock);
-                    }
-                }
-                
-                List<IRInst*> revCaseArgs;
-                for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii ++)
-                {
-                    revCaseArgs.add(switchInst->getCaseValue(ii));
-                    revCaseArgs.add(revCaseBlocks[ii]);
-                }
-                
-                builder->emitSwitch(
-                    condition,
-                    revAfterBlock,
-                    revDefaultBlock,
-                    revCaseArgs.getCount(),
-                    revCaseArgs.getBuffer());
-
-                return true;
-            }
-            default:
-                SLANG_UNIMPLEMENTED_X("Unhandled control flow inst during transposition");
-        }
-        return false;
     }
     
     TranspositionResult transposeInst(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
@@ -1972,9 +2112,7 @@ struct DiffTransposePass
 
     List<PendingBlockTerminatorEntry>                    pendingBlocks;
 
-    Dictionary<IRBlock*, Region*>                        regionMap;
-
-    List<Region*>                                        regions;
+    Dictionary<IRBlock*, List<IRInst*>>                  phiGradsMap;
     
 };
 
