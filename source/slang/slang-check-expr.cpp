@@ -2027,8 +2027,6 @@ namespace Slang
         for (auto & arg : expr->arguments)
         {
             arg = CheckTerm(arg);
-            if (!arg->type.type)
-                __debugbreak();
         }
 
         // If we are in a differentiable function, register differential witness tables involved in

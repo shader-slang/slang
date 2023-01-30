@@ -536,7 +536,6 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
 {
     if (context.isDifferentiableType((IRType*)typeInst))
         return true;
-
     // Look for equivalent types.
     for (auto type : context.differentiableWitnessDictionary)
     {

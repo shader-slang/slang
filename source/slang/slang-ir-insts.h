@@ -3295,8 +3295,6 @@ public:
         return emitGlobalGenericParam(getWitnessTableType(comformanceType));
     }
 
-    IRInst* emitArrayDifferentiableWitness(IRType* type, IRType* arrayType, IRInst* subwitness);
-
     IRBindGlobalGenericParam* emitBindGlobalGenericParam(
         IRInst* param,
         IRInst* val);

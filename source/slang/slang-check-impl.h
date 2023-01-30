@@ -1371,7 +1371,7 @@ namespace Slang
                 // i.e. if (A & B) subtype C because A subtype C, then we use AndTypeLeft to represent
                 // that relationship.
                 AndTypeLeftFlavor,
-                AndTypeRightFlavor,
+                AndTypeRightFlavor
             };
 
             Flavor flavor = DeclFlavor;

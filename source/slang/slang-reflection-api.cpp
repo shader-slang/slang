@@ -1492,11 +1492,9 @@ namespace Slang
                 LayoutSize elementCount = LayoutSize::infinite();
                 if( auto arrayType = as<ArrayExpressionType>(arrayTypeLayout->type) )
                 {
-                    if( auto elementCountVal = arrayType->getElementCount() )
+                    if( !arrayType->isUnsized())
                     {
-                        elementCount = LayoutSize::RawValue(getIntVal(elementCountVal));
-                        if (arrayType->isUnsized())
-                            elementCount = 0;
+                        elementCount = LayoutSize::RawValue(getIntVal(arrayType->getElementCount()));
                     }
                 }
                 addRangesRec(elementTypeLayout, path, multiplier * elementCount);
