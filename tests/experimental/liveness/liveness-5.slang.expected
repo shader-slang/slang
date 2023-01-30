@@ -72,35 +72,26 @@ int calcThing_0(int offset_0)
     }
     livenessEnd_0(k_0, 0);
     livenessEnd_1(another_0, 0);
-    int total_2;
     if(total_0 > 4)
     {
-        int _S5 = total_0;
-        livenessEnd_0(total_0, 0);
-        int _S6 = - _S5;
-        livenessStart_1(total_2, 0);
-        total_2 = _S6;
+        total_0 = - total_0;
     }
     else
     {
-        int _S7 = total_0;
-        livenessEnd_0(total_0, 0);
-        livenessStart_1(total_2, 0);
-        total_2 = _S7;
     }
-    return total_2;
+    return total_0;
 }
 
-layout(std430, binding = 0) buffer _S8 {
+layout(std430, binding = 0) buffer _S5 {
     int _data[];
 } outputBuffer_0;
 layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
-    uint _S9 = uint(index_0);
-    int _S10 = calcThing_0(index_0);
-    ((outputBuffer_0)._data[(_S9)]) = _S10;
+    uint _S6 = uint(index_0);
+    int _S7 = calcThing_0(index_0);
+    ((outputBuffer_0)._data[(_S6)]) = _S7;
     return;
 }
 

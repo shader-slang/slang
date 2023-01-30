@@ -11,6 +11,91 @@ struct PeepholeContext : InstPassBase
 
     bool changed = false;
 
+    bool tryFoldElementExtractFromUpdateInst(IRInst* inst)
+    {
+        bool isAccessChainEqual = false;
+        bool isAccessChainNotEqual = false;
+        List<IRInst*> chainKey;
+        IRInst* chainNode = inst;
+        for (;;)
+        {
+            switch (chainNode->getOp())
+            {
+            case kIROp_FieldExtract:
+            case kIROp_GetElement:
+                chainKey.add(chainNode->getOperand(1));
+                chainNode = chainNode->getOperand(0);
+                continue;
+            }
+            break;
+        }
+        chainKey.reverse();
+        if (auto updateInst = as<IRUpdateElement>(chainNode))
+        {
+            if (updateInst->getAccessKeyCount() > (UInt)chainKey.getCount())
+                return false;
+
+            isAccessChainEqual = true;
+            for (UInt i = 0; i < (UInt)chainKey.getCount(); i++)
+            {
+                if (updateInst->getAccessKey(i) != chainKey[i])
+                {
+                    isAccessChainEqual = false;
+                    if (as<IRStructKey>(chainKey[i]))
+                    {
+                        isAccessChainNotEqual = true;
+                        break;
+                    }
+                    else
+                    {
+                        if (auto constIndex1 = as<IRIntLit>(updateInst->getAccessKey(i)))
+                        {
+                            if (auto constIndex2 = as<IRIntLit>(chainKey[i]))
+                            {
+                                if (constIndex1->getValue() != constIndex2->getValue())
+                                {
+                                    isAccessChainNotEqual = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (isAccessChainEqual)
+            {
+                auto remainingKeys = chainKey.getArrayView(
+                    updateInst->getAccessKeyCount(),
+                    chainKey.getCount() - updateInst->getAccessKeyCount());
+                if (remainingKeys.getCount() == 0)
+                {
+                    inst->replaceUsesWith(updateInst->getElementValue());
+                    inst->removeAndDeallocate();
+                    return true;
+                }
+                else if (remainingKeys.getCount() > 0)
+                {
+                    IRBuilder builder(&sharedBuilderStorage);
+                    builder.setInsertBefore(inst);
+                    auto newValue = builder.emitElementExtract(updateInst->getElementValue(), remainingKeys);
+                    inst->replaceUsesWith(newValue);
+                    inst->removeAndDeallocate();
+                    return true;
+                }
+            }
+            else if (isAccessChainNotEqual)
+            {
+                IRBuilder builder(&sharedBuilderStorage);
+                builder.setInsertBefore(inst);
+                auto newInst = builder.emitElementExtract(updateInst->getOldValue(), chainKey.getArrayView());
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+                return true;
+            }
+        }
+        return false;
+    }
+
     void processInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -84,19 +169,9 @@ struct PeepholeContext : InstPassBase
                     }
                 }
             }
-            else if (auto updateField = as<IRUpdateField>(inst->getOperand(0)))
+            else
             {
-                if (inst->getOperand(1) == updateField->getFieldKey())
-                {
-                    inst->replaceUsesWith(updateField->getElementValue());
-                    inst->removeAndDeallocate();
-                    changed = true;
-                }
-                else
-                {
-                    inst->setOperand(0, updateField->getOldValue());
-                    changed = true;
-                }
+                changed = tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
         case kIROp_GetElement:
@@ -119,32 +194,18 @@ struct PeepholeContext : InstPassBase
                 inst->removeAndDeallocate();
                 changed = true;
             }
-            else if (auto updateElement = as<IRUpdateElement>(inst->getOperand(0)))
+            else
             {
-                if (inst->getOperand(1) == updateElement->getIndex())
-                {
-                    inst->replaceUsesWith(updateElement->getElementValue());
-                    inst->removeAndDeallocate();
-                    changed = true;
-                }
-                else if (auto constIndex1 = as<IRIntLit>(inst->getOperand(1)))
-                {
-                    if (auto constIndex2 = as<IRIntLit>(updateElement->getIndex()))
-                    {
-                        // If we can determine that the indices does not match,
-                        // then reduce the original value operand to before the update.
-                        if (constIndex1->getValue() != constIndex2->getValue())
-                        {
-                            inst->setOperand(0, updateElement->getOldValue());
-                            changed = true;
-                        }
-                    }
-                }
+                changed = tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
         case kIROp_UpdateElement:
             {
-                if (auto constIndex = as<IRIntLit>(inst->getOperand(1)))
+                auto updateInst = as<IRUpdateElement>(inst);
+                if (updateInst->getAccessKeyCount() != 1)
+                    break;
+                auto key = updateInst->getAccessKey(0);
+                if (auto constIndex = as<IRIntLit>(key))
                 {
                     auto oldVal = inst->getOperand(0);
                     if (oldVal->getOp() == kIROp_MakeArray ||
@@ -179,44 +240,43 @@ struct PeepholeContext : InstPassBase
                         }
                     }
                 }
-            }
-            break;
-        case kIROp_UpdateField:
-            {
-                auto oldVal = inst->getOperand(0);
-                if (oldVal->getOp() == kIROp_MakeStruct)
+                else if (auto structKey = as<IRStructKey>(key))
                 {
-                    auto structType = as<IRStructType>(inst->getDataType());
-                    if (!structType) break;
-                    List<IRInst*> args;
-                    UInt i = 0;
-                    bool isValid = true;
-                    for (auto field : structType->getFields())
+                    auto oldVal = inst->getOperand(0);
+                    if (oldVal->getOp() == kIROp_MakeStruct)
                     {
-                        IRInst* arg = nullptr;
-                        if (i < oldVal->getOperandCount())
-                            arg = oldVal->getOperand(i);
-                        if (field->getKey() == inst->getOperand(1))
-                            arg = inst->getOperand(2);
-                        if (arg)
+                        auto structType = as<IRStructType>(inst->getDataType());
+                        if (!structType) break;
+                        List<IRInst*> args;
+                        UInt i = 0;
+                        bool isValid = true;
+                        for (auto field : structType->getFields())
                         {
-                            args.add(arg);
+                            IRInst* arg = nullptr;
+                            if (i < oldVal->getOperandCount())
+                                arg = oldVal->getOperand(i);
+                            if (field->getKey() == inst->getOperand(1))
+                                arg = inst->getOperand(2);
+                            if (arg)
+                            {
+                                args.add(arg);
+                            }
+                            else
+                            {
+                                isValid = false;
+                                break;
+                            }
+                            i++;
                         }
-                        else
+                        if (isValid)
                         {
-                            isValid = false;
-                            break;
+                            IRBuilder builder(&sharedBuilderStorage);
+                            builder.setInsertBefore(inst);
+                            auto makeStruct = builder.emitMakeStruct(structType, (UInt)args.getCount(), args.getBuffer());
+                            inst->replaceUsesWith(makeStruct);
+                            inst->removeAndDeallocate();
+                            changed = true;
                         }
-                        i++;
-                    }
-                    if (isValid)
-                    {
-                        IRBuilder builder(&sharedBuilderStorage);
-                        builder.setInsertBefore(inst);
-                        auto makeStruct = builder.emitMakeStruct(structType, (UInt)args.getCount(), args.getBuffer());
-                        inst->replaceUsesWith(makeStruct);
-                        inst->removeAndDeallocate();
-                        changed = true;
                     }
                 }
             }

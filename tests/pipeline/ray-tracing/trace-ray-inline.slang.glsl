@@ -106,13 +106,9 @@ void main()
                 tHit_1 = 0.00000000000000000000;
                 bool _S6 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
 
-                MyProceduralHitAttrs_0 committedProceduralAttrs_2;
-
                 if(_S6)
                 {
                     bool _S7 = myProceduralAnyHit_0(payload_5);
-
-                    MyProceduralHitAttrs_0 committedProceduralAttrs_3;
 
                     if(_S7)
                     {
@@ -126,27 +122,23 @@ void main()
                         {
                         }
 
-                        committedProceduralAttrs_3 = _S8;
+                        committedProceduralAttrs_1 = _S8;
 
                     }
                     else
                     {
 
-                        committedProceduralAttrs_3 = committedProceduralAttrs_0;
+                        committedProceduralAttrs_1 = committedProceduralAttrs_0;
 
                     }
-
-                    committedProceduralAttrs_2 = committedProceduralAttrs_3;
 
                 }
                 else
                 {
 
-                    committedProceduralAttrs_2 = committedProceduralAttrs_0;
+                    committedProceduralAttrs_1 = committedProceduralAttrs_0;
 
                 }
-
-                committedProceduralAttrs_1 = committedProceduralAttrs_2;
 
                 break;
             }

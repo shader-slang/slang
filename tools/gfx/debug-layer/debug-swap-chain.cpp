@@ -55,8 +55,10 @@ Result DebugSwapchain::resize(GfxCount width, GfxCount height)
     {
         if (image->debugGetReferenceCount() != 1)
         {
-            GFX_DIAGNOSE_ERROR("all swapchain images must be released before calling resize().");
-            return SLANG_FAIL;
+            // Only warn here because tools like NSight might keep
+            // an additional reference to swapchain images.
+            GFX_DIAGNOSE_WARNING("all swapchain images must be released before calling resize().");
+            break;
         }
     }
     m_images.clearAndDeallocate();

@@ -311,8 +311,7 @@ INST(Call, call, 1, 0)
 INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
 
-INST(UpdateElement, updateElement, 3, 0)
-INST(UpdateField, updateField, 3, 0)
+INST(UpdateElement, updateElement, 2, 0)
 
 INST(PackAnyValue, packAnyValue, 1, 0)
 INST(UnpackAnyValue, unpackAnyValue, 1, 0)
@@ -764,6 +763,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// in an intermediary struct for reuse in backward propagation phase.
     INST(PrimalValueStructKeyDecoration, primalValueKey, 1, 0)
 
+        /// Used by the auto-diff pass to mark the primal element type of an
+        /// forward-differentiated updateElement inst.
+    INST(PrimalElementTypeDecoration, primalElementType, 1, 0)
+
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.
     INST(DerivativeMemberDecoration, derivativeMemberDecoration, 1, 0)
@@ -777,9 +780,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     /* Differentiable Type Dictionary */
     INST(DifferentiableTypeDictionaryDecoration, DifferentiableTypeDictionaryDecoration, 0, PARENT)
-
-        /// Decorates an interface type and stores the mapping from a normal function requirement key to its derivative requirement key.
-    INST(DifferentiableMethodRequirementDictionaryDecoration, DifferentiableMethodRequirementDictionaryDecoration, 0, PARENT)
 
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
@@ -900,16 +900,6 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
-
-/* DifferentiableMethodRequirementDictionaryItem */
-    INST(ForwardDifferentiableMethodRequirementDictionaryItem, DifferentiableMethodRequirementDictionaryItem, 0, 0)
-    INST(BackwardDifferentiableMethodRequirementDictionaryItem, DifferentiableMethodRequirementDictionaryItem, 0, 0)
-    INST(BackwardDifferentiablePrimalMethodRequirementDictionaryItem, DifferentiablePrimalMethodRequirementDictionaryItem, 0, 0)
-    INST(BackwardDifferentiablePropagateMethodRequirementDictionaryItem, DifferentiablePropagateMethodRequirementDictionaryItem, 0, 0)
-    INST(BackwardDifferentiableIntermediateTypeRequirementDictionaryItem, DifferentiableIntermediateTypeRequirementDictionaryItem, 0, 0)
-
-
-INST_RANGE(DifferentiableMethodRequirementDictionaryItem, ForwardDifferentiableMethodRequirementDictionaryItem, BackwardDifferentiableMethodRequirementDictionaryItem)
 
 #undef PARENT
 #undef USE_OTHER

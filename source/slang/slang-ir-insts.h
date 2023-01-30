@@ -698,6 +698,18 @@ struct IRPrimalValueStructKeyDecoration : IRDecoration
     IRStructKey* getStructKey() { return as<IRStructKey>(getOperand(0)); }
 };
 
+struct IRPrimalElementTypeDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_PrimalElementTypeDecoration
+    };
+
+    IR_LEAF_ISA(PrimalElementTypeDecoration)
+
+    IRInst* getPrimalElementType() { return getOperand(0); }
+};
+
 struct IRMixedDifferentialInstDecoration : IRDecoration
 {
     enum
@@ -832,26 +844,6 @@ struct IRDifferentiableTypeDictionaryItem : IRInst
 struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
 {
     IR_LEAF_ISA(DifferentiableTypeDictionaryDecoration)
-};
-
-struct IRDifferentiableMethodRequirementDictionaryDecoration : IRDecoration
-{
-    IR_LEAF_ISA(DifferentiableMethodRequirementDictionaryDecoration)
-};
-
-struct IRDifferentiableMethodRequirementDictionaryItem : IRInst
-{
-    IR_PARENT_ISA(DifferentiableMethodRequirementDictionaryItem)
-};
-
-struct IRForwardDifferentiableMethodRequirementDictionaryItem : IRDifferentiableMethodRequirementDictionaryItem
-{
-    IR_LEAF_ISA(ForwardDifferentiableMethodRequirementDictionaryItem)
-};
-
-struct IRBackwardDifferentiableMethodRequirementDictionaryItem : IRDifferentiableMethodRequirementDictionaryItem
-{
-    IR_LEAF_ISA(BackwardDifferentiableMethodRequirementDictionaryItem)
 };
 
 // An instruction that specializes another IR value
@@ -2199,28 +2191,15 @@ struct IRUpdateElement : IRInst
     IR_LEAF_ISA(UpdateElement)
 
     IRInst* getOldValue() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
-    IRInst* getElementValue() { return getOperand(2); }
-    IRInst* getPrimalElementType()
+    IRInst* getElementValue() { return getOperand(1); }
+    IRInst* getAccessKey(UInt index) { return getOperand(2 + index); }
+    UInt getAccessKeyCount() { return getOperandCount() - 2; }
+    List<IRInst*> getAccessChain()
     {
-        if (getOperandCount() != 4)
-            return nullptr;
-        return getOperand(3);
-    }
-};
-
-struct IRUpdateField : IRInst
-{
-    IR_LEAF_ISA(UpdateField)
-
-    IRInst* getOldValue() { return getOperand(0); }
-    IRInst* getFieldKey() { return getOperand(1); }
-    IRInst* getElementValue() { return getOperand(2); }
-    IRInst* getPrimalElementType()
-    {
-        if (getOperandCount() != 4)
-            return nullptr;
-        return getOperand(3);
+        List<IRInst*> result;
+        for (UInt i = 0; i < getAccessKeyCount(); i++)
+            result.add(getAccessKey(i));
+        return result;
     }
 };
 
@@ -2827,6 +2806,7 @@ public:
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
 
     IRInst* addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key);
+    IRInst* addPrimalElementTypeDecoration(IRInst* target, IRInst* type);
 
     // Add a differentiable type entry to the appropriate dictionary.
     IRInst* addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness);
@@ -3177,13 +3157,29 @@ public:
         IRInst*    base,
         IRInst*    index);
 
+    IRInst* emitElementExtract(
+        IRInst* base,
+        IRInst* index);
+
+    IRInst* emitElementExtract(
+        IRInst* base,
+        const ArrayView<IRInst*>& accessChain);
+
     IRInst* emitElementAddress(
         IRType*     type,
         IRInst*    basePtr,
         IRInst*    index);
 
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        IRInst* index);
+
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain);
+
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
-    IRInst* emitUpdateField(IRInst* base, IRInst* fieldKey, IRInst* newFieldVal);
+    IRInst* emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement);
 
     IRInst* emitGetAddress(
         IRType* type,

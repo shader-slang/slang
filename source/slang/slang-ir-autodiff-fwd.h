@@ -63,8 +63,6 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr);
 
-    InstPair transcribeUpdateField(IRBuilder* builder, IRInst* originalInst);
-
     InstPair transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst);
 
     InstPair transcribeLoop(IRBuilder* builder, IRLoop* origLoop);
@@ -97,9 +95,9 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     virtual InstPair transcribeInstImpl(IRBuilder* builder, IRInst* origInst) override;
 
-    virtual IROp getDifferentiableMethodDictionaryItemOp() override
+    virtual IROp getInterfaceRequirementDerivativeDecorationOp() override
     {
-        return kIROp_ForwardDifferentiableMethodRequirementDictionaryItem;
+        return kIROp_ForwardDerivativeDecoration;
     }
 
 };

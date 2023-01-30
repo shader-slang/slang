@@ -579,30 +579,19 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(IRBuilder* bui
     {
         return InstPair(primal, nullptr);
     }
-    auto dict = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
-    if (!dict)
+    auto decor = 
+        lookupInst->getRequirementKey()->findDecorationImpl(
+            getInterfaceRequirementDerivativeDecorationOp());
+    if (!decor)
     {
         return InstPair(primal, nullptr);
     }
 
-    for (auto child : dict->getChildren())
+    auto diffKey = decor->getOperand(0);
+    if (auto diffType = findInterfaceRequirement(interfaceType, diffKey))
     {
-        if (auto item = as<IRDifferentiableMethodRequirementDictionaryItem>(child))
-        {
-            if (item->getOp() == getDifferentiableMethodDictionaryItemOp())
-            {
-                if (item->getOperand(0) == lookupInst->getRequirementKey())
-                {
-                    auto diffKey = item->getOperand(1);
-                    if (auto diffType = findInterfaceRequirement(interfaceType, diffKey))
-                    {
-                        auto diff = builder->emitLookupInterfaceMethodInst((IRType*)diffType, primalWt, diffKey);
-                        return InstPair(primal, diff);
-                    }
-                    break;
-                }
-            }
-        }
+        auto diff = builder->emitLookupInterfaceMethodInst((IRType*)diffType, primalWt, diffKey);
+        return InstPair(primal, diff);
     }
     return InstPair(primal, nullptr);
 }

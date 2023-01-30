@@ -1957,6 +1957,10 @@ SLANG_GFX_IMPORT Result gfxGetFormatInfo(Format format, FormatInfo *outInfo);
 /// Given a type returns a function that can construct it, or nullptr if there isn't one
 SLANG_GFX_IMPORT Result gfxCreateDevice(const DeviceDesc* desc, out Optional<IDevice> outDevice);
 
+/// Reports current set of live objects in gfx.
+/// Currently this only calls D3D's ReportLiveObjects.
+SLANG_GFX_IMPORT Result gfxReportLiveObjects();
+
 /// Sets a callback for receiving debug messages.
 /// The layer does not hold a strong reference to the callback object.
 /// The user is responsible for holding the callback object alive.
