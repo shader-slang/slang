@@ -419,12 +419,6 @@ struct CFGNormalizationPass
                 if (isLoopTrivial(as<IRLoop>(branchInst)))
                 {
                     auto firstLoopBlock = as<IRLoop>(branchInst)->getTargetBlock();
-                    auto terminator = firstLoopBlock->getTerminator();
-                    
-                    // We really shouldn't see a conditional branch on a trivial loop
-                    // but if we hit this assert, handle this case.
-                    //
-                    SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(terminator));
                     
                     // Normalize the region from the first loop block till break.
                     auto preBreakEndPoint = getNormalizedRegionEndpoint(
@@ -583,6 +577,7 @@ struct CFGNormalizationPass
 };
 
 void normalizeCFG(
+    SharedIRBuilder*                  sharedBuilder,
     IRGlobalValueWithCode*            func,
     IRCFGNormalizationPass const&     options)
 {
@@ -591,9 +586,7 @@ void normalizeCFG(
     // 
     eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func);
 
-    SharedIRBuilder sharedBuilder(func->getModule());
-    sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
-    CFGNormalizationContext context = {&sharedBuilder, options.sink};   
+    CFGNormalizationContext context = {sharedBuilder, options.sink};   
     CFGNormalizationPass cfgPass(context);
     
     List<IRBlock*> workList;
@@ -622,7 +615,7 @@ void normalizeCFG(
     }
 
     disableIRValidationAtInsert();
-    constructSSA(&sharedBuilder, func);
+    constructSSA(sharedBuilder, func);
     enableIRValidationAtInsert();
 }
 
