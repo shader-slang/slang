@@ -511,7 +511,7 @@ namespace Slang
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
 
         IRCFGNormalizationPass cfgPass = {this->getSink()};
-        normalizeCFG(func);
+        normalizeCFG(autoDiffSharedContext->sharedBuilder, func);
 
         AutoDiffAddressConversionPolicy cvtPolicty;
         cvtPolicty.diffTypeContext = &diffTypeContext;
@@ -545,6 +545,8 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
+        
+        autoDiffSharedContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(

@@ -19,6 +19,7 @@ namespace Slang
         /// "after" block.
         ///
     void normalizeCFG(
+        SharedIRBuilder*                                 sharedBuilder,
         IRGlobalValueWithCode*                           func,
         IRCFGNormalizationPass const& options = IRCFGNormalizationPass());
     
