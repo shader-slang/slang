@@ -62,7 +62,7 @@ namespace Slang
         //
         while( auto arrayType = as<ArrayExpressionType>(type) )
         {
-            type = arrayType->baseType;
+            type = arrayType->getElementType();
         }
 
         if( auto parameterGroupType = as<ParameterGroupType>(type) )
@@ -1125,7 +1125,7 @@ namespace Slang
                     if(!intVal)
                     {
                         sink->diagnose(param.loc, Diagnostics::expectedValueOfTypeForSpecializationArg, paramDecl->getType(), paramDecl);
-                        intVal = getLinkage()->getASTBuilder()->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), 0);
+                        intVal = getLinkage()->getASTBuilder()->getIntVal(m_astBuilder->getIntType(), 0);
                     }
 
                     ModuleSpecializationInfo::GenericArgInfo expandedArg;

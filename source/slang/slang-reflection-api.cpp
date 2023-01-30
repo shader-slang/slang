@@ -149,7 +149,7 @@ static SlangParameterCategory maybeRemapParameterCategory(
         // of this variable?
         Type* type = typeLayout->getType();
         while (auto arrayType = as<ArrayExpressionType>(type))
-            type = arrayType->baseType;
+            type = arrayType->getElementType();
         switch (spReflectionType_GetKind(convert(type)))
         {
             case SLANG_TYPE_KIND_CONSTANT_BUFFER:
@@ -462,7 +462,7 @@ SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
 
     if(auto arrayType = as<ArrayExpressionType>(type))
     {
-        return arrayType->arrayLength ? (size_t) getIntVal(arrayType->arrayLength) : 0;
+        return !arrayType->isUnsized() ? (size_t)getIntVal(arrayType->getElementCount()) : 0;
     }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {
@@ -479,7 +479,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
 
     if(auto arrayType = as<ArrayExpressionType>(type))
     {
-        return (SlangReflectionType*) arrayType->baseType;
+        return (SlangReflectionType*) arrayType->getElementType();
     }
     else if( auto parameterGroupType = as<ParameterGroupType>(type))
     {
@@ -631,7 +631,7 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
 
     while(auto arrayType = as<ArrayExpressionType>(type))
     {
-        type = arrayType->baseType;
+        type = arrayType->getElementType();
     }
 
     if(auto textureType = as<TextureTypeBase>(type))
@@ -667,7 +667,7 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
 
     while(auto arrayType = as<ArrayExpressionType>(type))
     {
-        type = arrayType->baseType;
+        type = arrayType->getElementType();
     }
 
     if(auto textureType = as<TextureTypeBase>(type))
@@ -763,7 +763,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
 
     while(auto arrayType = as<ArrayExpressionType>(type))
     {
-        type = arrayType->baseType;
+        type = arrayType->getElementType();
     }
 
     if (auto textureType = as<TextureTypeBase>(type))
@@ -1492,9 +1492,11 @@ namespace Slang
                 LayoutSize elementCount = LayoutSize::infinite();
                 if( auto arrayType = as<ArrayExpressionType>(arrayTypeLayout->type) )
                 {
-                    if( auto elementCountVal = arrayType->arrayLength )
+                    if( auto elementCountVal = arrayType->getElementCount() )
                     {
                         elementCount = LayoutSize::RawValue(getIntVal(elementCountVal));
+                        if (arrayType->isUnsized())
+                            elementCount = 0;
                     }
                 }
                 addRangesRec(elementTypeLayout, path, multiplier * elementCount);

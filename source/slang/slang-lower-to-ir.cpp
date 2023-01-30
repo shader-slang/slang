@@ -1856,10 +1856,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitArrayExpressionType(ArrayExpressionType* type)
     {
-        auto elementType = lowerType(context, type->baseType);
-        if (type->arrayLength)
+        auto elementType = lowerType(context, type->getElementType());
+        if (!type->isUnsized())
         {
-            auto elementCount = lowerSimpleVal(context, type->arrayLength);
+            auto elementCount = lowerSimpleVal(context, type->getElementCount());
             return getBuilder()->getArrayType(
                 elementType,
                 elementCount);
@@ -1988,15 +1988,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
-    }
-
-    LoweredValInfo visitArrayDifferentiableSubtypeWitness(ArrayDifferentiableSubtypeWitness* witness)
-    {
-        auto supType = lowerType(context, witness->sup);
-        auto witnessTableType = getBuilder()->getWitnessTableType(supType);
-        auto subType = lowerType(context, witness->sub);
-        auto subwitness = lowerVal(context, witness->baseWitness);
-        return LoweredValInfo::simple(getBuilder()->emitArrayDifferentiableWitness(witnessTableType, subType, subwitness.val));
     }
 
     LoweredValInfo visitTaggedUnionType(TaggedUnionType* type)
@@ -3394,18 +3385,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) getIntVal(arrayType->arrayLength);
-
-            auto irDefaultElement = getSimpleVal(context, getDefaultVal(arrayType->baseType));
-
-            List<IRInst*> args;
-            for(UInt ee = 0; ee < elementCount; ++ee)
-            {
-                args.add(irDefaultElement);
-            }
+            auto irDefaultElement = getSimpleVal(context, getDefaultVal(arrayType->getElementType()));
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeArray(irType, args.getCount(), args.getBuffer()));
+                getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -3474,7 +3457,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // fill in the appropriate field of the result
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) getIntVal(arrayType->arrayLength);
+            UInt elementCount = (UInt) getIntVal(arrayType->getElementCount());
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -3484,7 +3467,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
             if(elementCount > argCount)
             {
-                auto irDefaultValue = getSimpleVal(context, getDefaultVal(arrayType->baseType));
+                auto irDefaultValue = getSimpleVal(context, getDefaultVal(arrayType->getElementType()));
                 for(UInt ee = argCount; ee < elementCount; ++ee)
                 {
                     args.add(irDefaultValue);

@@ -2117,15 +2117,6 @@ struct IRRTTIObject : IRInst
     IR_LEAF_ISA(RTTIObject)
 };
 
-/// Represents a witness that Array<T:IDifferentiable> : IDifferentiable.
-struct IRArrayDifferentiableWitness : IRInst
-{
-    IR_LEAF_ISA(ArrayDifferentiableWitness)
-
-    IRInst* getArrayType() { return getOperand(0); }
-    IRInst* getBaseWitness() { return getOperand(1); }
-};
-
 // An instruction that yields an undefined value.
 //
 // Note that we make this an instruction rather than a value,

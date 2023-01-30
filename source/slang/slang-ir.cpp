@@ -4881,13 +4881,6 @@ namespace Slang
         return irGenericParam;
     }
 
-    IRInst* IRBuilder::emitArrayDifferentiableWitness(IRType* type, IRType* arrayType, IRInst* subwitness)
-    {
-        IRInst* args[2] = { arrayType, subwitness };
-        auto inst = findOrEmitHoistableInst(type, kIROp_ArrayDifferentiableWitness, 2, args);
-        return inst;
-    }
-
     IRBindGlobalGenericParam* IRBuilder::emitBindGlobalGenericParam(
         IRInst* param,
         IRInst* val)
@@ -6750,7 +6743,6 @@ namespace Slang
         case kIROp_WitnessTableEntry:
         case kIROp_InterfaceRequirementEntry:
         case kIROp_Block:
-        case kIROp_ArrayDifferentiableWitness:
             return false;
 
             /// Liveness markers have no side effects

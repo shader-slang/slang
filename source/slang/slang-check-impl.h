@@ -1372,10 +1372,6 @@ namespace Slang
                 // that relationship.
                 AndTypeLeftFlavor,
                 AndTypeRightFlavor,
-
-                // Describes a relationship through array type.
-                // If T:Differentiable, then Array<T> : IDifferentiable.
-                ArrayTypeFlavor
             };
 
             Flavor flavor = DeclFlavor;
@@ -2042,4 +2038,6 @@ namespace Slang
 
         void checkModule(ModuleDecl* programNode);
     };
+
+    bool isUnsizedArrayType(Type* type);
 }

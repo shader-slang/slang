@@ -853,11 +853,11 @@ namespace Slang
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            auto baseDiffType = tryGetDifferentialType(builder, arrayType->baseType);
+            auto baseDiffType = tryGetDifferentialType(builder, arrayType->getElementType());
             if (!baseDiffType) return nullptr;
             return builder->getArrayType(
                 baseDiffType,
-                arrayType->arrayLength);
+                arrayType->getElementCount());
         }
 
         if (auto declRefType = as<DeclRefType>(type))
@@ -946,8 +946,8 @@ namespace Slang
 
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            maybeRegisterDifferentiableType(builder, arrayType->baseType);
-            return;
+            maybeRegisterDifferentiableType(builder, arrayType->getElementType());
+            // Fall through to register the array type itself.
         }
 
         if (auto declRefType = as<DeclRefType>(type))
@@ -990,8 +990,8 @@ namespace Slang
 
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            maybeRegisterDifferentiableTypeRecursive(builder, arrayType->baseType, workingSet);
-            return;
+            maybeRegisterDifferentiableTypeRecursive(builder, arrayType->getElementType(), workingSet);
+            // Fall through to register the array type itself.
         }
 
         if (auto declRefType = as<DeclRefType>(type))
@@ -1204,7 +1204,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::getIntVal(IntegerLiteralExpr* expr)
     {
-        return m_astBuilder->getOrCreate<ConstantIntVal>(expr->type.type, expr->value);
+        return m_astBuilder->getIntVal(expr->type.type, expr->value);
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -1433,7 +1433,7 @@ namespace Slang
             }
         }
 
-        IntVal* result = m_astBuilder->getOrCreate<ConstantIntVal>(invokeExpr.getExpr()->type.type, resultValue);
+        IntVal* result = m_astBuilder->getIntVal(invokeExpr.getExpr()->type.type, resultValue);
         return result;
     }
 
@@ -1517,7 +1517,7 @@ namespace Slang
         {
             // If it's a boolean, we allow promotion to int.
             const IntegerLiteralValue value = IntegerLiteralValue(boolLitExpr.getExpr()->value);
-            return m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getBoolType(), value);
+            return m_astBuilder->getIntVal(m_astBuilder->getBoolType(), value);
         }
 
         if (auto arrayLengthExpr = expr.as<GetArrayLengthExpr>())
@@ -1527,8 +1527,11 @@ namespace Slang
                 auto type = arrayLengthExpr.getExpr()->arrayExpr->type.type->substitute(m_astBuilder, expr.getSubsts());
                 if (auto arrayType = as<ArrayExpressionType>(type))
                 {
-                    if (auto val = as<IntVal>(arrayType->arrayLength))
-                        return val;
+                    if (!arrayType->isUnsized())
+                    {
+                        if (auto val = as<IntVal>(arrayType->getElementCount()))
+                            return val;
+                    }
                 }
             }
         }
@@ -1734,7 +1737,7 @@ namespace Slang
         {
             return CheckSimpleSubscriptExpr(
                 subscriptExpr,
-                baseArrayType->baseType);
+                baseArrayType->getElementType());
         }
         else if (auto vecType = as<VectorExpressionType>(baseType))
         {
@@ -2024,6 +2027,8 @@ namespace Slang
         for (auto & arg : expr->arguments)
         {
             arg = CheckTerm(arg);
+            if (!arg->type.type)
+                __debugbreak();
         }
 
         // If we are in a differentiable function, register differential witness tables involved in
@@ -2146,26 +2151,12 @@ namespace Slang
 
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = m_astBuilder->getDifferentiableInterface();
-        auto differentiableInterfaceType = m_astBuilder->getOrCreateDeclRefType(differentiableInterface, nullptr);
-
-        Type* innerType = primalType;
-        List<ArrayExpressionType*> arrayTypes;
-        while (auto arrType = as<ArrayExpressionType>(innerType))
-        {
-            innerType = arrType->baseType;
-            arrayTypes.add(arrType);
-        }
-        SubtypeWitness* conformanceWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(innerType, differentiableInterface));
+        
+        SubtypeWitness* conformanceWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(primalType, differentiableInterface));
         // Check if the provided type inherits from IDifferentiable.
         // If not, return the original type.
         if (conformanceWitness)
         {
-            for (Index i = arrayTypes.getCount() - 1; i >= 0; i--)
-            {
-                auto arrWitness = m_astBuilder->getOrCreate<ArrayDifferentiableSubtypeWitness>(arrayTypes[i], differentiableInterfaceType);
-                arrWitness->baseWitness = conformanceWitness;
-                conformanceWitness = arrWitness;
-            }
             return m_astBuilder->getDifferentialPairType(primalType, conformanceWitness);
         }
         else
@@ -2434,7 +2425,7 @@ namespace Slang
         if (auto arrType = as<ArrayExpressionType>(expr->arrayExpr->type))
         {
             expr->type = m_astBuilder->getIntType();
-            if (!arrType->arrayLength)
+            if (arrType->isUnsized())
             {
                 getSink()->diagnose(expr, Diagnostics::invalidArraySize);
             }
@@ -2850,7 +2841,7 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), elementCount)));
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
         }
 
         // A swizzle can be used as an l-value as long as there
@@ -2975,7 +2966,7 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), elementCount)));
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
         }
 
         // A swizzle can be used as an l-value as long as there

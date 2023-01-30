@@ -100,8 +100,6 @@ struct AutoDiffTranscriberBase
 
     // Get or construct `:IDifferentiable` conformance for a DifferentiablePair.
     IRWitnessTable* getDifferentialPairWitness(IRBuilder* builder, IRInst* inOriginalDiffPairType, IRInst* inPrimalDiffPairType);
-    // Get or construct `:IDifferentiable` conformance for an ArrayType.
-    IRInst* getArrayTypeWitness(IRBuilder* builder, IRInst* inOriginalArrayType, IRInst* inPrimalArrayType);
 
     IRInst* tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType);
 

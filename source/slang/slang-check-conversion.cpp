@@ -275,10 +275,11 @@ namespace Slang
             // TODO(tfoley): If we can compute the size of the array statically,
             // then we want to check that there aren't too many initializers present
 
-            auto toElementType = toArrayType->baseType;
-
-            if(auto toElementCount = toArrayType->arrayLength)
+            auto toElementType = toArrayType->getElementType();
+            if(!toArrayType->isUnsized())
             {
+                auto toElementCount = toArrayType->getElementCount();
+
                 // In the case of a sized array, we need to check that the number
                 // of elements being initialized matches what was declared.
                 //
@@ -349,7 +350,7 @@ namespace Slang
                 // We have a new type for the conversion, based on what
                 // we learned.
                 toType = m_astBuilder->getArrayType(toElementType,
-                    m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), elementCount));
+                    m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount));
             }
         }
         else if(auto toMatrixType = as<MatrixExpressionType>(toType))

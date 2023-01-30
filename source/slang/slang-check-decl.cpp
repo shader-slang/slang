@@ -955,17 +955,14 @@ namespace Slang
         }
     }
 
-    static bool isUnsizedArrayType(Type* type)
+    bool isUnsizedArrayType(Type* type)
     {
         // Not an array?
         auto arrayType = as<ArrayExpressionType>(type);
         if (!arrayType) return false;
 
         // Explicit element count given?
-        auto elementCount = arrayType->arrayLength;
-        if (elementCount) return true;
-
-        return true;
+        return arrayType->isUnsized();
     }
 
     bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
@@ -3304,7 +3301,7 @@ namespace Slang
             {
                 arg = synth.emitIndexExpr(arg, synth.emitVarExpr(indexVar));
             }
-            auto assignStmt = _synthesizeMemberAssignMemberHelper(synth, funcName, arrayType->baseType, innerLeft, _Move(args), nestingLevel + 1);
+            auto assignStmt = _synthesizeMemberAssignMemberHelper(synth, funcName, arrayType->getElementType(), innerLeft, _Move(args), nestingLevel + 1);
             synth.popScope();
             if (!assignStmt)
                 return nullptr;
@@ -5986,17 +5983,19 @@ namespace Slang
         if (!arrayType) return;
 
         // Explicit element count given?
-        auto elementCount = arrayType->arrayLength;
-        if (elementCount) return;
+        if (!isUnsizedArrayType(arrayType))
+            return;
 
         // No initializer?
         auto initExpr = varDecl->initExpr;
         if(!initExpr) return;
 
+        IntVal* elementCount = nullptr;
+
         // Is the type of the initializer an array type?
         if(auto arrayInitType = as<ArrayExpressionType>(initExpr->type))
         {
-            elementCount = arrayInitType->arrayLength;
+            elementCount = arrayInitType->getElementCount();
         }
         else
         {
@@ -6008,7 +6007,7 @@ namespace Slang
         // and install it into our type.
         varDecl->type.type = getArrayType(
             m_astBuilder,
-            arrayType->baseType,
+            arrayType->getElementType(),
             elementCount);
     }
 
@@ -6017,8 +6016,7 @@ namespace Slang
         auto arrayType = as<ArrayExpressionType>(varDecl->type);
         if (!arrayType) return;
 
-        auto elementCount = arrayType->arrayLength;
-        if (!elementCount)
+        if (arrayType->isUnsized())
         {
             // Note(tfoley): For now we allow arrays of unspecified size
             // everywhere, because some source languages (e.g., GLSL)
@@ -6030,6 +6028,7 @@ namespace Slang
         }
 
         // TODO(tfoley): How to handle the case where bound isn't known?
+        auto elementCount = arrayType->getElementCount();
         if (GetMinBound(elementCount) <= 0)
         {
             getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);

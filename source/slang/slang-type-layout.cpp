@@ -1467,6 +1467,8 @@ static LayoutSize GetElementCount(IntVal* val)
 
     if (auto constantVal = as<ConstantIntVal>(val))
     {
+        if (constantVal->value == kUnsizedArrayMagicLength)
+            return LayoutSize(LayoutSize::RawValue(0));
         return LayoutSize(LayoutSize::RawValue(constantVal->value));
     }
     else if( auto varRefVal = as<GenericParamIntVal>(val) )
@@ -3669,7 +3671,7 @@ static TypeLayoutResult _createTypeLayout(
     }
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        return createArrayLikeTypeLayout(context, arrayType, arrayType->baseType, arrayType->arrayLength);
+        return createArrayLikeTypeLayout(context, arrayType, arrayType->getElementType(), arrayType->getElementCount());
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {

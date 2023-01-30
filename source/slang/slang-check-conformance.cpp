@@ -176,12 +176,6 @@ namespace Slang
                 *link = extractWitness;
                 link = (SubtypeWitness**) &extractWitness->conjunctionWitness;
             }
-            else if (bb->flavor == TypeWitnessBreadcrumb::Flavor::ArrayTypeFlavor)
-            {
-                auto arrayDifferentiableWitness = m_astBuilder->create<ArrayDifferentiableSubtypeWitness>(bb->sub, bb->sup);
-                *link = arrayDifferentiableWitness;
-                link = (SubtypeWitness**)&arrayDifferentiableWitness->baseWitness;
-            }
             // Move on with the list.
             bb = bb->prev;
         }
@@ -499,24 +493,6 @@ namespace Slang
                 return true;
             }
         }
-        else if (auto arrayType = as<ArrayExpressionType>(subType))
-        {
-            // Array<T:Differentiable> conforms to IDifferentiable.
-            if (m_astBuilder->getDifferentiableInterface() == superTypeDeclRef)
-            {
-                Val* baseWitness;
-                if (_isDeclaredSubtype(arrayType->baseType, arrayType->baseType, superTypeDeclRef, &baseWitness, nullptr))
-                {
-                    if (outWitness)
-                    {
-                        auto witness = m_astBuilder->create<ArrayDifferentiableSubtypeWitness>(arrayType, m_astBuilder->getDiffInterfaceType());
-                        witness->baseWitness = as<SubtypeWitness>(baseWitness);
-                        *outWitness = witness;
-                    }
-                    return true;
-                }
-            }
-        }
         // default is failure
         return false;
     }
@@ -552,10 +528,6 @@ namespace Slang
 
     bool SemanticsVisitor::isTypeDifferentiable(Type* type)
     {
-        if (auto arrType = as<ArrayExpressionType>(type))
-        {
-            return isTypeDifferentiable(arrType->baseType);
-        }
         return isDeclaredSubtype(type, m_astBuilder->getDiffInterfaceType());
     }
 

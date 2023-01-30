@@ -544,46 +544,6 @@ Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBu
     return substValue;
 }
 
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayDifferentiableSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-bool ArrayDifferentiableSubtypeWitness::_equalsValOverride(Val* val)
-{
-    if (auto arrayWitness = as<ArrayDifferentiableSubtypeWitness>(val))
-    {
-        return sub->equalsVal(arrayWitness->sub);
-    }
-    return false;
-}
-
-void ArrayDifferentiableSubtypeWitness::_toTextOverride(StringBuilder& out)
-{
-    out << toSlice("ArrayDifferentiableWitness(") << sub << toSlice(")");
-}
-
-HashCode ArrayDifferentiableSubtypeWitness::_getHashCodeOverride()
-{
-    return sub->getHashCode();
-}
-
-Val* ArrayDifferentiableSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
-{
-    int diff = 0;
-
-    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
-    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
-    auto substBase = as<SubtypeWitness>(baseWitness->substituteImpl(astBuilder, subst, &diff));
-
-    if (!diff)
-        return this;
-
-    (*ioDiff)++;
-
-    ArrayDifferentiableSubtypeWitness* substValue = astBuilder->create<ArrayDifferentiableSubtypeWitness>(substSub, substSup);
-    substValue->baseWitness = substBase;
-    return substValue;
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TaggedUnionSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 bool TaggedUnionSubtypeWitness::_equalsValOverride(Val* val)
@@ -944,7 +904,7 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
     *ioDiff += diff;
 
     if (evaluatedTerms.getCount() == 0)
-        return astBuilder->getOrCreate<ConstantIntVal>(type, evaluatedConstantTerm);
+        return astBuilder->getIntVal(type, evaluatedConstantTerm);
     if (diff != 0)
     {
         auto newPolynomial = astBuilder->create<PolynomialIntVal>(type);
@@ -1257,7 +1217,7 @@ IntVal* PolynomialIntVal::canonicalize(ASTBuilder* builder)
         return terms[0]->paramFactors[0]->param;
     }
     if (terms.getCount() == 0)
-        return builder->getOrCreate<ConstantIntVal>(type, constantTerm);
+        return builder->getIntVal(type, constantTerm);
     return this;
 }
 
@@ -1429,7 +1389,7 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
         {
             SLANG_UNREACHABLE("constant folding of FuncCallIntVal");
         }
-        return astBuilder->getOrCreate<ConstantIntVal>(resultType, resultValue);
+        return astBuilder->getIntVal(resultType, resultValue);
     }
     return nullptr;
 }
