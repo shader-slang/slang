@@ -199,6 +199,13 @@ namespace Slang
         if(inst->getFullType())
             validateIRInstOperand(context, inst, &inst->typeUse);
 
+        // Avoid validating decoration operands
+        // since they don't have to conform to inst visibility
+        // constraints.
+        // 
+        if (as<IRDecoration>(inst))
+            return;
+
         UInt operandCount = inst->getOperandCount();
         for (UInt ii = 0; ii < operandCount; ++ii)
         {

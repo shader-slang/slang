@@ -969,8 +969,8 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
             }
             else
             {
-                auto diffType = _differentiateTypeImpl(builder, origType);
                 IRInst* primal = maybeCloneForPrimalInst(builder, origType);
+                auto diffType = _differentiateTypeImpl(builder, origType);
                 result = InstPair(primal, diffType);
             }
         }

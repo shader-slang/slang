@@ -3,6 +3,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-autodiff-cfg-norm.h"
 #include "slang-ir-util.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-ssa-simplification.h"
@@ -16,7 +17,7 @@ namespace Slang
     IRFuncType* BackwardDiffTranscriberBase::differentiateFunctionTypeImpl(IRBuilder* builder, IRFuncType* funcType, IRInst* intermeidateType)
     {
         List<IRType*> newParameterTypes;
-        IRType* diffReturnType;
+        IRType* diffReturnType; 
 
         for (UIndex i = 0; i < funcType->getParamCount(); i++)
         {
@@ -508,6 +509,9 @@ namespace Slang
             convertFuncToSingleReturnForm(func->getModule(), func);
         }
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
+
+        IRCFGNormalizationPass cfgPass = {this->getSink()};
+        normalizeCFG(func);
 
         AutoDiffAddressConversionPolicy cvtPolicty;
         cvtPolicty.diffTypeContext = &diffTypeContext;
