@@ -1195,6 +1195,14 @@ struct DiffTransposePass
             
             case kIROp_MakeVector:
                 return transposeMakeVector(builder, fwdInst, revValue);
+            case kIROp_MakeVectorFromScalar:
+                return transposeMakeVectorFromScalar(builder, fwdInst, revValue);
+            case kIROp_MakeMatrixFromScalar:
+                return transposeMakeMatrixFromScalar(builder, fwdInst, revValue);
+            case kIROp_MakeMatrix:
+                return transposeMakeMatrix(builder, fwdInst, revValue);
+            case kIROp_MatrixReshape:
+                return transposeMatrixReshape(builder, fwdInst, revValue);
             case kIROp_MakeStruct:
                 return transposeMakeStruct(builder, fwdInst, revValue);
             case kIROp_MakeArray:
@@ -1348,24 +1356,182 @@ struct DiffTransposePass
                             fwdGetDiff)));
     }
 
+    TranspositionResult transposeMakeVectorFromScalar(IRBuilder* builder, IRInst* fwdMakeVector, IRInst* revValue)
+    {
+        auto vectorType = as<IRVectorType>(revValue->getDataType());
+        SLANG_RELEASE_ASSERT(vectorType);
+        auto vectorSize = as<IRIntLit>(vectorType->getElementCount());
+        SLANG_RELEASE_ASSERT(vectorSize);
+
+        List<RevGradient> gradients;
+        for (UIndex ii = 0; ii < (UIndex)vectorSize->getValue(); ii++)
+        {
+            auto revComp = builder->emitElementExtract(revValue, builder->getIntValue(builder->getIntType(), ii));
+            gradients.add(RevGradient(
+                            RevGradient::Flavor::Simple,
+                            fwdMakeVector->getOperand(0),
+                            revComp,
+                            fwdMakeVector));
+        }
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeMatrixFromScalar(IRBuilder* builder, IRInst* fwdMakeMatrix, IRInst* revValue)
+    {
+        auto matrixType = as<IRMatrixType>(revValue->getDataType());
+        SLANG_RELEASE_ASSERT(matrixType);
+        auto row = as<IRIntLit>(matrixType->getRowCount());
+        auto col = as<IRIntLit>(matrixType->getColumnCount());
+        SLANG_RELEASE_ASSERT(row && col);
+
+        List<RevGradient> gradients;
+        for (UIndex r = 0; r < (UIndex)row->getValue(); r++)
+        {
+            for (UIndex c = 0; c < (UIndex)col->getValue(); c++)
+            {
+                auto revRow = builder->emitElementExtract(revValue, builder->getIntValue(builder->getIntType(), r));
+                auto revCol = builder->emitElementExtract(revRow, builder->getIntValue(builder->getIntType(), c));
+                gradients.add(RevGradient(
+                    RevGradient::Flavor::Simple,
+                    fwdMakeMatrix->getOperand(0),
+                    revCol,
+                    fwdMakeMatrix));
+            }
+        }
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeMatrix(IRBuilder* builder, IRInst* fwdMakeMatrix, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto matrixType = as<IRMatrixType>(fwdMakeMatrix->getDataType());
+        auto row = as<IRIntLit>(matrixType->getRowCount());
+        auto colCount = matrixType->getColumnCount();
+        IRType* rowVectorType = nullptr;
+        for (UIndex ii = 0; ii < fwdMakeMatrix->getOperandCount(); ii++)
+        {
+            auto argOperand = fwdMakeMatrix->getOperand(ii);
+            IRInst* gradAtIndex = nullptr;
+            if (auto vecType = as<IRVectorType>(argOperand->getDataType()))
+            {
+                gradAtIndex = builder->emitElementExtract(
+                    argOperand->getDataType(),
+                    revValue,
+                    builder->getIntValue(builder->getIntType(), ii));
+            }
+            else
+            {
+                SLANG_RELEASE_ASSERT(row);
+                UInt rowIndex = ii / row->getValue();
+                UInt colIndex = ii % row->getValue();
+                if (!rowVectorType)
+                    rowVectorType = builder->getVectorType(matrixType->getElementType(), colCount);
+                auto revRow = builder->emitElementExtract(
+                    rowVectorType,
+                    revValue,
+                    builder->getIntValue(builder->getIntType(), rowIndex));
+                gradAtIndex = builder->emitElementExtract(
+                    matrixType->getElementType(),
+                    revRow,
+                    builder->getIntValue(builder->getIntType(), colIndex));
+            }
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeMatrix->getOperand(ii),
+                gradAtIndex,
+                fwdMakeMatrix));
+        }
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMatrixReshape(IRBuilder* builder, IRInst* fwdMatrixReshape, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto operandMatrixType = as<IRMatrixType>(fwdMatrixReshape->getOperand(0)->getDataType());
+        SLANG_RELEASE_ASSERT(operandMatrixType);
+
+        auto operandRow = as<IRIntLit>(operandMatrixType->getRowCount());
+        auto operandCol = as<IRIntLit>(operandMatrixType->getColumnCount());
+        SLANG_RELEASE_ASSERT(operandRow && operandCol);
+
+        auto revMatrixType = as<IRMatrixType>(revValue->getDataType());
+        SLANG_RELEASE_ASSERT(revMatrixType);
+        auto revRow = as<IRIntLit>(revMatrixType->getRowCount());
+        auto revCol = as<IRIntLit>(revMatrixType->getColumnCount());
+        SLANG_RELEASE_ASSERT(revRow && revCol);
+
+        IRInst* dzero = nullptr;
+        List<IRInst*> elements;
+        for (IRIntegerValue r = 0; r < operandRow->getValue(); r++)
+        {
+            IRInst* dstRow = nullptr;
+            if (r < revRow->getValue())
+                dstRow = builder->emitElementExtract(revValue, builder->getIntValue(builder->getIntType(), r));
+            for (IRIntegerValue c = 0; c < operandCol->getValue(); c++)
+            {
+                IRInst* element = nullptr;
+                if (r < revRow->getValue() && c < revCol->getValue())
+                {
+                    element = builder->emitElementExtract(dstRow, builder->getIntValue(builder->getIntType(), c));
+                }
+                else
+                {
+                    if (!dzero)
+                    {
+                        dzero = builder->getFloatValue(operandMatrixType->getElementType(), 0.0f);
+                    }
+                    element = dzero;
+                }
+                elements.add(element);
+            }
+        }
+        auto gradToProp = builder->emitMakeMatrix(operandMatrixType, (UInt)elements.getCount(), elements.getBuffer());
+        gradients.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            fwdMatrixReshape->getOperand(0),
+            gradToProp,
+            fwdMatrixReshape));
+        return TranspositionResult(gradients);
+    }
+
     TranspositionResult transposeMakeVector(IRBuilder* builder, IRInst* fwdMakeVector, IRInst* revValue)
     {
-        // For now, we support only vector types. Extend this to other built-in types if necessary.
-        SLANG_ASSERT(fwdMakeVector->getOp() == kIROp_MakeVector);
-
         List<RevGradient> gradients;
         for (UIndex ii = 0; ii < fwdMakeVector->getOperandCount(); ii++)
         {
-            auto gradAtIndex = builder->emitElementExtract(
-                fwdMakeVector->getOperand(ii)->getDataType(),
-                revValue,
-                builder->getIntValue(builder->getIntType(), ii));
+            auto argOperand = fwdMakeVector->getOperand(ii);
+            UInt componentCount = 1;
+            if (auto vecType = as<IRVectorType>(argOperand->getDataType()))
+            {
+                auto intConstant = as<IRIntLit>(vecType->getElementCount());
+                SLANG_RELEASE_ASSERT(intConstant);
+                componentCount = (UInt)intConstant->getValue();
+            }
+            IRInst* gradAtIndex = nullptr;
+            if (componentCount == 1)
+            {
+                gradAtIndex = builder->emitElementExtract(
+                    argOperand->getDataType(),
+                    revValue,
+                    builder->getIntValue(builder->getIntType(), ii));
+            }
+            else
+            {
+                ShortList<UInt> componentIndices;
+                for (UInt index = ii; index < ii + componentCount; index++)
+                    componentIndices.add(index);
+                gradAtIndex = builder->emitSwizzle(
+                    argOperand->getDataType(),
+                    revValue,
+                    componentCount,
+                    componentIndices.getArrayView().getBuffer());
+            }
 
             gradients.add(RevGradient(
-                            RevGradient::Flavor::Simple,
-                            fwdMakeVector->getOperand(ii),
-                            gradAtIndex,
-                            fwdMakeVector));
+                RevGradient::Flavor::Simple,
+                fwdMakeVector->getOperand(ii),
+                gradAtIndex,
+                fwdMakeVector));
         }
 
         // (A = float3(X, Y, Z)) -> [(dX += dA), (dY += dA), (dZ += dA)]
