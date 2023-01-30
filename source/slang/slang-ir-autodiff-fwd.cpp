@@ -527,6 +527,9 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
                     auto diffArg = lookupDiffInst(origArg, nullptr);
                     if (diffArg)
                         newArgs.add(diffArg);
+                    else
+                        newArgs.add(
+                            getDifferentialZeroOfType(builder, origArg->getDataType()));
                 }
             }
 
@@ -581,11 +584,11 @@ InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder* builder, IRInst* ori
     switch(origInst->getOp())
     {
         case kIROp_FloatLit:
-            return InstPair(origInst, builder->getFloatValue(origInst->getDataType(), 0.0f));
+            return InstPair(origInst, nullptr);
         case kIROp_VoidLit:
             return InstPair(origInst, origInst);
         case kIROp_IntLit:
-            return InstPair(origInst, builder->getIntValue(origInst->getDataType(), 0));
+            return InstPair(origInst, nullptr);
     }
 
     getSink()->diagnose(
@@ -943,9 +946,15 @@ InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(IRBuilder* build
     SLANG_ASSERT(primalVal);
     auto diffPrimalVal = findOrTranscribePrimalInst(builder, origInst->getDifferentialValue());
     SLANG_ASSERT(diffPrimalVal);
+
     auto primalDiffVal = findOrTranscribeDiffInst(builder, origInst->getPrimalValue());
+    if (!primalDiffVal)
+        primalDiffVal = getDifferentialZeroOfType(builder, origInst->getPrimalValue()->getDataType());
     SLANG_ASSERT(primalDiffVal);
+
     auto diffDiffVal = findOrTranscribeDiffInst(builder, origInst->getDifferentialValue());
+    if (!diffDiffVal)
+        diffDiffVal = getDifferentialZeroOfType(builder, origInst->getDifferentialValue()->getDataType());
     SLANG_ASSERT(diffDiffVal);
 
     auto primalPairType = findOrTranscribePrimalInst(builder, origInst->getFullType());

@@ -1528,9 +1528,6 @@ struct DiffTransposePass
 
             IRInst* newInst = builder->emitMakeVector(targetType, operands.getCount(), operands.getBuffer());
             
-            if (isDifferentialInst(inst))
-                builder->markInstAsDifferential(newInst);
-            
             return newInst;
         }
         
@@ -1559,6 +1556,11 @@ struct DiffTransposePass
                 builder->setInsertAfter(operand);
 
                 IRInst* newOperand = promoteToType(builder, targetType, operand);
+                
+                if (isDifferentialInst(operand))
+                    builder->markInstAsDifferential(
+                        newOperand, tryGetPrimalTypeFromDiffInst(fwdInst));
+
                 newOperands.add(newOperand);
 
                 needNewInst = true;
@@ -1581,7 +1583,8 @@ struct DiffTransposePass
             builder->setInsertLoc(oldLoc);
 
             if (isDifferentialInst(fwdInst))
-                builder->markInstAsDifferential(newInst);
+                builder->markInstAsDifferential(
+                    newInst, tryGetPrimalTypeFromDiffInst(fwdInst));
 
             return newInst;
         }

@@ -49,11 +49,9 @@ float test_nested_if_else_single_iter_loop(float y)
                 break;
             }
         }
-        else
-        {
-            x = y * 6.0f;
-            break;
-        }
+
+        x = y * 6.0f;
+        break;
     }
 
     return x;
