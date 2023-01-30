@@ -6452,14 +6452,7 @@ namespace Slang
         this->parent = inParent;
         
 #if _DEBUG
-        // Disabling this for now. There's a case in 
-        // constructSSA that clones decorations on a param
-        // that hasn't yet been inserted into a block.
-        // This causes validation to fail because the decoration
-        // type is in IRModule, but the param is not nested under the 
-        // module yet.
-        // 
-        // validateIRInstOperands(this);
+        validateIRInstOperands(this);
 #endif
     }
 

@@ -3,6 +3,8 @@
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-ssa.h"
 
+#include "slang-ir-validate.h"
+
 namespace Slang
 {
 
@@ -590,6 +592,7 @@ void normalizeCFG(
     eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func);
 
     SharedIRBuilder sharedBuilder(func->getModule());
+    sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
     CFGNormalizationContext context = {&sharedBuilder, options.sink};   
     CFGNormalizationPass cfgPass(context);
     
@@ -618,7 +621,9 @@ void normalizeCFG(
         }
     }
 
-    constructSSA(func->getModule(), func);
+    disableIRValidationAtInsert();
+    constructSSA(&sharedBuilder, func);
+    enableIRValidationAtInsert();
 }
 
 }
