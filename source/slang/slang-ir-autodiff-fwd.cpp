@@ -1206,6 +1206,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_VectorReshape:
     case kIROp_IntCast:
     case kIROp_FloatCast:
+    case kIROp_MakeVectorFromScalar:
     case kIROp_MakeStruct:
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
@@ -1220,7 +1221,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_swizzle:
         return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
     
-    case kIROp_MakeVectorFromScalar:
     case kIROp_MakeTuple:
         return transcribeByPassthrough(builder, origInst);
     case kIROp_UpdateElement:

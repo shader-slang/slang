@@ -534,31 +534,7 @@ void stripNoDiffTypeAttribute(IRModule* module)
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst)
 {
-    HashSet<IRInst*> processedSet;
-    for (;typeInst;)
-    {
-        if (as<IRArrayTypeBase>(typeInst) || as<IRPtrTypeBase>(typeInst))
-        {
-            typeInst = typeInst->getOperand(0);
-            if (!processedSet.Add(typeInst))
-                return false;
-        }
-        else
-        {
-            break;
-        }
-    }
-    if (!typeInst)
-        return false;
-    switch (typeInst->getOp())
-    {
-    case kIROp_FloatType:
-    case kIROp_DifferentialPairType:
-        return true;
-    default:
-        break;
-    }
-    if (context.lookUpConformanceForType(typeInst))
+    if (context.isDifferentiableType((IRType*)typeInst))
         return true;
     // Look for equivalent types.
     for (auto type : context.differentiableWitnessDictionary)

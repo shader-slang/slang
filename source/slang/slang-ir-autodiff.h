@@ -190,6 +190,30 @@ struct DifferentiableTypeConformanceContext
         }
     }
 
+    bool isDifferentiableType(IRType* origType)
+    {
+        for (; origType;)
+        {
+            switch (origType->getOp())
+            {
+            case kIROp_FloatType:
+            case kIROp_HalfType:
+            case kIROp_DoubleType:
+                return true;
+            case kIROp_VectorType:
+            case kIROp_ArrayType:
+            case kIROp_PtrType:
+            case kIROp_OutType:
+            case kIROp_InOutType:
+                origType = (IRType*)origType->getOperand(0);
+                continue;
+            default:
+                return lookUpConformanceForType(origType) != nullptr;
+            }
+        }
+        return false;
+    }
+
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);

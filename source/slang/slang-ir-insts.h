@@ -2926,6 +2926,9 @@ public:
         IRType*         type,
         UInt            argCount,
         IRInst* const* args);
+    IRInst* emitMakeVectorFromScalar(
+        IRType* type,
+        IRInst* scalarValue);
 
     IRInst* emitMakeVector(
         IRType*                 type,
@@ -2933,6 +2936,7 @@ public:
     {
         return emitMakeVector(type, args.getCount(), args.getBuffer());
     }
+    IRInst* emitMatrixReshape(IRType* type, IRInst* inst);
 
     IRInst* emitMakeMatrix(
         IRType*         type,

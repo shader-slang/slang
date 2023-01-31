@@ -326,6 +326,8 @@ namespace Slang
         All = 7
     };
 
+    const int kUnsizedArrayMagicLength = 0x7FFFFFFF;
+
         /// Get the module dclaration that a declaration is associated with, if any.
     ModuleDecl* getModuleDecl(Decl* decl);
 

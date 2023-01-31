@@ -513,6 +513,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 vecType->elementCount = ExtractGenericArgInteger(subst->getArgs()[1]);
                 return vecType;
             }
+            else if (magicMod->magicName == "ArrayType")
+            {
+                SLANG_ASSERT(subst && subst->getArgs().getCount() == 2);
+                auto vecType = astBuilder->getOrCreate<ArrayExpressionType>(ExtractGenericArgType(subst->getArgs()[0]), ExtractGenericArgInteger(subst->getArgs()[1]));
+                vecType->declRef = declRef;
+                return vecType;
+            }
             else if (magicMod->magicName == "Matrix")
             {
                 SLANG_ASSERT(subst && subst->getArgs().getCount() == 3);
@@ -1097,19 +1104,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         Type* elementType,
         IntVal*         elementCount)
     {
-        auto arrayType = astBuilder->create<ArrayExpressionType>();
-        arrayType->baseType = elementType;
-        arrayType->arrayLength = elementCount;
-        return arrayType;
+        return astBuilder->getArrayType(elementType, elementCount);
     }
 
     ArrayExpressionType* getArrayType(
         ASTBuilder* astBuilder,
         Type* elementType)
     {
-        auto arrayType = astBuilder->create<ArrayExpressionType>();
-        arrayType->baseType = elementType;
-        return arrayType;
+        return astBuilder->getArrayType(elementType, nullptr);
     }
 
     NamedExpressionType* getNamedType(

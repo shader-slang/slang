@@ -3723,6 +3723,18 @@ namespace Slang
             &defaultValue);
     }
 
+    IRInst* IRBuilder::emitMakeVectorFromScalar(
+        IRType* type,
+        IRInst* scalarValue)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeVectorFromScalar, 1, &scalarValue);
+    }
+
+    IRInst* IRBuilder::emitMatrixReshape(IRType* type, IRInst* inst)
+    {
+        return emitIntrinsicInst(type, kIROp_MatrixReshape, 1, &inst);
+    }
+
     IRInst* IRBuilder::emitMakeVector(
         IRType*         type,
         UInt            argCount,

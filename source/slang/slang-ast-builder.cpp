@@ -290,13 +290,18 @@ PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
 
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
 {
-    ArrayExpressionType* arrayType = getOrCreateWithDefaultCtor<ArrayExpressionType>(elementType, elementCount);
-    if (!arrayType->baseType)
+    if (!elementCount)
+        elementCount = getIntVal(getIntType(), kUnsizedArrayMagicLength);
+
+    auto result = getOrCreate<ArrayExpressionType>(elementType, elementCount);
+    if (!result->declRef.decl)
     {
-        arrayType->baseType = elementType;
-        arrayType->arrayLength = elementCount;
+        auto arrayGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("ArrayType"));
+        auto arrayTypeDecl = arrayGenericDecl->inner;
+        auto substitutions = getOrCreate<GenericSubstitution>(arrayGenericDecl, elementType, elementCount);
+        result->declRef = DeclRef<Decl>(arrayTypeDecl, substitutions);
     }
-    return arrayType;
+    return result;
 }
 
 VectorExpressionType* ASTBuilder::getVectorType(
