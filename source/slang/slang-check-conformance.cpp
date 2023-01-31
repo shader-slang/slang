@@ -176,7 +176,6 @@ namespace Slang
                 *link = extractWitness;
                 link = (SubtypeWitness**) &extractWitness->conjunctionWitness;
             }
-
             // Move on with the list.
             bb = bb->prev;
         }
