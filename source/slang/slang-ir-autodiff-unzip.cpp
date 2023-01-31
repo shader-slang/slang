@@ -322,7 +322,10 @@ struct ExtractPrimalFuncContext
             {
                 if (shouldStoreInst(inst))
                 {
-                    builder.setInsertAfter(inst);
+                    if (as<IRParam>(inst))
+                        builder.setInsertBefore(block->getFirstOrdinaryInst());
+                    else
+                        builder.setInsertAfter(inst);
                     storeInst(builder, inst, outIntermediary);
                 }
                 else if (inst->getOp() == kIROp_Var)

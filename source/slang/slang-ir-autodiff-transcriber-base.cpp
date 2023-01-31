@@ -911,12 +911,14 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
 
                 // Tag the differential inst using a decoration (if it doesn't have one)
                 if (!pair.differential->findDecoration<IRDifferentialInstDecoration>() &&
-                    !pair.differential->findDecoration<IRMixedDifferentialInstDecoration>())
+                    !pair.differential->findDecoration<IRMixedDifferentialInstDecoration>() &&
+                    !as<IRConstant>(pair.differential))
                 {
                     // TODO: If the type is a 'relevant' pair type, need to mark it as mixed differential
                     // instead.
                     // 
-                    builder->markInstAsDifferential(pair.differential, as<IRType>(pair.primal->getDataType()));
+                    auto primalType = as<IRType>(pair.primal->getDataType());
+                    builder->markInstAsDifferential(pair.differential, primalType);
                 }
 
                 break;

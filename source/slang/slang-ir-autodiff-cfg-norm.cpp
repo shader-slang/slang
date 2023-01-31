@@ -97,14 +97,6 @@ struct CFGNormalizationPass
             builder->setInsertInto(afterBlock);
             unreachInst->removeAndDeallocate();
 
-            /*
-            HashSet<IRBlock*> predecessorSet;
-            for (auto predecessor : parentAfterBlock->getPredecessors())
-                predecessorSet.Add(predecessor);
-
-            SLANG_ASSERT(predecessorSet.Count() <= 1);
-            */
-
             builder->emitBranch(parentAfterBlock);
         }
     }
@@ -169,6 +161,45 @@ struct CFGNormalizationPass
 
         IRBlock* parentAfterBlock = afterBlocks[0];
 
+        auto addBreakBypassBranch = [&](IRBlock* block)
+        {
+            // We could arrive at the after-block before or
+            // after encountering a break statement.
+            // To handle this, we'll split the flow by checking the break flag
+            // 
+            builder.setInsertAfter(block);
+
+            auto preAfterSplitBlock = builder.emitBlock();
+            preAfterSplitBlock->insertBefore(block);
+
+            auto afterSplitBlock = builder.emitBlock();
+            afterSplitBlock->insertBefore(block);
+
+            block->replaceUsesWith(preAfterSplitBlock);
+
+            builder.setInsertInto(preAfterSplitBlock);
+            builder.emitBranch(afterSplitBlock);
+            
+            // Converging block for the split that we're making.
+            auto afterSplitAfterBlock = builder.emitBlock();
+
+            builder.setInsertInto(afterSplitBlock);
+            auto breakFlagValue = builder.emitLoad(parentRegion->breakVar);
+
+            builder.emitIfElse(
+                breakFlagValue,
+                block,
+                afterSplitAfterBlock,
+                afterSplitAfterBlock);
+
+            // At this point, we need to place afterSplitAfterBlock between
+            // at the _end_ of this region, but we aren't there yet (and 
+            // don't know which block is the end of this region)
+            // Therefore, we'll defer this step and add it to a list for later.
+            // 
+            pendingAfterBlocks.add(afterSplitAfterBlock);
+        };
+
         // Follow this thread of execution till we hit an 
         // acceptable after block.
         //
@@ -210,12 +241,15 @@ struct CFGNormalizationPass
                     auto afterBlock = ifElse->getAfterBlock();
 
                     // Trivial case, both end-points branch into the after block
-                    if (trueTargetBlock == afterBlock && 
+                    /*if (trueTargetBlock == afterBlock && 
                         falseTargetBlock == afterBlock)
                     {
+                        if ()
+                        addBreakBypassBranch(afterBlock);
                         currentBlock = afterBlock;
+                        // TODO: Need to split block.
                         break;
-                    }
+                    }*/
 
                     auto afterBreakRegion = false;
                     auto afterBaseRegion = false;
@@ -281,41 +315,7 @@ struct CFGNormalizationPass
                     // Do we need to split the after region?
                     if (afterBaseRegion && afterBreakRegion)
                     {
-                        // We could arrive at the after-block before or
-                        // after encountering a break statement.
-                        // To handle this, we'll split the flow by checking the break flag
-                        // 
-                        builder.setInsertAfter(afterBlock);
-
-                        auto preAfterSplitBlock = builder.emitBlock();
-                        preAfterSplitBlock->insertBefore(afterBlock);
-
-                        auto afterSplitBlock = builder.emitBlock();
-                        afterSplitBlock->insertBefore(afterBlock);
-
-                        afterBlock->replaceUsesWith(preAfterSplitBlock);
-
-                        builder.setInsertInto(preAfterSplitBlock);
-                        builder.emitBranch(afterSplitBlock);
-                        
-                        // Converging block for the split that we're making.
-                        auto afterSplitAfterBlock = builder.emitBlock();
-
-                        builder.setInsertInto(afterSplitBlock);
-                        auto breakFlagValue = builder.emitLoad(parentRegion->breakVar);
-
-                        builder.emitIfElse(
-                            breakFlagValue,
-                            afterBlock,
-                            afterSplitAfterBlock,
-                            afterSplitAfterBlock);
-
-                        // At this point, we need to place afterSplitAfterBlock between
-                        // at the _end_ of this region, but we aren't there yet (and 
-                        // don't know which block is the end of this region)
-                        // Therefore, we'll defer this step and add it to a list for later.
-                        // 
-                        pendingAfterBlocks.add(afterSplitAfterBlock);
+                        addBreakBypassBranch(afterBlock);
 
                         // Update current block.
                         currentBlock = afterBlock;
@@ -419,12 +419,6 @@ struct CFGNormalizationPass
                 if (isLoopTrivial(as<IRLoop>(branchInst)))
                 {
                     auto firstLoopBlock = as<IRLoop>(branchInst)->getTargetBlock();
-                    auto terminator = firstLoopBlock->getTerminator();
-                    
-                    // We really shouldn't see a conditional branch on a trivial loop
-                    // but if we hit this assert, handle this case.
-                    //
-                    SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(terminator));
                     
                     // Normalize the region from the first loop block till break.
                     auto preBreakEndPoint = getNormalizedRegionEndpoint(
@@ -583,6 +577,7 @@ struct CFGNormalizationPass
 };
 
 void normalizeCFG(
+    SharedIRBuilder*                  sharedBuilder,
     IRGlobalValueWithCode*            func,
     IRCFGNormalizationPass const&     options)
 {
@@ -591,9 +586,7 @@ void normalizeCFG(
     // 
     eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func);
 
-    SharedIRBuilder sharedBuilder(func->getModule());
-    sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
-    CFGNormalizationContext context = {&sharedBuilder, options.sink};   
+    CFGNormalizationContext context = {sharedBuilder, options.sink};   
     CFGNormalizationPass cfgPass(context);
     
     List<IRBlock*> workList;
@@ -622,7 +615,7 @@ void normalizeCFG(
     }
 
     disableIRValidationAtInsert();
-    constructSSA(&sharedBuilder, func);
+    constructSSA(sharedBuilder, func);
     enableIRValidationAtInsert();
 }
 
