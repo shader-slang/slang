@@ -2038,4 +2038,6 @@ namespace Slang
 
         void checkModule(ModuleDecl* programNode);
     };
+
+    bool isUnsizedArrayType(Type* type);
 }

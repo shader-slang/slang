@@ -206,8 +206,7 @@ namespace Slang
         }
         else
         {
-            ConstantIntVal* rangeBeginConst = m_astBuilder->getOrCreate<ConstantIntVal>();
-            rangeBeginConst->value = 0;
+            ConstantIntVal* rangeBeginConst = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 0);
             rangeBeginVal = rangeBeginConst;
         }
 

@@ -194,6 +194,31 @@ IRWitnessTable* AutoDiffTranscriberBase::getDifferentialPairWitness(IRBuilder* b
     return table;
 }
 
+IRInst* AutoDiffTranscriberBase::tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType)
+{
+    IRInst* witness =
+        differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)originalType);
+    if (witness)
+    {
+        witness = lookupPrimalInst(builder, witness, nullptr);
+        SLANG_RELEASE_ASSERT(witness || as<IRArrayType>(originalType));
+    }
+    if (!witness)
+    {
+        auto primalType = lookupPrimalInst(builder, originalType, nullptr);
+        SLANG_RELEASE_ASSERT(primalType);
+        if (auto primalPairType = as<IRDifferentialPairType>(primalType))
+        {
+            witness = getDifferentialPairWitness(builder, originalType, primalPairType);
+        }
+        else if (auto extractExistential = as<IRExtractExistentialType>(originalType))
+        {
+            differentiateExtractExistentialType(builder, extractExistential, witness);
+        }
+    }
+    return witness;
+}
+
 IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness)
 {
     return builder->getDifferentialPairType(
@@ -206,24 +231,8 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
     auto primalType = lookupPrimalInst(builder, originalType, nullptr);
     SLANG_RELEASE_ASSERT(primalType);
 
-    IRInst* witness = 
-        differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)originalType);
-    if (witness)
-    {
-        witness = lookupPrimalInst(builder, witness, nullptr);
-        SLANG_RELEASE_ASSERT(witness);
-    }
-    if (!witness)
-    {
-        if (auto primalPairType = as<IRDifferentialPairType>(primalType))
-        {
-            witness = getDifferentialPairWitness(builder, originalType, primalPairType);
-        }
-        else if (auto extractExistential = as<IRExtractExistentialType>(originalType))
-        {
-            differentiateExtractExistentialType(builder, extractExistential, witness);
-        }
-    }
+    IRInst* witness = tryGetDifferentiableWitness(builder, originalType);
+    SLANG_RELEASE_ASSERT(witness);
 
     return builder->getDifferentialPairType(
         (IRType*)primalType,

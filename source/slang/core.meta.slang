@@ -220,6 +220,12 @@ interface __FlagsEnumType : __EnumType
 {
 };
 
+__generic<T, let N:int>
+__magic_type(ArrayType)
+struct Array
+{
+}
+
 // The "comma operator" is effectively just a generic function that returns its second
 // argument. The left-to-right evaluation order guaranteed by Slang then ensures that
 // `left` is evaluated before `right`.

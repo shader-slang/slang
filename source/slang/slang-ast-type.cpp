@@ -314,62 +314,35 @@ Type* MatrixExpressionType::getRowType()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool ArrayExpressionType::_equalsImplOverride(Type* type)
+Type* ArrayExpressionType::getElementType()
 {
-    auto arrType = as<ArrayExpressionType>(type);
-    if (!arrType)
-        return false;
-    return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->equals(arrType->baseType));
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
 }
 
-Val* ArrayExpressionType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+IntVal* ArrayExpressionType::getElementCount()
 {
-    int diff = 0;
-    auto elementType = as<Type>(baseType->substituteImpl(astBuilder, subst, &diff));
-    IntVal* newArrayLength = nullptr;
-    if (arrayLength)
-    {
-        newArrayLength = as<IntVal>(arrayLength->substituteImpl(astBuilder, subst, &diff));
-        SLANG_ASSERT(newArrayLength);
-    }
-    if (diff)
-    {
-        *ioDiff = 1;
-        auto rsType = getArrayType(
-            astBuilder,
-            elementType,
-            newArrayLength);
-        return rsType;
-    }
-    return this;
-}
-
-Type* ArrayExpressionType::_createCanonicalTypeOverride()
-{
-    auto canonicalElementType = baseType->getCanonicalType();
-    auto canonicalArrayType = getASTBuilder()->getArrayType(
-        canonicalElementType,
-        arrayLength);
-    return canonicalArrayType;
-}
-
-HashCode ArrayExpressionType::_getHashCodeOverride()
-{
-    if (arrayLength)
-        return (baseType->getHashCode() * 16777619) ^ arrayLength->getHashCode();
-    else
-        return baseType->getHashCode();
+    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
 }
 
 void ArrayExpressionType::_toTextOverride(StringBuilder& out)
 {
-    out << baseType;
+    out << getElementType();
     out.appendChar('[');
-    if (arrayLength)
+    if (!isUnsized())
     {
-        out << arrayLength;
+        out << getElementCount();
     }
     out.appendChar(']');
+}
+
+bool ArrayExpressionType::isUnsized()
+{
+    if (auto constSize = as<ConstantIntVal>(getElementCount()))
+    {
+        if (constSize->value == kUnsizedArrayMagicLength)
+            return true;
+    }
+    return false;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypeType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

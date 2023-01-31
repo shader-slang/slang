@@ -1889,16 +1889,18 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
         
-        auto elementCount = (UInt) getIntVal(arrayType->arrayLength);
+        auto elementCount = (UInt) getIntVal(arrayType->getElementCount());
+        if (arrayType->isUnsized())
+            elementCount = 0;
 
         // We use the first element to derive the layout for the element type
-        auto elementTypeLayout = processEntryPointVaryingParameter(context, arrayType->baseType, state, varLayout);
+        auto elementTypeLayout = processEntryPointVaryingParameter(context, arrayType->getElementType(), state, varLayout);
 
         // We still walk over subsequent elements to make sure they consume resources
         // as needed
         for( UInt ii = 1; ii < elementCount; ++ii )
         {
-            processEntryPointVaryingParameter(context, arrayType->baseType, state, nullptr);
+            processEntryPointVaryingParameter(context, arrayType->getElementType(), state, nullptr);
         }
 
         RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
