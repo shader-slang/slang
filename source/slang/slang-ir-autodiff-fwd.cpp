@@ -579,16 +579,15 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
     return InstPair(nullptr, nullptr);
 }
 
-InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
 {
     switch(origInst->getOp())
     {
         case kIROp_FloatLit:
+        case kIROp_IntLit:
             return InstPair(origInst, nullptr);
         case kIROp_VoidLit:
             return InstPair(origInst, origInst);
-        case kIROp_IntLit:
-            return InstPair(origInst, nullptr);
     }
 
     getSink()->diagnose(
