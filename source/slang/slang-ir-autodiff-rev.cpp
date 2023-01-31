@@ -220,7 +220,6 @@ namespace Slang
         case kIROp_Specialize:
             return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
 
-        case kIROp_MakeVectorFromScalar:
         case kIROp_MakeTuple:
         case kIROp_FloatLit:
         case kIROp_IntLit:

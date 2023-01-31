@@ -5613,7 +5613,7 @@ namespace Slang
                     if(unknownCount)
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
-                        suffixBaseType = BaseType::Void;
+                        suffixBaseType = BaseType::Int;
                     }
                     // `u` or `ul` suffix -> `uint`
                     else if(uCount == 1 && (lCount <= 1) && zCount == 0)
@@ -5647,7 +5647,7 @@ namespace Slang
                     else
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
-                        suffixBaseType = BaseType::Void;
+                        suffixBaseType = BaseType::Int;
                     }
                 }
 
@@ -5711,7 +5711,7 @@ namespace Slang
                     if (unknownCount)
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidFloatingPointLiteralSuffix, suffix);
-                        suffixBaseType = BaseType::Void;
+                        suffixBaseType = BaseType::Float;
                     }
                     // `f` suffix -> `float`
                     if(fCount == 1 && !lCount && !hCount)
@@ -5732,7 +5732,7 @@ namespace Slang
                     else
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidFloatingPointLiteralSuffix, suffix);
-                        suffixBaseType = BaseType::Void;
+                        suffixBaseType = BaseType::Float;
                     }
                 }
 

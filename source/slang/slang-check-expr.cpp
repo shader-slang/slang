@@ -2314,6 +2314,7 @@ namespace Slang
             {
                 resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
                 semantics->getSink()->diagnose(funcExpr, Diagnostics::expectedFunction, funcExpr->type.type);
+                return;
             }
             resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType);
             if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
