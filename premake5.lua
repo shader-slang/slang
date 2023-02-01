@@ -38,7 +38,7 @@
 --
 
 -- To output linux will output to linux
--- % premake5 --os=linux gmake --build-location="build.linux"
+-- % premake5 --os=linux gmake2 --build-location="build.linux"
 --
 -- % cd build.linux
 -- % make config=release_x64
@@ -46,7 +46,12 @@
 -- % make config=debug_x64
 --
 -- From in the build directory you can use
--- % premake5 --file=../premake5.lua --os=linux gmake
+-- % premake5 --file=../premake5.lua --os=linux gmake2
+
+-- Fail if we try to use the deprecated 'gmake' generator
+if _ACTION == "gmake" then
+    premake.error "Please use the 'gmake2' generator instead of 'gmake'"
+end
 
 --
 -- Add the package path for slang-pack/slang-util
