@@ -501,6 +501,10 @@ struct DiffTransposePass
         List<IRBlock*> workList;
 
         // Build initial list of blocks to process by checking if they're differential blocks.
+        List<IRBlock*> traverseWorkList;
+        HashSet<IRBlock*> traverseSet;
+        traverseWorkList.add(revDiffFunc->getFirstBlock());
+        traverseSet.Add(revDiffFunc->getFirstBlock());
         for (IRBlock* block = revDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
         {
             if (!isDifferentialInst(block))
@@ -534,10 +538,13 @@ struct DiffTransposePass
         for (auto block : workList)
         {
             // Set dOutParameter as the transpose gradient for the return inst, if any.
-            if (auto returnInst = as<IRReturn>(block->getTerminator()))
+            if (transposeInfo.dOutInst)
             {
-                this->addRevGradientForFwdInst(returnInst, RevGradient(returnInst, transposeInfo.dOutInst, nullptr));
-                retVal = returnInst->getVal();
+                if (auto returnInst = as<IRReturn>(block->getTerminator()))
+                {
+                    this->addRevGradientForFwdInst(returnInst, RevGradient(returnInst, transposeInfo.dOutInst, nullptr));
+                    retVal = returnInst->getVal();
+                }
             }
 
             IRBlock* revBlock = revBlockMap[block];
@@ -575,7 +582,7 @@ struct DiffTransposePass
 
             auto branch = subBuilder.emitBranch(firstRevBlock);
 
-            if (!retVal)
+            if (!retVal || retVal->getOp() == kIROp_VoidLit)
             {
                 retVal = subBuilder.getVoidValue();
             }
@@ -849,6 +856,8 @@ struct DiffTransposePass
             {
                 auto returnPairType = as<IRDifferentialPairType>(
                     tryGetPrimalTypeFromDiffInst(returnInst->getVal()));
+                if (!returnPairType)
+                    return;
                 primalType = returnPairType->getValueType();
             }
             else if (auto loadInst = as<IRLoad>(inst))
@@ -955,21 +964,33 @@ struct DiffTransposePass
         {
             auto arg = fwdCall->getArg(ii);
             
-            // If this isn't a ptr-type, make a var.
-            if (!as<IRPtrTypeBase>(arg->getDataType()) && getDiffPairType(arg->getDataType()))
+            if (arg->getOp() == kIROp_LoadReverseGradient)
             {
+                // Original parameters that are `out DifferentiableType` will turn into
+                // a `in Differential` parameter. The split logic will insert LoadReverseGradient insts
+                // to inform us this case. Here we just need to generate a load of the derivative variable
+                // and use it as the final argument.
+                args.add(builder->emitLoad(arg->getOperand(0)));
+            }
+            else if (!as<IRPtrTypeBase>(arg->getDataType()) && getDiffPairType(arg->getDataType()))
+            {
+                // Normal differentiable input parameter will become an inout DiffPair parameter
+                // in the propagate func. The split logic has already prepared the initial value
+                // to pass in. We need to define a temp variable with this initial value and pass
+                // in the temp variable as argument to the inout parameter.
+
+                auto makePairArg = as<IRMakeDifferentialPair>(arg);
+                SLANG_RELEASE_ASSERT(makePairArg);
+
                 auto pairType = as<IRDifferentialPairType>(arg->getDataType());
-
                 auto var = builder->emitVar(arg->getDataType());
-
-                SLANG_ASSERT(as<IRMakeDifferentialPair>(arg));
 
                 // Initialize this var to (arg.primal, 0).
                 builder->emitStore(
-                    var, 
+                    var,
                     builder->emitMakeDifferentialPair(
                         arg->getDataType(),
-                        as<IRMakeDifferentialPair>(arg)->getPrimalValue(),
+                        makePairArg->getPrimalValue(),
                         builder->emitCallInst(
                             (IRType*)diffTypeContext.getDifferentialForType(builder, pairType->getValueType()),
                             diffTypeContext.getZeroMethodForType(builder, pairType->getValueType()),
@@ -987,9 +1008,12 @@ struct DiffTransposePass
             }
         }
 
-        args.add(revValue);
-        argTypes.add(revValue->getDataType());
-        argRequiresLoad.add(false);
+        if (revValue)
+        {
+            args.add(revValue);
+            argTypes.add(revValue->getDataType());
+            argRequiresLoad.add(false);
+        }
 
         args.add(primalContextDecor->getBackwardDerivativePrimalContextVar());
         argTypes.add(builder->getOutType(
@@ -1024,10 +1048,8 @@ struct DiffTransposePass
                     gradients.add(RevGradient(
                         RevGradient::Flavor::Simple,
                         fwdCall->getArg(ii),
-                        builder->emitLoad(
-                            builder->emitDifferentialPairAddressDifferential(
-                                diffArgPtrType,
-                                args[ii])), 
+                        builder->emitDifferentialPairGetDifferential(
+                            diffArgPtrType, builder->emitLoad(args[ii])),
                         nullptr));
                 }
             }
@@ -1213,6 +1235,8 @@ struct DiffTransposePass
             case kIROp_UpdateElement:
                 return transposeUpdateElement(builder, fwdInst, revValue);
 
+            case kIROp_LoadReverseGradient:
+            case kIROp_DefaultConstruct:
             case kIROp_Specialize:
             case kIROp_unconditionalBranch:
             case kIROp_conditionalBranch:
@@ -1266,8 +1290,8 @@ struct DiffTransposePass
         
         if (as<IRDifferentialPairType>(loadType))
         {
-            auto primalPtr = builder->emitDifferentialPairAddressPrimal(revPtr);
-            auto primalVal = builder->emitLoad(primalPtr);
+            auto primalPairVal = builder->emitLoad(revPtr);
+            auto primalVal = builder->emitDifferentialPairGetPrimal(primalPairVal);
 
             auto pairVal = builder->emitMakeDifferentialPair(loadType, primalVal, aggregateGradient);
 
@@ -1284,12 +1308,21 @@ struct DiffTransposePass
 
     TranspositionResult transposeStore(IRBuilder* builder, IRStore* fwdStore, IRInst*)
     {
+        IRInst* revVal = nullptr;
+        if (auto revGradDecor = fwdStore->getPtr()->findDecoration<IROutParamReverseGradientDecoration>())
+        {
+            revVal = revGradDecor->getValue();
+        }
+        else
+        {
+            revVal = builder->emitLoad(fwdStore->getPtr());
+        }
         return TranspositionResult(
                     List<RevGradient>(
                         RevGradient(
                             RevGradient::Flavor::Simple,
                             fwdStore->getVal(),
-                            builder->emitLoad(fwdStore->getPtr()),
+                            revVal,
                             fwdStore)));
     }
 

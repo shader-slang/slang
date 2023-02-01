@@ -54,11 +54,18 @@ struct AddressInstEliminationContext
         }
     endLoop:;
         auto lastAddr = accessChain.getLast();
-        auto lastVal = builder.emitLoad(lastAddr);
         accessChain.removeLast();
         accessChain.reverse();
-        auto update = builder.emitUpdateElement(lastVal, accessChain, val);
-        builder.emitStore(lastAddr, update);
+        if (accessChain.getCount())
+        {
+            auto lastVal = builder.emitLoad(lastAddr);
+            auto update = builder.emitUpdateElement(lastVal, accessChain, val);
+            builder.emitStore(lastAddr, update);
+        }
+        else
+        {
+            builder.emitStore(lastAddr, val);
+        }
     }
 
     void transformLoadAddr(IRUse* use)
@@ -92,7 +99,22 @@ struct AddressInstEliminationContext
         IRBuilder builder(sharedBuilder);
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
-        builder.emitStore(tempVar, getValue(builder, addr));
+        auto callee = getResolvedInstForDecorations(call->getCallee());
+        auto funcType = as<IRFuncType>(callee->getFullType());
+        SLANG_RELEASE_ASSERT(funcType);
+        UInt paramIndex = (UInt)(use - call->getOperands() - 1);
+        SLANG_RELEASE_ASSERT(call->getArg(paramIndex) == addr);
+        if (!as<IROutType>(funcType->getParamType(paramIndex)))
+        {
+            builder.emitStore(tempVar, getValue(builder, addr));
+        }
+        else
+        {
+            builder.emitStore(
+                tempVar,
+                builder.emitDefaultConstruct(
+                    as<IRPtrTypeBase>(tempVar->getDataType())->getValueType()));
+        }
         builder.setInsertAfter(call);
         storeValue(builder, addr, builder.emitLoad(tempVar));
         use->set(tempVar);
@@ -170,4 +192,5 @@ SlangResult eliminateAddressInsts(
     AddressInstEliminationContext ctx;
     return ctx.eliminateAddressInstsImpl(sharedBuilder, policy, func, sink);
 }
+
 } // namespace Slang

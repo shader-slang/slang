@@ -223,7 +223,9 @@ String dumpIRToString(IRInst* root)
 {
     StringBuilder sb;
     StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
-    dumpIR(root, IRDumpOptions(), nullptr, &writer);
+    IRDumpOptions options = {};
+    options.flags = IRDumpOptions::Flag::DumpDebugIds;
+    dumpIR(root, options, nullptr, &writer);
     return sb.ToString();
 }
 

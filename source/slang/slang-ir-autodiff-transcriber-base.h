@@ -123,6 +123,8 @@ struct AutoDiffTranscriberBase
 
     InstPair transcribeParam(IRBuilder* builder, IRParam* origParam);
 
+    virtual InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType) = 0;
+
     InstPair transcribeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* lookupInst);
 
     InstPair transcribeBlockImpl(IRBuilder* builder, IRBlock* origBlock, HashSet<IRInst*>& instsToSkip);

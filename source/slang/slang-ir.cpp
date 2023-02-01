@@ -3745,15 +3745,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair)
     {
-        return emitIntrinsicInst(
-            diffType,
-            kIROp_DifferentialPairGetDifferential,
-            1,
-            &diffPair);
-    }
-
-    IRInst* IRBuilder::emitDifferentialPairAddressDifferential(IRType* diffType, IRInst* diffPair)
-    {
+        SLANG_ASSERT(as<IRDifferentialPairType>(diffType));
         return emitIntrinsicInst(
             diffType,
             kIROp_DifferentialPairGetDifferential,
@@ -3763,7 +3755,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRInst* diffPair)
     {
-        auto valueType = as<IRDifferentialPairType>(diffPair->getDataType())->getValueType();
+        auto valueType = cast<IRDifferentialPairType>(diffPair->getDataType())->getValueType();
         return emitIntrinsicInst(
             valueType,
             kIROp_DifferentialPairGetPrimal,
@@ -3771,16 +3763,6 @@ namespace Slang
             &diffPair);
     }
 
-    IRInst* IRBuilder::emitDifferentialPairAddressPrimal(IRInst* diffPair)
-    {
-        auto valueType = as<IRDifferentialPairType>(
-            as<IRPtrTypeBase>(diffPair->getDataType())->getValueType())->getValueType();
-        return emitIntrinsicInst(
-            this->getPtrType(kIROp_PtrType, valueType),
-            kIROp_DifferentialPairGetPrimal,
-            1,
-            &diffPair);
-    }
 
     IRInst* IRBuilder::emitMakeMatrix(
         IRType*         type,
@@ -4236,6 +4218,18 @@ namespace Slang
             this,
             kIROp_Var,
             allocatedType);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitLoadReverseGradient(IRType* type, IRInst* diffValue)
+    {
+        auto inst = createInst<IRLoadReverseGradient>(
+            this,
+            kIROp_LoadReverseGradient,
+            type,
+            diffValue);
+
         addInst(inst);
         return inst;
     }
@@ -6818,6 +6812,7 @@ namespace Slang
         case kIROp_MakeTuple:
         case kIROp_GetTupleElement:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
+        case kIROp_LoadReverseGradient:
         case kIROp_ImageSubscript:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:

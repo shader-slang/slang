@@ -107,6 +107,7 @@ struct AutoDiffSharedContext
 
     AutoDiffSharedContext(IRModuleInst* inModuleInst);
 
+    IRInst* findDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairType* diffPairType);
 private:
 
     IRInst* findDifferentiableInterface();
@@ -306,5 +307,7 @@ void stripDerivativeDecorations(IRInst* inst);
 bool isBackwardDifferentiableFunc(IRInst* func);
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
+
+IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey);
 
 };

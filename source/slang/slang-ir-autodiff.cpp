@@ -24,7 +24,7 @@ bool isBackwardDifferentiableFunc(IRInst* func)
     return false;
 }
 
-static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
+IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
     {
@@ -316,6 +316,13 @@ AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
         if (differentialAssocTypeStructKey)
             isInterfaceAvailable = true;
     }
+}
+
+IRInst* AutoDiffSharedContext::findDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairType* diffPairType)
+{
+    auto witness = diffPairType->getWitness();
+    SLANG_RELEASE_ASSERT(witness);
+    return _lookupWitness(builder, witness, differentialAssocTypeStructKey);
 }
 
 IRInst* AutoDiffSharedContext::findDifferentiableInterface()

@@ -8,10 +8,14 @@ namespace Slang
 
 struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 {
+    // Pending values to write back to inout params at the end of the current function.
+    OrderedDictionary<IRInst*, InstPair> mapInOutParamToWriteBackValue;
+
     ForwardDiffTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
         : AutoDiffTranscriberBase(shared, inSharedBuilder, inSink)
     {
     }
+
 
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
     // If no primal name is available, returns a blank string.
@@ -94,6 +98,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
 
     virtual InstPair transcribeInstImpl(IRBuilder* builder, IRInst* origInst) override;
+
+    virtual InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType) override;
 
     virtual IROp getInterfaceRequirementDerivativeDecorationOp() override
     {
