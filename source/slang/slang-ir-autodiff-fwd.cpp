@@ -416,7 +416,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 auto pairPtrType = as<IRPtrTypeBase>(pairType);
                 auto pairValType = as<IRDifferentialPairType>(
                     pairPtrType ? pairPtrType->getValueType() : pairType);
-                auto diffType = autoDiffSharedContext->findDifferentialTypeFromDiffPairType(&argBuilder, pairValType);
+                auto diffType = differentiableTypeConformanceContext.getDifferentialTypeFromDiffPairType(&argBuilder, pairValType);
                 if (auto ptrParamType = as<IRPtrTypeBase>(paramType))
                 {
                     // Create temp var to pass in/out arguments.

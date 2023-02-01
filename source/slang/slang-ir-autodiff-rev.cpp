@@ -820,7 +820,7 @@ namespace Slang
                 if (diffPairType)
                 {
                     // Create dOut param. 
-                    auto diffType = (IRType*)autoDiffSharedContext->findDifferentialTypeFromDiffPairType(builder, diffPairType);
+                    auto diffType = (IRType*)differentiableTypeConformanceContext.getDifferentialTypeFromDiffPairType(builder, diffPairType);
                     newPropParam = builder->emitParam(diffType);
                     newPrimalParam = builder->emitParam(builder->getOutType(diffPairType->getValueType()));
                 }

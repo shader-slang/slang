@@ -667,7 +667,7 @@ struct DiffUnzipPass
             SLANG_RELEASE_ASSERT(diffPairPtrType);
             auto diffPairType = as<IRDifferentialPairType>(diffPairPtrType->getValueType());
             SLANG_RELEASE_ASSERT(diffPairType);
-            auto diffType = (IRType*)autodiffContext->findDifferentialTypeFromDiffPairType(diffBuilder, diffPairType);
+            auto diffType = (IRType*)diffTypeContext.getDifferentialTypeFromDiffPairType(diffBuilder, diffPairType);
             auto loadedParam = primalBuilder->emitLoad(param);
             return InstPair(
                 primalBuilder->emitDifferentialPairGetPrimal(loadedParam),

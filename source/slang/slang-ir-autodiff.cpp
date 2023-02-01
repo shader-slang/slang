@@ -318,13 +318,6 @@ AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
     }
 }
 
-IRInst* AutoDiffSharedContext::findDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairType* diffPairType)
-{
-    auto witness = diffPairType->getWitness();
-    SLANG_RELEASE_ASSERT(witness);
-    return _lookupWitness(builder, witness, differentialAssocTypeStructKey);
-}
-
 IRInst* AutoDiffSharedContext::findDifferentiableInterface()
 {
     if (auto module = as<IRModuleInst>(moduleInst))
@@ -405,6 +398,14 @@ IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* b
         return _lookupWitness(builder, conformance, key);
     }
     return nullptr;
+}
+
+IRInst* DifferentiableTypeConformanceContext::getDifferentialTypeFromDiffPairType(
+    IRBuilder* builder, IRDifferentialPairType* diffPairType)
+{
+    auto witness = diffPairType->getWitness();
+    SLANG_RELEASE_ASSERT(witness);
+    return _lookupWitness(builder, witness, sharedContext->differentialAssocTypeStructKey);
 }
 
 void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()

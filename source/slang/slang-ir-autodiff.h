@@ -107,7 +107,6 @@ struct AutoDiffSharedContext
 
     AutoDiffSharedContext(IRModuleInst* inModuleInst);
 
-    IRInst* findDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairType* diffPairType);
 private:
 
     IRInst* findDifferentiableInterface();
@@ -161,6 +160,8 @@ struct DifferentiableTypeConformanceContext
     IRInst* lookUpConformanceForType(IRInst* type);
 
     IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key);
+    
+    IRInst* getDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairType* diffPairType);
 
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable interface.
@@ -307,7 +308,5 @@ void stripDerivativeDecorations(IRInst* inst);
 bool isBackwardDifferentiableFunc(IRInst* func);
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
-
-IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey);
 
 };
