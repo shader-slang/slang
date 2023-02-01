@@ -139,6 +139,13 @@ struct DiffUnzipPass
 
         builder->setInsertInto(unzippedFunc);
 
+        auto originalParam = func->getFirstParam();
+        for (auto primalParam = unzippedFunc->getFirstParam(); primalParam; primalParam = primalParam->getNextParam())
+        {
+            primalMap[originalParam] = primalParam;
+            originalParam = originalParam->getNextParam();
+        }
+
         // Functions need to have at least two blocks at this point (one for parameters,
         // and atleast one for code)
         //
@@ -469,7 +476,7 @@ struct DiffUnzipPass
         }
     }
 
-    IRFunc* extractPrimalFunc(IRFunc* func, IRFunc* originalFunc, IRInst*& intermediateType);
+    IRFunc* extractPrimalFunc(IRFunc* func, IRFunc* originalFunc, bool isResultDifferentiable, IRInst*& intermediateType);
 
     bool isRelevantDifferentialPair(IRType* type)
     {
@@ -537,7 +544,6 @@ struct DiffUnzipPass
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
             auto arg = mixedCall->getArg(ii);
-
             if (isRelevantDifferentialPair(arg->getDataType()))
             {
                 primalArgs.add(lookupPrimalInst(arg));
@@ -552,20 +558,29 @@ struct DiffUnzipPass
         auto mixedDecoration = mixedCall->findDecoration<IRMixedDifferentialInstDecoration>();
         SLANG_ASSERT(mixedDecoration);
 
-        auto fwdPairResultType = as<IRDifferentialPairType>(mixedDecoration->getPairType());
-        SLANG_ASSERT(fwdPairResultType);
-
-        auto primalType = fwdPairResultType->getValueType();
-        auto diffType = (IRType*) diffTypeContext.getDifferentialForType(&globalBuilder, primalType);
+        IRType* primalType = mixedCall->getFullType();
+        IRType* diffType = mixedCall->getFullType();
+        IRType* resultType = mixedCall->getFullType();
+        if (auto fwdPairResultType = as<IRDifferentialPairType>(mixedDecoration->getPairType()))
+        {
+            primalType = fwdPairResultType->getValueType();
+            diffType = (IRType*)diffTypeContext.getDifferentialForType(&globalBuilder, primalType);
+            resultType = fwdPairResultType;
+        }
 
         auto primalVal = primalBuilder->emitCallInst(primalType, primalFn, primalArgs);
         primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
+
+        SLANG_RELEASE_ASSERT(mixedCall->getArgCount() <= primalFuncType->getParamCount());
 
         List<IRInst*> diffArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
             auto arg = mixedCall->getArg(ii);
 
+            // Depending on the type and direction of each argument,
+            // we might need to prepare a different value for the transposition logic to produce the
+            // correct final argument in the propagate function call.
             if (isRelevantDifferentialPair(arg->getDataType()))
             {
                 auto primalArg = lookupPrimalInst(arg);
@@ -574,18 +589,45 @@ struct DiffUnzipPass
                 // If arg is a mixed differential (pair), it should have already been split.
                 SLANG_ASSERT(primalArg);
                 SLANG_ASSERT(diffArg);
-
-                auto pairArg = diffBuilder->emitMakeDifferentialPair(
+                auto primalParamType = primalFuncType->getParamType(ii);
+                
+                if (auto outType = as<IROutType>(primalParamType))
+                {
+                    // For `out` parameters that expects an input derivative to propagate through,
+                    // we insert a `LoadReverseGradient` inst here to signify the logic in `transposeStore`
+                    // that this argument should actually be the currently accumulated derivative on
+                    // this variable. The end purpose is that we will generate a load(diffArg) in the
+                    // final transposed code and use that as the argument for the call, but we can't just
+                    // emit a normal load inst here because the transposition logic will turn loads into stores.
+                    auto outDiffType = cast<IRPtrTypeBase>(diffArg->getDataType())->getValueType();
+                    auto gradArg = diffBuilder->emitLoadReverseGradient(outDiffType, diffArg);
+                    diffBuilder->markInstAsDifferential(gradArg, primalArg->getDataType());
+                    diffArgs.add(gradArg);
+                }
+                else if (auto inoutType = as<IRInOutType>(primalParamType))
+                {
+                    SLANG_UNIMPLEMENTED_X("nested call inout parameter");
+                }
+                else
+                {
+                    // For ordinary differentiable input parameters, we make sure to provide
+                    // a differential pair. The actual logic that generates an inout variable
+                    // will be handled in `transposeCall()`.
+                    auto pairArg = diffBuilder->emitMakeDifferentialPair(
                         arg->getDataType(),
                         primalArg,
                         diffArg);
 
-                diffBuilder->markInstAsDifferential(pairArg, primalArg->getDataType());
-                diffArgs.add(pairArg);
+                    diffBuilder->markInstAsDifferential(pairArg, primalArg->getDataType());
+                    diffArgs.add(pairArg);
+                }
             }
             else
             {
-                diffArgs.add(arg);
+                // For non differentiable arguments, we can simply pass the argument as is
+                // if this isn't a `out` parameter, in which case it is removed from propagate call.
+                if (!as<IROutType>(arg->getDataType()))
+                    diffArgs.add(arg);
             }
         }
         
@@ -593,19 +635,22 @@ struct DiffUnzipPass
 
         diffBuilder->markInstAsDifferential(newFwdCallee);
 
-        auto diffPairVal = diffBuilder->emitCallInst(
-            fwdPairResultType, 
+        auto callInst = diffBuilder->emitCallInst(
+            resultType,
             newFwdCallee,
             diffArgs);
-        diffBuilder->markInstAsDifferential(diffPairVal, primalType);
+        diffBuilder->markInstAsDifferential(callInst, primalType);
 
         disableIRValidationAtInsert();
-        diffBuilder->addBackwardDerivativePrimalContextDecoration(diffPairVal, intermediateVar);
+        diffBuilder->addBackwardDerivativePrimalContextDecoration(callInst, intermediateVar);
         enableIRValidationAtInsert();
 
-        auto diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, diffPairVal);
-        diffBuilder->markInstAsDifferential(diffVal, primalType);
-
+        IRInst* diffVal = nullptr;
+        if (as<IRDifferentialPairType>(callInst->getDataType()))
+        {
+            diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, callInst);
+            diffBuilder->markInstAsDifferential(diffVal, primalType);
+        }
         return InstPair(primalVal, diffVal);
     }
 
@@ -616,52 +661,92 @@ struct DiffUnzipPass
 
     InstPair splitLoad(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRLoad* mixedLoad)
     {
-        // By the nature of how diff pairs are used, and the fact that FieldAddress/GetElementPtr,
-        // etc, cannot appear before a GetDifferential/GetPrimal, a mixed load can only be from a
-        // parameter or a variable.
-        // 
-        if (as<IRParam>(mixedLoad->getPtr()))
+        if (auto param = as<IRParam>(mixedLoad->getPtr()))
         {
-            // Should not occur with current impl of fwd-mode.
-            // If impl. changes, impl this case too.
-            // 
-            SLANG_UNIMPLEMENTED_X("Splitting a load from a param is not currently implemented.");
+            auto diffPairPtrType = as<IRPtrTypeBase>(param->getFullType());
+            SLANG_RELEASE_ASSERT(diffPairPtrType);
+            auto diffPairType = as<IRDifferentialPairType>(diffPairPtrType->getValueType());
+            SLANG_RELEASE_ASSERT(diffPairType);
+            auto diffType = (IRType*)diffTypeContext.getDifferentialTypeFromDiffPairType(diffBuilder, diffPairType);
+            auto loadedParam = primalBuilder->emitLoad(param);
+            return InstPair(
+                primalBuilder->emitDifferentialPairGetPrimal(loadedParam),
+                primalBuilder->emitDifferentialPairGetDifferential(diffType, loadedParam));
         }
 
         // Everything else should have already been split.
         auto primalPtr = lookupPrimalInst(mixedLoad->getPtr());
         auto diffPtr = lookupDiffInst(mixedLoad->getPtr());
+        auto primalVal = primalBuilder->emitLoad(primalPtr);
+        auto diffVal = diffBuilder->emitLoad(diffPtr);
+        diffBuilder->markInstAsDifferential(diffVal, primalVal->getFullType());
+        return InstPair(primalVal, diffVal);
+    }
 
-        return InstPair(primalBuilder->emitLoad(primalPtr), diffBuilder->emitLoad(diffPtr));
+    InstPair splitStore(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRStore* mixedStore)
+    {
+        // We will only generate mixed store to parameters. 
+        if (!as<IRParam>(mixedStore->getPtr()))
+        {
+            SLANG_UNIMPLEMENTED_X("Splitting a store that is not writing to a param.");
+        }
+
+        auto primalAddr = mixedStore->getPtr();
+
+        auto primalVal = lookupPrimalInst(mixedStore->getVal());
+        auto diffVal = lookupDiffInst(mixedStore->getVal());
+
+        // For now the param type and value type will not type-check in these store insts,
+        // but the param inst will be changed to the correct type after we synthesize primal and
+        // propagate func.
+        auto primalStore = primalBuilder->emitStore(primalAddr, primalVal);
+        auto diffStore = diffBuilder->emitStore(primalAddr, diffVal);
+
+        diffBuilder->markInstAsDifferential(diffStore, primalVal->getFullType());
+        return InstPair(primalStore, diffStore);
     }
 
     InstPair splitVar(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRVar* mixedVar)
     {
-        auto pairType = as<IRDifferentialPairType>(mixedVar->getDataType());
+        auto pairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(mixedVar->getDataType())->getValueType());
         auto primalType = pairType->getValueType();
         auto diffType = (IRType*) diffTypeContext.getDifferentialForType(primalBuilder, primalType);
-        
-        return InstPair(primalBuilder->emitVar(primalType), diffBuilder->emitVar(diffType));
+        auto primalVar = primalBuilder->emitVar(primalType);
+        auto diffVar = diffBuilder->emitVar(diffType);
+        diffBuilder->markInstAsDifferential(diffVar, primalType);
+        return InstPair(primalVar, diffVar);
     }
 
     InstPair splitReturn(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRReturn* mixedReturn)
     {
         auto pairType = as<IRDifferentialPairType>(mixedReturn->getVal()->getDataType());
-        auto primalType = pairType->getValueType();
+        // Are we returning a differentiable value?
+        if (pairType)
+        {
+            auto primalType = pairType->getValueType();
 
-        // Check that we have an unambiguous 'first' differential block.
-        SLANG_ASSERT(firstDiffBlock);
-        auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
-        auto pairVal = diffBuilder->emitMakeDifferentialPair(
-            pairType,
-            lookupPrimalInst(mixedReturn->getVal()),
-            lookupDiffInst(mixedReturn->getVal()));
-        diffBuilder->markInstAsDifferential(pairVal, primalType);
+            // Check that we have an unambiguous 'first' differential block.
+            SLANG_ASSERT(firstDiffBlock);
+            auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
+            auto pairVal = diffBuilder->emitMakeDifferentialPair(
+                pairType,
+                lookupPrimalInst(mixedReturn->getVal()),
+                lookupDiffInst(mixedReturn->getVal()));
+            diffBuilder->markInstAsDifferential(pairVal, primalType);
 
-        auto returnInst = diffBuilder->emitReturn(pairVal);
-        diffBuilder->markInstAsDifferential(returnInst, primalType);
+            auto returnInst = diffBuilder->emitReturn(pairVal);
+            diffBuilder->markInstAsDifferential(returnInst, primalType);
 
-        return InstPair(primalBranch, returnInst);
+            return InstPair(primalBranch, returnInst);
+        }
+        else
+        {
+            // If return value is not differentiable, just turn it into a trivial branch.
+            auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
+            auto returnInst = diffBuilder->emitReturn();
+            diffBuilder->markInstAsDifferential(returnInst, nullptr);
+            return InstPair(primalBranch, returnInst);
+        }
     }
 
     bool isBlockIndexed(IRBlock* block)
@@ -973,6 +1058,9 @@ struct DiffUnzipPass
         case kIROp_Load:
             return splitLoad(primalBuilder, diffBuilder, as<IRLoad>(inst));
         
+        case kIROp_Store:
+            return splitStore(primalBuilder, diffBuilder, as<IRStore>(inst));
+
         case kIROp_Return:
             return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
 

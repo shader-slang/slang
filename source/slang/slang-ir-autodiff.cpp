@@ -24,7 +24,7 @@ bool isBackwardDifferentiableFunc(IRInst* func)
     return false;
 }
 
-static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
+IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
     {
@@ -398,6 +398,14 @@ IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* b
         return _lookupWitness(builder, conformance, key);
     }
     return nullptr;
+}
+
+IRInst* DifferentiableTypeConformanceContext::getDifferentialTypeFromDiffPairType(
+    IRBuilder* builder, IRDifferentialPairType* diffPairType)
+{
+    auto witness = diffPairType->getWitness();
+    SLANG_RELEASE_ASSERT(witness);
+    return _lookupWitness(builder, witness, sharedContext->differentialAssocTypeStructKey);
 }
 
 void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()

@@ -326,6 +326,10 @@ INST(Var, var, 0, 0)
 INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
 
+// Produced and removed during backward auto-diff pass as a temporary placeholder representing the
+// currently accumulated derivative to pass to some dOut argument in a nested call.
+INST(LoadReverseGradient, LoadReverseGradient, 1, 0)
+
 INST(FieldExtract, get_field, 2, 0)
 INST(FieldAddress, get_field_addr, 2, 0)
 
@@ -766,6 +770,12 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Used by the auto-diff pass to mark the primal element type of an
         /// forward-differentiated updateElement inst.
     INST(PrimalElementTypeDecoration, primalElementType, 1, 0)
+
+        /// Used by the auto-diff pass. An `out T` parameter will transcribe to a `in T.Differential` parameter.
+        /// We will also create a temp var of type `T.Differential` in the function body so the `load` and `stores`
+        /// can operand on a valid address. We use this decoration to associate this temp var with its corresponding
+        /// input parameter.
+    INST(OutParamReverseGradientDecoration, outParamRevGrad, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.

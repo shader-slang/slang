@@ -160,6 +160,8 @@ struct DifferentiableTypeConformanceContext
     IRInst* lookUpConformanceForType(IRInst* type);
 
     IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key);
+    
+    IRInst* getDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairType* diffPairType);
 
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable interface.

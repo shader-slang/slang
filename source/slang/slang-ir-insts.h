@@ -723,6 +723,18 @@ struct IRMixedDifferentialInstDecoration : IRDecoration
     IRType* getPairType() { return as<IRType>(getOperand(0)); }
 };
 
+struct IROutParamReverseGradientDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_OutParamReverseGradientDecoration
+    };
+
+    IR_LEAF_ISA(OutParamReverseGradientDecoration)
+
+    IRInst* getValue() { return getOperand(0); }
+};
+
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -1770,6 +1782,12 @@ struct IRGetElementPtr : IRInst
     IRInst* getIndex() { return getOperand(1); }
 };
 
+struct IRLoadReverseGradient :IRInst
+{
+    IR_LEAF_ISA(LoadReverseGradient)
+    IRInst* getValue() { return getOperand(0); }
+};
+
 struct IRGetNativePtr : IRInst
 {
     IR_LEAF_ISA(GetNativePtr);
@@ -2598,7 +2616,6 @@ public:
     IRInst* getBoolValue(bool value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
-    IRInst* getDifferentialBottom();
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* _getPtrValue(void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
@@ -2920,8 +2937,6 @@ public:
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
-    IRInst* emitDifferentialPairAddressDifferential(IRType* diffType, IRInst* diffPair);
-    IRInst* emitDifferentialPairAddressPrimal(IRInst* diffPair);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,
@@ -3128,6 +3143,8 @@ public:
 
     IRInst* emitLoad(
         IRInst*    ptr);
+
+    IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
 
     IRInst* emitStore(
         IRInst*    dstPtr,
