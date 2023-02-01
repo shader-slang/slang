@@ -14,6 +14,8 @@
 namespace Slang
 {
 
+struct ParameterBlockTransposeInfo;
+
 struct DiffUnzipPass
 {
     AutoDiffSharedContext*                  autodiffContext;
@@ -120,7 +122,7 @@ struct DiffUnzipPass
         return diffMap[inst];
     }
 
-    IRFunc* unzipDiffInsts(IRFunc* func)
+    void unzipDiffInsts(IRFunc* func)
     {
         diffTypeContext.setFunc(func);
 
@@ -129,21 +131,33 @@ struct DiffUnzipPass
         
         IRBuilder* builder = &builderStorage;
 
-        // Clone the entire function.
-        // TODO: Maybe don't clone? The reverse-mode process seems to clone several times.
-        // TODO: Looks like we get a copy of the decorations?
-        IRCloneEnv subEnv;
-        subEnv.parent = &cloneEnv;
-        builder->setInsertBefore(func);
-        IRFunc* unzippedFunc = as<IRFunc>(cloneInst(&subEnv, builder, func));
+        IRFunc* unzippedFunc = func;
 
-        builder->setInsertInto(unzippedFunc);
+        // Initialize the primal/diff map for parameters.
+        // Generate distinct references for parameters that should be split.
+        // We don't actually modify the parameter list here, instead we emit
+        // PrimalParamRef(param) and DiffParamRef(param) and use those to represent
+        // a use from the primal or diff part of the program.
+        builder->setInsertBefore(unzippedFunc->getFirstBlock()->getTerminator());
 
-        auto originalParam = func->getFirstParam();
         for (auto primalParam = unzippedFunc->getFirstParam(); primalParam; primalParam = primalParam->getNextParam())
         {
-            primalMap[originalParam] = primalParam;
-            originalParam = originalParam->getNextParam();
+            auto type = primalParam->getFullType();
+            if (auto ptrType = as<IRPtrTypeBase>(type))
+            {
+                type = ptrType->getValueType();
+            }
+            if (auto pairType = as<IRDifferentialPairType>(type))
+            {
+                IRInst* diffType = diffTypeContext.getDifferentialTypeFromDiffPairType(builder, pairType);
+                if (as<IRPtrTypeBase>(primalParam->getFullType()))
+                    diffType = builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
+                auto primalRef = builder->emitPrimalParamRef(primalParam);
+                auto diffRef = builder->emitDiffParamRef((IRType*)diffType, primalParam);
+                builder->markInstAsDifferential(diffRef, pairType->getValueType());
+                primalMap[primalParam] = primalRef;
+                diffMap[primalParam] = diffRef;
+            }
         }
 
         // Functions need to have at least two blocks at this point (one for parameters,
@@ -239,8 +253,6 @@ struct DiffUnzipPass
         // Remove old blocks.
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
-
-        return unzippedFunc;
     }
 
     IRBlock* getInitializerBlock(IndexedRegion* region)
@@ -476,25 +488,12 @@ struct DiffUnzipPass
         }
     }
 
-    IRFunc* extractPrimalFunc(IRFunc* func, IRFunc* originalFunc, bool isResultDifferentiable, IRInst*& intermediateType);
-
-    bool isRelevantDifferentialPair(IRType* type)
-    {
-        if (as<IRDifferentialPairType>(type))
-        {
-            return true;
-        }
-        else if (auto argPtrType = as<IRPtrTypeBase>(type))
-        {
-            if (as<IRDifferentialPairType>(argPtrType->getValueType()))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
+    IRFunc* extractPrimalFunc(
+        IRFunc* func,
+        IRFunc* originalFunc,
+        ParameterBlockTransposeInfo& paramInfo,
+        IRInst*& intermediateType);
+    
     static IRInst* _getOriginalFunc(IRInst* call)
     {
         if (auto decor = call->findDecoration<IRAutoDiffOriginalValueDecoration>())
@@ -606,7 +605,13 @@ struct DiffUnzipPass
                 }
                 else if (auto inoutType = as<IRInOutType>(primalParamType))
                 {
-                    SLANG_UNIMPLEMENTED_X("nested call inout parameter");
+                    // Since arg is split into separate vars, we need a new temp var that represents
+                    // the remerged diff pair.
+                    auto diffPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(arg->getDataType())->getValueType());
+                    auto primalValueType = diffPairType->getValueType();
+                    auto diffPairRef = diffBuilder->emitReverseGradientDiffPairRef(arg->getDataType(), primalArg, diffArg);
+                    diffBuilder->markInstAsDifferential(diffPairRef, primalValueType);
+                    diffArgs.add(diffPairRef);
                 }
                 else
                 {
@@ -661,20 +666,6 @@ struct DiffUnzipPass
 
     InstPair splitLoad(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRLoad* mixedLoad)
     {
-        if (auto param = as<IRParam>(mixedLoad->getPtr()))
-        {
-            auto diffPairPtrType = as<IRPtrTypeBase>(param->getFullType());
-            SLANG_RELEASE_ASSERT(diffPairPtrType);
-            auto diffPairType = as<IRDifferentialPairType>(diffPairPtrType->getValueType());
-            SLANG_RELEASE_ASSERT(diffPairType);
-            auto diffType = (IRType*)diffTypeContext.getDifferentialTypeFromDiffPairType(diffBuilder, diffPairType);
-            auto loadedParam = primalBuilder->emitLoad(param);
-            return InstPair(
-                primalBuilder->emitDifferentialPairGetPrimal(loadedParam),
-                primalBuilder->emitDifferentialPairGetDifferential(diffType, loadedParam));
-        }
-
-        // Everything else should have already been split.
         auto primalPtr = lookupPrimalInst(mixedLoad->getPtr());
         auto diffPtr = lookupDiffInst(mixedLoad->getPtr());
         auto primalVal = primalBuilder->emitLoad(primalPtr);
@@ -685,22 +676,14 @@ struct DiffUnzipPass
 
     InstPair splitStore(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRStore* mixedStore)
     {
-        // We will only generate mixed store to parameters. 
-        if (!as<IRParam>(mixedStore->getPtr()))
-        {
-            SLANG_UNIMPLEMENTED_X("Splitting a store that is not writing to a param.");
-        }
-
-        auto primalAddr = mixedStore->getPtr();
+        auto primalAddr = lookupPrimalInst(mixedStore->getPtr());
+        auto diffAddr = lookupDiffInst(mixedStore->getPtr());
 
         auto primalVal = lookupPrimalInst(mixedStore->getVal());
         auto diffVal = lookupDiffInst(mixedStore->getVal());
 
-        // For now the param type and value type will not type-check in these store insts,
-        // but the param inst will be changed to the correct type after we synthesize primal and
-        // propagate func.
         auto primalStore = primalBuilder->emitStore(primalAddr, primalVal);
-        auto diffStore = diffBuilder->emitStore(primalAddr, diffVal);
+        auto diffStore = diffBuilder->emitStore(diffAddr, diffVal);
 
         diffBuilder->markInstAsDifferential(diffStore, primalVal->getFullType());
         return InstPair(primalStore, diffStore);

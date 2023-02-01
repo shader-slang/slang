@@ -723,18 +723,6 @@ struct IRMixedDifferentialInstDecoration : IRDecoration
     IRType* getPairType() { return as<IRType>(getOperand(0)); }
 };
 
-struct IROutParamReverseGradientDecoration : IRDecoration
-{
-    enum
-    {
-        kOp = kIROp_OutParamReverseGradientDecoration
-    };
-
-    IR_LEAF_ISA(OutParamReverseGradientDecoration)
-
-    IRInst* getValue() { return getOperand(0); }
-};
-
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -1782,10 +1770,29 @@ struct IRGetElementPtr : IRInst
     IRInst* getIndex() { return getOperand(1); }
 };
 
-struct IRLoadReverseGradient :IRInst
+struct IRLoadReverseGradient : IRInst
 {
     IR_LEAF_ISA(LoadReverseGradient)
     IRInst* getValue() { return getOperand(0); }
+};
+
+struct IRReverseGradientDiffPairRef : IRInst
+{
+    IR_LEAF_ISA(ReverseGradientDiffPairRef)
+    IRInst* getPrimal() { return getOperand(0); }
+    IRInst* getDiff() { return getOperand(1); }
+};
+
+struct IRPrimalParamRef : IRInst
+{
+    IR_LEAF_ISA(PrimalParamRef)
+    IRInst* getReferencedParam() { return getOperand(0); }
+};
+
+struct IRDiffParamRef : IRInst
+{
+    IR_LEAF_ISA(DiffParamRef)
+    IRInst* getReferencedParam() { return getOperand(0); }
 };
 
 struct IRGetNativePtr : IRInst
@@ -3145,6 +3152,9 @@ public:
         IRInst*    ptr);
 
     IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
+    IRInst* emitReverseGradientDiffPairRef(IRType* type, IRInst* primalVar, IRInst* diffVar);
+    IRInst* emitPrimalParamRef(IRInst* param);
+    IRInst* emitDiffParamRef(IRType* type, IRInst* param);
 
     IRInst* emitStore(
         IRInst*    dstPtr,

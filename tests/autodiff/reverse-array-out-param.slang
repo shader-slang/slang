@@ -40,16 +40,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = dpd.d.m;
     outputBuffer[1] = dpd.d.n;
 }
-
-[BackwardDifferentiable]
-void inner(float x, out float y)
-{
-    y = 2 * x;
-}
-
-[BackwardDifferentiable]
-void outter(float x, out float y)
-{
-    inner(x, y);
-    inner(x, y);
-}

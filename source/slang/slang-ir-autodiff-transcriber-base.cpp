@@ -563,6 +563,8 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(IRBuilder* bui
 // 
 IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType)
 {
+    primalType = (IRType*)unwrapAttributedType(primalType);
+
     if (auto diffType = differentiateType(builder, primalType))
     {
         switch (diffType->getOp())
