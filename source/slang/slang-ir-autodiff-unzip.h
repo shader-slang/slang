@@ -635,19 +635,22 @@ struct DiffUnzipPass
 
         diffBuilder->markInstAsDifferential(newFwdCallee);
 
-        auto diffPairVal = diffBuilder->emitCallInst(
+        auto callInst = diffBuilder->emitCallInst(
             resultType,
             newFwdCallee,
             diffArgs);
-        diffBuilder->markInstAsDifferential(diffPairVal, primalType);
+        diffBuilder->markInstAsDifferential(callInst, primalType);
 
         disableIRValidationAtInsert();
-        diffBuilder->addBackwardDerivativePrimalContextDecoration(diffPairVal, intermediateVar);
+        diffBuilder->addBackwardDerivativePrimalContextDecoration(callInst, intermediateVar);
         enableIRValidationAtInsert();
 
-        auto diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, diffPairVal);
-        diffBuilder->markInstAsDifferential(diffVal, primalType);
-
+        IRInst* diffVal = nullptr;
+        if (as<IRDifferentialPairType>(callInst->getDataType()))
+        {
+            diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, callInst);
+            diffBuilder->markInstAsDifferential(diffVal, primalType);
+        }
         return InstPair(primalVal, diffVal);
     }
 

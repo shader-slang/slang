@@ -380,46 +380,47 @@ struct ExtractPrimalFuncContext
         for (auto param = func->getFirstParam(); param;)
         {
             auto next = param->getNextParam();
-
-            for (auto use = param->firstUse; use; use = use->nextUse)
+            [this, firstBlock, &builder, param]()
             {
-                if (use->getUser()->getOp() == kIROp_AutoDiffOriginalValueDecoration)
+                for (auto use = param->firstUse; use; use = use->nextUse)
                 {
-                    use->getUser()->getParent()->replaceUsesWith(param);
-                    goto processNextParam;
+                    if (use->getUser()->getOp() == kIROp_AutoDiffOriginalValueDecoration)
+                    {
+                        use->getUser()->getParent()->replaceUsesWith(param);
+                        return;
+                    }
+                    else if (use->getUser()->getOp() == kIROp_OutParamReverseGradientDecoration)
+                    {
+                        // This is a propagate func specific parameter, we should remove it.
+                        SLANG_RELEASE_ASSERT(!param->hasMoreThanOneUse());
+                        param->removeAndDeallocate();
+                        return;
+                    }
                 }
-                else if (use->getUser()->getOp() == kIROp_OutParamReverseGradientDecoration)
-                {
-                    // This is a propagate func specific parameter, we should remove it.
-                    SLANG_RELEASE_ASSERT(!param->hasMoreThanOneUse());
-                    param->removeAndDeallocate();
-                    goto processNextParam;
-                }
-            }
 
-            IRInst* valueType = param->getDataType();
-            auto inoutType = as<IRPtrTypeBase>(param->getDataType());
-            if (inoutType) valueType = inoutType->getValueType();
-            auto diffPairType = as<IRDifferentialPairType>(valueType);
-            if (!diffPairType)
-                goto processNextParam;
-            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+                IRInst* valueType = param->getDataType();
+                auto inoutType = as<IRPtrTypeBase>(param->getDataType());
+                if (inoutType) valueType = inoutType->getValueType();
+                auto diffPairType = as<IRDifferentialPairType>(valueType);
+                if (!diffPairType)
+                    return;
 
-            auto originalValueType = diffPairType->getValueType();
+                builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
 
-            // Create a local var to act as the old param.
-            auto tempVar = builder.emitVar(diffPairType);
-            param->replaceUsesWith(tempVar);
-            auto pairValue = builder.emitMakeDifferentialPair(
-                diffPairType,
-                param,
-                backwardPrimalTranscriber->getDifferentialZeroOfType(&builder, originalValueType));
-            builder.emitStore(tempVar, pairValue);
+                auto originalValueType = diffPairType->getValueType();
 
-            // Change the param type to original type.
-            param->setFullType(originalValueType);
+                // Create a local var to act as the old param.
+                auto tempVar = builder.emitVar(diffPairType);
+                param->replaceUsesWith(tempVar);
+                auto pairValue = builder.emitMakeDifferentialPair(
+                    diffPairType,
+                    param,
+                    backwardPrimalTranscriber->getDifferentialZeroOfType(&builder, originalValueType));
+                builder.emitStore(tempVar, pairValue);
 
-        processNextParam:;
+                // Change the param type to original type.
+                param->setFullType(originalValueType);
+            }();
             param = next;
         }
 

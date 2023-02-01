@@ -3745,7 +3745,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair)
     {
-        SLANG_ASSERT(as<IRDifferentialPairType>(diffType));
+        SLANG_ASSERT(as<IRDifferentialPairType>(diffPair->getDataType()));
         return emitIntrinsicInst(
             diffType,
             kIROp_DifferentialPairGetDifferential,
