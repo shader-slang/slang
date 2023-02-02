@@ -7,13 +7,13 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef DifferentialPair<float2> dpfloat2;
 
-[ForwardDifferentiable]
+[BackwardDifferentiable]
 float diffMax(float x, float y)
 {
     return max(x, y);
 }
 
-[ForwardDifferentiable]
+[BackwardDifferentiable]
 float2 diffMax2(float2 x, float2 y)
 {
     return max(x, y);
@@ -38,5 +38,13 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         outputBuffer[3] = res.d[0];     // Expect: 2.000000
         outputBuffer[4] = res.p[1];     // Expect: 4.000000
         outputBuffer[5] = res.d[1];     // Expect: -1.000000
+    }
+
+    {
+        dpfloat dpx = dpfloat(2.0, 0.0);
+        dpfloat dpy = dpfloat(5.0, 0.0);
+        __bwd_diff(diffMax)(dpx, dpy, 3.0);
+        outputBuffer[6] = dpx.d; // Expect: 0.000000
+        outputBuffer[7] = dpy.d; // Expect: 3.000000
     }
 }

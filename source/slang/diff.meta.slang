@@ -313,6 +313,15 @@ DifferentialPair<vector<T, N>> __d_sin_vector(DifferentialPair<vector<T, N>> dpx
     VECTOR_MAP_D_UNARY(T, N, __d_sin, dpx);
 }
 
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDerivativeOf(sin)]
+void __d_sin(inout DifferentialPair<T> dpx, T.Differential dOut)
+{
+    dpx = diffPair(
+        dpx.p,
+        T.dmul(cos(dpx.p), dOut));
+}
+
 // Cosine
 
 __generic<T : __BuiltinFloatingPointType>
@@ -394,7 +403,23 @@ DifferentialPair<vector<T, N>> __d_max_vector(DifferentialPair<vector<T, N>> dpx
 {
     VECTOR_MAP_D_BINARY(T, N, __d_max, dpx, dpy);
 }
-
+/*
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDerivativeOf(max)]
+void __d_max(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
+{
+    if (dpx.p > dpy.p)
+    {
+        dpx = diffPair(dpx.p, dOut);
+        dpy = diffPair(dpy.p, T.dzero());
+    }
+    else
+    {
+        dpx = diffPair(dpx.p, T.dzero());
+        dpy = diffPair(dpy.p, dOut);
+    }
+}
+*/
 // Minimum
 
 __generic<T : __BuiltinFloatingPointType>
