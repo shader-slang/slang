@@ -379,6 +379,7 @@ Result linkAndOptimizeIR(
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
         enableIRValidationAtInsert();
         changed |= processAutodiffCalls(irModule, sink);
+        auto irStr = dumpIRToString(irModule->getModuleInst());
         disableIRValidationAtInsert();
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 

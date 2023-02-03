@@ -655,7 +655,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
         }
         else
         {
-            differentiableTypeConformanceContext.getZeroMethodForType(builder, primalType);
+            zeroMethod = differentiableTypeConformanceContext.getZeroMethodForType(builder, primalType);
         }
         SLANG_RELEASE_ASSERT(zeroMethod);
 
