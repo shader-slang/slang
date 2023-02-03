@@ -51,10 +51,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{BE412850-4BB9-429A-877C-BFBC4B34186C}</ProjectGuid>
+    <ProjectGuid>{3242BAA7-FC4C-4F76-83BC-E4403099DC1D}</ProjectGuid>
     <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>test-process</RootNamespace>
+    <RootNamespace>slang-lookup-generator</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -120,43 +120,43 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x86\debug\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x86\debug\test-process\</IntDir>
-    <TargetName>test-process</TargetName>
+    <IntDir>..\..\..\intermediate\windows-x86\debug\slang-lookup-generator\</IntDir>
+    <TargetName>slang-lookup-generator</TargetName>
     <TargetExt>.exe</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x64\debug\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x64\debug\test-process\</IntDir>
-    <TargetName>test-process</TargetName>
+    <IntDir>..\..\..\intermediate\windows-x64\debug\slang-lookup-generator\</IntDir>
+    <TargetName>slang-lookup-generator</TargetName>
     <TargetExt>.exe</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\..\bin\windows-aarch64\debug\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-aarch64\debug\test-process\</IntDir>
-    <TargetName>test-process</TargetName>
+    <IntDir>..\..\..\intermediate\windows-aarch64\debug\slang-lookup-generator\</IntDir>
+    <TargetName>slang-lookup-generator</TargetName>
     <TargetExt>.exe</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x86\release\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x86\release\test-process\</IntDir>
-    <TargetName>test-process</TargetName>
+    <IntDir>..\..\..\intermediate\windows-x86\release\slang-lookup-generator\</IntDir>
+    <TargetName>slang-lookup-generator</TargetName>
     <TargetExt>.exe</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x64\release\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x64\release\test-process\</IntDir>
-    <TargetName>test-process</TargetName>
+    <IntDir>..\..\..\intermediate\windows-x64\release\slang-lookup-generator\</IntDir>
+    <TargetName>slang-lookup-generator</TargetName>
     <TargetExt>.exe</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\..\bin\windows-aarch64\release\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-aarch64\release\test-process\</IntDir>
-    <TargetName>test-process</TargetName>
+    <IntDir>..\..\..\intermediate\windows-aarch64\release\slang-lookup-generator\</IntDir>
+    <TargetName>slang-lookup-generator</TargetName>
     <TargetExt>.exe</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -271,7 +271,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\tools\test-process\test-process-main.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-lookup-generator\lookup-generator-main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\compiler-core\compiler-core.vcxproj">

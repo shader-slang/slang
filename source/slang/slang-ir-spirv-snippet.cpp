@@ -1,6 +1,7 @@
 // slang-ir-spirv-snippet.cpp
 
-#include"slang-ir-spirv-snippet.h"
+#include "slang-ir-spirv-snippet.h"
+#include "slang-lookup-spirv.h"
 #include "../core/slang-token-reader.h"
 
 namespace Slang
@@ -60,8 +61,58 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                 mapInstNameToIndex[instName] = (int)snippet->instructions.getCount();
                 tokenReader.Read(Slang::Misc::TokenType::OpAssign);
             }
-            inst.opCode = (SpvWord)tokenReader.ReadInt();
+            SpvOp opCode;
+            switch (tokenReader.NextToken().Type)
+            {
+            case Slang::Misc::TokenType::IntLiteral:
+                opCode = (SpvOp)tokenReader.ReadInt();
+                break;
+            case Slang::Misc::TokenType::Identifier:
+            {
+                auto opName = tokenReader.ReadWord();
+                if(!lookupSpvOp(opName.getUnownedSlice(), opCode))
+                {
+                    throw Misc::TextFormatException(
+                        "Text parsing error: Unrecognized SPIR-V opcode: " + opName);
+                }
+                break;
+            }
+            default:
+                throw Misc::TextFormatException(
+                    "Text parsing error: SPIR-V intrinsics must begin with an integer or opcode name");
+            }
+            inst.opCode = opCode;
             bool insideOperandList = true;
+            const bool isExtInst = inst.opCode == SpvOpExtInst;
+            bool isGLSLstd450OpcodeAllowed = false;
+            auto readExtInstOpcode = [&]()
+            {
+                switch (tokenReader.NextToken().Type)
+                {
+                case Slang::Misc::TokenType::IntLiteral:
+                    return (SpvWord)tokenReader.ReadInt();
+                    break;
+                case Slang::Misc::TokenType::Identifier:
+                {
+                    if(isGLSLstd450OpcodeAllowed)
+                    {
+                        auto opName = tokenReader.ReadWord();
+                        GLSLstd450 glslOpcode;
+                        if(!lookupGLSLstd450(opName.getUnownedSlice(), glslOpcode))
+                        {
+                            throw Misc::TextFormatException(
+                                "Text parsing error: Unrecognized SPIR-V GLSLstd450 opcode: " + opName);
+                        }
+                        printf("BNBBB: %d\n", glslOpcode);
+                        return (SpvWord)glslOpcode;
+                    }
+                }
+                // fallthrough
+                default:
+                    throw Misc::TextFormatException(
+                        "Text parsing error: Failed to read SPIR-V ExtInst Opcode");
+                }
+            };
             while (insideOperandList)
             {
                 ASMOperand operand = {ASMOperandType::SpvWord, 0, 0, 0};
@@ -115,14 +166,16 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                         {
                             operand.type = SpvSnippet::ASMOperandType::GLSL450ExtInstSet;
                             inst.operands.add(operand);
+                            // Allow the next token to be parsed as a glslsstd450 opcode
+                            isGLSLstd450OpcodeAllowed = isExtInst;
                         }
                         else if (identifier == "fi")
                         {
                             operand.type = SpvSnippet::ASMOperandType::FloatIntegerSelection;
                             tokenReader.Read("(");
-                            operand.content = (SpvWord)tokenReader.ReadInt();
+                            operand.content = readExtInstOpcode();
                             tokenReader.Read(",");
-                            operand.content2 = (SpvWord)tokenReader.ReadInt();
+                            operand.content2 = readExtInstOpcode();
                             tokenReader.Read(")");
                             inst.operands.add(operand);
                         }
@@ -130,11 +183,11 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                         {
                             operand.type = SpvSnippet::ASMOperandType::FloatUnsignedSignedSelection;
                             tokenReader.Read("(");
-                            operand.content = (SpvWord)tokenReader.ReadInt();
+                            operand.content = readExtInstOpcode();
                             tokenReader.Read(",");
-                            operand.content2 = (SpvWord)tokenReader.ReadInt();
+                            operand.content2 = readExtInstOpcode();
                             tokenReader.Read(",");
-                            operand.content3 = (SpvWord)tokenReader.ReadInt();
+                            operand.content3 = readExtInstOpcode();
                             tokenReader.Read(")");
                             inst.operands.add(operand);
                         }
@@ -181,6 +234,14 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                             tokenReader.Read(")");
                             snippet->constants.add(constant);
                             operand.content = (SpvWord)(snippet->constants.getCount() - 1);
+                            inst.operands.add(operand);
+                        }
+                        else if(isGLSLstd450OpcodeAllowed)
+                        {
+                            GLSLstd450 glslstd450Opcode;
+                            lookupGLSLstd450(identifier.getUnownedSlice(), glslstd450Opcode);
+                            operand.type = SpvSnippet::ASMOperandType::SpvWord;
+                            operand.content = (SpvWord)glslstd450Opcode;
                             inst.operands.add(operand);
                         }
                         else

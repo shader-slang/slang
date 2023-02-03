@@ -915,6 +915,7 @@ struct SPIRVEmitContext
             getSection(SpvLogicalSectionID::ExtIntInstImports),
             nullptr,
             SpvOpExtInstImport,
+            kResultID,
             UnownedStringSlice("GLSL.std.450"));
         return m_glsl450ExtInst;
     }
@@ -1213,7 +1214,7 @@ struct SPIRVEmitContext
         // ...
 
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode");
+            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for global instruction");
             UNREACHABLE_RETURN(nullptr);
         }
     }
@@ -1568,7 +1569,7 @@ struct SPIRVEmitContext
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
-    // When emititng blobal instructions, we usually have to
+    // When emitting global instructions, we usually have to
     // pick the right logical section to emit them into, while
     // for local instructions they will usually emit into
     // a known parent (the basic block that contains them).
@@ -1579,7 +1580,7 @@ struct SPIRVEmitContext
         switch( inst->getOp() )
         {
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode");
+            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for local instruction");
             break;
         case kIROp_Specialize:
             return nullptr;
