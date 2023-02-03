@@ -61,7 +61,8 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
         
     IRFuncType* differentiateFunctionTypeImpl(IRBuilder* builder, IRFuncType* funcType, IRInst* intermediateType);
 
-    InstPair transposeBlock(IRBuilder* builder, IRBlock* origBlock);
+    IRType* transcribeParamTypeForPrimalFunc(IRBuilder* builder, IRType* paramType);
+    IRType* transcribeParamTypeForPropagateFunc(IRBuilder* builder, IRType* paramType);
 
     // Puts parameters into their own block.
     void makeParameterBlock(IRBuilder* inBuilder, IRFunc* func);
@@ -69,19 +70,10 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     // Transcribe a function definition.
     virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) = 0;
 
-    void transposeParameterBlock(IRBuilder* builder, IRFunc* diffFunc);
+    // Transcribes the parameter block and returns the dOut param if exists.
+    IRInst* transposeParameterBlock(IRBuilder* builder, IRFunc* diffFunc, List<IRInst*>& primalFuncSpecificParams, bool isResultDifferentiable);
 
-    IRInst* copyParam(IRBuilder* builder, IRParam* origParam);
-
-    InstPair copyBinaryArith(IRBuilder* builder, IRInst* origArith);
-
-    IRInst* transposeBinaryArithBackward(IRBuilder* builder, IRInst* origArith, IRInst* grad);
-
-    InstPair copyInst(IRBuilder* builder, IRInst* origInst);
-
-    IRInst* transposeParamBackward(IRBuilder* builder, IRInst* param, IRInst* grad);
-    
-    IRInst* transposeInstBackward(IRBuilder* builder, IRInst* origInst, IRInst* grad);
+    InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType);
 
     InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize);
 

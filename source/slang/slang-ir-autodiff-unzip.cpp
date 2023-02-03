@@ -279,7 +279,7 @@ struct ExtractPrimalFuncContext
             inst);
     }
 
-    IRFunc* turnUnzippedFuncIntoPrimalFunc(IRFunc* unzippedFunc, IRFunc* originalFunc, IRInst*& outIntermediateType)
+    IRFunc* turnUnzippedFuncIntoPrimalFunc(IRFunc* unzippedFunc, IRFunc* originalFunc, bool isResultDifferentiable, IRInst*& outIntermediateType)
     {
         IRBuilder builder(sharedBuilder);
 
@@ -322,7 +322,10 @@ struct ExtractPrimalFuncContext
             {
                 if (shouldStoreInst(inst))
                 {
-                    builder.setInsertAfter(inst);
+                    if (as<IRParam>(inst))
+                        builder.setInsertBefore(block->getFirstOrdinaryInst());
+                    else
+                        builder.setInsertAfter(inst);
                     storeInst(builder, inst, outIntermediary);
                 }
                 else if (inst->getOp() == kIROp_Var)
@@ -366,33 +369,59 @@ struct ExtractPrimalFuncContext
         builder.emitStore(outIntermediary, defVal);
 
         // The primal func will not have the result derivative param (second to last param), so we remove it.
-        auto resultDerivativeParam = func->getLastParam()->getPrevParam();
-        SLANG_RELEASE_ASSERT(!resultDerivativeParam->hasUses());
-        resultDerivativeParam->removeAndDeallocate();
-
-        // Finally, go through parameters and turn DifferentiablePair<T> back to T.
-        for (auto param : func->getParams())
+        if (isResultDifferentiable)
         {
-            IRInst* valueType = param->getDataType();
-            auto inoutType = as<IRPtrTypeBase>(param->getDataType());
-            if (inoutType) valueType = inoutType->getValueType();
-            auto diffPairType = as<IRDifferentialPairType>(valueType);
-            if (!diffPairType) continue;
-            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+            auto resultDerivativeParam = func->getLastParam()->getPrevParam();
+            SLANG_RELEASE_ASSERT(!resultDerivativeParam->hasUses());
+            resultDerivativeParam->removeAndDeallocate();
+        }
 
-            auto originalValueType = diffPairType->getValueType();
+        // Finally, go through parameters and translate their type back to primal type.
+        for (auto param = func->getFirstParam(); param;)
+        {
+            auto next = param->getNextParam();
+            [this, firstBlock, &builder, param]()
+            {
+                for (auto use = param->firstUse; use; use = use->nextUse)
+                {
+                    if (use->getUser()->getOp() == kIROp_AutoDiffOriginalValueDecoration)
+                    {
+                        use->getUser()->getParent()->replaceUsesWith(param);
+                        return;
+                    }
+                    else if (use->getUser()->getOp() == kIROp_OutParamReverseGradientDecoration)
+                    {
+                        // This is a propagate func specific parameter, we should remove it.
+                        SLANG_RELEASE_ASSERT(!param->hasMoreThanOneUse());
+                        param->removeAndDeallocate();
+                        return;
+                    }
+                }
 
-            // Create a local var to act as the old param.
-            auto tempVar = builder.emitVar(diffPairType);
-            param->replaceUsesWith(tempVar);
-            auto pairValue = builder.emitMakeDifferentialPair(
-                diffPairType,
-                param,
-                backwardPrimalTranscriber->getDifferentialZeroOfType(&builder, originalValueType));
-            builder.emitStore(tempVar, pairValue);
+                IRInst* valueType = param->getDataType();
+                auto inoutType = as<IRPtrTypeBase>(param->getDataType());
+                if (inoutType) valueType = inoutType->getValueType();
+                auto diffPairType = as<IRDifferentialPairType>(valueType);
+                if (!diffPairType)
+                    return;
 
-            // Change the param type to original type.
-            param->setFullType(originalValueType);
+                builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
+                auto originalValueType = diffPairType->getValueType();
+
+                // Create a local var to act as the old param.
+                auto tempVar = builder.emitVar(diffPairType);
+                param->replaceUsesWith(tempVar);
+                auto pairValue = builder.emitMakeDifferentialPair(
+                    diffPairType,
+                    param,
+                    backwardPrimalTranscriber->getDifferentialZeroOfType(&builder, originalValueType));
+                builder.emitStore(tempVar, pairValue);
+
+                // Change the param type to original type.
+                param->setFullType(originalValueType);
+            }();
+            param = next;
         }
 
         return unzippedFunc;
@@ -417,7 +446,7 @@ static void copyPrimalValueStructKeyDecorations(IRInst* inst, IRCloneEnv& cloneE
 }
 
 IRFunc* DiffUnzipPass::extractPrimalFunc(
-    IRFunc* func, IRFunc* originalFunc, IRInst*& intermediateType)
+    IRFunc* func, IRFunc* originalFunc, bool isResultDifferentiable, IRInst*& intermediateType)
 {
     IRBuilder builder(this->autodiffContext->sharedBuilder);
     builder.setInsertBefore(func);
@@ -431,7 +460,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     context.init(autodiffContext->sharedBuilder, autodiffContext->transcriberSet.primalTranscriber);
 
     intermediateType = nullptr;
-    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, intermediateType);
+    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, isResultDifferentiable, intermediateType);
 
     if (auto nameHint = primalFunc->findDecoration<IRNameHintDecoration>())
     {

@@ -56,8 +56,16 @@ struct SourceFile : public RefObject
     {
         if (text.begin())
             free((void*)text.begin());
-        if (node)
+
+        // To avoid deep recursion in the Node destructor,
+        // we delete the first level of the node tree iteratively.
+        while (node)
+        {
+            Node* next = node->next;
+            node->next = nullptr;
             delete node;
+            node = next;
+        }
     }
 };
 

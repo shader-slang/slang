@@ -315,6 +315,15 @@ namespace Slang
 
             return cloneWithCapacity(newCapacity);
         }
+
+            /// Overload delete to silence ASAN new-delete-type-mismatch errors.
+            /// These occur because the allocation size of StringRepresentation
+            /// does not match deallocation size (due variable sized string payload).
+        void operator delete(void* p)
+        {
+            StringRepresentation* str = (StringRepresentation*) p;
+            ::operator delete(str);
+        }        
     };
 
     class String;

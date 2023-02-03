@@ -17,16 +17,6 @@ DiagnosticSink* AutoDiffTranscriberBase::getSink()
     return sink;
 }
 
-String AutoDiffTranscriberBase::makeDiffPairName(IRInst* origVar)
-{
-    if (auto namehintDecoration = origVar->findDecoration<IRNameHintDecoration>())
-    {
-        return ("dp" + String(namehintDecoration->getName()));
-    }
-
-    return String("");
-}
-
 void AutoDiffTranscriberBase::mapDifferentialInst(IRInst* origInst, IRInst* diffInst)
 {
     if (hasDifferentialInst(origInst))
@@ -194,6 +184,31 @@ IRWitnessTable* AutoDiffTranscriberBase::getDifferentialPairWitness(IRBuilder* b
     return table;
 }
 
+IRInst* AutoDiffTranscriberBase::tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType)
+{
+    IRInst* witness =
+        differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)originalType);
+    if (witness)
+    {
+        witness = lookupPrimalInst(builder, witness, nullptr);
+        SLANG_RELEASE_ASSERT(witness || as<IRArrayType>(originalType));
+    }
+    if (!witness)
+    {
+        auto primalType = lookupPrimalInst(builder, originalType, nullptr);
+        SLANG_RELEASE_ASSERT(primalType);
+        if (auto primalPairType = as<IRDifferentialPairType>(primalType))
+        {
+            witness = getDifferentialPairWitness(builder, originalType, primalPairType);
+        }
+        else if (auto extractExistential = as<IRExtractExistentialType>(originalType))
+        {
+            differentiateExtractExistentialType(builder, extractExistential, witness);
+        }
+    }
+    return witness;
+}
+
 IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness)
 {
     return builder->getDifferentialPairType(
@@ -206,24 +221,8 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
     auto primalType = lookupPrimalInst(builder, originalType, nullptr);
     SLANG_RELEASE_ASSERT(primalType);
 
-    IRInst* witness = 
-        differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)originalType);
-    if (witness)
-    {
-        witness = lookupPrimalInst(builder, witness, nullptr);
-        SLANG_RELEASE_ASSERT(witness);
-    }
-    if (!witness)
-    {
-        if (auto primalPairType = as<IRDifferentialPairType>(primalType))
-        {
-            witness = getDifferentialPairWitness(builder, originalType, primalPairType);
-        }
-        else if (auto extractExistential = as<IRExtractExistentialType>(originalType))
-        {
-            differentiateExtractExistentialType(builder, extractExistential, witness);
-        }
-    }
+    IRInst* witness = tryGetDifferentiableWitness(builder, originalType);
+    SLANG_RELEASE_ASSERT(witness);
 
     return builder->getDifferentialPairType(
         (IRType*)primalType,
@@ -514,46 +513,7 @@ InstPair AutoDiffTranscriberBase::transcribeParam(IRBuilder* builder, IRParam* o
     bool isFuncParam = (func && origParam->getParent() == func->getFirstBlock());
     if (isFuncParam)
     {
-        if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalDataType))
-        {
-            IRInst* diffPairParam = builder->emitParam(diffPairType);
-
-            auto diffPairVarName = makeDiffPairName(origParam);
-            if (diffPairVarName.getLength() > 0)
-                builder->addNameHintDecoration(diffPairParam, diffPairVarName.getUnownedSlice());
-
-            SLANG_ASSERT(diffPairParam);
-
-            if (auto pairType = as<IRDifferentialPairType>(diffPairType))
-            {
-                return InstPair(
-                    builder->emitDifferentialPairGetPrimal(diffPairParam),
-                    builder->emitDifferentialPairGetDifferential(
-                        (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
-                        diffPairParam));
-            }
-            else if (auto pairPtrType = as<IRPtrTypeBase>(diffPairType))
-            {
-                auto ptrInnerPairType = as<IRDifferentialPairType>(pairPtrType->getValueType());
-
-                return InstPair(
-                    builder->emitDifferentialPairAddressPrimal(diffPairParam),
-                    builder->emitDifferentialPairAddressDifferential(
-                        builder->getPtrType(
-                            kIROp_PtrType,
-                            (IRType*)pairBuilder->getDiffTypeFromPairType(builder, ptrInnerPairType)),
-                        diffPairParam));
-            }
-        }
-
-        auto primalInst = cloneInst(&cloneEnv, builder, origParam);
-        if (auto primalParam = as<IRParam>(primalInst))
-        {
-            SLANG_RELEASE_ASSERT(builder->getInsertLoc().getBlock());
-            primalParam->removeFromParent();
-            builder->getInsertLoc().getBlock()->addParam(primalParam);
-        }
-        return InstPair(primalInst, nullptr);
+        return transcribeFuncParam(builder, origParam, primalDataType);
     }
     else
     {
@@ -608,10 +568,14 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
         switch (diffType->getOp())
         {
         case kIROp_DifferentialPairType:
-            return builder->emitMakeDifferentialPair(
-                diffType,
-                getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()),
-                getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()));
+            {
+                auto makeDiffPair = builder->emitMakeDifferentialPair(
+                    diffType,
+                    getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()),
+                    getDifferentialZeroOfType(builder, as<IRDifferentialPairType>(diffType)->getValueType()));
+                builder->markInstAsDifferential(makeDiffPair, as<IRDifferentialPairType>(diffType)->getValueType());
+                return makeDiffPair;
+            }
         }
 
         if (auto arrayType = as<IRArrayType>(primalType))
@@ -638,6 +602,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
             {
                 auto wt = lookupInterface->getWitnessTable();
                 zeroMethod = builder->emitLookupInterfaceMethodInst(builder->getFuncType(List<IRType*>(), diffType), wt, autoDiffSharedContext->zeroMethodStructKey);
+                builder->markInstAsDifferential(zeroMethod);
             }
         }
         SLANG_RELEASE_ASSERT(zeroMethod);
@@ -750,6 +715,7 @@ InstPair AutoDiffTranscriberBase::transcribeReturn(IRBuilder* builder, IRReturn*
         IRInst* primalReturnVal = findOrTranscribePrimalInst(builder, origReturnVal);
 
         IRInst* primalReturn = builder->emitReturn(primalReturnVal);
+        builder->markInstAsMixedDifferential(primalReturn, nullptr);
         return InstPair(primalReturn, nullptr);
 
     }
@@ -902,12 +868,14 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
 
                 // Tag the differential inst using a decoration (if it doesn't have one)
                 if (!pair.differential->findDecoration<IRDifferentialInstDecoration>() &&
-                    !pair.differential->findDecoration<IRMixedDifferentialInstDecoration>())
+                    !pair.differential->findDecoration<IRMixedDifferentialInstDecoration>() &&
+                    !as<IRConstant>(pair.differential))
                 {
                     // TODO: If the type is a 'relevant' pair type, need to mark it as mixed differential
                     // instead.
                     // 
-                    builder->markInstAsDifferential(pair.differential, as<IRType>(pair.primal->getDataType()));
+                    auto primalType = as<IRType>(pair.primal->getDataType());
+                    builder->markInstAsDifferential(pair.differential, primalType);
                 }
 
                 break;
@@ -960,8 +928,8 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
             }
             else
             {
-                auto diffType = _differentiateTypeImpl(builder, origType);
                 IRInst* primal = maybeCloneForPrimalInst(builder, origType);
+                auto diffType = _differentiateTypeImpl(builder, origType);
                 result = InstPair(primal, diffType);
             }
         }

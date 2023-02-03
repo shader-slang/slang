@@ -432,19 +432,18 @@ class ParameterBlockType : public UniformParameterGroupType
     SLANG_AST_CLASS(ParameterBlockType)
 };
 
-class ArrayExpressionType : public Type 
+class ArrayExpressionType : public DeclRefType 
 {
     SLANG_AST_CLASS(ArrayExpressionType)
-
-    Type* baseType = nullptr;
-    IntVal* arrayLength = nullptr;
-
-    // Overrides should be public so base classes can access
+    ArrayExpressionType(Type* inElementType, IntVal* inElementCount)
+    {
+        SLANG_UNUSED(inElementType);
+        SLANG_UNUSED(inElementCount);
+    }
+    bool isUnsized();
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
-    bool _equalsImplOverride(Type* type);
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    HashCode _getHashCodeOverride();
+    Type* getElementType();
+    IntVal* getElementCount();
 };
 
 // The "type" of an expression that resolves to a type.
@@ -500,7 +499,7 @@ class VectorExpressionType : public ArithmeticExpressionType
     BasicExpressionType* _getScalarTypeOverride();
 
     VectorExpressionType(Type* inElementType, IntVal* inElementCount)
-        : elementType(inElementType), elementCount(inElementCount)
+       : elementType(inElementType), elementCount(inElementCount)
     {}
 };
 

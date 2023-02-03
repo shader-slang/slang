@@ -230,6 +230,11 @@ public:
             });
     }
 
+    ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
+    {
+        return getOrCreate<ConstantIntVal>(type, value);
+    }
+
     DeclRefType* getOrCreateDeclRefType(Decl* decl, Substitutions* outer)
     {
         NodeDesc desc;

@@ -663,6 +663,15 @@ struct IRBackwardDerivativeDecoration : IRDecoration
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRLoopCounterDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_LoopCounterDecoration
+    };
+    IR_LEAF_ISA(LoopCounterDecoration)
+};
+
 struct IRDifferentialInstDecoration : IRDecoration
 {
     enum
@@ -712,6 +721,18 @@ struct IRMixedDifferentialInstDecoration : IRDecoration
     IR_LEAF_ISA(MixedDifferentialInstDecoration)
 
     IRType* getPairType() { return as<IRType>(getOperand(0)); }
+};
+
+struct IROutParamReverseGradientDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_OutParamReverseGradientDecoration
+    };
+
+    IR_LEAF_ISA(OutParamReverseGradientDecoration)
+
+    IRInst* getValue() { return getOperand(0); }
 };
 
 struct IRBackwardDifferentiableDecoration : IRDecoration
@@ -1761,6 +1782,12 @@ struct IRGetElementPtr : IRInst
     IRInst* getIndex() { return getOperand(1); }
 };
 
+struct IRLoadReverseGradient :IRInst
+{
+    IR_LEAF_ISA(LoadReverseGradient)
+    IRInst* getValue() { return getOperand(0); }
+};
+
 struct IRGetNativePtr : IRInst
 {
     IR_LEAF_ISA(GetNativePtr);
@@ -2589,7 +2616,6 @@ public:
     IRInst* getBoolValue(bool value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
-    IRInst* getDifferentialBottom();
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* _getPtrValue(void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
@@ -2911,12 +2937,13 @@ public:
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
-    IRInst* emitDifferentialPairAddressDifferential(IRType* diffType, IRInst* diffPair);
-    IRInst* emitDifferentialPairAddressPrimal(IRInst* diffPair);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,
         IRInst* const* args);
+    IRInst* emitMakeVectorFromScalar(
+        IRType* type,
+        IRInst* scalarValue);
 
     IRInst* emitMakeVector(
         IRType*                 type,
@@ -2924,6 +2951,7 @@ public:
     {
         return emitMakeVector(type, args.getCount(), args.getBuffer());
     }
+    IRInst* emitMatrixReshape(IRType* type, IRInst* inst);
 
     IRInst* emitMakeMatrix(
         IRType*         type,
@@ -3116,6 +3144,8 @@ public:
     IRInst* emitLoad(
         IRInst*    ptr);
 
+    IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
+
     IRInst* emitStore(
         IRInst*    dstPtr,
         IRInst*    srcVal);
@@ -3160,6 +3190,14 @@ public:
         IRType*     type,
         IRInst*    basePtr,
         IRInst*    index);
+
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        IRInst* index);
+
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
+        const ArrayView<IRInst*>& accessChain);
 
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement);
@@ -3235,6 +3273,13 @@ public:
         IRBlock*    target,
         IRBlock*    breakBlock,
         IRBlock*    continueBlock);
+    
+    IRInst* emitLoop(
+        IRBlock*      target,
+        IRBlock*      breakBlock,
+        IRBlock*      continueBlock,
+        Int           argCount,
+        IRInst*const* args);
 
     IRInst* emitBranch(
         IRInst*    val,
@@ -3580,6 +3625,11 @@ public:
     void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalContextDecoration, ctx);
+    }
+
+    void addLoopCounterDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_LoopCounterDecoration);
     }
 
     void markInstAsDifferential(IRInst* value)

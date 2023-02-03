@@ -24,7 +24,7 @@ bool isBackwardDifferentiableFunc(IRInst* func)
     return false;
 }
 
-static IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
+IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
     {
@@ -400,6 +400,14 @@ IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* b
     return nullptr;
 }
 
+IRInst* DifferentiableTypeConformanceContext::getDifferentialTypeFromDiffPairType(
+    IRBuilder* builder, IRDifferentialPairType* diffPairType)
+{
+    auto witness = diffPairType->getWitness();
+    SLANG_RELEASE_ASSERT(witness);
+    return _lookupWitness(builder, witness, sharedContext->differentialAssocTypeStructKey);
+}
+
 void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
 {
     for (auto globalInst : sharedContext->moduleInst->getChildren())
@@ -534,31 +542,7 @@ void stripNoDiffTypeAttribute(IRModule* module)
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst)
 {
-    HashSet<IRInst*> processedSet;
-    for (;typeInst;)
-    {
-        if (as<IRArrayTypeBase>(typeInst) || as<IRPtrTypeBase>(typeInst))
-        {
-            typeInst = typeInst->getOperand(0);
-            if (!processedSet.Add(typeInst))
-                return false;
-        }
-        else
-        {
-            break;
-        }
-    }
-    if (!typeInst)
-        return false;
-    switch (typeInst->getOp())
-    {
-    case kIROp_FloatType:
-    case kIROp_DifferentialPairType:
-        return true;
-    default:
-        break;
-    }
-    if (context.lookUpConformanceForType(typeInst))
+    if (context.isDifferentiableType((IRType*)typeInst))
         return true;
     // Look for equivalent types.
     for (auto type : context.differentiableWitnessDictionary)

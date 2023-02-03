@@ -7,6 +7,7 @@
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-util.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-single-return.h"
 
 namespace Slang
 {
@@ -232,6 +233,8 @@ InstPair ForwardDiffTranscriber::transcribeStore(IRBuilder* builder, IRStore* or
             builder->markInstAsMixedDifferential(diffStoreVal, diffPairType);
 
             auto store = builder->emitStore(primalStoreLocation, valToStore);
+            builder->markInstAsMixedDifferential(store, diffPairType);
+
             return InstPair(store, nullptr);
         }
     }
@@ -385,12 +388,18 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     SLANG_ASSERT(calleeType);
     SLANG_RELEASE_ASSERT(calleeType->getParamCount() == origCall->getArgCount());
 
+    auto placeholderCall = builder->emitCallInst(nullptr, builder->emitUndefined(builder->getTypeKind()), 0, nullptr);
+    builder->setInsertBefore(placeholderCall);
+    IRBuilder argBuilder = *builder;
+    IRBuilder afterBuilder = argBuilder;
+    afterBuilder.setInsertAfter(placeholderCall);
+
     List<IRInst*> args;
     // Go over the parameter list and create pairs for each input (if required)
     for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
     {
         auto origArg = origCall->getArg(ii);
-        auto primalArg = findOrTranscribePrimalInst(builder, origArg);
+        auto primalArg = findOrTranscribePrimalInst(&argBuilder, origArg);
         SLANG_ASSERT(primalArg);
 
         auto primalType = primalArg->getDataType();
@@ -402,20 +411,71 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 while (auto attrType = as<IRAttributedType>(primalType))
                     primalType = attrType->getBaseType();
             }
-            if (auto pairType = tryGetDiffPairType(builder, primalType))
+            if (auto pairType = tryGetDiffPairType(&argBuilder, primalType))
             {
-                auto diffArg = findOrTranscribeDiffInst(builder, origArg);
-                if (!diffArg)
-                    diffArg = getDifferentialZeroOfType(builder, primalType);
+                auto pairPtrType = as<IRPtrTypeBase>(pairType);
+                auto pairValType = as<IRDifferentialPairType>(
+                    pairPtrType ? pairPtrType->getValueType() : pairType);
+                auto diffType = differentiableTypeConformanceContext.getDifferentialTypeFromDiffPairType(&argBuilder, pairValType);
+                if (auto ptrParamType = as<IRPtrTypeBase>(paramType))
+                {
+                    // Create temp var to pass in/out arguments.
+                    auto srcVar = argBuilder.emitVar(ptrParamType->getValueType());
+                    argBuilder.markInstAsMixedDifferential(srcVar, pairValType->getValueType());
 
-                // If a pair type can be formed, this must be non-null.
-                SLANG_RELEASE_ASSERT(diffArg);
+                    auto diffArg = findOrTranscribeDiffInst(&argBuilder, origArg);
+                    if (ptrParamType->getOp() == kIROp_InOutType)
+                    {
+                        // Set initial value.
+                        auto primalVal = argBuilder.emitLoad(primalArg);
+                        auto diffArgVal = diffArg;
+                        if (!diffArg)
+                            diffArgVal = getDifferentialZeroOfType(builder, (IRType*)pairValType->getValueType());
+                        else
+                        {
+                            diffArgVal = argBuilder.emitLoad(diffArg);
+                            argBuilder.markInstAsDifferential(diffArgVal, pairValType->getValueType());
+                        }
+                        auto initVal = argBuilder.emitMakeDifferentialPair(pairValType, primalVal, diffArgVal);
+                        argBuilder.markInstAsMixedDifferential(initVal, primalType);
+                        auto store = argBuilder.emitStore(srcVar, initVal);
+                        argBuilder.markInstAsMixedDifferential(store, primalType);
+                    }
+                    if (as<IROutTypeBase>(ptrParamType))
+                    {
+                        // Read back new value.
+                        auto newVal = afterBuilder.emitLoad(srcVar);
+                        afterBuilder.markInstAsMixedDifferential(newVal, pairValType->getValueType());
+                        auto newPrimalVal = afterBuilder.emitDifferentialPairGetPrimal(newVal);
+                        afterBuilder.emitStore(primalArg, newPrimalVal);
+
+                        if (diffArg)
+                        {
+                            auto newDiffVal = afterBuilder.emitDifferentialPairGetDifferential((IRType*)diffType, newVal);
+                            afterBuilder.markInstAsDifferential(newDiffVal, pairValType->getValueType());
+                            auto storeInst = afterBuilder.emitStore(diffArg, newDiffVal);
+                            afterBuilder.markInstAsDifferential(storeInst, pairValType->getValueType());
+                        }
+                    }
+                    args.add(srcVar);
+                    continue;
+                }
+                else
+                {
+                    auto diffArg = findOrTranscribeDiffInst(&argBuilder, origArg);
+                    if (!diffArg)
+                        diffArg = getDifferentialZeroOfType(&argBuilder, primalType);
+
+                    // If a pair type can be formed, this must be non-null.
+                    SLANG_RELEASE_ASSERT(diffArg);
+
+                    auto diffPair = argBuilder.emitMakeDifferentialPair(pairType, primalArg, diffArg);
+                    argBuilder.markInstAsMixedDifferential(diffPair, pairType);
+
+                    args.add(diffPair);
+                    continue;
+                }
                 
-                auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
-                builder->markInstAsMixedDifferential(diffPair, pairType);
-
-                args.add(diffPair);
-                continue;
             }
         }
         // Argument is not differentiable.
@@ -424,26 +484,29 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
     
     IRType* diffReturnType = nullptr;
-    diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
+    diffReturnType = tryGetDiffPairType(&argBuilder, origCall->getFullType());
 
     if (!diffReturnType)
     {
         SLANG_RELEASE_ASSERT(origCall->getFullType()->getOp() == kIROp_VoidType);
-        diffReturnType = builder->getVoidType();
+        diffReturnType = argBuilder.getVoidType();
     }
 
-    auto callInst = builder->emitCallInst(
+    auto callInst = argBuilder.emitCallInst(
         diffReturnType,
         diffCallee,
         args);
-    builder->markInstAsMixedDifferential(callInst, diffReturnType);
-    builder->addAutoDiffOriginalValueDecoration(callInst, primalCallee);
+    placeholderCall->removeAndDeallocate();
+    argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
+    argBuilder.addAutoDiffOriginalValueDecoration(callInst, primalCallee);
+
+    *builder = afterBuilder;
 
     if (diffReturnType->getOp() != kIROp_VoidType)
     {
-        IRInst* primalResultValue = builder->emitDifferentialPairGetPrimal(callInst);
-        auto diffType = differentiateType(builder, origCall->getFullType());
-        IRInst* diffResultValue = builder->emitDifferentialPairGetDifferential(diffType, callInst);
+        IRInst* primalResultValue = afterBuilder.emitDifferentialPairGetPrimal(callInst);
+        auto diffType = differentiateType(&afterBuilder, origCall->getFullType());
+        IRInst* diffResultValue = afterBuilder.emitDifferentialPairGetDifferential(diffType, callInst);
         return InstPair(primalResultValue, diffResultValue);
     }
     else
@@ -527,6 +590,9 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
                     auto diffArg = lookupDiffInst(origArg, nullptr);
                     if (diffArg)
                         newArgs.add(diffArg);
+                    else
+                        newArgs.add(
+                            getDifferentialZeroOfType(builder, origArg->getDataType()));
                 }
             }
 
@@ -576,16 +642,15 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
     return InstPair(nullptr, nullptr);
 }
 
-InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder* builder, IRInst* origInst)
+InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
 {
     switch(origInst->getOp())
     {
         case kIROp_FloatLit:
-            return InstPair(origInst, builder->getFloatValue(origInst->getDataType(), 0.0f));
+        case kIROp_IntLit:
+            return InstPair(origInst, nullptr);
         case kIROp_VoidLit:
             return InstPair(origInst, origInst);
-        case kIROp_IntLit:
-            return InstPair(origInst, builder->getIntValue(origInst->getDataType(), 0));
     }
 
     getSink()->diagnose(
@@ -943,9 +1008,15 @@ InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(IRBuilder* build
     SLANG_ASSERT(primalVal);
     auto diffPrimalVal = findOrTranscribePrimalInst(builder, origInst->getDifferentialValue());
     SLANG_ASSERT(diffPrimalVal);
+
     auto primalDiffVal = findOrTranscribeDiffInst(builder, origInst->getPrimalValue());
+    if (!primalDiffVal)
+        primalDiffVal = getDifferentialZeroOfType(builder, origInst->getPrimalValue()->getDataType());
     SLANG_ASSERT(primalDiffVal);
+
     auto diffDiffVal = findOrTranscribeDiffInst(builder, origInst->getDifferentialValue());
+    if (!diffDiffVal)
+        diffDiffVal = getDifferentialZeroOfType(builder, origInst->getDifferentialValue()->getDataType());
     SLANG_ASSERT(diffDiffVal);
 
     auto primalPairType = findOrTranscribePrimalInst(builder, origInst->getFullType());
@@ -1142,6 +1213,8 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
     builder.setInsertInto(diffFunc);
 
     differentiableTypeConformanceContext.setFunc(primalFunc);
+    
+    mapInOutParamToWriteBackValue.Clear();
 
     // Transcribe children from origFunc into diffFunc
     for (auto block = primalFunc->getFirstBlock(); block; block = block->getNextBlock())
@@ -1151,6 +1224,43 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
     // shouldn't be an issue, for consistency, we put them back in order.
     for (auto block = primalFunc->getFirstBlock(); block; block = block->getNextBlock())
         as<IRBlock>(lookupDiffInst(block))->insertAtEnd(diffFunc);
+
+    for (auto block : diffFunc->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() == kIROp_Return)
+            {
+                // Insert write backs to mutable parameters before returning.
+                builder.setInsertBefore(inst);
+                for (auto& writeBack : mapInOutParamToWriteBackValue)
+                {
+                    auto param = writeBack.Key;
+                    auto primalVal = builder.emitLoad(writeBack.Value.primal);
+                    IRInst* valToStore = nullptr;
+                    if (writeBack.Value.differential)
+                    {
+                        auto diffVal = builder.emitLoad(writeBack.Value.differential);
+                        builder.markInstAsDifferential(diffVal, primalVal->getFullType());
+                        valToStore = builder.emitMakeDifferentialPair(cast<IRPtrTypeBase>(param->getFullType())->getValueType(),
+                            primalVal, diffVal);
+                        builder.markInstAsMixedDifferential(valToStore, valToStore->getFullType());
+                    }
+                    else
+                    {
+                        valToStore = builder.emitLoad(writeBack.Value.primal);
+                    }
+
+                    auto storeInst = builder.emitStore(param, valToStore);
+
+                    if (writeBack.Value.differential)
+                    {
+                        builder.markInstAsMixedDifferential(storeInst, valToStore->getFullType());
+                    }
+                }
+            }
+        }
+    }
 
     return InstPair(primalFunc, diffFunc);
 }
@@ -1198,6 +1308,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_VectorReshape:
     case kIROp_IntCast:
     case kIROp_FloatCast:
+    case kIROp_MakeVectorFromScalar:
     case kIROp_MakeStruct:
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
@@ -1212,7 +1323,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_swizzle:
         return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
     
-    case kIROp_MakeVectorFromScalar:
     case kIROp_MakeTuple:
         return transcribeByPassthrough(builder, origInst);
     case kIROp_UpdateElement:
@@ -1287,6 +1397,79 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     }
 
     return InstPair(nullptr, nullptr);
+}
+
+String ForwardDiffTranscriber::makeDiffPairName(IRInst* origVar)
+{
+    if (auto namehintDecoration = origVar->findDecoration<IRNameHintDecoration>())
+    {
+        return ("dp" + String(namehintDecoration->getName()));
+    }
+
+    return String("");
+}
+
+InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
+{
+    if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalType))
+    {
+        IRInst* diffPairParam = builder->emitParam(diffPairType);
+
+        auto diffPairVarName = makeDiffPairName(origParam);
+        if (diffPairVarName.getLength() > 0)
+            builder->addNameHintDecoration(diffPairParam, diffPairVarName.getUnownedSlice());
+
+        SLANG_ASSERT(diffPairParam);
+
+        if (auto pairType = as<IRDifferentialPairType>(diffPairType))
+        {
+            return InstPair(
+                builder->emitDifferentialPairGetPrimal(diffPairParam),
+                builder->emitDifferentialPairGetDifferential(
+                    (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
+                    diffPairParam));
+        }
+        else if (auto pairPtrType = as<IRPtrTypeBase>(diffPairType))
+        {
+            auto ptrInnerPairType = as<IRDifferentialPairType>(pairPtrType->getValueType());
+            // Make a local copy of the parameter for primal and diff parts.
+            auto primal = builder->emitVar(ptrInnerPairType->getValueType());
+            auto diffType = differentiateType(builder, cast<IRPtrTypeBase>(origParam->getDataType())->getValueType());
+            auto diff = builder->emitVar(diffType);
+
+            IRInst* primalInitVal = nullptr;
+            IRInst* diffInitVal = nullptr;
+            if (as<IROutType>(diffPairType))
+            {
+                primalInitVal = builder->emitDefaultConstruct(ptrInnerPairType->getValueType());
+                diffInitVal = builder->emitDefaultConstructRaw(diffType);
+            }
+            else
+            {
+                auto initVal = builder->emitLoad(diffPairParam);
+                primalInitVal = builder->emitDifferentialPairGetPrimal(initVal);
+                diffInitVal = builder->emitDifferentialPairGetDifferential(diffType, initVal);
+            }
+            builder->markInstAsDifferential(diffInitVal, ptrInnerPairType->getValueType());
+            
+            builder->emitStore(primal, primalInitVal);
+
+            auto diffStore = builder->emitStore(diff, diffInitVal);
+            builder->markInstAsDifferential(diffStore, ptrInnerPairType->getValueType());
+
+            mapInOutParamToWriteBackValue[diffPairParam] = InstPair(primal, diff);
+            return InstPair(primal, diff);
+        }
+    }
+
+    auto primalInst = cloneInst(&cloneEnv, builder, origParam);
+    if (auto primalParam = as<IRParam>(primalInst))
+    {
+        SLANG_RELEASE_ASSERT(builder->getInsertLoc().getBlock());
+        primalParam->removeFromParent();
+        builder->getInsertLoc().getBlock()->addParam(primalParam);
+    }
+    return InstPair(primalInst, nullptr);
 }
 
 }

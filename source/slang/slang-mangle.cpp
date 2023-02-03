@@ -217,8 +217,8 @@ namespace Slang
         else if (auto arrType = dynamicCast<ArrayExpressionType>(type))
         {
             emitRaw(context, "a");
-            emitSimpleIntVal(context, arrType->arrayLength);
-            emitType(context, arrType->baseType);
+            emitSimpleIntVal(context, arrType->getElementCount());
+            emitType(context, arrType->getElementType());
         }
         else if( auto taggedUnionType = dynamicCast<TaggedUnionType>(type) )
         {
