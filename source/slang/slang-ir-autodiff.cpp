@@ -496,6 +496,8 @@ void stripTempDecorations(IRInst* inst)
         case kIROp_DifferentialInstDecoration:
         case kIROp_MixedDifferentialInstDecoration:
         case kIROp_AutoDiffOriginalValueDecoration:
+        case kIROp_BackwardDerivativePrimalReturnDecoration:
+        case kIROp_PrimalValueStructKeyDecoration:
             decor->removeAndDeallocate();
             break;
         default:

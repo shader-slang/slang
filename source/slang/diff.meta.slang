@@ -322,6 +322,15 @@ void __d_sin(inout DifferentialPair<T> dpx, T.Differential dOut)
         T.dmul(cos(dpx.p), dOut));
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(sin)]
+void __d_sin_vector(inout DifferentialPair<vector<T, N>> dpx, vector<T, N>.Differential dOut)
+{
+    dpx = diffPair(
+        dpx.p,
+        vector<T, N>.dmul(cos(dpx.p), dOut));
+}
+
 // Cosine
 
 __generic<T : __BuiltinFloatingPointType>
@@ -338,6 +347,24 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 DifferentialPair<vector<T, N>> __d_cos_vector(DifferentialPair<vector<T, N>> dpx)
 {
     VECTOR_MAP_D_UNARY(T, N, __d_cos, dpx);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDerivativeOf(cos)]
+void __d_cos(inout DifferentialPair<T> dpx, T.Differential dOut)
+{
+    dpx = diffPair(
+        dpx.p,
+        T.dmul(-sin(dpx.p), dOut));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(cos)]
+void __d_cos_vector(inout DifferentialPair<vector<T, N>> dpx, vector<T, N>.Differential dOut)
+{
+    dpx = diffPair(
+        dpx.p,
+        vector<T, N>.dmul(-sin(dpx.p), dOut));
 }
 
 // Base-e logarithm
