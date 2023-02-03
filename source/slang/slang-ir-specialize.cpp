@@ -392,13 +392,14 @@ struct SpecializationContext
             {
                 for (auto decor : genericReturnVal->getDecorations())
                 {
+                    bool specialized = false;
                     if (decor->getOp() == kIROp_ForwardDerivativeDecoration ||
                         decor->getOp() == kIROp_UserDefinedBackwardDerivativeDecoration)
                     {
                         // If we already have a diff func on this specialize, skip.
                         if (auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
                         {
-                            return false;
+                            continue;
                         }
 
                         auto specDiffFunc = as<IRSpecialize>(decor->getOperand(0));
@@ -443,8 +444,10 @@ struct SpecializationContext
 
                         builder.addDecoration(specInst, decor->getOp(), newDiffFunc);
 
-                        return true;
+                        specialized = true;
                     }
+                    if (specialized)
+                        return true;
                 }
             }
             return false;

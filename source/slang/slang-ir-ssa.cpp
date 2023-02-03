@@ -386,7 +386,7 @@ static void cloneRelevantDecorations(
             //
             if( !val->findDecorationImpl(decoration->getOp()) )
             {
-                cloneDecoration(decoration, val, var->getModule());
+                cloneDecoration(nullptr, decoration, val, var->getModule());
             }
             break;
         }

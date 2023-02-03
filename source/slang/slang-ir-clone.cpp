@@ -279,6 +279,7 @@ IRInst* cloneInst(
 }
 
 void cloneDecoration(
+    IRCloneEnv*     cloneEnv,
     IRDecoration*   oldDecoration,
     IRInst*         newParent,
     IRModule*       module)
@@ -292,6 +293,7 @@ void cloneDecoration(
         builder.setInsertInto(newParent);
 
     IRCloneEnv env;
+    env.parent = cloneEnv;
     cloneInst(&env, &builder, oldDecoration);
 }
 
@@ -300,6 +302,7 @@ void cloneDecoration(
     IRInst*         newParent)
 {
     cloneDecoration(
+        nullptr,
         oldDecoration,
         newParent,
         newParent->getModule());
