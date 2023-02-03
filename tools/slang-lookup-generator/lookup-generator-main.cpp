@@ -5,6 +5,7 @@
 #include "../../source/compiler-core/slang-json-value.h"
 #include "../../source/compiler-core/slang-lexer.h"
 #include "../../source/core/slang-io.h"
+#include "../../source/core/slang-secure-crt.h"
 
 using namespace Slang;
 
@@ -82,7 +83,7 @@ enum HashFindResult {
 // https://cmph.sourceforge.net/papers/esa09.pdf
 static HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams)
 {
-    SLANG_ASSERT(ss.getCount() < std::numeric_limits<UInt32>::max());
+    // Check for uniqueness
     for (Index i = 0; i < ss.getCount(); ++i)
     {
         for (Index j = i + 1; j < ss.getCount(); ++j)
@@ -93,7 +94,9 @@ static HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& has
             }
         }
     }
-    const UInt32       nBuckets = ss.getCount();
+
+    SLANG_ASSERT(UIndex(ss.getCount()) < std::numeric_limits<UInt32>::max());
+    const UInt32       nBuckets = UInt32(ss.getCount());
     List<List<String>> initialBuckets;
     initialBuckets.setCount(nBuckets);
 
@@ -207,7 +210,8 @@ void writeHashFile(
     const List<String> includes,
     const HashParams&  hashParams)
 {
-    FILE* f = fopen(outCppPath, "w");
+    FILE* f = nullptr;
+    fopen_s(&f, outCppPath, "w");
     if (!f)
     {
         return;
