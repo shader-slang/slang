@@ -347,7 +347,7 @@ workspace "slang"
         architecture "ARM64"
     filter { "platforms:aarch64", "toolset:clang" }
         buildoptions { "-arch arm64" }
-    linkoptions { "-arch arm64" }
+        linkoptions { "-arch arm64" }
 
     filter { "toolset:clang or gcc*" }
         -- Makes all symbols hidden by default unless explicitly 'exported'
