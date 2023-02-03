@@ -1,7 +1,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
@@ -12,6 +13,12 @@ typedef DifferentialPair<float3> dpfloat3;
 float diffExp(float x)
 {
     return exp(x);
+}
+
+[BackwardDifferentiable]
+float diffSin(float x)
+{
+    return sin(x);
 }
 
 [numthreads(1, 1, 1)]
@@ -29,5 +36,11 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         __bwd_diff(diffExp)(dpx, 1.0);
         outputBuffer[2] = dpx.p; // Expect: 0.000000
         outputBuffer[3] = dpx.d; // Expect: 1.000000
+    }
+
+    {
+        dpfloat dpx = dpfloat(float.getPi(), 1.0);
+        __bwd_diff(diffSin)(dpx, 1.0);
+        outputBuffer[4] = dpx.d; // Expect: -1.000000
     }
 }
