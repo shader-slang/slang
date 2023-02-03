@@ -1036,7 +1036,7 @@ struct DiffTransposePass
             argRequiresLoad.add(false);
         }
 
-        args.add(primalContextDecor->getBackwardDerivativePrimalContextVar());
+        args.add(builder->emitLoad(primalContextDecor->getBackwardDerivativePrimalContextVar()));
         argTypes.add(builder->getOutType(
             as<IRPtrTypeBase>(
                 primalContextDecor->getBackwardDerivativePrimalContextVar()->getDataType())

@@ -478,6 +478,9 @@ namespace Slang
         if (!parent)
             return nullptr;
 
+        if (as<AssocTypeDecl>(parent))
+            return nullptr;
+
         // If we reach here, we are expecting a synthesized decl defined in `subType`.
         // Instead of returning a DeclRefExpr to the requirement decl, we synthesize a placeholder decl
         // in `subType` and return a DeclRefExpr to the synthesized decl.
