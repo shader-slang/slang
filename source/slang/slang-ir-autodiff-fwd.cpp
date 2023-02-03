@@ -411,7 +411,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 while (auto attrType = as<IRAttributedType>(primalType))
                     primalType = attrType->getBaseType();
             }
-            if (auto pairType = tryGetDiffPairType(&argBuilder, primalType))
+            if (auto pairType = tryGetDiffPairType(&argBuilder, origCall->getArg(ii)->getDataType()))
             {
                 auto pairPtrType = as<IRPtrTypeBase>(pairType);
                 auto pairValType = as<IRDifferentialPairType>(
@@ -1201,7 +1201,7 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
     // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
     if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
     {
-        cloneDecoration(dictDecor, diffFunc);
+        cloneDecoration(&cloneEnv, dictDecor, diffFunc, diffFunc->getModule());
     }
     return diffFunc;
 }
