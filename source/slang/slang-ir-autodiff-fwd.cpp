@@ -402,6 +402,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         auto primalArg = findOrTranscribePrimalInst(&argBuilder, origArg);
         SLANG_ASSERT(primalArg);
 
+        auto origType = origCall->getArg(ii)->getDataType();
         auto primalType = primalArg->getDataType();
         auto paramType = calleeType->getParamType(ii);
         if (!isNoDiffType(paramType))
@@ -410,8 +411,10 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
             {
                 while (auto attrType = as<IRAttributedType>(primalType))
                     primalType = attrType->getBaseType();
+                while (auto attrType = as<IRAttributedType>(origType))
+                    origType = attrType->getBaseType();
             }
-            if (auto pairType = tryGetDiffPairType(&argBuilder, origCall->getArg(ii)->getDataType()))
+            if (auto pairType = tryGetDiffPairType(&argBuilder, origType))
             {
                 auto pairPtrType = as<IRPtrTypeBase>(pairType);
                 auto pairValType = as<IRDifferentialPairType>(
