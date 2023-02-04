@@ -786,6 +786,12 @@ struct DiffTransposePass
 
         for (auto externInst : externInsts)
         {
+            if (isNoDiffType(externInst->getDataType()))
+            {
+                popRevGradients(externInst);
+                continue;
+            }
+
             auto primalType = tryGetPrimalTypeFromDiffInst(externInst);
             SLANG_ASSERT(primalType);
 
@@ -967,10 +973,16 @@ struct DiffTransposePass
         };
         List<DiffValWriteBack> writebacks;
 
+        auto baseFnType = as<IRFuncType>(baseFn->getDataType());
+
+        SLANG_RELEASE_ASSERT(baseFnType);
+        SLANG_RELEASE_ASSERT(fwdCall->getArgCount() == baseFnType->getParamCount());
+
         for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
         {
             auto arg = fwdCall->getArg(ii);
-            
+            auto paramType = baseFnType->getParamType(ii);
+
             if (as<IRLoadReverseGradient>(arg))
             {
                 // Original parameters that are `out DifferentiableType` will turn into
@@ -1023,9 +1035,17 @@ struct DiffTransposePass
             }
             else
             {
-                args.add(arg);
-                argTypes.add(arg->getDataType());
-                argRequiresLoad.add(false);
+                if (as<IROutType>(paramType))
+                {
+                    args.add(nullptr);
+                    argRequiresLoad.add(false);
+                }
+                else
+                {
+                    args.add(arg);
+                    argTypes.add(arg->getDataType());
+                    argRequiresLoad.add(false);
+                }
             }
         }
 
@@ -1047,7 +1067,20 @@ struct DiffTransposePass
             revFnType,
             baseFn);
 
-        builder->emitCallInst(revFnType->getResultType(), revCallee, args);
+        List<IRInst*> callArgs;
+        for (auto arg : args)
+            if (arg)
+                callArgs.add(arg);
+        builder->emitCallInst(revFnType->getResultType(), revCallee, callArgs);
+
+        // Writeback result gradient to their corresponding splitted variable.
+        for (auto wb : writebacks)
+        {
+            auto loadedPair = builder->emitLoad(wb.srcTempPairVar);
+            auto diffType = as<IRPtrTypeBase>(wb.destVar->getDataType())->getValueType();
+            auto loadedDiff = builder->emitDifferentialPairGetDifferential(diffType, loadedPair);
+            builder->emitStore(wb.destVar, loadedDiff);
+        }
 
         // Writeback result gradient to their corresponding splitted variable.
         for (auto wb : writebacks)
@@ -1059,8 +1092,11 @@ struct DiffTransposePass
         }
 
         List<RevGradient> gradients;
-        for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
+        for (Index ii = 0; ii < args.getCount(); ii++)
         {
+            if (!args[ii])
+                continue;
+
             // Is this arg relevant to auto-diff?
             if (auto diffPairType = getDiffPairType(args[ii]->getDataType()))
             {
@@ -1072,13 +1108,11 @@ struct DiffTransposePass
                     auto diffArgType = (IRType*)diffTypeContext.getDifferentialForType(
                         builder, 
                         diffPairType->getValueType());
-                    auto diffArgPtrType = builder->getPtrType(kIROp_PtrType, diffArgType);
-                    
                     gradients.add(RevGradient(
                         RevGradient::Flavor::Simple,
                         fwdCall->getArg(ii),
                         builder->emitDifferentialPairGetDifferential(
-                            diffArgPtrType, builder->emitLoad(args[ii])),
+                            diffArgType, builder->emitLoad(args[ii])),
                         nullptr));
                 }
             }
