@@ -2338,6 +2338,13 @@ namespace Slang
                 {
                     for (auto param : funcDecl->getParameters())
                     {
+                        if (param->findModifier<NoDiffModifier>())
+                        {
+                            if (param->findModifier<OutModifier>() &&
+                                !param->findModifier<InModifier>() &&
+                                !param->findModifier<InOutModifier>())
+                                continue;
+                        }
                         resultDiffExpr->newParameterNames.add(param->getName());
                     }
                     resultDiffExpr->newParameterNames.add(semantics->getName("resultGradient"));
