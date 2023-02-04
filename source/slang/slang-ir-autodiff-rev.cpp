@@ -417,7 +417,10 @@ namespace Slang
             }
             else
             {
-                auto var = builder.emitVar(primalParamType);
+                auto primalPtrType = as<IRPtrTypeBase>(primalParamType);
+                SLANG_RELEASE_ASSERT(primalPtrType);
+                auto primalValueType = primalPtrType->getValueType();
+                auto var = builder.emitVar(primalValueType);
                 primalArgs.add(var);
             }
             primalTypes.add(primalParamType);
@@ -1147,7 +1150,12 @@ namespace Slang
                     instsToRemove.Add(getDiff);
                 }
                 else
-                    SLANG_UNEXPECTED("unknown use of parameter.");
+                {
+                    // If the user is something else, it'd better be a non relevant parameter.
+                    if (diffRefReplacement || diffWriteRefReplacement)
+                        SLANG_UNEXPECTED("unknown use of parameter.");
+                    use->set(primalRefReplacement);
+                }
             }
         }
 
