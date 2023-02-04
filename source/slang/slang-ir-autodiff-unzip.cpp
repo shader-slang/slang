@@ -370,8 +370,6 @@ struct ExtractPrimalFuncContext
         auto defVal = builder.emitDefaultConstructRaw((IRType*)intermediateType);
         builder.emitStore(outIntermediary, defVal);
 
-        eliminateDeadCode(func);
-
         // Remove any parameters not in `primalParams` set.
         List<IRInst*> params;
         for (auto param = func->getFirstParam(); param;)
@@ -379,7 +377,7 @@ struct ExtractPrimalFuncContext
             auto nextParam = param->getNextParam();
             if (!primalParams.Contains(param))
             {
-                SLANG_RELEASE_ASSERT(!param->hasUses());
+                param->replaceUsesWith(builder.getVoidValue());
                 param->removeAndDeallocate();
             }
             param = nextParam;
@@ -472,21 +470,26 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
             if (auto structKeyDecor = inst->findDecoration<IRPrimalValueStructKeyDecoration>())
             {
                 builder.setInsertBefore(inst);
-                auto val = builder.emitFieldExtract(
-                    inst->getDataType(),
-                    intermediateVar,
-                    structKeyDecor->getStructKey());
                 if (inst->getOp() == kIROp_Var)
                 {
                     // This is a var for intermediate context.
+                    auto valType = cast<IRPtrTypeBase>(inst->getFullType())->getValueType();
+                    auto val = builder.emitFieldExtract(
+                        valType,
+                        intermediateVar,
+                        structKeyDecor->getStructKey());
                     auto tempVar =
-                        builder.emitVar(cast<IRPtrTypeBase>(inst->getFullType())->getValueType());
+                        builder.emitVar(valType);
                     builder.emitStore(tempVar, val);
                     inst->replaceUsesWith(tempVar);
                 }
                 else
                 {
                     // Orindary value.
+                    auto val = builder.emitFieldExtract(
+                        inst->getFullType(),
+                        intermediateVar,
+                        structKeyDecor->getStructKey());
                     inst->replaceUsesWith(val);
                 }
                 instsToRemove.add(inst);
@@ -505,6 +508,8 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     {
         inst->removeAndDeallocate();
     }
+    
+    stripTempDecorations(func);
 
     // Run simplification to DCE unnecessary insts.
     eliminateDeadCode(func);

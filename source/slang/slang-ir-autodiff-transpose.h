@@ -1037,10 +1037,9 @@ struct DiffTransposePass
         }
 
         args.add(builder->emitLoad(primalContextDecor->getBackwardDerivativePrimalContextVar()));
-        argTypes.add(builder->getOutType(
-            as<IRPtrTypeBase>(
+        argTypes.add(as<IRPtrTypeBase>(
                 primalContextDecor->getBackwardDerivativePrimalContextVar()->getDataType())
-                ->getValueType()));
+                ->getValueType());
         argRequiresLoad.add(false);
 
         auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());

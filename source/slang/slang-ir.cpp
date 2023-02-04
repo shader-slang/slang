@@ -6797,6 +6797,8 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
+                if (call->findDecoration<IRNoSideEffectDecoration>())
+                    return false;
                 return !isPureFunctionalCall(call);
             }
             break;

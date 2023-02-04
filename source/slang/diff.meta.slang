@@ -207,7 +207,6 @@ DifferentialPair<matrix<T,R,C>> mul(DifferentialPair<matrix<T,R,N>> right, Diffe
     } \
     return DifferentialPair<vector<TYPE, COUNT>>(result, d_result)
 
-
 #define VECTOR_MAP_D_BINARY(TYPE, COUNT, D_FUNC, LEFT, RIGHT)                                                                          \
     vector<TYPE, COUNT> result;                                                                                                        \
     vector<TYPE, COUNT>.Differential d_result;                                                                                         \
@@ -220,6 +219,28 @@ DifferentialPair<matrix<T,R,C>> mul(DifferentialPair<matrix<T,R,N>> right, Diffe
     }                                                                                                                                  \
     return DifferentialPair<vector<TYPE, COUNT>>(result, d_result)
 
+#define VECTOR_MAP_BWD_D_UNARY(TYPE, COUNT, D_FUNC, VALUE, D_OUT)            \
+    vector<TYPE, COUNT>.Differential d_result;                               \
+    for (int i = 0; i < N; ++i)                                              \
+    {                                                                        \
+        DifferentialPair<TYPE> dp_elem = diffPair(VALUE.p[i], TYPE.dzero()); \
+        D_FUNC(dp_elem, __slang_noop_cast<TYPE.Differential>(D_OUT[i]));     \
+        d_result[i] = __slang_noop_cast<TYPE>(dp_elem.d);                    \
+    }                                                                        \
+    VALUE = diffPair(VALUE.p, d_result)
+
+#define VECTOR_MAP_BWD_D_BINARY(TYPE, COUNT, D_FUNC, LEFT, RIGHT, D_OUT)           \
+    vector<TYPE, COUNT>.Differential left_d_result, right_d_result;                \
+    for (int i = 0; i < N; ++i)                                                    \
+    {                                                                              \
+        DifferentialPair<TYPE> left_dp = diffPair(LEFT.p[i], TYPE.dzero());        \
+        DifferentialPair<TYPE> right_dp = diffPair(RIGHT.p[i], TYPE.dzero());      \
+        D_FUNC(left_dp, right_dp, __slang_noop_cast<TYPE.Differential>(D_OUT[i])); \
+        left_d_result[i] = __slang_noop_cast<TYPE>(left_dp.d);                     \
+        right_d_result[i] = __slang_noop_cast<TYPE>(right_dp.d);                   \
+    }                                                                              \
+    LEFT = diffPair(LEFT.p, left_d_result);                                        \
+    RIGHT = diffPair(RIGHT.p, right_d_result)
 
 // Detach and set derivatives to zero
 
@@ -430,23 +451,22 @@ DifferentialPair<vector<T, N>> __d_max_vector(DifferentialPair<vector<T, N>> dpx
 {
     VECTOR_MAP_D_BINARY(T, N, __d_max, dpx, dpy);
 }
-/*
+
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(max)]
 void __d_max(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
 {
-    if (dpx.p > dpy.p)
-    {
-        dpx = diffPair(dpx.p, dOut);
-        dpy = diffPair(dpy.p, T.dzero());
-    }
-    else
-    {
-        dpx = diffPair(dpx.p, T.dzero());
-        dpy = diffPair(dpy.p, dOut);
-    }
+    dpx = diffPair(dpx.p, dpx.p > dpy.p ? dOut : T.dzero());
+    dpy = diffPair(dpy.p, dpy.p > dpx.p ? dOut : T.dzero());
 }
-*/
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(max)]
+DifferentialPair<vector<T, N>> __d_max_vector(inout DifferentialPair<vector<T, N>> dpx, inout DifferentialPair<vector<T, N>> dpy, vector<T, N>.Differential dOut)
+{
+    VECTOR_MAP_BWD_D_BINARY(T, N, __d_max, dpx, dpy, dOut);
+}
+
 // Minimum
 
 __generic<T : __BuiltinFloatingPointType>
