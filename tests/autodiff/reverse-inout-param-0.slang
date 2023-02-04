@@ -5,27 +5,27 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typedef DifferentialPair<float> dpfloat;
-typedef float.Differential dfloat;
-
 [BackwardDifferentiable]
-float g(float y)
+void g(float x, out float y)
 {
-    float result = 2.0f * y;
-    return result * result;
+    y = (x + 1) * (x + 1);
 }
 
 [BackwardDifferentiable]
-float f(float x)
+void f(float x, out float y)
 {
-    return 3.0f * g(2.0f * x);
+    g(x, y);
+    g(x, y);
 }
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    dpfloat dpa = dpfloat(1.0, 0.0);
+    var x = diffPair(5.0);
+    float yDiffOut = 1.0;
 
-    __bwd_diff(f)(dpa, 1.0f);
-    outputBuffer[0] = dpa.d; // Expect: 96.0
+    __bwd_diff(f)(x, yDiffOut);
+
+    outputBuffer[0] = x.p; // should be 5, since bwd_diff does not write back new primal val.
+    outputBuffer[1] = x.d; // 12.0
 }

@@ -478,6 +478,7 @@ namespace Slang
         if (!parent)
             return nullptr;
 
+
         // If we reach here, we are expecting a synthesized decl defined in `subType`.
         // Instead of returning a DeclRefExpr to the requirement decl, we synthesize a placeholder decl
         // in `subType` and return a DeclRefExpr to the synthesized decl.
@@ -862,6 +863,15 @@ namespace Slang
 
         if (auto declRefType = as<DeclRefType>(type))
         {
+            if (auto builtinRequirement = declRefType->declRef.getDecl()->findModifier<BuiltinRequirementModifier>())
+            {
+                if (builtinRequirement->kind == BuiltinRequirementKind::DifferentialType)
+                {
+                    // We are trying to get differential type from a differential type.
+                    // The result is itself.
+                    return type;
+                }
+            }
             if (auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterface())))
             {
                 auto diffTypeLookupResult = lookUpMember(
@@ -2328,6 +2338,13 @@ namespace Slang
                 {
                     for (auto param : funcDecl->getParameters())
                     {
+                        if (param->findModifier<NoDiffModifier>())
+                        {
+                            if (param->findModifier<OutModifier>() &&
+                                !param->findModifier<InModifier>() &&
+                                !param->findModifier<InOutModifier>())
+                                continue;
+                        }
                         resultDiffExpr->newParameterNames.add(param->getName());
                     }
                     resultDiffExpr->newParameterNames.add(semantics->getName("resultGradient"));

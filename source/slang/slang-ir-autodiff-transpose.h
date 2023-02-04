@@ -786,6 +786,12 @@ struct DiffTransposePass
 
         for (auto externInst : externInsts)
         {
+            if (isNoDiffType(externInst->getDataType()))
+            {
+                popRevGradients(externInst);
+                continue;
+            }
+
             auto primalType = tryGetPrimalTypeFromDiffInst(externInst);
             SLANG_ASSERT(primalType);
 
@@ -960,17 +966,44 @@ struct DiffTransposePass
             return as<IRDifferentialPairType>(type);
         };
 
+        struct DiffValWriteBack
+        {
+            IRInst* destVar;
+            IRInst* srcTempPairVar;
+        };
+        List<DiffValWriteBack> writebacks;
+
+        auto baseFnType = as<IRFuncType>(baseFn->getDataType());
+
+        SLANG_RELEASE_ASSERT(baseFnType);
+        SLANG_RELEASE_ASSERT(fwdCall->getArgCount() == baseFnType->getParamCount());
+
         for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
         {
             auto arg = fwdCall->getArg(ii);
-            
-            if (arg->getOp() == kIROp_LoadReverseGradient)
+            auto paramType = baseFnType->getParamType(ii);
+
+            if (as<IRLoadReverseGradient>(arg))
             {
                 // Original parameters that are `out DifferentiableType` will turn into
                 // a `in Differential` parameter. The split logic will insert LoadReverseGradient insts
                 // to inform us this case. Here we just need to generate a load of the derivative variable
                 // and use it as the final argument.
                 args.add(builder->emitLoad(arg->getOperand(0)));
+            }
+            else if (auto instPair = as<IRReverseGradientDiffPairRef>(arg))
+            {
+                // An argument to an inout parameter will come in the form of a ReverseGradientDiffPairRef(primalVar, diffVar) inst
+                // after splitting.
+                // In order to perform the call, we need a temporary var to store the DiffPair.
+                auto pairType = as<IRPtrTypeBase>(arg->getDataType())->getValueType();
+                auto tempVar = builder->emitVar(pairType);
+                auto primalVal = builder->emitLoad(instPair->getPrimal());
+                auto diffVal = builder->emitLoad(instPair->getDiff());
+                auto pairVal = builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
+                builder->emitStore(tempVar, pairVal);
+                args.add(tempVar);
+                writebacks.add(DiffValWriteBack{instPair->getDiff(), tempVar});
             }
             else if (!as<IRPtrTypeBase>(arg->getDataType()) && getDiffPairType(arg->getDataType()))
             {
@@ -1002,9 +1035,17 @@ struct DiffTransposePass
             }
             else
             {
-                args.add(arg);
-                argTypes.add(arg->getDataType());
-                argRequiresLoad.add(false);
+                if (as<IROutType>(paramType))
+                {
+                    args.add(nullptr);
+                    argRequiresLoad.add(false);
+                }
+                else
+                {
+                    args.add(arg);
+                    argTypes.add(arg->getDataType());
+                    argRequiresLoad.add(false);
+                }
             }
         }
 
@@ -1015,11 +1056,10 @@ struct DiffTransposePass
             argRequiresLoad.add(false);
         }
 
-        args.add(primalContextDecor->getBackwardDerivativePrimalContextVar());
-        argTypes.add(builder->getOutType(
-            as<IRPtrTypeBase>(
+        args.add(builder->emitLoad(primalContextDecor->getBackwardDerivativePrimalContextVar()));
+        argTypes.add(as<IRPtrTypeBase>(
                 primalContextDecor->getBackwardDerivativePrimalContextVar()->getDataType())
-                ->getValueType()));
+                ->getValueType());
         argRequiresLoad.add(false);
 
         auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
@@ -1027,11 +1067,27 @@ struct DiffTransposePass
             revFnType,
             baseFn);
 
-        builder->emitCallInst(revFnType->getResultType(), revCallee, args);
+        List<IRInst*> callArgs;
+        for (auto arg : args)
+            if (arg)
+                callArgs.add(arg);
+        builder->emitCallInst(revFnType->getResultType(), revCallee, callArgs);
+
+        // Writeback result gradient to their corresponding splitted variable.
+        for (auto wb : writebacks)
+        {
+            auto loadedPair = builder->emitLoad(wb.srcTempPairVar);
+            auto diffType = as<IRPtrTypeBase>(wb.destVar->getDataType())->getValueType();
+            auto loadedDiff = builder->emitDifferentialPairGetDifferential(diffType, loadedPair);
+            builder->emitStore(wb.destVar, loadedDiff);
+        }
 
         List<RevGradient> gradients;
-        for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
+        for (Index ii = 0; ii < args.getCount(); ii++)
         {
+            if (!args[ii])
+                continue;
+
             // Is this arg relevant to auto-diff?
             if (auto diffPairType = getDiffPairType(args[ii]->getDataType()))
             {
@@ -1043,13 +1099,11 @@ struct DiffTransposePass
                     auto diffArgType = (IRType*)diffTypeContext.getDifferentialForType(
                         builder, 
                         diffPairType->getValueType());
-                    auto diffArgPtrType = builder->getPtrType(kIROp_PtrType, diffArgType);
-                    
                     gradients.add(RevGradient(
                         RevGradient::Flavor::Simple,
                         fwdCall->getArg(ii),
                         builder->emitDifferentialPairGetDifferential(
-                            diffArgPtrType, builder->emitLoad(args[ii])),
+                            diffArgType, builder->emitLoad(args[ii])),
                         nullptr));
                 }
             }
@@ -1308,14 +1362,13 @@ struct DiffTransposePass
 
     TranspositionResult transposeStore(IRBuilder* builder, IRStore* fwdStore, IRInst*)
     {
-        IRInst* revVal = nullptr;
-        if (auto revGradDecor = fwdStore->getPtr()->findDecoration<IROutParamReverseGradientDecoration>())
+        IRInst* revVal = builder->emitLoad(fwdStore->getPtr());
+        if (auto diffPairType = as<IRDifferentialPairType>(revVal->getDataType()))
         {
-            revVal = revGradDecor->getValue();
-        }
-        else
-        {
-            revVal = builder->emitLoad(fwdStore->getPtr());
+            revVal = builder->emitDifferentialPairGetDifferential(
+                (IRType*)diffTypeContext.getDifferentialTypeFromDiffPairType(
+                    builder, diffPairType),
+                revVal);
         }
         return TranspositionResult(
                     List<RevGradient>(
@@ -1747,7 +1800,8 @@ struct DiffTransposePass
         for (UIndex ii = 0; ii < fwdInst->getOperandCount(); ii++)
         {
             auto operand = fwdInst->getOperand(ii);
-            if (operand->getDataType() != targetType)
+            auto operandType = unwrapAttributedType(operand->getDataType());
+            if (operandType != targetType)
             {
                 // Insert new operand just after the old operand, so we have the old
                 // operands available.
@@ -2271,7 +2325,6 @@ struct DiffTransposePass
         {
             gradientsMap[fwdInst] = List<RevGradient>();
         }
-
         gradientsMap[fwdInst].GetValue().add(assignment);
     }
 

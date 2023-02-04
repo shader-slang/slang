@@ -286,6 +286,7 @@ struct DifferentialPairTypeBuilder
 };
 
 void stripAutoDiffDecorations(IRModule* module);
+void stripTempDecorations(IRInst* inst);
 
 bool isNoDiffType(IRType* paramType);
 
@@ -308,5 +309,21 @@ void stripDerivativeDecorations(IRInst* inst);
 bool isBackwardDifferentiableFunc(IRInst* func);
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
+
+inline bool isRelevantDifferentialPair(IRType* type)
+{
+    if (as<IRDifferentialPairType>(type))
+    {
+        return true;
+    }
+    else if (auto argPtrType = as<IRPtrTypeBase>(type))
+    {
+        if (as<IRDifferentialPairType>(argPtrType->getValueType()))
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 };

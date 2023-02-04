@@ -402,6 +402,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         auto primalArg = findOrTranscribePrimalInst(&argBuilder, origArg);
         SLANG_ASSERT(primalArg);
 
+        auto origType = origCall->getArg(ii)->getDataType();
         auto primalType = primalArg->getDataType();
         auto paramType = calleeType->getParamType(ii);
         if (!isNoDiffType(paramType))
@@ -410,8 +411,10 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
             {
                 while (auto attrType = as<IRAttributedType>(primalType))
                     primalType = attrType->getBaseType();
+                while (auto attrType = as<IRAttributedType>(origType))
+                    origType = attrType->getBaseType();
             }
-            if (auto pairType = tryGetDiffPairType(&argBuilder, primalType))
+            if (auto pairType = tryGetDiffPairType(&argBuilder, origType))
             {
                 auto pairPtrType = as<IRPtrTypeBase>(pairType);
                 auto pairValType = as<IRDifferentialPairType>(
@@ -1201,7 +1204,7 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
     // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
     if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
     {
-        cloneDecoration(dictDecor, diffFunc);
+        cloneDecoration(&cloneEnv, dictDecor, diffFunc, diffFunc->getModule());
     }
     return diffFunc;
 }
@@ -1434,8 +1437,10 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam
             auto ptrInnerPairType = as<IRDifferentialPairType>(pairPtrType->getValueType());
             // Make a local copy of the parameter for primal and diff parts.
             auto primal = builder->emitVar(ptrInnerPairType->getValueType());
+
             auto diffType = differentiateType(builder, cast<IRPtrTypeBase>(origParam->getDataType())->getValueType());
             auto diff = builder->emitVar(diffType);
+            builder->markInstAsDifferential(diff, ptrInnerPairType->getValueType());
 
             IRInst* primalInitVal = nullptr;
             IRInst* diffInitVal = nullptr;
@@ -1447,6 +1452,8 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam
             else
             {
                 auto initVal = builder->emitLoad(diffPairParam);
+                builder->markInstAsMixedDifferential(initVal, ptrInnerPairType);
+
                 primalInitVal = builder->emitDifferentialPairGetPrimal(initVal);
                 diffInitVal = builder->emitDifferentialPairGetDifferential(diffType, initVal);
             }
