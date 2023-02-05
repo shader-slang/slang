@@ -5,7 +5,6 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-dominators.h"
-#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -138,7 +137,6 @@ struct EliminateMultiLevelBreakContext
                     break;
                 }
             }
-            auto irdump = dumpIRToString(func);
             for (auto& l : regions)
             {
                 l->forEach(
