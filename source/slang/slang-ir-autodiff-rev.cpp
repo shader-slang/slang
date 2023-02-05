@@ -269,9 +269,16 @@ namespace Slang
             return diffValueType;
         }
         
+        auto maybeConvertInOutTypeToValueType = [](IRType* type)
+        {
+            if (auto inoutType = as<IRInOutType>(type))
+                return inoutType->getValueType();
+            return type;
+        };
+
         // If the param is marked as no_diff, return the primal type.
         if (auto primalNoDiffType = _getPrimalTypeFromNoDiffType(this, builder, paramType))
-            return primalNoDiffType;
+            return maybeConvertInOutTypeToValueType(primalNoDiffType);
         
         auto diffPairType = tryGetDiffPairType(builder, paramType);
         if (diffPairType)
@@ -281,7 +288,7 @@ namespace Slang
             return diffPairType;
         }
         auto primalType = (IRType*)findOrTranscribePrimalInst(builder, paramType);
-        return primalType;
+        return maybeConvertInOutTypeToValueType(primalType);
     }
 
     // Create an empty func to represent the transcribed func of `origFunc`.
@@ -1003,15 +1010,40 @@ namespace Slang
             }
             else if (!isRelevantDifferentialPair(fwdParam->getDataType()))
             {
-                // Case 2: non differentiable, non output parameters.
-                // If parameter is not an out param and has nothing to do with differentiation,
-                // simply move the parameter to the end.
-                //
-                fwdParam->removeFromParent();
-                fwdDiffParameterBlock->addParam(fwdParam);
-                result.primalFuncParams.Add(fwdParam);
-                result.propagateFuncParams.Add(fwdParam);
-                continue;
+                if (inoutType)
+                {
+                    // Case 2: non differentiable inout parameter.
+                    // They should become an inout parameter in primal func, but an in parameter in
+                    // bwd func.
+                    fwdParam->removeFromParent();
+                    fwdDiffParameterBlock->addParam(fwdParam);
+                    result.primalFuncParams.Add(fwdParam);
+
+                    primalRefReplacement = fwdParam;
+
+                    // Create an in param for the prop func.
+                    auto propParam = builder->emitParam(inoutType->getValueType());
+                    result.propagateFuncParams.Add(propParam);
+
+                    // Create a local var for the out param for the primal part of the prop func.
+                    auto tempPrimalVar = nextBlockBuilder.emitVar(inoutType->getValueType());
+                    result.propagateFuncSpecificPrimalInsts.add(tempPrimalVar);
+                    auto storeInst = nextBlockBuilder.emitStore(tempPrimalVar, propParam);
+                    result.propagateFuncSpecificPrimalInsts.add(storeInst);
+                    result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = tempPrimalVar;
+                }
+                else
+                {
+                    // Case 3: non differentiable, non output parameters.
+                    // If parameter is not an out param and has nothing to do with differentiation,
+                    // simply move the parameter to the end.
+                    //
+                    fwdParam->removeFromParent();
+                    fwdDiffParameterBlock->addParam(fwdParam);
+                    result.primalFuncParams.Add(fwdParam);
+                    result.propagateFuncParams.Add(fwdParam);
+                    continue;
+                }
             }
             else if(!inoutType)
             {

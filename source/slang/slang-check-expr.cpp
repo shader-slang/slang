@@ -2232,8 +2232,17 @@ namespace Slang
             {
                 if (as<DifferentialPairType>(derivType))
                 {
-                    // Using inout type on all the derivative parameters
+                    // An `in` differentiable parameter becomes an `inout` parameter.
                     derivType = m_astBuilder->getInOutType(derivType);
+                }
+                else if (auto inoutType = as<InOutType>(derivType))
+                {
+                    if (!as<DifferentialPairType>(inoutType->getValueType()))
+                    {
+                        // An `inout` non differentiable parameter becomes an `in` parameter
+                        // (removing `out`).
+                        derivType = inoutType->getValueType();
+                    }
                 }
                 type->paramTypes.add(derivType);
             }
