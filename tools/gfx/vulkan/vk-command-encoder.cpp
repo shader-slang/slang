@@ -188,18 +188,18 @@ Result PipelineCommandEncoder::setPipelineStateWithRootObjectImpl(
     return SLANG_OK;
 }
 
-void PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindPoint)
+Result PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindPoint)
 {
     auto& api = *m_api;
 
     // Get specialized pipeline state and bind it.
     //
     RefPtr<PipelineStateBase> newPipeline;
-    m_device->maybeSpecializePipeline(
-        m_currentPipeline, &m_commandBuffer->m_rootObject, newPipeline);
+    SLANG_RETURN_ON_FAIL(m_device->maybeSpecializePipeline(
+        m_currentPipeline, &m_commandBuffer->m_rootObject, newPipeline));
     PipelineStateImpl* newPipelineImpl = static_cast<PipelineStateImpl*>(newPipeline.Ptr());
 
-    newPipelineImpl->ensureAPIPipelineStateCreated();
+    SLANG_RETURN_ON_FAIL(newPipelineImpl->ensureAPIPipelineStateCreated());
     m_currentPipeline = newPipelineImpl;
 
     bindRootShaderObjectImpl(pipelineBindPoint);
@@ -210,6 +210,8 @@ void PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindPoi
         api.vkCmdBindPipeline(m_vkCommandBuffer, pipelineBindPoint, newPipelineImpl->m_pipeline);
         m_boundPipelines[pipelineBindPointId] = newPipelineImpl->m_pipeline;
     }
+    
+    return SLANG_OK;
 }
 
 void ResourceCommandEncoder::copyBuffer(
@@ -1084,30 +1086,32 @@ void RenderCommandEncoder::setIndexBuffer(
         m_vkCommandBuffer, bufferImpl->m_buffer.m_buffer, (VkDeviceSize)offset, indexType);
 }
 
-void RenderCommandEncoder::prepareDraw()
+Result RenderCommandEncoder::prepareDraw()
 {
     auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
     if (!pipeline)
     {
-        assert(!"Invalid render pipeline");
-        return;
+        return SLANG_FAIL;
     }
-    bindRenderState(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    SLANG_RETURN_ON_FAIL(bindRenderState(VK_PIPELINE_BIND_POINT_GRAPHICS));
+    return SLANG_OK;
 }
 
-void RenderCommandEncoder::draw(GfxCount vertexCount, GfxIndex startVertex)
+Result RenderCommandEncoder::draw(GfxCount vertexCount, GfxIndex startVertex)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     auto& api = *m_api;
     api.vkCmdDraw(m_vkCommandBuffer, vertexCount, 1, 0, 0);
+    return SLANG_OK;
 }
 
-void RenderCommandEncoder::drawIndexed(
+Result RenderCommandEncoder::drawIndexed(
     GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     auto& api = *m_api;
     api.vkCmdDrawIndexed(m_vkCommandBuffer, indexCount, 1, startIndex, baseVertex, 0);
+    return SLANG_OK;
 }
 
 void RenderCommandEncoder::setStencilReference(uint32_t referenceValue)
@@ -1116,7 +1120,7 @@ void RenderCommandEncoder::setStencilReference(uint32_t referenceValue)
     api.vkCmdSetStencilReference(m_vkCommandBuffer, VK_STENCIL_FRONT_AND_BACK, referenceValue);
 }
 
-void RenderCommandEncoder::drawIndirect(
+Result RenderCommandEncoder::drawIndirect(
     GfxCount maxDrawCount,
     IBufferResource* argBuffer,
     Offset argOffset,
@@ -1124,9 +1128,10 @@ void RenderCommandEncoder::drawIndirect(
     Offset countOffset)
 {
     // Vulkan does not support sourcing the count from a buffer.
-    assert(!countBuffer);
+    if (countBuffer)
+        return SLANG_FAIL;
 
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     auto& api = *m_api;
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
     api.vkCmdDrawIndirect(
@@ -1135,9 +1140,10 @@ void RenderCommandEncoder::drawIndirect(
         argOffset,
         maxDrawCount,
         sizeof(VkDrawIndirectCommand));
+    return SLANG_OK;
 }
 
-void RenderCommandEncoder::drawIndexedIndirect(
+Result RenderCommandEncoder::drawIndexedIndirect(
     GfxCount maxDrawCount,
     IBufferResource* argBuffer,
     Offset argOffset,
@@ -1145,9 +1151,11 @@ void RenderCommandEncoder::drawIndexedIndirect(
     Offset countOffset)
 {
     // Vulkan does not support sourcing the count from a buffer.
-    assert(!countBuffer);
+    if (countBuffer)
+        return SLANG_FAIL;
 
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
+
     auto& api = *m_api;
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
     api.vkCmdDrawIndexedIndirect(
@@ -1156,6 +1164,7 @@ void RenderCommandEncoder::drawIndexedIndirect(
         argOffset,
         maxDrawCount,
         sizeof(VkDrawIndexedIndirectCommand));
+    return SLANG_OK;
 }
 
 Result RenderCommandEncoder::setSamplePositions(
@@ -1173,26 +1182,27 @@ Result RenderCommandEncoder::setSamplePositions(
     return SLANG_E_NOT_AVAILABLE;
 }
 
-void RenderCommandEncoder::drawInstanced(
+Result RenderCommandEncoder::drawInstanced(
     GfxCount vertexCount,
     GfxCount instanceCount,
     GfxIndex startVertex,
     GfxIndex startInstanceLocation)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     auto& api = *m_api;
     api.vkCmdDraw(
         m_vkCommandBuffer, vertexCount, instanceCount, startVertex, startInstanceLocation);
+    return SLANG_OK;
 }
 
-void RenderCommandEncoder::drawIndexedInstanced(
+Result RenderCommandEncoder::drawIndexedInstanced(
     GfxCount indexCount,
     GfxCount instanceCount,
     GfxIndex startIndexLocation,
     GfxIndex baseVertexLocation,
     GfxIndex startInstanceLocation)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     auto& api = *m_api;
     api.vkCmdDrawIndexed(
         m_vkCommandBuffer,
@@ -1201,6 +1211,7 @@ void RenderCommandEncoder::drawIndexedInstanced(
         startIndexLocation,
         baseVertexLocation,
         startInstanceLocation);
+    return SLANG_OK;
 }
 
 void ComputeCommandEncoder::endEncoding() { endEncodingImpl(); }
@@ -1217,21 +1228,21 @@ Result ComputeCommandEncoder::bindPipelineWithRootObject(
     return setPipelineStateWithRootObjectImpl(pipelineState, rootObject);
 }
 
-void ComputeCommandEncoder::dispatchCompute(int x, int y, int z)
+Result ComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 {
     auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
     if (!pipeline)
     {
-        assert(!"Invalid compute pipeline");
-        return;
+        return SLANG_FAIL;
     }
 
     // Also create descriptor sets based on the given pipeline layout
-    bindRenderState(VK_PIPELINE_BIND_POINT_COMPUTE);
+    SLANG_RETURN_ON_FAIL(bindRenderState(VK_PIPELINE_BIND_POINT_COMPUTE));
     m_api->vkCmdDispatch(m_vkCommandBuffer, x, y, z);
+    return SLANG_OK;
 }
 
-void ComputeCommandEncoder::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
+Result ComputeCommandEncoder::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
     SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
 }
@@ -1439,7 +1450,7 @@ Result RayTracingCommandEncoder::bindPipelineWithRootObject(
     return setPipelineStateWithRootObjectImpl(pipelineState, rootObject);
 }
 
-void RayTracingCommandEncoder::dispatchRays(
+Result RayTracingCommandEncoder::dispatchRays(
     GfxIndex raygenShaderIndex,
     IShaderTable* shaderTable,
     GfxCount width,
@@ -1449,7 +1460,7 @@ void RayTracingCommandEncoder::dispatchRays(
     auto vkApi = m_commandBuffer->m_renderer->m_api;
     auto vkCommandBuffer = m_commandBuffer->m_commandBuffer;
 
-    bindRenderState(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR);
+    SLANG_RETURN_ON_FAIL(bindRenderState(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR));
 
     auto rtProps = vkApi.m_rtProperties;
     auto shaderTableImpl = (ShaderTableImpl*)shaderTable;
@@ -1492,6 +1503,8 @@ void RayTracingCommandEncoder::dispatchRays(
         (uint32_t)width,
         (uint32_t)height,
         (uint32_t)depth);
+
+    return SLANG_OK;
 }
 
 void RayTracingCommandEncoder::endEncoding() { endEncodingImpl(); }
