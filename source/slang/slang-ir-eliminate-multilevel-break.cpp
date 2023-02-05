@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -61,15 +62,19 @@ struct EliminateMultiLevelBreakContext
 
         void collectBreakableRegionBlocks(BreakableRegionInfo& info)
         {
-            auto successors = as<IRBlock>(info.headerInst->getParent())->getSuccessors();
-            for (auto successor : successors)
-            {
-                if (info.blockSet.Add(successor))
-                    info.blocks.add(successor);
-            }
             // Push break block to a stack so we can easily check if a block is a break block in its
             // parent regions.
             breakBlocks.Add(info.getBreakBlock());
+            
+            auto successors = as<IRBlock>(info.headerInst->getParent())->getSuccessors();
+            for (auto successor : successors)
+            {
+                if (!breakBlocks.Add(successor))
+                    continue;
+                if (info.blockSet.Add(successor))
+                    info.blocks.add(successor);
+            }
+
             for (Index i = 0; i < info.blocks.getCount(); i++)
             {
                 auto block = info.blocks[i];
@@ -133,7 +138,7 @@ struct EliminateMultiLevelBreakContext
                     break;
                 }
             }
-
+            auto irdump = dumpIRToString(func);
             for (auto& l : regions)
             {
                 l->forEach(
