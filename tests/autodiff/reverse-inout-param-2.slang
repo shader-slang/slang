@@ -56,14 +56,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     p.m = 1.0;
     p.n = 2.0;
 
-    ND v2 = { 1.0 };
+    let v2 : ND = { 1.0 };
 
     var x = diffPair(5.0);
     float yDiffOut = 1.0;
 
     __bwd_diff(f)(p, v2, x, yDiffOut);
 
-    // (3+((3+x)*x))*((3+x)*x) = (3+3x+x^2)*(3x+x^2)
     outputBuffer[0] = x.p; // should be 5, since bwd_diff does not write back new primal val.
     outputBuffer[1] = x.d; // 14
     outputBuffer[2] = p.m; // 1.0
