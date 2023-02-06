@@ -464,7 +464,7 @@ float fwd_derivative(float a, DifferentialPair<float> x);
 void back_prop(float a, inout DifferentialPair<float> x, float d_y);
 ```
 
-## Calling Non-Differentiable Function from a Differentiable Function
+## Calling Non-Differentiable Functions from a Differentiable Function
 Calling non-differentiable function from a differentiable function is allowed. However, derivatives will not be propagated through the call. The user is required to clarify the intention by prefixing the call with the `no_diff` keyword. An unclarified 
 call to non-differnetiable function will result in a compile-time error.
 
@@ -517,7 +517,7 @@ An interface method requirement can be marked as `[ForwardDifferentiable]` or `[
 
 ## Restrictions of Automatic Differentiation
 
-The compiler can generate forward derivative and backward propagation implementations for most uses of array and struct types, including arbitrary read and write access at dynamic array indices, and supports uses of generics and interfaces. This covers the set of operations that is sufficient for a lot of functions. However, the user need to be aware of the following restrictions when using automatic differentiation:
+The compiler can generate forward derivative and backward propagation implementations for most uses of array and struct types, including arbitrary read and write access at dynamic array indices, and supports uses of all types of control flows, mutable parameters, generics and interfaces. This covers the set of operations that is sufficient for a lot of functions. However, the user needs to be aware of the following restrictions when using automatic differentiation:
 
 - No access to global variables or shader parameters within a differentiable function.
 - All operations to global resources, including texture reads or atomic writes, are treating as a non-differentiable operation.
