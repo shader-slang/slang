@@ -83,7 +83,7 @@ Result PipelineCommandEncoder::_bindRenderState(
     auto commandList = m_d3dCmdList;
     auto pipelineTypeIndex = (int)newPipelineImpl->desc.type;
     auto programImpl = static_cast<ShaderProgramImpl*>(newPipelineImpl->m_program.Ptr());
-    newPipelineImpl->ensureAPIPipelineStateCreated();
+    SLANG_RETURN_ON_FAIL(newPipelineImpl->ensureAPIPipelineStateCreated());
     submitter->setRootSignature(programImpl->m_rootObjectLayout->m_rootSignature);
     submitter->setPipelineState(newPipelineImpl);
     RootShaderObjectLayoutImpl* rootLayoutImpl = programImpl->m_rootObjectLayout;
@@ -975,23 +975,19 @@ void RenderCommandEncoderImpl::setIndexBuffer(
     m_boundIndexOffset = (UINT)offset;
 }
 
-void RenderCommandEncoderImpl::prepareDraw()
+Result RenderCommandEncoderImpl::prepareDraw()
 {
     auto pipelineState = m_currentPipeline.Ptr();
     if (!pipelineState || (pipelineState->desc.type != PipelineType::Graphics))
     {
-        assert(!"No graphics pipeline state set");
-        return;
+        return SLANG_FAIL;
     }
 
     // Submit - setting for graphics
     {
         GraphicsSubmitter submitter(m_d3dCmdList);
         RefPtr<PipelineStateBase> newPipeline;
-        if (SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
-        {
-            assert(!"Failed to bind render state");
-        }
+        SLANG_RETURN_ON_FAIL(_bindRenderState(&submitter, newPipeline));
     }
 
     m_d3dCmdList->IASetPrimitiveTopology(m_primitiveTopology);
@@ -1034,19 +1030,22 @@ void RenderCommandEncoderImpl::prepareDraw()
 
         m_d3dCmdList->IASetIndexBuffer(&indexBufferView);
     }
+    return SLANG_OK;
 }
 
-void RenderCommandEncoderImpl::draw(GfxCount vertexCount, GfxIndex startVertex)
+Result RenderCommandEncoderImpl::draw(GfxCount vertexCount, GfxIndex startVertex)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     m_d3dCmdList->DrawInstanced((uint32_t)vertexCount, 1, (uint32_t)startVertex, 0);
+    return SLANG_OK;
 }
 
-void RenderCommandEncoderImpl::drawIndexed(
+Result RenderCommandEncoderImpl::drawIndexed(
     GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     m_d3dCmdList->DrawIndexedInstanced((uint32_t)indexCount, 1, (uint32_t)startIndex, (uint32_t)baseVertex, 0);
+    return SLANG_OK;
 }
 
 void RenderCommandEncoderImpl::endEncoding()
@@ -1097,14 +1096,14 @@ void RenderCommandEncoderImpl::setStencilReference(uint32_t referenceValue)
     m_d3dCmdList->OMSetStencilRef((UINT)referenceValue);
 }
 
-void RenderCommandEncoderImpl::drawIndirect(
+Result RenderCommandEncoderImpl::drawIndirect(
     GfxCount maxDrawCount,
     IBufferResource* argBuffer,
     Offset argOffset,
     IBufferResource* countBuffer,
     Offset countOffset)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
 
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
     auto countBufferImpl = static_cast<BufferResourceImpl*>(countBuffer);
@@ -1116,16 +1115,17 @@ void RenderCommandEncoderImpl::drawIndirect(
         (uint64_t)argOffset,
         countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
         (uint64_t)countOffset);
+    return SLANG_OK;
 }
 
-void RenderCommandEncoderImpl::drawIndexedIndirect(
+Result RenderCommandEncoderImpl::drawIndexedIndirect(
     GfxCount maxDrawCount,
     IBufferResource* argBuffer,
     Offset argOffset,
     IBufferResource* countBuffer,
     Offset countOffset)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
 
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
     auto countBufferImpl = static_cast<BufferResourceImpl*>(countBuffer);
@@ -1137,6 +1137,8 @@ void RenderCommandEncoderImpl::drawIndexedIndirect(
         (uint64_t)argOffset,
         countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
         (uint64_t)countOffset);
+
+    return SLANG_OK;
 }
 
 Result RenderCommandEncoderImpl::setSamplePositions(
@@ -1151,34 +1153,36 @@ Result RenderCommandEncoderImpl::setSamplePositions(
     return SLANG_E_NOT_AVAILABLE;
 }
 
-void RenderCommandEncoderImpl::drawInstanced(
+Result RenderCommandEncoderImpl::drawInstanced(
     GfxCount vertexCount,
     GfxCount instanceCount,
     GfxIndex startVertex,
     GfxIndex startInstanceLocation)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     m_d3dCmdList->DrawInstanced(
         (uint32_t)vertexCount,
         (uint32_t)instanceCount,
         (uint32_t)startVertex,
         (uint32_t)startInstanceLocation);
+    return SLANG_OK;
 }
 
-void RenderCommandEncoderImpl::drawIndexedInstanced(
+Result RenderCommandEncoderImpl::drawIndexedInstanced(
     GfxCount indexCount,
     GfxCount instanceCount,
     GfxIndex startIndexLocation,
     GfxIndex baseVertexLocation,
     GfxIndex startInstanceLocation)
 {
-    prepareDraw();
+    SLANG_RETURN_ON_FAIL(prepareDraw());
     m_d3dCmdList->DrawIndexedInstanced(
         (uint32_t)indexCount,
         (uint32_t)instanceCount,
         (uint32_t)startIndexLocation,
         baseVertexLocation,
         (uint32_t)startInstanceLocation);
+    return SLANG_OK;
 }
 
 void ComputeCommandEncoderImpl::endEncoding() { PipelineCommandEncoder::endEncodingImpl(); }
@@ -1203,35 +1207,31 @@ Result ComputeCommandEncoderImpl::bindPipelineWithRootObject(
     return bindPipelineWithRootObjectImpl(state, rootObject);
 }
 
-void ComputeCommandEncoderImpl::dispatchCompute(int x, int y, int z)
+Result ComputeCommandEncoderImpl::dispatchCompute(int x, int y, int z)
 {
     // Submit binding for compute
     {
         ComputeSubmitter submitter(m_d3dCmdList);
         RefPtr<PipelineStateBase> newPipeline;
-        if (SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
-        {
-            assert(!"Failed to bind render state");
-        }
+        SLANG_RETURN_ON_FAIL(_bindRenderState(&submitter, newPipeline));
     }
     m_d3dCmdList->Dispatch(x, y, z);
+    return SLANG_OK;
 }
 
-void ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
+Result ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
     // Submit binding for compute
     {
         ComputeSubmitter submitter(m_d3dCmdList);
         RefPtr<PipelineStateBase> newPipeline;
-        if (SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
-        {
-            assert(!"Failed to bind render state");
-        }
+        SLANG_RETURN_ON_FAIL(_bindRenderState(&submitter, newPipeline));
     }
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
 
     m_d3dCmdList->ExecuteIndirect(
         m_renderer->dispatchIndirectCmdSignature, 1, argBufferImpl->m_resource, (uint64_t)offset, nullptr, 0);
+    return SLANG_OK;
 }
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
@@ -1337,7 +1337,7 @@ void RayTracingCommandEncoderImpl::bindPipeline(
     bindPipelineImpl(state, outRootObject);
 }
 
-void RayTracingCommandEncoderImpl::dispatchRays(
+Result RayTracingCommandEncoderImpl::dispatchRays(
     GfxIndex rayGenShaderIndex,
     IShaderTable* shaderTable,
     GfxCount width,
@@ -1361,10 +1361,7 @@ void RayTracingCommandEncoderImpl::dispatchRays(
             }
         };
         RayTracingSubmitter submitter(m_commandBuffer->m_cmdList4);
-        if (SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
-        {
-            assert(!"Failed to bind render state");
-        }
+        SLANG_RETURN_ON_FAIL(_bindRenderState(&submitter, newPipeline));
         if (newPipeline)
             pipeline = newPipeline.Ptr();
     }
@@ -1405,6 +1402,8 @@ void RayTracingCommandEncoderImpl::dispatchRays(
     dispatchDesc.Height = (UINT)height;
     dispatchDesc.Depth = (UINT)depth;
     m_commandBuffer->m_cmdList4->DispatchRays(&dispatchDesc);
+
+    return SLANG_OK;
 }
 
 #endif
