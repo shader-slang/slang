@@ -1082,6 +1082,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_Param:
     case kIROp_Func:
     case kIROp_Alloca:
+    case kIROp_Store:
         return false;
 
     // Never fold these, because their result cannot be computed
@@ -1997,17 +1998,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
-    case kIROp_Store:
-        {
-            auto prec = getInfo(EmitOp::Assign);
-            needClose = maybeEmitParens(outerPrec, prec);
-
-            emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit(" = ");
-            emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
-        }
-        break;
-
     case kIROp_Call:
         {
             emitCallExpr((IRCall*)inst, outerPrec);
@@ -2390,6 +2380,22 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         {
             auto var = cast<IRVar>(inst);
             emitVar(var);
+        }
+        break;
+
+    case kIROp_Store:
+        {
+            if (inst->getPrevInst() == inst->getOperand(0) && inst->getOperand(0)->getOp() == kIROp_Var)
+            {
+                // If we are storing into a var that is defined right before the store, we have
+                // already folded the store in the initialization of the var, so we can skip here.
+                break;
+            }
+            auto prec = getInfo(EmitOp::Assign);
+            emitDereferenceOperand(inst->getOperand(0), leftSide(getInfo(EmitOp::General), prec));
+            m_writer->emit(" = ");
+            emitOperand(inst->getOperand(1), rightSide(prec, getInfo(EmitOp::General)));
+            m_writer->emit(";\n");
         }
         break;
 
@@ -3320,6 +3326,15 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
     emitSemantics(varDecl);
 
     emitLayoutSemantics(varDecl);
+
+    if (auto store = as<IRStore>(varDecl->getNextInst()))
+    {
+        if (store->getPtr() == varDecl)
+        {
+            m_writer->emit(" = ");
+            emitOperand(store->getVal(), getInfo(EmitOp::General));
+        }
+    }
 
     m_writer->emit(";\n");
 }

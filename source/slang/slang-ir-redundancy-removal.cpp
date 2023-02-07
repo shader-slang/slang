@@ -127,54 +127,6 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     return context.removeRedundancyInBlock(deduplicateCtx, root);
 }
 
-IRInst* getRootAddr(IRInst* addr)
-{
-    for (;;)
-    {
-        switch (addr->getOp())
-        {
-        case kIROp_GetElementPtr:
-        case kIROp_FieldAddress:
-            addr = addr->getOperand(0);
-            continue;
-        default:
-            break;
-        }
-        break;
-    }
-    return addr;
-}
-
-// A simple and conservative address aliasing check.
-bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2)
-{
-    if (addr1 == addr2)
-        return true;
-
-    // Two variables can never alias.
-    addr1 = getRootAddr(addr1);
-    addr2 = getRootAddr(addr2);
-
-    // Global addresses can alias with anything.
-    if (!isChildInstOf(addr1, func))
-        return true;
-
-    if (!isChildInstOf(addr2, func))
-        return true;
-
-    if (addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Var
-        && addr1 != addr2)
-        return false;
-
-    // A param and a var can never alias.
-    if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
-            addr2->getOp() == kIROp_Var ||
-        addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
-            addr2->getParent() == func->getFirstBlock())
-        return false;
-    return true;
-}
-
 bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
 {
     bool changed = false;
@@ -198,21 +150,9 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                             changed = true;
                             break;
                         }
-                        else
-                        {
-                            // Can this store affect the load?
-                            // If so, the value is unknown and we should bail.
-                            if (canAddressesPotentiallyAlias(func, store->getPtr(), load->getPtr()))
-                            {
-                                break;
-                            }
-                        }
                     }
-                    else if (as<IRCall>(prev))
-                    {
-                        break;
-                    }
-                    else if (prev->mightHaveSideEffects())
+
+                    if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr()))
                     {
                         break;
                     }
@@ -227,6 +167,10 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                 bool hasAddrUse = false;
                 bool hasOverridingStore = false;
 
+                // Stores to global variables will never get removed.
+                if (!isChildInstOf(store->getPtr(), func))
+                    hasAddrUse = true;
+
                 for (auto next = store->getNextInst(); next; next = next->getNextInst())
                 {
                     if (auto nextStore = as<IRStore>(next))
@@ -237,8 +181,9 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                             break;
                         }
                     }
-                    // If we see any insts that have side effects before seeing an overriding store,
-                    // don't remove the store.
+
+                    // If we see any insts that have reads or modifies the address before seeing
+                    // an overriding store, don't remove the store.
                     // We can make the test more accurate by collecting all addresses related to
                     // the target address first, and only bail out if any of the related addresses
                     // are involved.
@@ -250,55 +195,12 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                             hasAddrUse = true;
                         }
                         break;
-                    case kIROp_Call:
-                        {
-                            auto call = as<IRCall>(next);
-                            // Can this address alias with any address arguments?
-                            for (UInt i = 0; i < call->getArgCount(); i++)
-                            {
-                                auto arg = call->getArg(i);
-                                if (!arg->getDataType())
-                                    continue;
-                                if (as<IRPtrTypeBase>(arg->getDataType()))
-                                {
-                                    if (canAddressesPotentiallyAlias(func, store->getPtr(), arg))
-                                    {
-                                        hasAddrUse = true;
-                                        break;
-                                    }
-                                }
-                                switch (arg->getDataType()->getOp())
-                                {
-                                case kIROp_ComPtrType:
-                                case kIROp_RawPointerType:
-                                case kIROp_RTTIPointerType:
-                                case kIROp_PseudoPtrType:
-                                case kIROp_CastPtrToInt:
-                                case kIROp_CastIntToPtr:
-                                    hasAddrUse = true;
-                                    break;
-                                case kIROp_OutType:
-                                case kIROp_InOutType:
-                                case kIROp_PtrType:
-                                case kIROp_RefType:
-                                    if (canAddressesPotentiallyAlias(func, store->getPtr(), arg))
-                                    {
-                                        hasAddrUse = true;
-                                    }
-                                    break;
-                                default:
-                                    break;
-                                }
-                            }
-                        }
-                        break;
                     default:
-                        if (next->mightHaveSideEffects())
+                        if (canInstHaveSideEffectAtAddress(func, next, store->getPtr()))
                         {
                             hasAddrUse = true;
                         }
                         break;
-
                     }
                     if (hasAddrUse)
                         break;
