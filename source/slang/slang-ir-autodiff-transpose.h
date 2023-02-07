@@ -1040,6 +1040,13 @@ struct DiffTransposePass
                     args.add(nullptr);
                     argRequiresLoad.add(false);
                 }
+                else if (as<IRInOutType>(paramType))
+                {
+                    arg = builder->emitLoad(arg);
+                    args.add(arg);
+                    argTypes.add(arg->getDataType());
+                    argRequiresLoad.add(false);
+                }
                 else
                 {
                     args.add(arg);

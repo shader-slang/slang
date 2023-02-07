@@ -360,18 +360,20 @@ public:
             m_writer->setIndexBuffer(buffer, indexFormat, offset);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL
+        virtual SLANG_NO_THROW Result SLANG_MCALL
             draw(GfxCount vertexCount, GfxIndex startVertex) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->draw(vertexCount, startVertex);
+            return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL
+        virtual SLANG_NO_THROW Result SLANG_MCALL
             drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawIndexed(indexCount, startIndex, baseVertex);
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override
@@ -379,7 +381,7 @@ public:
             m_writer->setStencilReference(referenceValue);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
+        virtual SLANG_NO_THROW Result SLANG_MCALL drawIndirect(
             GfxCount maxDrawCount,
             IBufferResource* argBuffer,
             Offset argOffset,
@@ -392,9 +394,10 @@ public:
             SLANG_UNUSED(countBuffer);
             SLANG_UNUSED(countOffset);
             SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::drawIndirect");
+            return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
+        virtual SLANG_NO_THROW Result SLANG_MCALL drawIndexedIndirect(
             GfxCount maxDrawCount,
             IBufferResource* argBuffer,
             Offset argOffset,
@@ -407,6 +410,7 @@ public:
             SLANG_UNUSED(countBuffer);
             SLANG_UNUSED(countOffset);
             SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::drawIndirect");
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
@@ -420,7 +424,7 @@ public:
             return SLANG_E_NOT_AVAILABLE;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
+        virtual SLANG_NO_THROW Result SLANG_MCALL drawInstanced(
             GfxCount vertexCount,
             GfxCount instanceCount,
             GfxIndex startVertex,
@@ -428,9 +432,10 @@ public:
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
+            return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
+        virtual SLANG_NO_THROW Result SLANG_MCALL drawIndexedInstanced(
             GfxCount indexCount,
             GfxCount instanceCount,
             GfxIndex startIndexLocation,
@@ -439,6 +444,7 @@ public:
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawIndexedInstanced(indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+            return SLANG_OK;
         }
     };
 
@@ -497,13 +503,14 @@ public:
             return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL dispatchCompute(int x, int y, int z) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->dispatchCompute(x, y, z);
+            return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override
         {
             SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::dispatchComputeIndirect");
         }
