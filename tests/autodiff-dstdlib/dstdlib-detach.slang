@@ -1,20 +1,26 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
 typedef DifferentialPair<float2> dpfloat2;
 typedef DifferentialPair<float3> dpfloat3;
 
-[ForwardDifferentiable]
+[BackwardDifferentiable]
 float diffDetach(float x)
 {
     return detach(x);
 }
 
-[ForwardDifferentiable]
+[BackwardDifferentiable]
+float2 diffDetach2(float2 x)
+{
+    return detach(x);
+}
+
+[BackwardDifferentiable]
 float3 diffDetach3(float3 x)
 {
     return detach(x);
@@ -37,7 +43,14 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         outputBuffer[3] = res.d[0];            // Expect: 0.000000
         outputBuffer[4] = res.p[1];            // Expect: -3.000000
         outputBuffer[5] = res.d[1];            // Expect: 0.000000
-        outputBuffer[6] = res.p[2];           // Expect: -1.000000
-        outputBuffer[7] = res.d[2];           // Expect: 0.000000
+        outputBuffer[6] = res.p[2];            // Expect: -1.000000
+        outputBuffer[7] = res.d[2];            // Expect: 0.000000
+    }
+
+    {
+        dpfloat2 dpx = dpfloat2(float2(1.0, -2.0), float2(1.0, 1.0));
+        __bwd_diff(diffDetach2)(dpx, float2(2.0, -3.0));
+        outputBuffer[8] = dpx.d[0]; // Expect: 0.000000
+        outputBuffer[9] = dpx.d[1]; // Expect: 0.000000
     }
 }
