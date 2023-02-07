@@ -869,6 +869,8 @@ bool isTypeEqual(IRType* a, IRType* b);
 // True if this is an integral IRBasicType, not including Char or Ptr types
 bool isIntegralType(IRType* t);
 
+bool isIntegralScalarOrCompositeType(IRType* t);
+
 void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
 
 // Constant Instructions
@@ -941,6 +943,13 @@ struct IRIntLit : IRConstant
     IRIntegerValue getValue() { return value.intVal; }
 
     IR_LEAF_ISA(IntLit);
+};
+
+struct IRFloatLit : IRConstant
+{
+    IRFloatingPointValue getValue() { return value.floatVal; }
+
+    IR_LEAF_ISA(FloatLit);
 };
 
 struct IRBoolLit : IRConstant
