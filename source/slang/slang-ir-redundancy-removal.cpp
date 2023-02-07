@@ -127,6 +127,54 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     return context.removeRedundancyInBlock(deduplicateCtx, root);
 }
 
+IRInst* getRootAddr(IRInst* addr)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+            addr = addr->getOperand(0);
+            continue;
+        default:
+            break;
+        }
+        break;
+    }
+    return addr;
+}
+
+// A simple and conservative address aliasing check.
+bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2)
+{
+    if (addr1 == addr2)
+        return true;
+
+    // Two variables can never alias.
+    addr1 = getRootAddr(addr1);
+    addr2 = getRootAddr(addr2);
+
+    // Global addresses can alias with anything.
+    if (!isChildInstOf(addr1, func))
+        return true;
+
+    if (!isChildInstOf(addr2, func))
+        return true;
+
+    if (addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Var
+        && addr1 != addr2)
+        return false;
+
+    // A param and a var can never alias.
+    if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
+            addr2->getOp() == kIROp_Var ||
+        addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
+            addr2->getParent() == func->getFirstBlock())
+        return false;
+    return true;
+}
+
 bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
 {
     bool changed = false;
@@ -149,6 +197,15 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                             load->removeAndDeallocate();
                             changed = true;
                             break;
+                        }
+                        else
+                        {
+                            // Can this store affect the load?
+                            // If so, the value is unknown and we should bail.
+                            if (canAddressesPotentiallyAlias(func, store->getPtr(), load->getPtr()))
+                            {
+                                break;
+                            }
                         }
                     }
                     else if (as<IRCall>(prev))
@@ -188,15 +245,63 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                     switch (next->getOp())
                     {
                     case kIROp_Load:
+                        if (canAddressesPotentiallyAlias(func, next->getOperand(0), store->getPtr()))
+                        {
+                            hasAddrUse = true;
+                        }
+                        break;
                     case kIROp_Call:
-                        hasAddrUse = true;
+                        {
+                            auto call = as<IRCall>(next);
+                            // Can this address alias with any address arguments?
+                            for (UInt i = 0; i < call->getArgCount(); i++)
+                            {
+                                auto arg = call->getArg(i);
+                                if (!arg->getDataType())
+                                    continue;
+                                if (as<IRPtrTypeBase>(arg->getDataType()))
+                                {
+                                    if (canAddressesPotentiallyAlias(func, store->getPtr(), arg))
+                                    {
+                                        hasAddrUse = true;
+                                        break;
+                                    }
+                                }
+                                switch (arg->getDataType()->getOp())
+                                {
+                                case kIROp_ComPtrType:
+                                case kIROp_RawPointerType:
+                                case kIROp_RTTIPointerType:
+                                case kIROp_PseudoPtrType:
+                                case kIROp_CastPtrToInt:
+                                case kIROp_CastIntToPtr:
+                                    hasAddrUse = true;
+                                    break;
+                                case kIROp_OutType:
+                                case kIROp_InOutType:
+                                case kIROp_PtrType:
+                                case kIROp_RefType:
+                                    if (canAddressesPotentiallyAlias(func, store->getPtr(), arg))
+                                    {
+                                        hasAddrUse = true;
+                                    }
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
+                        }
                         break;
-                    }
-                    if (next->mightHaveSideEffects())
-                    {
-                        hasAddrUse = true;
+                    default:
+                        if (next->mightHaveSideEffects())
+                        {
+                            hasAddrUse = true;
+                        }
                         break;
+
                     }
+                    if (hasAddrUse)
+                        break;
                 }
 
                 if (!hasAddrUse && hasOverridingStore)
