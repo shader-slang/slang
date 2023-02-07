@@ -260,10 +260,10 @@ DifferentialPair<vector<T, N>> __d_detach_vector(DifferentialPair<vector<T, N>> 
 {
     VECTOR_MAP_D_UNARY(T, N, __d_detach, dpx);
 }
-/*
+
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(detach)]
-DifferentialPair<T> __d_detach(inout DifferentialPair<T> dpx, T.Differential dOut)
+void __d_detach(inout DifferentialPair<T> dpx, T.Differential dOut)
 {
     dpx = diffPair(dpx.p, T.dzero());
 }
@@ -274,7 +274,7 @@ void __d_detach_vector(inout DifferentialPair<vector<T, N>> dpx, vector<T, N>.Di
 {
     dpx = diffPair(dpx.p, vector<T, N>.dzero());
 }
-*/
+
 // Natural Exponent
 
 __generic<T : __BuiltinFloatingPointType>
