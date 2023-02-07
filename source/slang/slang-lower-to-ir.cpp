@@ -3304,6 +3304,15 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    LoweredValInfo visitRefExpr(RefExpr* expr)
+    {
+        auto loweredBase = lowerLValueExpr(context, expr->base);
+
+        SLANG_ASSERT(loweredBase.flavor == LoweredValInfo::Flavor::Ptr);
+        loweredBase.flavor = LoweredValInfo::Flavor::Simple;
+        return loweredBase;
+    }
+
     LoweredValInfo visitParenExpr(ParenExpr* expr)
     {
         return lowerSubExpr(expr->base);
@@ -4612,10 +4621,6 @@ LoweredValInfo lowerRValueExpr(
     RValueExprLoweringVisitor visitor;
     visitor.context = context;
     auto info = visitor.dispatch(expr);
-    if (as<RefType>(expr->type))
-    {
-        info.val = context->irBuilder->emitLoad(info.val);
-    }
     return info;
 }
 

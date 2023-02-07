@@ -268,6 +268,13 @@ class SwizzleExpr: public Expr
     SourceLoc memberOpLoc;
 };
 
+// An operation to convert an l-value to a reference type.
+class RefExpr : public Expr
+{
+    SLANG_AST_CLASS(RefExpr)
+    Expr* base = nullptr;
+};
+
 // A dereference of a pointer or pointer-like type
 class DerefExpr: public Expr
 {
