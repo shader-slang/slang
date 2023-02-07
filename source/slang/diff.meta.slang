@@ -260,7 +260,7 @@ DifferentialPair<vector<T, N>> __d_detach_vector(DifferentialPair<vector<T, N>> 
 {
     VECTOR_MAP_D_UNARY(T, N, __d_detach, dpx);
 }
-
+/*
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(detach)]
 DifferentialPair<T> __d_detach(inout DifferentialPair<T> dpx, T.Differential dOut)
@@ -274,7 +274,7 @@ void __d_detach_vector(inout DifferentialPair<vector<T, N>> dpx, vector<T, N>.Di
 {
     dpx = diffPair(dpx.p, vector<T, N>.dzero());
 }
-
+*/
 // Natural Exponent
 
 __generic<T : __BuiltinFloatingPointType>
@@ -328,6 +328,22 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 DifferentialPair<vector<T, N>> __d_abs_vector(DifferentialPair<vector<T, N>> dpx)
 {
     VECTOR_MAP_D_UNARY(T, N, __d_abs, dpx);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDerivativeOf(abs)]
+void __d_abs(inout DifferentialPair<T> dpx, T.Differential dOut)
+{
+    dpx = diffPair(
+        dpx.p,
+        T.dmul(__slang_noop_cast<T>(sign(dpx.p)), dOut));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(abs)]
+void __d_abs_vector(inout DifferentialPair<vector<T, N>> dpx, vector<T, N>.Differential dOut)
+{
+    VECTOR_MAP_BWD_D_UNARY(T, N, __d_abs, dpx, dOut);
 }
 
 // Sine
