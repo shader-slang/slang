@@ -521,7 +521,7 @@ The compiler can generate forward derivative and backward propagation implementa
 
 - No access to global variables or shader parameters within a differentiable function.
 - All operations to global resources, including texture reads or atomic writes, are treating as a non-differentiable operation.
-- If a differentiable function contains calls that causes side-effects such as writes to global memory, there will not be a guarantee on how many times the side-effect will occur during the resulting derivative function or back-propagation function.
+- If a differentiable function contains calls that cause side-effects such as updates to global memory, there will not be a guarantee on how many times the side-effect will occur during the resulting derivative function or back-propagation function.
 - All loops in a backward differentiable function must end within a statically known number of iterations. If the maximum number of iterations is not trivially deductible by the type system as a compile-time constant, a manually attribute is needed at the loop to provide the number. If the number of actually executed iterations exceeds what is being specified, the resulting runtime behavior is undefined.
 
 The above restrictions do no apply if a user-defined derivative or backward propagation function is provided.
