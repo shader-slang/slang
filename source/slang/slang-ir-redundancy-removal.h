@@ -8,4 +8,6 @@ namespace Slang
 
     bool removeRedundancy(IRModule* module);
     bool removeRedundancyInFunc(IRGlobalValueWithCode* func);
+
+    bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func);
 }

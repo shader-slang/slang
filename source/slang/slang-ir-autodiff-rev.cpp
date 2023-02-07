@@ -12,6 +12,7 @@
 #include "slang-ir-addr-inst-elimination.h"
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-init-local-var.h"
+#include "slang-ir-redundancy-removal.h"
 
 namespace Slang
 {
@@ -305,7 +306,14 @@ namespace Slang
         IRFunc* primalFunc = origFunc;
 
         maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
-        differentiableTypeConformanceContext.setFunc(origFunc);
+
+        // The original func may not have a type dictionary if it is not originally marked as
+        // differentiable, in this case we would have already pulled the necessary types from
+        // the user-provided derivative function, so we are still fine.
+        if (origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
+        {
+            differentiableTypeConformanceContext.setFunc(origFunc);
+        }
 
         auto diffFunc = builder.createFunc();
 
@@ -334,7 +342,7 @@ namespace Slang
             builder.setInsertBefore(diffFunc->getFirstDecorationOrChild());
             cloneInst(&cloneEnv, &builder, dictDecor);
         }
-
+        builder.addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
         return InstPair(primalFunc, diffFunc);
     }
 
@@ -588,43 +596,6 @@ namespace Slang
         return result;
     }
 
-    void eliminateRedundantLoad(IRFunc* func)
-    {
-        for (auto block : func->getBlocks())
-        {
-            for (auto inst = block->getFirstInst(); inst;)
-            {
-                auto nextInst = inst->getNextInst();
-                if (auto load = as<IRLoad>(inst))
-                {
-                    for (auto prev = inst->getPrevInst(); prev; prev = prev->getPrevInst())
-                    {
-                        if (auto store = as<IRStore>(prev))
-                        {
-                            if (store->getPtr() == load->getPtr())
-                            {
-                                // If the load is preceeded by a store without any side-effect insts in-between, remove the load.
-                                auto value = store->getVal();
-                                load->replaceUsesWith(value);
-                                load->removeAndDeallocate();
-                                break;
-                            }
-                        }
-                        else if (as<IRCall>(prev))
-                        {
-                            break;
-                        }
-                        else if (prev->mightHaveSideEffects())
-                        {
-                            break;
-                        }
-                    }
-                }
-                inst = nextInst;
-            }
-        }
-    }
-
     // Create a copy of originalFunc's forward derivative in the same generic context (if any) of
     // `diffPropagateFunc`.
     IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
@@ -669,7 +640,7 @@ namespace Slang
         primalOuterParent->removeAndDeallocate();
 
         // Remove redundant loads since they interfere with transposition logic.
-        eliminateRedundantLoad(fwdDiffFunc);
+        eliminateRedundantLoadStore(fwdDiffFunc);
 
         // Migrate the new forward derivative function into the generic parent of `diffPropagateFunc`.
         if (auto fwdParentGeneric = as<IRGeneric>(findOuterGeneric(fwdDiffFunc)))
