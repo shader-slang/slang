@@ -620,6 +620,14 @@ class UnrollAttribute : public Attribute
     IntegerLiteralValue getCount();
 };
 
+// An `[maxiters(count)]`
+class MaxItersAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(MaxItersAttribute)
+ 
+    int32_t value = 0;
+};
+
 class LoopAttribute : public Attribute 
 {
     SLANG_AST_CLASS(LoopAttribute)

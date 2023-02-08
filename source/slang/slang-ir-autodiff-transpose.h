@@ -78,11 +78,6 @@ struct DiffTransposePass
         // of the *output* of the function.
         // 
         IRInst* dOutInst;
-
-        // Mapping between *primal* insts in the forward-mode function, and the 
-        // reverse-mode function
-        //
-        Dictionary<IRInst*, IRInst*>* primalsMap;
     };
 
     struct PendingBlockTerminatorEntry
@@ -151,6 +146,79 @@ struct DiffTransposePass
         SLANG_ASSERT(predecessorSet.Count() == 1);
 
         return (*predecessorSet.begin());
+    }
+
+    void buildInitializerBlockMap(IRBlock* block, IRBlock* endBlock, IRBlock* currInitBlock)
+    {
+        if (initializerBlockMap.ContainsKey(block)) return;
+        if (block == endBlock) return;
+
+        initializerBlockMap[block] = currInitBlock;
+
+        auto terminator = block->getTerminator();
+        switch (terminator->getOp())
+        {
+            case kIROp_unconditionalBranch:
+                return buildInitializerBlockMap(
+                    as<IRUnconditionalBranch>(terminator)->getTargetBlock(),
+                    endBlock,
+                    currInitBlock);
+
+            case kIROp_ifElse:
+            {
+                buildInitializerBlockMap(
+                    as<IRIfElse>(terminator)->getTrueBlock(),
+                    as<IRIfElse>(terminator)->getAfterBlock(),
+                    currInitBlock);
+
+                buildInitializerBlockMap(
+                    as<IRIfElse>(terminator)->getFalseBlock(),
+                    as<IRIfElse>(terminator)->getAfterBlock(),
+                    currInitBlock);
+                
+                buildInitializerBlockMap(
+                    as<IRIfElse>(terminator)->getAfterBlock(),
+                    endBlock,
+                    currInitBlock);
+
+                return;
+            }
+
+            case kIROp_Return:
+                return;
+            
+            case kIROp_loop:
+            {
+                auto condBlock = as<IRLoop>(terminator)->getTargetBlock();
+                auto loopRegionBlock = as<IRIfElse>(condBlock->getTerminator())->getTrueBlock();
+                auto breakRegionBlock = as<IRIfElse>(condBlock->getTerminator())->getFalseBlock();
+
+                initializerBlockMap[condBlock] = condBlock;
+
+                buildInitializerBlockMap(
+                    loopRegionBlock,
+                    condBlock,
+                    condBlock);
+                
+                buildInitializerBlockMap(
+                    breakRegionBlock,
+                    endBlock,
+                    currInitBlock);
+                return;
+            }
+
+            case kIROp_Switch:
+            {
+                SLANG_UNIMPLEMENTED_X("Switch-case initializer map not implemented");
+                return;
+            }
+
+            default:
+            {
+                SLANG_UNEXPECTED("Unrecognized inst for 'buildInitializerMap()'");
+                return;
+            }
+        }
     }
 
     RegionEntryPoint reverseCFGRegion(IRBlock* block, List<IRBlock*> endBlocks)
@@ -353,6 +421,13 @@ struct DiffTransposePass
                             getPhiGrads(firstLoopBlock).getBuffer());
                     }
 
+                    auto phiGrads = getPhiGrads(condBlock);
+                    if (phiGrads.getCount() > 0)
+                    {
+                        revTrueBlock = insertPhiBlockBefore(revTrueBlock, phiGrads);
+                        revFalseBlock = insertPhiBlockBefore(revFalseBlock, phiGrads);
+                    }
+
                     // Emit condition into the new cond block.
                     builder.setInsertInto(revCondBlock);
                     builder.emitIfElse(
@@ -533,7 +608,15 @@ struct DiffTransposePass
         // 
         firstRevDiffBlockMap[revDiffFunc] = revBlockMap[terminalDiffBlocks[0]];
 
-        IRInst* retVal = nullptr;
+        // Before transposing the contents of the blocks,
+        // build a list of 'first' blocks for every region which
+        // is where we'll emit accumulator variables. 
+        // Since we don't have any control flow on the reverse-mode blocks yet,
+        // this will be build on the corresponding fwd-mode blocks, using the
+        // *last* fwd-mode block of each region as the initializer block.
+        // 
+        auto firstDiffBlock = as<IRUnconditionalBranch>(terminalPrimalBlocks[0]->getTerminator())->getTargetBlock();
+        buildInitializerBlockMap(firstDiffBlock, nullptr, terminalDiffBlocks[0]);
 
         for (auto block : workList)
         {
@@ -543,7 +626,6 @@ struct DiffTransposePass
                 if (auto returnInst = as<IRReturn>(block->getTerminator()))
                 {
                     this->addRevGradientForFwdInst(returnInst, RevGradient(returnInst, transposeInfo.dOutInst, nullptr));
-                    retVal = returnInst->getVal();
                 }
             }
 
@@ -572,6 +654,11 @@ struct DiffTransposePass
             auto terminalPrimalBlock = terminalPrimalBlocks[0];
             auto firstRevBlock = as<IRBlock>(revBlockMap[terminalDiffBlocks[0]]);
 
+            auto returnDecoration = 
+                terminalPrimalBlock->getTerminator()->findDecoration<IRBackwardDerivativePrimalReturnDecoration>();
+            SLANG_ASSERT(returnDecoration);
+            auto retVal = returnDecoration->getBackwardDerivativePrimalReturnValue();
+
             terminalPrimalBlock->getTerminator()->removeAndDeallocate();
             
             IRBuilder subBuilder(builder.getSharedBuilder());
@@ -582,15 +669,6 @@ struct DiffTransposePass
 
             auto branch = subBuilder.emitBranch(firstRevBlock);
 
-            if (!retVal || retVal->getOp() == kIROp_VoidLit)
-            {
-                retVal = subBuilder.getVoidValue();
-            }
-            else
-            {
-                auto makePair = cast<IRMakeDifferentialPair>(retVal);
-                retVal = makePair->getPrimalValue();
-            }
             subBuilder.addBackwardDerivativePrimalReturnDecoration(branch, retVal);
         }
 
@@ -607,6 +685,25 @@ struct DiffTransposePass
         for (auto block : workList)
         {
             block->removeAndDeallocate();
+        }
+    }
+
+    IRInst* extractAccumulatorVarGradient(IRBuilder* builder, IRInst* fwdInst)
+    {
+        if (auto accVar = getOrCreateAccumulatorVar(fwdInst))
+        {
+            auto gradValue = builder->emitLoad(accVar);
+            builder->emitStore(
+                accVar,
+                emitDZeroOfDiffInstType(
+                    builder,
+                    tryGetPrimalTypeFromDiffInst(fwdInst)));
+            
+            return gradValue;
+        }
+        else
+        {
+            return nullptr;
         }
     }
 
@@ -688,6 +785,30 @@ struct DiffTransposePass
             }
         }
 
+        // Some special instructions simply need to be copied over.
+        // These do not deal with differentials.
+        // TODO: This will not work if there are any differential
+        // insts that rely on loop counter vars having a specific
+        // value. 
+        // The solution is to have primal insts appearing in 
+        // differential blocks be in their own special blocks that are
+        // ignored entirely, rather than dealing with them one inst 
+        // at a time.
+        // 
+        for (IRInst* child = fwdBlock->getFirstChild(); child;)
+        {  
+            auto nextChild = child->getNextInst();
+
+            if (child->findDecoration<IRLoopCounterDecoration>())
+            {
+                // Loop counter insts should not have any gradients.
+                SLANG_ASSERT(!hasRevGradients(child));
+                child->insertAtEnd(revBlock);
+            }
+            
+            child = nextChild;
+        }
+
         // Move pointer & reference insts to the top of the reverse-mode block.
         List<IRInst*> nonValueInsts;
         for (IRInst* child = fwdBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
@@ -719,6 +840,7 @@ struct DiffTransposePass
             if (as<IRDecoration>(child) || as<IRParam>(child))
                 continue;
 
+            
             transposeInst(&builder, child);
         }
 
@@ -744,10 +866,10 @@ struct DiffTransposePass
             // 
             if (isInstUsedOutsideParentBlock(param))
             {
-                auto accVar = getOrCreateAccumulatorVar(param);
+                auto accGradient = extractAccumulatorVarGradient(&builder, param);
                 addRevGradientForFwdInst(
                     param, 
-                    RevGradient(param, builder.emitLoad(accVar), nullptr));
+                    RevGradient(param, accGradient, nullptr));
             }
             
             if (hasRevGradients(param))
@@ -839,15 +961,6 @@ struct DiffTransposePass
             break;
         }
 
-        // Some special instructions simply need to be copied over.
-        // These do not deal with differentials.
-        // 
-        if (inst->findDecoration<IRLoopCounterDecoration>())
-        {
-            inst->insertAtEnd(builder->getBlock());
-            return;
-        }
-
         // Look for gradient entries for this inst.
         List<RevGradient> gradients;
         if (hasRevGradients(inst))
@@ -898,9 +1011,9 @@ struct DiffTransposePass
         // 
         if (isInstUsedOutsideParentBlock(inst) && !as<IRLoad>(inst))
         {
-            auto accVar = getOrCreateAccumulatorVar(inst);
+            auto accGradient = extractAccumulatorVarGradient(builder, inst);
             gradients.add(
-                RevGradient(inst, builder->emitLoad(accVar), nullptr));
+                RevGradient(inst, accGradient, nullptr));
         }
         
         // Emit the aggregate of all the gradients here. 
@@ -2362,8 +2475,6 @@ struct DiffTransposePass
 
     Dictionary<IRInst*, IRVar*>                          revAccumulatorVarMap;
 
-    Dictionary<IRInst*, IRInst*>*                        primalsMap;
-
     List<IRInst*>                                        usedPtrs;
 
     Dictionary<IRBlock*, IRBlock*>                       revBlockMap;
@@ -2375,6 +2486,8 @@ struct DiffTransposePass
     List<PendingBlockTerminatorEntry>                    pendingBlocks;
 
     Dictionary<IRBlock*, List<IRInst*>>                  phiGradsMap;
+
+    Dictionary<IRBlock*, IRBlock*>                       initializerBlockMap;
     
 };
 

@@ -598,6 +598,7 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(LayoutDecoration,                  layout,                 1, 0)
     INST(LoopControlDecoration,             loopControl,            1, 0)
+    INST(LoopMaxItersDecoration,            loopMaxIters,           1, 0)
     INST(IntrinsicOpDecoration, intrinsicOp, 1, 0)
     /* TargetSpecificDecoration */
         INST(TargetDecoration,              target,                 1, 0)
@@ -767,13 +768,19 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(LoopCounterDecoration, loopCounterDecoration, 0, 0)
 
+    /* Auto-diff inst decorations */
+        /// Used by the auto-diff pass to mark insts that compute
+        /// a primal value.
+        INST(PrimalInstDecoration, primalInstDecoration, 0, 0)
+
         /// Used by the auto-diff pass to mark insts that compute
         /// a differential value.
-    INST(DifferentialInstDecoration, diffInstDecoration, 1, 0)
+        INST(DifferentialInstDecoration, diffInstDecoration, 1, 0)
 
         /// Used by the auto-diff pass to mark insts that compute
         /// BOTH a differential and a primal value.
-    INST(MixedDifferentialInstDecoration, mixedDiffInstDecoration, 1, 0)
+        INST(MixedDifferentialInstDecoration, mixedDiffInstDecoration, 1, 0)
+    INST_RANGE(AutodiffInstDecoration, PrimalInstDecoration, MixedDifferentialInstDecoration)
 
         /// Used by the auto-diff pass to mark insts whose result is stored
         /// in an intermediary struct for reuse in backward propagation phase.
