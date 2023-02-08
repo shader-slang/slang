@@ -229,6 +229,217 @@ String dumpIRToString(IRInst* root)
     return sb.ToString();
 }
 
+void copyNameHintDecoration(IRInst* dest, IRInst* src)
+{
+    auto decor = src->findDecoration<IRNameHintDecoration>();
+    if (decor)
+    {
+        cloneDecoration(decor, dest);
+    }
+}
+
+void getTypeNameHint(StringBuilder& sb, IRInst* type)
+{
+    if (!type)
+        return;
+
+    switch (type->getOp())
+    {
+    case kIROp_FloatType:
+        sb << "float";
+        break;
+    case kIROp_HalfType:
+        sb << "half";
+        break;
+    case kIROp_DoubleType:
+        sb << "double";
+        break;
+    case kIROp_IntType:
+        sb << "int";
+        break;
+    case kIROp_Int8Type:
+        sb << "int8";
+        break;
+    case kIROp_Int16Type:
+        sb << "int16";
+        break;
+    case kIROp_Int64Type:
+        sb << "int64";
+        break;
+    case kIROp_IntPtrType:
+        sb << "intptr";
+        break;
+    case kIROp_UIntType:
+        sb << "uint";
+        break;
+    case kIROp_UInt8Type:
+        sb << "uint8";
+        break;
+    case kIROp_UInt16Type:
+        sb << "uint16";
+        break;
+    case kIROp_UInt64Type:
+        sb << "uint64";
+        break;
+    case kIROp_UIntPtrType:
+        sb << "uintptr";
+        break;
+    case kIROp_CharType:
+        sb << "char";
+        break;
+    case kIROp_StringType:
+        sb << "string";
+        break;
+    case kIROp_ArrayType:
+        sb << "array_";
+        getTypeNameHint(sb, type->getOperand(0));
+        break;
+    case kIROp_VectorType:
+        getTypeNameHint(sb, type->getOperand(0));
+        getTypeNameHint(sb, as<IRVectorType>(type)->getElementCount());
+        break;
+    case kIROp_MatrixType:
+        getTypeNameHint(sb, type->getOperand(0));
+        getTypeNameHint(sb, as<IRMatrixType>(type)->getRowCount());
+        sb << "x";
+        getTypeNameHint(sb, as<IRMatrixType>(type)->getColumnCount());
+        break;
+    case kIROp_IntLit:
+        sb << as<IRIntLit>(type)->getValue();
+        break;
+    default:
+        if (auto decor = type->findDecoration<IRNameHintDecoration>())
+            sb << decor->getName();
+        break;
+    }
+}
+
+static IRInst* _getRootAddr(IRInst* addr)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+            addr = addr->getOperand(0);
+            continue;
+        default:
+            break;
+        }
+        break;
+    }
+    return addr;
+}
+
+// A simple and conservative address aliasing check.
+bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2)
+{
+    if (addr1 == addr2)
+        return true;
+
+    // Two variables can never alias.
+    addr1 = _getRootAddr(addr1);
+    addr2 = _getRootAddr(addr2);
+
+    // Global addresses can alias with anything.
+    if (!isChildInstOf(addr1, func))
+        return true;
+
+    if (!isChildInstOf(addr2, func))
+        return true;
+
+    if (addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Var
+        && addr1 != addr2)
+        return false;
+
+    // A param and a var can never alias.
+    if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
+        addr2->getOp() == kIROp_Var ||
+        addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
+        addr2->getParent() == func->getFirstBlock())
+        return false;
+    return true;
+}
+
+bool isPtrLikeOrHandleType(IRInst* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_ComPtrType:
+    case kIROp_RawPointerType:
+    case kIROp_RTTIPointerType:
+    case kIROp_PseudoPtrType:
+    case kIROp_OutType:
+    case kIROp_InOutType:
+    case kIROp_PtrType:
+    case kIROp_RefType:
+        return true;
+    }
+    return false;
+}
+
+bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Store:
+        // If the target of the store inst may overlap addr, return true.
+        if (canAddressesPotentiallyAlias(func, as<IRStore>(inst)->getPtr(), addr))
+            return true;
+        break;
+    case kIROp_Call:
+        {
+            auto call = as<IRCall>(inst);
+
+            // If addr is a global variable, calling a function may change its value.
+            // So we need to return true here to be conservative.
+            if (!isChildInstOf(_getRootAddr(addr), func))
+            {
+                auto callee = call->getCallee();
+                if (callee &&
+                    callee->findDecoration<IRReadNoneDecoration>() &&
+                    callee->findDecoration<IRNoSideEffectDecoration>())
+                {
+                    // An exception is if the callee is side-effect free and is not reading from
+                    // memory.
+                }
+                else
+                {
+                    return true;
+                }
+            }
+
+            // If any pointer typed argument of the call inst may overlap addr, return true.
+            for (UInt i = 0; i < call->getArgCount(); i++)
+            {
+                if (isPtrLikeOrHandleType(call->getArg(i)->getDataType()))
+                {
+                    if (canAddressesPotentiallyAlias(func, call->getArg(i), addr))
+                        return true;
+                }
+            }
+        }
+        break;
+    case kIROp_CastPtrToInt:
+    case kIROp_Reinterpret:
+    case kIROp_BitCast:
+        {
+            // If we are trying to cast an address to something else, return true.
+            if (isPtrLikeOrHandleType(inst->getOperand(0)->getDataType()) &&
+                canAddressesPotentiallyAlias(func, inst->getOperand(0), addr))
+                return true;
+        }
+        break;
+    default:
+        // Default behavior is that any insts that have side effect may affect `addr`.
+        if (inst->mightHaveSideEffects())
+            return true;
+        break;
+    }
+    return false;
+}
+
 bool isPureFunctionalCall(IRCall* call)
 {
     auto callee = getResolvedInstForDecorations(call->getCallee());

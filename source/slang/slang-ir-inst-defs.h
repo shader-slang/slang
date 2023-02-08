@@ -797,6 +797,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     /* Differentiable Type Dictionary */
     INST(DifferentiableTypeDictionaryDecoration, DifferentiableTypeDictionaryDecoration, 0, PARENT)
 
+        /// Overrides the floating mode for the target function
+    INST(FloatingPointModeOverrideDecoration, FloatingPointModeOverride, 1, 0)
+
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
     INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)

@@ -846,6 +846,13 @@ struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
     IR_LEAF_ISA(DifferentiableTypeDictionaryDecoration)
 };
 
+struct IRFloatingModeOverrideDecoration : IRDecoration
+{
+    IR_LEAF_ISA(FloatingPointModeOverrideDecoration)
+
+    FloatingPointMode getFloatingPointMode() { return (FloatingPointMode)cast<IRIntLit>(getOperand(0))->getValue(); }
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
@@ -2834,6 +2841,8 @@ public:
 
     // Add a differentiable type entry to the appropriate dictionary.
     IRInst* addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness);
+
+    IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
     IRInst* emitSpecializeInst(
         IRType*         type,

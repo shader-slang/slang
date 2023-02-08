@@ -1863,6 +1863,7 @@ namespace Slang
 
     Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     {
+        expr->left = maybeOpenRef(expr->left);
         auto type = expr->left->type;
         auto right = maybeOpenRef(expr->right);
         expr->right = coerce(type, right);
