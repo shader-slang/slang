@@ -306,7 +306,7 @@ struct DiffUnzipPass
         
         if (auto maxItersDecoration = loop->findDecoration<IRLoopMaxItersDecoration>())
         {
-            region->maxIters = maxItersDecoration->getMaxIters();
+            region->maxIters = (Count) maxItersDecoration->getMaxIters();
             region->status = IndexedRegion::CountStatus::Static;
         }
         
