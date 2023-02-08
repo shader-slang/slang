@@ -15,13 +15,13 @@ float diffDetach(float x)
 }
 
 [BackwardDifferentiable]
-float2 diffDetach2(float2 x)
+float2 diffDetach(float2 x)
 {
     return detach(x);
 }
 
 [BackwardDifferentiable]
-float3 diffDetach3(float3 x)
+float3 diffDetach(float3 x)
 {
     return detach(x);
 }
@@ -38,7 +38,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     {
         dpfloat3 dpx = dpfloat3(float3(2.f, -3.f, -1.f), float3(-2.f, 3.f, -1.f));
-        dpfloat3 res = __fwd_diff(diffDetach3)(dpx);
+        dpfloat3 res = __fwd_diff(diffDetach)(dpx);
         outputBuffer[2] = res.p[0];            // Expect: 2.000000
         outputBuffer[3] = res.d[0];            // Expect: 0.000000
         outputBuffer[4] = res.p[1];            // Expect: -3.000000
@@ -55,7 +55,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     {
         dpfloat2 dpx = dpfloat2(float2(1.0, -2.0), float2(1.0, 1.0));
-        __bwd_diff(diffDetach2)(dpx, float2(2.0, -3.0));
+        __bwd_diff(diffDetach)(dpx, float2(2.0, -3.0));
         outputBuffer[9] = dpx.d[0]; // Expect: 0.000000
         outputBuffer[10] = dpx.d[1]; // Expect: 0.000000
     }
