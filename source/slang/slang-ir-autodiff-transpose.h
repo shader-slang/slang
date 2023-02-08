@@ -1089,15 +1089,6 @@ struct DiffTransposePass
             builder->emitStore(wb.destVar, loadedDiff);
         }
 
-        // Writeback result gradient to their corresponding splitted variable.
-        for (auto wb : writebacks)
-        {
-            auto loadedPair = builder->emitLoad(wb.srcTempPairVar);
-            auto diffType = as<IRPtrTypeBase>(wb.destVar->getDataType())->getValueType();
-            auto loadedDiff = builder->emitDifferentialPairGetDifferential(diffType, loadedPair);
-            builder->emitStore(wb.destVar, loadedDiff);
-        }
-
         List<RevGradient> gradients;
         for (Index ii = 0; ii < args.getCount(); ii++)
         {
