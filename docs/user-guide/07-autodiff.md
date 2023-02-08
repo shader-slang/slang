@@ -118,7 +118,7 @@ $$Y = f_1 \circ f_2 \circ \cdots \circ f_n(\mathbf{w}_0)$$
 Where $$\mathbf{w}_0$$ is the first layer of parameters.
 
 ### Forward Propagation of Derivatives
-When developing and training such a system, we are typically interested in evaluating the partial derivative of the system output with regard to some parameter $$\omega$$. To do so we can utilize the forward and backward derivative propagation functions for each $$f_i$$. Where the forward derivative propagation function is defined by:
+When developing and training such a system, we often need to evaluate the partial derivative of a differentiable function with regard to some parameter $$\omega$$. The simpliest way to obtain a partial derivative is to call a forward derivative propagation function, which is defined by:
 
 $$ \mathbb{F}[f_i] = f_i'(\mathbf{w}_i, \mathbf{w}_i') = \sum_{\omega_i\in\mathbf{w}_i} \frac{\partial f}{\partial \omega_i} \omega_i' $$
 
@@ -127,7 +127,7 @@ Where $$\omega' \in \mathbf{w}'$$ represents the partial derivative of $$\omega_
 Given this definition, $$\mathbb{F}[f]$$ can be used as a forward propagation function that is able to compute $$\frac{\partial f_i}{\partial \omega_0}$$ from $$\frac{\partial \omega_{i-1}}{\partial \omega_0}$$.
 
 ### Backward Propagation of Derivatives
-When training a neural network, we are more interested in figuring out the partial derivative of the final system output with regard to a parameter $$\omega_i$$ in $$f_i$$. To do so, we generally utilize the backward derivative propagation function
+When the backpropagation algorithm to train a neural network, we are more interested in figuring out the partial derivative of the final system output with regard to a parameter $$\omega_i$$ in $$f_i$$. To do so, we generally utilize the backward derivative propagation function
 
 $$\mathbb{B}[f_i] = f_i^{-1}(\frac{\partial Y}{\partial f_i}) = \frac{\partial Y}{\partial \mathbf{w}_i}$$
 
