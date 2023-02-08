@@ -781,13 +781,13 @@ T detach(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 vector<T, N> detach(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, detach, x);
+    return x;
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 matrix<T, N, M> detach(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, detach, x);
+    return x;
 }
 
 // Absolute value (HLSL SM 1.0)
