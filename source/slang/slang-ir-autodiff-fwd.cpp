@@ -149,6 +149,7 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 builder->markInstAsDifferential(diffSub, resultType);
                 
                 auto diffMul = builder->emitMul(resultType, primalRight, primalRight);
+                builder->markInstAsPrimal(diffMul);
 
                 auto diffDiv = builder->emitDiv(diffType, diffSub, diffMul);
                 builder->markInstAsDifferential(diffDiv, resultType);
@@ -1242,6 +1243,9 @@ void ForwardDiffTranscriber::checkAutodiffInstDecorations(IRFunc* fwdFunc)
     {
         for (auto inst = block->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
         {
+            // TODO: Special case, not sure why these insts show up
+            if (as<IRUndefined>(inst)) continue;
+
             List<IRDecoration*> decorations;
             for (auto decoration : inst->getDecorations())
             {

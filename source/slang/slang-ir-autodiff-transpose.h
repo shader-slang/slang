@@ -148,79 +148,6 @@ struct DiffTransposePass
         return (*predecessorSet.begin());
     }
 
-    void buildInitializerBlockMap(IRBlock* block, IRBlock* endBlock, IRBlock* currInitBlock)
-    {
-        if (initializerBlockMap.ContainsKey(block)) return;
-        if (block == endBlock) return;
-
-        initializerBlockMap[block] = currInitBlock;
-
-        auto terminator = block->getTerminator();
-        switch (terminator->getOp())
-        {
-            case kIROp_unconditionalBranch:
-                return buildInitializerBlockMap(
-                    as<IRUnconditionalBranch>(terminator)->getTargetBlock(),
-                    endBlock,
-                    currInitBlock);
-
-            case kIROp_ifElse:
-            {
-                buildInitializerBlockMap(
-                    as<IRIfElse>(terminator)->getTrueBlock(),
-                    as<IRIfElse>(terminator)->getAfterBlock(),
-                    currInitBlock);
-
-                buildInitializerBlockMap(
-                    as<IRIfElse>(terminator)->getFalseBlock(),
-                    as<IRIfElse>(terminator)->getAfterBlock(),
-                    currInitBlock);
-                
-                buildInitializerBlockMap(
-                    as<IRIfElse>(terminator)->getAfterBlock(),
-                    endBlock,
-                    currInitBlock);
-
-                return;
-            }
-
-            case kIROp_Return:
-                return;
-            
-            case kIROp_loop:
-            {
-                auto condBlock = as<IRLoop>(terminator)->getTargetBlock();
-                auto loopRegionBlock = as<IRIfElse>(condBlock->getTerminator())->getTrueBlock();
-                auto breakRegionBlock = as<IRIfElse>(condBlock->getTerminator())->getFalseBlock();
-
-                initializerBlockMap[condBlock] = condBlock;
-
-                buildInitializerBlockMap(
-                    loopRegionBlock,
-                    condBlock,
-                    condBlock);
-                
-                buildInitializerBlockMap(
-                    breakRegionBlock,
-                    endBlock,
-                    currInitBlock);
-                return;
-            }
-
-            case kIROp_Switch:
-            {
-                SLANG_UNIMPLEMENTED_X("Switch-case initializer map not implemented");
-                return;
-            }
-
-            default:
-            {
-                SLANG_UNEXPECTED("Unrecognized inst for 'buildInitializerMap()'");
-                return;
-            }
-        }
-    }
-
     RegionEntryPoint reverseCFGRegion(IRBlock* block, List<IRBlock*> endBlocks)
     {
         IRBlock* revBlock = revBlockMap[block];
@@ -607,16 +534,6 @@ struct DiffTransposePass
         // we'll emit temporary vars to hold per-block derivatives.
         // 
         firstRevDiffBlockMap[revDiffFunc] = revBlockMap[terminalDiffBlocks[0]];
-
-        // Before transposing the contents of the blocks,
-        // build a list of 'first' blocks for every region which
-        // is where we'll emit accumulator variables. 
-        // Since we don't have any control flow on the reverse-mode blocks yet,
-        // this will be build on the corresponding fwd-mode blocks, using the
-        // *last* fwd-mode block of each region as the initializer block.
-        // 
-        auto firstDiffBlock = as<IRUnconditionalBranch>(terminalPrimalBlocks[0]->getTerminator())->getTargetBlock();
-        buildInitializerBlockMap(firstDiffBlock, nullptr, terminalDiffBlocks[0]);
 
         for (auto block : workList)
         {
