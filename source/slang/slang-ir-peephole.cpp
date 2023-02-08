@@ -167,68 +167,75 @@ struct PeepholeContext : InstPassBase
             (floatingPointMode == FloatingPointMode::Fast ||
              isIntegralScalarOrCompositeType(inst->getDataType()));
 
+        auto tryReplace = [&](IRInst* replacement) -> bool
+        {
+            if (replacement->getFullType() != inst->getFullType())
+            {
+                // If the operand type is different from result type,
+                // we try to convert for some known cases.
+                if (auto vectorType = as<IRVectorType>(inst->getFullType()))
+                {
+                    if (vectorType->getElementType() != replacement->getFullType())
+                        return false;
+                    IRBuilder builder(sharedBuilderStorage);
+                    builder.setInsertBefore(inst);
+                    replacement = builder.emitMakeVectorFromScalar(inst->getFullType(), replacement);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            inst->replaceUsesWith(replacement);
+            inst->removeAndDeallocate();
+            return true;
+        };
+
         switch (inst->getOp())
         {
         case kIROp_Add:
             if (isZero(inst->getOperand(0)))
             {
-                inst->replaceUsesWith(inst->getOperand(1));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(1));
             }
             else if (isZero(inst->getOperand(1)))
             {
-                inst->replaceUsesWith(inst->getOperand(0));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(0));
             }
             break;
         case kIROp_Sub:
             if (isZero(inst->getOperand(1)))
             {
-                inst->replaceUsesWith(inst->getOperand(0));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(0));
             }
             break;
         case kIROp_Mul:
             if (isOne(inst->getOperand(0)))
             {
-                inst->replaceUsesWith(inst->getOperand(1));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(1));
             }
             else if (isOne(inst->getOperand(1)))
             {
-                inst->replaceUsesWith(inst->getOperand(0));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(0));
             }
             else if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
             {
-                inst->replaceUsesWith(inst->getOperand(0));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(0));
             }
             else if (allowUnsafeOptimizations && isZero(inst->getOperand(1)))
             {
-                inst->replaceUsesWith(inst->getOperand(1));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(1));
             }
             break;
         case kIROp_Div:
             if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
             {
-                inst->replaceUsesWith(inst->getOperand(0));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(0));
             }
             else if (isOne(inst->getOperand(1)))
             {
-                inst->replaceUsesWith(inst->getOperand(0));
-                inst->removeAndDeallocate();
-                return true;
+                return tryReplace(inst->getOperand(0));
             }
         }
         return false;

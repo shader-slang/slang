@@ -151,11 +151,8 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                             break;
                         }
                     }
-                    else if (as<IRCall>(prev))
-                    {
-                        break;
-                    }
-                    else if (prev->mightHaveSideEffects())
+
+                    if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr()))
                     {
                         break;
                     }
@@ -170,6 +167,10 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                 bool hasAddrUse = false;
                 bool hasOverridingStore = false;
 
+                // Stores to global variables will never get removed.
+                if (!isChildInstOf(store->getPtr(), func))
+                    hasAddrUse = true;
+
                 for (auto next = store->getNextInst(); next; next = next->getNextInst())
                 {
                     if (auto nextStore = as<IRStore>(next))
@@ -180,23 +181,29 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                             break;
                         }
                     }
-                    // If we see any insts that have side effects before seeing an overriding store,
-                    // don't remove the store.
+
+                    // If we see any insts that have reads or modifies the address before seeing
+                    // an overriding store, don't remove the store.
                     // We can make the test more accurate by collecting all addresses related to
                     // the target address first, and only bail out if any of the related addresses
                     // are involved.
                     switch (next->getOp())
                     {
                     case kIROp_Load:
-                    case kIROp_Call:
-                        hasAddrUse = true;
+                        if (canAddressesPotentiallyAlias(func, next->getOperand(0), store->getPtr()))
+                        {
+                            hasAddrUse = true;
+                        }
+                        break;
+                    default:
+                        if (canInstHaveSideEffectAtAddress(func, next, store->getPtr()))
+                        {
+                            hasAddrUse = true;
+                        }
                         break;
                     }
-                    if (next->mightHaveSideEffects())
-                    {
-                        hasAddrUse = true;
+                    if (hasAddrUse)
                         break;
-                    }
                 }
 
                 if (!hasAddrUse && hasOverridingStore)

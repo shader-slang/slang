@@ -54,6 +54,7 @@
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-simplify-for-emit.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -1008,6 +1009,9 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             linkedIR));
         
         auto irModule = linkedIR.module;
+        
+        // Perform final simplifications to help emit logic to generate more compact code.
+        simplifyForEmit(irModule);
 
         metadata = linkedIR.metadata;
 
@@ -1015,15 +1019,6 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         // passes have been performed, we can emit target code from
         // the IR module.
         //
-        // TODO: do we want to emit directly from IR, or translate the
-        // IR back into AST for emission?
-#if 0
-        {
-            StringBuilder sb;
-            StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
-            dumpIR(irModule, getIRDumpOptions(), sourceManager, &writer);
-        }
-#endif
         sourceEmitter->emitModule(irModule, sink);
     }
 

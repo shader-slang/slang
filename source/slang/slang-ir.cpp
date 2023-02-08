@@ -6599,6 +6599,8 @@ namespace Slang
     void IRInst::insertBefore(IRInst* other)
     {
         SLANG_ASSERT(other);
+        if (other->getPrevInst() == this)
+            return;
         _insertAt(other->getPrevInst(), other, other->getParent());
     }
 
