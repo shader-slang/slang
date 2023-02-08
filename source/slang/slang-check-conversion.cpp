@@ -864,13 +864,13 @@ namespace Slang
             
             ConversionCost subCost = kConversionCost_GetRef;
 
-            RefExpr* refExpr = nullptr;
+            MakeRefExpr* refExpr = nullptr;
             if (outToExpr)
             {
-                refExpr = m_astBuilder->create<RefExpr>();
+                refExpr = m_astBuilder->create<MakeRefExpr>();
                 refExpr->base = fromExpr;
                 refExpr->type = QualType(refType);
-                refExpr->type.isLeftValue = true;
+                refExpr->type.isLeftValue = false;
                 *outToExpr = refExpr;
             }
             if (outCost)
@@ -890,19 +890,17 @@ namespace Slang
             //
             ConversionCost subCost = kConversionCost_None;
 
-            DerefExpr* derefExpr = nullptr;
+            Expr* openRefExpr = nullptr;
             if (outToExpr)
             {
-                derefExpr = m_astBuilder->create<DerefExpr>();
-                derefExpr->base = fromExpr;
-                derefExpr->type = QualType(fromValueType);
+                openRefExpr = maybeOpenRef(fromExpr);
             }
 
             if (!_coerce(
                 toType,
                 outToExpr,
                 fromValueType,
-                derefExpr,
+                openRefExpr,
                 &subCost))
             {
                 return false;

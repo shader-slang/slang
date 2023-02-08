@@ -269,9 +269,9 @@ class SwizzleExpr: public Expr
 };
 
 // An operation to convert an l-value to a reference type.
-class RefExpr : public Expr
+class MakeRefExpr : public Expr
 {
-    SLANG_AST_CLASS(RefExpr)
+    SLANG_AST_CLASS(MakeRefExpr)
     Expr* base = nullptr;
 };
 

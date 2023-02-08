@@ -1928,7 +1928,7 @@ namespace Slang
         }
 
         CASE(DerefExpr)
-        CASE(RefExpr)
+        CASE(MakeRefExpr)
         CASE(MatrixSwizzleExpr)
         CASE(SwizzleExpr)
         CASE(OverloadedExpr)
