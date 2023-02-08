@@ -941,6 +941,9 @@ InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* orig
         diffLoopOperands.getBuffer());
     builder->markInstAsMixedDifferential(diffLoop);
 
+    if (auto maxItersDecoration = origLoop->findDecoration<IRLoopMaxItersDecoration>())
+        builder->addLoopMaxItersDecoration(diffLoop, maxItersDecoration->getMaxIters());
+
     return InstPair(diffLoop, diffLoop);
 }
 

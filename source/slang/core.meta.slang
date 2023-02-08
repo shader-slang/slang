@@ -2824,7 +2824,7 @@ __attributeTarget(LoopStmt)
 attribute_syntax [allow_uav_condition]  : AllowUAVConditionAttribute;
 
 __attributeTarget(LoopStmt)
-attribute_syntax [maxiters(count)] : MaxItersAttribute;
+attribute_syntax [maxiters(count)]      : MaxItersAttribute;
 
 __attributeTarget(IfStmt)
 attribute_syntax [flatten]              : FlattenAttribute;

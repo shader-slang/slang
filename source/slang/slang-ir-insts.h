@@ -71,7 +71,8 @@ struct IRLoopMaxItersDecoration : IRDecoration
     enum { kOp = kIROp_LoopMaxItersDecoration };
     IR_LEAF_ISA(LoopMaxItersDecoration)
 
-    IRConstant* getMaxIters() { return cast<IRConstant>(getOperand(0)); }
+    IRConstant* getMaxItersInst() { return cast<IRConstant>(getOperand(0)); }
+    IRIntegerValue getMaxIters() { return as<IRIntLit>(getOperand(0))->getValue(); }
 };
 
 struct IRTargetSpecificDecoration : IRDecoration

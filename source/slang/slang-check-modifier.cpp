@@ -511,7 +511,7 @@ namespace Slang
         {
             if (auto cint = checkConstantIntVal(attr->args[0]))
             {
-                attr->value = cint;
+                maxItersAttrs->value = cint->value;
             }
             else
             {

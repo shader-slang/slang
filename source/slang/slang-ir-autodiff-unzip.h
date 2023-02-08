@@ -306,7 +306,7 @@ struct DiffUnzipPass
         
         if (auto maxItersDecoration = loop->findDecoration<IRLoopMaxItersDecoration>())
         {
-            region->maxIters = as<IRIntLit>(maxItersDecoration->getMaxIters())->getValue();
+            region->maxIters = maxItersDecoration->getMaxIters();
             region->status = IndexedRegion::CountStatus::Static;
         }
         
@@ -1061,19 +1061,27 @@ struct DiffUnzipPass
                 primalArgs.add(mixedLoop->getArg(ii));
         }
 
-        return InstPair(
-            primalBuilder->emitLoop(
-                as<IRBlock>(primalMap[nextBlock]),
-                as<IRBlock>(primalMap[breakBlock]),
-                as<IRBlock>(primalMap[continueBlock]),
-                primalArgs.getCount(),
-                primalArgs.getBuffer()),
-            diffBuilder->emitLoop(
-                as<IRBlock>(diffMap[nextBlock]),
-                as<IRBlock>(diffMap[breakBlock]),
-                as<IRBlock>(diffMap[continueBlock]),
-                diffArgs.getCount(),
-                diffArgs.getBuffer()));
+        auto primalLoop = primalBuilder->emitLoop(
+            as<IRBlock>(primalMap[nextBlock]),
+            as<IRBlock>(primalMap[breakBlock]),
+            as<IRBlock>(primalMap[continueBlock]),
+            primalArgs.getCount(),
+            primalArgs.getBuffer());
+
+        auto diffLoop = diffBuilder->emitLoop(
+            as<IRBlock>(diffMap[nextBlock]),
+            as<IRBlock>(diffMap[breakBlock]),
+            as<IRBlock>(diffMap[continueBlock]),
+            diffArgs.getCount(),
+            diffArgs.getBuffer());
+
+        if (auto maxItersDecoration = mixedLoop->findDecoration<IRLoopMaxItersDecoration>())
+        {
+            primalBuilder->addLoopMaxItersDecoration(primalLoop, maxItersDecoration->getMaxIters());
+            diffBuilder->addLoopMaxItersDecoration(diffLoop, maxItersDecoration->getMaxIters());
+        }
+
+        return InstPair(primalLoop, diffLoop);
     }
 
     InstPair splitControlFlow(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* branchInst)

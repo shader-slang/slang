@@ -13,6 +13,7 @@ float test_simple_loop(float y)
 {
     float t = y;
 
+    [maxiters(5)]
     for (int i = 0; i < 3; i++)
     {
         t = t * t;
