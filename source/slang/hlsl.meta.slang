@@ -781,13 +781,13 @@ T detach(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 vector<T, N> detach(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, detach, x);
+    return x;
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 matrix<T, N, M> detach(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, detach, x);
+    return x;
 }
 
 // Absolute value (HLSL SM 1.0)
@@ -4793,7 +4793,7 @@ void __executeCallable(uint shaderIndex, int payloadLocation);
 __generic<Payload>
 __target_intrinsic(__glslRayTracing, "$XC")
 [__readNone]
-int __callablePayloadLocation(Payload payload);
+int __callablePayloadLocation(__ref Payload payload);
 
 // Now we provide a hard-coded definition of `CallShader()` for GLSL-based
 // targets, which maps the generic HLSL operation into the non-generic
@@ -4848,7 +4848,7 @@ void __traceRay(
 __generic<Payload>
 __target_intrinsic(__glslRayTracing, "$XP")
 [__readNone]
-int __rayPayloadLocation(Payload payload);
+int __rayPayloadLocation(__ref Payload payload);
 
 __generic<payload_t>
 __specialized_for_target(glsl)
@@ -5678,7 +5678,7 @@ struct VkSubpassInputMS<T>
 // We access the HitObjectAttributes via this function for the desired type, and it acts *as if* it's just an access
 // to the global t.
 [ForceInline]
-__ref T __hitObjectAttributes<T>()
+Ref<T> __hitObjectAttributes<T>()
 {
     [__vulkanHitObjectAttributes]   
     static T t;
@@ -5691,7 +5691,7 @@ __ref T __hitObjectAttributes<T>()
 __generic<Payload>
 __target_intrinsic(__glslRayTracing, "$XH")
 [__readNone]
-int __hitObjectAttributesLocation(Payload payload);
+int __hitObjectAttributesLocation(__ref Payload payload);
 
     /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,
     /// or as a key in ReorderThread. Created by one of several methods described below. HitObject

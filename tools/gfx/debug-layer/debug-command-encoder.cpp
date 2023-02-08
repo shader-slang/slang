@@ -46,17 +46,17 @@ Result DebugComputeCommandEncoder::bindPipelineWithRootObject(
     return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
 }
 
-void DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
+Result DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->dispatchCompute(x, y, z);
+    return baseObject->dispatchCompute(x, y, z);
 }
 
-void DebugComputeCommandEncoder::dispatchComputeIndirect(
+Result DebugComputeCommandEncoder::dispatchComputeIndirect(
     IBufferResource* cmdBuffer, Offset offset)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->dispatchComputeIndirect(getInnerObj(cmdBuffer), offset);
+    return baseObject->dispatchComputeIndirect(getInnerObj(cmdBuffer), offset);
 }
 
 void DebugRenderCommandEncoder::endEncoding()
@@ -130,20 +130,20 @@ void DebugRenderCommandEncoder::setIndexBuffer(
     baseObject->setIndexBuffer(innerBuffer, indexFormat, offset);
 }
 
-void DebugRenderCommandEncoder::draw(GfxCount vertexCount, GfxIndex startVertex)
+Result DebugRenderCommandEncoder::draw(GfxCount vertexCount, GfxIndex startVertex)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->draw(vertexCount, startVertex);
+    return baseObject->draw(vertexCount, startVertex);
 }
 
-void DebugRenderCommandEncoder::drawIndexed(
+Result DebugRenderCommandEncoder::drawIndexed(
     GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->drawIndexed(indexCount, startIndex, baseVertex);
+    return baseObject->drawIndexed(indexCount, startIndex, baseVertex);
 }
 
-void DebugRenderCommandEncoder::drawIndirect(
+Result DebugRenderCommandEncoder::drawIndirect(
     GfxCount maxDrawCount,
     IBufferResource* argBuffer,
     Offset argOffset,
@@ -151,11 +151,11 @@ void DebugRenderCommandEncoder::drawIndirect(
     Offset countOffset)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->drawIndirect(
+    return baseObject->drawIndirect(
         maxDrawCount, getInnerObj(argBuffer), argOffset, getInnerObj(countBuffer), countOffset);
 }
 
-void DebugRenderCommandEncoder::drawIndexedIndirect(
+Result DebugRenderCommandEncoder::drawIndexedIndirect(
     GfxCount maxDrawCount,
     IBufferResource* argBuffer,
     Offset argOffset,
@@ -163,7 +163,7 @@ void DebugRenderCommandEncoder::drawIndexedIndirect(
     Offset countOffset)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->drawIndexedIndirect(
+    return baseObject->drawIndexedIndirect(
         maxDrawCount, getInnerObj(argBuffer), argOffset, getInnerObj(countBuffer), countOffset);
 }
 
@@ -180,7 +180,7 @@ Result DebugRenderCommandEncoder::setSamplePositions(
     return baseObject->setSamplePositions(samplesPerPixel, pixelCount, samplePositions);
 }
 
-void DebugRenderCommandEncoder::drawInstanced(
+Result DebugRenderCommandEncoder::drawInstanced(
     GfxCount vertexCount,
     GfxCount instanceCount,
     GfxIndex startVertex,
@@ -191,7 +191,7 @@ void DebugRenderCommandEncoder::drawInstanced(
         vertexCount, instanceCount, startVertex, startInstanceLocation);
 }
 
-void DebugRenderCommandEncoder::drawIndexedInstanced(
+Result DebugRenderCommandEncoder::drawIndexedInstanced(
     GfxCount indexCount,
     GfxCount instanceCount,
     GfxIndex startIndexLocation,
@@ -483,7 +483,7 @@ Result DebugRayTracingCommandEncoder::bindPipelineWithRootObject(
     return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
 }
 
-void DebugRayTracingCommandEncoder::dispatchRays(
+Result DebugRayTracingCommandEncoder::dispatchRays(
     GfxIndex rayGenShaderIndex,
     IShaderTable* shaderTable,
     GfxCount width,
@@ -491,7 +491,7 @@ void DebugRayTracingCommandEncoder::dispatchRays(
     GfxCount depth)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->dispatchRays(rayGenShaderIndex, getInnerObj(shaderTable), width, height, depth);
+    return baseObject->dispatchRays(rayGenShaderIndex, getInnerObj(shaderTable), width, height, depth);
 }
 
 } // namespace debug

@@ -17,57 +17,65 @@ struct Vertex_0
 
 void just_two_0(out Vertex_0 v_0, out Vertex_0 w_0)
 {
-    Texes_0 _S1 = { vec2(0.00000000000000000000, 0.00000000000000000000), vec4(0.00000000000000000000, 0.00000000000000000000, 0.00000000000000000000, 0.00000000000000000000) };
-    Vertex_0 _S2 = { vec4(0.00000000000000000000), vec3(1.00000000000000000000), _S1 };
-    v_0 = _S2;
-    w_0 = v_0;
+    const vec4 _S1 = vec4(0.0);
+    const vec3 _S2 = vec3(1.0);
+    Texes_0 _S3 = { vec2(0.0, 0.0), vec4(0.0, 0.0, 0.0, 0.0) };
+    v_0.pos_0 = _S1;
+    v_0.col_0 = _S2;
+    v_0.ts_0 = _S3;
+    w_0.pos_0 = _S1;
+    w_0.col_0 = _S2;
+    w_0.ts_0 = _S3;
     return;
 }
 
 void just_one_0(out Vertex_0 v_1)
 {
-    Texes_0 _S3 = { vec2(0.00000000000000000000, 0.00000000000000000000), vec4(0.00000000000000000000, 0.00000000000000000000, 0.00000000000000000000, 0.00000000000000000000) };
-    Vertex_0 _S4 = { vec4(0.00000000000000000000), vec3(1.00000000000000000000), _S3 };
-    v_1 = _S4;
+    const vec3 _S4 = vec3(1.0);
+    Texes_0 _S5 = { vec2(0.0, 0.0), vec4(0.0, 0.0, 0.0, 0.0) };
+    v_1.pos_0 = vec4(0.0);
+    v_1.col_0 = _S4;
+    v_1.ts_0 = _S5;
     return;
 }
 
 void part_of_one_0(out vec4 p_0)
 {
-    p_0 = vec4(1.00000000000000000000, 2.00000000000000000000, 3.00000000000000000000, 4.00000000000000000000);
+    p_0 = vec4(1.0, 2.0, 3.0, 4.0);
     return;
 }
 
 void write_struct_0(out Texes_0 t_0)
 {
-    t_0.tex1_0 = vec2(0.00000000000000000000);
-    t_0.tex2_0 = vec4(1.00000000000000000000);
+    t_0.tex1_0 = vec2(0.0);
+    t_0.tex2_0 = vec4(1.0);
     return;
 }
 
 layout(location = 0)
-out vec3  _S5[3];
+out vec3  _S6[3];
 
 layout(location = 1)
-out vec2  _S6[3];
+out vec2  _S7[3];
 
 layout(location = 2)
-out vec4  _S7[3];
+out vec4  _S8[3];
 
 out gl_MeshPerVertexEXT
 {
     vec4 gl_Position;
 } gl_MeshVerticesEXT[3];
 
+out uvec3  gl_PrimitiveTriangleIndicesEXT[1];
 void everything_0()
 {
-    vec3 _S8 = vec3(1.00000000000000000000);
-    vec2 _S9 = vec2(0.00000000000000000000, 0.00000000000000000000);
-    vec4 _S10 = vec4(0.00000000000000000000, 0.00000000000000000000, 0.00000000000000000000, 0.00000000000000000000);
-    gl_MeshVerticesEXT[0U].gl_Position = vec4(0.00000000000000000000);
-    _S5[0U] = _S8;
+    vec3 _S9 = vec3(1.0);
+    vec2 _S10 = vec2(0.0, 0.0);
+    vec4 _S11 = vec4(0.0, 0.0, 0.0, 0.0);
+    gl_MeshVerticesEXT[0U].gl_Position = vec4(0.0);
     _S6[0U] = _S9;
     _S7[0U] = _S10;
+    _S8[0U] = _S11;
     return;
 }
 
@@ -79,66 +87,61 @@ void a_0()
 
 void b_0()
 {
-    Vertex_0 _S11;
     Vertex_0 _S12;
-    just_two_0(_S12, _S11);
-    Vertex_0 _S13 = _S12;
+    Vertex_0 _S13;
+    just_two_0(_S13, _S12);
+    Vertex_0 _S14 = _S13;
     gl_MeshVerticesEXT[0U].gl_Position = _S13.pos_0;
-    _S5[0U] = _S13.col_0;
-    Texes_0 _S14 = _S13.ts_0;
-    _S6[0U] = _S14.tex1_0;
-    _S7[0U] = _S14.tex2_0;
-    Vertex_0 _S15 = _S11;
-    gl_MeshVerticesEXT[0U].gl_Position = _S15.pos_0;
-    _S5[0U] = _S15.col_0;
-    Texes_0 _S16 = _S15.ts_0;
-    _S6[0U] = _S16.tex1_0;
-    _S7[0U] = _S16.tex2_0;
+    _S6[0U] = _S14.col_0;
+    _S7[0U] = _S14.ts_0.tex1_0;
+    _S8[0U] = _S14.ts_0.tex2_0;
+    Vertex_0 _S15 = _S12;
+    gl_MeshVerticesEXT[0U].gl_Position = _S12.pos_0;
+    _S6[0U] = _S15.col_0;
+    _S7[0U] = _S15.ts_0.tex1_0;
+    _S8[0U] = _S15.ts_0.tex2_0;
     return;
 }
 
-void c_0(uint _S17)
+void c_0(uint _S16)
 {
-    Vertex_0 _S18;
-    just_one_0(_S18);
-    Vertex_0 _S19 = _S18;
-    gl_MeshVerticesEXT[_S17].gl_Position = _S19.pos_0;
-    _S5[_S17] = _S19.col_0;
-    Texes_0 _S20 = _S19.ts_0;
-    _S6[_S17] = _S20.tex1_0;
-    _S7[_S17] = _S20.tex2_0;
+    Vertex_0 _S17;
+    just_one_0(_S17);
+    Vertex_0 _S18 = _S17;
+    gl_MeshVerticesEXT[_S16].gl_Position = _S17.pos_0;
+    _S6[_S16] = _S18.col_0;
+    _S7[_S16] = _S18.ts_0.tex1_0;
+    _S8[_S16] = _S18.ts_0.tex2_0;
     return;
 }
 
-void d_0(uint _S21)
+void d_0(uint _S19)
 {
-    Vertex_0 _S22;
-    Vertex_0 _S23;
-    just_two_0(_S23, _S22);
-    Vertex_0 _S24 = _S23;
-    gl_MeshVerticesEXT[_S21].gl_Position = _S24.pos_0;
-    _S5[_S21] = _S24.col_0;
-    Texes_0 _S25 = _S24.ts_0;
-    _S6[_S21] = _S25.tex1_0;
-    _S7[_S21] = _S25.tex2_0;
-    Vertex_0 _S26 = _S22;
-    gl_MeshVerticesEXT[0U].gl_Position = _S26.pos_0;
-    _S5[0U] = _S26.col_0;
-    Texes_0 _S27 = _S26.ts_0;
-    _S6[0U] = _S27.tex1_0;
-    _S7[0U] = _S27.tex2_0;
+    Vertex_0 _S20;
+    Vertex_0 _S21;
+    just_two_0(_S21, _S20);
+    Vertex_0 _S22 = _S21;
+    gl_MeshVerticesEXT[_S19].gl_Position = _S21.pos_0;
+    _S6[_S19] = _S22.col_0;
+    _S7[_S19] = _S22.ts_0.tex1_0;
+    _S8[_S19] = _S22.ts_0.tex2_0;
+    Vertex_0 _S23 = _S20;
+    gl_MeshVerticesEXT[0U].gl_Position = _S20.pos_0;
+    _S6[0U] = _S23.col_0;
+    _S7[0U] = _S23.ts_0.tex1_0;
+    _S8[0U] = _S23.ts_0.tex2_0;
     return;
 }
 
-void e_0(uint _S28)
+void e_0(uint _S24)
 {
-    part_of_one_0(gl_MeshVerticesEXT[_S28].gl_Position);
-    Texes_0 _S29;
-    write_struct_0(_S29);
-    Texes_0 _S30 = _S29;
-    _S6[_S28] = _S30.tex1_0;
-    _S7[_S28] = _S30.tex2_0;
-    part_of_one_0(_S7[_S28]);
+    part_of_one_0(gl_MeshVerticesEXT[_S24].gl_Position);
+    Texes_0 _S25;
+    write_struct_0(_S25);
+    Texes_0 _S26 = _S25;
+    _S7[_S24] = _S25.tex1_0;
+    _S8[_S24] = _S26.tex2_0;
+    part_of_one_0(_S8[_S24]);
     return;
 }
 

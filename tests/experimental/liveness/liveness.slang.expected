@@ -22,9 +22,9 @@ int someSlowFunc_0(int a_0)
 {
     uint _S1 = uint(a_0);
     uint v_0;
-    int i_0;
     livenessStart_0(v_0, 0);
     v_0 = _S1;
+    int i_0;
     livenessStart_1(i_0, 0);
     i_0 = 0;
     for(;;)
@@ -91,9 +91,9 @@ void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
     int i_2;
-    int res_0;
     livenessStart_1(i_2, 0);
     i_2 = 0;
+    int res_0;
     livenessStart_1(res_0, 0);
     res_0 = index_0;
     for(;;)
@@ -113,30 +113,33 @@ void main()
         SomeStruct_0 _S8 = makeSomeStruct_0();
         t_0 = _S8;
         const int  _S9[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-        SomeStruct_0 u_0 = { 0, 0, _S9 };
-        SomeStruct_0 u_1;
+        SomeStruct_0 u_0;
         if((v_1 & 256) != 0)
         {
             s_3.x_0 = ((anotherBuffer_0)._data[(uint(v_1 & 3))]);
             t_0.x_0 = ((anotherBuffer_0)._data[(uint(v_1 & 3))]);
-            livenessStart_2(u_1, 0);
-            u_1 = u_0;
+            livenessStart_2(u_0, 0);
+            u_0.a_1 = 0;
+            u_0.x_0 = 0;
+            u_0.c_0 = _S9;
         }
         else
         {
             SomeStruct_0 x_1;
             livenessStart_2(x_1, 0);
-            x_1 = u_0;
+            x_1.a_1 = 0;
+            x_1.x_0 = 0;
+            x_1.c_0 = _S9;
             x_1.x_0 = ((anotherBuffer_0)._data[(uint(v_1 & 3))]) + 1;
             SomeStruct_0 _S10 = x_1;
             livenessEnd_2(x_1, 0);
-            livenessStart_2(u_1, 0);
-            u_1 = _S10;
+            livenessStart_2(u_0, 0);
+            u_0 = _S10;
         }
         s_3.c_0[index_0 & 7] = s_3.c_0[index_0 & 7] + 1;
         int _S11 = s_3.x_0 + t_0.x_0;
-        SomeStruct_0 _S12 = u_1;
-        livenessEnd_2(u_1, 0);
+        SomeStruct_0 _S12 = u_0;
+        livenessEnd_2(u_0, 0);
         int _S13 = _S11 + _S12.x_0;
         int _S14 = doThing_0(t_0);
         int _S15 = _S13 + _S14;

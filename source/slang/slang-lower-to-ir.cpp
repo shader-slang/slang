@@ -3304,6 +3304,15 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    LoweredValInfo visitMakeRefExpr(MakeRefExpr* expr)
+    {
+        auto loweredBase = lowerLValueExpr(context, expr->base);
+
+        SLANG_ASSERT(loweredBase.flavor == LoweredValInfo::Flavor::Ptr);
+        loweredBase.flavor = LoweredValInfo::Flavor::Simple;
+        return loweredBase;
+    }
+
     LoweredValInfo visitParenExpr(ParenExpr* expr)
     {
         return lowerSubExpr(expr->base);
@@ -4234,11 +4243,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         switch (baseVal.flavor)
         {
         case LoweredValInfo::Flavor::Simple:
-            return LoweredValInfo::simple(
-                builder->emitElementExtract(
-                    type,
-                    getSimpleVal(context, baseVal),
-                    indexVal));
+                return LoweredValInfo::simple(
+                    builder->emitElementExtract(
+                        type,
+                        getSimpleVal(context, baseVal),
+                        indexVal));
 
         case LoweredValInfo::Flavor::Ptr:
             return LoweredValInfo::ptr(
@@ -4416,7 +4425,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
     {
-        return lowerLValueExpr(context, expr->innerExpr);
+        auto info = lowerRValueExpr(context, expr->innerExpr);
+        SLANG_RELEASE_ASSERT(as<IRPtrTypeBase>(info.val->getFullType()));
+        SLANG_RELEASE_ASSERT(info.flavor == LoweredValInfo::Flavor::Simple);
+        info.flavor = LoweredValInfo::Flavor::Ptr;
+        return info;
     }
 };
 
@@ -4596,10 +4609,6 @@ LoweredValInfo lowerLValueExpr(
     LValueExprLoweringVisitor visitor;
     visitor.context = context;
     auto info = visitor.dispatch(expr);
-    if (as<RefType>(expr->type))
-    {
-        info.flavor = LoweredValInfo::Flavor::Ptr;
-    }
     return info;
 }
 
@@ -4612,10 +4621,6 @@ LoweredValInfo lowerRValueExpr(
     RValueExprLoweringVisitor visitor;
     visitor.context = context;
     auto info = visitor.dispatch(expr);
-    if (as<RefType>(expr->type))
-    {
-        info.val = context->irBuilder->emitLoad(info.val);
-    }
     return info;
 }
 

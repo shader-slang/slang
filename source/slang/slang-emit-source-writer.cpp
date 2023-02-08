@@ -247,8 +247,21 @@ void SourceWriter::emit(double value)
     stream.setf(std::ios::fixed, std::ios::floatfield);
     stream.precision(20);
     stream << value;
-
-    emit(stream.str().c_str());
+    auto str = stream.str();
+    auto slice = UnownedStringSlice(str.c_str());
+    // Remove redundant trailing 0s.
+    if (slice.end() > slice.begin())
+    {
+        auto lastChar = slice.end() - 1;
+        while (lastChar > slice.begin() && *lastChar == '0')
+            lastChar--;
+        if (*lastChar == '.')
+            lastChar++;
+        if (lastChar > slice.end() - 1)
+            lastChar = slice.end() - 1;
+        slice = slice.subString(0, lastChar - slice.begin() + 1);
+    }
+    emit(slice);
 }
 
 void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocation)

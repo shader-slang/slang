@@ -10,6 +10,7 @@ struct PeepholeContext : InstPassBase
     {}
 
     bool changed = false;
+    FloatingPointMode floatingPointMode = FloatingPointMode::Precise;
 
     bool tryFoldElementExtractFromUpdateInst(IRInst* inst)
     {
@@ -96,8 +97,158 @@ struct PeepholeContext : InstPassBase
         return false;
     }
 
+    bool isZero(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+            return as<IRIntLit>(inst)->getValue() == 0;
+        case kIROp_FloatLit:
+            return as<IRFloatLit>(inst)->getValue() == 0.0;
+        case kIROp_MakeVector:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MatrixReshape:
+        case kIROp_VectorReshape:
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (!isZero(inst->getOperand(i)))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+            return isZero(inst->getOperand(0));
+        default:
+            return false;
+        }
+    }
+
+    bool isOne(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+            return as<IRIntLit>(inst)->getValue() == 1;
+        case kIROp_FloatLit:
+            return as<IRFloatLit>(inst)->getValue() == 1.0;
+        case kIROp_MakeVector:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MatrixReshape:
+        case kIROp_VectorReshape:
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (!isOne(inst->getOperand(i)))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+            return isOne(inst->getOperand(0));
+        default:
+            return false;
+        }
+    }
+
+    bool tryOptimizeArithmeticInst(IRInst* inst)
+    {
+        bool allowUnsafeOptimizations =
+            (floatingPointMode == FloatingPointMode::Fast ||
+             isIntegralScalarOrCompositeType(inst->getDataType()));
+
+        auto tryReplace = [&](IRInst* replacement) -> bool
+        {
+            if (replacement->getFullType() != inst->getFullType())
+            {
+                // If the operand type is different from result type,
+                // we try to convert for some known cases.
+                if (auto vectorType = as<IRVectorType>(inst->getFullType()))
+                {
+                    if (vectorType->getElementType() != replacement->getFullType())
+                        return false;
+                    IRBuilder builder(sharedBuilderStorage);
+                    builder.setInsertBefore(inst);
+                    replacement = builder.emitMakeVectorFromScalar(inst->getFullType(), replacement);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            inst->replaceUsesWith(replacement);
+            inst->removeAndDeallocate();
+            return true;
+        };
+
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+            if (isZero(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            else if (isZero(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            break;
+        case kIROp_Sub:
+            if (isZero(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            break;
+        case kIROp_Mul:
+            if (isOne(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            else if (isOne(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (allowUnsafeOptimizations && isZero(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            break;
+        case kIROp_Div:
+            if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (isOne(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+        }
+        return false;
+    }
+
     void processInst(IRInst* inst)
     {
+        if (as<IRGlobalValueWithCode>(inst))
+        {
+            if (auto fpModeDecor = inst->findDecoration<IRFloatingModeOverrideDecoration>())
+                floatingPointMode = fpModeDecor->getFloatingPointMode();
+        }
+
         switch (inst->getOp())
         {
         case kIROp_GetResultError:
@@ -432,6 +583,12 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_Add:
+        case kIROp_Mul:
+        case kIROp_Sub:
+        case kIROp_Div:
+            changed = tryOptimizeArithmeticInst(inst);
+            break;
         default:
             break;
         }
@@ -443,6 +600,7 @@ struct PeepholeContext : InstPassBase
         sharedBuilder->init(module);
         sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
         bool result = false;
+
         for (;;)
         {
             changed = false;
