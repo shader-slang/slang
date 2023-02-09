@@ -349,6 +349,7 @@ DIAGNOSTIC(31143, Error, missingOriginalDefintionOfExternDecl, "no original defi
 
 DIAGNOSTIC(31145, Error, invalidCustomDerivative, "invalid custom derivative attribute.")
 DIAGNOSTIC(31146, Error, declAlreadyHasAttribute, "'$0' already has attribute '[$1]'.")
+DIAGNOSTIC(31147, Error, cannotResolveOriginalFunctionForDerivative, "cannot resolve the original function for the the custom derivative.")
 
 // Enums
 
