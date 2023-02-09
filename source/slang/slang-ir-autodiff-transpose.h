@@ -1247,6 +1247,8 @@ struct DiffTransposePass
             case kIROp_Add:
             case kIROp_Mul:
             case kIROp_Sub: 
+            case kIROp_Div: 
+            case kIROp_Neg:
                 return transposeArithmetic(builder, fwdInst, revValue);
 
             case kIROp_Call:
@@ -1925,6 +1927,41 @@ struct DiffTransposePass
                 else
                 {
                     SLANG_ASSERT_FAILURE("Neither operand of a mul instruction is a differential inst");
+                }
+            }   
+            case kIROp_Div: 
+            {
+                if (isDifferentialInst(fwdInst->getOperand(0)))
+                {
+                    SLANG_RELEASE_ASSERT(!isDifferentialInst(fwdInst->getOperand(1)));
+
+                    // (Out = dA / B) -> (dA += dOut / B)
+                    return TranspositionResult(
+                        List<RevGradient>(
+                            RevGradient(
+                                fwdInst->getOperand(0),
+                                builder->emitDiv(operandType, revValue, fwdInst->getOperand(1)),
+                                fwdInst)));
+                }
+                {
+                    SLANG_ASSERT_FAILURE("The first operand of a div inst must be a differential inst");
+                }
+            }
+            case kIROp_Neg: 
+            {
+                if (isDifferentialInst(fwdInst->getOperand(0)))
+                {
+                    // (Out = -dA) -> (dA += -dOut)
+                    return TranspositionResult(
+                        List<RevGradient>(
+                            RevGradient(
+                                fwdInst->getOperand(0),
+                                builder->emitNeg(operandType, revValue),
+                                fwdInst)));
+                }
+                else
+                {
+                    SLANG_ASSERT_FAILURE("Cannot transpose neg of a non-differentiable inst");
                 }
             }   
 

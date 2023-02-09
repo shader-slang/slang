@@ -1329,9 +1329,12 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
     
     case kIROp_MakeTuple:
+    case kIROp_Neg:
         return transcribeByPassthrough(builder, origInst);
+
     case kIROp_UpdateElement:
         return transcribeUpdateElement(builder, origInst);
+
     case kIROp_unconditionalBranch:
         return transcribeControlFlow(builder, origInst);
 
@@ -1346,6 +1349,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_FieldExtract:
     case kIROp_FieldAddress:
         return transcribeFieldExtract(builder, origInst);
+
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
         return transcribeGetElement(builder, origInst);
@@ -1361,12 +1365,15 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_MakeDifferentialPair:
         return transcribeMakeDifferentialPair(builder, as<IRMakeDifferentialPair>(origInst));
+
     case kIROp_DifferentialPairGetPrimal:
     case kIROp_DifferentialPairGetDifferential:
         return transcribeDifferentialPairGetElement(builder, origInst);
+
     case kIROp_ExtractExistentialValue:
     case kIROp_MakeExistential:
         return transcribeSingleOperandInst(builder, origInst);
+
     case kIROp_ExtractExistentialType:
     {
         IRInst* witnessTable;
@@ -1377,8 +1384,10 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     }
     case kIROp_ExtractExistentialWitnessTable:
         return transcribeExtractExistentialWitnessTable(builder, origInst);
+
     case kIROp_WrapExistential:
         return transcribeWrapExistential(builder, origInst);
+
     case kIROp_undefined:
         return transcribeUndefined(builder, origInst);
 
@@ -1387,8 +1396,10 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         // so we treat this inst as non differentiable.
         // We can extend the frontend and IR with a separate op-code that can provide an explicit diff value.
         return trascribeNonDiffInst(builder, origInst);
+
     case kIROp_StructKey:
         return InstPair(origInst, nullptr);
+        
     case kIROp_Unreachable:
     {
         auto unreachInst = builder->emitUnreachable();
