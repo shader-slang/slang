@@ -211,7 +211,7 @@ void writeHashFile(
     const HashParams&  hashParams)
 {
     FILE* f = nullptr;
-    fopen_s(&f, outCppPath, "w");
+    fopen_s(&f, outCppPath, "wb");
     if (!f)
     {
         return;
