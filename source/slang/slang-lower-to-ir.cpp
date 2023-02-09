@@ -4845,6 +4845,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Loop);
         }
+        else if( auto maxItersAttr = stmt->findModifier<MaxItersAttribute>() )
+        {
+            getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
+        }
         // TODO: handle other cases here
     }
 

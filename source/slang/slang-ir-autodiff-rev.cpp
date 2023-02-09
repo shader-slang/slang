@@ -765,7 +765,7 @@ namespace Slang
 
         // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter) representing the
         // derivative of the return value.
-        DiffTransposePass::FuncTranspositionInfo info = { paramTransposeInfo.dOutParam, nullptr};
+        DiffTransposePass::FuncTranspositionInfo info = { paramTransposeInfo.dOutParam };
         diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, info);
 
         eliminateDeadCode(diffPropagateFunc);

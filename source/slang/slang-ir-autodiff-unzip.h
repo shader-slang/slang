@@ -232,6 +232,24 @@ struct DiffUnzipPass
         // 
         lowerIndexedRegions();
 
+        // Copy regions from fwd-block to their split blocks
+        // to make it easier to do lookups.
+        //
+        {
+            List<IRBlock*> workList;
+            for (auto blockRegionPair : indexRegionMap)
+            {
+                IRBlock* block = blockRegionPair.Key;
+                workList.add(block);
+            }
+
+            for (auto block : workList)
+            {
+                indexRegionMap[as<IRBlock>(primalMap[block])] = (IndexedRegion*)indexRegionMap[block];
+                indexRegionMap[as<IRBlock>(diffMap[block])] = (IndexedRegion*)indexRegionMap[block];
+            }
+        }
+
         // Process intermediate insts in indexed blocks
         // into array loads/stores.
         // 
@@ -262,19 +280,44 @@ struct DiffUnzipPass
 
     IRBlock* getUpdateBlock(IndexedRegion* region)
     {
+        // TODO: What if the 'continue' region has multiple
+        // blocks?
+        // We ideally want the _last_ block before control loops back.
+        // 
+        SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(
+            region->continueBlock->getTerminator())->getTargetBlock() == region->firstBlock);
+
         return region->continueBlock;
+    }
+
+    IRBlock* getFirstLoopBodyBlock(IndexedRegion* region)
+    {
+        // Grab the 'condition' block.
+        auto condBlock = region->firstBlock;
+
+        SLANG_RELEASE_ASSERT(as<IRIfElse>(condBlock->getTerminator()));
+
+        return as<IRIfElse>(condBlock->getTerminator())->getTrueBlock();
     }
     
     void tryInferMaxIndex(IndexedRegion* region)
     {
         if (region->status != IndexedRegion::CountStatus::Unresolved)
             return;
+
+        auto loop = as<IRLoop>(region->initBlock->getTerminator());
         
-        // We're going to fix this at a some random number
-        // for now, and then add some basic inference + user-defined decoration
-        // 
-        region->maxIters = 5;
-        region->status = IndexedRegion::CountStatus::Static;
+        if (auto maxItersDecoration = loop->findDecoration<IRLoopMaxItersDecoration>())
+        {
+            region->maxIters = (Count) maxItersDecoration->getMaxIters();
+            region->status = IndexedRegion::CountStatus::Static;
+        }
+        
+        if (region->status == IndexedRegion::CountStatus::Unresolved)
+        {
+            SLANG_UNEXPECTED("Could not resolve max iters \
+                for loop appearing in reverse-mode");
+        }
     }
 
     // Make a primal value *available* to the differential block.
@@ -297,22 +340,49 @@ struct DiffUnzipPass
         for (auto region : indexRegions)
         {
 
-            IRBlock* initializerBlock = getInitializerBlock(region);
+            //IRBlock* initializerBlock = getInitializerBlock(region);
+            IRBlock* breakBlock = region->breakBlock;
 
             // Grab first primal block.
-            auto firstPrimalBlock = primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()];
+            IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
             
             // Make variable in the top-most block (so it's visible to diff blocks)
-            builder.setInsertInto(firstPrimalBlock);
-            region->primalCountVar = builder.emitVar(builder.getUIntType());
+            builder.setInsertBefore(firstPrimalBlock->getTerminator());
+            region->primalCountVar = builder.emitVar(builder.getIntType());
+            builder.emitStore(
+                region->primalCountVar, 
+                builder.getIntValue(builder.getIntType(), 0));
 
-            // Make another variable in the diff block initialized to the 
-            // final value of the primal counter.
+            // NOTE: This is a hacky shortcut we're taking here.
+            // Technically the unzip pass should not affect the
+            // correctness (it must still compute the proper fwd-mode derivative)
+            // However, we're currently making the loop counter go backwards to
+            // make it easier on the transposition pass, so the output from
+            // the unzip pass is neither fwd-mode or rev-mode until the transposition
+            // step is complete.
             // 
-            builder.setInsertInto(diffMap[initializerBlock]);
-            auto primalCounterValue = builder.emitLoad(region->primalCountVar);
-            region->diffCountVar = builder.emitVar(builder.getUIntType());
-            builder.emitStore(region->diffCountVar, primalCounterValue);
+            // TODO: Ideally this needs to be replaced with a small inversion step
+            // within the transposition pass.
+            //
+            // Emit the diff counter into the diff *break* block (
+            // which we're praying turns into the reverse initializer block)
+            // initialized to the final value of the primal counter.
+            // 
+            builder.setInsertBefore(as<IRBlock>(diffMap[breakBlock])->getTerminator());
+            //auto primalCounterValue = builder.emitLoad(region->primalCountVar);
+            auto primalCounterCurrValue = builder.emitLoad(region->primalCountVar);
+            auto primalCounterLastValue = builder.emitSub(
+                primalCounterCurrValue->getDataType(),
+                primalCounterCurrValue,
+                builder.getIntValue(builder.getIntType(), 1));
+
+            region->diffCountVar = builder.emitVar(builder.getIntType());
+            auto diffCountInit = builder.emitStore(region->diffCountVar, primalCounterLastValue);
+
+            builder.addLoopCounterDecoration(diffCountInit);
+            builder.addLoopCounterDecoration(region->diffCountVar);
+            builder.addLoopCounterDecoration(primalCounterCurrValue);
+            builder.addLoopCounterDecoration(primalCounterLastValue);
             
             IRBlock* updateBlock = getUpdateBlock(region);
             
@@ -324,9 +394,9 @@ struct DiffUnzipPass
 
                 auto counterVal = builder.emitLoad(region->primalCountVar);
                 auto incCounterVal = builder.emitAdd(
-                    builder.getUIntType(), 
+                    builder.getIntType(), 
                     counterVal,
-                    builder.getIntValue(builder.getUIntType(), 1));
+                    builder.getIntValue(builder.getIntType(), 1));
 
                 auto incStore = builder.emitStore(region->primalCountVar, incCounterVal);
 
@@ -336,25 +406,16 @@ struct DiffUnzipPass
             }
 
             {
-                // NOTE: This is a hacky shortcut we're taking here.
-                // Technically the unzip pass should not affect the
-                // correctness (it must still compute the proper fwd-mode derivative)
-                // However, we're currently making the loop counter go backwards to
-                // make it easier on the transposition pass, so the output from
-                // the unzip pass is neither fwd-mode or rev-mode until the transposition
-                // step is complete.
-                // 
-                // TODO: Ideally this needs to be replaced with a small inversion step
-                // within the transposition pass.
-                //
+                IRBlock* firstLoopBlock = getFirstLoopBodyBlock(region);
+                auto diffFirstLoopBlock = as<IRBlock>(diffMap[firstLoopBlock]);
 
-                builder.setInsertBefore(as<IRBlock>(diffMap[updateBlock])->getTerminator());
+                builder.setInsertBefore(diffFirstLoopBlock->getTerminator());
 
                 auto counterVal = builder.emitLoad(region->diffCountVar);
                 auto decCounterVal = builder.emitSub(
-                    builder.getUIntType(), 
+                    builder.getIntType(), 
                     counterVal,
-                    builder.getIntValue(builder.getUIntType(), 0));
+                    builder.getIntValue(builder.getIntType(), 1));
 
                 auto decStore = builder.emitStore(region->diffCountVar, decCounterVal);
 
@@ -363,6 +424,27 @@ struct DiffUnzipPass
                 builder.addLoopCounterDecoration(counterVal);
                 builder.addLoopCounterDecoration(decCounterVal);
                 builder.addLoopCounterDecoration(decStore);
+
+                // TODO:
+                // This is another hack here to avoid the counter from going negative 
+                // (since they are not valid indices)
+                //
+                IRBlock* diffCondBlock = as<IRBlock>(diffMap[region->firstBlock]);
+
+                builder.setInsertBefore(diffCondBlock->getTerminator());
+                IRInst* diffCounterVal = builder.emitLoad(region->diffCountVar);
+                IRInst* diffCounterCmp = builder.emitIntrinsicInst(
+                        builder.getBoolType(),
+                        kIROp_Geq,
+                        2,
+                        List<IRInst*>(
+                            diffCounterVal,
+                            builder.getIntValue(builder.getIntType(), 0)).getBuffer());
+                
+                as<IRIfElse>(diffCondBlock->getTerminator())->condition.set(diffCounterCmp);
+
+                builder.addLoopCounterDecoration(diffCounterVal);
+                builder.addLoopCounterDecoration(diffCounterCmp);
             }
 
         }
@@ -394,6 +476,7 @@ struct DiffUnzipPass
             for (; region; region = region->parent)
                 regions.add(region);
         }
+
         
         for (auto inst : primalInsts)
         {
@@ -407,6 +490,7 @@ struct DiffUnzipPass
                 if (isDifferentialInst(useBlock))
                 {
                     shouldStore = true;
+                    break;
                 }
             }
 
@@ -439,52 +523,111 @@ struct DiffUnzipPass
             auto storageVar = builder.emitVar(arrayType);
 
             // 3. Store current value into the array and replace uses with a load.
+            // TODO: If an index is missing, use the 'last' value of the primal index.
             {
                 builder.setInsertAfter(inst);
                 
                 IRInst* storeAddr = storageVar;
-                IRType* currType = storageVar->getDataType();
+                IRType* currType = as<IRPtrTypeBase>(storageVar->getDataType())->getValueType();
 
                 for (auto region : regions)
                 {
                     currType = as<IRArrayType>(currType)->getElementType();
 
                     storeAddr = builder.emitElementAddress(
-                        currType,
+                        builder.getPtrType(currType),
                         storeAddr, 
-                        region->primalCountVar);
+                        builder.emitLoad(region->primalCountVar));
                 }
 
                 builder.emitStore(storeAddr, inst);
             }
 
             // 4. Replace uses in differential blocks with loads from the array.
+            List<IRInst*> instsToTag;
             {
+                List<IRUse*> diffUses;
                 for (auto use = inst->firstUse; use; use = use->nextUse)
+                {   
+                    if (as<IRDecoration>(use->getUser()))
+                        continue;
+
+                    IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+                    if (useBlock && isDifferentialInst(useBlock))
+                        diffUses.add(use);
+                }
+
+                for (auto use : diffUses)
                 {
                     IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+                    builder.setInsertBefore(use->getUser());
 
-                    if (isDifferentialInst(useBlock))
+                    IRInst* loadAddr = storageVar;
+                    IRType* currType = as<IRPtrTypeBase>(storageVar->getDataType())->getValueType();
+
+                    // Enumerate use block regions.
+                    // TODO: Probably a good idea to do this ahead of time for
+                    // all blocks.
+                    //
+                    List<IndexedRegion*> useBlockRegions;
                     {
-                        builder.setInsertBefore(use->getUser());
+                        IndexedRegion* region = indexRegionMap.ContainsKey(useBlock) ? 
+                            (IndexedRegion*)indexRegionMap[useBlock] : nullptr;
+                        for (; region; region = region->parent)
+                            useBlockRegions.add(region);
+                    }
 
-                        IRInst* loadAddr = storageVar;
-                        IRType* currType = storageVar->getDataType();
-
-                        for (auto region : regions)
+                    for (auto region : regions)
+                    {
+                        currType = as<IRArrayType>(currType)->getElementType();
+                        if (useBlockRegions.contains(region))
                         {
-                            currType = as<IRArrayType>(currType)->getElementType();
+                            // If the use-block is under the same region, use the 
+                            // differential counter variable
+                            //
+                            auto diffCounterCurrValue = builder.emitLoad(region->diffCountVar);
+                            instsToTag.add(diffCounterCurrValue);
 
                             loadAddr = builder.emitElementAddress(
-                                currType,
+                                builder.getPtrType(currType),
                                 loadAddr, 
-                                region->diffCountVar);
+                                diffCounterCurrValue);
+                        }
+                        else
+                        {
+                            // If the use-block is outside this region, use the
+                            // last available value (by indexing with primal counter minus 1)
+                            // 
+                            auto primalCounterCurrValue = builder.emitLoad(region->primalCountVar);
+                            auto primalCounterLastValue = builder.emitSub(
+                                primalCounterCurrValue->getDataType(),
+                                primalCounterCurrValue,
+                                builder.getIntValue(builder.getIntType(), 1));
+
+                            instsToTag.add(primalCounterCurrValue);
+                            instsToTag.add(primalCounterLastValue);
+
+                            loadAddr = builder.emitElementAddress(
+                                builder.getPtrType(currType),
+                                loadAddr, 
+                                primalCounterLastValue);
                         }
 
-                        use->set(builder.emitLoad(loadAddr));
+                        instsToTag.add(loadAddr);
                     }
+
+                    auto loadedValue = builder.emitLoad(loadAddr);
+                    instsToTag.add(loadedValue);
+
+                    use->set(loadedValue);
                 }
             }
+
+            // TODO: Loop-counter is not really the right decoration..
+            // replace with primal-inst when it's ready.
+            // 
+            for (auto instToTag : instsToTag)
+                builder.addLoopCounterDecoration(instToTag);
         }
     }
 
@@ -710,7 +853,11 @@ struct DiffUnzipPass
 
             // Check that we have an unambiguous 'first' differential block.
             SLANG_ASSERT(firstDiffBlock);
+            
             auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
+            primalBuilder->addBackwardDerivativePrimalReturnDecoration(
+                primalBranch, lookupPrimalInst(mixedReturn->getVal()));
+
             auto pairVal = diffBuilder->emitMakeDifferentialPair(
                 pairType,
                 lookupPrimalInst(mixedReturn->getVal()),
@@ -726,6 +873,9 @@ struct DiffUnzipPass
         {
             // If return value is not differentiable, just turn it into a trivial branch.
             auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
+            primalBuilder->addBackwardDerivativePrimalReturnDecoration(
+                primalBranch, primalBuilder->getVoidValue());
+
             auto returnInst = diffBuilder->emitReturn();
             diffBuilder->markInstAsDifferential(returnInst, nullptr);
             return InstPair(primalBranch, returnInst);
@@ -903,15 +1053,38 @@ struct DiffUnzipPass
         // Push a new index.
         addNewIndex(mixedLoop);
 
-        return InstPair(
-            primalBuilder->emitLoop(
-                as<IRBlock>(primalMap[nextBlock]),
-                as<IRBlock>(primalMap[breakBlock]),
-                as<IRBlock>(primalMap[continueBlock])),
-            diffBuilder->emitLoop(
-                as<IRBlock>(diffMap[nextBlock]),
-                as<IRBlock>(diffMap[breakBlock]),
-                as<IRBlock>(diffMap[continueBlock])));
+        // Split args.
+        List<IRInst*> primalArgs;
+        List<IRInst*> diffArgs;
+        for (UIndex ii = 0; ii < mixedLoop->getArgCount(); ii++)
+        {
+            if (isDifferentialInst(mixedLoop->getArg(ii)))
+                diffArgs.add(mixedLoop->getArg(ii));
+            else
+                primalArgs.add(mixedLoop->getArg(ii));
+        }
+
+        auto primalLoop = primalBuilder->emitLoop(
+            as<IRBlock>(primalMap[nextBlock]),
+            as<IRBlock>(primalMap[breakBlock]),
+            as<IRBlock>(primalMap[continueBlock]),
+            primalArgs.getCount(),
+            primalArgs.getBuffer());
+
+        auto diffLoop = diffBuilder->emitLoop(
+            as<IRBlock>(diffMap[nextBlock]),
+            as<IRBlock>(diffMap[breakBlock]),
+            as<IRBlock>(diffMap[continueBlock]),
+            diffArgs.getCount(),
+            diffArgs.getBuffer());
+
+        if (auto maxItersDecoration = mixedLoop->findDecoration<IRLoopMaxItersDecoration>())
+        {
+            primalBuilder->addLoopMaxItersDecoration(primalLoop, maxItersDecoration->getMaxIters());
+            diffBuilder->addLoopMaxItersDecoration(diffLoop, maxItersDecoration->getMaxIters());
+        }
+
+        return InstPair(primalLoop, diffLoop);
     }
 
     InstPair splitControlFlow(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* branchInst)

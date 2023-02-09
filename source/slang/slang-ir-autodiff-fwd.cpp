@@ -149,6 +149,7 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 builder->markInstAsDifferential(diffSub, resultType);
                 
                 auto diffMul = builder->emitMul(resultType, primalRight, primalRight);
+                builder->markInstAsPrimal(diffMul);
 
                 auto diffDiv = builder->emitDiv(diffType, diffSub, diffMul);
                 builder->markInstAsDifferential(diffDiv, resultType);
@@ -881,6 +882,29 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
     return InstPair(primalUpdateField, diffUpdateElement);
 }
 
+List<IRInst*> ForwardDiffTranscriber::transcribePhiArgs(IRBuilder* builder, List<IRInst*> origPhiArgs)
+{
+    // Grab the differentials for any phi nodes.
+    List<IRInst*> newArgs;
+    for (auto origArg : origPhiArgs)
+    {
+        auto primalArg = lookupPrimalInst(builder, origArg);
+        newArgs.add(primalArg);
+
+        if (differentiateType(builder, origArg->getDataType()))
+        {
+            auto diffArg = lookupDiffInst(origArg, nullptr);
+            if (diffArg)
+                newArgs.add(diffArg);
+            else
+                newArgs.add(
+                    getDifferentialZeroOfType(builder, origArg->getDataType()));
+        }
+    }
+
+    return newArgs;
+}
+
 InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* origLoop)
 {
     // The loop comes with three blocks.. we just need to transcribe each one
@@ -902,13 +926,14 @@ InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* orig
     diffLoopOperands.add(diffTargetBlock);
     diffLoopOperands.add(diffBreakBlock);
     diffLoopOperands.add(diffContinueBlock);
-
-    // If there are any other operands, use their primal versions.
+    
+    List<IRInst*> phiArgs;
     for (UIndex ii = diffLoopOperands.getCount(); ii < origLoop->getOperandCount(); ii++)
-    {
-        auto primalOperand = findOrTranscribePrimalInst(builder, origLoop->getOperand(ii));
-        diffLoopOperands.add(primalOperand);
-    }
+        phiArgs.add(origLoop->getOperand(ii));
+
+    auto newPhiArgs = transcribePhiArgs(builder, phiArgs);
+    for (auto newArg : newPhiArgs)
+        diffLoopOperands.add(newArg);
 
     IRInst* diffLoop = builder->emitIntrinsicInst(
         nullptr,
@@ -916,6 +941,9 @@ InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* orig
         diffLoopOperands.getCount(),
         diffLoopOperands.getBuffer());
     builder->markInstAsMixedDifferential(diffLoop);
+
+    if (auto maxItersDecoration = origLoop->findDecoration<IRLoopMaxItersDecoration>())
+        builder->addLoopMaxItersDecoration(diffLoop, maxItersDecoration->getMaxIters());
 
     return InstPair(diffLoop, diffLoop);
 }
@@ -1211,6 +1239,28 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
     return diffFunc;
 }
 
+void ForwardDiffTranscriber::checkAutodiffInstDecorations(IRFunc* fwdFunc)
+{
+    for (auto block = fwdFunc->getFirstBlock(); block; block = block->getNextBlock())
+    {
+        for (auto inst = block->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
+        {
+            // TODO: Special case, not sure why these insts show up
+            if (as<IRUndefined>(inst)) continue;
+
+            List<IRDecoration*> decorations;
+            for (auto decoration : inst->getDecorations())
+            {
+                if (as<IRAutodiffInstDecoration>(decoration))
+                    decorations.add(decoration);
+            }
+
+            // Must have _exactly_ one autodiff tag.
+            SLANG_ASSERT(decorations.getCount() == 1);
+        }
+    }
+}
+
 // Transcribe a function definition.
 InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
 {
@@ -1266,6 +1316,10 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
             }
         }
     }
+    
+#if _DEBUG
+    checkAutodiffInstDecorations(diffFunc);
+#endif
 
     return InstPair(primalFunc, diffFunc);
 }
@@ -1310,7 +1364,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
     case kIROp_MatrixReshape:
-    case kIROp_VectorReshape:
     case kIROp_IntCast:
     case kIROp_FloatCast:
     case kIROp_MakeVectorFromScalar:

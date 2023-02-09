@@ -507,6 +507,17 @@ namespace Slang
             // as 1 arg if nothing is specified)
             SLANG_ASSERT(attr->args.getCount() == 1);
         }
+        else if (auto maxItersAttrs = as<MaxItersAttribute>(attr))
+        {
+            if (auto cint = checkConstantIntVal(attr->args[0]))
+            {
+                maxItersAttrs->value = (int32_t) cint->value;
+            }
+            else
+            {
+                getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 1);
+            }
+        }
         else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
         {
             // check arguments against attribute parameters defined in attribClassDecl

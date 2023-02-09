@@ -567,6 +567,6 @@ The compiler can generate forward derivative and backward propagation implementa
 - No access to global variables or shader parameters within a differentiable function.
 - All operations to global resources, including texture reads or atomic writes, are treating as a non-differentiable operation.
 - If a differentiable function contains calls that cause side-effects such as updates to global memory, there will not be a guarantee on how many times the side-effect will occur during the resulting derivative function or back-propagation function.
-- All loops in a backward differentiable function must end within a statically known number of iterations. If the maximum number of iterations is not trivially deductible by the type system as a compile-time constant, a manually attribute is needed at the loop to provide the number. If the number of actually executed iterations exceeds what is being specified, the resulting runtime behavior is undefined.
+- `for` loops: In a backward differentiable function, loops currently cannot have `continue` statements although `break` statements are supported. Loops must use the attribute `[MaxIters(<count>)]` to specify a maximum number of iterations. This will be used by compiler to allocate space to store intermediate data. If the actual number of iterations exceeds the provided maximum, the behavior is undefined.
 
-The above restrictions do no apply if a user-defined derivative or backward propagation function is provided.
+The above restrictions do not apply if a user-defined derivative or backward propagation function is provided.
