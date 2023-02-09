@@ -448,12 +448,12 @@ namespace Slang
             return -1;
         }
 
+        bool contains(const T& val) const { return indexOf(val) != Index(-1); }
+
         void sort()
         {
             sort([](const T& t1, const T& t2){return t1 < t2;});
         }
-
-        bool contains(const T& val) const { return indexOf(val) != Index(-1); }
 
         template<typename Comparer>
         void sort(Comparer compare)
@@ -461,6 +461,17 @@ namespace Slang
             //insertionSort(buffer, 0, _count - 1);
             //quickSort(buffer, 0, _count - 1, compare);
             std::sort(m_buffer, m_buffer + m_count, compare);
+        }
+
+        void stableSort()
+        {
+            stableSort([](const T& t1, const T& t2){return t1 < t2;});
+        }
+
+        template<typename Comparer>
+        void stableSort(Comparer compare)
+        {
+            std::stable_sort(m_buffer, m_buffer + m_count, compare);
         }
 
         template <typename IterateFunc>
