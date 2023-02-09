@@ -275,10 +275,11 @@ namespace Slang
             // TODO(tfoley): If we can compute the size of the array statically,
             // then we want to check that there aren't too many initializers present
 
-            auto toElementType = toArrayType->baseType;
-
-            if(auto toElementCount = toArrayType->arrayLength)
+            auto toElementType = toArrayType->getElementType();
+            if(!toArrayType->isUnsized())
             {
+                auto toElementCount = toArrayType->getElementCount();
+
                 // In the case of a sized array, we need to check that the number
                 // of elements being initialized matches what was declared.
                 //
@@ -349,7 +350,7 @@ namespace Slang
                 // We have a new type for the conversion, based on what
                 // we learned.
                 toType = m_astBuilder->getArrayType(toElementType,
-                    m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), elementCount));
+                    m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount));
             }
         }
         else if(auto toMatrixType = as<MatrixExpressionType>(toType))
@@ -641,11 +642,6 @@ namespace Slang
             return true;
         }
 
-        if (auto refType = as<RefType>(toType))
-        {
-            return _coerce(refType->getValueType(), outToExpr, fromType, fromExpr, outCost);
-        }
-
         // If both are string types we assume they are convertable in both directions
         if (as<StringTypeBase>(fromType) && as<StringTypeBase>(toType))
         {
@@ -858,6 +854,63 @@ namespace Slang
                 *outCost = subCost + kConversionCost_ImplicitDereference;
             return true;
         }
+
+        if (auto refType = as<RefType>(toType))
+        {
+            if (!refType->getValueType()->equals(fromType))
+                return false;
+            if (!fromExpr->type.isLeftValue)
+                return false;
+            
+            ConversionCost subCost = kConversionCost_GetRef;
+
+            MakeRefExpr* refExpr = nullptr;
+            if (outToExpr)
+            {
+                refExpr = m_astBuilder->create<MakeRefExpr>();
+                refExpr->base = fromExpr;
+                refExpr->type = QualType(refType);
+                refExpr->type.isLeftValue = false;
+                *outToExpr = refExpr;
+            }
+            if (outCost)
+                *outCost = subCost;
+            return true;
+        }
+
+
+        // Allow implicit dereferencing a reference type.
+        if (auto fromRefType = as<RefType>(fromType))
+        {
+            auto fromValueType = fromRefType->getValueType();
+
+            // If we convert, e.g., `ConstantBuffer<A> to `A`, we will allow
+            // subsequent conversion of `A` to `B` if such a conversion
+            // is possible.
+            //
+            ConversionCost subCost = kConversionCost_None;
+
+            Expr* openRefExpr = nullptr;
+            if (outToExpr)
+            {
+                openRefExpr = maybeOpenRef(fromExpr);
+            }
+
+            if (!_coerce(
+                toType,
+                outToExpr,
+                fromValueType,
+                openRefExpr,
+                &subCost))
+            {
+                return false;
+            }
+
+            if (outCost)
+                *outCost = subCost + kConversionCost_ImplicitDereference;
+            return true;
+        }
+
 
         // The main general-purpose approach for conversion is
         // using suitable marked initializer ("constructor")

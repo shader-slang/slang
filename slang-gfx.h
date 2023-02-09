@@ -1726,17 +1726,17 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset = 0) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW Result SLANG_MCALL
         draw(GfxCount vertexCount, GfxIndex startVertex = 0) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW Result SLANG_MCALL
         drawIndexed(GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
+    virtual SLANG_NO_THROW Result SLANG_MCALL drawIndirect(
         GfxCount maxDrawCount,
         IBufferResource* argBuffer,
         Offset argOffset,
         IBufferResource* countBuffer = nullptr,
         Offset countOffset = 0) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
+    virtual SLANG_NO_THROW Result SLANG_MCALL drawIndexedIndirect(
         GfxCount maxDrawCount,
         IBufferResource* argBuffer,
         Offset argOffset,
@@ -1745,12 +1745,12 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
         GfxCount samplesPerPixel, GfxCount pixelCount, const SamplePosition* samplePositions) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
+    virtual SLANG_NO_THROW Result SLANG_MCALL drawInstanced(
         GfxCount vertexCount,
         GfxCount instanceCount,
         GfxIndex startVertex,
         GfxIndex startInstanceLocation) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
+    virtual SLANG_NO_THROW Result SLANG_MCALL drawIndexedInstanced(
         GfxCount indexCount,
         GfxCount instanceCount,
         GfxIndex startIndexLocation,
@@ -1780,8 +1780,8 @@ public:
     // Sets the current pipeline state along with a pre-created mutable root shader object.
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* cmdBuffer, Offset offset) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL dispatchCompute(int x, int y, int z) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL dispatchComputeIndirect(IBufferResource* cmdBuffer, Offset offset) = 0;
 };
 
 enum class AccelerationStructureCopyMode
@@ -1828,7 +1828,7 @@ public:
 
     /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
     /// `rayGenShaderIndex` specifies the index into the shader table that identifies the ray generation shader.
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
+    virtual SLANG_NO_THROW Result SLANG_MCALL dispatchRays(
         GfxIndex rayGenShaderIndex,
         IShaderTable* shaderTable,
         GfxCount width,

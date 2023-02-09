@@ -14,6 +14,8 @@
 namespace Slang
 {
 
+struct ParameterBlockTransposeInfo;
+
 struct DiffUnzipPass
 {
     AutoDiffSharedContext*                  autodiffContext;
@@ -33,6 +35,77 @@ struct DiffUnzipPass
     // might run into an issue here?
     IRBlock*                                firstDiffBlock;
 
+    struct IndexedRegion
+    {
+        // Parent indexed region (for nested loops)
+        IndexedRegion* parent           = nullptr;
+
+        // Intializer block for the index.
+        IRBlock*       initBlock        = nullptr;
+
+        // Index 'starts' at the first loop block (included)
+        IRBlock*       firstBlock       = nullptr;
+
+        // Index stops at the break block (not included)
+        IRBlock*       breakBlock       = nullptr;
+
+        // Block where index updates happen.
+        IRBlock*       continueBlock    = nullptr;
+
+        // After lowering, store references to the count
+        // variables associated with this region
+        //
+        IRVar*         primalCountVar   = nullptr;
+        IRVar*         diffCountVar     = nullptr;
+
+        enum CountStatus
+        {
+            Unresolved,
+            Dynamic,
+            Static
+        };
+
+        CountStatus    status           = CountStatus::Unresolved;
+
+        // Inferred maximum number of iterations.
+        Count          maxIters         = -1;
+
+        IndexedRegion() : 
+            parent(nullptr),
+            initBlock(nullptr),
+            firstBlock(nullptr),
+            breakBlock(nullptr),
+            continueBlock(nullptr),
+            primalCountVar(nullptr),
+            diffCountVar(nullptr),
+            status(CountStatus::Unresolved),
+            maxIters(-1)
+        { }
+
+        IndexedRegion(
+            IndexedRegion* parent,
+            IRBlock* initBlock,
+            IRBlock* firstBlock,
+            IRBlock* breakBlock,
+            IRBlock* continueBlock) : 
+            parent(parent),
+            initBlock(initBlock),
+            firstBlock(firstBlock),
+            breakBlock(breakBlock),
+            continueBlock(continueBlock),
+            primalCountVar(nullptr),
+            diffCountVar(nullptr),
+            status(CountStatus::Unresolved),
+            maxIters(-1)
+        { }
+    };
+
+    // Keep track of indexed blocks and their corresponding index heirarchy.
+    Dictionary<IRBlock*, IndexedRegion*>          indexRegionMap;
+
+    List<IndexedRegion*>                          indexRegions;
+
+
     DiffUnzipPass(
         AutoDiffSharedContext* autodiffContext)
         : autodiffContext(autodiffContext)
@@ -49,7 +122,7 @@ struct DiffUnzipPass
         return diffMap[inst];
     }
 
-    IRFunc* unzipDiffInsts(IRFunc* func)
+    void unzipDiffInsts(IRFunc* func)
     {
         diffTypeContext.setFunc(func);
 
@@ -58,23 +131,42 @@ struct DiffUnzipPass
         
         IRBuilder* builder = &builderStorage;
 
-        // Clone the entire function.
-        // TODO: Maybe don't clone? The reverse-mode process seems to clone several times.
-        // TODO: Looks like we get a copy of the decorations?
-        IRCloneEnv subEnv;
-        subEnv.parent = &cloneEnv;
-        builder->setInsertBefore(func);
-        IRFunc* unzippedFunc = as<IRFunc>(cloneInst(&subEnv, builder, func));
+        IRFunc* unzippedFunc = func;
 
-        builder->setInsertInto(unzippedFunc);
+        // Initialize the primal/diff map for parameters.
+        // Generate distinct references for parameters that should be split.
+        // We don't actually modify the parameter list here, instead we emit
+        // PrimalParamRef(param) and DiffParamRef(param) and use those to represent
+        // a use from the primal or diff part of the program.
+        builder->setInsertBefore(unzippedFunc->getFirstBlock()->getTerminator());
+
+        for (auto primalParam = unzippedFunc->getFirstParam(); primalParam; primalParam = primalParam->getNextParam())
+        {
+            auto type = primalParam->getFullType();
+            if (auto ptrType = as<IRPtrTypeBase>(type))
+            {
+                type = ptrType->getValueType();
+            }
+            if (auto pairType = as<IRDifferentialPairType>(type))
+            {
+                IRInst* diffType = diffTypeContext.getDifferentialTypeFromDiffPairType(builder, pairType);
+                if (as<IRPtrTypeBase>(primalParam->getFullType()))
+                    diffType = builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
+                auto primalRef = builder->emitPrimalParamRef(primalParam);
+                auto diffRef = builder->emitDiffParamRef((IRType*)diffType, primalParam);
+                builder->markInstAsDifferential(diffRef, pairType->getValueType());
+                primalMap[primalParam] = primalRef;
+                diffMap[primalParam] = diffRef;
+            }
+        }
 
         // Functions need to have at least two blocks at this point (one for parameters,
         // and atleast one for code)
         //
         SLANG_ASSERT(unzippedFunc->getFirstBlock() != nullptr);
         SLANG_ASSERT(unzippedFunc->getFirstBlock()->getNextBlock() != nullptr);
-
-        IRBlock* firstBlock = unzippedFunc->getFirstBlock()->getNextBlock();
+        
+        IRBlock* firstBlock = as<IRUnconditionalBranch>(unzippedFunc->getFirstBlock()->getTerminator())->getTargetBlock();
 
         List<IRBlock*> mixedBlocks;
         for (IRBlock* block = firstBlock; block; block = block->getNextBlock())
@@ -122,35 +214,286 @@ struct DiffUnzipPass
             splitBlock(block, as<IRBlock>(primalMap[block]), as<IRBlock>(diffMap[block]));
         }
 
+        // Propagate indexed region information.
+        propagateAllIndexRegions();
+
+        // Try to infer maximum counts for all regions.
+        // (only regions whose intermediates are used outside their region
+        // require a maximum count, so we may see some unresolved regions
+        // without any issues)
+        // 
+        for (auto region : indexRegions)
+        {
+            tryInferMaxIndex(region);
+        }
+
+        // Emit counter variables and other supporting
+        // instructions for all regions.
+        // 
+        lowerIndexedRegions();
+
+        // Process intermediate insts in indexed blocks
+        // into array loads/stores.
+        // 
+        for (auto block : mixedBlocks)
+        {
+            auto primalBlock = primalMap[block];
+            
+            if (isBlockIndexed(block))
+            {
+                processIndexedFwdBlock(block);
+            }
+        }
+
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
+
+        cleanupIndexRegionInfo();
 
         // Remove old blocks.
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
-
-        return unzippedFunc;
     }
 
-    IRFunc* extractPrimalFunc(IRFunc* func, IRFunc* originalFunc, IRInst*& intermediateType);
-
-    bool isRelevantDifferentialPair(IRType* type)
+    IRBlock* getInitializerBlock(IndexedRegion* region)
     {
-        if (as<IRDifferentialPairType>(type))
+        return region->initBlock;
+    }
+
+    IRBlock* getUpdateBlock(IndexedRegion* region)
+    {
+        return region->continueBlock;
+    }
+    
+    void tryInferMaxIndex(IndexedRegion* region)
+    {
+        if (region->status != IndexedRegion::CountStatus::Unresolved)
+            return;
+        
+        // We're going to fix this at a some random number
+        // for now, and then add some basic inference + user-defined decoration
+        // 
+        region->maxIters = 5;
+        region->status = IndexedRegion::CountStatus::Static;
+    }
+
+    // Make a primal value *available* to the differential block.
+    // This can get quite involved, and we're going to rely on
+    // constructSSA to do most of the heavy-lifting & optimization
+    // For now, we'll simply create a variable in the top-most
+    // primal block, then load it in the last primal block
+    // 
+    //void hoistValue(IRInst* primalInst)
+    //{
+    //    IRBlock* terminalPrimalBlock = getTerminalPrimalBlock();
+    //    IRBlock* firstPrimalBlock = getFirstPrimalBlock();
+    //}
+
+    void lowerIndexedRegions()
+    {
+        IRBuilder builder(autodiffContext->sharedBuilder);
+
+
+        for (auto region : indexRegions)
         {
-            return true;
-        }
-        else if (auto argPtrType = as<IRPtrTypeBase>(type))
-        {
-            if (as<IRDifferentialPairType>(argPtrType->getValueType()))
+
+            IRBlock* initializerBlock = getInitializerBlock(region);
+
+            // Grab first primal block.
+            auto firstPrimalBlock = primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()];
+            
+            // Make variable in the top-most block (so it's visible to diff blocks)
+            builder.setInsertInto(firstPrimalBlock);
+            region->primalCountVar = builder.emitVar(builder.getUIntType());
+
+            // Make another variable in the diff block initialized to the 
+            // final value of the primal counter.
+            // 
+            builder.setInsertInto(diffMap[initializerBlock]);
+            auto primalCounterValue = builder.emitLoad(region->primalCountVar);
+            region->diffCountVar = builder.emitVar(builder.getUIntType());
+            builder.emitStore(region->diffCountVar, primalCounterValue);
+            
+            IRBlock* updateBlock = getUpdateBlock(region);
+            
             {
-                return true;
+                // TODO: Figure out if the counter update needs to go before or after
+                // the rest of the update block.
+                // 
+                builder.setInsertBefore(as<IRBlock>(primalMap[updateBlock])->getTerminator());
+
+                auto counterVal = builder.emitLoad(region->primalCountVar);
+                auto incCounterVal = builder.emitAdd(
+                    builder.getUIntType(), 
+                    counterVal,
+                    builder.getIntValue(builder.getUIntType(), 1));
+
+                auto incStore = builder.emitStore(region->primalCountVar, incCounterVal);
+
+                builder.addLoopCounterDecoration(counterVal);
+                builder.addLoopCounterDecoration(incCounterVal);
+                builder.addLoopCounterDecoration(incStore);
+            }
+
+            {
+                // NOTE: This is a hacky shortcut we're taking here.
+                // Technically the unzip pass should not affect the
+                // correctness (it must still compute the proper fwd-mode derivative)
+                // However, we're currently making the loop counter go backwards to
+                // make it easier on the transposition pass, so the output from
+                // the unzip pass is neither fwd-mode or rev-mode until the transposition
+                // step is complete.
+                // 
+                // TODO: Ideally this needs to be replaced with a small inversion step
+                // within the transposition pass.
+                //
+
+                builder.setInsertBefore(as<IRBlock>(diffMap[updateBlock])->getTerminator());
+
+                auto counterVal = builder.emitLoad(region->diffCountVar);
+                auto decCounterVal = builder.emitSub(
+                    builder.getUIntType(), 
+                    counterVal,
+                    builder.getIntValue(builder.getUIntType(), 0));
+
+                auto decStore = builder.emitStore(region->diffCountVar, decCounterVal);
+
+                // Mark insts as loop counter insts to avoid removing them.
+                //
+                builder.addLoopCounterDecoration(counterVal);
+                builder.addLoopCounterDecoration(decCounterVal);
+                builder.addLoopCounterDecoration(decStore);
+            }
+
+        }
+    }
+
+    void processIndexedFwdBlock(IRBlock* fwdBlock)
+    {
+        if (!isBlockIndexed(fwdBlock))
+            return;
+        
+        // Grab first primal block.
+        IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[fwdBlock->getParent()->getFirstBlock()->getNextBlock()]);
+        
+        // Scan through instructions and identify those that are used
+        // outside the local block.
+        //
+        IRBlock* primalBlock = as<IRBlock>(primalMap[fwdBlock]);
+
+        List<IRInst*> primalInsts;
+        for (auto child = primalBlock->getFirstChild(); child; child = child->getNextInst())
+            primalInsts.add(child);
+
+        IRBuilder builder(autodiffContext->sharedBuilder);
+
+        // Build list of indices that this block is affected by.
+        List<IndexedRegion*> regions;
+        {
+            IndexedRegion* region = indexRegionMap[fwdBlock];
+            for (; region; region = region->parent)
+                regions.add(region);
+        }
+        
+        for (auto inst : primalInsts)
+        {
+            // 1. Check if we need to store inst (is it used in a differential block?)
+
+            bool shouldStore = false;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+
+                if (isDifferentialInst(useBlock))
+                {
+                    shouldStore = true;
+                }
+            }
+
+            if (!shouldStore) continue;
+
+            // 2. Emit an array to top-level to allocate space.
+            
+            builder.setInsertBefore(firstPrimalBlock->getTerminator());
+
+            IRType* arrayType = inst->getDataType();
+            SLANG_ASSERT(!as<IRPtrTypeBase>(arrayType)); // can't store pointers.
+
+            for (auto region : regions)
+            {
+                SLANG_ASSERT(region->status == IndexedRegion::CountStatus::Static);
+                SLANG_ASSERT(region->maxIters >= 0);
+
+                arrayType = builder.getArrayType(
+                    arrayType,
+                    builder.getIntValue(
+                        builder.getUIntType(),
+                        region->maxIters));
+            }
+
+            // Reverse the list since the indices needs to be 
+            // emitted in reverse order.
+            // 
+            regions.reverse();
+            
+            auto storageVar = builder.emitVar(arrayType);
+
+            // 3. Store current value into the array and replace uses with a load.
+            {
+                builder.setInsertAfter(inst);
+                
+                IRInst* storeAddr = storageVar;
+                IRType* currType = storageVar->getDataType();
+
+                for (auto region : regions)
+                {
+                    currType = as<IRArrayType>(currType)->getElementType();
+
+                    storeAddr = builder.emitElementAddress(
+                        currType,
+                        storeAddr, 
+                        region->primalCountVar);
+                }
+
+                builder.emitStore(storeAddr, inst);
+            }
+
+            // 4. Replace uses in differential blocks with loads from the array.
+            {
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                {
+                    IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+
+                    if (isDifferentialInst(useBlock))
+                    {
+                        builder.setInsertBefore(use->getUser());
+
+                        IRInst* loadAddr = storageVar;
+                        IRType* currType = storageVar->getDataType();
+
+                        for (auto region : regions)
+                        {
+                            currType = as<IRArrayType>(currType)->getElementType();
+
+                            loadAddr = builder.emitElementAddress(
+                                currType,
+                                loadAddr, 
+                                region->diffCountVar);
+                        }
+
+                        use->set(builder.emitLoad(loadAddr));
+                    }
+                }
             }
         }
-
-        return false;
     }
 
+    IRFunc* extractPrimalFunc(
+        IRFunc* func,
+        IRFunc* originalFunc,
+        ParameterBlockTransposeInfo& paramInfo,
+        IRInst*& intermediateType);
+    
     static IRInst* _getOriginalFunc(IRInst* call)
     {
         if (auto decor = call->findDecoration<IRAutoDiffOriginalValueDecoration>())
@@ -200,7 +543,6 @@ struct DiffUnzipPass
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
             auto arg = mixedCall->getArg(ii);
-
             if (isRelevantDifferentialPair(arg->getDataType()))
             {
                 primalArgs.add(lookupPrimalInst(arg));
@@ -215,20 +557,29 @@ struct DiffUnzipPass
         auto mixedDecoration = mixedCall->findDecoration<IRMixedDifferentialInstDecoration>();
         SLANG_ASSERT(mixedDecoration);
 
-        auto fwdPairResultType = as<IRDifferentialPairType>(mixedDecoration->getPairType());
-        SLANG_ASSERT(fwdPairResultType);
-
-        auto primalType = fwdPairResultType->getValueType();
-        auto diffType = (IRType*) diffTypeContext.getDifferentialForType(&globalBuilder, primalType);
+        IRType* primalType = mixedCall->getFullType();
+        IRType* diffType = mixedCall->getFullType();
+        IRType* resultType = mixedCall->getFullType();
+        if (auto fwdPairResultType = as<IRDifferentialPairType>(mixedDecoration->getPairType()))
+        {
+            primalType = fwdPairResultType->getValueType();
+            diffType = (IRType*)diffTypeContext.getDifferentialForType(&globalBuilder, primalType);
+            resultType = fwdPairResultType;
+        }
 
         auto primalVal = primalBuilder->emitCallInst(primalType, primalFn, primalArgs);
         primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
+
+        SLANG_RELEASE_ASSERT(mixedCall->getArgCount() <= primalFuncType->getParamCount());
 
         List<IRInst*> diffArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
             auto arg = mixedCall->getArg(ii);
 
+            // Depending on the type and direction of each argument,
+            // we might need to prepare a different value for the transposition logic to produce the
+            // correct final argument in the propagate function call.
             if (isRelevantDifferentialPair(arg->getDataType()))
             {
                 auto primalArg = lookupPrimalInst(arg);
@@ -237,18 +588,51 @@ struct DiffUnzipPass
                 // If arg is a mixed differential (pair), it should have already been split.
                 SLANG_ASSERT(primalArg);
                 SLANG_ASSERT(diffArg);
-
-                auto pairArg = diffBuilder->emitMakeDifferentialPair(
+                auto primalParamType = primalFuncType->getParamType(ii);
+                
+                if (auto outType = as<IROutType>(primalParamType))
+                {
+                    // For `out` parameters that expects an input derivative to propagate through,
+                    // we insert a `LoadReverseGradient` inst here to signify the logic in `transposeStore`
+                    // that this argument should actually be the currently accumulated derivative on
+                    // this variable. The end purpose is that we will generate a load(diffArg) in the
+                    // final transposed code and use that as the argument for the call, but we can't just
+                    // emit a normal load inst here because the transposition logic will turn loads into stores.
+                    auto outDiffType = cast<IRPtrTypeBase>(diffArg->getDataType())->getValueType();
+                    auto gradArg = diffBuilder->emitLoadReverseGradient(outDiffType, diffArg);
+                    diffBuilder->markInstAsDifferential(gradArg, primalArg->getDataType());
+                    diffArgs.add(gradArg);
+                }
+                else if (auto inoutType = as<IRInOutType>(primalParamType))
+                {
+                    // Since arg is split into separate vars, we need a new temp var that represents
+                    // the remerged diff pair.
+                    auto diffPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(arg->getDataType())->getValueType());
+                    auto primalValueType = diffPairType->getValueType();
+                    auto diffPairRef = diffBuilder->emitReverseGradientDiffPairRef(arg->getDataType(), primalArg, diffArg);
+                    diffBuilder->markInstAsDifferential(diffPairRef, primalValueType);
+                    diffArgs.add(diffPairRef);
+                }
+                else
+                {
+                    // For ordinary differentiable input parameters, we make sure to provide
+                    // a differential pair. The actual logic that generates an inout variable
+                    // will be handled in `transposeCall()`.
+                    auto pairArg = diffBuilder->emitMakeDifferentialPair(
                         arg->getDataType(),
                         primalArg,
                         diffArg);
 
-                diffBuilder->markInstAsDifferential(pairArg, primalArg->getDataType());
-                diffArgs.add(pairArg);
+                    diffBuilder->markInstAsDifferential(pairArg, primalArg->getDataType());
+                    diffArgs.add(pairArg);
+                }
             }
             else
             {
-                diffArgs.add(arg);
+                // For non differentiable arguments, we can simply pass the argument as is
+                // if this isn't a `out` parameter, in which case it is removed from propagate call.
+                if (!as<IROutType>(arg->getDataType()))
+                    diffArgs.add(arg);
             }
         }
         
@@ -256,19 +640,22 @@ struct DiffUnzipPass
 
         diffBuilder->markInstAsDifferential(newFwdCallee);
 
-        auto diffPairVal = diffBuilder->emitCallInst(
-            fwdPairResultType, 
+        auto callInst = diffBuilder->emitCallInst(
+            resultType,
             newFwdCallee,
             diffArgs);
-        diffBuilder->markInstAsDifferential(diffPairVal, primalType);
+        diffBuilder->markInstAsDifferential(callInst, primalType);
 
         disableIRValidationAtInsert();
-        diffBuilder->addBackwardDerivativePrimalContextDecoration(diffPairVal, intermediateVar);
+        diffBuilder->addBackwardDerivativePrimalContextDecoration(callInst, intermediateVar);
         enableIRValidationAtInsert();
 
-        auto diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, diffPairVal);
-        diffBuilder->markInstAsDifferential(diffVal, primalType);
-
+        IRInst* diffVal = nullptr;
+        if (as<IRDifferentialPairType>(callInst->getDataType()))
+        {
+            diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, callInst);
+            diffBuilder->markInstAsDifferential(diffVal, primalType);
+        }
         return InstPair(primalVal, diffVal);
     }
 
@@ -279,52 +666,252 @@ struct DiffUnzipPass
 
     InstPair splitLoad(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRLoad* mixedLoad)
     {
-        // By the nature of how diff pairs are used, and the fact that FieldAddress/GetElementPtr,
-        // etc, cannot appear before a GetDifferential/GetPrimal, a mixed load can only be from a
-        // parameter or a variable.
-        // 
-        if (as<IRParam>(mixedLoad->getPtr()))
-        {
-            // Should not occur with current impl of fwd-mode.
-            // If impl. changes, impl this case too.
-            // 
-            SLANG_UNIMPLEMENTED_X("Splitting a load from a param is not currently implemented.");
-        }
-
-        // Everything else should have already been split.
         auto primalPtr = lookupPrimalInst(mixedLoad->getPtr());
         auto diffPtr = lookupDiffInst(mixedLoad->getPtr());
+        auto primalVal = primalBuilder->emitLoad(primalPtr);
+        auto diffVal = diffBuilder->emitLoad(diffPtr);
+        diffBuilder->markInstAsDifferential(diffVal, primalVal->getFullType());
+        return InstPair(primalVal, diffVal);
+    }
 
-        return InstPair(primalBuilder->emitLoad(primalPtr), diffBuilder->emitLoad(diffPtr));
+    InstPair splitStore(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRStore* mixedStore)
+    {
+        auto primalAddr = lookupPrimalInst(mixedStore->getPtr());
+        auto diffAddr = lookupDiffInst(mixedStore->getPtr());
+
+        auto primalVal = lookupPrimalInst(mixedStore->getVal());
+        auto diffVal = lookupDiffInst(mixedStore->getVal());
+
+        auto primalStore = primalBuilder->emitStore(primalAddr, primalVal);
+        auto diffStore = diffBuilder->emitStore(diffAddr, diffVal);
+
+        diffBuilder->markInstAsDifferential(diffStore, primalVal->getFullType());
+        return InstPair(primalStore, diffStore);
     }
 
     InstPair splitVar(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRVar* mixedVar)
     {
-        auto pairType = as<IRDifferentialPairType>(mixedVar->getDataType());
+        auto pairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(mixedVar->getDataType())->getValueType());
         auto primalType = pairType->getValueType();
         auto diffType = (IRType*) diffTypeContext.getDifferentialForType(primalBuilder, primalType);
-        
-        return InstPair(primalBuilder->emitVar(primalType), diffBuilder->emitVar(diffType));
+        auto primalVar = primalBuilder->emitVar(primalType);
+        auto diffVar = diffBuilder->emitVar(diffType);
+        diffBuilder->markInstAsDifferential(diffVar, primalType);
+        return InstPair(primalVar, diffVar);
     }
 
     InstPair splitReturn(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRReturn* mixedReturn)
     {
         auto pairType = as<IRDifferentialPairType>(mixedReturn->getVal()->getDataType());
-        auto primalType = pairType->getValueType();
+        // Are we returning a differentiable value?
+        if (pairType)
+        {
+            auto primalType = pairType->getValueType();
 
-        // Check that we have an unambiguous 'first' differential block.
-        SLANG_ASSERT(firstDiffBlock);
-        auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
-        auto pairVal = diffBuilder->emitMakeDifferentialPair(
-            pairType,
-            lookupPrimalInst(mixedReturn->getVal()),
-            lookupDiffInst(mixedReturn->getVal()));
-        diffBuilder->markInstAsDifferential(pairVal, primalType);
+            // Check that we have an unambiguous 'first' differential block.
+            SLANG_ASSERT(firstDiffBlock);
+            auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
+            auto pairVal = diffBuilder->emitMakeDifferentialPair(
+                pairType,
+                lookupPrimalInst(mixedReturn->getVal()),
+                lookupDiffInst(mixedReturn->getVal()));
+            diffBuilder->markInstAsDifferential(pairVal, primalType);
 
-        auto returnInst = diffBuilder->emitReturn(pairVal);
-        diffBuilder->markInstAsDifferential(returnInst, primalType);
+            auto returnInst = diffBuilder->emitReturn(pairVal);
+            diffBuilder->markInstAsDifferential(returnInst, primalType);
 
-        return InstPair(primalBranch, returnInst);
+            return InstPair(primalBranch, returnInst);
+        }
+        else
+        {
+            // If return value is not differentiable, just turn it into a trivial branch.
+            auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
+            auto returnInst = diffBuilder->emitReturn();
+            diffBuilder->markInstAsDifferential(returnInst, nullptr);
+            return InstPair(primalBranch, returnInst);
+        }
+    }
+
+    bool isBlockIndexed(IRBlock* block)
+    {
+        return indexRegionMap.ContainsKey(block) && indexRegionMap[block] != nullptr;
+    }
+
+    void addNewIndex(IRLoop* targetLoop)
+    {
+        // Create indexed region without a parent for now. 
+        // The parent will be filled in during propagation.
+        // 
+        IndexedRegion* region = new IndexedRegion(
+            nullptr,
+            as<IRBlock>(targetLoop->getParent()),
+            targetLoop->getTargetBlock(),
+            targetLoop->getBreakBlock(),
+            targetLoop->getContinueBlock());
+        
+        indexRegionMap[targetLoop->getTargetBlock()] = region;
+        indexRegions.add(region);
+    }
+
+    // Deallocate regions
+    void cleanupIndexRegionInfo()
+    {
+        for (auto region : indexRegions)
+        {
+            delete region;
+        }
+
+        indexRegions.clear();
+        indexRegionMap.Clear();
+    }
+
+    void propagateAllIndexRegions()
+    {
+
+
+        // Load up the starting block of every region into
+        // initial worklist.
+        // 
+        List<IRBlock*> workList;
+        HashSet<IRBlock*> workSet;
+        for (auto region : indexRegions)
+        {
+            workList.add(region->firstBlock);
+            workSet.Add(region->firstBlock);
+        }
+
+        // Keep propagating from initial work list to predecessors
+        // Add blocks to work list if their region assignment has changed
+        // Add the beginning blocks for complete regions if region parent has changed.
+        // 
+        while (workList.getCount() > 0)
+        {
+            auto block = workList.getLast();
+            workList.removeLast();
+            workSet.Remove(block);
+            
+            HashSet<IRBlock*> successors;
+
+            for (auto successor : block->getSuccessors())
+            {
+                if (successors.Contains(successor))
+                    continue;
+                
+                if (propagateIndexRegion(block, successor))
+                {
+                    if (!workSet.Contains(successor))
+                    {
+                        workList.add(successor);
+                        workSet.Add(successor);
+                    }
+
+                    // Do we have an index region for the successor, which is
+                    // also the starting block of that region?
+                    // Then the change might have been the addition of 
+                    // a parent node. Add the break block so the
+                    // change can be propagated further.
+                    // 
+                    if (isBlockIndexed(successor))
+                    {
+                        IndexedRegion* succRegion = indexRegionMap[successor];
+                        if (succRegion->firstBlock == successor)
+                        {
+                            if (!workSet.Contains(succRegion->breakBlock))
+                            {
+                                workList.add(succRegion->breakBlock);
+                                workSet.Add(succRegion->breakBlock);
+                            }
+                        }
+                    }
+                }
+
+                successors.Add(successor);
+            }
+        }
+    }
+
+    bool setIndexRegion(IRBlock* block, IndexedRegion* region)
+    {
+        if (!region) return false;
+
+        if (indexRegionMap.ContainsKey(block)
+            && indexRegionMap[block] == region)
+            return false;
+
+        indexRegionMap[block] = region;
+        return true;
+    }
+
+    bool propagateIndexRegion(IRBlock* srcBlock, IRBlock* nextBlock)
+    {
+        // Is the current region indexed? 
+        // If not, there's nothing to propagate
+        //
+        if (!isBlockIndexed(srcBlock))
+            return false;
+        
+        IndexedRegion* region = indexRegionMap[srcBlock];
+        
+        // If the target's index is already resolved, 
+        // check if it's a sub-region.
+        // 
+        if (isBlockIndexed(nextBlock))
+        {
+            IndexedRegion* nextRegion = indexRegionMap[nextBlock];
+
+            // If we're at the first block of a region, 
+            // set current region as continue-region's
+            // parent.
+            //
+            if (nextBlock == nextRegion->firstBlock && nextRegion != region)
+            {
+                nextRegion->parent = region;
+                return true;
+            }
+
+            return false;
+        }
+
+        // If we're at the break block, move up to the parent index.
+        if (nextBlock == region->breakBlock)
+            return setIndexRegion(nextBlock, region->parent);
+
+        // If none of the special cases hit, copy the 
+        // current region to the next block.
+        // 
+        return setIndexRegion(nextBlock, region);
+    }
+
+    // Splitting a loop is one of the trickiest parts of the unzip pass.
+    // Thus far, we've been dealing with blocks that are only run once, so we 
+    // could arbitrarily move intermediate instructions to other blocks since they are
+    // generated and consumed at-most one time.
+    // 
+    // Intermediate instructions in a loop can take on a different value each iteration
+    // and thus need to be stored explicitly to an array.
+    // 
+    // We also need to ascertain an upper limit on the iteration count. 
+    // With very few exceptions, this is a fundamental requirement.
+    // 
+    InstPair splitLoop(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRLoop* mixedLoop)
+    {
+        
+        auto breakBlock = mixedLoop->getBreakBlock();
+        auto continueBlock = mixedLoop->getContinueBlock();
+        auto nextBlock = mixedLoop->getTargetBlock();
+
+        // Push a new index.
+        addNewIndex(mixedLoop);
+
+        return InstPair(
+            primalBuilder->emitLoop(
+                as<IRBlock>(primalMap[nextBlock]),
+                as<IRBlock>(primalMap[breakBlock]),
+                as<IRBlock>(primalMap[continueBlock])),
+            diffBuilder->emitLoop(
+                as<IRBlock>(diffMap[nextBlock]),
+                as<IRBlock>(diffMap[breakBlock]),
+                as<IRBlock>(diffMap[continueBlock])));
     }
 
     InstPair splitControlFlow(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* branchInst)
@@ -430,6 +1017,9 @@ struct DiffUnzipPass
                         diffCaseArgs.getBuffer()));
             }
         
+        case kIROp_loop:
+            return splitLoop(primalBuilder, diffBuilder, as<IRLoop>(branchInst));
+        
         default:
             SLANG_UNEXPECTED("Unhandled instruction");
         }
@@ -451,6 +1041,9 @@ struct DiffUnzipPass
         case kIROp_Load:
             return splitLoad(primalBuilder, diffBuilder, as<IRLoad>(inst));
         
+        case kIROp_Store:
+            return splitStore(primalBuilder, diffBuilder, as<IRStore>(inst));
+
         case kIROp_Return:
             return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
 
@@ -544,11 +1137,13 @@ struct DiffUnzipPass
                     (use->getUser()->getParent() != diffBlock));
             }
 
-            inst->removeAndDeallocate();
+            // Leave terminator in to keep CFG info.
+            if (!as<IRTerminatorInst>(inst))
+                inst->removeAndDeallocate();
         }
 
         // Nothing should be left in the original block.
-        SLANG_ASSERT(block->getFirstChild() == nullptr);
+        SLANG_ASSERT(block->getFirstChild() == block->getTerminator());
 
         // Branch from primal to differential block.
         // Functionally, the new blocks should produce the same output as the

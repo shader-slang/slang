@@ -64,8 +64,8 @@ void main()
 
     CoarseVertex_0  _S10[3] = { _S7, _S8, _S9 };
 
-    int ii_0;
-    ii_0 = 0;
+    int ii_0 = 0;
+
     for(;;)
     {
         if(ii_0 < 3)
@@ -75,17 +75,14 @@ void main()
             break;
         }
 
-        CoarseVertex_0 coarseVertex_0 = _S10[ii_0];
-
         RasterVertex_0 rasterVertex_0;
-        rasterVertex_0.position_0 = coarseVertex_0.position_1;
-        rasterVertex_0.color_0 = coarseVertex_0.color_1;
-        rasterVertex_0.id_0 = coarseVertex_0.id_1 + _S6;
-
+        rasterVertex_0.position_0 = _S10[ii_0].position_1;
+        rasterVertex_0.color_0 = _S10[ii_0].color_1;
+        rasterVertex_0.id_0 = _S10[ii_0].id_1 + _S6;
         RasterVertex_0 _S11 = rasterVertex_0;
+        _S4 = rasterVertex_0.position_0;
+        _S5 = _S11.color_0;
 
-        output_position = _S11.position_0;
-        output_color = _S11.color_0;
         gl_Layer = int(_S11.id_0);
 
         EmitVertex();

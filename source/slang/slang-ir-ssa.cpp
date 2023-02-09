@@ -84,7 +84,7 @@ struct ConstructSSAContext
     Dictionary<IRBlock*, RefPtr<SSABlockInfo>> blockInfos;
 
     // IR building state to use during the operation
-    SharedIRBuilder sharedBuilder;
+    SharedIRBuilder* sharedBuilder;
 
     // Instructions to remove during cleanup
     List<IRInst*> instsToRemove;
@@ -386,7 +386,7 @@ static void cloneRelevantDecorations(
             //
             if( !val->findDecorationImpl(decoration->getOp()) )
             {
-                cloneDecoration(decoration, val, var->getModule());
+                cloneDecoration(nullptr, decoration, val, var->getModule());
             }
             break;
         }
@@ -1043,7 +1043,7 @@ static void breakCriticalEdges(
 
     for (auto edge : criticalEdges)
     {
-        context->sharedBuilder.insertBlockAlongEdge(edge);
+        context->sharedBuilder->insertBlockAlongEdge(edge);
     }
 }
 
@@ -1205,10 +1205,27 @@ bool constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
     ConstructSSAContext context;
     context.globalVal = globalVal;
 
-    context.sharedBuilder.init(module);
+    SharedIRBuilder sharedBuilder(module);
+    context.sharedBuilder = &sharedBuilder;
 
     context.builder.init(context.sharedBuilder);
     context.builder.setInsertInto(module);
+
+    return constructSSA(&context);
+}
+
+// Construct SSA form for a global value with code and reuse 
+// an existing sharedBuilder
+//
+bool constructSSA(SharedIRBuilder* sharedBuilder, IRGlobalValueWithCode* globalVal)
+{
+    ConstructSSAContext context;
+    context.globalVal = globalVal;
+    
+    context.sharedBuilder = sharedBuilder;
+
+    context.builder.init(sharedBuilder);
+    context.builder.setInsertInto(sharedBuilder->getModule());
 
     return constructSSA(&context);
 }

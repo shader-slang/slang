@@ -20,6 +20,31 @@ struct IRReverseDerivativePassOptions
     // Nothing for now..
 };
 
+// The result of function parameter transposition.
+// Contains necessary info for future processing in the backward differentation pass.
+struct ParameterBlockTransposeInfo
+{
+    // Parameters that should be in the furture primal function.
+    HashSet<IRInst*> primalFuncParams;
+
+    // Parameters that should be in the furture propagate function.
+    HashSet<IRInst*> propagateFuncParams;
+
+    // The value with which a primal specific parameter should be replaced in propagate func.
+    OrderedDictionary<IRInst*, IRInst*> mapPrimalSpecificParamToReplacementInPropFunc;
+
+    // The insts added that is specific for propagate functions and should be removed
+    // from the future primal func.
+    List<IRInst*> propagateFuncSpecificPrimalInsts;
+
+    // Write backs to perform at the end of the back-prop function in order to return the
+    // computed output derivatives for an inout parameter.
+    OrderedDictionary<IRInst*, InstPair> outDiffWritebacks;
+
+    // The dOut parameter representing the result derivative to propagate backwards through.
+    IRInst* dOutParam;
+};
+
 struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 {
     FuncBodyTranscriptionTaskType diffTaskType;
@@ -61,7 +86,8 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
         
     IRFuncType* differentiateFunctionTypeImpl(IRBuilder* builder, IRFuncType* funcType, IRInst* intermediateType);
 
-    InstPair transposeBlock(IRBuilder* builder, IRBlock* origBlock);
+    IRType* transcribeParamTypeForPrimalFunc(IRBuilder* builder, IRType* paramType);
+    IRType* transcribeParamTypeForPropagateFunc(IRBuilder* builder, IRType* paramType);
 
     // Puts parameters into their own block.
     void makeParameterBlock(IRBuilder* inBuilder, IRFunc* func);
@@ -69,19 +95,19 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     // Transcribe a function definition.
     virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) = 0;
 
-    void transposeParameterBlock(IRBuilder* builder, IRFunc* diffFunc);
-
-    IRInst* copyParam(IRBuilder* builder, IRParam* origParam);
-
-    InstPair copyBinaryArith(IRBuilder* builder, IRInst* origArith);
-
-    IRInst* transposeBinaryArithBackward(IRBuilder* builder, IRInst* origArith, IRInst* grad);
-
-    InstPair copyInst(IRBuilder* builder, IRInst* origInst);
-
-    IRInst* transposeParamBackward(IRBuilder* builder, IRInst* param, IRInst* grad);
+    // Splits and transpose the parameter block.
+    // After this operation, the parameter block will contain parameters for both the future
+    // primal func and the future propagate func.
+    // Additional info is returned in `ParameterBlockTransposeInfo` for future processing such
+    // as inserting write-back logic or splitting them into different functions.
+    ParameterBlockTransposeInfo splitAndTransposeParameterBlock(
+        IRBuilder* builder,
+        IRFunc* diffFunc,
+        bool isResultDifferentiable);
     
-    IRInst* transposeInstBackward(IRBuilder* builder, IRInst* origInst, IRInst* grad);
+    void writeBackDerivativeToInOutParams(ParameterBlockTransposeInfo& info, IRFunc* diffFunc);
+    
+    InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType);
 
     InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize);
 

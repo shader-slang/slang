@@ -389,6 +389,25 @@
     updateCurrentSubsection(findCurrentSubsection());
   </script>
 
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        inlineMath: [ ['$$','$$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\(","\\)"] ],
+      },
+      TeX: {
+        Macros: {
+          bra: ["\\langle{#1}|", 1],
+          ket: ["|{#1}\\rangle", 1],
+          braket: ["\\langle{#1}\\rangle", 1],
+          bk: ["\\langle{#1}|{#2}|{#3}\\rangle", 3]
+       }
+     }
+    });
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
   {% if site.google_analytics %}
   <script>
     (function (i, s, o, g, r, a, m) {

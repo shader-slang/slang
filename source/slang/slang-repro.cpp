@@ -248,19 +248,19 @@ struct StoreContext
             if (srcPathInfo->m_fileBlob && base[fileState]->contents.isNull())
             {
                 UnownedStringSlice contents((const char*)srcPathInfo->m_fileBlob->getBufferPointer(), srcPathInfo->m_fileBlob->getBufferSize());
-                auto offsetContents = m_container->newString(contents);
+                const auto offsetContents = m_container->newString(contents);
                 base[fileState]->contents = offsetContents;
             }
 
             if (srcPathInfo->m_canonicalPath.getLength() && base[fileState]->canonicalPath.isNull())
             {
-                auto offsetCanonicalPath = fromString(srcPathInfo->m_canonicalPath);
+                const auto offsetCanonicalPath = fromString(srcPathInfo->m_canonicalPath);
                 base[fileState]->canonicalPath = offsetCanonicalPath;
             }
 
             if (srcPathInfo->m_uniqueIdentity.getLength() && base[fileState]->uniqueIdentity.isNull())
             {
-                auto offsetUniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity);
+                const auto offsetUniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity);
                 base[fileState]->uniqueIdentity = offsetUniqueIdentity;
             }
         }
@@ -280,8 +280,8 @@ struct StoreContext
         for (const auto& srcDefine : srcDefines)
         {
             // Do allocation before setting
-            auto key = fromString(srcDefine.Key);
-            auto value = fromString(srcDefine.Value);
+            const auto key = fromString(srcDefine.Key);
+            const auto value = fromString(srcDefine.Value);
 
             auto& dstDefine = base[dstDefines[index]];
             dstDefine.first = key;
@@ -300,7 +300,9 @@ struct StoreContext
 
         for (Index j = 0; j < src.getCount(); ++j)
         {
-            base[dst[j]] = fromString(src[j]);
+            const auto offsetSrc = fromString(src[j]);
+
+            base[dst[j]] = offsetSrc;
         }
         return dst;
     }
@@ -483,7 +485,8 @@ static String _scrubName(const String& in)
         SLANG_ASSERT(linkage->searchDirectories.parent == nullptr);
         for (Index i = 0; i < srcPaths.getCount(); ++i)
         {
-            base[dstPaths[i]] = context.fromString(srcPaths[i].path);
+            const auto srcPath = context.fromString(srcPaths[i].path);
+            base[dstPaths[i]] = srcPath;
         }
         base[requestState]->searchPaths = dstPaths;
     }
@@ -510,7 +513,8 @@ static String _scrubName(const String& in)
 
                 for (Index j = 0; j < srcFiles.getCount(); ++j)
                 {
-                    base[dstSourceFiles[j]] = context.addSourceFile(srcFiles[j]);
+                    const auto srcFile = context.addSourceFile(srcFiles[j]);
+                    base[dstSourceFiles[j]] = srcFile; 
                 }
             }
 
@@ -542,8 +546,8 @@ static String _scrubName(const String& in)
             Index index = 0;
             for (const auto& pair : srcFiles)
             {
-                Offset32Ptr<OffsetString> path = context.fromString(pair.Key);
-                Offset32Ptr<PathInfoState> pathInfo = context.addPathInfo(pair.Value);
+                const auto path = context.fromString(pair.Key);
+                const auto pathInfo = context.addPathInfo(pair.Value);
 
                 PathAndPathInfo& dstInfo = base[pathMap[index]];
                 dstInfo.path = path;
@@ -616,7 +620,9 @@ static String _scrubName(const String& in)
             }
 
             // Save the unique generated name
-            base[file]->uniqueName = inOutContainer.newString(uniqueName.getUnownedSlice());
+            const auto offsetUniqueName = inOutContainer.newString(uniqueName.getUnownedSlice());
+
+            base[file]->uniqueName = offsetUniqueName;
 
             base[files[i]] = file;
         }

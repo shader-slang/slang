@@ -78,6 +78,7 @@ namespace Slang
         // Conversion from a buffer to the type it carries needs to add a minimal
         // extra cost, just so we can distinguish an overload on `ConstantBuffer<Foo>`
         // from one on `Foo`
+        kConversionCost_GetRef = 5,
         kConversionCost_ImplicitDereference = 10,
 
         // Conversions based on explicit sub-typing relationships are the cheapest

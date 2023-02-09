@@ -3,6 +3,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-autodiff-cfg-norm.h"
 #include "slang-ir-util.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-ssa-simplification.h"
@@ -10,42 +11,22 @@
 #include "slang-ir-single-return.h"
 #include "slang-ir-addr-inst-elimination.h"
 #include "slang-ir-eliminate-multilevel-break.h"
+#include "slang-ir-init-local-var.h"
+#include "slang-ir-redundancy-removal.h"
 
 namespace Slang
 {
     IRFuncType* BackwardDiffTranscriberBase::differentiateFunctionTypeImpl(IRBuilder* builder, IRFuncType* funcType, IRInst* intermeidateType)
     {
         List<IRType*> newParameterTypes;
-        IRType* diffReturnType;
+        IRType* diffReturnType; 
 
         for (UIndex i = 0; i < funcType->getParamCount(); i++)
         {
-            bool noDiff = false;
             auto origType = funcType->getParamType(i);
-            auto primalType = (IRType*)findOrTranscribePrimalInst(builder, origType);
-
-            if (auto attrType = as<IRAttributedType>(primalType))
-            {
-                if (attrType->findAttr<IRNoDiffAttr>())
-                {
-                    noDiff = true;
-                    primalType = attrType->getBaseType();
-                }
-            }
-            if (noDiff)
-            {
-                newParameterTypes.add(primalType);
-            }
-            else
-            {
-                if (auto diffPairType = tryGetDiffPairType(builder, origType))
-                {
-                    auto inoutDiffPairType = builder->getPtrType(kIROp_InOutType, diffPairType);
-                    newParameterTypes.add(inoutDiffPairType);
-                }
-                else
-                    newParameterTypes.add(primalType);
-            }
+            auto paramType = transcribeParamTypeForPropagateFunc(builder, origType);
+            if (paramType)
+                newParameterTypes.add(paramType);
         }
 
         if (auto diffResultType = differentiateType(builder, funcType->getResultType()))
@@ -74,7 +55,7 @@ namespace Slang
         for (UInt i = 0; i < funcType->getParamCount(); i++)
         {
             auto origType = funcType->getParamType(i);
-            auto primalType = (IRType*)findOrTranscribePrimalInst(builder, origType);
+            auto primalType = transcribeParamTypeForPrimalFunc(builder, origType);
             paramTypes.add(primalType);
         }
         paramTypes.add(outType);
@@ -219,7 +200,6 @@ namespace Slang
         case kIROp_Specialize:
             return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
 
-        case kIROp_MakeVectorFromScalar:
         case kIROp_MakeTuple:
         case kIROp_FloatLit:
         case kIROp_IntLit:
@@ -252,52 +232,64 @@ namespace Slang
         return String("");
     }
 
-    InstPair BackwardDiffTranscriberBase::transposeBlock(IRBuilder* builder, IRBlock* origBlock)
+    static IRType* _getPrimalTypeFromNoDiffType(BackwardDiffTranscriberBase* transcriber, IRBuilder* builder, IRType* origType)
     {
-        IRBuilder subBuilder(builder->getSharedBuilder());
-        subBuilder.setInsertLoc(builder->getInsertLoc());
+        IRType* valueType = origType;
+        auto ptrType = as<IROutTypeBase>(valueType);
+        if (ptrType)
+            valueType = ptrType->getValueType();
 
-        IRBlock* diffBlock = subBuilder.emitBlock();
-
-        subBuilder.setInsertInto(diffBlock);
-
-        // First transcribe every parameter in the block.
-        for (auto param = origBlock->getFirstParam(); param; param = param->getNextParam())
-            this->copyParam(&subBuilder, param);
-
-        // The extra param for input gradient
-        auto gradParam = subBuilder.emitParam(as<IRFuncType>(origBlock->getParent()->getFullType())->getResultType());
-
-        // Then, run through every instruction and use the transcriber to generate the appropriate
-        // derivative code.
-        //
-        for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
-            this->copyInst(&subBuilder, child);
-
-        auto lastInst = diffBlock->getLastOrdinaryInst();
-        List<IRInst*> grads = { gradParam };
-        upperGradients.Add(lastInst, grads);
-        for (auto child = diffBlock->getLastOrdinaryInst(); child; child = child->getPrevInst())
+        if (auto attrType = as<IRAttributedType>(valueType))
         {
-            auto upperGrads = upperGradients.TryGetValue(child);
-            if (!upperGrads)
-                continue;
-            if (upperGrads->getCount() > 1)
+            if (attrType->findAttr<IRNoDiffAttr>())
             {
-                auto sumGrad = upperGrads->getFirst();
-                for (auto i = 1; i < upperGrads->getCount(); i++)
-                {
-                    sumGrad = subBuilder.emitAdd(sumGrad->getDataType(), sumGrad, (*upperGrads)[i]);
-                }
-                this->transposeInstBackward(&subBuilder, child, sumGrad);
+                auto primalValueType = (IRType*)transcriber->findOrTranscribePrimalInst(builder, valueType);
+                if (ptrType)
+                    return builder->getPtrType(ptrType->getOp(), primalValueType);
+                return primalValueType;
             }
-            else
-                this->transposeInstBackward(&subBuilder, child, upperGrads->getFirst());
         }
+        return nullptr;
+    }
 
-        subBuilder.emitReturn();
+    IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPrimalFunc(IRBuilder* builder, IRType* paramType)
+    {
+        // If the param is marked as no_diff, return the primal type.
+        if (auto primalNoDiffType = _getPrimalTypeFromNoDiffType(this, builder, paramType))
+            return primalNoDiffType;
 
-        return InstPair(diffBlock, diffBlock);
+        return (IRType*)findOrTranscribePrimalInst(builder, paramType);
+    }
+
+    IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(IRBuilder* builder, IRType* paramType)
+    {
+        if (auto outType = as<IROutType>(paramType))
+        {
+            auto valueType = outType->getValueType();
+            auto diffValueType = differentiateType(builder, valueType);
+            return diffValueType;
+        }
+        
+        auto maybeConvertInOutTypeToValueType = [](IRType* type)
+        {
+            if (auto inoutType = as<IRInOutType>(type))
+                return inoutType->getValueType();
+            return type;
+        };
+
+        // If the param is marked as no_diff, return the primal type.
+        if (auto primalNoDiffType = _getPrimalTypeFromNoDiffType(this, builder, paramType))
+            return maybeConvertInOutTypeToValueType(primalNoDiffType);
+        
+        auto diffPairType = tryGetDiffPairType(builder, paramType);
+        if (diffPairType)
+        {
+            if (!as<IRPtrTypeBase>(diffPairType))
+                return builder->getInOutType(diffPairType);
+            return diffPairType;
+        }
+        auto primalType = (IRType*)findOrTranscribePrimalInst(builder, paramType);
+        return maybeConvertInOutTypeToValueType(primalType);
     }
 
     // Create an empty func to represent the transcribed func of `origFunc`.
@@ -314,7 +306,14 @@ namespace Slang
         IRFunc* primalFunc = origFunc;
 
         maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
-        differentiableTypeConformanceContext.setFunc(origFunc);
+
+        // The original func may not have a type dictionary if it is not originally marked as
+        // differentiable, in this case we would have already pulled the necessary types from
+        // the user-provided derivative function, so we are still fine.
+        if (origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
+        {
+            differentiableTypeConformanceContext.setFunc(origFunc);
+        }
 
         auto diffFunc = builder.createFunc();
 
@@ -343,7 +342,7 @@ namespace Slang
             builder.setInsertBefore(diffFunc->getFirstDecorationOrChild());
             cloneInst(&cloneEnv, &builder, dictDecor);
         }
-
+        builder.addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
         return InstPair(primalFunc, diffFunc);
     }
 
@@ -387,39 +386,68 @@ namespace Slang
         IRBuilder builder(inBuilder->getSharedBuilder());
         builder.setInsertInto(header.differential);
         builder.emitBlock();
-        auto funcType = as<IRFuncType>(header.differential->getDataType());
+        auto origFuncType = as<IRFuncType>(origFunc->getFullType());
         List<IRInst*> primalArgs, propagateArgs;
         List<IRType*> primalTypes, propagateTypes;
-        for (UInt i = 0; i < funcType->getParamCount(); i++)
+        for (UInt i = 0; i < origFuncType->getParamCount(); i++)
         {
-            auto paramType = (IRType*)findOrTranscribePrimalInst(&builder, funcType->getParamType(i));
-            auto param = builder.emitParam(paramType);
-            if (i != funcType->getParamCount() - 1)
+            auto primalParamType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getParamType(i));
+            auto propagateParamType = transcribeParamTypeForPropagateFunc(&builder, origFuncType->getParamType(i));
+            if (propagateParamType)
             {
-                primalArgs.add(param);
+                auto param = builder.emitParam(propagateParamType);
+                propagateTypes.add(propagateParamType);
+                propagateArgs.add(param);
+
+                // Fetch primal values to use as arguments in primal func call.
+                IRInst* primalArg = param;
+                if (!as<IROutType>(primalParamType))
+                {
+                    // As long as the primal parameter is not an out type,
+                    // we need to fetch the primal value from the parameter.
+                    if (as<IRPtrTypeBase>(propagateParamType))
+                    {
+                        primalArg = builder.emitLoad(param);
+                    }
+                    if (auto diffPairType = as<IRDifferentialPairType>(primalArg->getDataType()))
+                    {
+                        primalArg = builder.emitDifferentialPairGetPrimal(primalArg);
+                    }
+                }
+                if (auto primalParamPtrType = as<IRPtrTypeBase>(primalParamType))
+                {
+                    // If primal parameter is mutable, we need to pass in a temp var.
+                    auto tempVar = builder.emitVar(primalParamPtrType->getValueType());
+                    if (primalParamPtrType->getOp() == kIROp_InOutType)
+                    {
+                        // If the primal parameter is inout, we need to set the initial value.
+                        builder.emitStore(tempVar, primalArg);
+                    }
+                    primalArgs.add(tempVar);
+                }
+                else
+                {
+                    primalArgs.add(primalArg);
+                }
             }
+            else
+            {
+                auto primalPtrType = as<IRPtrTypeBase>(primalParamType);
+                SLANG_RELEASE_ASSERT(primalPtrType);
+                auto primalValueType = primalPtrType->getValueType();
+                auto var = builder.emitVar(primalValueType);
+                primalArgs.add(var);
+            }
+            primalTypes.add(primalParamType);
+        }
+
+        // Add dOut argument to propagateArgs.
+        auto diffResultType = differentiateType(&builder, origFunc->getResultType());
+        if (diffResultType)
+        {
+            auto param = builder.emitParam(diffResultType);
             propagateArgs.add(param);
-            propagateTypes.add(paramType);
-        }
-
-        // Fetch primal values to use as arguments in primal func call.
-        for (auto& arg : primalArgs)
-        {
-            IRInst* valueType = arg->getDataType();
-            auto inoutType = as<IRPtrTypeBase>(arg->getDataType());
-            if (inoutType)
-            {
-                valueType = inoutType->getValueType();
-                arg = builder.emitLoad(arg);
-            }
-            auto diffPairType = as<IRDifferentialPairType>(valueType);
-            if (!diffPairType) continue;
-            arg = builder.emitDifferentialPairGetPrimal(arg);
-        }
-
-        for (auto& arg : primalArgs)
-        {
-            primalTypes.add(arg->getFullType());
+            propagateTypes.add(param->getFullType());
         }
 
         auto outerGeneric = findOuterGeneric(origFunc);
@@ -433,7 +461,6 @@ namespace Slang
 
         auto intermediateVar = builder.emitVar(intermediateType);
 
-        auto origFuncType = as<IRFuncType>(origFunc->getDataType());
         auto primalFuncType = builder.getFuncType(
             primalTypes,
             origFuncType->getResultType());
@@ -486,6 +513,51 @@ namespace Slang
         builder.emitBranch(firstBlock);
     }
 
+    void insertTempVarForMutableParams(SharedIRBuilder* sharedBuilder, IRFunc* func)
+    {
+        IRBuilder builder(sharedBuilder);
+        auto firstBlock = func->getFirstBlock();
+        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        
+        OrderedDictionary<IRParam*, IRVar*> mapParamToTempVar;
+        List<IRParam*> params;
+        for (auto param : firstBlock->getParams())
+        {
+            if (auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
+            {
+                params.add(param);
+            }
+        }
+
+        for (auto param : params)
+        {
+            auto ptrType = as<IRPtrTypeBase>(param->getDataType());
+            auto tempVar = builder.emitVar(ptrType->getValueType());
+            param->replaceUsesWith(tempVar);
+            mapParamToTempVar[param] = tempVar;
+            if (ptrType->getOp() != kIROp_OutType)
+            {
+                builder.emitStore(tempVar, builder.emitLoad(param));
+            }
+        }
+
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (inst->getOp() == kIROp_Return)
+                {
+                    builder.setInsertBefore(inst);
+                    for (auto& kv : mapParamToTempVar)
+                    {
+                        builder.emitStore(kv.Key, builder.emitLoad(kv.Value));
+                    }
+                }
+            }
+        }
+    }
+
+
     struct AutoDiffAddressConversionPolicy : public AddressConversionPolicy
     {
         DifferentiableTypeConformanceContext* diffTypeContext;
@@ -508,6 +580,11 @@ namespace Slang
             convertFuncToSingleReturnForm(func->getModule(), func);
         }
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
+
+        IRCFGNormalizationPass cfgPass = {this->getSink()};
+        normalizeCFG(autoDiffSharedContext->sharedBuilder, func);
+
+        insertTempVarForMutableParams(sharedBuilder, func);
 
         AutoDiffAddressConversionPolicy cvtPolicty;
         cvtPolicty.diffTypeContext = &diffTypeContext;
@@ -541,6 +618,8 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
+        
+        autoDiffSharedContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
@@ -559,6 +638,9 @@ namespace Slang
 
         // Remove the clone of original func.
         primalOuterParent->removeAndDeallocate();
+
+        // Remove redundant loads since they interfere with transposition logic.
+        eliminateRedundantLoadStore(fwdDiffFunc);
 
         // Migrate the new forward derivative function into the generic parent of `diffPropagateFunc`.
         if (auto fwdParentGeneric = as<IRGeneric>(findOuterGeneric(fwdDiffFunc)))
@@ -584,7 +666,39 @@ namespace Slang
             }
             fwdParentGeneric->removeAndDeallocate();
         }
+
         return fwdDiffFunc;
+    }
+
+    InstPair BackwardDiffTranscriberBase::transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
+    {
+        SLANG_UNUSED(primalType);
+
+        SLANG_RELEASE_ASSERT(origParam->getParent() && origParam->getParent()->getParent()
+            && origParam->getParent()->getParent()->getOp() == kIROp_Generic);
+
+        auto primalInst = maybeCloneForPrimalInst(builder, origParam);
+        if (auto primalParam = as<IRParam>(primalInst))
+        {
+            SLANG_RELEASE_ASSERT(builder->getInsertLoc().getBlock());
+            primalParam->removeFromParent();
+            builder->getInsertLoc().getBlock()->addParam(primalParam);
+        }
+        return InstPair(primalInst, nullptr);
+    }
+
+    // Keep primal param replacement insts alive during DCE.
+    static void _lockPrimalParamReplacementInsts(IRBuilder* builder, ParameterBlockTransposeInfo& paramInfo)
+    {
+        for (auto& kv : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
+            builder->addKeepAliveDecoration(kv.Value);
+    }
+
+    // Remove [KeepAlive] decorations for primal param replacement insts.
+    static void _unlockPrimalParamReplacementInsts(ParameterBlockTransposeInfo& paramInfo)
+    {
+        for (auto& kv : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
+            kv.Value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
     }
 
     // Transcribe a function definition.
@@ -610,6 +724,8 @@ namespace Slang
         if (!fwdDiffFunc)
             return;
 
+        bool isResultDifferentiable = as<IRDifferentialPairType>(fwdDiffFunc->getResultType());
+
         // Split first block into a paramter block.
         this->makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
         
@@ -622,9 +738,9 @@ namespace Slang
         // Copy primal insts to the first block of the unzipped function, copy diff insts to the
         // second block of the unzipped function.
         // 
-        IRFunc* unzippedFwdDiffFunc = diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
+        diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
+        IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
 
-       
         // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
         builder->setInsertInto(diffPropagateFunc->getParent());
         {
@@ -637,14 +753,19 @@ namespace Slang
         }
 
         // Transpose the first block (parameter block)
-        transposeParameterBlock(builder, diffPropagateFunc);
+        auto paramTransposeInfo =
+            splitAndTransposeParameterBlock(builder, diffPropagateFunc, isResultDifferentiable);
+
+        // The insts we inserted in paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc
+        // may be used by write back logic that we are going to insert later.
+        // Before then we want to keep them alive.
+        _lockPrimalParamReplacementInsts(builder, paramTransposeInfo);
 
         builder->setInsertInto(diffPropagateFunc);
 
-        auto dOutParameter = diffPropagateFunc->getLastParam()->getPrevParam();
-
-        // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter) representing the 
-        DiffTransposePass::FuncTranspositionInfo info = {dOutParameter, nullptr};
+        // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter) representing the
+        // derivative of the return value.
+        DiffTransposePass::FuncTranspositionInfo info = { paramTransposeInfo.dOutParam, nullptr};
         diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, info);
 
         eliminateDeadCode(diffPropagateFunc);
@@ -653,11 +774,36 @@ namespace Slang
         // with the intermediate results computed from the extracted func.
         IRInst* intermediateType = nullptr;
         auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
-            diffPropagateFunc, primalFunc, intermediateType);
+            diffPropagateFunc, primalFunc, paramTransposeInfo, intermediateType);
 
-        // Clean up by deallocating the tempoarary forward derivative func.
-        fwdDiffFunc->removeAndDeallocate();
+        // At this point the unzipped func is just an empty shell
+        // and we can simply remove it.
+        unzippedFwdDiffFunc->removeAndDeallocate();
         
+        // Write back derivatives to inout parameters.
+        writeBackDerivativeToInOutParams(paramTransposeInfo, diffPropagateFunc);
+
+        // Remove primalFunc specific params.
+        List<IRInst*> paramsToRemove;
+        for (auto param : diffPropagateFunc->getParams())
+        {
+            if (!paramTransposeInfo.propagateFuncParams.Contains(param))
+                paramsToRemove.add(param);
+        }
+        for (auto param : paramsToRemove)
+        {
+            if (param->hasUses())
+            {
+                IRInst* replacement = nullptr;
+                paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc.TryGetValue(param, replacement);
+                SLANG_RELEASE_ASSERT(replacement);
+                param->replaceUsesWith(replacement);
+            }
+            param->removeAndDeallocate();
+        }
+
+        _unlockPrimalParamReplacementInsts(paramTransposeInfo);
+
         // If primal function is nested in a generic, we want to create separate generics for all the associated things
         // we have just created.
         auto primalOuterGeneric = findOuterGeneric(primalFunc);
@@ -684,282 +830,418 @@ namespace Slang
             auto specializedBackwardPrimalFunc = maybeSpecializeWithGeneric(*builder, primalFuncGeneric, primalOuterGeneric);
             builder->addBackwardDerivativePrimalDecoration(primalFunc, specializedBackwardPrimalFunc);
         }
+
+        initializeLocalVariables(builder->getSharedBuilder(), primalFunc);
+        initializeLocalVariables(builder->getSharedBuilder(), diffPropagateFunc);
     }
 
-    void BackwardDiffTranscriberBase::transposeParameterBlock(IRBuilder* builder, IRFunc* diffFunc)
+    ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(
+        IRBuilder* builder,
+        IRFunc* diffFunc,
+        bool isResultDifferentiable)
     {
+        // This method splits transposes the all the parameters for both the primal and propagate computation.
+        // At the end of this method, the parameter block will contain a combination of parameters for
+        // both the to-be-primal function and to-be-propagate function.
+        // We use ParameterBlockTransposeInfo::primalFuncParams and ParameterBlockTransposeInfo::propagateFuncParams
+        // to track which parameters are dedicated to the future primal or propagate func.
+        // A later step will then split the parameters out to each new function.
+
+        ParameterBlockTransposeInfo result;
+
+        // First, we initialize the IR builders and locate the import code insertion points that will
+        // be used for the rest of this method.
+
         IRBlock* fwdDiffParameterBlock = diffFunc->getFirstBlock();
 
         // Find the 'next' block using the terminator inst of the parameter block.
         auto fwdParamBlockBranch = as<IRUnconditionalBranch>(fwdDiffParameterBlock->getTerminator());
         auto nextBlock = fwdParamBlockBranch->getTargetBlock();
 
-        builder->setInsertInto(fwdDiffParameterBlock);
+        auto nextBlockBuilder = *builder;
+        nextBlockBuilder.setInsertBefore(nextBlock->getFirstOrdinaryInst());
 
-        List<IRParam*> fwdParams;
-        for (auto child = fwdDiffParameterBlock->getFirstParam(); child; child = child->getNextParam())
+        IRBlock* firstDiffBlock = nullptr;
+        for (auto block : diffFunc->getBlocks())
         {
-            fwdParams.add(child);
+            if (isDifferentialInst(block))
+            {
+                firstDiffBlock = block;
+                break;
+            }
         }
 
-        // 1. Turn fwd-diff versions of the parameters into reverse-diff versions by wrapping them as InOutType<>
+        SLANG_RELEASE_ASSERT(firstDiffBlock);
+
+        auto diffBuilder = *builder;
+        diffBuilder.setInsertBefore(firstDiffBlock->getFirstOrdinaryInst());
+
+        builder->setInsertBefore(fwdParamBlockBranch);
+
+        // Collect all the original parameters.
+        List<IRParam*> fwdParams;
+        for (auto param : diffFunc->getParams())
+            fwdParams.add(param);
+
+        // Maintain a set for insts pending removal.
+        OrderedHashSet<IRInst*> instsToRemove;
+
+        // Now we begin the actual processing.
+        // The first step is to transcribe all the existing parameters from the original function.
+        // There are many cases to handle, including different combinations of parameter directions and
+        // whether or not the parameter is differentiable.
+        // To normalize the process for all these cases, we determine the following actions for each parameter:
+        // 1. Should this original parameter be translated to a parameter in the primal func and the propagate func?
+        //    if so, we emit a param inst representing the final parameter for that func. If the parameter should be
+        //    mapped to both the primal func and the propagate func, we will emit two separate params with their
+        //    final type.
+        // 2. If this parameter has a corresponding primal func parameter, we replace all uses of the original
+        //    parameter in the primal computation code to the new primal parameter. If any initialization logic
+        //    is needed to convert the type of the new primal parameter to what the code was expecting, we insert
+        //    that code in the first block.
+        // 3. If this parameter has a correponding propagate func parameter, we replace all uses of the original parameter
+        //    in the diff computation code to the new propagate parameter. We insert necessary initialization diff block or the first block
+        //    depending on whether we want that logic go through the transposition pass. We may need to replace the uses
+        //    to different values/variables depending on whether that use is a read or write.
+        // 4. If the parameter has both corresponding primal and propagate parameters, we also need to consider
+        //    how the future propagate function access the primal parameter. We will insert necessary preparation code
+        //    that constructs temp vars or values to replace the primal parameter after we remove it from the
+        //    propagate func.
+        // Base on above discussion, we need to compute the following values for each parameter:
+        // - diffRefReplacement. What should all read(load) references to this parameter from differential code be replaced to.
+        // - diffRefWriteReplacement. What should all write references to this parameter from differential code be replaced to.
+        // - primalRefReplacement. What should all references to this parameter from primal code be replaced to.
+        // - mapPrimalSpecificParamToReplacementInPropFunc[param]. What should all references to this parameter
+        //      from the primal compuation logic in the future propagate function be replaced to.
         for (auto fwdParam : fwdParams)
         {   
-            // TODO: Handle ptr<pair> types.
-            if (auto diffPairType = as<IRDifferentialPairType>(fwdParam->getDataType()))
-            {
-                // Create inout version. 
-                auto inoutDiffPairType = builder->getInOutType(diffPairType);
-                auto newParam = builder->emitParam(inoutDiffPairType); 
+            // Define the replacement insts that we are going to fill in for each case.
+            IRInst* diffRefReplacement = nullptr;
+            IRInst* primalRefReplacement = nullptr;
+            IRInst* diffWriteRefReplacement = nullptr;
 
-                // Map the _load_ of the new parameter as the clone of the old one.
-                auto newParamLoad = builder->emitLoad(newParam);
-                newParamLoad->insertAtStart(nextBlock); // Move to first block _after_ the parameter block.
-                fwdParam->replaceUsesWith(newParamLoad);
-                fwdParam->removeAndDeallocate();
+            // Common logic that computes all the important types we care about.
+            IRDifferentialPairType* diffPairType = as<IRDifferentialPairType>(fwdParam->getDataType());
+            auto inoutType = as<IRInOutType>(fwdParam->getDataType());
+            auto outType = as<IROutType>(fwdParam->getDataType());
+            if (inoutType)
+                diffPairType = as<IRDifferentialPairType>(inoutType->getValueType());
+            else if (outType)
+                diffPairType = as<IRDifferentialPairType>(outType->getValueType());
+            IRType* primalType = nullptr;
+            IRType* diffType = nullptr;
+            if (diffPairType)
+            {
+                primalType = diffPairType->getValueType();
+                diffType = (IRType*)differentiableTypeConformanceContext
+                               .getDifferentialTypeFromDiffPairType(builder, diffPairType);
             }
-            else
+
+            // Now we handle each combination of parameter direction x differentiability.
+            if (outType)
             {
-                // Default case (parameter has nothing to do with differentiation)
-                // Simply move the parameter to the end.
-                //
-                fwdParam->removeFromParent();
-                fwdDiffParameterBlock->addParam(fwdParam);
-            }
-        }
-
-        auto paramCount = as<IRFuncType>(diffFunc->getDataType())->getParamCount();
-
-        // 2. Add a parameter for 'derivative of the output' (d_out). 
-        // The type is the second last parameter type of the function.
-        // 
-        auto dOutParamType = as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 2);
-
-        SLANG_ASSERT(dOutParamType);
-
-        builder->emitParam(dOutParamType);
-
-        // Add a parameter for intermediate val.
-        builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1));
-    }
-
-    IRInst* BackwardDiffTranscriberBase::copyParam(IRBuilder* builder, IRParam* origParam)
-    {
-        auto primalDataType = origParam->getDataType();
-
-        if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalDataType))
-        {
-            auto inoutDiffPairType = builder->getPtrType(kIROp_InOutType, diffPairType);
-            IRInst* diffParam = builder->emitParam(inoutDiffPairType);
-
-            auto diffPairVarName = makeDiffPairName(origParam);
-            if (diffPairVarName.getLength() > 0)
-                builder->addNameHintDecoration(diffParam, diffPairVarName.getUnownedSlice());
-
-            SLANG_ASSERT(diffParam);
-            auto paramValue = builder->emitLoad(diffParam);
-            auto primal = builder->emitDifferentialPairGetPrimal(paramValue);
-            orginalToTranscribed.Add(origParam, primal);
-            primalToDiffPair.Add(primal, diffParam);
-
-            return diffParam;
-        }
-
-        return maybeCloneForPrimalInst(builder, origParam);
-    }
-
-    InstPair BackwardDiffTranscriberBase::copyBinaryArith(IRBuilder* builder, IRInst* origArith)
-    {
-        SLANG_ASSERT(origArith->getOperandCount() == 2);
-
-        auto origLeft = origArith->getOperand(0);
-        auto origRight = origArith->getOperand(1);
-
-        IRInst* primalLeft;
-        if (!orginalToTranscribed.TryGetValue(origLeft, primalLeft))
-        {
-            primalLeft = origLeft;
-        }
-        IRInst* primalRight;
-        if (!orginalToTranscribed.TryGetValue(origRight, primalRight))
-        {
-            primalRight = origRight;
-        }
-
-        auto resultType = origArith->getDataType();
-        IRInst* newInst;
-        switch (origArith->getOp())
-        {
-        case kIROp_Add:
-            newInst = builder->emitAdd(resultType, primalLeft, primalRight);
-            break;
-        case kIROp_Mul:
-            newInst = builder->emitMul(resultType, primalLeft, primalRight);
-            break;
-        case kIROp_Sub:
-            newInst = builder->emitSub(resultType, primalLeft, primalRight);
-            break;
-        case kIROp_Div:
-            newInst = builder->emitDiv(resultType, primalLeft, primalRight);
-            break;
-        default:
-            newInst = nullptr;
-            getSink()->diagnose(origArith->sourceLoc,
-                Diagnostics::unimplemented,
-                "this arithmetic instruction cannot be differentiated");
-        }
-        orginalToTranscribed.Add(origArith, newInst);
-        return InstPair(newInst, nullptr);
-    }
-
-    IRInst* BackwardDiffTranscriberBase::transposeBinaryArithBackward(IRBuilder* builder, IRInst* origArith, IRInst* grad)
-    {
-        SLANG_ASSERT(origArith->getOperandCount() == 2);
-
-        auto lhs = origArith->getOperand(0);
-        auto rhs = origArith->getOperand(1);
-
-        if (as<IRInOutType>(lhs->getDataType()))
-        {
-            lhs = builder->emitLoad(lhs);
-            lhs = builder->emitDifferentialPairGetPrimal(lhs);
-        }
-        if (as<IRInOutType>(rhs->getDataType()))
-        {
-            rhs = builder->emitLoad(rhs);
-            rhs = builder->emitDifferentialPairGetPrimal(rhs);
-        }
-
-        IRInst* leftGrad;
-        IRInst* rightGrad;
-
-
-        switch (origArith->getOp())
-        {
-        case kIROp_Add:
-            leftGrad = grad;
-            rightGrad = grad;
-            break;
-        case kIROp_Mul:
-            leftGrad = builder->emitMul(grad->getDataType(), rhs, grad);
-            rightGrad = builder->emitMul(grad->getDataType(), lhs, grad);
-            break;
-        case kIROp_Sub:
-            leftGrad = grad;
-            rightGrad = builder->emitNeg(grad->getDataType(), grad);
-            break;
-        case kIROp_Div:
-            leftGrad = builder->emitMul(grad->getDataType(), rhs, grad);
-            rightGrad = builder->emitMul(grad->getDataType(), lhs, grad); // TODO 1.0 / Grad
-            break;
-        default:
-            getSink()->diagnose(origArith->sourceLoc,
-                Diagnostics::unimplemented,
-                "this arithmetic instruction cannot be differentiated");
-        }
-
-        lhs = origArith->getOperand(0);
-        rhs = origArith->getOperand(1);
-        if (auto leftGrads = upperGradients.TryGetValue(lhs))
-        {
-            leftGrads->add(leftGrad);
-        }
-        else
-        {
-            upperGradients.Add(lhs, leftGrad);
-        }
-        if (auto rightGrads = upperGradients.TryGetValue(rhs))
-        {
-            rightGrads->add(rightGrad);
-        }
-        else
-        {
-            upperGradients.Add(rhs, rightGrad);
-        }
-
-        return nullptr;
-    }
-
-    InstPair BackwardDiffTranscriberBase::copyInst(IRBuilder* builder, IRInst* origInst)
-    {
-        // Handle common SSA-style operations
-        switch (origInst->getOp())
-        {
-        case kIROp_Param:
-            return transcribeParam(builder, as<IRParam>(origInst));
-
-        case kIROp_Return:
-            return InstPair(nullptr, nullptr);
-
-        case kIROp_Add:
-        case kIROp_Mul:
-        case kIROp_Sub:
-        case kIROp_Div:
-            return copyBinaryArith(builder, origInst);
-
-        default:
-            // Not yet implemented
-            SLANG_ASSERT(0);
-        }
-
-        return InstPair(nullptr, nullptr);
-    }
-
-    IRInst* BackwardDiffTranscriberBase::transposeParamBackward(IRBuilder* builder, IRInst* param, IRInst* grad)
-    {
-        IRInOutType* inoutParam = as<IRInOutType>(param->getDataType());
-        auto pairType = as<IRDifferentialPairType>(inoutParam->getValueType());
-        auto paramValue = builder->emitLoad(param);
-        auto primal = builder->emitDifferentialPairGetPrimal(paramValue);
-        auto diff = builder->emitDifferentialPairGetDifferential(
-            (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
-            paramValue
-        );
-        auto newDiff = builder->emitAdd(grad->getDataType(), diff, grad);
-        auto updatedParam = builder->emitMakeDifferentialPair(pairType, primal, newDiff);
-        auto store = builder->emitStore(param, updatedParam);
-
-        return store;
-    }
-
-    IRInst* BackwardDiffTranscriberBase::transposeInstBackward(IRBuilder* builder, IRInst* origInst, IRInst* grad)
-    {
-        // Handle common SSA-style operations
-        switch (origInst->getOp())
-        {
-        case kIROp_Param:
-            return transposeParamBackward(builder, as<IRParam>(origInst), grad);
-
-        case kIROp_Add:
-        case kIROp_Mul:
-        case kIROp_Sub:
-        case kIROp_Div:
-            return transposeBinaryArithBackward(builder, origInst, grad);
-
-        case kIROp_DifferentialPairGetPrimal:
-        {
-            if (auto param = primalToDiffPair.TryGetValue(origInst))
-            {
-                if (auto leftGrads = upperGradients.TryGetValue(*param))
+                // Case 1: out parameters.
+                // Out parameters need to be handled differently whether or not it is differentiable,
+                // since the propagate function will not have a corresponding output.
+                if (diffPairType)
                 {
-                    leftGrads->add(grad);
+                    // Create dOut param. 
+                    auto diffParam = builder->emitParam(diffType);
+                    copyNameHintDecoration(diffParam, fwdParam);
+                    result.propagateFuncParams.Add(diffParam);
+                    primalRefReplacement = builder->emitParam(builder->getOutType(primalType));
+                    copyNameHintDecoration(primalRefReplacement, fwdParam);
+
+                    // Create a local var for read access in pre-transpose code.
+                    // This will the var from which we will fetch the final resulting derivative
+                    // after transposition.
+                    auto tempVar = nextBlockBuilder.emitVar(diffType);
+                    copyNameHintDecoration(tempVar, fwdParam);
+                    nextBlockBuilder.markInstAsDifferential(tempVar, diffPairType);
+
+                    // Initialize the var with input diff param at start.
+                    // Note that we insert the store in the primal block so it won't get transposed.
+                    auto storeInst = nextBlockBuilder.emitStore(tempVar, diffParam);
+                    nextBlockBuilder.markInstAsDifferential(storeInst, diffPairType);
+                    // Since this store inst is specific to propagate function, we track it in a
+                    // set so we can remove it when we generate the primal func.
+                    result.propagateFuncSpecificPrimalInsts.add(storeInst);
+                    
+                    diffWriteRefReplacement = tempVar;
+                    diffRefReplacement = tempVar;
                 }
                 else
                 {
-                    upperGradients.Add(*param, grad);
+                    primalRefReplacement = builder->emitParam(outType);
+                    copyNameHintDecoration(primalRefReplacement, fwdParam);
+                }
+                result.primalFuncParams.Add(primalRefReplacement);
+                
+                // Create a local var for the out param for the primal part of the prop func.
+                auto tempPrimalVar = nextBlockBuilder.emitVar(outType->getValueType());
+                copyNameHintDecoration(tempPrimalVar, fwdParam);
+                result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = tempPrimalVar;
+
+                instsToRemove.Add(fwdParam);
+            }
+            else if (!isRelevantDifferentialPair(fwdParam->getDataType()))
+            {
+                if (inoutType)
+                {
+                    // Case 2: non differentiable inout parameter.
+                    // They should become an inout parameter in primal func, but an in parameter in
+                    // bwd func.
+                    fwdParam->removeFromParent();
+                    fwdDiffParameterBlock->addParam(fwdParam);
+                    result.primalFuncParams.Add(fwdParam);
+
+                    primalRefReplacement = fwdParam;
+
+                    // Create an in param for the prop func.
+                    auto propParam = builder->emitParam(inoutType->getValueType());
+                    copyNameHintDecoration(propParam, fwdParam);
+                    result.propagateFuncParams.Add(propParam);
+
+                    // Create a local var for the out param for the primal part of the prop func.
+                    auto tempPrimalVar = nextBlockBuilder.emitVar(inoutType->getValueType());
+                    copyNameHintDecoration(tempPrimalVar, fwdParam);
+
+                    result.propagateFuncSpecificPrimalInsts.add(tempPrimalVar);
+                    auto storeInst = nextBlockBuilder.emitStore(tempPrimalVar, propParam);
+                    result.propagateFuncSpecificPrimalInsts.add(storeInst);
+                    result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = tempPrimalVar;
+                }
+                else
+                {
+                    // Case 3: non differentiable, non output parameters.
+                    // If parameter is not an out param and has nothing to do with differentiation,
+                    // simply move the parameter to the end.
+                    //
+                    fwdParam->removeFromParent();
+                    fwdDiffParameterBlock->addParam(fwdParam);
+                    result.primalFuncParams.Add(fwdParam);
+                    result.propagateFuncParams.Add(fwdParam);
+                    continue;
                 }
             }
+            else if(!inoutType)
+            {
+                // Case 4: `in` differentiable parameters.
+
+                SLANG_RELEASE_ASSERT(diffPairType);
+
+                // Create inout version. 
+                auto inoutDiffPairType = builder->getInOutType(diffPairType);
+                primalRefReplacement = builder->emitParam(primalType);
+                copyNameHintDecoration(primalRefReplacement, fwdParam);
+
+                result.primalFuncParams.Add(primalRefReplacement);
+                auto propParam = builder->emitParam(inoutDiffPairType);
+                copyNameHintDecoration(propParam, fwdParam);
+                result.propagateFuncParams.Add(propParam);
+
+                // A reference to this parameter from the diff blocks should be replaced with a load
+                // of the differential component of the pair.
+                auto newParamLoad = diffBuilder.emitLoad(propParam);
+                diffBuilder.markInstAsDifferential(newParamLoad, primalType);
+
+                diffRefReplacement = diffBuilder.emitDifferentialPairGetDifferential(diffType, newParamLoad);
+                diffBuilder.markInstAsDifferential(diffRefReplacement, primalType);
+
+                // Load the primal component from the prop param and use it as replacement for the
+                // primal param in the primal part of the prop func.
+                // Since these are logic specific to propagate function, we will add them to the
+                // `propagateFuncSpecificPrimalInsts` set so we can remove them when we generate the primal func.
+                auto primalReplacementLoad = nextBlockBuilder.emitLoad(propParam);
+                result.propagateFuncSpecificPrimalInsts.add(primalReplacementLoad);
+                auto primalVal = nextBlockBuilder.emitDifferentialPairGetPrimal(primalReplacementLoad);
+                result.propagateFuncSpecificPrimalInsts.add(primalVal);
+                result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = primalVal;
+
+                instsToRemove.Add(fwdParam);
+            }
             else
-                SLANG_ASSERT(0);
-            return nullptr;
+            {
+                // Case 5: `inout` differentiable parameters.
+                SLANG_ASSERT(inoutType && diffPairType);
+
+                // Process differentiable inout parameters.
+                auto primalParam = builder->emitParam(builder->getInOutType(primalType));
+                copyNameHintDecoration(primalParam, fwdParam);
+                result.primalFuncParams.Add(primalParam);
+
+                auto diffParam = builder->emitParam(inoutType);
+                copyNameHintDecoration(diffParam, fwdParam);
+                result.propagateFuncParams.Add(diffParam);
+
+                // Primal references to this param is the new primal param.
+                primalRefReplacement = primalParam;
+
+                // Diff references to this param should be replaced with one local temp var
+                // for read and one separate temp var for write.
+
+                // Load the inital diff value.
+                auto loadedParam = nextBlockBuilder.emitLoad(diffParam);
+                auto initDiff = nextBlockBuilder.emitDifferentialPairGetDifferential(diffType, loadedParam);
+
+                // Create a local var for diff read access.
+                auto diffVar = nextBlockBuilder.emitVar(diffType);
+                copyNameHintDecoration(diffVar, fwdParam);
+                result.propagateFuncSpecificPrimalInsts.add(diffVar);
+                diffBuilder.markInstAsDifferential(diffVar, diffPairType);
+                diffRefReplacement = diffVar;
+
+                // Clear the diff read var to zero at start of the function.
+                auto dzero = getDifferentialZeroOfType(&nextBlockBuilder, primalType);
+                result.propagateFuncSpecificPrimalInsts.add(dzero);
+                auto initDiffStore = nextBlockBuilder.emitStore(diffVar, dzero);
+                result.propagateFuncSpecificPrimalInsts.add(initDiffStore);
+
+                // Create a local var for diff write access.
+                auto diffWriteVar = nextBlockBuilder.emitVar(diffType);
+                copyNameHintDecoration(diffWriteVar, fwdParam);
+
+                // Initialize write var to 0.
+                auto writeStore = nextBlockBuilder.emitStore(diffWriteVar, initDiff);
+                result.propagateFuncSpecificPrimalInsts.add(writeStore);
+
+                diffWriteRefReplacement = diffWriteVar;
+
+                // Create a local var for the primal logic in the propagate func.
+                auto primalVar = nextBlockBuilder.emitVar(primalType);
+                copyNameHintDecoration(primalVar, fwdParam);
+
+                result.propagateFuncSpecificPrimalInsts.add(primalVar);
+                auto initPrimalVal = nextBlockBuilder.emitDifferentialPairGetPrimal(loadedParam);
+                result.propagateFuncSpecificPrimalInsts.add(initPrimalVal);
+                auto storeInst = nextBlockBuilder.emitStore(primalVar, initPrimalVal);
+                result.propagateFuncSpecificPrimalInsts.add(storeInst);
+                result.mapPrimalSpecificParamToReplacementInPropFunc[primalParam] = primalVar;
+                result.outDiffWritebacks[diffParam] = InstPair(initPrimalVal, diffVar);
+
+                instsToRemove.Add(fwdParam);
+            }
+
+            // We have emitted all the new parameters and computed the replacements for the original
+            // parameter. Now we perform that replacement.
+            List<IRUse*> uses;
+            for (auto use = fwdParam->firstUse; use; use = use->nextUse)
+                uses.add(use);
+            for (auto use : uses)
+            {
+                if (auto primalRef = as<IRPrimalParamRef>(use->getUser()))
+                {
+                    SLANG_RELEASE_ASSERT(primalRefReplacement);
+                    primalRef->replaceUsesWith(primalRefReplacement);
+                    instsToRemove.Add(primalRef);
+                }
+                else if (auto getPrimal = as<IRDifferentialPairGetPrimal>(use->getUser()))
+                {
+                    SLANG_RELEASE_ASSERT(primalRefReplacement);
+                    getPrimal->replaceUsesWith(primalRefReplacement);
+                    instsToRemove.Add(getPrimal);
+                }
+                else if (auto propagateRef = as<IRDiffParamRef>(use->getUser()))
+                {
+                    SLANG_RELEASE_ASSERT(diffRefReplacement);
+                    auto refUse = propagateRef->firstUse;
+                    while (refUse)
+                    {
+                        auto nextUse = refUse->nextUse;
+                        switch (refUse->getUser()->getOp())
+                        {
+                        case kIROp_Load:
+                            refUse->set(diffRefReplacement);
+                            break;
+                        case kIROp_Store:
+                            refUse->set(diffWriteRefReplacement);
+                            break;
+                        default:
+                            SLANG_RELEASE_ASSERT(!diffWriteRefReplacement);
+                            refUse->set(diffRefReplacement);
+                        }
+                        refUse = nextUse;
+                    }
+                    instsToRemove.Add(propagateRef);
+                }
+                else if (auto getDiff = as<IRDifferentialPairGetDifferential>(use->getUser()))
+                {
+                    SLANG_RELEASE_ASSERT(diffRefReplacement);
+                    getDiff->replaceUsesWith(diffRefReplacement);
+                    instsToRemove.Add(getDiff);
+                }
+                else
+                {
+                    // If the user is something else, it'd better be a non relevant parameter.
+                    if (diffRefReplacement || diffWriteRefReplacement)
+                        SLANG_UNEXPECTED("unknown use of parameter.");
+                    use->set(primalRefReplacement);
+                }
+            }
         }
 
-        default:
-            // Not yet implemented
-            SLANG_ASSERT(0);
+        // Actually remove all the insts that we decided to remove in the process.
+        for (auto inst : instsToRemove)
+        {
+            inst->removeAndDeallocate();
         }
 
-        return nullptr;
+
+        // The next step is to insert new parameters that is not related to any existing parameters.
+        // 
+        // If the return type of the original function is differentiable,
+        // add a parameter for 'derivative of the output' (d_out). 
+        // The type is the second last parameter type of the function.
+        // 
+        auto paramCount = as<IRFuncType>(diffFunc->getDataType())->getParamCount();
+        IRParam* dOutParam = nullptr;
+        if (isResultDifferentiable)
+        {
+            auto dOutParamType = as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 2);
+
+            SLANG_ASSERT(dOutParamType);
+
+            dOutParam = builder->emitParam(dOutParamType);
+            builder->addNameHintDecoration(dOutParam, UnownedStringSlice("_s_dOut"));
+            result.propagateFuncParams.Add(dOutParam);
+        }
+
+        // Add a parameter for intermediate val.
+        auto ctxParam = builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1));
+        builder->addNameHintDecoration(ctxParam, UnownedStringSlice("_s_diff_ctx"));
+        result.primalFuncParams.Add(ctxParam);
+        result.propagateFuncParams.Add(ctxParam);
+        result.dOutParam = dOutParam;
+        return result;
+    }
+
+    void BackwardDiffTranscriberBase::writeBackDerivativeToInOutParams(ParameterBlockTransposeInfo& info, IRFunc* diffFunc)
+    {
+        IRInst* returnInst = nullptr;
+        for (auto block : diffFunc->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (inst->getOp() == kIROp_Return)
+                {
+                    returnInst = inst;
+                    break;
+                }
+            }
+        }
+        SLANG_RELEASE_ASSERT(returnInst);
+
+        IRBuilder builder(sharedBuilder);
+        builder.setInsertBefore(returnInst);
+        for (auto& wb : info.outDiffWritebacks)
+        {
+            auto dest = wb.Key;
+            auto srcPrimalVal = wb.Value.primal;
+            auto srcDiffAddr = wb.Value.differential;
+            auto srcDiffVal = builder.emitLoad(srcDiffAddr);
+            auto destVal = builder.emitMakeDifferentialPair(as<IRPtrTypeBase>(dest->getFullType())->getValueType(), srcPrimalVal, srcDiffVal);
+            builder.emitStore(dest, destVal);
+        }
     }
 
     InstPair BackwardDiffTranscriberBase::transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)

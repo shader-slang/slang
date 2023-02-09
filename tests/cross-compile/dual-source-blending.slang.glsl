@@ -21,16 +21,16 @@ struct FragmentOutput_0
 
 void main()
 {
+    const vec4 _S4 = vec4(0.0, 0.0, 0.0, 0.0);
     FragmentOutput_0 f_0;
 
-    FragmentOutput_0 _S4 = { vec4(0.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 0.0) };
-    f_0 = _S4;
+    f_0.a_0 = _S4;
 
+    f_0.b_0 = _S4;
     f_0.a_0 = _S3;
     f_0.b_0 = _S3;
-
     FragmentOutput_0 _S5 = f_0;
-    _S1 = _S5.a_0;
+    _S1 = f_0.a_0;
     _S2 = _S5.b_0;
 
     return;

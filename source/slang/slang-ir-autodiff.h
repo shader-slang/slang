@@ -160,6 +160,8 @@ struct DifferentiableTypeConformanceContext
     IRInst* lookUpConformanceForType(IRInst* type);
 
     IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key);
+    
+    IRInst* getDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairType* diffPairType);
 
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable interface.
@@ -188,6 +190,30 @@ struct DifferentiableTypeConformanceContext
         default:
             return lookUpInterfaceMethod(builder, origType, sharedContext->differentialAssocTypeStructKey);
         }
+    }
+
+    bool isDifferentiableType(IRType* origType)
+    {
+        for (; origType;)
+        {
+            switch (origType->getOp())
+            {
+            case kIROp_FloatType:
+            case kIROp_HalfType:
+            case kIROp_DoubleType:
+                return true;
+            case kIROp_VectorType:
+            case kIROp_ArrayType:
+            case kIROp_PtrType:
+            case kIROp_OutType:
+            case kIROp_InOutType:
+                origType = (IRType*)origType->getOperand(0);
+                continue;
+            default:
+                return lookUpConformanceForType(origType) != nullptr;
+            }
+        }
+        return false;
     }
 
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
@@ -260,6 +286,7 @@ struct DifferentialPairTypeBuilder
 };
 
 void stripAutoDiffDecorations(IRModule* module);
+void stripTempDecorations(IRInst* inst);
 
 bool isNoDiffType(IRType* paramType);
 
@@ -282,5 +309,21 @@ void stripDerivativeDecorations(IRInst* inst);
 bool isBackwardDifferentiableFunc(IRInst* func);
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
+
+inline bool isRelevantDifferentialPair(IRType* type)
+{
+    if (as<IRDifferentialPairType>(type))
+    {
+        return true;
+    }
+    else if (auto argPtrType = as<IRPtrTypeBase>(type))
+    {
+        if (as<IRDifferentialPairType>(argPtrType->getValueType()))
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 };

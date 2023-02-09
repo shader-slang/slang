@@ -1928,6 +1928,7 @@ namespace Slang
         }
 
         CASE(DerefExpr)
+        CASE(MakeRefExpr)
         CASE(MatrixSwizzleExpr)
         CASE(SwizzleExpr)
         CASE(OverloadedExpr)
@@ -2038,4 +2039,6 @@ namespace Slang
 
         void checkModule(ModuleDecl* programNode);
     };
+
+    bool isUnsizedArrayType(Type* type);
 }
