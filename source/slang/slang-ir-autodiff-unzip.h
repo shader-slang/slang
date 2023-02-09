@@ -284,6 +284,9 @@ struct DiffUnzipPass
         // blocks?
         // We ideally want the _last_ block before control loops back.
         // 
+        SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(
+            region->continueBlock->getTerminator())->getTargetBlock() == region->firstBlock);
+
         return region->continueBlock;
     }
 
@@ -292,7 +295,7 @@ struct DiffUnzipPass
         // Grab the 'condition' block.
         auto condBlock = region->firstBlock;
 
-        SLANG_ASSERT(as<IRIfElse>(condBlock->getTerminator()));
+        SLANG_RELEASE_ASSERT(as<IRIfElse>(condBlock->getTerminator()));
 
         return as<IRIfElse>(condBlock->getTerminator())->getTrueBlock();
     }
