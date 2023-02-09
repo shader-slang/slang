@@ -128,7 +128,7 @@ static HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& has
     {
         initialBuckets[hash(s)].add(s);
     }
-    initialBuckets.sort([](const List<String>& a, const List<String>& b) { return a.getCount() > b.getCount(); });
+    initialBuckets.stableSort([](const List<String>& a, const List<String>& b) { return a.getCount() > b.getCount(); });
 
     // These are our outputs, the salts are calculated such that for all input
     // word, x, hash(x, salt[hash(x, 0)]) is unique
