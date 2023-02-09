@@ -15,7 +15,7 @@ namespace Slang {
 struct SharedSCCPContext
 {
     IRModule*       module;
-    SharedIRBuilder sharedBuilder;
+    SharedIRBuilder* sharedBuilder;
 };
 //
 // Next we have a context struct that will be applied for each function (or other
@@ -1663,8 +1663,10 @@ bool applySparseConditionalConstantPropagation(
 {
     SharedSCCPContext shared;
     shared.module = module;
-    shared.sharedBuilder.init(module);
-    shared.sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
+    SharedIRBuilder sharedBuilderStorage;
+    shared.sharedBuilder = &sharedBuilderStorage;
+    sharedBuilderStorage.init(module);
+    sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
 
     // First we fold constants at global scope.
     SCCPContext globalContext;
@@ -1683,8 +1685,10 @@ bool applySparseConditionalConstantPropagation(IRInst* func)
 {
     SharedSCCPContext shared;
     shared.module = func->getModule();
-    shared.sharedBuilder.init(shared.module);
-    shared.sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
+    SharedIRBuilder sharedBuilderStorage;
+    shared.sharedBuilder = &sharedBuilderStorage;
+    sharedBuilderStorage.init(shared.module);
+    sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
 
     SCCPContext globalContext;
     globalContext.shared = &shared;
@@ -1692,6 +1696,24 @@ bool applySparseConditionalConstantPropagation(IRInst* func)
 
     // Run recursive SCCP passes on each child code block.
     return applySparseConditionalConstantPropagationRec(globalContext, func);
+}
+
+IRInst* tryConstantFoldInst(SharedIRBuilder* sharedBuilder, IRInst* inst)
+{
+    SharedSCCPContext shared;
+    shared.module = inst->getModule();
+    shared.sharedBuilder = sharedBuilder;
+    SCCPContext instContext;
+    instContext.shared = &shared;
+    instContext.code = nullptr;
+    instContext.builderStorage.init(sharedBuilder);
+    auto foldResult = instContext.interpretOverLattice(inst);
+    if (!foldResult.value)
+    {
+        return inst;
+    }
+    inst->replaceUsesWith(foldResult.value);
+    return foldResult.value;
 }
 
 }

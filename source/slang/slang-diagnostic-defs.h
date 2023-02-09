@@ -567,6 +567,7 @@ DIAGNOSTIC(40010, Note, seeInterfaceUsage, "see usage of interface '$0'.")
 
 DIAGNOSTIC(40011, Error, unconstrainedGenericParameterNotAllowedInDynamicFunction, "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
 
+DIAGNOSTIC(40020, Error, cannotUnrollLoop, "loop does not terminate within the limited number of iterations, unrolling is aborted.")
 
 // 41000 - IR-level validation issues
 

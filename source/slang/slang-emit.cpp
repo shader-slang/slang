@@ -34,6 +34,7 @@
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-reinterpret.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
@@ -376,6 +377,16 @@ Result linkAndOptimizeIR(
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
         // since we may be missing out cases prevented by the functions that we just specialzied.
         performMandatoryEarlyInlining(irModule);
+
+        // Unroll loops.
+        if (codeGenContext->getSink()->getErrorCount() == 0)
+        {
+            SharedIRBuilder sharedBuilder(irModule);
+            sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
+            if (!unrollLoopsInModule(&sharedBuilder, irModule, codeGenContext->getSink()))
+                return SLANG_FAIL;
+        }
+
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
         enableIRValidationAtInsert();

@@ -90,8 +90,6 @@ void main()
         }
         uint _S3 = (rayQueryGetIntersectionTypeEXT((query_0), false));
 
-        MyProceduralHitAttrs_0 committedProceduralAttrs_1;
-
         switch(_S3)
         {
         case 1U:
@@ -118,13 +116,13 @@ void main()
                         {
                         }
 
-                        committedProceduralAttrs_1 = _S6;
+                        committedProceduralAttrs_0 = _S6;
 
                     }
                     else
                     {
 
-                        committedProceduralAttrs_1 = committedProceduralAttrs_0;
+                        committedProceduralAttrs_0 = committedProceduralAttrs_0;
 
                     }
 
@@ -132,7 +130,7 @@ void main()
                 else
                 {
 
-                    committedProceduralAttrs_1 = committedProceduralAttrs_0;
+                    committedProceduralAttrs_0 = committedProceduralAttrs_0;
 
                 }
 
@@ -157,21 +155,15 @@ void main()
                 else
                 {
                 }
-
-                committedProceduralAttrs_1 = committedProceduralAttrs_0;
-
                 break;
             }
         default:
             {
-
-                committedProceduralAttrs_1 = committedProceduralAttrs_0;
-
                 break;
             }
         }
 
-        committedProceduralAttrs_0 = committedProceduralAttrs_1;
+        committedProceduralAttrs_0 = committedProceduralAttrs_0;
 
     }
 

@@ -2815,6 +2815,9 @@ __attributeTarget(LoopStmt)
 attribute_syntax [unroll(count: int = 0)]   : UnrollAttribute;
 
 __attributeTarget(LoopStmt)
+attribute_syntax [ForceUnroll(count: int = 0)]   : ForceUnrollAttribute;
+
+__attributeTarget(LoopStmt)
 attribute_syntax [loop]                 : LoopAttribute;
 
 __attributeTarget(LoopStmt)

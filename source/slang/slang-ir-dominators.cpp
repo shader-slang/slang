@@ -276,27 +276,19 @@ struct DepthFirstSearchContext
     /// then recursively visit its (unvisited) successors, and
     /// then perform any post-actions.
     ///
-    void walk(IRBlock* block)
+    template<typename SuccessorFunc>
+    void walk(IRBlock* block, const SuccessorFunc& getSuccessors)
     {
         visited.Add(block);
         preVisit(block);
-        for(auto succ : block->getSuccessors())
+        for(auto succ : getSuccessors(block))
         {
             if(!visited.Contains(succ))
             {
-                walk(succ);
+                walk(succ, getSuccessors);
             }
         }
         postVisit(block);
-    }
-
-    /// Walk the blocks in a function (or other code-bearing value).
-    void walk(IRGlobalValueWithCode* code)
-    {
-        auto root = code->getFirstBlock();
-        if(!root)
-            return;
-        walk(root);
     }
 
     /// Overridable action to perform on first entering a CFG node.
@@ -329,7 +321,8 @@ void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
 {
     PostorderComputationContext context;
     context.order = &outOrder;
-    context.walk(code);
+    if (code->getFirstBlock())
+        context.walk(code->getFirstBlock(), [](IRBlock* block) {return block->getSuccessors(); });
 
     // Append unvisited blocks (unreachable blocks) to the begining of postOrder.
     List<IRBlock*> prefix;
@@ -342,6 +335,25 @@ void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
     }
     prefix.addRange(outOrder);
     outOrder = _Move(prefix);
+}
+
+void computePostorderOnReverseCFG(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
+{
+    PostorderComputationContext context;
+    context.order = &outOrder;
+    for (auto block = code->getLastBlock(); block; block = block->getPrevBlock())
+    {
+        auto terminator = block->getTerminator();
+        switch (terminator->getOp())
+        {
+        case kIROp_Return:
+        case kIROp_MissingReturn:
+        case kIROp_Unreachable:
+            context.walk(block, [](IRBlock* b) {return b->getPredecessors(); });
+            break;
+        }
+    }
+    return;
 }
 
 //

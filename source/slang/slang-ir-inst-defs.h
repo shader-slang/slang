@@ -678,6 +678,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A `[ForceInline]` decoration indicates the callee should be inlined by the Slang compiler.
     INST(ForceInlineDecoration, ForceInline, 0, 0)
 
+        /// A `[ForceUnroll]` decoration indicates the loop should be unrolled by the Slang compiler.
+    INST(ForceUnrollDecoration, ForceUnroll, 0, 0)
+
         /// A `[naturalSizeAndAlignment(s,a)]` decoration is attached to a type to indicate that is has natural size `s` and alignment `a`
     INST(NaturalSizeAndAlignmentDecoration, naturalSizeAndAlignment, 2, 0)
 

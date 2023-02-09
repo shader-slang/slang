@@ -531,6 +531,9 @@ IR_SIMPLE_DECORATION(UnsafeForceInlineEarlyDecoration)
 
 IR_SIMPLE_DECORATION(ForceInlineDecoration)
 
+IR_SIMPLE_DECORATION(ForceUnrollDecoration)
+
+
 struct IRNaturalSizeAndAlignmentDecoration : IRDecoration
 {
     enum { kOp = kIROp_NaturalSizeAndAlignmentDecoration };
@@ -3546,6 +3549,11 @@ public:
     void addLoopMaxItersDecoration(IRInst* value, IntegerLiteralValue iters)
     {
         addDecoration(value, kIROp_LoopMaxItersDecoration, getIntValue(getIntType(), iters));
+    }
+
+    void addLoopForceUnrollDecoration(IRInst* value, IntegerLiteralValue iters)
+    {
+        addDecoration(value, kIROp_ForceUnrollDecoration, getIntValue(getIntType(), iters));
     }
 
     void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)

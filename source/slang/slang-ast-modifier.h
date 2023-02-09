@@ -616,8 +616,15 @@ class AttributeUsageAttribute : public Attribute
 class UnrollAttribute : public Attribute 
 {
     SLANG_AST_CLASS(UnrollAttribute)
- 
-    IntegerLiteralValue getCount();
+
+};
+
+// An `[unroll]` or `[unroll(count)]` attribute
+class ForceUnrollAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ForceUnrollAttribute)
+
+    int32_t maxIterations = 0;
 };
 
 // An `[maxiters(count)]`
