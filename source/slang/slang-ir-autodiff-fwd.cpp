@@ -1190,6 +1190,8 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
         inBuilder->addForwardDerivativeDecoration(origFunc, diffFunc);
     }
 
+    inBuilder->addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
+
     FuncBodyTranscriptionTask task;
     task.type = FuncBodyTranscriptionTaskType::Forward;
     task.originalFunc = origFunc;

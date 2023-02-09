@@ -4604,6 +4604,14 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode)
+    {
+        return addDecoration(
+            dest,
+            kIROp_FloatingPointModeOverrideDecoration,
+            getIntValue(getIntType(), (IRIntegerValue)mode));
+    }
+
     IRInst* IRBuilder::emitSwizzle(
         IRType*         type,
         IRInst*         base,
@@ -6418,6 +6426,20 @@ namespace Slang
         return false;
     }
 
+    bool isIntegralScalarOrCompositeType(IRType* t)
+    {
+        if (!t)
+            return false;
+        switch (t->getOp())
+        {
+        case kIROp_VectorType:
+        case kIROp_MatrixType:
+            return isIntegralType((IRType*)t->getOperand(0));
+        default:
+            return isIntegralType(t);
+        }
+    }
+
     void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     {
         Index index = outInsts.getCount();
@@ -6577,6 +6599,8 @@ namespace Slang
     void IRInst::insertBefore(IRInst* other)
     {
         SLANG_ASSERT(other);
+        if (other->getPrevInst() == this)
+            return;
         _insertAt(other->getPrevInst(), other, other->getParent());
     }
 

@@ -295,6 +295,7 @@ struct ExtractPrimalFuncContext
         auto oldIntermediateParam = func->getLastParam();
         auto outIntermediary =
             builder.emitParam(builder.getInOutType((IRType*)intermediateType));
+        oldIntermediateParam->transferDecorationsTo(outIntermediary);
         primalParams.Add(outIntermediary);
         oldIntermediateParam->replaceUsesWith(outIntermediary);
         oldIntermediateParam->removeAndDeallocate();
@@ -473,15 +474,34 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                 if (inst->getOp() == kIROp_Var)
                 {
                     // This is a var for intermediate context.
-                    auto valType = cast<IRPtrTypeBase>(inst->getFullType())->getValueType();
-                    auto val = builder.emitFieldExtract(
-                        valType,
-                        intermediateVar,
-                        structKeyDecor->getStructKey());
-                    auto tempVar =
-                        builder.emitVar(valType);
-                    builder.emitStore(tempVar, val);
-                    inst->replaceUsesWith(tempVar);
+                    // Replace all loads of the var with a field extract.
+                    // Other type of uses will get a temp var that stores a copy of the field.
+                    while (auto use = inst->firstUse)
+                    {
+                        if (as<IRDecoration>(use->getUser()))
+                        {
+                            use->set(builder.getVoidValue());
+                            continue;
+                        }
+                        builder.setInsertBefore(use->getUser());
+                        auto valType = cast<IRPtrTypeBase>(inst->getFullType())->getValueType();
+                        auto val = builder.emitFieldExtract(
+                            valType,
+                            intermediateVar,
+                            structKeyDecor->getStructKey());
+                        if (use->getUser()->getOp() == kIROp_Load)
+                        {
+                            use->getUser()->replaceUsesWith(val);
+                            use->getUser()->removeAndDeallocate();
+                        }
+                        else
+                        {
+                            auto tempVar =
+                                builder.emitVar(valType);
+                            builder.emitStore(tempVar, val);
+                            use->set(tempVar);
+                        }
+                    }
                 }
                 else
                 {
