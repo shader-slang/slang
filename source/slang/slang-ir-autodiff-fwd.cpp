@@ -877,6 +877,14 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
                     diffBase, diffAccessChain, diffVal);
                 builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
             }
+            else
+            {
+                auto primalElementType = primalVal->getDataType();
+                auto zeroElementDiff = getDifferentialZeroOfType(builder, primalElementType);
+                diffUpdateElement = builder->emitUpdateElement(
+                    diffBase, diffAccessChain, zeroElementDiff);
+                builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
+            }
         }
     }
     return InstPair(primalUpdateField, diffUpdateElement);
