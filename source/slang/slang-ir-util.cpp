@@ -413,8 +413,9 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             }
 
             // If any pointer typed argument of the call inst may overlap addr, return true.
-            for (UInt i = 1; i < call->getArgCount(); i++)
+            for (UInt i = 0; i < call->getArgCount(); i++)
             {
+                SLANG_RELEASE_ASSERT(call->getArg(i)->getDataType());
                 if (isPtrLikeOrHandleType(call->getArg(i)->getDataType()))
                 {
                     if (canAddressesPotentiallyAlias(func, call->getArg(i), addr))
