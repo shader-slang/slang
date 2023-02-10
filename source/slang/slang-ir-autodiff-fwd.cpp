@@ -148,7 +148,7 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 builder->markInstAsDifferential(diffRightTimesLeft, resultType);
                 builder->markInstAsDifferential(diffSub, resultType);
                 
-                auto diffMul = builder->emitMul(resultType, primalRight, primalRight);
+                auto diffMul = builder->emitMul(primalRight->getFullType(), primalRight, primalRight);
                 builder->markInstAsPrimal(diffMul);
 
                 auto diffDiv = builder->emitDiv(diffType, diffSub, diffMul);
