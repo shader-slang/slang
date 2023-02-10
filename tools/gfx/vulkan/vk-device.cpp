@@ -221,7 +221,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         for (auto apiVersion : apiVersionsToTry)
         {
             applicationInfo.apiVersion = apiVersion;
-            if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) == VK_SUCCESS)
+            // If r is VK_ERROR_LAYER_NOT_PRESENT, it's almost certainly
+            // because the layer shared library failed to load (we check that
+            // the layer is known earlier). It might, for example, be absent
+            // from the system library search path, and not referenced with an
+            // absolute path in VkLayer_khronos_validation.json.
+            const auto r = m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) ;
+            if (r == VK_SUCCESS)
             {
                 break;
             }
