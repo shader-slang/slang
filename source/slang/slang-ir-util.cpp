@@ -364,6 +364,8 @@ bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IR
 
 bool isPtrLikeOrHandleType(IRInst* type)
 {
+    if (!type)
+        return false;
     switch (type->getOp())
     {
     case kIROp_ComPtrType:
