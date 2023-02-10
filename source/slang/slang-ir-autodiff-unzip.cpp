@@ -256,7 +256,8 @@ struct ExtractPrimalFuncContext
         auto structKey = genTypeBuilder.createStructKey();
         genTypeBuilder.setInsertInto(structType);
 
-        if (isChildInstOf(fieldType->getParent(), structType->getParent()))
+        if (fieldType->getParent() != structType->getParent() &&
+            isChildInstOf(fieldType->getParent(), structType->getParent()))
         {
             IRCloneEnv cloneEnv;
             fieldType = cloneInst(&cloneEnv, &genTypeBuilder, fieldType);

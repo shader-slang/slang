@@ -364,6 +364,8 @@ bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IR
 
 bool isPtrLikeOrHandleType(IRInst* type)
 {
+    if (!type)
+        return false;
     switch (type->getOp())
     {
     case kIROp_ComPtrType:
@@ -413,6 +415,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             // If any pointer typed argument of the call inst may overlap addr, return true.
             for (UInt i = 0; i < call->getArgCount(); i++)
             {
+                SLANG_RELEASE_ASSERT(call->getArg(i)->getDataType());
                 if (isPtrLikeOrHandleType(call->getArg(i)->getDataType()))
                 {
                     if (canAddressesPotentiallyAlias(func, call->getArg(i), addr))
