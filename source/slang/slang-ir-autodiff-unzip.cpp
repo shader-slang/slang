@@ -532,10 +532,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     
     stripTempDecorations(func);
 
-    // Run simplification to DCE unnecessary insts.
-    eliminateDeadCode(func);
-    eliminateDeadCode(primalFunc);
-
     return primalFunc;
 }
 } // namespace Slang
