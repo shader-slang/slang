@@ -502,6 +502,17 @@ namespace Slang
         // TODO: we should handle the special case of `{0}` as an initializer
         // for arbitrary `struct` types here.
 
+        // If this initializer list has a more specific type than just
+        // InitializerListType (i.e. it's already undergone a coercion) we
+        // should ensure that we're allowed to coerce from that type to our
+        // desired type.
+        // If this isn't prohibited, then we can proceed to try and coerce from
+        // the initializer list itself; assuming that coercion is closed under
+        // composition this shouldn't fail.
+        if(!as<InitializerListType>(fromInitializerListExpr->type) &&
+           !canCoerce(toType, fromInitializerListExpr->type, nullptr))
+            return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
+
         if(!_readAggregateValueFromInitializerList(toType, outToExpr, fromInitializerListExpr, argIndex))
             return false;
 
