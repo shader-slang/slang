@@ -2474,7 +2474,7 @@ namespace Slang
         auto funcExpr = expr->functionExpr;
         funcExpr = CheckTerm(funcExpr);
 
-        // Now ensure that the term represnets a (proper) type.
+        // Now ensure that the term represents a (proper) type.
         TypeExp typeExp;
         typeExp.exp = funcExpr;
         typeExp = CheckProperType(typeExp);
@@ -2544,6 +2544,7 @@ namespace Slang
                             // make this a major concern (since they aren't supported in HLSL).
                             //
                             InitializerListExpr* initListExpr = m_astBuilder->create<InitializerListExpr>();
+                            initListExpr->loc = expr->loc;
                             auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
                             return coerce(typeExp.type, checkedInitListExpr);
