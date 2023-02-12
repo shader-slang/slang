@@ -539,6 +539,10 @@ namespace Slang
             {
                 builder.emitStore(tempVar, builder.emitLoad(param));
             }
+            else
+            {
+                builder.emitStore(tempVar, builder.emitDefaultConstruct(ptrType->getValueType()));
+            }
         }
 
         for (auto block : func->getBlocks())
@@ -589,6 +593,7 @@ namespace Slang
         AutoDiffAddressConversionPolicy cvtPolicty;
         cvtPolicty.diffTypeContext = &diffTypeContext;
         auto result = eliminateAddressInsts(sharedBuilder, &cvtPolicty, func, sink);
+
         if (SLANG_SUCCEEDED(result))
         {
             simplifyFunc(func);
@@ -824,6 +829,7 @@ namespace Slang
             moveInstChildren(existingPrimalHeader, primalFuncGeneric);
             primalFuncGeneric->replaceUsesWith(existingPrimalHeader);
             primalFuncGeneric->removeAndDeallocate();
+            primalFuncGeneric = existingPrimalHeader;
         }
         else
         {
@@ -831,7 +837,7 @@ namespace Slang
             builder->addBackwardDerivativePrimalDecoration(primalFunc, specializedBackwardPrimalFunc);
         }
 
-        initializeLocalVariables(builder->getSharedBuilder(), primalFunc);
+        initializeLocalVariables(builder->getSharedBuilder(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
         initializeLocalVariables(builder->getSharedBuilder(), diffPropagateFunc);
     }
 
@@ -957,7 +963,6 @@ namespace Slang
                     // after transposition.
                     auto tempVar = nextBlockBuilder.emitVar(diffType);
                     copyNameHintDecoration(tempVar, fwdParam);
-                    nextBlockBuilder.markInstAsDifferential(tempVar, diffPairType);
 
                     // Initialize the var with input diff param at start.
                     // Note that we insert the store in the primal block so it won't get transposed.
@@ -1088,7 +1093,6 @@ namespace Slang
                 auto diffVar = nextBlockBuilder.emitVar(diffType);
                 copyNameHintDecoration(diffVar, fwdParam);
                 result.propagateFuncSpecificPrimalInsts.add(diffVar);
-                diffBuilder.markInstAsDifferential(diffVar, diffPairType);
                 diffRefReplacement = diffVar;
 
                 // Clear the diff read var to zero at start of the function.

@@ -506,6 +506,7 @@ struct DiffTransposePass
         List<IRBlock*> traverseWorkList;
         HashSet<IRBlock*> traverseSet;
         traverseWorkList.add(revDiffFunc->getFirstBlock());
+
         traverseSet.Add(revDiffFunc->getFirstBlock());
         for (IRBlock* block = revDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
         {
@@ -517,8 +518,12 @@ struct DiffTransposePass
                 // or entirely with differential insts.
                 continue;
             }
+
             workList.add(block);
         }
+
+        if (!workList.getCount())
+            return;
 
         // Reverse the order of the blocks.
         workList.reverse();
@@ -533,7 +538,32 @@ struct DiffTransposePass
         // Keep track of first diff block, since this is where 
         // we'll emit temporary vars to hold per-block derivatives.
         // 
-        firstRevDiffBlockMap[revDiffFunc] = revBlockMap[terminalDiffBlocks[0]];
+        auto firstRevDiffBlock = revBlockMap[terminalDiffBlocks[0]].GetValue();
+        firstRevDiffBlockMap[revDiffFunc] = firstRevDiffBlock;
+
+        // Move all diff vars to first block, and initialize them with zero.
+        builder.setInsertInto(firstRevDiffBlock);
+        for (auto block : workList)
+        {
+            for (auto inst = block->getFirstInst(); inst;)
+            {
+                auto nextInst = inst->getNextInst();
+                if (auto varInst = as<IRVar>(inst))
+                {
+                    if (auto diffDecor = varInst->findDecoration<IRDifferentialInstDecoration>())
+                    {
+                        if (auto ptrPrimalType = as<IRPtrTypeBase>(diffDecor->getPrimalType()))
+                        {
+                            varInst->insertAtEnd(firstRevDiffBlock);
+
+                            auto dzero = emitDZeroOfDiffInstType(&builder, ptrPrimalType->getValueType());
+                            builder.emitStore(varInst, dzero);
+                        }
+                    }
+                }
+                inst = nextInst;
+            }
+        }
 
         for (auto block : workList)
         {
