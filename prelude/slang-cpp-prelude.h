@@ -207,6 +207,9 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 // GCC Specific
 #if SLANG_GCC_FAMILY
 #	define SLANG_ALIGN_OF(T)	__alignof__(T)
+
+#   define SLANG_BREAKPOINT(id) __builtin_trap()
+
 // Use this macro instead of offsetof, because gcc produces warning if offsetof is used on a 
 // non POD type, even though it produces the correct result
 #   define SLANG_OFFSET_OF(T, ELEMENT) (size_t(&((T*)1)->ELEMENT) - 1)
@@ -215,12 +218,20 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 // Microsoft VC specific
 #if SLANG_VC
 #   define SLANG_ALIGN_OF(T) __alignof(T)
+
+#	define SLANG_BREAKPOINT(id) __debugbreak();
+
 #endif // SLANG_VC
 
 // Default impls
 
 #ifndef SLANG_OFFSET_OF
 #   define SLANG_OFFSET_OF(X, Y) offsetof(X, Y)
+#endif
+
+#ifndef SLANG_BREAKPOINT
+// Make it crash with a write to 0!
+#   define SLANG_BREAKPOINT(id) (*((int*)0) = int(id));
 #endif
 
 // If slang.h has been included we don't need any of these definitions
