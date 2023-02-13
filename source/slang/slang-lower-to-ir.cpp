@@ -4849,6 +4849,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
         }
+        else if (auto forceUnrollAttr = stmt->findModifier<ForceUnrollAttribute>())
+        {
+            getBuilder()->addLoopForceUnrollDecoration(inst, forceUnrollAttr->maxIterations);
+        }
         // TODO: handle other cases here
     }
 

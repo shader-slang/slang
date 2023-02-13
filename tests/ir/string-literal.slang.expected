@@ -1,6 +1,7 @@
 result code = 0
 standard error = {
 ### LOWER-TO-IR:
+undefined
 [entryPoint(6 : Int, "main", "string-literal")]
 [numThreads(1 : Int, 1 : Int, 1 : Int)]
 [export("_S3tu04mainp1puV")]
@@ -13,7 +14,6 @@ block %1(
 	return_val(void_constant)
 }
 global_hashed_string_literals("Hello \t\n\0x083 World")
-undefined
 ###
 }
 standard output = {

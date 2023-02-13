@@ -86,21 +86,13 @@ struct DeadCodeEliminationContext
     {
         if (!undefInst)
         {
-            for (auto inst : module->getModuleInst()->getChildren())
-            {
-                if (inst->getOp() == kIROp_undefined && inst->getDataType() && inst->getDataType()->getOp() == kIROp_VoidType)
-                {
-                    undefInst = inst;
-                    break;
-                }
-            }
-            if (!undefInst)
-            {
-                SharedIRBuilder builderStorage(module);
-                IRBuilder builder(&builderStorage);
+            SharedIRBuilder builderStorage(module);
+            IRBuilder builder(&builderStorage);
+            if (auto firstChild = module->getModuleInst()->getFirstChild())
+                builder.setInsertBefore(firstChild);
+            else
                 builder.setInsertInto(module->getModuleInst());
-                undefInst = builder.emitUndefined(builder.getVoidType());
-            }
+            undefInst = Slang::getUndefInst(builder, module);
         }
         return undefInst;
     }

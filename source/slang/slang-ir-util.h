@@ -167,6 +167,9 @@ bool isPureFunctionalCall(IRCall* callInst);
 bool isPtrLikeOrHandleType(IRInst* type);
 
 bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
+
+IRInst* getUndefInst(IRBuilder builder, IRModule* module);
+
 }
 
 #endif
