@@ -427,7 +427,7 @@ struct PeepholeContext : InstPassBase
                             else
                                 break;
                             if (i == (IRIntegerValue)constIndex->getValue())
-                                arg = inst->getOperand(2);
+                                arg = updateInst->getElementValue();
                             args.add(arg);
                         }
                         if (args.getCount() == arraySize->getValue())
@@ -456,8 +456,8 @@ struct PeepholeContext : InstPassBase
                             IRInst* arg = nullptr;
                             if (i < oldVal->getOperandCount())
                                 arg = oldVal->getOperand(i);
-                            if (field->getKey() == inst->getOperand(1))
-                                arg = inst->getOperand(2);
+                            if (field->getKey() == key)
+                                arg = updateInst->getElementValue();
                             if (arg)
                             {
                                 args.add(arg);
