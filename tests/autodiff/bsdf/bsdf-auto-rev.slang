@@ -32,10 +32,15 @@ struct Auto_Bwd_BSDFParameters : IDifferentiable
 };
 
 [BackwardDifferentiable]
-void bsdfGGXSample(in ShadingData sd, in Auto_Bwd_BSDFParameters params, out Auto_Bwd_ScatterSample result)
+bool bsdfGGXSample(in ShadingData sd, in Auto_Bwd_BSDFParameters params, out Auto_Bwd_ScatterSample result)
 {
     float3 wiLocal = no_diff(sd.toLocal(sd.V));
     float2 u = float2(0.8, 0.3);
+
+    if (wiLocal.z < 1e-6)
+    {
+        return false;
+    }
 
     // Taken from Rendering.Materials.Microfacet. Follows the Walter et al. EGSR07 BTDF paper
     float alphaSqr = params.roughness * params.roughness;
@@ -52,6 +57,8 @@ void bsdfGGXSample(in ShadingData sd, in Auto_Bwd_BSDFParameters params, out Aut
     result.wo = no_diff(sd.fromLocal(woLocal)); // wo to world.
     result.pdf = detach(pdf);
     result.weight = evalGGXDivByPDF(wiLocal, woLocal, hLocal, params) * pdf / detach(pdf);
+
+    return woLocal.z > 1e-6;
 }
 
 [BackwardDifferentiable]

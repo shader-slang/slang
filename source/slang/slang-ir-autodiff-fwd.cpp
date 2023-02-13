@@ -1514,7 +1514,8 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam
 
             auto diffType = differentiateType(builder, cast<IRPtrTypeBase>(origParam->getDataType())->getValueType());
             auto diff = builder->emitVar(diffType);
-            builder->markInstAsDifferential(diff, ptrInnerPairType->getValueType());
+            builder->markInstAsDifferential(
+                diff, builder->getPtrType(ptrInnerPairType->getValueType()));
 
             IRInst* primalInitVal = nullptr;
             IRInst* diffInitVal = nullptr;
