@@ -735,14 +735,10 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 Index argIndex = 0;
                 SLANG_RELEASE_ASSERT(m_argCount > argIndex);
                 auto arg = m_args[argIndex].get();
-                auto argLoad = as<IRLoad>(arg);
-                SLANG_RELEASE_ASSERT(argLoad);
-
-                auto argVar = argLoad->getOperand(0);
 
                 // Find the associated decoration
                 IRDecoration* foundDecoration = nullptr;
-                for (auto decoration : argVar->getDecorations())
+                for (auto decoration : arg->getDecorations())
                 {
                     const auto curKind = LocationTracker::getKindFromDecoration(decoration);
                     if (curKind == kind)
@@ -755,7 +751,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 // Must have found the decoration
                 SLANG_ASSERT(foundDecoration);
 
-                const auto location = m_emitter->getLocationTracker().getValue(kind, argVar, foundDecoration);
+                const auto location = m_emitter->getLocationTracker().getValue(kind, arg, foundDecoration);
                 m_writer->emit(location);
             }
         }

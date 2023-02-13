@@ -349,6 +349,7 @@ DIAGNOSTIC(31143, Error, missingOriginalDefintionOfExternDecl, "no original defi
 
 DIAGNOSTIC(31145, Error, invalidCustomDerivative, "invalid custom derivative attribute.")
 DIAGNOSTIC(31146, Error, declAlreadyHasAttribute, "'$0' already has attribute '[$1]'.")
+DIAGNOSTIC(31147, Error, cannotResolveOriginalFunctionForDerivative, "cannot resolve the original function for the the custom derivative.")
 
 // Enums
 
@@ -566,6 +567,7 @@ DIAGNOSTIC(40010, Note, seeInterfaceUsage, "see usage of interface '$0'.")
 
 DIAGNOSTIC(40011, Error, unconstrainedGenericParameterNotAllowedInDynamicFunction, "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
 
+DIAGNOSTIC(40020, Error, cannotUnrollLoop, "loop does not terminate within the limited number of iterations, unrolling is aborted.")
 
 // 41000 - IR-level validation issues
 

@@ -193,13 +193,14 @@ SLANG_NO_THROW Result SLANG_MCALL
     return SLANG_OK;
 }
 
-SLANG_NO_THROW void SLANG_MCALL ComputeCommandEncoderImpl::dispatchCompute(int x, int y, int z)
+SLANG_NO_THROW Result SLANG_MCALL ComputeCommandEncoderImpl::dispatchCompute(int x, int y, int z)
 {
     m_writer->bindRootShaderObject(m_rootObject);
     m_writer->dispatchCompute(x, y, z);
+    return SLANG_OK;
 }
 
-SLANG_NO_THROW void SLANG_MCALL
+SLANG_NO_THROW Result SLANG_MCALL
     ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
     SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");

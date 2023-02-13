@@ -502,6 +502,17 @@ namespace Slang
         // TODO: we should handle the special case of `{0}` as an initializer
         // for arbitrary `struct` types here.
 
+        // If this initializer list has a more specific type than just
+        // InitializerListType (i.e. it's already undergone a coercion) we
+        // should ensure that we're allowed to coerce from that type to our
+        // desired type.
+        // If this isn't prohibited, then we can proceed to try and coerce from
+        // the initializer list itself; assuming that coercion is closed under
+        // composition this shouldn't fail.
+        if(!as<InitializerListType>(fromInitializerListExpr->type) &&
+           !canCoerce(toType, fromInitializerListExpr->type, nullptr))
+            return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
+
         if(!_readAggregateValueFromInitializerList(toType, outToExpr, fromInitializerListExpr, argIndex))
             return false;
 
@@ -640,11 +651,6 @@ namespace Slang
             if(outCost)
                 *outCost = kConversionCost_None;
             return true;
-        }
-
-        if (auto refType = as<RefType>(toType))
-        {
-            return _coerce(refType->getValueType(), outToExpr, fromType, fromExpr, outCost);
         }
 
         // If both are string types we assume they are convertable in both directions
@@ -859,6 +865,63 @@ namespace Slang
                 *outCost = subCost + kConversionCost_ImplicitDereference;
             return true;
         }
+
+        if (auto refType = as<RefType>(toType))
+        {
+            if (!refType->getValueType()->equals(fromType))
+                return false;
+            if (!fromExpr->type.isLeftValue)
+                return false;
+            
+            ConversionCost subCost = kConversionCost_GetRef;
+
+            MakeRefExpr* refExpr = nullptr;
+            if (outToExpr)
+            {
+                refExpr = m_astBuilder->create<MakeRefExpr>();
+                refExpr->base = fromExpr;
+                refExpr->type = QualType(refType);
+                refExpr->type.isLeftValue = false;
+                *outToExpr = refExpr;
+            }
+            if (outCost)
+                *outCost = subCost;
+            return true;
+        }
+
+
+        // Allow implicit dereferencing a reference type.
+        if (auto fromRefType = as<RefType>(fromType))
+        {
+            auto fromValueType = fromRefType->getValueType();
+
+            // If we convert, e.g., `ConstantBuffer<A> to `A`, we will allow
+            // subsequent conversion of `A` to `B` if such a conversion
+            // is possible.
+            //
+            ConversionCost subCost = kConversionCost_None;
+
+            Expr* openRefExpr = nullptr;
+            if (outToExpr)
+            {
+                openRefExpr = maybeOpenRef(fromExpr);
+            }
+
+            if (!_coerce(
+                toType,
+                outToExpr,
+                fromValueType,
+                openRefExpr,
+                &subCost))
+            {
+                return false;
+            }
+
+            if (outCost)
+                *outCost = subCost + kConversionCost_ImplicitDereference;
+            return true;
+        }
+
 
         // The main general-purpose approach for conversion is
         // using suitable marked initializer ("constructor")

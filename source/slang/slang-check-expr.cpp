@@ -478,6 +478,7 @@ namespace Slang
         if (!parent)
             return nullptr;
 
+
         // If we reach here, we are expecting a synthesized decl defined in `subType`.
         // Instead of returning a DeclRefExpr to the requirement decl, we synthesize a placeholder decl
         // in `subType` and return a DeclRefExpr to the synthesized decl.
@@ -862,6 +863,15 @@ namespace Slang
 
         if (auto declRefType = as<DeclRefType>(type))
         {
+            if (auto builtinRequirement = declRefType->declRef.getDecl()->findModifier<BuiltinRequirementModifier>())
+            {
+                if (builtinRequirement->kind == BuiltinRequirementKind::DifferentialType)
+                {
+                    // We are trying to get differential type from a differential type.
+                    // The result is itself.
+                    return type;
+                }
+            }
             if (auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterface())))
             {
                 auto diffTypeLookupResult = lookUpMember(
@@ -1853,6 +1863,7 @@ namespace Slang
 
     Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     {
+        expr->left = maybeOpenRef(expr->left);
         auto type = expr->left->type;
         auto right = maybeOpenRef(expr->right);
         expr->right = coerce(type, right);
@@ -2222,8 +2233,17 @@ namespace Slang
             {
                 if (as<DifferentialPairType>(derivType))
                 {
-                    // Using inout type on all the derivative parameters
+                    // An `in` differentiable parameter becomes an `inout` parameter.
                     derivType = m_astBuilder->getInOutType(derivType);
+                }
+                else if (auto inoutType = as<InOutType>(derivType))
+                {
+                    if (!as<DifferentialPairType>(inoutType->getValueType()))
+                    {
+                        // An `inout` non differentiable parameter becomes an `in` parameter
+                        // (removing `out`).
+                        derivType = inoutType->getValueType();
+                    }
                 }
                 type->paramTypes.add(derivType);
             }
@@ -2328,6 +2348,13 @@ namespace Slang
                 {
                     for (auto param : funcDecl->getParameters())
                     {
+                        if (param->findModifier<NoDiffModifier>())
+                        {
+                            if (param->findModifier<OutModifier>() &&
+                                !param->findModifier<InModifier>() &&
+                                !param->findModifier<InOutModifier>())
+                                continue;
+                        }
                         resultDiffExpr->newParameterNames.add(param->getName());
                     }
                     resultDiffExpr->newParameterNames.add(semantics->getName("resultGradient"));
@@ -2447,7 +2474,7 @@ namespace Slang
         auto funcExpr = expr->functionExpr;
         funcExpr = CheckTerm(funcExpr);
 
-        // Now ensure that the term represnets a (proper) type.
+        // Now ensure that the term represents a (proper) type.
         TypeExp typeExp;
         typeExp.exp = funcExpr;
         typeExp = CheckProperType(typeExp);
@@ -2517,6 +2544,7 @@ namespace Slang
                             // make this a major concern (since they aren't supported in HLSL).
                             //
                             InitializerListExpr* initListExpr = m_astBuilder->create<InitializerListExpr>();
+                            initListExpr->loc = expr->loc;
                             auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
                             return coerce(typeExp.type, checkedInitListExpr);

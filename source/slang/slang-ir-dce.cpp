@@ -3,6 +3,7 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -16,6 +17,7 @@ struct DeadCodeEliminationContext
     // `eliminateDeadCode` function.
     //
     IRModule*                       module;
+
     IRDeadCodeEliminationOptions    options;
 
     // If we removed an inst, there may be still "weak references" to the inst.
@@ -84,21 +86,13 @@ struct DeadCodeEliminationContext
     {
         if (!undefInst)
         {
-            for (auto inst : module->getModuleInst()->getChildren())
-            {
-                if (inst->getOp() == kIROp_undefined && inst->getDataType() && inst->getDataType()->getOp() == kIROp_VoidType)
-                {
-                    undefInst = inst;
-                    break;
-                }
-            }
-            if (!undefInst)
-            {
-                SharedIRBuilder builderStorage(module);
-                IRBuilder builder(&builderStorage);
+            SharedIRBuilder builderStorage(module);
+            IRBuilder builder(&builderStorage);
+            if (auto firstChild = module->getModuleInst()->getFirstChild())
+                builder.setInsertBefore(firstChild);
+            else
                 builder.setInsertInto(module->getModuleInst());
-                undefInst = builder.emitUndefined(builder.getVoidType());
-            }
+            undefInst = Slang::getUndefInst(builder, module);
         }
         return undefInst;
     }
@@ -128,6 +122,9 @@ struct DeadCodeEliminationContext
         {
             auto inst = workList.getLast();
             workList.removeLast();
+
+            if (!isChildInstOf(inst, root))
+                continue;
 
             // At this point we know that `inst` is live,
             // and we want to start considering which other
@@ -426,7 +423,6 @@ bool eliminateDeadCode(
     DeadCodeEliminationContext context;
     context.module = module;
     context.options = options;
-
     return context.processModule();
 }
 
@@ -437,7 +433,6 @@ bool eliminateDeadCode(
     DeadCodeEliminationContext context;
     context.module = root->getModule();
     context.options = options;
-
     return context.processInst(root);
 }
 

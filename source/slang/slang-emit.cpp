@@ -34,6 +34,7 @@
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-reinterpret.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
@@ -54,6 +55,7 @@
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-simplify-for-emit.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -375,6 +377,16 @@ Result linkAndOptimizeIR(
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
         // since we may be missing out cases prevented by the functions that we just specialzied.
         performMandatoryEarlyInlining(irModule);
+
+        // Unroll loops.
+        if (codeGenContext->getSink()->getErrorCount() == 0)
+        {
+            SharedIRBuilder sharedBuilder(irModule);
+            sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
+            if (!unrollLoopsInModule(&sharedBuilder, irModule, codeGenContext->getSink()))
+                return SLANG_FAIL;
+        }
+
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
         enableIRValidationAtInsert();
@@ -1008,6 +1020,9 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             linkedIR));
         
         auto irModule = linkedIR.module;
+        
+        // Perform final simplifications to help emit logic to generate more compact code.
+        simplifyForEmit(irModule);
 
         metadata = linkedIR.metadata;
 
@@ -1015,15 +1030,6 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         // passes have been performed, we can emit target code from
         // the IR module.
         //
-        // TODO: do we want to emit directly from IR, or translate the
-        // IR back into AST for emission?
-#if 0
-        {
-            StringBuilder sb;
-            StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
-            dumpIR(irModule, getIRDumpOptions(), sourceManager, &writer);
-        }
-#endif
         sourceEmitter->emitModule(irModule, sink);
     }
 

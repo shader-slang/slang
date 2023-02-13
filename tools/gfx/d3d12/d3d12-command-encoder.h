@@ -177,9 +177,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL dispatchCompute(int x, int y, int z) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW Result SLANG_MCALL
         dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override;
 };
 
@@ -250,23 +250,23 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset = 0) override;
 
-    void prepareDraw();
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    Result prepareDraw();
+    virtual SLANG_NO_THROW Result SLANG_MCALL
         draw(GfxCount vertexCount, GfxIndex startVertex = 0) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW Result SLANG_MCALL
         drawIndexed(GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0) override;
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
+    virtual SLANG_NO_THROW Result SLANG_MCALL drawIndirect(
         GfxCount maxDrawCount,
         IBufferResource* argBuffer,
         Offset argOffset,
         IBufferResource* countBuffer,
         Offset countOffset) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
+    virtual SLANG_NO_THROW Result SLANG_MCALL drawIndexedIndirect(
         GfxCount maxDrawCount,
         IBufferResource* argBuffer,
         Offset argOffset,
@@ -278,13 +278,13 @@ public:
         GfxCount pixelCount,
         const SamplePosition* samplePositions) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
+    virtual SLANG_NO_THROW Result SLANG_MCALL drawInstanced(
         GfxCount vertexCount,
         GfxCount instanceCount,
         GfxIndex startVertex,
         GfxIndex startInstanceLocation) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
+    virtual SLANG_NO_THROW Result SLANG_MCALL drawIndexedInstanced(
         GfxCount indexCount,
         GfxCount instanceCount,
         GfxIndex startIndexLocation,
@@ -331,7 +331,7 @@ public:
     {
         return bindPipelineWithRootObjectImpl(state, rootObject);
     }
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
+    virtual SLANG_NO_THROW Result SLANG_MCALL dispatchRays(
         GfxIndex rayGenShaderIndex,
         IShaderTable* shaderTable,
         GfxCount width,

@@ -256,6 +256,11 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
     builder.setInsertBefore(diffType);
 
     auto pairStructType = builder.createStructType();
+    StringBuilder nameBuilder;
+    nameBuilder << "DiffPair_";
+    getTypeNameHint(nameBuilder, origBaseType);
+    builder.addNameHintDecoration(pairStructType, nameBuilder.ToString().getUnownedSlice());
+
     builder.createStructField(pairStructType, _getOrCreatePrimalStructKey(), origBaseType);
     builder.createStructField(pairStructType, _getOrCreateDiffStructKey(), (IRType*)diffType);
     return pairStructType;
@@ -455,6 +460,7 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_ForwardDerivativeDecoration:
             case kIROp_DerivativeMemberDecoration:
             case kIROp_DifferentiableTypeDictionaryDecoration:
+            case kIROp_PrimalInstDecoration:
             case kIROp_DifferentialInstDecoration:
             case kIROp_MixedDifferentialInstDecoration:
             case kIROp_BackwardDerivativeDecoration:
@@ -496,6 +502,8 @@ void stripTempDecorations(IRInst* inst)
         case kIROp_DifferentialInstDecoration:
         case kIROp_MixedDifferentialInstDecoration:
         case kIROp_AutoDiffOriginalValueDecoration:
+        case kIROp_BackwardDerivativePrimalReturnDecoration:
+        case kIROp_PrimalValueStructKeyDecoration:
             decor->removeAndDeallocate();
             break;
         default:

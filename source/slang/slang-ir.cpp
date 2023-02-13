@@ -4234,6 +4234,50 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitReverseGradientDiffPairRef(IRType* type, IRInst* primalVar, IRInst* diffVar)
+    {
+        auto inst = createInst<IRReverseGradientDiffPairRef>(
+            this,
+            kIROp_ReverseGradientDiffPairRef,
+            type,
+            primalVar,
+            diffVar);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitPrimalParamRef(IRInst* param)
+    {
+        auto type = param->getFullType();
+        auto ptrType = as<IRPtrTypeBase>(type);
+        auto valueType = type;
+        if (ptrType) valueType = ptrType->getValueType();
+        auto pairType = as<IRDifferentialPairType>(valueType);
+        IRType* finalType = pairType->getValueType();
+        if (ptrType) finalType = getPtrType(ptrType->getOp(), finalType);
+        auto inst = createInst<IRPrimalParamRef>(
+            this,
+            kIROp_PrimalParamRef,
+            finalType,
+            param);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitDiffParamRef(IRType* type, IRInst* param)
+    {
+        auto inst = createInst<IRDiffParamRef>(
+            this,
+            kIROp_DiffParamRef,
+            type,
+            param);
+
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitLoad(
         IRType* type,
         IRInst* ptr)
@@ -4558,6 +4602,14 @@ namespace Slang
 
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode)
+    {
+        return addDecoration(
+            dest,
+            kIROp_FloatingPointModeOverrideDecoration,
+            getIntValue(getIntType(), (IRIntegerValue)mode));
     }
 
     IRInst* IRBuilder::emitSwizzle(
@@ -6374,6 +6426,20 @@ namespace Slang
         return false;
     }
 
+    bool isIntegralScalarOrCompositeType(IRType* t)
+    {
+        if (!t)
+            return false;
+        switch (t->getOp())
+        {
+        case kIROp_VectorType:
+        case kIROp_MatrixType:
+            return isIntegralType((IRType*)t->getOperand(0));
+        default:
+            return isIntegralType(t);
+        }
+    }
+
     void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     {
         Index index = outInsts.getCount();
@@ -6533,6 +6599,8 @@ namespace Slang
     void IRInst::insertBefore(IRInst* other)
     {
         SLANG_ASSERT(other);
+        if (other->getPrevInst() == this)
+            return;
         _insertAt(other->getPrevInst(), other, other->getParent());
     }
 
@@ -6753,6 +6821,8 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
+                if (call->findDecoration<IRNoSideEffectDecoration>())
+                    return false;
                 return !isPureFunctionalCall(call);
             }
             break;
@@ -6809,10 +6879,14 @@ namespace Slang
         case kIROp_MakeOptionalNone:
         case kIROp_OptionalHasValue:
         case kIROp_GetOptionalValue:
+        case kIROp_DifferentialPairGetPrimal:
+        case kIROp_DifferentialPairGetDifferential:
+        case kIROp_MakeDifferentialPair:
         case kIROp_MakeTuple:
         case kIROp_GetTupleElement:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
         case kIROp_LoadReverseGradient:
+        case kIROp_ReverseGradientDiffPairRef:
         case kIROp_ImageSubscript:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:

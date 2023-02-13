@@ -1,9 +1,9 @@
 //TEST_IGNORE_FILE:
 
 #version 450
+#extension GL_EXT_nonuniform_qualifier : require
 layout(row_major) uniform;
 layout(row_major) buffer;
-#extension GL_EXT_nonuniform_qualifier : require
 
 layout(std430, binding = 1) buffer _S1 {
     int _data[];
@@ -18,21 +18,21 @@ void main()
     int index_0 = int(gl_GlobalInvocationID.x);
     int innerIndex_0 = index_0 & 3;
 
+    int _S3 = nonuniformEXT(index_0 >> 2);
     uint bufferCount_0;
     uint bufferStride_0;
-    (bufferCount_0) = (g_aoa_0[nonuniformEXT(index_0 >> 2)])._data.length();
-    (bufferStride_0) = 0;
+    (bufferCount_0) = (g_aoa_0[_S3])._data.length(); (bufferStride_0) = 0;
 
     int innerIndex_1;
     if(uint(innerIndex_0) >= bufferCount_0)
     {
-        innerIndex_1 = int(bufferCount_0 - uint(1));
+        innerIndex_1 = int(bufferCount_0 - 1U);
     }
     else
     {
         innerIndex_1 = innerIndex_0;
     }
-    uint _S3 = uint(innerIndex_1);
-    ((outputBuffer_0)._data[(uint(index_0))]) = ((g_aoa_0[nonuniformEXT(index_0 >> 2)])._data[(_S3)]);
+    uint _S4 = uint(innerIndex_1);
+    ((outputBuffer_0)._data[(uint(index_0))]) = ((g_aoa_0[_S3])._data[(_S4)]);
     return;
 }

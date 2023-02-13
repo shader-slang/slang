@@ -94,6 +94,10 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     // Transcribe a function without marking the result as a decoration.
     IRFunc* transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc);
 
+    List<IRInst*> transcribePhiArgs(IRBuilder* builder, List<IRInst*> origPhiArgs);
+
+    void checkAutodiffInstDecorations(IRFunc* fwdFunc);
+
     // Create an empty func to represent the transcribed func of `origFunc`.
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
 

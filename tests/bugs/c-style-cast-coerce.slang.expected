@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/bugs/c-style-cast-coerce.slang(15): error 30019: expected an expression of type 'T', got 'S'
+    T t = (S)0;
+          ^
+}
+standard output = {
+}

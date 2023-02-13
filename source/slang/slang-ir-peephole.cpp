@@ -1,5 +1,6 @@
 #include "slang-ir-peephole.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-sccp.h"
 
 namespace Slang
 {
@@ -10,6 +11,14 @@ struct PeepholeContext : InstPassBase
     {}
 
     bool changed = false;
+    FloatingPointMode floatingPointMode = FloatingPointMode::Precise;
+    bool removeOldInst = true;
+
+    void maybeRemoveOldInst(IRInst* inst)
+    {
+        if (removeOldInst)
+            inst->removeAndDeallocate();
+    }
 
     bool tryFoldElementExtractFromUpdateInst(IRInst* inst)
     {
@@ -70,7 +79,7 @@ struct PeepholeContext : InstPassBase
                 if (remainingKeys.getCount() == 0)
                 {
                     inst->replaceUsesWith(updateInst->getElementValue());
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     return true;
                 }
                 else if (remainingKeys.getCount() > 0)
@@ -79,7 +88,7 @@ struct PeepholeContext : InstPassBase
                     builder.setInsertBefore(inst);
                     auto newValue = builder.emitElementExtract(updateInst->getElementValue(), remainingKeys);
                     inst->replaceUsesWith(newValue);
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     return true;
                 }
             }
@@ -89,21 +98,213 @@ struct PeepholeContext : InstPassBase
                 builder.setInsertBefore(inst);
                 auto newInst = builder.emitElementExtract(updateInst->getOldValue(), chainKey.getArrayView());
                 inst->replaceUsesWith(newInst);
-                inst->removeAndDeallocate();
+                maybeRemoveOldInst(inst);
                 return true;
             }
         }
         return false;
     }
 
+    bool isZero(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+            return as<IRIntLit>(inst)->getValue() == 0;
+        case kIROp_FloatLit:
+            return as<IRFloatLit>(inst)->getValue() == 0.0;
+        case kIROp_BoolLit:
+            return as<IRBoolLit>(inst)->getValue() == false;
+        case kIROp_MakeVector:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MatrixReshape:
+        case kIROp_VectorReshape:
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (!isZero(inst->getOperand(i)))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+            return isZero(inst->getOperand(0));
+        default:
+            return false;
+        }
+    }
+
+    bool isOne(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+            return as<IRIntLit>(inst)->getValue() == 1;
+        case kIROp_FloatLit:
+            return as<IRFloatLit>(inst)->getValue() == 1.0;
+        case kIROp_BoolLit:
+            return as<IRBoolLit>(inst)->getValue();
+        case kIROp_MakeVector:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MatrixReshape:
+        case kIROp_VectorReshape:
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (!isOne(inst->getOperand(i)))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+            return isOne(inst->getOperand(0));
+        default:
+            return false;
+        }
+    }
+
+    bool tryOptimizeArithmeticInst(IRInst* inst)
+    {
+        bool allowUnsafeOptimizations =
+            (floatingPointMode == FloatingPointMode::Fast ||
+             isIntegralScalarOrCompositeType(inst->getDataType()));
+
+        auto tryReplace = [&](IRInst* replacement) -> bool
+        {
+            if (replacement->getFullType() != inst->getFullType())
+            {
+                // If the operand type is different from result type,
+                // we try to convert for some known cases.
+                if (auto vectorType = as<IRVectorType>(inst->getFullType()))
+                {
+                    if (vectorType->getElementType() != replacement->getFullType())
+                        return false;
+                    IRBuilder builder(sharedBuilderStorage);
+                    builder.setInsertBefore(inst);
+                    replacement = builder.emitMakeVectorFromScalar(inst->getFullType(), replacement);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            inst->replaceUsesWith(replacement);
+            maybeRemoveOldInst(inst);
+            return true;
+        };
+
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+            if (isZero(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            else if (isZero(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            break;
+        case kIROp_Sub:
+            if (isZero(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            break;
+        case kIROp_Mul:
+            if (isOne(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            else if (isOne(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (allowUnsafeOptimizations && isZero(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            break;
+        case kIROp_Div:
+            if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (isOne(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            break;
+        case kIROp_And:
+            if (isZero(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (isZero(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            else if (isOne(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (isOne(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            break;
+        case kIROp_Or:
+            if (isZero(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            else if (isZero(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            else if (isOne(inst->getOperand(1)))
+            {
+                return tryReplace(inst->getOperand(1));
+            }
+            else if (isOne(inst->getOperand(0)))
+            {
+                return tryReplace(inst->getOperand(0));
+            }
+            break;
+        }
+        return false;
+    }
+
     void processInst(IRInst* inst)
     {
+        if (as<IRGlobalValueWithCode>(inst))
+        {
+            if (auto fpModeDecor = inst->findDecoration<IRFloatingModeOverrideDecoration>())
+                floatingPointMode = fpModeDecor->getFloatingPointMode();
+        }
+
         switch (inst->getOp())
         {
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
                 inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                maybeRemoveOldInst(inst);
                 changed = true;
             }
             break;
@@ -111,7 +312,7 @@ struct PeepholeContext : InstPassBase
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultValue)
             {
                 inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
-                inst->removeAndDeallocate();
+                maybeRemoveOldInst(inst);
                 changed = true;
             }
             break;
@@ -120,14 +321,14 @@ struct PeepholeContext : InstPassBase
             {
                 IRBuilder builder(&sharedBuilderStorage);
                 inst->replaceUsesWith(builder.getBoolValue(true));
-                inst->removeAndDeallocate();
+                maybeRemoveOldInst(inst);
                 changed = true;
             }
             else if (inst->getOperand(0)->getOp() == kIROp_MakeResultValue)
             {
                 IRBuilder builder(&sharedBuilderStorage);
                 inst->replaceUsesWith(builder.getBoolValue(false));
-                inst->removeAndDeallocate();
+                maybeRemoveOldInst(inst);
                 changed = true;
             }
             break;
@@ -138,7 +339,7 @@ struct PeepholeContext : InstPassBase
                 if (auto intLit = as<IRIntLit>(element))
                 {
                     inst->replaceUsesWith(inst->getOperand(0)->getOperand((UInt)intLit->value.intVal));
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
             }
@@ -164,7 +365,7 @@ struct PeepholeContext : InstPassBase
                     if (fieldIndex != -1 && fieldIndex < (Index)inst->getOperand(0)->getOperandCount())
                     {
                         inst->replaceUsesWith(inst->getOperand(0)->getOperand((UInt)fieldIndex));
-                        inst->removeAndDeallocate();
+                        maybeRemoveOldInst(inst);
                         changed = true;
                     }
                 }
@@ -184,14 +385,14 @@ struct PeepholeContext : InstPassBase
                 if ((UInt)index->getValue() < opCount)
                 {
                     inst->replaceUsesWith(inst->getOperand(0)->getOperand((UInt)index->getValue()));
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
             }
             else if (inst->getOperand(0)->getOp() == kIROp_MakeArrayFromElement)
             {
                 inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
-                inst->removeAndDeallocate();
+                maybeRemoveOldInst(inst);
                 changed = true;
             }
             else
@@ -235,7 +436,7 @@ struct PeepholeContext : InstPassBase
                             builder.setInsertBefore(inst);
                             auto makeArray = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
                             inst->replaceUsesWith(makeArray);
-                            inst->removeAndDeallocate();
+                            maybeRemoveOldInst(inst);
                             changed = true;
                         }
                     }
@@ -274,7 +475,7 @@ struct PeepholeContext : InstPassBase
                             builder.setInsertBefore(inst);
                             auto makeStruct = builder.emitMakeStruct(structType, (UInt)args.getCount(), args.getBuffer());
                             inst->replaceUsesWith(makeStruct);
-                            inst->removeAndDeallocate();
+                            maybeRemoveOldInst(inst);
                             changed = true;
                         }
                     }
@@ -288,7 +489,7 @@ struct PeepholeContext : InstPassBase
                 builder.setInsertBefore(inst);
                 auto neq = builder.emitNeq(ptr, builder.getNullVoidPtrValue());
                 inst->replaceUsesWith(neq);
-                inst->removeAndDeallocate();
+                maybeRemoveOldInst(inst);
                 changed = true;
             }
             break;
@@ -302,7 +503,7 @@ struct PeepholeContext : InstPassBase
                     builder.setInsertBefore(inst);
                     auto trueVal = builder.getBoolValue(true);
                     inst->replaceUsesWith(trueVal);
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
             }
@@ -315,7 +516,7 @@ struct PeepholeContext : InstPassBase
                 if (isTypeEqual(inst->getOperand(0)->getDataType(), inst->getDataType()))
                 {
                     inst->replaceUsesWith(inst->getOperand(0));
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
             }
@@ -327,7 +528,7 @@ struct PeepholeContext : InstPassBase
                     if (isTypeEqual(inst->getOperand(0)->getOperand(0)->getDataType(), inst->getDataType()))
                     {
                         inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
-                        inst->removeAndDeallocate();
+                        maybeRemoveOldInst(inst);
                         changed = true;
                     }
                 }
@@ -339,7 +540,7 @@ struct PeepholeContext : InstPassBase
             if (isTypeEqual(inst->getOperand(0)->getDataType(), inst->getDataType()))
             {
                 inst->replaceUsesWith(inst->getOperand(0));
-                inst->removeAndDeallocate();
+                maybeRemoveOldInst(inst);
                 changed = true;
             }
         }
@@ -349,7 +550,7 @@ struct PeepholeContext : InstPassBase
                 if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
                 {
                     inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
             }
@@ -362,7 +563,7 @@ struct PeepholeContext : InstPassBase
                     builder.setInsertBefore(inst);
                     auto trueVal = builder.getBoolValue(true);
                     inst->replaceUsesWith(trueVal);
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
                 else if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalNone)
@@ -371,7 +572,7 @@ struct PeepholeContext : InstPassBase
                     builder.setInsertBefore(inst);
                     auto falseVal = builder.getBoolValue(false);
                     inst->replaceUsesWith(falseVal);
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
             }
@@ -381,7 +582,7 @@ struct PeepholeContext : InstPassBase
                 if (inst->getOperand(0)->getOp() == kIROp_PtrLit)
                 {
                     inst->replaceUsesWith(inst->getOperand(0));
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
             }
@@ -391,7 +592,7 @@ struct PeepholeContext : InstPassBase
                 if (inst->getOperand(0)->getOp() == kIROp_ExtractExistentialValue)
                 {
                     inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
                 }
             }
@@ -427,8 +628,61 @@ struct PeepholeContext : InstPassBase
                 if (auto newCtor = builder.emitDefaultConstruct(inst->getFullType(), false))
                 {
                     inst->replaceUsesWith(newCtor);
-                    inst->removeAndDeallocate();
+                    maybeRemoveOldInst(inst);
                     changed = true;
+                }
+            }
+            break;
+        case kIROp_Add:
+        case kIROp_Mul:
+        case kIROp_Sub:
+        case kIROp_Div:
+        case kIROp_And:
+        case kIROp_Or:
+            changed = tryOptimizeArithmeticInst(inst);
+            break;
+
+        case kIROp_Param:
+            {
+                auto block = as<IRBlock>(inst->parent);
+                if (!block)
+                    break;
+                UInt paramIndex = 0;
+                auto prevParam = inst->getPrevInst();
+                while (as<IRParam>(prevParam))
+                {
+                    prevParam = prevParam->getPrevInst();
+                    paramIndex++;
+                }
+                IRInst* argValue = nullptr;
+                for (auto pred : block->getPredecessors())
+                {
+                    auto terminator = as<IRUnconditionalBranch>(pred->getTerminator());
+                    if (!terminator)
+                        continue;
+                    SLANG_ASSERT(terminator->getArgCount() > paramIndex);
+                    auto arg = terminator->getArg(paramIndex);
+                    if (arg->getOp() == kIROp_undefined)
+                        continue;
+                    if (argValue == nullptr)
+                        argValue = arg;
+                    else if (argValue == arg)
+                    {
+                    }
+                    else
+                    {
+                        argValue = nullptr;
+                        break;
+                    }
+                }
+                if (argValue)
+                {
+                    if (inst->hasUses())
+                    {
+                        inst->replaceUsesWith(argValue);
+                        // Never remove param inst.
+                        changed = true;
+                    }
                 }
             }
             break;
@@ -443,6 +697,7 @@ struct PeepholeContext : InstPassBase
         sharedBuilder->init(module);
         sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
         bool result = false;
+
         for (;;)
         {
             changed = false;
@@ -471,6 +726,17 @@ bool peepholeOptimize(IRInst* func)
 {
     PeepholeContext context = PeepholeContext(func->getModule());
     return context.processFunc(func);
+}
+
+bool tryReplaceInstUsesWithSimplifiedValue(SharedIRBuilder* sharedBuilder, IRInst* inst)
+{
+    if (inst != tryConstantFoldInst(sharedBuilder, inst))
+        return true;
+
+    PeepholeContext context = PeepholeContext(inst->getModule());
+    context.removeOldInst = false;
+    context.processInst(inst);
+    return context.changed;
 }
 
 } // namespace Slang

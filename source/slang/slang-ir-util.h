@@ -153,11 +153,23 @@ inline IRInst* unwrapAttributedType(IRInst* type)
     return type;
 }
 
+void getTypeNameHint(StringBuilder& sb, IRInst* type);
+void copyNameHintDecoration(IRInst* dest, IRInst* src);
+
+bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
+
 String dumpIRToString(IRInst* root);
 
 // Returns whether a call insts can be treated as a pure functional inst
 // (no writes to memory, no side effects).
 bool isPureFunctionalCall(IRCall* callInst);
+
+bool isPtrLikeOrHandleType(IRInst* type);
+
+bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
+
+IRInst* getUndefInst(IRBuilder builder, IRModule* module);
+
 }
 
 #endif

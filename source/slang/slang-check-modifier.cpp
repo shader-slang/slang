@@ -507,6 +507,31 @@ namespace Slang
             // as 1 arg if nothing is specified)
             SLANG_ASSERT(attr->args.getCount() == 1);
         }
+        else if (auto forceUnrollAttr = as<ForceUnrollAttribute>(attr))
+        {
+            if (forceUnrollAttr->args.getCount() < 1)
+            {
+                getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 1);
+            }
+            auto cint = checkConstantIntVal(attr->args[0]);
+            if (cint)
+                forceUnrollAttr->maxIterations = (int32_t)cint->value;
+        }
+        else if (auto maxItersAttrs = as<MaxItersAttribute>(attr))
+        {
+            if (attr->args.getCount() < 1)
+            {
+                getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 1);
+            }
+            else
+            {
+                auto cint = checkConstantIntVal(attr->args[0]);
+                if (cint)
+                {
+                    maxItersAttrs->value = (int32_t) cint->value;
+                }
+            }
+        }
         else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
         {
             // check arguments against attribute parameters defined in attribClassDecl

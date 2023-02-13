@@ -133,6 +133,7 @@ IRInst* cloneInst(
     /// Uses `module` to allocate any new instructions.
     ///
 void cloneDecoration(
+    IRCloneEnv*     parentEnv,
     IRDecoration*   oldDecoration,
     IRInst*         newParent,
     IRModule*       module);
