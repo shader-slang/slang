@@ -20,6 +20,8 @@ The Slang system is designed to provide developers of real-time graphics applica
 
 * Generics and interfaces allow shader specialization to be expressed cleanly without resort to preprocessor techniques or string-pasting. Unlike C++ templates, Slang's generics are checked ahead of time and don't produce cascading error messages that are difficult to diagnose. The same generic shader can be specialized for a variety of different types to produce specialized code ahead of time, or on the fly, completely under application control.
 
+* Automatic differentiation enables generating forward and backward derivative propagation code from any user defined functions, speeding up the integration of machine learning techniques that rely on differentiable kernels.
+
 * Slang provides a module system that can be used to logically organize code and benefit from separate compilation. Slang modules can be compiled offline to a custom IR (with optional obfuscation) and then linked at runtime to generate DXIL, SPIR-V etc.
 
 * Rather than require tedious explicit `register` and `layout` specifications on each shader parameter, Slang supports completely automate and deterministic assignment of binding locations to parameter. You can write simple and clean code and still get the deterministic layout your application wants.
