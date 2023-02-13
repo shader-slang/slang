@@ -6478,6 +6478,7 @@ void ReorderThread( HitObject HitOrMiss );
 ///
 /// There doesn't appear to be an equivalent for debugBreak for HLSL
 
+__target_intrinsic(hlsl, "/* debugBreak() not currently supported for HLSL */")
 __target_intrinsic(cuda,"__brkpt()")
 __target_intrinsic(cpp, "SLANG_BREAKPOINT(0)")
 void debugBreak();
