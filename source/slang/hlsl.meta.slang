@@ -5688,10 +5688,10 @@ Ref<T> __hitObjectAttributes<T>()
 // Next is the custom intrinsic that will compute the hitObjectAttributes location
 // for GLSL-based targets.
 //
-__generic<Payload>
+__generic<Attributes>
 __target_intrinsic(__glslRayTracing, "$XH")
 [__readNone]
-int __hitObjectAttributesLocation(__ref Payload payload);
+int __hitObjectAttributesLocation(__ref Attributes attributes);
 
     /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,
     /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
@@ -6471,3 +6471,17 @@ __target_intrinsic(hlsl, "NvReorderThread")
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __target_intrinsic(glsl, "reorderThreadNV")
 void ReorderThread( HitObject HitOrMiss );
+
+
+///
+/// DebugBreak support 
+///
+/// There doesn't appear to be an equivalent for debugBreak for HLSL
+
+__target_intrinsic(cuda,"__brkpt()")
+__target_intrinsic(cpp, "SLANG_BREAKPOINT(0)")
+void debugBreak();
+
+__specialized_for_target(glsl)
+[[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
+void debugBreak();

@@ -42,6 +42,7 @@ Items with ^ means there is some discussion about support later in the document 
 | Atomics on RWBuffer         |     Yes      |   Yes        |   Yes      |     No        |    No + 
 | Sampler Feedback            |     No       |   Yes        |   No +     |     No        |    Yes ^
 | RWByteAddressBuffer Atomic  |     No       |   Yes ^      |   Yes ^    |     Yes       |    No +
+| debugBreak                  |     No       |   No         |   Yes      |     Yes       |    Yes
 
 ## Half Type
 
@@ -223,4 +224,10 @@ in the separate [NVAPI Support](nvapi-support.md) document.
 
 On Vulkan, for float the [`GL_EXT_shader_atomic_float`](https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_EXT_shader_atomic_float.html) extension is required. For int64 the [`GL_EXT_shader_atomic_int64`](https://raw.githubusercontent.com/KhronosGroup/GLSL/master/extensions/ext/GL_EXT_shader_atomic_int64.txt) extension is required.
 
-CUDA requires SM6.0 or higher for int64 support. 
+CUDA requires SM6.0 or higher for int64 support.
+
+## debugBreak
+
+Slang has preliminary support for `debugBreak()` intrinsic. With the appropriate tooling, when `debugBreak` is hit it will cause execution to halt and display in the attached debugger.
+
+Currently this is supported in all targets except HLSL. Note that on some targets if there isn't an appropriate debugging environment the debugBreak might cause execution to fail or potentially it is ignored. 
