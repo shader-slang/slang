@@ -2,6 +2,9 @@
 // We can't enable because output source includes path to prelude.
 //DISABLE_TEST:SIMPLE:-stage compute -entry computeMain -target cpp -line-directive-mode none
 //DISABLE_TEST:SIMPLE:-stage compute -entry computeMain -target cuda -line-directive-mode none
+// With `slang-llvm` this will crash, but the call stack isn't really usable.
+// With downstream host compilers this should break into the debugger. It's not enabled as that isn't testable.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -Xslang... -O0 -g -X.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 
