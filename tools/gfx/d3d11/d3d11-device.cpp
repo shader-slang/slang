@@ -1322,8 +1322,11 @@ Result DeviceImpl::createProgram(
 
         if (diagnostics)
         {
+            DebugMessageType msgType = DebugMessageType::Warning;
+            if (compileResult != SLANG_OK)
+                msgType = DebugMessageType::Error;
             getDebugCallback()->handleMessage(
-                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                msgType,
                 DebugMessageSource::Slang,
                 (char*)diagnostics->getBufferPointer());
             if (outDiagnosticBlob)

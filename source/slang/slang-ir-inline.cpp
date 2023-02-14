@@ -53,10 +53,8 @@ struct InliningPassBase
         // so that even if `child` gets removed (because of inlining)
         // we automatically start at the next instruction after it.
         //
-        IRInst* next = nullptr;
-        for( auto child = inst->getFirstChild(); child; child = next )
+        for (auto child : inst->getModifiableChildren())
         {
-            next = child->getNextInst();
             changed |= considerAllCallSitesRec(child);
         }
         return changed;

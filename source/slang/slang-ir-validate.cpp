@@ -186,6 +186,28 @@ namespace Slang
             if (pp == operandParent)
                 return;
         }
+
+        // We allow out-of-order def-use in global scope.
+        bool allInGlobalScope = inst->getParent() && inst->getParent()->getOp() == kIROp_Module;
+        if (allInGlobalScope)
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto op = inst->getOperand(i);
+                if (!op)
+                    continue;
+                if (!op->getParent())
+                    continue;
+                if (op->getParent()->getOp() != kIROp_Module)
+                {
+                    allInGlobalScope = false;
+                    break;
+                }
+            }
+        }
+        if (allInGlobalScope)
+            return;
+
         //
         // We failed to find `operandParent` while walking the ancestors of `inst`,
         // so something had gone wrong.

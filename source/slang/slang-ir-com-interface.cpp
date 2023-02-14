@@ -105,7 +105,7 @@ void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, Diagnosti
             for (auto use : uses)
             {
                 // Do the replacement
-                use->set(result);
+                builder.replaceOperand(use, result);
             }
         }
     }

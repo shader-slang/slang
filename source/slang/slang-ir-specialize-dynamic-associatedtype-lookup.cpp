@@ -200,23 +200,22 @@ struct AssociatedTypeLookupSpecializationContext
                 if (!seqId)
                     return;
                 // Insert code to pack sequential ID into an uint2 at all use sites.
-                IRUse* nextUse = nullptr;
-                for (auto use = inst->firstUse; use; use = nextUse)
+                traverseUses(inst, [&](IRUse* use)
                 {
-                    nextUse = use->nextUse;
                     if (as<IRCOMWitnessDecoration>(use->getUser()))
-                        continue;
+                    {
+                        return;
+                    }
                     IRBuilder builder(sharedContext->sharedBuilderStorage);
                     builder.setInsertBefore(use->getUser());
                     auto uint2Type = builder.getVectorType(
                         builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
                     IRInst* uint2Args[] = {
                         seqId->getSequentialIDOperand(),
-                        builder.getIntValue(builder.getUIntType(), 0)};
+                        builder.getIntValue(builder.getUIntType(), 0) };
                     auto uint2seqID = builder.emitMakeVector(uint2Type, 2, uint2Args);
-                    use->set(uint2seqID);
-                    use = nextUse;
-                }
+                    builder.replaceOperand(use, uint2seqID);
+                });
             }
         });
 
@@ -229,14 +228,12 @@ struct AssociatedTypeLookupSpecializationContext
                 builder.setInsertBefore(globalInst);
                 auto witnessTableIDType = builder.getWitnessTableIDType(
                     (IRType*)cast<IRWitnessTableType>(globalInst)->getConformanceType());
-                IRUse* nextUse = nullptr;
-                for (auto use = globalInst->firstUse; use; use = nextUse)
+                traverseUses(globalInst, [&](IRUse* use)
                 {
-                    nextUse = use->nextUse;
                     if (use->getUser()->getOp() == kIROp_WitnessTable)
-                        continue;
-                    use->set(witnessTableIDType);
-                }
+                        return;
+                    builder.replaceOperand(use, witnessTableIDType);
+                });
                 sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
             }
         }

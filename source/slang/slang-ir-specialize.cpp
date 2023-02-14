@@ -897,7 +897,8 @@ struct SpecializationContext
                     // specialization opportunities (generic specialization,
                     // existential specialization, simplifications, etc.)
                     //
-                    iterChanged |= maybeSpecializeInst(inst);
+                    if (inst->hasUses() || inst->mightHaveSideEffects())
+                        iterChanged |= maybeSpecializeInst(inst);
 
                     // Finally, we need to make our logic recurse through
                     // the whole IR module, so we want to add the children
@@ -1041,7 +1042,6 @@ struct SpecializationContext
                     // The old callee should be in the form of `specialize(.operator[], IInterfaceType)`,
                     // we should update it to be `specialize(.operator[], elementType)`, so the return type
                     // of the load call is `elementType`.
-                    auto oldCallee = inst->getCallee();
 
                     // A subscript operation on mutable buffers returns a ptr type instead of a value type.
                     // We need to make sure the pointer-ness is preserved correctly.
@@ -1057,9 +1057,6 @@ struct SpecializationContext
                     inst->replaceUsesWith(newWrapExistential);
                     workList.Remove(inst);
                     inst->removeAndDeallocate();
-                    SLANG_ASSERT(!oldCallee->hasUses());
-                    workList.Remove(oldCallee);
-                    oldCallee->removeAndDeallocate();
                     addUsersToWorkList(newWrapExistential);
 
                     workList.Remove(wrapExistential);

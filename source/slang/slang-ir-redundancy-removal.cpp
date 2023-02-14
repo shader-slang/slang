@@ -38,8 +38,6 @@ struct RedundancyRemovalContext
                     case kIROp_GetElement:
                     case kIROp_GetElementPtr:
                     case kIROp_UpdateElement:
-                    case kIROp_LookupWitness:
-                    case kIROp_Specialize:
                     case kIROp_OptionalHasValue:
                     case kIROp_GetOptionalValue:
                     case kIROp_MakeOptionalValue:

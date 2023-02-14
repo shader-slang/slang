@@ -549,6 +549,8 @@ struct GenericChildrenMigrationContextImpl
                 }
                 if (as<IRConstant>(inst))
                     return false;
+                if (getIROpInfo(inst->getOp()).isHoistable())
+                    return false;
                 return true;
             });
     }

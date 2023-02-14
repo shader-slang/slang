@@ -256,16 +256,16 @@ struct ResourceOutputSpecializationPass
         // the aid of this pass.
         //
         List<IRCall*> calls;
-        for( auto use = oldFunc->firstUse; use; use = use->nextUse )
-        {
-            auto user = use->getUser();
-            auto call = as<IRCall>(user);
-            if(!call)
-                continue;
-            if(call->getCallee() != oldFunc)
-                continue;
-            calls.add(call);
-        }
+        traverseUses(oldFunc, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                auto call = as<IRCall>(user);
+                if (!call)
+                    return;
+                if (call->getCallee() != oldFunc)
+                    return;
+                calls.add(call);
+            });
 
         // Once we have identified the calls to `oldFunc`, we will set about replacing
         // them with calls to `newFunc`.
@@ -833,16 +833,16 @@ struct ResourceOutputSpecializationPass
         // `out`/`inout` parameters that doesn't have as many "gotcha" cases.
         //
         List<IRStore*> stores;
-        for( auto use = param->firstUse; use; use = use->nextUse )
-        {
-            auto user = use->getUser();
-            auto store = as<IRStore>(user);
-            if(!store)
-                continue;
-            if(store->ptr.get() != param)
-                continue;
-            stores.add(store);
-        }
+        traverseUses(param, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                auto store = as<IRStore>(user);
+                if (!store)
+                    return;
+                if (store->ptr.get() != param)
+                    return;
+                stores.add(store);
+            });
 
         // Having identified the places where a value is stored to
         // the output parameter, we iterate over those values to
@@ -1194,16 +1194,16 @@ bool specializeResourceUsage(
         // Inline unspecializable resource output functions and then continue trying.
         for (auto func : unspecializableFuncs)
         {
-            for (auto use = func->firstUse; use; use = use->nextUse)
+            traverseUses(func, [&](IRUse* use)
             {
                 auto user = use->getUser();
                 auto call = as<IRCall>(user);
                 if (!call)
-                    continue;
+                    return;
                 if (call->getCallee() != func)
-                    continue;
+                    return;
                 inlineCall(call);
-            }
+            });
         }
         simplifyIR(irModule);
     }

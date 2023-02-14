@@ -2,116 +2,84 @@
 
 namespace Slang
 {
-    struct DeduplicateContext
-    {
-        SharedIRBuilder* builder;
-        IRInst* addValue(IRInst* value)
-        {
-            if (!value) return nullptr;
-            if (as<IRType>(value))
-                return addTypeValue(value);
-            if (auto constValue = as<IRConstant>(value))
-                return addConstantValue(constValue);
-            return value;
-        }
-        IRInst* addConstantValue(IRConstant* value)
-        {
-            IRConstantKey key = { value };
-            value->setFullType((IRType*)addValue(value->getFullType()));
-            if (auto newValue = builder->getConstantMap().TryGetValue(key))
-                return *newValue;
-            builder->getConstantMap()[key] = value;
-            return value;
-        }
-        IRInst* addTypeValue(IRInst* value)
-        {
-            // Do not deduplicate struct or interface types.
-            switch (value->getOp())
-            {
-            case kIROp_StructType:
-            case kIROp_InterfaceType:
-                return value;
-            default:
-                break;
-            }
-
-            for (UInt i = 0; i < value->getOperandCount(); i++)
-            {
-                value->setOperand(i, addValue(value->getOperand(i)));
-            }
-            value->setFullType((IRType*)addValue(value->getFullType()));
-            IRInstKey key = { value };
-            if (auto newValue = builder->getGlobalValueNumberingMap().TryGetValue(key))
-                return *newValue;
-            builder->getGlobalValueNumberingMap()[key] = value;
-            return value;
-        }
-    };
     void SharedIRBuilder::deduplicateAndRebuildGlobalNumberingMap()
     {
-        DeduplicateContext context;
-        context.builder = this;
-        m_constantMap.Clear();
-        m_globalValueNumberingMap.Clear();
-        List<IRInst*> instToRemove;
-        for (auto inst : m_module->getGlobalInsts())
-        {
-            if (auto constVal = as<IRConstant>(inst))
-            {
-                auto newConst = context.addConstantValue(constVal);
-                if (newConst != constVal)
-                {
-                    constVal->replaceUsesWith(newConst);
-                    instToRemove.add(constVal);
-                }
-            }
-        }
-        for (auto inst : m_module->getGlobalInsts())
-        {
-            if (as<IRType>(inst) || as<IRSpecialize>(inst))
-            {
-                auto newInst = context.addTypeValue(inst);
-                if (newInst != inst)
-                {
-                    inst->replaceUsesWith(newInst);
-                    instToRemove.add(inst);
-                }
-            }
-        }
-        for (auto inst : instToRemove)
-            inst->removeAndDeallocate();
     }
 
     void SharedIRBuilder::replaceGlobalInst(IRInst* oldInst, IRInst* newInst)
     {
-        List<IRUse*> uses;
-        for (auto use = oldInst->firstUse; use; use = use->nextUse)
-        {
-            uses.add(use);
-        }
+        oldInst->replaceUsesWith(newInst);
+    }
 
-        bool shouldUpdateGlobalNumberedCache = false;
-        for (auto use : uses)
+    void SharedIRBuilder::removeHoistableInstFromGlobalNumberingMap(IRInst* instToRemove)
+    {
+        HashSet<IRInst*> userWorkListSet;
+        List<IRInst*> userWorkList;
+        auto addToWorkList = [&](IRInst* i)
         {
-            use->set(newInst);
-            // depending on the type of the user inst, we may need to rebuild and update the global
-            // numbering cache.
-            if (isGloballyNumberedInst(use->getUser()))
+            if (userWorkListSet.Add(i))
+                userWorkList.add(i);
+        };
+        addToWorkList(instToRemove);
+        for (Index i = 0; i < userWorkList.getCount(); i++)
+        {
+            auto inst = userWorkList[i];
+            if (getIROpInfo(inst->getOp()).isHoistable())
             {
-                shouldUpdateGlobalNumberedCache = true;
+                _removeGlobalNumberingEntry(inst);
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                {
+                    addToWorkList(use->getUser());
+                }
             }
-        }
-        oldInst->removeAndDeallocate();
-        if (shouldUpdateGlobalNumberedCache)
-        {
-            deduplicateAndRebuildGlobalNumberingMap();
         }
     }
 
-    bool SharedIRBuilder::isGloballyNumberedInst(IRInst* inst)
+    void addHoistableInst(
+        IRBuilder* builder,
+        IRInst* inst);
+
+    void SharedIRBuilder::tryHoistInst(IRInst* inst)
     {
-        if (!inst->getParent() || inst->getParent()->getOp() != kIROp_Module)
-            return false;
-        return m_globalValueNumberingMap.ContainsKey(IRInstKey{inst});
+        List<IRInst*> workList;
+        HashSet<IRInst*> workListSet;
+        workList.add(inst);
+        workListSet.Add(inst);
+        IRBuilder builder(inst->getModule());
+
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            auto item = workList[i];
+
+            // Does inst no longer depend on anything defined locally?
+            // If so we should hoist it.
+            bool shouldHoist = false;
+            for (UInt a = 0; a < item->getOperandCount(); a++)
+            {
+                auto opParent = item->getOperand(a)->getParent();
+                if (opParent != item->getParent())
+                {
+                    shouldHoist = true;
+                    break;
+                }
+            }
+
+            // Hoisting this inst 
+            if (shouldHoist)
+            {
+                item->removeFromParent();
+                addHoistableInst(&builder, item);
+
+                // Continue to consider all users for hoisting.
+                for (auto use = item->firstUse; use; use = use->nextUse)
+                {
+                    if (getIROpInfo(use->getUser()->getOp()).isHoistable())
+                    {
+                        if (workListSet.Add(use->getUser()))
+                            workList.add(use->getUser());
+                    }
+                }
+            }
+        }
     }
 }

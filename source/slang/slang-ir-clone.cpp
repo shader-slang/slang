@@ -72,28 +72,28 @@ IRInst* cloneInstAndOperands(
     auto oldType = oldInst->getFullType();
     auto newType = (IRType*) findCloneForOperand(env, oldType);
 
-    // Next we will create an empty shell of the instruction,
-    // with space for the operands, but no actual operand
-    // values attached.
-    //
-    UInt operandCount = oldInst->getOperandCount();
-    auto newInst = builder->emitIntrinsicInst(
-        newType,
-        oldInst->getOp(),
-        operandCount,
-        nullptr);
-
-    // Finally we will iterate over the operands of `oldInst`
+    // Next we will iterate over the operands of `oldInst`
     // to find their replacements and install them as
     // the operands of `newInst`.
     //
-    for(UInt ii = 0; ii < operandCount; ++ii)
+    UInt operandCount = oldInst->getOperandCount();
+
+    ShortList<IRInst*> newOperands;
+    newOperands.setCount(operandCount);
+    for (UInt ii = 0; ii < operandCount; ++ii)
     {
         auto oldOperand = oldInst->getOperand(ii);
         auto newOperand = findCloneForOperand(env, oldOperand);
 
-        newInst->getOperands()[ii].init(newInst, newOperand);
+        newOperands[ii] = newOperand;
     }
+
+    // Finally we create the inst with the updated operands.
+    auto newInst = builder->emitIntrinsicInst(
+        newType,
+        oldInst->getOp(),
+        operandCount,
+        newOperands.getArrayView().getBuffer());
 
     newInst->sourceLoc = oldInst->sourceLoc;
 

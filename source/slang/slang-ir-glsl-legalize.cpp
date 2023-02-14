@@ -1791,7 +1791,7 @@ void legalizeMeshOutputParam(
     // the writes may only be writing to parts of the output struct, or may not
     // be writes at all (i.e. being passed as an out paramter).
     //
-    traverseUses(g, [&](IRInst* u)
+    traverseUsers(g, [&](IRInst* u)
     {
         auto l = as<IRLoad>(u);
         SLANG_EXPECT(l, "Mesh Output sentinel parameter wasn't used in a load");
@@ -1811,7 +1811,7 @@ void legalizeMeshOutputParam(
                 return;
             }
             // Otherwise, go through the uses one by one and see what we can do
-            traverseUses(a, [&](IRInst* s)
+            traverseUsers(a, [&](IRInst* s)
             {
                 IRBuilderInsertLocScope locScope{builder};
                 builder->setInsertBefore(s);
@@ -2022,7 +2022,7 @@ void legalizeMeshOutputParam(
 
     for(auto builtin : builtins)
     {
-        traverseUses(builtin.param, [&](IRInst* u)
+        traverseUsers(builtin.param, [&](IRInst* u)
         {
             auto p = as<IRGetElementPtr>(u);
             SLANG_EXPECT(p, "Mesh Output sentinel parameter wasn't used as an array");
