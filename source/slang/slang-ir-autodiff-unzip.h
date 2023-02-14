@@ -346,19 +346,57 @@ struct DiffUnzipPass
         }
     }
 
-    UIndex addPhiOutputArg(IRBlock* block, IRInst* arg)
+    UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
     {
+        SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(block->getTerminator()));
+        
+        auto branchInst = as<IRUnconditionalBranch>(block->getTerminator());
+        List<IRInst*> phiArgs;
+        
+        for (UIndex ii = 0; ii < branchInst->getArgCount(); ii++)
+            phiArgs.add(branchInst->getArg(ii));
+        
+        phiArgs.add(arg);
 
+        builder->setInsertInto(block);
+        switch (branchInst->getOp())
+        {
+            case kIROp_unconditionalBranch:
+                builder->emitBranch(branchInst->getTargetBlock(), phiArgs.getCount(), phiArgs.getBuffer());
+                break;
+            
+            case kIROp_loop:
+                builder->emitLoop(
+                    as<IRLoop>(branchInst)->getTargetBlock(),
+                    as<IRLoop>(branchInst)->getBreakBlock(),
+                    as<IRLoop>(branchInst)->getContinueBlock(),
+                    phiArgs.getCount(),
+                    phiArgs.getBuffer());
+                break;
+            
+            default:
+                break;
+        }
+
+        branchInst->removeAndDeallocate();
+        return phiArgs.getCount() - 1;
     }
 
-    IRInst* addPhiInputParam(IRBlock* block, IRType* type)
+    IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type)
     {
-
+        builder->setInsertInto(block);
+        return builder->emitParam(type);
     }
 
-    IRInst* addPhiInputParam(IRBlock* block, IRType* type, UIndex index)
+    IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type, UIndex index)
     {
+        List<IRParam*> params;
+        for (auto param : block->getParams())
+            params.add(param);
 
+        SLANG_RELEASE_ASSERT(index == (UCount)params.getCount());
+
+        return addPhiInputParam(builder, block, type);
     }
 
     IRBlock* getBlock(IRInst* inst)
@@ -378,7 +416,7 @@ struct DiffUnzipPass
         if (auto block = as<IRBlock>(inst->getParent()))
             return inst;
 
-        return getBlock(inst->getParent());
+        return getInstInBlock(inst->getParent());
     }
 
     void lowerIndexedRegions()
@@ -390,10 +428,10 @@ struct DiffUnzipPass
         {
 
             //IRBlock* initializerBlock = getInitializerBlock(region);
-            IRBlock* breakBlock = region->breakBlock;
+            //IRBlock* breakBlock = region->breakBlock;
 
             // Grab first primal block.
-            IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
+            //IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
             
             // Make variable in the top-most block (so it's visible to diff blocks)
             /*
@@ -411,13 +449,17 @@ struct DiffUnzipPass
                 builder.setInsertBefore(primalCondBlock->getTerminator());
 
                 auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
+                    &builder,
                     primalInitBlock, 
                     builder.getIntValue(builder.getIntType(), 0));
 
                 region->primalCountVar = addPhiInputParam(
+                    &builder,
                     primalCondBlock,
                     builder.getIntType(),
                     phiCounterArgLoopEntryIndex);
+                builder.addLoopCounterDecoration(region->primalCountVar);
+                builder.markInstAsPrimal(region->primalCountVar);
                 
                 IRBlock* primalUpdateBlock = as<IRBlock>(primalMap[getUpdateBlock(region)]);
                 builder.setInsertBefore(primalUpdateBlock->getTerminator());
@@ -428,7 +470,7 @@ struct DiffUnzipPass
                     builder.getIntValue(builder.getIntType(), 1));
                 builder.markInstAsPrimal(incCounterVal);
 
-                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(primalUpdateBlock, incCounterVal);
+                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, primalUpdateBlock, incCounterVal);
 
                 SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
             }
@@ -441,14 +483,17 @@ struct DiffUnzipPass
                 builder.setInsertBefore(diffCondBlock->getTerminator());
 
                 auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
+                    &builder,
                     diffInitBlock, 
                     builder.getIntValue(builder.getIntType(), 0));
 
                 region->diffCountVar = addPhiInputParam(
+                    &builder,
                     diffCondBlock,
                     builder.getIntType(),
                     phiCounterArgLoopEntryIndex);
                 builder.addLoopCounterDecoration(region->diffCountVar);
+                builder.markInstAsPrimal(region->diffCountVar);
                 
                 IRBlock* diffUpdateBlock = as<IRBlock>(diffMap[getUpdateBlock(region)]);
                 builder.setInsertBefore(diffUpdateBlock->getTerminator());
@@ -459,7 +504,7 @@ struct DiffUnzipPass
                     builder.getIntValue(builder.getIntType(), 1));
                 builder.markInstAsPrimal(incCounterVal);
 
-                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(diffUpdateBlock, incCounterVal);
+                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, diffUpdateBlock, incCounterVal);
 
                 SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
 
@@ -691,7 +736,7 @@ struct DiffUnzipPass
                     storeAddr = builder.emitElementAddress(
                         builder.getPtrType(currType),
                         storeAddr, 
-                        builder.emitLoad(region->primalCountVar));
+                        region->primalCountVar);
                 }
 
                 builder.emitStore(storeAddr, inst);

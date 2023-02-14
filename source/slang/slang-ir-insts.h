@@ -3572,11 +3572,6 @@ public:
         addDecoration(value, kIROp_LoopMaxItersDecoration, getIntValue(getIntType(), iters));
     }
 
-    void addLoopCounterLastIndexDecoration(IRInst* value, IRInst* lastIndex)
-    {
-        addDecoration(value, kIROp_LoopCounterLastIndexDecoration, lastIndex);
-    }
-
     void addLoopForceUnrollDecoration(IRInst* value, IntegerLiteralValue iters)
     {
         addDecoration(value, kIROp_ForceUnrollDecoration, getIntValue(getIntType(), iters));

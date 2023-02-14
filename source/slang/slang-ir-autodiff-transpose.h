@@ -589,8 +589,9 @@ struct DiffTransposePass
         auto firstFwdDiffBlock = branchInst->getTargetBlock();
         reverseCFGRegion(firstFwdDiffBlock, List<IRBlock*>());
 
-        // Lower any loop-exit-value decorations that initialize loop intermediates
-        // for the reverse loop.
+        // Lower any loop-exit-value decorations into initializations for loop intermediate vals, 
+        // and convert loop initial values into terminating conditions.
+        // 
         // TODO: We need a way to confirm that all required vars have an initial value
         // (is there a built-in dataflow tool for this?)
         // 
@@ -598,8 +599,8 @@ struct DiffTransposePass
         {
             if (auto loopInst = as<IRLoop>(block->getTerminator()))
             {
-                lowerLoopExitDecorations(&builder, loopInst);
-                //lowerLoopEntryValues(&builder, loopInst)
+                lowerLoopExitValues(&builder, loopInst);
+                lowerLoopEntryValues(&builder, loopInst);
             }
         }
 
@@ -858,19 +859,18 @@ struct DiffTransposePass
         List<IRInst*> phiParamRevGradInsts;
         for (IRParam* param = fwdBlock->getFirstParam(); param; param = param->getNextParam())
         {
-            // This param might be used outside this block.
-            // If so, add/get an accumulator.
-            // 
-            if (isInstUsedOutsideParentBlock(param))
-            {
-                auto accGradient = extractAccumulatorVarGradient(&builder, param);
-                addRevGradientForFwdInst(
-                    param, 
-                    RevGradient(param, accGradient, nullptr));
-            }
-            
             if (isDifferentialInst(param))
             {
+                // This param might be used outside this block.
+                // If so, add/get an accumulator.
+                // 
+                if (isInstUsedOutsideParentBlock(param))
+                {
+                    auto accGradient = extractAccumulatorVarGradient(&builder, param);
+                    addRevGradientForFwdInst(
+                        param, 
+                        RevGradient(param, accGradient, nullptr));
+                }
                 if (hasRevGradients(param))
                 {
                     auto gradients = popRevGradients(param);
@@ -1009,7 +1009,7 @@ struct DiffTransposePass
         }
     }
 
-    void lowerLoopExitDecorations(IRBuilder* builder, IRLoop* fwdLoop)
+    void lowerLoopExitValues(IRBuilder* builder, IRLoop* fwdLoop)
     {
         while (auto loopExitValueDecoration = fwdLoop->findDecoration<IRLoopExitPrimalValueDecoration>())
         {
@@ -1024,10 +1024,57 @@ struct DiffTransposePass
         }
     }
 
-    void lowerLoopExitDecorations(IRBuilder* builder, IRBlock* block)
+    void lowerLoopExitValues(IRBuilder* builder, IRBlock* block)
     {
         if (auto loopInst = as<IRLoop>(block->getTerminator()))
-            lowerLoopExitDecorations(builder, loopInst);
+            lowerLoopExitValues(builder, loopInst);
+    }
+
+    // Go through loop block phi-args, and look for ones with the primal inst tag
+    // These need to be 'inverted', which for a loop means inserting a check into
+    // loop condition block.
+    // 
+    void lowerLoopEntryValues(IRBuilder* builder, IRLoop* loopInst)
+    {   
+        List<IRInst*> primalArgs;
+        List<IRInst*> primalParams;
+
+        auto firstLoopBlock = loopInst->getTargetBlock();
+
+        List<IRParam*> loopParams;
+        for (auto param : firstLoopBlock->getParams())
+            loopParams.add(param);
+
+        for (UIndex ii = 0; ii < loopInst->getArgCount(); ii++)
+        {
+            if (loopInst->getArg(ii)->findDecoration<IRPrimalInstDecoration>())
+            {
+                primalArgs.add(loopInst->getArg(ii));
+                primalParams.add(loopParams[ii]);
+            }
+        }
+
+        IRBlock* revLoopCondBlock = revBlockMap[firstLoopBlock];
+        
+        builder->setInsertBefore(revLoopCondBlock->getTerminator());
+
+        auto loopBaseCondition = as<IRIfElse>(revLoopCondBlock->getTerminator())->getCondition();
+        for (UIndex ii = 0; ii < (UCount)primalArgs.getCount(); ii++)
+        {
+            auto paramBoundsCheck = builder->emitIntrinsicInst(
+                builder->getBoolType(),
+                kIROp_Neq,
+                2,
+                List<IRInst*>(primalParams[ii], primalArgs[ii]).getBuffer());
+            
+            loopBaseCondition = builder->emitIntrinsicInst(
+                builder->getBoolType(),
+                kIROp_And,
+                2,
+                List<IRInst*>(paramBoundsCheck, loopBaseCondition).getBuffer());
+        }
+
+        as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(loopBaseCondition);
     }
 
     List<InvInstPair> invertInst(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
@@ -1043,9 +1090,9 @@ struct DiffTransposePass
         }
     }
 
-    bool hasInverse(IRInst* primalInst)
+    bool hasInverse(IRInst*)
     {
-        return inverseValueMap.ContainsKey(primalInst);
+        return true;
     }
 
     IRInst* getInverse(IRBuilder* builder, IRInst* primalInst)
@@ -1055,10 +1102,12 @@ struct DiffTransposePass
         return invInst;*/
 
         // Note: There are other possible cases here, although not important
-        // right noe. Like when a value is available to load from the primal block.
+        // right now. For example, a value is available to load from the primal block.
         // 
         if (auto invVar = getOrCreateInverseVar(primalInst))
             return builder->emitLoad(invVar);
+        
+        return nullptr;
     }
 
     void setInverse(IRBuilder* builder, IRInst* inst, IRInst* invInst)
