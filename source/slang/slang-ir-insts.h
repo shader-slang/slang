@@ -683,6 +683,18 @@ struct IRLoopCounterDecoration : IRDecoration
     IR_LEAF_ISA(LoopCounterDecoration)
 };
 
+struct IRLoopExitPrimalValueDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_LoopExitPrimalValueDecoration
+    };
+    IR_LEAF_ISA(LoopExitPrimalValueDecoration)
+
+    IRInst* getTargetInst() { return getOperand(0); }
+    IRInst* getLoopExitValInst() { return getOperand(1); }
+};
+
 struct IRAutodiffInstDecoration : IRDecoration
 {
     IR_PARENT_ISA(AutodiffInstDecoration)
@@ -3700,6 +3712,11 @@ public:
     void addLoopCounterDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_LoopCounterDecoration);
+    }
+
+    void addLoopExitPrimalValueDecoration(IRInst* value, IRInst* primalInst, IRInst* exitValue)
+    {
+        addDecoration(value, kIROp_LoopExitPrimalValueDecoration, primalInst, exitValue);
     }
 
     void markInstAsPrimal(IRInst* value)

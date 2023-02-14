@@ -741,7 +741,7 @@ struct DiffTransposePass
                     auto primalType = arg->getDataType();
                     auto primalInvParam = builder.emitParam(primalType);
 
-                    setInverseForPrimalInst(arg, primalInvParam);
+                    setInverse(arg, primalInvParam);
                 }
             }
         }
@@ -836,21 +836,37 @@ struct DiffTransposePass
                     RevGradient(param, accGradient, nullptr));
             }
             
-            if (hasRevGradients(param))
+            if (isDifferentialInst(param))
             {
-                auto gradients = popRevGradients(param);
+                if (hasRevGradients(param))
+                {
+                    auto gradients = popRevGradients(param);
 
-                auto gradInst = emitAggregateValue(
-                    &builder,
-                    tryGetPrimalTypeFromDiffInst(param),
-                    gradients);
-                
-                phiParamRevGradInsts.add(gradInst);
+                    auto gradInst = emitAggregateValue(
+                        &builder,
+                        tryGetPrimalTypeFromDiffInst(param),
+                        gradients);
+                    
+                    phiParamRevGradInsts.add(gradInst);
+                }
+                else
+                {
+                    phiParamRevGradInsts.add(
+                        emitDZeroOfDiffInstType(&builder, tryGetPrimalTypeFromDiffInst(param)));
+                }
+            }
+            else if (isPrimalInst(param))
+            {
+                if (hasInverse(param))
+                    phiParamRevGradInsts.add(popInverse(param));
+                else
+                {
+                    SLANG_UNEXPECTED("param is a primal inst but has no registered inverse");
+                }
             }
             else
             {
-                phiParamRevGradInsts.add(
-                    emitDZeroOfDiffInstType(&builder, tryGetPrimalTypeFromDiffInst(param)));
+                SLANG_UNEXPECTED("param is neither differential nor primal");
             }
         }
 
@@ -915,17 +931,92 @@ struct DiffTransposePass
 
     }
 
-    List<IRInst*> invertInst(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
+    struct InvInstPair
+    {
+        IRInst* inst;
+        IRInst* invInst;
+
+        InvInstPair(IRInst* inst, IRInst* invInst) :
+            inst(inst), invInst(invInst)
+        { }
+
+        InvInstPair() : inst(nullptr), invInst(nullptr)
+        { }
+    };
+
+    List<InvInstPair> invertArithmetic(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
+    {
+        switch (primalInst->getOp())
+        {
+            case kIROp_Add:
+            {
+                SLANG_RELEASE_ASSERT(as<IRConstant>(primalInst->getOperand(1)));
+                return List<InvInstPair>(
+                    InvInstPair(
+                        primalInst->getOperand(0),
+                        builder->emitSub(
+                            primalInst->getOperand(0)->getDataType(),
+                            invOutput,
+                            primalInst->getOperand(1))));
+            }
+            case kIROp_Sub:
+            {
+                SLANG_RELEASE_ASSERT(as<IRConstant>(primalInst->getOperand(1)));
+                return List<InvInstPair>(
+                    InvInstPair(
+                        primalInst->getOperand(0),
+                        builder->emitAdd(
+                            primalInst->getOperand(0)->getDataType(),
+                            invOutput,
+                            primalInst->getOperand(1))));
+            }
+
+            default:
+                SLANG_UNEXPECTED("Unhandled arithmetic inst for inversion");
+        }
+    }
+
+    // TODO(sai): Run this before the transposition to already have the values available.
+    void lowerLoopExitDecorations(IRBuilder* builder, IRLoop* fwdLoop)
+    {
+        while (auto loopExitValueDecoration = fwdLoop->findDecoration<IRLoopExitPrimalValueDecoration>())
+        {
+            builder->setInsertInto(revBlockMap[fwdLoop->getBreakBlock()]);
+            setInverse(loopExitValueDecoration->getTargetInst(), loopExitValueDecoration->getLoopExitValInst());
+        }
+    }
+
+    List<InvInstPair> invertInst(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
     {
         switch (primalInst->getOp())
         {
             case kIROp_Add:
             case kIROp_Sub:
-                invertOffsetArithmetic(builder, primalInst, invOutput);
+                return invertArithmetic(builder, primalInst, invOutput);
             
             default:
                 SLANG_UNIMPLEMENTED_X("Unhandled inst type for inversion");
         }
+    }
+
+    bool hasInverse(IRInst* primalInst)
+    {
+        return inverseValueMap.ContainsKey(primalInst);
+    }
+
+    IRInst* popInverse(IRInst* primalInst)
+    {
+        IRInst* invInst = inverseValueMap[primalInst].GetValue();
+        inverseValueMap.Remove(invInst);
+        return invInst;
+    }
+
+    void setInverse(IRInst* inst, IRInst* invInst)
+    {
+        // Should not see 'inst' more than once.
+        SLANG_RELEASE_ASSERT(!inverseValueMap.ContainsKey(inst));
+
+        inverseValueMap[inst] = invInst;
     }
 
     void invertInst(IRBuilder* builder, IRInst* primalInst)
@@ -935,7 +1026,10 @@ struct DiffTransposePass
         {
             auto invOutput = popInverse(primalInst);
 
-            invertInst(builder, primalInst, invOutput);
+            auto invEntries = invertInst(builder, primalInst, invOutput);
+
+            for (auto entry : invEntries)
+                setInverse(entry.inst, entry.invInst);
         }
         else
         {
@@ -2515,9 +2609,8 @@ struct DiffTransposePass
     List<PendingBlockTerminatorEntry>                    pendingBlocks;
 
     Dictionary<IRBlock*, List<IRInst*>>                  phiGradsMap;
-
-    Dictionary<IRBlock*, IRBlock*>                       initializerBlockMap;
     
+    Dictionary<IRInst*, IRInst*>                         inverseValueMap;
 };
 
 
