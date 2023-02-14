@@ -589,6 +589,20 @@ struct DiffTransposePass
         auto firstFwdDiffBlock = branchInst->getTargetBlock();
         reverseCFGRegion(firstFwdDiffBlock, List<IRBlock*>());
 
+        // Lower any loop-exit-value decorations that initialize loop intermediates
+        // for the reverse loop.
+        // TODO: We need a way to confirm that all required vars have an initial value
+        // (is there a built-in dataflow tool for this?)
+        // 
+        for (auto block : workList)
+        {
+            if (auto loopInst = as<IRLoop>(block->getTerminator()))
+            {
+                lowerLoopExitDecorations(&builder, loopInst);
+                //lowerLoopEntryValues(&builder, loopInst)
+            }
+        }
+
         // Link the last differential fwd-mode block (which will be the first
         // rev-mode block) as the successor to the last primal block.
         // We assume that the original function is in single-return form
@@ -687,6 +701,32 @@ struct DiffTransposePass
         return tempRevVar;
     }
 
+    IRVar* getOrCreateInverseVar(IRInst* primalInst)
+    {
+        // Check if we have a var already.
+        if (inverseVarMap.ContainsKey(primalInst))
+            return inverseVarMap[primalInst];
+        
+        IRBuilder tempVarBuilder(autodiffContext->sharedBuilder);
+        
+        IRBlock* firstDiffBlock = firstRevDiffBlockMap[as<IRFunc>(primalInst->getParent()->getParent())];
+
+        if (auto firstInst = firstDiffBlock->getFirstOrdinaryInst())
+            tempVarBuilder.setInsertBefore(firstInst);
+        else
+            tempVarBuilder.setInsertInto(firstDiffBlock);
+        
+        auto primalType = primalInst->getDataType();
+
+        // Emit a var in the top-level differential block to hold the gradient, 
+        // and initialize it.
+        auto tempInvVar = tempVarBuilder.emitVar(primalType);
+
+        inverseVarMap[primalInst] = tempInvVar;
+
+        return tempInvVar;
+    }
+
     bool isInstUsedOutsideParentBlock(IRInst* inst)
     {
         auto currBlock = inst->getParent();
@@ -741,20 +781,14 @@ struct DiffTransposePass
                     auto primalType = arg->getDataType();
                     auto primalInvParam = builder.emitParam(primalType);
 
-                    setInverse(arg, primalInvParam);
+                    setInverse(&builder, arg, primalInvParam);
                 }
             }
         }
 
-        // Some special instructions simply need to be copied over.
-        // These do not deal with differentials.
-        // TODO: This will not work if there are any differential
-        // insts that rely on loop counter vars having a specific
-        // value. 
-        // The solution is to have primal insts appearing in 
-        // differential blocks be in their own special blocks that are
-        // ignored entirely, rather than dealing with them one inst 
-        // at a time.
+        // Some insts are simply accessing (loading) primal values from 
+        // the primal blocks. These can safely be moved to the top of the 
+        // rev-mode block (in order)
         // 
         for (IRInst* child = fwdBlock->getFirstChild(); child;)
         {  
@@ -762,8 +796,6 @@ struct DiffTransposePass
 
             if (child->findDecoration<IRPrimalValueAccessDecoration>())
             {
-                // Primal value accesses should not have any gradients.
-                SLANG_ASSERT(!hasRevGradients(child));
                 child->insertAtEnd(revBlock);
             }
             
@@ -774,6 +806,8 @@ struct DiffTransposePass
         List<IRInst*> nonValueInsts;
         for (IRInst* child = fwdBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
         {
+            SLANG_RELEASE_ASSERT(!child->findDecoration<IRPrimalValueAccessDecoration>());
+
             // If the instruction is pointer typed, it's not actually computing a value.
             // 
             if (as<IRPtrTypeBase>(child->getDataType()))
@@ -805,7 +839,6 @@ struct DiffTransposePass
                 transposeInst(&builder, child);
             else if (isPrimalInst(child))
                 invertInst(&builder, child);
-
         }
 
         // After processing the block's instructions, we 'flush' any remaining gradients 
@@ -858,7 +891,7 @@ struct DiffTransposePass
             else if (isPrimalInst(param))
             {
                 if (hasInverse(param))
-                    phiParamRevGradInsts.add(popInverse(param));
+                    phiParamRevGradInsts.add(getInverse(&builder, param));
                 else
                 {
                     SLANG_UNEXPECTED("param is a primal inst but has no registered inverse");
@@ -976,14 +1009,25 @@ struct DiffTransposePass
         }
     }
 
-    // TODO(sai): Run this before the transposition to already have the values available.
     void lowerLoopExitDecorations(IRBuilder* builder, IRLoop* fwdLoop)
     {
         while (auto loopExitValueDecoration = fwdLoop->findDecoration<IRLoopExitPrimalValueDecoration>())
         {
-            builder->setInsertInto(revBlockMap[fwdLoop->getBreakBlock()]);
-            setInverse(loopExitValueDecoration->getTargetInst(), loopExitValueDecoration->getLoopExitValInst());
+            IRBlock* revLoopInitBlock = revBlockMap[fwdLoop->getBreakBlock()];
+
+            if (auto revLoopInst = revLoopInitBlock->getTerminator())
+                builder->setInsertBefore(revLoopInst);
+            else
+                builder->setInsertInto(revLoopInitBlock);
+
+            setInverse(builder, loopExitValueDecoration->getTargetInst(), loopExitValueDecoration->getLoopExitValInst());
         }
+    }
+
+    void lowerLoopExitDecorations(IRBuilder* builder, IRBlock* block)
+    {
+        if (auto loopInst = as<IRLoop>(block->getTerminator()))
+            lowerLoopExitDecorations(builder, loopInst);
     }
 
     List<InvInstPair> invertInst(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
@@ -1004,19 +1048,23 @@ struct DiffTransposePass
         return inverseValueMap.ContainsKey(primalInst);
     }
 
-    IRInst* popInverse(IRInst* primalInst)
+    IRInst* getInverse(IRBuilder* builder, IRInst* primalInst)
     {
-        IRInst* invInst = inverseValueMap[primalInst].GetValue();
+        /*IRInst* invInst = inverseValueMap[primalInst].GetValue();
         inverseValueMap.Remove(invInst);
-        return invInst;
+        return invInst;*/
+
+        // Note: There are other possible cases here, although not important
+        // right noe. Like when a value is available to load from the primal block.
+        // 
+        if (auto invVar = getOrCreateInverseVar(primalInst))
+            return builder->emitLoad(invVar);
     }
 
-    void setInverse(IRInst* inst, IRInst* invInst)
+    void setInverse(IRBuilder* builder, IRInst* inst, IRInst* invInst)
     {
-        // Should not see 'inst' more than once.
-        SLANG_RELEASE_ASSERT(!inverseValueMap.ContainsKey(inst));
-
-        inverseValueMap[inst] = invInst;
+        if (auto invVar = getOrCreateInverseVar(inst))
+            builder->emitStore(invVar, invInst);
     }
 
     void invertInst(IRBuilder* builder, IRInst* primalInst)
@@ -1024,12 +1072,12 @@ struct DiffTransposePass
         // Look for an available inverse entry for this primalInst's *output*
         if (hasInverse(primalInst))
         {
-            auto invOutput = popInverse(primalInst);
+            auto invOutput = getInverse(builder, primalInst);
 
             auto invEntries = invertInst(builder, primalInst, invOutput);
 
             for (auto entry : invEntries)
-                setInverse(entry.inst, entry.invInst);
+                setInverse(builder, entry.inst, entry.invInst);
         }
         else
         {
@@ -2597,6 +2645,8 @@ struct DiffTransposePass
     Dictionary<IRInst*, List<RevGradient>>               gradientsMap;
 
     Dictionary<IRInst*, IRVar*>                          revAccumulatorVarMap;
+
+    Dictionary<IRInst*, IRVar*>                          inverseVarMap;
 
     List<IRInst*>                                        usedPtrs;
 

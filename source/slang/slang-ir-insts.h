@@ -3719,6 +3719,11 @@ public:
         addDecoration(value, kIROp_LoopExitPrimalValueDecoration, primalInst, exitValue);
     }
 
+    void addPrimalValueAccessDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_PrimalValueAccessDecoration);
+    }
+
     void markInstAsPrimal(IRInst* value)
     {
         addDecoration(value, kIROp_PrimalInstDecoration);

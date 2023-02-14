@@ -426,8 +426,9 @@ struct DiffUnzipPass
                     builder.getIntType(), 
                     region->primalCountVar,
                     builder.getIntValue(builder.getIntType(), 1));
+                builder.markInstAsPrimal(incCounterVal);
 
-                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(primalInitBlock, incCounterVal);
+                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(primalUpdateBlock, incCounterVal);
 
                 SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
             }
@@ -447,6 +448,7 @@ struct DiffUnzipPass
                     diffCondBlock,
                     builder.getIntType(),
                     phiCounterArgLoopEntryIndex);
+                builder.addLoopCounterDecoration(region->diffCountVar);
                 
                 IRBlock* diffUpdateBlock = as<IRBlock>(diffMap[getUpdateBlock(region)]);
                 builder.setInsertBefore(diffUpdateBlock->getTerminator());
@@ -455,8 +457,9 @@ struct DiffUnzipPass
                     builder.getIntType(), 
                     region->diffCountVar,
                     builder.getIntValue(builder.getIntType(), 1));
+                builder.markInstAsPrimal(incCounterVal);
 
-                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(diffInitBlock, incCounterVal);
+                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(diffUpdateBlock, incCounterVal);
 
                 SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
 
@@ -496,7 +499,7 @@ struct DiffUnzipPass
             builder.addLoopCounterDecoration(primalCounterCurrValue);
             builder.addLoopCounterDecoration(primalCounterLastValue);*/
             
-            IRBlock* updateBlock = getUpdateBlock(region);
+            /*IRBlock* updateBlock = getUpdateBlock(region);
             
             {
                 // TODO: Figure out if the counter update needs to go before or after
@@ -515,7 +518,7 @@ struct DiffUnzipPass
                 builder.addLoopCounterDecoration(counterVal);
                 builder.addLoopCounterDecoration(incCounterVal);
                 builder.addLoopCounterDecoration(incStore);
-            }
+            }*/
 
             /*{
                 IRBlock* firstLoopBlock = getFirstLoopBodyBlock(region);
@@ -693,7 +696,7 @@ struct DiffUnzipPass
 
                 builder.emitStore(storeAddr, inst);
             }
-
+ 
             // 4. Replace uses in differential blocks with loads from the array.
             List<IRInst*> instsToTag;
             {
@@ -777,11 +780,11 @@ struct DiffUnzipPass
                 }
             }
 
-            // TODO: Loop-counter is not really the right decoration..
-            // replace with primal-inst when it's ready.
-            // 
             for (auto instToTag : instsToTag)
-                builder.addLoopCounterDecoration(instToTag);
+            {
+                builder.addPrimalValueAccessDecoration(instToTag);
+                builder.markInstAsPrimal(instToTag);
+            }
         }
     }
 
