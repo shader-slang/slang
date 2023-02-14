@@ -370,7 +370,7 @@ static String _scrubName(const String& in)
         dst->shouldDumpIntermediates = request->shouldDumpIntermediates;
 
         dst->debugInfoLevel = linkage->debugInfoLevel;
-        dst->optimizationLevel = linkage->optimizationLevel;
+        dst->optimizationLevel = linkage->minimumOptimizationLevel;
         dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->m_passThrough;
 
@@ -915,7 +915,7 @@ struct LoadContext
         externalRequest->setDumpIntermediates(int(requestState->shouldDumpIntermediates));
         externalRequest->setLineDirectiveMode(SlangLineDirectiveMode(requestState->lineDirectiveMode));
         externalRequest->setDebugInfoLevel(SlangDebugInfoLevel(requestState->debugInfoLevel));
-        externalRequest->setOptimizationLevel(SlangOptimizationLevel(requestState->optimizationLevel));
+        externalRequest->setMinimumOptimizationLevel(SlangOptimizationLevel(requestState->optimizationLevel));
         externalRequest->setOutputContainerFormat(SlangContainerFormat(requestState->containerFormat));
         externalRequest->setPassThrough(SlangPassThrough(request->m_passThrough));
 

@@ -1292,8 +1292,7 @@ namespace Slang
 
         {
             auto linkage = getLinkage();
-
-            switch (linkage->optimizationLevel)
+            switch (getOptimizationLevel())
             {
                 case OptimizationLevel::None:       options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None; break;
                 case OptimizationLevel::Default:    options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Default;  break;
@@ -2140,6 +2139,12 @@ namespace Slang
 
         
         _dumpIntermediateMaybeWithAssembly(artifact);
+    }
+
+    OptimizationLevel CodeGenContext::getOptimizationLevel()
+    {
+        return std::max(getLinkage()->minimumOptimizationLevel,
+                        getTargetReq()->getMinimumOptimizationLevel());
     }
 
     IRDumpOptions CodeGenContext::getIRDumpOptions()

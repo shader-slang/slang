@@ -390,7 +390,7 @@ SLANG_API void spSetOptimizationLevel(
     SlangOptimizationLevel  level)
 {
     SLANG_ASSERT(request);
-    request->setOptimizationLevel(level);
+    request->setMinimumOptimizationLevel(level);
 }
 
 SLANG_API void spSetOutputContainerFormat(

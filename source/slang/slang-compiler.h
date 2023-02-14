@@ -1525,6 +1525,12 @@ namespace Slang
         {
             targetProfile = profile;
         }
+        // Should this be "requireOptimizationLevel" which sets min opt level
+        // to the max of the existing value and the new required one?
+        void setMinimumOptimizationLevel(OptimizationLevel optLevel)
+        {
+            minimumOptimizationLevel = optLevel;
+        }
         void setFloatingPointMode(FloatingPointMode mode)
         {
             floatingPointMode = mode;
@@ -1564,6 +1570,7 @@ namespace Slang
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return format; }
         Profile getTargetProfile() { return targetProfile; }
+        OptimizationLevel getMinimumOptimizationLevel() { return minimumOptimizationLevel; }
         FloatingPointMode getFloatingPointMode() { return floatingPointMode; }
         LineDirectiveMode getLineDirectiveMode() { return lineDirectiveMode; }
         SlangTargetFlags getTargetFlags() { return targetFlags; }
@@ -1585,6 +1592,7 @@ namespace Slang
         CodeGenTarget           format = CodeGenTarget::Unknown;
         SlangTargetFlags        targetFlags = 0;
         Slang::Profile          targetProfile = Slang::Profile();
+        OptimizationLevel       minimumOptimizationLevel = OptimizationLevel::None;
         FloatingPointMode       floatingPointMode = FloatingPointMode::Default;
         List<CapabilityAtom>    rawCapabilities;
         CapabilitySet           cookedCapabilities;
@@ -1885,7 +1893,7 @@ namespace Slang
 
         DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
-        OptimizationLevel optimizationLevel = OptimizationLevel::Default;
+        OptimizationLevel minimumOptimizationLevel = OptimizationLevel::Default;
 
         SerialCompressionType serialCompressionType = SerialCompressionType::VariableByteLite;
 
@@ -2464,6 +2472,8 @@ namespace Slang
 
         void maybeDumpIntermediate(IArtifact* artifact);
 
+        OptimizationLevel getOptimizationLevel();
+
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
         ExtensionTracker* m_extensionTracker = nullptr;
@@ -2539,7 +2549,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setMinimumOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOutputContainerFormat(SlangContainerFormat format) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setPassThrough(SlangPassThrough passThrough) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData) SLANG_OVERRIDE;
