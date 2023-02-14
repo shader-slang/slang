@@ -43,6 +43,7 @@ Items with ^ means there is some discussion about support later in the document 
 | [Sampler Feedback](#sampler-feedback)               |     No       |   Yes        |   No +     |     No        |    Yes ^
 | [RWByteAddressBuffer Atomic](#byte-address-atomic)  |     No       |   Yes ^      |   Yes ^    |     Yes       |    No +
 | [Shader Execution Reordering](#ser)                 |     No       |   Yes ^      |   Yes ^    |     No        |    No 
+| [debugBreak](#debug-break)                          |     No       |   No         |   Yes      |     Yes       |    Yes
 
 <a id="half"></a>
 ## Half Type
@@ -261,3 +262,17 @@ There is preliminary [Mesh Shader support](https://github.com/shader-slang/slang
 More information about [Shader Execution Reordering](shader-execution-reordering.md).
 
 Currently support is available in D3D12 via NVAPI, and for Vulkan via the [GL_NV_shader_invocation_reorder](https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_shader_invocation_reorder.txt) extension.
+
+<a id="debug-break"></a>
+## Debug Break
+
+Slang has preliminary support for `debugBreak()` intrinsic. With the appropriate tooling, when `debugBreak` is hit it will cause execution to halt and display in the attached debugger.
+
+Currently this is supported in all targets except HLSL. Note that on some targets if there isn't an appropriate debugging environment the debugBreak might cause execution to fail or potentially it is ignored. 
+
+On C++ targets debugBreak is implemented using SLANG_BREAKPOINT defined in "slang-cpp-prelude.h". If there isn't a suitable intrinsic, this will default to attempting to write to `nullptr` leading to a crash. 
+
+Some additional details:
+
+* If [slang-llvm](cpu-target.md#slang-llvm) is being used as the downstream compiler (as is typical with `host-callable`), it will crash into the debugger, but may not produce a usable stack trace.
+* For "normal" C++ downstream compilers such as Clang/Gcc/Visual Studio, to break into readable source code, debug information is typically necessary. Disabling optimizations may be useful to break on the appropriate specific line, and have variables inspectable.
