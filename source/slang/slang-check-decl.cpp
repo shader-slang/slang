@@ -5372,7 +5372,15 @@ namespace Slang
             // If it's specialized for target it should have a body...
             if (auto funcDecl = as<FunctionDeclBase>(decl))
             {
-                SLANG_ASSERT(funcDecl->body);
+                // Normally if we have specialization for target it must have a body.
+                if (funcDecl->body == nullptr)
+                {
+                    // If it doesn't have a body but does have a target intrinsic/SPIRVInstructionOp
+                    // it's probably ok
+
+                    SLANG_ASSERT(funcDecl->findModifier<SPIRVInstructionOpAttribute>() || 
+                        funcDecl->findModifier<TargetIntrinsicModifier>());
+                }
             }
             Name* targetName = specializedModifier->targetToken.getName();
 
