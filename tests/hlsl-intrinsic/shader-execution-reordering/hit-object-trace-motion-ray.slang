@@ -2,7 +2,7 @@
 
 // Motion rays not supported on HLSL impl currently
 //DISABLE_TEST:SIMPLE: -target dxil -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -DNV_SHADER_EXTN_SLOT=u0 
-//TEST:SIMPLE: -target glsl -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
+//TEST:SIMPLE: -target spirv -entry rayGenerationMain -stage raygeneration -profile glsl_460+GL_EXT_ray_tracing -line-directive-mode none 
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -use-dxil -profile sm_6_6 -render-feature ray-query
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
