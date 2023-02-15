@@ -649,6 +649,32 @@ struct DiffUnzipPass
         }
     }
 
+    void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
+    {
+        if (as<IRParam>(inst))
+        {
+            SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
+            builder->setInsertBefore(as<IRBlock>(inst->getParent())->getFirstOrdinaryInst());
+        }
+        else
+        {
+            builder->setInsertBefore(inst);
+        }
+    }
+
+    void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
+    {
+        if (as<IRParam>(inst))
+        {
+            SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
+            builder->setInsertBefore(as<IRBlock>(inst->getParent())->getFirstOrdinaryInst());
+        }
+        else
+        {
+            builder->setInsertAfter(inst);
+        }
+    }
+
     void processIndexedFwdBlock(IRBlock* fwdBlock)
     {
         if (!isBlockIndexed(fwdBlock))
@@ -724,7 +750,7 @@ struct DiffUnzipPass
             // 3. Store current value into the array and replace uses with a load.
             // TODO: If an index is missing, use the 'last' value of the primal index.
             {
-                builder.setInsertAfter(inst);
+                setInsertAfterOrdinaryInst(&builder, inst);
                 
                 IRInst* storeAddr = storageVar;
                 IRType* currType = as<IRPtrTypeBase>(storageVar->getDataType())->getValueType();
@@ -762,7 +788,7 @@ struct DiffUnzipPass
                 for (auto use : diffUses)
                 {
                     IRBlock* useBlock = getBlock(use->getUser());
-                    builder.setInsertBefore(getInstInBlock(use->getUser()));
+                    setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
 
                     IRInst* loadAddr = storageVar;
                     IRType* currType = as<IRPtrTypeBase>(storageVar->getDataType())->getValueType();

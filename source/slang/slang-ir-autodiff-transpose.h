@@ -227,6 +227,9 @@ struct DiffTransposePass
                     IRBlock* revAfterBlock = revBlockMap[currentBlock];
                     
                     builder.setInsertInto(revCondBlock);
+                    
+                    hoistPrimalOperands(&builder, ifElse->getCondition());
+
                     builder.emitIfElse(
                         ifElse->getCondition(),
                         revTrueEntryBlock,
@@ -357,6 +360,8 @@ struct DiffTransposePass
 
                     // Emit condition into the new cond block.
                     builder.setInsertInto(revCondBlock);
+                    hoistPrimalOperands(&builder, ifElse->getCondition());
+
                     builder.emitIfElse(
                         ifElse->getCondition(),
                         revTrueBlock,
@@ -442,7 +447,11 @@ struct DiffTransposePass
                     }
 
                     auto revSwitchBlock = revBlockMap[breakBlock];
+
                     builder.setInsertInto(revSwitchBlock);
+
+                    hoistPrimalOperands(&builder, switchInst->getCondition());
+
                     builder.emitSwitch(
                         switchInst->getCondition(),
                         revBreakBlock,
@@ -704,6 +713,10 @@ struct DiffTransposePass
 
     IRVar* getOrCreateInverseVar(IRInst* primalInst)
     {
+        // No need to store inverse values for constants.
+        if (as<IRConstant>(primalInst))
+            return nullptr;
+
         // Check if we have a var already.
         if (inverseVarMap.ContainsKey(primalInst))
             return inverseVarMap[primalInst];
@@ -774,7 +787,7 @@ struct DiffTransposePass
                             revParam,
                             nullptr));
                 }
-                else
+                else if (isPrimalInst(arg))
                 {
                     // If the output arg is a primal, emit a parameter
                     // to accept it as an _input_ for the reverse-mode
@@ -784,6 +797,10 @@ struct DiffTransposePass
 
                     setInverse(&builder, arg, primalInvParam);
                 }
+                else
+                {
+                    SLANG_UNEXPECTED("Encountered inst not marked as primal or differential");
+                }
             }
         }
 
@@ -791,7 +808,7 @@ struct DiffTransposePass
         // the primal blocks. These can safely be moved to the top of the 
         // rev-mode block (in order)
         // 
-        for (IRInst* child = fwdBlock->getFirstChild(); child;)
+        /*for (IRInst* child = fwdBlock->getFirstChild(); child;)
         {  
             auto nextChild = child->getNextInst();
 
@@ -801,18 +818,16 @@ struct DiffTransposePass
             }
             
             child = nextChild;
-        }
+        }*/
 
         // Move pointer & reference insts to the top of the reverse-mode block.
         List<IRInst*> nonValueInsts;
         for (IRInst* child = fwdBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
         {
-            SLANG_RELEASE_ASSERT(!child->findDecoration<IRPrimalValueAccessDecoration>());
-
             // If the instruction is pointer typed, it's not actually computing a value.
             // 
-            if (as<IRPtrTypeBase>(child->getDataType()))
-                nonValueInsts.add(child);
+            //if (as<IRPtrTypeBase>(child->getDataType()))
+            //    nonValueInsts.add(child);
             
             // Slang doesn't support function values. So if we see a func-typed inst
             // it's proabably a reference to a function.
@@ -833,6 +848,9 @@ struct DiffTransposePass
         // 
         for (IRInst* child = fwdBlock->getLastChild(); child; child = child->getPrevInst())
         {
+            if (child->findDecoration<IRPrimalValueAccessDecoration>())
+                continue;
+
             if (as<IRDecoration>(child) || as<IRParam>(child))
                 continue;
 
@@ -1011,16 +1029,19 @@ struct DiffTransposePass
 
     void lowerLoopExitValues(IRBuilder* builder, IRLoop* fwdLoop)
     {
-        while (auto loopExitValueDecoration = fwdLoop->findDecoration<IRLoopExitPrimalValueDecoration>())
+        for (auto decoration : fwdLoop->getDecorations())
         {
-            IRBlock* revLoopInitBlock = revBlockMap[fwdLoop->getBreakBlock()];
+            if (auto loopExitValueDecoration = as<IRLoopExitPrimalValueDecoration>(decoration))
+            {
+                IRBlock* revLoopInitBlock = revBlockMap[fwdLoop->getBreakBlock()];
 
-            if (auto revLoopInst = revLoopInitBlock->getTerminator())
-                builder->setInsertBefore(revLoopInst);
-            else
-                builder->setInsertInto(revLoopInitBlock);
+                if (auto revLoopInst = revLoopInitBlock->getTerminator())
+                    builder->setInsertBefore(revLoopInst);
+                else
+                    builder->setInsertInto(revLoopInitBlock);
 
-            setInverse(builder, loopExitValueDecoration->getTargetInst(), loopExitValueDecoration->getLoopExitValInst());
+                setInverse(builder, loopExitValueDecoration->getTargetInst(), loopExitValueDecoration->getLoopExitValInst());
+            }
         }
     }
 
@@ -1047,7 +1068,7 @@ struct DiffTransposePass
 
         for (UIndex ii = 0; ii < loopInst->getArgCount(); ii++)
         {
-            if (loopInst->getArg(ii)->findDecoration<IRPrimalInstDecoration>())
+            if (isPrimalInst(loopParams[ii]))
             {
                 primalArgs.add(loopInst->getArg(ii));
                 primalParams.add(loopParams[ii]);
@@ -1090,9 +1111,12 @@ struct DiffTransposePass
         }
     }
 
-    bool hasInverse(IRInst*)
+    bool hasInverse(IRInst* primalInst)
     {
-        return true;
+        if (getOrCreateInverseVar(primalInst))
+            return true;
+        else
+            return false;
     }
 
     IRInst* getInverse(IRBuilder* builder, IRInst* primalInst)
@@ -1114,6 +1138,76 @@ struct DiffTransposePass
     {
         if (auto invVar = getOrCreateInverseVar(inst))
             builder->emitStore(invVar, invInst);
+    }
+
+    /*void replacePrimalInstUses(IRBuilder* builder, IRInst* primalInst)
+    {
+        List<IRUse*> diffUses;
+        for (auto use = primalInst->firstUse; use; use = use->nextUse)
+        {   
+            if (as<IRDecoration>(use->getUser()))
+                continue;
+
+            IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+            if (useBlock && isDifferentialInst(useBlock))
+                diffUses.add(use);
+        }
+
+        for (auto use : diffUses)
+        {
+            builder->setInsertBefore(use->getUser());
+            auto invValue = getInverse(builder, primalInst);
+            use->set(invValue);
+        }
+    }*/
+
+    HashSet<IRInst*> hoistedInsts;
+    void hoistPrimalOperands(IRBuilder* revBuilder, IRInst* fwdInst)
+    {
+        for (UIndex ii = 0; ii < fwdInst->getOperandCount(); ii++)
+        {
+            // For now we'll only hoist primal operands that are 
+            // generated in differential blocks.
+            // Eventually, we also want this method to move primal access
+            // insts to the reverse-mode blocks (i.e. this method will
+            // make sure all requried primal insts are moved to the right
+            // place)
+            // 
+            auto operand = fwdInst->getOperand(ii);
+            if (isPrimalInst(operand) && 
+                as<IRBlock>(operand->getParent()) && 
+                isDifferentialInst(as<IRBlock>(operand->getParent())))
+            {
+                if (!operand->findDecoration<IRPrimalValueAccessDecoration>())
+                {
+                    // This operand must have an inverse, load that.
+                    if (hasInverse(operand))
+                    {
+                        fwdInst->setOperand(ii, getInverse(revBuilder, operand));
+                    }
+                }
+                else
+                {
+                    // Are the operands of this primal inst also available in the reverse-mode context?
+                    // If not, move/load them.
+                    // 
+                    hoistPrimalOperands(revBuilder, operand);
+
+                    auto block = as<IRBlock>(operand->getParent());
+                    SLANG_RELEASE_ASSERT(block);
+
+                    if (block == revBuilder->getBlock())
+                    {
+                        // Already in block, skip..
+                        continue;
+                    }
+
+                    // Otherwise, move our operand to the the current builder location.
+                    operand->removeFromParent();
+                    revBuilder->addInst(operand);
+                }
+            }
+        }
     }
 
     void invertInst(IRBuilder* builder, IRInst* primalInst)
@@ -1185,6 +1279,11 @@ struct DiffTransposePass
             // 
             SLANG_ASSERT(gradients.getCount() == 0);
         }
+
+        // Ensure primal operands are replaced with insts accessible in the 
+        // reverse-mode context.
+        // 
+        hoistPrimalOperands(builder, inst);
 
         // Is this inst used in another differential block?
         // Emit a function-scope accumulator variable, and include it's value.
