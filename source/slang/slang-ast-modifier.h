@@ -616,8 +616,23 @@ class AttributeUsageAttribute : public Attribute
 class UnrollAttribute : public Attribute 
 {
     SLANG_AST_CLASS(UnrollAttribute)
+
+};
+
+// An `[unroll]` or `[unroll(count)]` attribute
+class ForceUnrollAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ForceUnrollAttribute)
+
+    int32_t maxIterations = 0;
+};
+
+// An `[maxiters(count)]`
+class MaxItersAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(MaxItersAttribute)
  
-    IntegerLiteralValue getCount();
+    int32_t value = 0;
 };
 
 class LoopAttribute : public Attribute 

@@ -96,6 +96,52 @@ static bool isTrivialSingleIterationLoop(
     return true;
 }
 
+static bool removeDeadBlocks(IRGlobalValueWithCode* func)
+{
+    bool changed = false;
+    List<IRBlock*> workList;
+    auto firstBlock = func->getFirstBlock();
+    if (!firstBlock)
+        return false;
+
+    for (auto block = firstBlock->getNextBlock(); block; block = block->getNextBlock())
+    {
+        workList.add(block);
+    }
+
+    HashSet<IRBlock*> workListSet;
+    List<IRBlock*> nextWorkList;
+    for (;;)
+    {
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            auto block = workList[i];
+            if (!block->hasUses() && as<IRTerminatorInst>(block->getFirstInst()))
+            {
+                for (auto succ : block->getSuccessors())
+                {
+                    if (workListSet.Add(succ))
+                    {
+                        nextWorkList.add(succ);
+                    }
+                }
+                block->removeAndDeallocate();
+                changed = true;
+            }
+        }
+        if (nextWorkList.getCount())
+        {
+            workList = _Move(nextWorkList);
+            workListSet.Clear();
+        }
+        else
+        {
+            break;
+        }
+    }
+    return changed;
+}
+
 static bool processFunc(IRGlobalValueWithCode* func)
 {
     auto firstBlock = func->getFirstBlock();
@@ -109,84 +155,90 @@ static bool processFunc(IRGlobalValueWithCode* func)
     IRBuilder builder(&sharedBuilder);
 
     bool changed = false;
-
-    List<IRBlock*> workList;
-    HashSet<IRBlock*> processedBlock;
-    workList.add(func->getFirstBlock());
-    while (workList.getCount())
+    for (;;)
     {
-        auto block = workList.getFirst();
-        workList.fastRemoveAt(0);
-        while (block)
+        List<IRBlock*> workList;
+        HashSet<IRBlock*> processedBlock;
+        workList.add(func->getFirstBlock());
+        while (workList.getCount())
         {
-            if (auto loop = as<IRLoop>(block->getTerminator()))
+            auto block = workList.getFirst();
+            workList.fastRemoveAt(0);
+            while (block)
             {
-                // If continue block is unreachable, remove it.
-                auto continueBlock = loop->getContinueBlock();
-                if (continueBlock && !continueBlock->hasMoreThanOneUse())
+                if (auto loop = as<IRLoop>(block->getTerminator()))
                 {
-                    loop->continueBlock.set(loop->getTargetBlock());
-                    continueBlock->removeAndDeallocate();
-                }
-
-                // If there isn't any actual back jumps into loop target and there is a trivial
-                // break at the end of the loop, we can remove the header and turn it into
-                // a normal branch.
-                auto targetBlock = loop->getTargetBlock();
-                if (isTrivialSingleIterationLoop(func, loop, simplificationContext))
-                {
-                    builder.setInsertBefore(loop);
-                    List<IRInst*> args;
-                    for (UInt i = 0; i < loop->getArgCount(); i++)
+                    // If continue block is unreachable, remove it.
+                    auto continueBlock = loop->getContinueBlock();
+                    if (continueBlock && !continueBlock->hasMoreThanOneUse())
                     {
-                        args.add(loop->getArg(i));
+                        loop->continueBlock.set(loop->getTargetBlock());
+                        continueBlock->removeAndDeallocate();
                     }
-                    builder.emitBranch(targetBlock, args.getCount(), args.getBuffer());
-                    loop->removeAndDeallocate();
-                }
-            }
 
-            // If `block` does not end with an unconditional branch, bail.
-            if (block->getTerminator()->getOp() != kIROp_unconditionalBranch)
-                break;
-            auto branch = as<IRUnconditionalBranch>(block->getTerminator());
-            auto successor = branch->getTargetBlock();
-            // Only perform the merge if `block` is the only predecessor of `successor`.
-            // We also need to make sure not to merge a block that serves as the
-            // merge point in CFG. Such blocks will have more than one use.
-            if (successor->hasMoreThanOneUse())
-                break;
-            if (block->hasMoreThanOneUse())
-                break;
-            changed = true;
-            Index paramIndex = 0;
-            auto inst = successor->getFirstDecorationOrChild();
-            while (inst)
-            {
-                auto next = inst->getNextInst();
-                if (inst->getOp() == kIROp_Param)
-                {
-                    inst->replaceUsesWith(branch->getArg(paramIndex));
-                    paramIndex++;
+                    // If there isn't any actual back jumps into loop target and there is a trivial
+                    // break at the end of the loop, we can remove the header and turn it into
+                    // a normal branch.
+                    auto targetBlock = loop->getTargetBlock();
+                    if (isTrivialSingleIterationLoop(func, loop, simplificationContext))
+                    {
+                        builder.setInsertBefore(loop);
+                        List<IRInst*> args;
+                        for (UInt i = 0; i < loop->getArgCount(); i++)
+                        {
+                            args.add(loop->getArg(i));
+                        }
+                        builder.emitBranch(targetBlock, args.getCount(), args.getBuffer());
+                        loop->removeAndDeallocate();
+                    }
                 }
-                else
+
+                // If `block` does not end with an unconditional branch, bail.
+                if (block->getTerminator()->getOp() != kIROp_unconditionalBranch)
+                    break;
+                auto branch = as<IRUnconditionalBranch>(block->getTerminator());
+                auto successor = branch->getTargetBlock();
+                // Only perform the merge if `block` is the only predecessor of `successor`.
+                // We also need to make sure not to merge a block that serves as the
+                // merge point in CFG. Such blocks will have more than one use.
+                if (successor->hasMoreThanOneUse())
+                    break;
+                if (block->hasMoreThanOneUse())
+                    break;
+                changed = true;
+                Index paramIndex = 0;
+                auto inst = successor->getFirstDecorationOrChild();
+                while (inst)
                 {
-                    inst->removeFromParent();
-                    inst->insertAtEnd(block);
+                    auto next = inst->getNextInst();
+                    if (inst->getOp() == kIROp_Param)
+                    {
+                        inst->replaceUsesWith(branch->getArg(paramIndex));
+                        paramIndex++;
+                    }
+                    else
+                    {
+                        inst->removeFromParent();
+                        inst->insertAtEnd(block);
+                    }
+                    inst = next;
                 }
-                inst = next;
+                branch->removeAndDeallocate();
+                assert(!successor->hasUses());
+                successor->removeAndDeallocate();
             }
-            branch->removeAndDeallocate();
-            assert(!successor->hasUses());
-            successor->removeAndDeallocate();
-        }
-        for (auto successor : block->getSuccessors())
-        {
-            if (processedBlock.Add(successor))
+            for (auto successor : block->getSuccessors())
             {
-                workList.add(successor);
+                if (processedBlock.Add(successor))
+                {
+                    workList.add(successor);
+                }
             }
         }
+        bool blocksRemoved = removeDeadBlocks(func);
+        changed |= blocksRemoved;
+        if (!blocksRemoved)
+            break;
     }
     return changed;
 }

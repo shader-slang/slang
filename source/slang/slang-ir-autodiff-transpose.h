@@ -78,11 +78,6 @@ struct DiffTransposePass
         // of the *output* of the function.
         // 
         IRInst* dOutInst;
-
-        // Mapping between *primal* insts in the forward-mode function, and the 
-        // reverse-mode function
-        //
-        Dictionary<IRInst*, IRInst*>* primalsMap;
     };
 
     struct PendingBlockTerminatorEntry
@@ -353,6 +348,13 @@ struct DiffTransposePass
                             getPhiGrads(firstLoopBlock).getBuffer());
                     }
 
+                    auto phiGrads = getPhiGrads(condBlock);
+                    if (phiGrads.getCount() > 0)
+                    {
+                        revTrueBlock = insertPhiBlockBefore(revTrueBlock, phiGrads);
+                        revFalseBlock = insertPhiBlockBefore(revFalseBlock, phiGrads);
+                    }
+
                     // Emit condition into the new cond block.
                     builder.setInsertInto(revCondBlock);
                     builder.emitIfElse(
@@ -504,6 +506,7 @@ struct DiffTransposePass
         List<IRBlock*> traverseWorkList;
         HashSet<IRBlock*> traverseSet;
         traverseWorkList.add(revDiffFunc->getFirstBlock());
+
         traverseSet.Add(revDiffFunc->getFirstBlock());
         for (IRBlock* block = revDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
         {
@@ -515,8 +518,12 @@ struct DiffTransposePass
                 // or entirely with differential insts.
                 continue;
             }
+
             workList.add(block);
         }
+
+        if (!workList.getCount())
+            return;
 
         // Reverse the order of the blocks.
         workList.reverse();
@@ -531,9 +538,32 @@ struct DiffTransposePass
         // Keep track of first diff block, since this is where 
         // we'll emit temporary vars to hold per-block derivatives.
         // 
-        firstRevDiffBlockMap[revDiffFunc] = revBlockMap[terminalDiffBlocks[0]];
+        auto firstRevDiffBlock = revBlockMap[terminalDiffBlocks[0]].GetValue();
+        firstRevDiffBlockMap[revDiffFunc] = firstRevDiffBlock;
 
-        IRInst* retVal = nullptr;
+        // Move all diff vars to first block, and initialize them with zero.
+        builder.setInsertInto(firstRevDiffBlock);
+        for (auto block : workList)
+        {
+            for (auto inst = block->getFirstInst(); inst;)
+            {
+                auto nextInst = inst->getNextInst();
+                if (auto varInst = as<IRVar>(inst))
+                {
+                    if (auto diffDecor = varInst->findDecoration<IRDifferentialInstDecoration>())
+                    {
+                        if (auto ptrPrimalType = as<IRPtrTypeBase>(diffDecor->getPrimalType()))
+                        {
+                            varInst->insertAtEnd(firstRevDiffBlock);
+
+                            auto dzero = emitDZeroOfDiffInstType(&builder, ptrPrimalType->getValueType());
+                            builder.emitStore(varInst, dzero);
+                        }
+                    }
+                }
+                inst = nextInst;
+            }
+        }
 
         for (auto block : workList)
         {
@@ -543,7 +573,6 @@ struct DiffTransposePass
                 if (auto returnInst = as<IRReturn>(block->getTerminator()))
                 {
                     this->addRevGradientForFwdInst(returnInst, RevGradient(returnInst, transposeInfo.dOutInst, nullptr));
-                    retVal = returnInst->getVal();
                 }
             }
 
@@ -572,6 +601,11 @@ struct DiffTransposePass
             auto terminalPrimalBlock = terminalPrimalBlocks[0];
             auto firstRevBlock = as<IRBlock>(revBlockMap[terminalDiffBlocks[0]]);
 
+            auto returnDecoration = 
+                terminalPrimalBlock->getTerminator()->findDecoration<IRBackwardDerivativePrimalReturnDecoration>();
+            SLANG_ASSERT(returnDecoration);
+            auto retVal = returnDecoration->getBackwardDerivativePrimalReturnValue();
+
             terminalPrimalBlock->getTerminator()->removeAndDeallocate();
             
             IRBuilder subBuilder(builder.getSharedBuilder());
@@ -582,15 +616,6 @@ struct DiffTransposePass
 
             auto branch = subBuilder.emitBranch(firstRevBlock);
 
-            if (!retVal || retVal->getOp() == kIROp_VoidLit)
-            {
-                retVal = subBuilder.getVoidValue();
-            }
-            else
-            {
-                auto makePair = cast<IRMakeDifferentialPair>(retVal);
-                retVal = makePair->getPrimalValue();
-            }
             subBuilder.addBackwardDerivativePrimalReturnDecoration(branch, retVal);
         }
 
@@ -607,6 +632,25 @@ struct DiffTransposePass
         for (auto block : workList)
         {
             block->removeAndDeallocate();
+        }
+    }
+
+    IRInst* extractAccumulatorVarGradient(IRBuilder* builder, IRInst* fwdInst)
+    {
+        if (auto accVar = getOrCreateAccumulatorVar(fwdInst))
+        {
+            auto gradValue = builder->emitLoad(accVar);
+            builder->emitStore(
+                accVar,
+                emitDZeroOfDiffInstType(
+                    builder,
+                    tryGetPrimalTypeFromDiffInst(fwdInst)));
+            
+            return gradValue;
+        }
+        else
+        {
+            return nullptr;
         }
     }
 
@@ -688,6 +732,30 @@ struct DiffTransposePass
             }
         }
 
+        // Some special instructions simply need to be copied over.
+        // These do not deal with differentials.
+        // TODO: This will not work if there are any differential
+        // insts that rely on loop counter vars having a specific
+        // value. 
+        // The solution is to have primal insts appearing in 
+        // differential blocks be in their own special blocks that are
+        // ignored entirely, rather than dealing with them one inst 
+        // at a time.
+        // 
+        for (IRInst* child = fwdBlock->getFirstChild(); child;)
+        {  
+            auto nextChild = child->getNextInst();
+
+            if (child->findDecoration<IRLoopCounterDecoration>())
+            {
+                // Loop counter insts should not have any gradients.
+                SLANG_ASSERT(!hasRevGradients(child));
+                child->insertAtEnd(revBlock);
+            }
+            
+            child = nextChild;
+        }
+
         // Move pointer & reference insts to the top of the reverse-mode block.
         List<IRInst*> nonValueInsts;
         for (IRInst* child = fwdBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
@@ -719,6 +787,7 @@ struct DiffTransposePass
             if (as<IRDecoration>(child) || as<IRParam>(child))
                 continue;
 
+            
             transposeInst(&builder, child);
         }
 
@@ -744,10 +813,10 @@ struct DiffTransposePass
             // 
             if (isInstUsedOutsideParentBlock(param))
             {
-                auto accVar = getOrCreateAccumulatorVar(param);
+                auto accGradient = extractAccumulatorVarGradient(&builder, param);
                 addRevGradientForFwdInst(
                     param, 
-                    RevGradient(param, builder.emitLoad(accVar), nullptr));
+                    RevGradient(param, accGradient, nullptr));
             }
             
             if (hasRevGradients(param))
@@ -839,15 +908,6 @@ struct DiffTransposePass
             break;
         }
 
-        // Some special instructions simply need to be copied over.
-        // These do not deal with differentials.
-        // 
-        if (inst->findDecoration<IRLoopCounterDecoration>())
-        {
-            inst->insertAtEnd(builder->getBlock());
-            return;
-        }
-
         // Look for gradient entries for this inst.
         List<RevGradient> gradients;
         if (hasRevGradients(inst))
@@ -898,9 +958,9 @@ struct DiffTransposePass
         // 
         if (isInstUsedOutsideParentBlock(inst) && !as<IRLoad>(inst))
         {
-            auto accVar = getOrCreateAccumulatorVar(inst);
+            auto accGradient = extractAccumulatorVarGradient(builder, inst);
             gradients.add(
-                RevGradient(inst, builder->emitLoad(accVar), nullptr));
+                RevGradient(inst, accGradient, nullptr));
         }
         
         // Emit the aggregate of all the gradients here. 
@@ -1247,6 +1307,8 @@ struct DiffTransposePass
             case kIROp_Add:
             case kIROp_Mul:
             case kIROp_Sub: 
+            case kIROp_Div: 
+            case kIROp_Neg:
                 return transposeArithmetic(builder, fwdInst, revValue);
 
             case kIROp_Call:
@@ -1927,6 +1989,41 @@ struct DiffTransposePass
                     SLANG_ASSERT_FAILURE("Neither operand of a mul instruction is a differential inst");
                 }
             }   
+            case kIROp_Div: 
+            {
+                if (isDifferentialInst(fwdInst->getOperand(0)))
+                {
+                    SLANG_RELEASE_ASSERT(!isDifferentialInst(fwdInst->getOperand(1)));
+
+                    // (Out = dA / B) -> (dA += dOut / B)
+                    return TranspositionResult(
+                        List<RevGradient>(
+                            RevGradient(
+                                fwdInst->getOperand(0),
+                                builder->emitDiv(operandType, revValue, fwdInst->getOperand(1)),
+                                fwdInst)));
+                }
+                {
+                    SLANG_ASSERT_FAILURE("The first operand of a div inst must be a differential inst");
+                }
+            }
+            case kIROp_Neg: 
+            {
+                if (isDifferentialInst(fwdInst->getOperand(0)))
+                {
+                    // (Out = -dA) -> (dA += -dOut)
+                    return TranspositionResult(
+                        List<RevGradient>(
+                            RevGradient(
+                                fwdInst->getOperand(0),
+                                builder->emitNeg(operandType, revValue),
+                                fwdInst)));
+                }
+                else
+                {
+                    SLANG_ASSERT_FAILURE("Cannot transpose neg of a non-differentiable inst");
+                }
+            }   
 
             default:
                 SLANG_ASSERT_FAILURE("Unhandled arithmetic");
@@ -2362,8 +2459,6 @@ struct DiffTransposePass
 
     Dictionary<IRInst*, IRVar*>                          revAccumulatorVarMap;
 
-    Dictionary<IRInst*, IRInst*>*                        primalsMap;
-
     List<IRInst*>                                        usedPtrs;
 
     Dictionary<IRBlock*, IRBlock*>                       revBlockMap;
@@ -2375,6 +2470,8 @@ struct DiffTransposePass
     List<PendingBlockTerminatorEntry>                    pendingBlocks;
 
     Dictionary<IRBlock*, List<IRInst*>>                  phiGradsMap;
+
+    Dictionary<IRBlock*, IRBlock*>                       initializerBlockMap;
     
 };
 

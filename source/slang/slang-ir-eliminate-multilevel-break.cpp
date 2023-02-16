@@ -253,7 +253,7 @@ struct EliminateMultiLevelBreakContext
             builder.emitBranch(newBreakBodyBlock);
             builder.setInsertInto(newBreakBodyBlock);
             auto levelNeq = builder.emitNeq(targetLevelParam, builder.getIntValue(builder.getIntType(), skippedRegion->level));
-            builder.emitIfElse(levelNeq, jumpToOuterBlock, breakBlock, unreachableBlock);
+            builder.emitIfElse(levelNeq, jumpToOuterBlock, breakBlock, breakBlock);
             builder.setInsertInto(jumpToOuterBlock);
             if (skippedOverRegions.Contains(skippedRegion->parent))
             {

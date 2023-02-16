@@ -4771,6 +4771,9 @@ namespace Slang
 
     List<Expr*> getImaginaryArgsToOriginalFuncFromBackwardDerivativeFunc(ASTBuilder* astBuilder, FunctionDeclBase* bwdDiffFunc, SourceLoc loc)
     {
+        // Note: it isn't always possible to construct original arguments from
+        // backward propagation arguments because backward propagation function
+        // may drop certain parameters.
         List<Expr*> imaginaryArguments;
         for (auto param : bwdDiffFunc->getParameters())
         {
@@ -4789,6 +4792,12 @@ namespace Slang
             }
             imaginaryArguments.add(arg);
         }
+        // Assume the last parameter is `dOut`.
+        // This is not true if the function returns a non-differentiable value.
+        // However in that uncommon case we just fail the overload resolution
+        // and require the user to provide disambiguate themselves.
+        if (imaginaryArguments.getCount())
+            imaginaryArguments.fastRemoveAt(imaginaryArguments.getCount() - 1);
         return imaginaryArguments;
     }
 
@@ -4808,41 +4817,99 @@ namespace Slang
         DeclAssociationKind assocKind,
         const List<Expr*>& imaginaryArgsToOriginal)
     {
-        auto invokeExpr = visitor->constructUncheckedInvokeExpr(derivativeOfAttr->funcExpr, imaginaryArgsToOriginal);
-        auto resolved = visitor->ResolveInvoke(invokeExpr);
-        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+        DeclRef<Decl> calleeDeclRef;
+        auto calleeDeclRefExpr = as<DeclRefExpr>(derivativeOfAttr->funcExpr);
+        if (!calleeDeclRefExpr)
         {
-            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+            auto invokeExpr = visitor->constructUncheckedInvokeExpr(derivativeOfAttr->funcExpr, imaginaryArgsToOriginal);
+            auto resolved = visitor->ResolveInvoke(invokeExpr);
+            if (auto resolvedInvoke = as<InvokeExpr>(resolved))
             {
-                auto calleeDecl = calleeDeclRef->declRef.getDecl();
-                if (auto existingModifier = _findModifier<TDerivativeAttr>(calleeDecl))
-                {
-                    // The primal function already has a `[*Derivative]` attribute, this is invalid.
-                    visitor->getSink()->diagnose(
-                        derivativeOfAttr,
-                        Diagnostics::declAlreadyHasAttribute,
-                        calleeDeclRef->declRef,
-                        getDerivativeAttrName<TDerivativeAttr>());
-                    visitor->getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef->declRef.getDecl());
-                }
-                derivativeOfAttr->funcExpr = calleeDeclRef;
-                auto derivativeAttr = visitor->getASTBuilder()->create<TDerivativeAttr>();
-                derivativeAttr->loc = derivativeOfAttr->loc;
-                auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
-                auto declRef =
-                    DeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
-                auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, derivativeOfAttr->loc, nullptr);
-                declRefExpr->type.type = nullptr;
-                derivativeAttr->args.add(declRefExpr);
-                derivativeAttr->funcExpr = declRefExpr;
-                checkDerivativeAttribute(visitor, as<FunctionDeclBase>(calleeDeclRef->declRef.getDecl()), derivativeAttr);
-                derivativeOfAttr->backDeclRef = derivativeAttr->funcExpr;
-                derivativeAttr->funcExpr = nullptr;
-                visitor->getShared()->registerAssociatedDecl(calleeDeclRef->declRef.getDecl(), assocKind, funcDecl);
-                return;
+                calleeDeclRefExpr = as<DeclRefExpr>(resolvedInvoke->functionExpr);
             }
         }
-        visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::invalidCustomDerivative);
+        if (!calleeDeclRefExpr)
+        {
+            visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
+            return;
+        }
+        calleeDeclRef = calleeDeclRefExpr->declRef;
+        if (auto calleeGenDecl = as<GenericDecl>(calleeDeclRef.getDecl()))
+        {
+            auto parentGenericDecl = as<GenericDecl>(funcDecl->parentDecl);
+            if (!parentGenericDecl)
+            {
+                visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
+                return;
+            }
+            FunctionDeclBase* funcReturnVal = nullptr;
+            List<Val*> args;
+            for (auto mm : parentGenericDecl->members)
+            {
+                if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm))
+                {
+                    args.add(DeclRefType::create(visitor->getASTBuilder(), DeclRef<Decl>(genericTypeParamDecl, nullptr)));
+                }
+                else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
+                {
+                    args.add(visitor->getASTBuilder()->getOrCreate<GenericParamIntVal>(
+                        genericValueParamDecl->getType(),
+                        genericValueParamDecl, nullptr));
+                }
+            }
+            auto funcs = calleeGenDecl->getMembersOfType<FunctionDeclBase>();
+            if (funcs.isEmpty())
+            {
+                visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
+                return;
+            }
+            funcReturnVal = funcs.getFirst();
+            if (funcReturnVal)
+            {
+                auto subst = visitor->getASTBuilder()->getOrCreateGenericSubstitution(calleeGenDecl, args, nullptr);
+                calleeDeclRef.decl = funcReturnVal;
+                calleeDeclRef.substitutions = subst;
+                calleeDeclRefExpr = as<DeclRefExpr>(visitor->ConstructDeclRefExpr(
+                    calleeDeclRef, nullptr, derivativeOfAttr->loc, nullptr));
+            }
+            else
+            {
+                calleeDeclRef = DeclRef<Decl>();
+                calleeDeclRefExpr = nullptr;
+            }
+        }
+
+        auto calleeFunc = as<FunctionDeclBase>(calleeDeclRef.getDecl());
+        if (!calleeFunc)
+        {
+            visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
+            return;
+        }
+
+        if (auto existingModifier = _findModifier<TDerivativeAttr>(calleeFunc))
+        {
+            // The primal function already has a `[*Derivative]` attribute, this is invalid.
+            visitor->getSink()->diagnose(
+                derivativeOfAttr,
+                Diagnostics::declAlreadyHasAttribute,
+                calleeDeclRef,
+                getDerivativeAttrName<TDerivativeAttr>());
+            visitor->getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef.getDecl());
+        }
+        derivativeOfAttr->funcExpr = calleeDeclRefExpr;
+        auto derivativeAttr = visitor->getASTBuilder()->create<TDerivativeAttr>();
+        derivativeAttr->loc = derivativeOfAttr->loc;
+        auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
+        auto declRef =
+            DeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
+        auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, derivativeOfAttr->loc, nullptr);
+        declRefExpr->type.type = nullptr;
+        derivativeAttr->args.add(declRefExpr);
+        derivativeAttr->funcExpr = declRefExpr;
+        checkDerivativeAttribute(visitor, calleeFunc, derivativeAttr);
+        derivativeOfAttr->backDeclRef = derivativeAttr->funcExpr;
+        derivativeAttr->funcExpr = nullptr;
+        visitor->getShared()->registerAssociatedDecl(calleeDeclRef.getDecl(), assocKind, funcDecl);
     }
 
     static void checkDerivativeAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, ForwardDerivativeAttribute* attr)
@@ -5305,7 +5372,15 @@ namespace Slang
             // If it's specialized for target it should have a body...
             if (auto funcDecl = as<FunctionDeclBase>(decl))
             {
-                SLANG_ASSERT(funcDecl->body);
+                // Normally if we have specialization for target it must have a body.
+                if (funcDecl->body == nullptr)
+                {
+                    // If it doesn't have a body but does have a target intrinsic/SPIRVInstructionOp
+                    // it's probably ok
+
+                    SLANG_ASSERT(funcDecl->findModifier<SPIRVInstructionOpAttribute>() || 
+                        funcDecl->findModifier<TargetIntrinsicModifier>());
+                }
             }
             Name* targetName = specializedModifier->targetToken.getName();
 

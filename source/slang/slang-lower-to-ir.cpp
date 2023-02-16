@@ -4845,6 +4845,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Loop);
         }
+        else if( auto maxItersAttr = stmt->findModifier<MaxItersAttribute>() )
+        {
+            getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
+        }
+        else if (auto forceUnrollAttr = stmt->findModifier<ForceUnrollAttribute>())
+        {
+            getBuilder()->addLoopForceUnrollDecoration(inst, forceUnrollAttr->maxIterations);
+        }
         // TODO: handle other cases here
     }
 
@@ -8428,8 +8436,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 else
                 {
                     originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
-                    getBuilder()->addForwardDifferentiableDecoration(irFunc);
-                    getBuilder()->addBackwardDifferentiableDecoration(irFunc);
                 }
             }
             subContext->irBuilder->setInsertInto(irFunc);
