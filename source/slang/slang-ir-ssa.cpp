@@ -923,6 +923,15 @@ IRBlock* IREdge::getSuccessor() const
     return cast<IRBlock>(getUse()->get());
 }
 
+void SharedIRBuilder::init(IRModule* module)
+{
+    m_module = module;
+    m_session = module->getSession();
+
+    m_globalValueNumberingMap.Clear();
+    m_constantMap.Clear();
+}
+
 void SharedIRBuilder::insertBlockAlongEdge(
     IREdge const&       edge)
 {

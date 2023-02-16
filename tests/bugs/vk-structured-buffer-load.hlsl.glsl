@@ -2,17 +2,9 @@
 //TEST_IGNORE_FILE:
 
 #version 460
+#extension GL_NV_ray_tracing : require
 layout(row_major) uniform;
 layout(row_major) buffer;
-#extension GL_NV_ray_tracing : require
-
-#define rcp_tmp _S2
-#define RayData _S3
-#define Attributes _S4
-
-#define tmpA _S5
-#define tmpB _S6
-#define tmpC _S7
 
 layout(std430, binding = 1) readonly buffer _S1 {
     float _data[];
@@ -20,8 +12,8 @@ layout(std430, binding = 1) readonly buffer _S1 {
 
 float rcp_0(float x_0)
 {
-    float rcp_tmp = float(1.00000000000000000000) / x_0;
-    return rcp_tmp;
+    float _S2 = 1.0 / x_0;
+    return _S2;
 }
 
 struct RayHitInfoPacked_0
@@ -29,49 +21,48 @@ struct RayHitInfoPacked_0
     vec4 PackedHitInfoA_0;
 };
 
-rayPayloadInNV RayHitInfoPacked_0 RayData;
+rayPayloadInNV RayHitInfoPacked_0 _S3;
 
 struct BuiltInTriangleIntersectionAttributes_0
 {
     vec2 barycentrics_0;
 };
 
-hitAttributeNV BuiltInTriangleIntersectionAttributes_0 Attributes;
+hitAttributeNV BuiltInTriangleIntersectionAttributes_0 _S4;
 
 void main()
 {
-    float HitT_0 = (gl_RayTmaxNV);
-    RayData.PackedHitInfoA_0.x = HitT_0;
-
+    float HitT_0 = ((gl_RayTmaxNV));
+    _S3.PackedHitInfoA_0.x = HitT_0;
 
     float offsfloat_0 = ((gParamBlock_sbuf_0)._data[(0)]);
 
-    uint use_rcp_0 = 0U | uint(HitT_0 > 0.00000000000000000000);
+    uint use_rcp_0 = 0U | uint(HitT_0 > 0.0);
 
-    if(bool(use_rcp_0))
+    if(use_rcp_0 != 0U)
     {
 
-        float tmpA = rcp_0(offsfloat_0);
+        float _S5 = rcp_0(offsfloat_0);
 
-        RayData.PackedHitInfoA_0.y = tmpA;
+        _S3.PackedHitInfoA_0.y = _S5;
 
     }
     else
     {
 
-        if(use_rcp_0 > 0U&&offsfloat_0 == 0.00000000000000000000)
+        if(use_rcp_0 > 0U&&offsfloat_0 == 0.0)
         {
 
-            float tmpB = (inversesqrt((offsfloat_0 + 1.00000000000000000000)));
+            float _S6 = (inversesqrt((offsfloat_0 + 1.0)));
 
-            RayData.PackedHitInfoA_0.y = tmpB;
+            _S3.PackedHitInfoA_0.y = _S6;
 
         }
         else
         {
-            float tmpC = (inversesqrt((offsfloat_0)));
+            float _S7 = (inversesqrt((offsfloat_0)));
 
-            RayData.PackedHitInfoA_0.y = tmpC;
+            _S3.PackedHitInfoA_0.y = _S7;
 
         }
 

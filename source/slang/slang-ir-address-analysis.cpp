@@ -79,9 +79,8 @@ namespace Slang
         // Deduplicate and move known address insts.
         for (auto block : func->getBlocks())
         {
-            for (auto inst = block->getFirstChild(); inst;)
+            for (auto inst : block->getModifiableChildren())
             {
-                auto next = inst->getNextInst();
                 switch (inst->getOp())
                 {
                 case kIROp_Var:
@@ -151,7 +150,6 @@ namespace Slang
                     }
                     break;
                 }
-                inst = next;
             }
         }
 

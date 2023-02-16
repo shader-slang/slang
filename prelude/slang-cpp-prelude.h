@@ -296,8 +296,8 @@ struct ISlangUnknown
 
 // Includes
 
-#include "slang-cpp-types.h"
 #include "slang-cpp-scalar-intrinsics.h"
+#include "slang-cpp-types.h"
 
 // TODO(JS): Hack! Output C++ code from slang can copy uninitialized variables. 
 #if defined(_MSC_VER)

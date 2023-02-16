@@ -1256,10 +1256,8 @@ struct DiffUnzipPass
         diffBuilder.setInsertInto(diffBlock);
 
         List<IRInst*> splitInsts;
-        for (auto child = block->getFirstChild(); child;)
+        for (auto child : block->getModifiableChildren())
         {
-            IRInst* nextChild = child->getNextInst();
-
             if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(child))
             {
                 // Replace GetDiff(A) with A.d
@@ -1267,7 +1265,6 @@ struct DiffUnzipPass
                 {
                     getDiffInst->replaceUsesWith(lookupDiffInst(getDiffInst->getBase()));
                     getDiffInst->removeAndDeallocate();
-                    child = nextChild;
                     continue;
                 }
             }
@@ -1278,7 +1275,6 @@ struct DiffUnzipPass
                 {
                     getPrimalInst->replaceUsesWith(lookupPrimalInst(getPrimalInst->getBase()));
                     getPrimalInst->removeAndDeallocate();
-                    child = nextChild;
                     continue;
                 }
             }
@@ -1296,8 +1292,6 @@ struct DiffUnzipPass
             {
                 child->insertAtEnd(primalBlock);
             }
-
-            child = nextChild;
         }
 
         // Remove insts that were split.

@@ -49,7 +49,7 @@ struct DeduplicateContext
             return *newValue;
         for (UInt i = 0; i < value->getOperandCount(); i++)
         {
-            value->setOperand(i, deduplicate(value->getOperand(i), shouldDeduplicate));
+            value->unsafeSetOperand(i, deduplicate(value->getOperand(i), shouldDeduplicate));
         }
         value->setFullType((IRType*)deduplicate(value->getFullType(), shouldDeduplicate));
         if (auto newValue = deduplicateMap.TryGetValue(key))

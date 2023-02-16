@@ -56,25 +56,51 @@ namespace Slang
                 lowerGenericFuncType(&builder, genericParent, cast<IRFuncType>(func->getFullType()));
             SLANG_ASSERT(loweredGenericType);
             loweredFunc->setFullType(loweredGenericType);
-            List<IRInst*> clonedParams;
 
+            List<IRInst*> childrenToDemote;
+            List<IRInst*> clonedParams;
             for (auto genericChild : genericParent->getFirstBlock()->getChildren())
             {
-                if (genericChild == func)
+                switch (genericChild->getOp())
+                {
+                case kIROp_Func:
                     continue;
-                if (genericChild->getOp() == kIROp_Return)
+                case kIROp_Return:
                     continue;
+                }
                 // Process all generic parameters and local type definitions.
                 auto clonedChild = cloneInst(&cloneEnv, &builder, genericChild);
-                if (clonedChild->getOp() == kIROp_Param)
+                switch (clonedChild->getOp())
                 {
-                    auto paramType = clonedChild->getFullType();
-                    auto loweredParamType = sharedContext->lowerType(&builder, paramType);
-                    if (loweredParamType != paramType)
+                case kIROp_Param:
                     {
-                        clonedChild->setFullType((IRType*)loweredParamType);
+                        auto paramType = clonedChild->getFullType();
+                        auto loweredParamType = sharedContext->lowerType(&builder, paramType);
+                        if (loweredParamType != paramType)
+                        {
+                            clonedChild->setFullType((IRType*)loweredParamType);
+                        }
+                        clonedParams.add(clonedChild);
                     }
-                    clonedParams.add(clonedChild);
+                    break;
+
+                case kIROp_LookupWitness:
+                case kIROp_Specialize:
+                    {
+                        childrenToDemote.add(clonedChild);
+                        // Make sure all uses are from the function body.
+                        for (auto use = genericChild->firstUse; use; use = use->nextUse)
+                        {
+                            if (use->getUser()->getParent() == genericChild->getParent())
+                            {
+                                // This specialize/lookup is used as operand to some other
+                                // global inst in the generic. This is not supported now.
+                                SLANG_UNIMPLEMENTED_X(
+                                    "Unsupported use of specialize/lookupWitness in generic body.");
+                            }
+                        }
+                        continue;
+                    }
                 }
             }
             cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage, func, loweredFunc);
@@ -85,6 +111,15 @@ namespace Slang
                 param->removeFromParent();
                 block->addParam(as<IRParam>(param));
             }
+
+            // Demote specialize and lookupWitness insts and their dependents down to function body.
+            auto insertPoint = block->getFirstOrdinaryInst();
+            for (Index i = childrenToDemote.getCount() - 1; i >= 0; i--)
+            {
+                auto child = childrenToDemote[i];
+                child->insertBefore(insertPoint);
+            }
+
             // Lower generic typed parameters into AnyValueType.
             auto firstInst = loweredFunc->getFirstOrdinaryInst();
             builder.setInsertBefore(firstInst);
@@ -292,7 +327,8 @@ namespace Slang
                 loweredFunc = lowerGenericFunction(funcToSpecialize);
                 if (loweredFunc != funcToSpecialize)
                 {
-                    specializeInst->setOperand(0, loweredFunc);
+                    IRBuilder builder;
+                    builder.replaceOperand(specializeInst->getOperands(), loweredFunc);
                 }
             }
         }

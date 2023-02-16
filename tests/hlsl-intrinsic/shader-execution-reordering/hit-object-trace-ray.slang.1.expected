@@ -14,15 +14,15 @@ struct SomeValues_0
 };
 
 layout(location = 0)
+hitObjectAttributeNV
+SomeValues_0 t_0;
+
+layout(location = 0)
 rayPayloadEXT
 SomeValues_0 p_0;
 
 layout(binding = 0)
 uniform accelerationStructureEXT scene_0;
-
-layout(location = 0)
-hitObjectAttributeNV
-SomeValues_0 t_0;
 
 SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_0)
 {

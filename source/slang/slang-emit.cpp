@@ -1022,7 +1022,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         auto irModule = linkedIR.module;
         
         // Perform final simplifications to help emit logic to generate more compact code.
-        simplifyForEmit(irModule);
+        simplifyForEmit(irModule, targetRequest);
 
         metadata = linkedIR.metadata;
 

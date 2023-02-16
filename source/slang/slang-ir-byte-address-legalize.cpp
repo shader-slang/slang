@@ -66,11 +66,8 @@ struct ByteAddressBufferLegalizationContext
             break;
         }
 
-
-        IRInst* nextChild = nullptr;
-        for( IRInst* child = inst->getFirstChild(); child; child = nextChild )
+        for( IRInst* child : inst->getModifiableChildren())
         {
-            nextChild = child->getNextInst();
             processInstRec(child);
         }
     }
