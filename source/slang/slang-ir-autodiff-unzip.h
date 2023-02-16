@@ -56,8 +56,10 @@ struct DiffUnzipPass
         // After lowering, store references to the count
         // variables associated with this region
         //
-        IRInst*         primalCountVar   = nullptr;
+        IRInst*         primalCountParam   = nullptr;
         IRInst*         diffCountVar     = nullptr;
+
+        IRVar*          primalCountLastVar   = nullptr;
 
         enum CountStatus
         {
@@ -77,7 +79,7 @@ struct DiffUnzipPass
             firstBlock(nullptr),
             breakBlock(nullptr),
             continueBlock(nullptr),
-            primalCountVar(nullptr),
+            primalCountParam(nullptr),
             diffCountVar(nullptr),
             status(CountStatus::Unresolved),
             maxIters(-1)
@@ -94,7 +96,7 @@ struct DiffUnzipPass
             firstBlock(firstBlock),
             breakBlock(breakBlock),
             continueBlock(continueBlock),
-            primalCountVar(nullptr),
+            primalCountParam(nullptr),
             diffCountVar(nullptr),
             status(CountStatus::Unresolved),
             maxIters(-1)
@@ -275,7 +277,7 @@ struct DiffUnzipPass
         /*List<IRVar*> varsToReduce;
         for (auto indexRegion : indexRegions)
         {
-            varsToReduce.add(indexRegion->primalCountVar);
+            varsToReduce.add(indexRegion->primalCountParam);
             varsToReduce.add(indexRegion->diffCountVar);
         }
         
@@ -431,14 +433,15 @@ struct DiffUnzipPass
             //IRBlock* breakBlock = region->breakBlock;
 
             // Grab first primal block.
-            //IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
+            IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
+            builder.setInsertBefore(firstPrimalBlock->getTerminator());
+            region->primalCountLastVar = builder.emitVar(builder.getIntType());
             
             // Make variable in the top-most block (so it's visible to diff blocks)
             /*
-            builder.setInsertBefore(firstPrimalBlock->getTerminator());
-            region->primalCountVar = builder.emitVar(builder.getIntType());
+            
             builder.emitStore(
-                region->primalCountVar, 
+                region->primalCountParam, 
                 builder.getIntValue(builder.getIntType(), 0));
             */
             {
@@ -453,26 +456,31 @@ struct DiffUnzipPass
                     primalInitBlock, 
                     builder.getIntValue(builder.getIntType(), 0));
 
-                region->primalCountVar = addPhiInputParam(
+                region->primalCountParam = addPhiInputParam(
                     &builder,
                     primalCondBlock,
                     builder.getIntType(),
                     phiCounterArgLoopEntryIndex);
-                builder.addLoopCounterDecoration(region->primalCountVar);
-                builder.markInstAsPrimal(region->primalCountVar);
+                builder.addLoopCounterDecoration(region->primalCountParam);
+                builder.markInstAsPrimal(region->primalCountParam);
                 
                 IRBlock* primalUpdateBlock = as<IRBlock>(primalMap[getUpdateBlock(region)]);
                 builder.setInsertBefore(primalUpdateBlock->getTerminator());
 
                 auto incCounterVal = builder.emitAdd(
                     builder.getIntType(), 
-                    region->primalCountVar,
+                    region->primalCountParam,
                     builder.getIntValue(builder.getIntType(), 1));
                 builder.markInstAsPrimal(incCounterVal);
 
                 auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, primalUpdateBlock, incCounterVal);
 
                 SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
+
+                IRBlock* primalBreakBlock = as<IRBlock>(primalMap[region->breakBlock]);
+                builder.setInsertBefore(primalBreakBlock->getTerminator());
+                
+                builder.emitStore(region->primalCountLastVar, region->primalCountParam);
             }
 
             {
@@ -509,7 +517,14 @@ struct DiffUnzipPass
                 SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
 
                 auto loopInst = as<IRLoop>(diffInitBlock->getTerminator());
-                builder.addLoopExitPrimalValueDecoration(loopInst, region->diffCountVar, region->primalCountVar);
+
+                builder.setInsertBefore(loopInst);
+
+                auto primalCounterLastVal = builder.emitLoad(region->primalCountLastVar);
+                builder.markInstAsPrimal(primalCounterLastVal);
+                builder.addPrimalValueAccessDecoration(primalCounterLastVal);
+
+                builder.addLoopExitPrimalValueDecoration(loopInst, region->diffCountVar, primalCounterLastVal);
             }
 
             // NOTE: This is a hacky shortcut we're taking here.
@@ -529,8 +544,8 @@ struct DiffUnzipPass
             // 
             
             /*builder.setInsertBefore(as<IRBlock>(diffMap[breakBlock])->getTerminator());
-            //auto primalCounterValue = builder.emitLoad(region->primalCountVar);
-            auto primalCounterCurrValue = builder.emitLoad(region->primalCountVar);
+            //auto primalCounterValue = builder.emitLoad(region->primalCountParam);
+            auto primalCounterCurrValue = builder.emitLoad(region->primalCountParam);
             auto primalCounterLastValue = builder.emitSub(
                 primalCounterCurrValue->getDataType(),
                 primalCounterCurrValue,
@@ -552,13 +567,13 @@ struct DiffUnzipPass
                 // 
                 builder.setInsertBefore(as<IRBlock>(primalMap[updateBlock])->getTerminator());
 
-                auto counterVal = builder.emitLoad(region->primalCountVar);
+                auto counterVal = builder.emitLoad(region->primalCountParam);
                 auto incCounterVal = builder.emitAdd(
                     builder.getIntType(), 
                     counterVal,
                     builder.getIntValue(builder.getIntType(), 1));
 
-                auto incStore = builder.emitStore(region->primalCountVar, incCounterVal);
+                auto incStore = builder.emitStore(region->primalCountParam, incCounterVal);
 
                 builder.addLoopCounterDecoration(counterVal);
                 builder.addLoopCounterDecoration(incCounterVal);
@@ -610,8 +625,8 @@ struct DiffUnzipPass
             /*{
                 builder.setInsertBefore(as<IRBlock>(diffMap[region->initBlock])->getTerminator());
 
-                auto primalCounterValue = builder.emitLoad(region->primalCountVar);
-                auto primalCounterCurrValue = builder.emitLoad(region->primalCountVar);
+                auto primalCounterValue = builder.emitLoad(region->primalCountParam);
+                auto primalCounterCurrValue = builder.emitLoad(region->primalCountParam);
                 auto primalCounterLastValue = builder.emitSub(
                     primalCounterCurrValue->getDataType(),
                     primalCounterCurrValue,
@@ -623,7 +638,7 @@ struct DiffUnzipPass
                 auto diffLoopInst = as<IRLoop>(region->initBlock->getTerminator());
                 // builder.addLoopCounterLastIndexDecoration(diffLoopInst, primalCounterLastValue);
                 builder.addLoopExitPrimalValueDecoration(
-                    diffLoopInst, region->primalCountVar, primalCounterLastValue);
+                    diffLoopInst, region->primalCountParam, primalCounterLastValue);
 
                 builder.setInsertBefore(as<IRBlock>(diffMap[updateBlock])->getTerminator());
 
@@ -747,6 +762,11 @@ struct DiffUnzipPass
             
             auto storageVar = builder.emitVar(arrayType);
 
+            // TODO(sai) STOPPED HERE: For some reason, we still have a direct param access
+            // when trying to cover up the access to last value of loop counter.
+            // Maybe we need a different way to access this? (use a var)
+            // Special case?
+
             // 3. Store current value into the array and replace uses with a load.
             // TODO: If an index is missing, use the 'last' value of the primal index.
             {
@@ -762,7 +782,7 @@ struct DiffUnzipPass
                     storeAddr = builder.emitElementAddress(
                         builder.getPtrType(currType),
                         storeAddr, 
-                        region->primalCountVar);
+                        region->primalCountParam);
                 }
 
                 builder.emitStore(storeAddr, inst);
@@ -826,13 +846,14 @@ struct DiffUnzipPass
                             // If the use-block is outside this region, use the
                             // last available value (by indexing with primal counter minus 1)
                             // 
-                            auto primalCounterCurrValue = region->primalCountVar;//builder.emitLoad(region->primalCountVar);
+                            // TODO: primalCountParam may not be avaiable here..
+                            auto primalCounterCurrValue = builder.emitLoad(region->primalCountLastVar);
                             auto primalCounterLastValue = builder.emitSub(
                                 primalCounterCurrValue->getDataType(),
                                 primalCounterCurrValue,
                                 builder.getIntValue(builder.getIntType(), 1));
 
-                            //instsToTag.add(primalCounterCurrValue);
+                            instsToTag.add(primalCounterCurrValue);
                             instsToTag.add(primalCounterLastValue);
 
                             loadAddr = builder.emitElementAddress(

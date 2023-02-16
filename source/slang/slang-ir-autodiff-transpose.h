@@ -228,7 +228,7 @@ struct DiffTransposePass
                     
                     builder.setInsertInto(revCondBlock);
                     
-                    hoistPrimalOperands(&builder, ifElse->getCondition());
+                    hoistPrimalInst(&builder, ifElse->getCondition());
 
                     builder.emitIfElse(
                         ifElse->getCondition(),
@@ -360,7 +360,7 @@ struct DiffTransposePass
 
                     // Emit condition into the new cond block.
                     builder.setInsertInto(revCondBlock);
-                    hoistPrimalOperands(&builder, ifElse->getCondition());
+                    hoistPrimalInst(&builder, ifElse->getCondition());
 
                     builder.emitIfElse(
                         ifElse->getCondition(),
@@ -450,7 +450,7 @@ struct DiffTransposePass
 
                     builder.setInsertInto(revSwitchBlock);
 
-                    hoistPrimalOperands(&builder, switchInst->getCondition());
+                    hoistPrimalInst(&builder, switchInst->getCondition());
 
                     builder.emitSwitch(
                         switchInst->getCondition(),
@@ -609,7 +609,7 @@ struct DiffTransposePass
             if (auto loopInst = as<IRLoop>(block->getTerminator()))
             {
                 lowerLoopExitValues(&builder, loopInst);
-                lowerLoopEntryValues(&builder, loopInst);
+                invertLoopCondition(&builder, loopInst);
             }
         }
 
@@ -1040,6 +1040,8 @@ struct DiffTransposePass
                 else
                     builder->setInsertInto(revLoopInitBlock);
 
+                hoistPrimalInst(builder, loopExitValueDecoration->getLoopExitValInst());
+
                 setInverse(builder, loopExitValueDecoration->getTargetInst(), loopExitValueDecoration->getLoopExitValInst());
             }
         }
@@ -1051,49 +1053,77 @@ struct DiffTransposePass
             lowerLoopExitValues(builder, loopInst);
     }
 
-    // Go through loop block phi-args, and look for ones with the primal inst tag
-    // These need to be 'inverted', which for a loop means inserting a check into
+    // Go through loop block phi-args, and look for loop counter
+    // arguments, which for a loop means inserting a check into
     // loop condition block.
+    // This method also adds logic to skip the first iteration. 
+    // (a 'do-while' loop)
     // 
-    void lowerLoopEntryValues(IRBuilder* builder, IRLoop* loopInst)
+    void invertLoopCondition(IRBuilder* builder, IRLoop* loopInst)
     {   
-        List<IRInst*> primalArgs;
-        List<IRInst*> primalParams;
-
         auto firstLoopBlock = loopInst->getTargetBlock();
 
-        List<IRParam*> loopParams;
-        for (auto param : firstLoopBlock->getParams())
-            loopParams.add(param);
-
-        for (UIndex ii = 0; ii < loopInst->getArgCount(); ii++)
-        {
-            if (isPrimalInst(loopParams[ii]))
-            {
-                primalArgs.add(loopInst->getArg(ii));
-                primalParams.add(loopParams[ii]);
-            }
-        }
-
         IRBlock* revLoopCondBlock = revBlockMap[firstLoopBlock];
-        
         builder->setInsertBefore(revLoopCondBlock->getTerminator());
 
         auto loopBaseCondition = as<IRIfElse>(revLoopCondBlock->getTerminator())->getCondition();
-        for (UIndex ii = 0; ii < (UCount)primalArgs.getCount(); ii++)
-        {
-            auto paramBoundsCheck = builder->emitIntrinsicInst(
+        
+        // Convert the loop from a 'for' into a 'do-while' by skipping the first check
+
+        IRBlock* revLoopStartBlock = revBlockMap[as<IRBlock>(loopInst->getBreakBlock())];
+        builder->setInsertBefore(revLoopStartBlock->getTerminator());
+
+        auto firstLoopCheckSkipVar = builder->emitVar(builder->getBoolType());
+        builder->emitStore(firstLoopCheckSkipVar, builder->getBoolValue(true));
+
+        builder->setInsertBefore(revLoopCondBlock->getTerminator());
+        auto firstLoopCheckSkipVal = builder->emitLoad(firstLoopCheckSkipVar);
+
+        builder->emitStore(firstLoopCheckSkipVar, builder->getBoolValue(false));
+
+        loopBaseCondition = builder->emitIntrinsicInst(
+                builder->getBoolType(),
+                kIROp_Or,
+                2,
+                List<IRInst*>(firstLoopCheckSkipVal, loopBaseCondition).getBuffer());
+
+        // Add a terminating condition based on the loop counter's initial primal value
+
+        IRParam* loopCounterParam = nullptr;
+        UIndex loopCounterParamIndex = 0;
+        for (auto param : firstLoopBlock->getParams())
+        {   
+            if (param->findDecoration<IRLoopCounterDecoration>())
+            {
+                // There really should be two (or more) loop counter params.
+                SLANG_RELEASE_ASSERT(loopCounterParam == nullptr);
+                loopCounterParam = param;
+            }
+            else
+            {
+                loopCounterParamIndex++;
+            }
+        }
+
+        // Should see atleast one loop counter parameter on the first loop block.
+        SLANG_RELEASE_ASSERT(loopCounterParam);
+
+        IRInst* loopCounterInitVal = loopInst->getArg(loopCounterParamIndex);
+
+        auto paramBoundsCheck = builder->emitIntrinsicInst(
                 builder->getBoolType(),
                 kIROp_Neq,
                 2,
-                List<IRInst*>(primalParams[ii], primalArgs[ii]).getBuffer());
+                List<IRInst*>(
+                    hoistPrimalInst(builder, loopCounterParam),
+                    hoistPrimalInst(builder, loopCounterInitVal)).getBuffer());
             
-            loopBaseCondition = builder->emitIntrinsicInst(
-                builder->getBoolType(),
-                kIROp_And,
-                2,
-                List<IRInst*>(paramBoundsCheck, loopBaseCondition).getBuffer());
-        }
+        loopBaseCondition = builder->emitIntrinsicInst(
+            builder->getBoolType(),
+            kIROp_And,
+            2,
+            List<IRInst*>(paramBoundsCheck, loopBaseCondition).getBuffer());
+
 
         as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(loopBaseCondition);
     }
@@ -1161,7 +1191,45 @@ struct DiffTransposePass
         }
     }*/
 
-    HashSet<IRInst*> hoistedInsts;
+    IRInst* hoistPrimalInst(IRBuilder* revBuilder, IRInst* inst)
+    {
+        SLANG_RELEASE_ASSERT(isPrimalInst(inst));
+
+        // Are the operands of this primal inst also available in the reverse-mode context?
+        // If not, move/load them.
+        // 
+        hoistPrimalOperands(revBuilder, inst);
+
+        if (isPrimalInst(inst) && 
+            as<IRBlock>(inst->getParent()) && 
+            isDifferentialInst(as<IRBlock>(inst->getParent())))
+        {
+            if (!inst->findDecoration<IRPrimalValueAccessDecoration>())
+            {
+                return getInverse(revBuilder, inst);
+            }
+            else
+            {
+                auto block = as<IRBlock>(inst->getParent());
+                SLANG_RELEASE_ASSERT(block);
+
+                if (block == revBuilder->getBlock())
+                {
+                    // Already in block..
+                    return inst;
+                }
+
+                // Otherwise, move our inst to the the current builder location.
+                inst->removeFromParent();
+                revBuilder->addInst(inst);
+
+                return inst;
+            }
+        }
+
+        return inst;
+    }
+
     void hoistPrimalOperands(IRBuilder* revBuilder, IRInst* fwdInst)
     {
         for (UIndex ii = 0; ii < fwdInst->getOperandCount(); ii++)
@@ -1173,39 +1241,10 @@ struct DiffTransposePass
             // make sure all requried primal insts are moved to the right
             // place)
             // 
-            auto operand = fwdInst->getOperand(ii);
-            if (isPrimalInst(operand) && 
-                as<IRBlock>(operand->getParent()) && 
-                isDifferentialInst(as<IRBlock>(operand->getParent())))
+            if (isPrimalInst(fwdInst->getOperand(ii)))
             {
-                if (!operand->findDecoration<IRPrimalValueAccessDecoration>())
-                {
-                    // This operand must have an inverse, load that.
-                    if (hasInverse(operand))
-                    {
-                        fwdInst->setOperand(ii, getInverse(revBuilder, operand));
-                    }
-                }
-                else
-                {
-                    // Are the operands of this primal inst also available in the reverse-mode context?
-                    // If not, move/load them.
-                    // 
-                    hoistPrimalOperands(revBuilder, operand);
-
-                    auto block = as<IRBlock>(operand->getParent());
-                    SLANG_RELEASE_ASSERT(block);
-
-                    if (block == revBuilder->getBlock())
-                    {
-                        // Already in block, skip..
-                        continue;
-                    }
-
-                    // Otherwise, move our operand to the the current builder location.
-                    operand->removeFromParent();
-                    revBuilder->addInst(operand);
-                }
+                auto hoistedPrimalInst = hoistPrimalInst(revBuilder, fwdInst->getOperand(ii));
+                fwdInst->setOperand(ii, hoistedPrimalInst);
             }
         }
     }
@@ -1262,7 +1301,7 @@ struct DiffTransposePass
                 if (auto pairType = as<IRDifferentialPairType>(loadInst->getDataType()))
                 {
                     primalType = pairType->getValueType();
-                }   
+                }
             }
         }
 
