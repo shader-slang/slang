@@ -732,7 +732,7 @@ struct DiffTransposePass
         
         auto primalType = primalInst->getDataType();
 
-        // Emit a var in the top-level differential block to hold the gradient, 
+        // Emit a var in the top-level differential block to hold the inverse, 
         // and initialize it.
         auto tempInvVar = tempVarBuilder.emitVar(primalType);
 
