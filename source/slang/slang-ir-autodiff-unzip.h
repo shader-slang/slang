@@ -261,39 +261,9 @@ struct DiffUnzipPass
             if (isBlockIndexed(block))
                 processIndexedFwdBlock(block);
         }
-
-        // We're going to do something weird here, mixed blocks have been split
-        // at this point so we don't need them, but deallocating them will cause problems
-        // since we're still using them as dictionary keys, so we remove them from
-        // the function here, and then deallocate them all later.
-        // 
-        for (auto block : mixedBlocks)
-            block->removeFromParent();
         
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
-
-        // Reduce counter variables to SSA temporaries
-        /*List<IRVar*> varsToReduce;
-        for (auto indexRegion : indexRegions)
-        {
-            varsToReduce.add(indexRegion->primalCountParam);
-            varsToReduce.add(indexRegion->diffCountVar);
-        }
-        
-        constructSSA(autodiffContext->sharedBuilder, func, varsToReduce);
-
-        // Tag the new phi temporaries as primal values.
-        tagNewParams(builder, func);
-
-        // Process blocks _again_ because the primal counters may now be used
-        // in indexed differential blocks, and need to be hoisted.
-        // 
-        for (auto block : mixedBlocks)
-        {   
-            if (isBlockIndexed(block))
-                processIndexedFwdBlock(block);
-        }*/
 
         cleanupIndexRegionInfo();
 
@@ -428,22 +398,13 @@ struct DiffUnzipPass
 
         for (auto region : indexRegions)
         {
-
-            //IRBlock* initializerBlock = getInitializerBlock(region);
-            //IRBlock* breakBlock = region->breakBlock;
-
             // Grab first primal block.
             IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
             builder.setInsertBefore(firstPrimalBlock->getTerminator());
+
+            // Make variable in the top-most block (so it's visible to diff blocks)
             region->primalCountLastVar = builder.emitVar(builder.getIntType());
             
-            // Make variable in the top-most block (so it's visible to diff blocks)
-            /*
-            
-            builder.emitStore(
-                region->primalCountParam, 
-                builder.getIntValue(builder.getIntType(), 0));
-            */
             {
                 IRBlock* primalInitBlock = as<IRBlock>(primalMap[region->initBlock]);
                 
@@ -526,131 +487,6 @@ struct DiffUnzipPass
 
                 builder.addLoopExitPrimalValueDecoration(loopInst, region->diffCountVar, primalCounterLastVal);
             }
-
-            // NOTE: This is a hacky shortcut we're taking here.
-            // Technically the unzip pass should not affect the
-            // correctness (it must still compute the proper fwd-mode derivative)
-            // However, we're currently making the loop counter go backwards to
-            // make it easier on the transposition pass, so the output from
-            // the unzip pass is neither fwd-mode or rev-mode until the transposition
-            // step is complete.
-            // 
-            // TODO: Ideally this needs to be replaced with a small inversion step
-            // within the transposition pass.
-            //
-            // Emit the diff counter into the diff *break* block (
-            // which we're praying turns into the reverse initializer block)
-            // initialized to the final value of the primal counter.
-            // 
-            
-            /*builder.setInsertBefore(as<IRBlock>(diffMap[breakBlock])->getTerminator());
-            //auto primalCounterValue = builder.emitLoad(region->primalCountParam);
-            auto primalCounterCurrValue = builder.emitLoad(region->primalCountParam);
-            auto primalCounterLastValue = builder.emitSub(
-                primalCounterCurrValue->getDataType(),
-                primalCounterCurrValue,
-                builder.getIntValue(builder.getIntType(), 1));
-
-            region->diffCountVar = builder.emitVar(builder.getIntType());
-            auto diffCountInit = builder.emitStore(region->diffCountVar, primalCounterLastValue);
-
-            builder.addLoopCounterDecoration(diffCountInit);
-            builder.addLoopCounterDecoration(region->diffCountVar);
-            builder.addLoopCounterDecoration(primalCounterCurrValue);
-            builder.addLoopCounterDecoration(primalCounterLastValue);*/
-            
-            /*IRBlock* updateBlock = getUpdateBlock(region);
-            
-            {
-                // TODO: Figure out if the counter update needs to go before or after
-                // the rest of the update block.
-                // 
-                builder.setInsertBefore(as<IRBlock>(primalMap[updateBlock])->getTerminator());
-
-                auto counterVal = builder.emitLoad(region->primalCountParam);
-                auto incCounterVal = builder.emitAdd(
-                    builder.getIntType(), 
-                    counterVal,
-                    builder.getIntValue(builder.getIntType(), 1));
-
-                auto incStore = builder.emitStore(region->primalCountParam, incCounterVal);
-
-                builder.addLoopCounterDecoration(counterVal);
-                builder.addLoopCounterDecoration(incCounterVal);
-                builder.addLoopCounterDecoration(incStore);
-            }*/
-
-            /*{
-                IRBlock* firstLoopBlock = getFirstLoopBodyBlock(region);
-                auto diffFirstLoopBlock = as<IRBlock>(diffMap[firstLoopBlock]);
-
-                builder.setInsertBefore(diffFirstLoopBlock->getTerminator());
-
-                auto counterVal = builder.emitLoad(region->diffCountVar);
-                auto decCounterVal = builder.emitSub(
-                    builder.getIntType(), 
-                    counterVal,
-                    builder.getIntValue(builder.getIntType(), 1));
-
-                auto decStore = builder.emitStore(region->diffCountVar, decCounterVal);
-
-                // Mark insts as loop counter insts to avoid removing them.
-                //
-                builder.addLoopCounterDecoration(counterVal);
-                builder.addLoopCounterDecoration(decCounterVal);
-                builder.addLoopCounterDecoration(decStore);
-
-                // TODO:
-                // This is another hack here to avoid the counter from going negative 
-                // (since they are not valid indices)
-                //
-                IRBlock* diffCondBlock = as<IRBlock>(diffMap[region->firstBlock]);
-
-                builder.setInsertBefore(diffCondBlock->getTerminator());
-                IRInst* diffCounterVal = builder.emitLoad(region->diffCountVar);
-                IRInst* diffCounterCmp = builder.emitIntrinsicInst(
-                        builder.getBoolType(),
-                        kIROp_Geq,
-                        2,
-                        List<IRInst*>(
-                            diffCounterVal,
-                            builder.getIntValue(builder.getIntType(), 0)).getBuffer());
-                
-                as<IRIfElse>(diffCondBlock->getTerminator())->condition.set(diffCounterCmp);
-
-                builder.addLoopCounterDecoration(diffCounterVal);
-                builder.addLoopCounterDecoration(diffCounterCmp);
-            }*/
-
-            /*{
-                builder.setInsertBefore(as<IRBlock>(diffMap[region->initBlock])->getTerminator());
-
-                auto primalCounterValue = builder.emitLoad(region->primalCountParam);
-                auto primalCounterCurrValue = builder.emitLoad(region->primalCountParam);
-                auto primalCounterLastValue = builder.emitSub(
-                    primalCounterCurrValue->getDataType(),
-                    primalCounterCurrValue,
-                    builder.getIntValue(builder.getIntType(), 1));
-
-                region->diffCountVar = builder.emitVar(builder.getIntType());
-                auto diffCountInit = builder.emitStore(region->diffCountVar, primalCounterLastValue);
-
-                auto diffLoopInst = as<IRLoop>(region->initBlock->getTerminator());
-                // builder.addLoopCounterLastIndexDecoration(diffLoopInst, primalCounterLastValue);
-                builder.addLoopExitPrimalValueDecoration(
-                    diffLoopInst, region->primalCountParam, primalCounterLastValue);
-
-                builder.setInsertBefore(as<IRBlock>(diffMap[updateBlock])->getTerminator());
-
-                auto counterVal = builder.emitLoad(region->diffCountVar);
-                auto incCounterVal = builder.emitAdd(
-                    builder.getIntType(), 
-                    counterVal,
-                    builder.getIntValue(builder.getIntType(), 1)); 
-
-                auto incStore = builder.emitStore(region->diffCountVar, incCounterVal);
-            }*/
-
         }
     }
 

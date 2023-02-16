@@ -804,30 +804,17 @@ struct DiffTransposePass
             }
         }
 
-        // Some insts are simply accessing (loading) primal values from 
-        // the primal blocks. These can safely be moved to the top of the 
-        // rev-mode block (in order)
-        // 
-        /*for (IRInst* child = fwdBlock->getFirstChild(); child;)
-        {  
-            auto nextChild = child->getNextInst();
-
-            if (child->findDecoration<IRPrimalValueAccessDecoration>())
-            {
-                child->insertAtEnd(revBlock);
-            }
-            
-            child = nextChild;
-        }*/
-
         // Move pointer & reference insts to the top of the reverse-mode block.
         List<IRInst*> nonValueInsts;
         for (IRInst* child = fwdBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
         {
-            // If the instruction is pointer typed, it's not actually computing a value.
+            // If the instruction is a variable allocation (or reverse-gradient pair reference), 
+            // move to top.
+            // TODO: This is hacky.. Need a more principled way to handle this 
+            // (like primal inst hoisting)
             // 
-            //if (as<IRPtrTypeBase>(child->getDataType()))
-            //    nonValueInsts.add(child);
+            if (as<IRVar>(child) || as<IRReverseGradientDiffPairRef>(child))
+                nonValueInsts.add(child);
             
             // Slang doesn't support function values. So if we see a func-typed inst
             // it's proabably a reference to a function.
@@ -1151,10 +1138,6 @@ struct DiffTransposePass
 
     IRInst* getInverse(IRBuilder* builder, IRInst* primalInst)
     {
-        /*IRInst* invInst = inverseValueMap[primalInst].GetValue();
-        inverseValueMap.Remove(invInst);
-        return invInst;*/
-
         // Note: There are other possible cases here, although not important
         // right now. For example, a value is available to load from the primal block.
         // 
@@ -1169,27 +1152,6 @@ struct DiffTransposePass
         if (auto invVar = getOrCreateInverseVar(inst))
             builder->emitStore(invVar, invInst);
     }
-
-    /*void replacePrimalInstUses(IRBuilder* builder, IRInst* primalInst)
-    {
-        List<IRUse*> diffUses;
-        for (auto use = primalInst->firstUse; use; use = use->nextUse)
-        {   
-            if (as<IRDecoration>(use->getUser()))
-                continue;
-
-            IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
-            if (useBlock && isDifferentialInst(useBlock))
-                diffUses.add(use);
-        }
-
-        for (auto use : diffUses)
-        {
-            builder->setInsertBefore(use->getUser());
-            auto invValue = getInverse(builder, primalInst);
-            use->set(invValue);
-        }
-    }*/
 
     IRInst* hoistPrimalInst(IRBuilder* revBuilder, IRInst* inst)
     {
