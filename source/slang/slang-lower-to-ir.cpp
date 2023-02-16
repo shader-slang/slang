@@ -8436,8 +8436,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 else
                 {
                     originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
-                    getBuilder()->addForwardDifferentiableDecoration(irFunc);
-                    getBuilder()->addBackwardDifferentiableDecoration(irFunc);
                 }
             }
             subContext->irBuilder->setInsertInto(irFunc);

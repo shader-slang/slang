@@ -165,7 +165,6 @@ public:
 
         HashSet<IRInst*> produceDiffSet;
         HashSet<IRInst*> expectDiffSet;
-        int differentiableInputs = 0;
         int differentiableOutputs = 0;
         for (auto param : funcInst->getFirstBlock()->getParams())
         {
@@ -173,8 +172,6 @@ public:
             {
                 if (as<IROutTypeBase>(param->getFullType()))
                     differentiableOutputs++;
-                if (!as<IROutType>(param->getFullType()))
-                    differentiableInputs++;
                 produceDiffSet.Add(param);
             }
         }
@@ -186,8 +183,6 @@ public:
 
         if (differentiableOutputs == 0)
             sink->diagnose(funcInst, Diagnostics::differentiableFuncMustHaveOutput);
-        if (differentiableInputs == 0)
-            sink->diagnose(funcInst, Diagnostics::differentiableFuncMustHaveInput);
 
         DifferentiableLevel requiredDiffLevel = DifferentiableLevel::Forward;
         if (isBackwardDifferentiableFunc(funcInst))
