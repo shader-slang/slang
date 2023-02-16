@@ -192,7 +192,7 @@ SlangResult ComTestContext::_runTest()
     // Set the target flag to indicate that we want to compile all into a library.
     request->setTargetFlags(targetIndex, SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
 
-    request->setMinimumOptimizationLevel(SLANG_OPTIMIZATION_LEVEL_NONE);
+    request->setOptimizationLevel(SLANG_OPTIMIZATION_LEVEL_NONE);
     request->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
 
     // Add the translation unit

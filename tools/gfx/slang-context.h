@@ -37,7 +37,6 @@ namespace gfx
             if (targetProfile == nullptr)
                 targetProfile = defaultProfileName;
             targetDesc.profile = globalSession->findProfile(targetProfile);
-            targetDesc.minimumOptimizationLevel = desc.optimizationLevel;
             targetDesc.floatingPointMode = desc.floatingPointMode;
             targetDesc.lineDirectiveMode = desc.lineDirectiveMode;
             targetDesc.flags = desc.targetFlags;

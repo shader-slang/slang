@@ -970,7 +970,6 @@ void Linkage::addTarget(
     auto targetIndex = addTarget(CodeGenTarget(desc.format));
     auto target = targets[targetIndex];
 
-    target->setMinimumOptimizationLevel(OptimizationLevel(desc.minimumOptimizationLevel));
     target->setFloatingPointMode(FloatingPointMode(desc.floatingPointMode));
     target->addTargetFlags(desc.flags);
     target->setTargetProfile(Profile(desc.profile));
@@ -4733,9 +4732,9 @@ void EndToEndCompileRequest::setDebugInfoLevel(SlangDebugInfoLevel level)
     getLinkage()->debugInfoLevel = DebugInfoLevel(level);
 }
 
-void EndToEndCompileRequest::setMinimumOptimizationLevel(SlangOptimizationLevel level)
+void EndToEndCompileRequest::setOptimizationLevel(SlangOptimizationLevel level)
 {
-    getLinkage()->minimumOptimizationLevel = OptimizationLevel(level);
+    getLinkage()->optimizationLevel = OptimizationLevel(level);
 }
 
 void EndToEndCompileRequest::setOutputContainerFormat(SlangContainerFormat format)

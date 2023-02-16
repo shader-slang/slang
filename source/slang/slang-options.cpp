@@ -1495,7 +1495,7 @@ struct OptionsParser
                         }
                     }
                  
-                    compileRequest->setMinimumOptimizationLevel(level);
+                    compileRequest->setOptimizationLevel(level);
                 }
 
                 // Note: unlike with `-O` above, we have to consider that other

@@ -3544,12 +3544,9 @@ namespace slang
             SlangDebugInfoLevel     level) = 0;
 
             /*!
-            @brief Set the minimum level of optimization to perform.
-            Other compiler settings such as the optimization level requested in
-            TargetDesc might increase the eventual optimization above the value
-            specified here.
+            @brief Set the level of optimization to perform.
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL setMinimumOptimizationLevel(
+        virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(
             SlangOptimizationLevel  level) = 0;
 
 
@@ -4070,14 +4067,6 @@ namespace slang
             /** Default mode to use for floating-point operations on the target.
             */
         SlangFloatingPointMode  floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
-
-            /** The lower bound on optimization level to use for the target.
-            *
-            * Other compiler settings such as the optimization level requested
-            * in the ICompileRequest might increase the eventual
-            * optimization above the value specified here.
-            */
-        SlangOptimizationLevel minimumOptimizationLevel = SLANG_OPTIMIZATION_LEVEL_NONE;
 
             /** The line directive mode for output source code.
             */
