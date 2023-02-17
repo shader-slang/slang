@@ -720,7 +720,7 @@ struct DiffTransposePass
         if (inverseVarMap.ContainsKey(primalInst))
             return inverseVarMap[primalInst];
         
-        IRBuilder tempVarBuilder(autodiffContext->sharedBuilder);
+        IRBuilder tempVarBuilder(autodiffContext->moduleInst);
         
         IRBlock* firstDiffBlock = firstRevDiffBlockMap[as<IRFunc>(primalInst->getParent()->getParent())];
 
