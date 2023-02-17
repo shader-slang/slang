@@ -1059,7 +1059,7 @@ struct DiffTransposePass
         {   
             if (param->findDecoration<IRLoopCounterDecoration>())
             {
-                // There really should be two (or more) loop counter params.
+                // There really not should be two (or more) loop counter params.
                 SLANG_RELEASE_ASSERT(loopCounterParam == nullptr);
                 loopCounterParam = param;
             }
