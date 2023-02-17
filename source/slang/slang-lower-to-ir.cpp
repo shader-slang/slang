@@ -4856,6 +4856,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Loop);
         }
+        else if (auto inferredMaxItersAttr = stmt->findModifier<InferredMaxItersAttribute>())
+        {
+            getBuilder()->addLoopMaxItersDecoration(inst, inferredMaxItersAttr->value);
+        }
         else if( auto maxItersAttr = stmt->findModifier<MaxItersAttribute>() )
         {
             getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
@@ -4901,8 +4905,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             breakLabel,
             continueLabel);
 
-        addLoopDecorations(loopInst, stmt);
-
         insertBlock(loopHead);
 
         // Now that we are within the header block, we
@@ -4922,6 +4924,37 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Emit the body of the loop
         insertBlock(bodyLabel);
         lowerStmt(context, stmt->statement);
+
+        if (auto inferredMaxIters = stmt->findModifier<InferredMaxItersAttribute>())
+        {
+            // We only use inferred max iters attribute when the loop body
+            // does not modify induction var.
+            auto inductionVar = emitDeclRef(context, inferredMaxIters->inductionVar, builder->getIntType());
+            if (inductionVar.val)
+            {
+                int writes = 0;
+                traverseUsers(inductionVar.val, [&](IRInst* user) {if (user->getOp() != kIROp_Load) writes++; });
+                if (writes > 1)
+                {
+                    removeModifier(stmt, inferredMaxIters);
+                }
+            }
+        }
+        if (auto inferredMaxIters = stmt->findModifier<InferredMaxItersAttribute>())
+        {
+            if (auto maxIters = stmt->findModifier<MaxItersAttribute>())
+            {
+                if (inferredMaxIters->value < maxIters->value)
+                {
+                    context->getSink()->diagnose(
+                        maxIters,
+                        Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
+                        inferredMaxIters->value);
+                }
+            }
+        }
+        addLoopDecorations(loopInst, stmt);
+
 
         // Insert the `continue` block
         insertBlock(continueLabel);

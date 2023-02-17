@@ -24,6 +24,11 @@ void g(float x)
     float val = 0;
     if (x > 5)
         val = x + 1;
+
+    for (int i = 0; i < 5; i++) // Not ok, we can't infer the loop iterations because the body modifies induction var.
+    {
+        i = (int)x;
+    }
     return;
 }
 

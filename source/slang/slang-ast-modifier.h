@@ -635,6 +635,14 @@ class MaxItersAttribute : public Attribute
     int32_t value = 0;
 };
 
+// An inferred max iteration count on a loop.
+class InferredMaxItersAttribute : public Attribute
+{
+    SLANG_AST_CLASS(InferredMaxItersAttribute)
+    DeclRef<Decl> inductionVar;
+    int32_t value = 0;
+};
+
 class LoopAttribute : public Attribute 
 {
     SLANG_AST_CLASS(LoopAttribute)

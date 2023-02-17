@@ -2023,6 +2023,11 @@ namespace Slang
         void visitGpuForeachStmt(GpuForeachStmt *stmt);
 
         void visitExpressionStmt(ExpressionStmt *stmt);
+
+        // Try to infer the max number of iterations the loop will run.
+        void tryInferLoopMaxIterations(ForStmt* stmt);
+
+        void checkLoopInDifferentiableFunc(Stmt* stmt);
     };
 
     struct SemanticsDeclVisitorBase
