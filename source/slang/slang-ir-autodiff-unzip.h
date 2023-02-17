@@ -669,8 +669,7 @@ struct DiffUnzipPass
                             // If the use-block is under the same region, use the 
                             // differential counter variable
                             //
-                            auto diffCounterCurrValue = region->diffCountParam;//builder.emitLoad(region->diffCountParam);
-                            //instsToTag.add(diffCounterCurrValue);
+                            auto diffCounterCurrValue = region->diffCountParam;
 
                             loadAddr = builder.emitElementAddress(
                                 builder.getPtrType(currType),
@@ -682,7 +681,6 @@ struct DiffUnzipPass
                             // If the use-block is outside this region, use the
                             // last available value (by indexing with primal counter minus 1)
                             // 
-                            // TODO: primalCountParam may not be avaiable here..
                             auto primalCounterCurrValue = builder.emitLoad(region->primalCountLastVar);
                             auto primalCounterLastValue = builder.emitSub(
                                 primalCounterCurrValue->getDataType(),

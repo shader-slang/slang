@@ -1233,27 +1233,6 @@ bool constructSSA(SharedIRBuilder* sharedBuilder, IRGlobalValueWithCode* globalV
     return constructSSA(&context);
 }
 
-// Construct SSA form for a global value with code and reuse 
-// an existing sharedBuilder
-//
-/*bool constructSSA(
-    SharedIRBuilder* sharedBuilder,
-    IRGlobalValueWithCode* globalVal,
-    List<IRVar*> promotableVars)
-{
-    ConstructSSAContext context;
-    context.globalVal = globalVal;
-    
-    context.sharedBuilder = sharedBuilder;
-
-    context.builder.init(sharedBuilder);
-    context.builder.setInsertInto(sharedBuilder->getModule());
-
-    context.promotableVars = promotableVars;
-
-    return constructSSA(&context);
-}*/
-
 bool constructSSA(IRModule* module, IRInst* globalVal)
 {
     switch (globalVal->getOp())
