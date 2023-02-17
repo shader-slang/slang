@@ -46,7 +46,7 @@ namespace Slang
                 return genericValue;
             }
             IRCloneEnv cloneEnv;
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
+            IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(genericParent);
             // Do not clone func type (which would break IR def-use rules if we do it here)
             // This is OK since we will lower the type immediately after the clone.
@@ -56,28 +56,54 @@ namespace Slang
                 lowerGenericFuncType(&builder, genericParent, cast<IRFuncType>(func->getFullType()));
             SLANG_ASSERT(loweredGenericType);
             loweredFunc->setFullType(loweredGenericType);
-            List<IRInst*> clonedParams;
 
+            List<IRInst*> childrenToDemote;
+            List<IRInst*> clonedParams;
             for (auto genericChild : genericParent->getFirstBlock()->getChildren())
             {
-                if (genericChild == func)
+                switch (genericChild->getOp())
+                {
+                case kIROp_Func:
                     continue;
-                if (genericChild->getOp() == kIROp_Return)
+                case kIROp_Return:
                     continue;
+                }
                 // Process all generic parameters and local type definitions.
                 auto clonedChild = cloneInst(&cloneEnv, &builder, genericChild);
-                if (clonedChild->getOp() == kIROp_Param)
+                switch (clonedChild->getOp())
                 {
-                    auto paramType = clonedChild->getFullType();
-                    auto loweredParamType = sharedContext->lowerType(&builder, paramType);
-                    if (loweredParamType != paramType)
+                case kIROp_Param:
                     {
-                        clonedChild->setFullType((IRType*)loweredParamType);
+                        auto paramType = clonedChild->getFullType();
+                        auto loweredParamType = sharedContext->lowerType(&builder, paramType);
+                        if (loweredParamType != paramType)
+                        {
+                            clonedChild->setFullType((IRType*)loweredParamType);
+                        }
+                        clonedParams.add(clonedChild);
                     }
-                    clonedParams.add(clonedChild);
+                    break;
+
+                case kIROp_LookupWitness:
+                case kIROp_Specialize:
+                    {
+                        childrenToDemote.add(clonedChild);
+                        // Make sure all uses are from the function body.
+                        for (auto use = genericChild->firstUse; use; use = use->nextUse)
+                        {
+                            if (use->getUser()->getParent() == genericChild->getParent())
+                            {
+                                // This specialize/lookup is used as operand to some other
+                                // global inst in the generic. This is not supported now.
+                                SLANG_UNIMPLEMENTED_X(
+                                    "Unsupported use of specialize/lookupWitness in generic body.");
+                            }
+                        }
+                        continue;
+                    }
                 }
             }
-            cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage, func, loweredFunc);
+            cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module, func, loweredFunc);
 
             auto block = as<IRBlock>(loweredFunc->getFirstChild());
             for (auto param : clonedParams)
@@ -85,6 +111,15 @@ namespace Slang
                 param->removeFromParent();
                 block->addParam(as<IRParam>(param));
             }
+
+            // Demote specialize and lookupWitness insts and their dependents down to function body.
+            auto insertPoint = block->getFirstOrdinaryInst();
+            for (Index i = childrenToDemote.getCount() - 1; i >= 0; i--)
+            {
+                auto child = childrenToDemote[i];
+                child->insertBefore(insertPoint);
+            }
+
             // Lower generic typed parameters into AnyValueType.
             auto firstInst = loweredFunc->getFirstOrdinaryInst();
             builder.setInsertBefore(firstInst);
@@ -142,7 +177,7 @@ namespace Slang
                 (IRType*)newOperands[0]);
 
             IRCloneEnv cloneEnv;
-            cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage, funcType, newFuncType);
+            cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module, funcType, newFuncType);
             return newFuncType;
         }
 
@@ -162,7 +197,7 @@ namespace Slang
 
             List<IRInterfaceRequirementEntry*> newEntries;
 
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
+            IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(interfaceType);
 
             // Translate IRFuncType in interface requirements.
@@ -205,7 +240,7 @@ namespace Slang
             loweredType = builder.createInterfaceType(newEntries.getCount(), (IRInst**)newEntries.getBuffer());
             loweredType->sourceLoc = interfaceType->sourceLoc;
             IRCloneEnv cloneEnv;
-            cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage,
+            cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module,
                 interfaceType, loweredType);
             sharedContext->loweredInterfaceTypes.Add(interfaceType, loweredType);
             sharedContext->mapLoweredInterfaceToOriginal[loweredType] = interfaceType;
@@ -224,7 +259,7 @@ namespace Slang
         void lowerWitnessTable(IRWitnessTable* witnessTable)
         {
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTable->getConformanceType()));
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(witnessTable);
             if (interfaceType != witnessTable->getConformanceType())
@@ -292,7 +327,8 @@ namespace Slang
                 loweredFunc = lowerGenericFunction(funcToSpecialize);
                 if (loweredFunc != funcToSpecialize)
                 {
-                    specializeInst->setOperand(0, loweredFunc);
+                    IRBuilder builder;
+                    builder.replaceOperand(specializeInst->getOperands(), loweredFunc);
                 }
             }
         }
@@ -323,20 +359,11 @@ namespace Slang
             {
                  lowered.Key->replaceUsesWith(lowered.Value);
             }
-            // Update hash keys of globalNumberingMap, since the types are modified.
-            sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
             sharedContext->mapInterfaceRequirementKeyValue.Clear();
         }
 
         void processModule()
         {
-            // We start by initializing our shared IR building state,
-            // since we will re-use that state for any code we
-            // generate along the way.
-            //
-            SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->init(sharedContext->module);
-
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
             while (sharedContext->workList.getCount() != 0)

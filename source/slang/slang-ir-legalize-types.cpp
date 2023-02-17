@@ -98,11 +98,8 @@ IRTypeLegalizationContext::IRTypeLegalizationContext(
     session = inModule->getSession();
     module = inModule;
 
-    auto sharedBuilder = &sharedBuilderStorage;
-    sharedBuilder->init(module);
-
+    builderStorage = IRBuilder(inModule);
     builder = &builderStorage;
-    builder->init(sharedBuilder);
 }
 
 static void registerLegalizedValue(
@@ -1861,14 +1858,27 @@ static LegalVal legalizeInst(
         // While the operands are all "simple," they might not necessarily
         // be equal to the operands we started with.
         //
+        ShortList<IRInst*> newArgs;
+        newArgs.setCount(argCount);
+        bool recreate = false;
         for (UInt aa = 0; aa < argCount; ++aa)
         {
             auto legalArg = legalArgs[aa];
-            inst->setOperand(aa, legalArg.getSimple());
+            newArgs[aa] = legalArg.getSimple();
+            if (newArgs[aa] != inst->getOperand(aa))
+                recreate = true;
         }
-
+        if (recreate)
+        {
+            IRBuilder builder(inst->getModule());
+            builder.setInsertBefore(inst);
+            auto newInst = builder.emitIntrinsicInst(legalType.getSimple(), inst->getOp(), argCount, newArgs.getArrayView().getBuffer());
+            inst->replaceUsesWith(newInst);
+            inst->removeFromParent();
+            context->replacedInstructions.add(inst);
+            return LegalVal::simple(newInst);
+        }
         inst->setFullType(legalType.getSimple());
-
         return LegalVal::simple(inst);
     }
 
@@ -1888,6 +1898,10 @@ static LegalVal legalizeInst(
         legalType,
         legalArgs.getBuffer());
 
+    if (legalVal.flavor == LegalVal::Flavor::simple)
+    {
+        inst->replaceUsesWith(legalVal.getSimple());
+    }
     // After we are done, we will eliminate the
     // original instruction by removing it from
     // the IR.

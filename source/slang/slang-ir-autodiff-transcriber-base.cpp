@@ -682,7 +682,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
 
 InstPair AutoDiffTranscriberBase::transcribeBlockImpl(IRBuilder* builder, IRBlock* origBlock, HashSet<IRInst*>& instsToSkip)
 {
-    IRBuilder subBuilder(builder->getSharedBuilder());
+    IRBuilder subBuilder = *builder;
     subBuilder.setInsertLoc(builder->getInsertLoc());
     
     IRInst* diffBlock = subBuilder.emitBlock();
@@ -844,7 +844,7 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
 
     IRGeneric* primalGeneric = origGeneric;
 
-    IRBuilder builder(inBuilder->getSharedBuilder());
+    IRBuilder builder = *inBuilder;
     builder.setInsertBefore(origGeneric);
 
     auto diffGeneric = builder.emitGeneric();

@@ -149,11 +149,10 @@ typedef size_t NonUniformResourceIndex;
 template <typename T, int ROWS, int COLS>
 struct Matrix;
 
-typedef bool bool1;
+typedef int1 bool1;
 typedef int2 bool2;
 typedef int3 bool3;
 typedef int4 bool4; 
-
 
 typedef signed char int8_t;
 typedef short int16_t;
@@ -186,163 +185,522 @@ union Union64
     double d;
 };
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_fmod(float x, float y)
+{
+    return ::fmodf(x, y);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL double _slang_fmod(double x, double y)
+{
+    return ::fmod(x, y);
+}
+
+#if SLANG_CUDA_ENABLE_HALF
+
+// Add the other vector half types
+struct __half1 { __half x; };
+struct __align__(4) __half3 { __half x, y, z; };
+struct __align__(4) __half4 { __half x, y, z, w; };
+#endif
+
+#define SLANG_VECTOR_GET_ELEMENT(T) \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_vector_get_element(T##1 x, int index) { return ((T*)(&x))[index]; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_vector_get_element(T##2 x, int index) { return ((T*)(&x))[index]; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_vector_get_element(T##3 x, int index) { return ((T*)(&x))[index]; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_vector_get_element(T##4 x, int index) { return ((T*)(&x))[index]; }
+SLANG_VECTOR_GET_ELEMENT(int)
+SLANG_VECTOR_GET_ELEMENT(uint)
+SLANG_VECTOR_GET_ELEMENT(short)
+SLANG_VECTOR_GET_ELEMENT(ushort)
+SLANG_VECTOR_GET_ELEMENT(char)
+SLANG_VECTOR_GET_ELEMENT(uchar)
+SLANG_VECTOR_GET_ELEMENT(longlong)
+SLANG_VECTOR_GET_ELEMENT(ulonglong)
+SLANG_VECTOR_GET_ELEMENT(float)
+SLANG_VECTOR_GET_ELEMENT(double)
+
+#define SLANG_VECTOR_GET_ELEMENT_PTR(T) \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##1* x, int index) { return ((T*)(x)) + index; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##2* x, int index) { return ((T*)(x)) + index; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##3* x, int index) { return ((T*)(x)) + index; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##4* x, int index) { return ((T*)(x)) + index; }
+SLANG_VECTOR_GET_ELEMENT_PTR(int)
+SLANG_VECTOR_GET_ELEMENT_PTR(uint)
+SLANG_VECTOR_GET_ELEMENT_PTR(short)
+SLANG_VECTOR_GET_ELEMENT_PTR(ushort)
+SLANG_VECTOR_GET_ELEMENT_PTR(char)
+SLANG_VECTOR_GET_ELEMENT_PTR(uchar)
+SLANG_VECTOR_GET_ELEMENT_PTR(longlong)
+SLANG_VECTOR_GET_ELEMENT_PTR(ulonglong)
+SLANG_VECTOR_GET_ELEMENT_PTR(float)
+SLANG_VECTOR_GET_ELEMENT_PTR(double)
+
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_VECTOR_GET_ELEMENT(__half)
+SLANG_VECTOR_GET_ELEMENT_PTR(__half)
+#endif
+
+#define SLANG_CUDA_VECTOR_BINARY_OP(T, n, op) \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal, T##n other) \
+    { \
+        T##n result;\
+        for (int i = 0; i < n; i++) \
+            *_slang_vector_get_element_ptr(&result, i) = _slang_vector_get_element(thisVal,i) op _slang_vector_get_element(other,i); \
+        return result;\
+    }
+#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op) \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other) \
+    { \
+        bool##n result;\
+        for (int i = 0; i < n; i++) \
+            *_slang_vector_get_element_ptr(&result, i) = (int)(_slang_vector_get_element(thisVal,i) op _slang_vector_get_element(other,i)); \
+        return result;\
+    }
+#define SLANG_CUDA_VECTOR_UNARY_OP(T, n, op) \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal) \
+    { \
+        T##n result;\
+        for (int i = 0; i < n; i++) \
+            *_slang_vector_get_element_ptr(&result, i) = op _slang_vector_get_element(thisVal,i); \
+        return result;\
+    }
+
+#define SLANG_CUDA_VECTOR_INT_OP(T, n) \
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, +)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, -)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, *)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, /)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, %)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, ^)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, &)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, |)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, &&)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, ||)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, >>)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, <<)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >=)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <=)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, ==)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, !=)\
+    SLANG_CUDA_VECTOR_UNARY_OP(T, n, !)\
+    SLANG_CUDA_VECTOR_UNARY_OP(T, n, -)\
+    SLANG_CUDA_VECTOR_UNARY_OP(T, n, ~)
+
+#define SLANG_CUDA_VECTOR_INT_OPS(T) \
+    SLANG_CUDA_VECTOR_INT_OP(T, 2) \
+    SLANG_CUDA_VECTOR_INT_OP(T, 3) \
+    SLANG_CUDA_VECTOR_INT_OP(T, 4)
+
+SLANG_CUDA_VECTOR_INT_OPS(int)
+SLANG_CUDA_VECTOR_INT_OPS(uint)
+SLANG_CUDA_VECTOR_INT_OPS(ushort)
+SLANG_CUDA_VECTOR_INT_OPS(short)
+SLANG_CUDA_VECTOR_INT_OPS(char)
+SLANG_CUDA_VECTOR_INT_OPS(uchar)
+SLANG_CUDA_VECTOR_INT_OPS(longlong)
+SLANG_CUDA_VECTOR_INT_OPS(ulonglong)
+
+#define SLANG_CUDA_VECTOR_FLOAT_OP(T, n) \
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, +)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, -)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, *)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, /)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, &&)\
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, ||)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >=)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <=)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, ==)\
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, !=)\
+    SLANG_CUDA_VECTOR_UNARY_OP(T, n, -)
+#define SLANG_CUDA_VECTOR_FLOAT_OPS(T) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(T, 2) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(T, 3) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(T, 4)
+
+SLANG_CUDA_VECTOR_FLOAT_OPS(float)
+SLANG_CUDA_VECTOR_FLOAT_OPS(double)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_CUDA_VECTOR_FLOAT_OPS(__half)
+#endif
+#define SLANG_CUDA_FLOAT_VECTOR_MOD_IMPL(T, n)\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator%(const T##n& left, const T##n& right) \
+    {\
+        T##n result;\
+        for (int i = 0; i < n; i++) \
+            *_slang_vector_get_element_ptr(&result, i) = _slang_fmod(_slang_vector_get_element(left,i), _slang_vector_get_element(right,i)); \
+        return result;\
+    }
+#define SLANG_CUDA_FLOAT_VECTOR_MOD(T) \
+    SLANG_CUDA_FLOAT_VECTOR_MOD_IMPL(T, 2)\
+    SLANG_CUDA_FLOAT_VECTOR_MOD_IMPL(T, 3)\
+    SLANG_CUDA_FLOAT_VECTOR_MOD_IMPL(T, 4)
+
+SLANG_CUDA_FLOAT_VECTOR_MOD(float)
+SLANG_CUDA_FLOAT_VECTOR_MOD(double)
+
+#define SLANG_MAKE_VECTOR(T) \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##2 make_##T##2(T x, T y) { return T##2{x, y}; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##3 make_##T##3(T x, T y, T z) { return T##3{ x, y, z }; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##4 make_##T##4(T x, T y, T z, T w) { return T##4{ x, y, z, w }; }
+SLANG_MAKE_VECTOR(int)
+SLANG_MAKE_VECTOR(uint)
+SLANG_MAKE_VECTOR(short)
+SLANG_MAKE_VECTOR(ushort)
+SLANG_MAKE_VECTOR(char)
+SLANG_MAKE_VECTOR(uchar)
+SLANG_MAKE_VECTOR(float)
+SLANG_MAKE_VECTOR(double)
+SLANG_MAKE_VECTOR(longlong)
+SLANG_MAKE_VECTOR(ulonglong)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_MAKE_VECTOR(__half)
+#endif
+
+#define SLANG_MAKE_VECTOR_FROM_SCALAR(T) \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##1 make_##T##1(T x) { return T##1{x}; }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##2 make_##T##2(T x) { return make_##T##2(x, x); }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##3 make_##T##3(T x) { return make_##T##3(x, x, x); }\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##4 make_##T##4(T x) { return make_##T##4(x, x, x, x); }
+SLANG_MAKE_VECTOR_FROM_SCALAR(int)
+SLANG_MAKE_VECTOR_FROM_SCALAR(uint)
+SLANG_MAKE_VECTOR_FROM_SCALAR(short)
+SLANG_MAKE_VECTOR_FROM_SCALAR(ushort)
+SLANG_MAKE_VECTOR_FROM_SCALAR(char)
+SLANG_MAKE_VECTOR_FROM_SCALAR(uchar)
+SLANG_MAKE_VECTOR_FROM_SCALAR(longlong)
+SLANG_MAKE_VECTOR_FROM_SCALAR(ulonglong)
+SLANG_MAKE_VECTOR_FROM_SCALAR(float)
+SLANG_MAKE_VECTOR_FROM_SCALAR(double)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_MAKE_VECTOR_FROM_SCALAR(__half)
+#endif
+
+template<typename T, int n>
+struct GetVectorTypeImpl {};
+
+#define GET_VECTOR_TYPE_IMPL(T, n)\
+struct GetVectorTypeImpl<T,n>\
+{\
+    typedef T##n type;\
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n fromScalar(T v) { return make_##T##n(v); } \
+};
+#define GET_VECTOR_TYPE_IMPL_N(T)\
+    GET_VECTOR_TYPE_IMPL(T, 1)\
+    GET_VECTOR_TYPE_IMPL(T, 2)\
+    GET_VECTOR_TYPE_IMPL(T, 3)\
+    GET_VECTOR_TYPE_IMPL(T, 4)
+
+GET_VECTOR_TYPE_IMPL_N(int)
+GET_VECTOR_TYPE_IMPL_N(uint)
+GET_VECTOR_TYPE_IMPL_N(short)
+GET_VECTOR_TYPE_IMPL_N(ushort)
+GET_VECTOR_TYPE_IMPL_N(char)
+GET_VECTOR_TYPE_IMPL_N(uchar)
+GET_VECTOR_TYPE_IMPL_N(longlong)
+GET_VECTOR_TYPE_IMPL_N(ulonglong)
+GET_VECTOR_TYPE_IMPL_N(float)
+GET_VECTOR_TYPE_IMPL_N(double)
+#if SLANG_CUDA_ENABLE_HALF
+GET_VECTOR_TYPE_IMPL_N(__half)
+#endif
+template<typename T, int n>
+using Vector = typename GetVectorTypeImpl<T, n>::type;
+
+template<typename T, int n, typename OtherT, int m>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Vector<T, n> _slang_vector_reshape(const Vector<OtherT, m> other)
+{
+    Vector<T, n> result;
+    for (int i = 0; i < n; i++)
+    {
+        OtherT otherElement = T(0);
+        if (i < m)
+            otherElement = _slang_vector_get_element(other, i);
+        *_slang_vector_get_element_ptr(&result, i) = (T)otherElement;
+    }
+    return result;
+}
+
+template <typename T, int ROWS, int COLS>
+struct Matrix
+{
+    Vector<T, COLS> rows[ROWS];
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Vector<T, COLS>& operator[](size_t index) { return rows[index]; }
+};
+
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(T scalar)
+{
+    Matrix<T, ROWS, COLS> result;
+    for (int i = 0; i < ROWS; i++)
+        result.rows[i] = GetVectorTypeImpl<T, COLS>::fromScalar(scalar);
+    return result;
+
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(const Vector<T, COLS>& row0)
+{
+    Matrix<T, ROWS, COLS> result;
+    result.rows[0] = row0;
+    return result;
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(const Vector<T, COLS>& row0, const Vector<T, COLS>& row1)
+{
+    Matrix<T, ROWS, COLS> result;
+    result.rows[0] = row0;
+    result.rows[1] = row1;
+    return result;
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(const Vector<T, COLS>& row0, const Vector<T, COLS>& row1, const Vector<T, COLS>& row2)
+{
+    Matrix<T, ROWS, COLS> result;
+    result.rows[0] = row0;
+    result.rows[1] = row1;
+    result.rows[2] = row2;
+    return result;
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(const Vector<T, COLS>& row0, const Vector<T, COLS>& row1, const Vector<T, COLS>& row2, const Vector<T, COLS>& row3)
+{
+    Matrix<T, ROWS, COLS> result;
+    result.rows[0] = row0;
+    result.rows[1] = row1;
+    result.rows[2] = row2;
+    result.rows[3] = row3;
+    return result;
+}
+
+template<typename T, int ROWS, int COLS, typename U, int otherRow, int otherCol>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(const Matrix<U, otherRow, otherCol>& other)
+{
+    Matrix<T, ROWS, COLS> result;
+    int minRow = ROWS;
+    int minCol = COLS;
+    if (minRow > otherRow) minRow = otherRow;
+    if (minCol > otherCol) minCol = otherCol;
+    for (int i = 0; i < minRow; i++)
+        for (int j = 0; j < minCol; j++)
+            *_slang_vector_get_element_ptr(result.rows + i, j) = (T)_slang_vector_get_element(other.rows[i], j);
+    return result;
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(T v0, T v1, T v2, T v3)
+{
+    Matrix<T, ROWS, COLS> rs;
+    rs.rows[0].x = v0;  rs.rows[0].y = v1;
+    rs.rows[1].x = v2;  rs.rows[1].y = v3;
+    return rs;
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(T v0, T v1, T v2, T v3, T v4, T v5)
+{
+    Matrix<T, ROWS, COLS> rs;
+    if (COLS == 3)
+    {
+        rs.rows[0].x = v0;  rs.rows[0].y = v1; rs.rows[0].z = v2;
+        rs.rows[1].x = v3;  rs.rows[1].y = v4; rs.rows[1].z = v5;
+    }
+    else
+    {
+        rs.rows[0].x = v0;  rs.rows[0].y = v1;
+        rs.rows[1].x = v2;  rs.rows[1].y = v3;
+        rs.rows[2].x = v4;  rs.rows[2].y = v5;
+    }
+    return rs;
+
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7)
+{
+    Matrix<T, ROWS, COLS> rs;
+    if (COLS == 4)
+    {
+        rs.rows[0].x = v0;  rs.rows[0].y = v1; rs.rows[0].z = v2; rs.rows[0].w = v3;
+        rs.rows[1].x = v4;  rs.rows[1].y = v5; rs.rows[1].z = v6; rs.rows[1].w = v7;
+    }
+    else
+    {
+        rs.rows[0].x = v0;  rs.rows[0].y = v1;
+        rs.rows[1].x = v2;  rs.rows[1].y = v3;
+        rs.rows[2].x = v4;  rs.rows[2].y = v5;
+        rs.rows[3].x = v6;  rs.rows[3].y = v7;
+    }
+    return rs;
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7, T v8)
+{
+    Matrix<T, ROWS, COLS> rs;
+    rs.rows[0].x = v0;  rs.rows[0].y = v1;  rs.rows[0].z = v2;
+    rs.rows[1].x = v3;  rs.rows[1].y = v4;  rs.rows[1].z = v5;
+    rs.rows[2].x = v6;  rs.rows[2].y = v7;  rs.rows[2].z = v8;
+    return rs;
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7, T v8, T v9, T v10, T v11)
+{
+    Matrix<T, ROWS, COLS> rs;
+    if (COLS == 4)
+    {
+        rs.rows[0].x = v0;  rs.rows[0].y = v1;  rs.rows[0].z = v2;  rs.rows[0].w = v3;
+        rs.rows[1].x = v4;  rs.rows[1].y = v5;  rs.rows[1].z = v6;  rs.rows[1].w = v7;
+        rs.rows[2].x = v8;  rs.rows[2].y = v9;  rs.rows[2].z = v10; rs.rows[2].w = v11;
+    }
+    else
+    {
+        rs.rows[0].x = v0;  rs.rows[0].y = v1;  rs.rows[0].z = v2;
+        rs.rows[1].x = v3;  rs.rows[1].y = v4;  rs.rows[1].z = v5;
+        rs.rows[2].x = v6;  rs.rows[2].y = v7;  rs.rows[2].z = v8;
+        rs.rows[3].x = v9;  rs.rows[3].y = v10; rs.rows[3].z = v11;
+    }
+    return rs;
+}
+
+template<typename T, int ROWS, int COLS>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7, T v8, T v9, T v10, T v11, T v12, T v13, T v14, T v15)
+{
+    Matrix<T, ROWS, COLS> rs;
+    rs.rows[0].x = v0;  rs.rows[0].y = v1;  rs.rows[0].z = v2;  rs.rows[0].w = v3;
+    rs.rows[1].x = v4;  rs.rows[1].y = v5;  rs.rows[1].z = v6;  rs.rows[1].w = v7;
+    rs.rows[2].x = v8;  rs.rows[2].y = v9;  rs.rows[2].z = v10; rs.rows[2].w = v11;
+    rs.rows[3].x = v12; rs.rows[3].y = v13; rs.rows[3].z = v14; rs.rows[3].w = v15;
+    return rs;
+}
+
+#define SLANG_MATRIX_BINARY_OP(T, op) \
+    template<int R, int C> \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, R, C> operator op(const Matrix<T, R, C>& thisVal, const Matrix<T, R, C>& other) \
+    { \
+        Matrix<T, R, C> result;\
+        for (int i = 0; i < R; i++) \
+            for (int j = 0; j < C; j++) \
+                *_slang_vector_get_element_ptr(result.rows+i,j) = _slang_vector_get_element(thisVal.rows[i], j) op _slang_vector_get_element(other.rows[i], j); \
+        return result;\
+    }
+
+#define SLANG_MATRIX_UNARY_OP(T, op) \
+    template<int R, int C> \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, R, C> operator op(const Matrix<T, R, C>& thisVal) \
+    { \
+        Matrix<T, R, C> result;\
+        for (int i = 0; i < R; i++) \
+            for (int j = 0; j < C; j++) \
+                *_slang_vector_get_element_ptr(result.rows+i,j) = op _slang_vector_get_element(thisVal.rows[i], j); \
+        return result;\
+    }
+#define SLANG_INT_MATRIX_OPS(T) \
+    SLANG_MATRIX_BINARY_OP(T, +)\
+    SLANG_MATRIX_BINARY_OP(T, -)\
+    SLANG_MATRIX_BINARY_OP(T, *)\
+    SLANG_MATRIX_BINARY_OP(T, / )\
+    SLANG_MATRIX_BINARY_OP(T, &)\
+    SLANG_MATRIX_BINARY_OP(T, |)\
+    SLANG_MATRIX_BINARY_OP(T, &&)\
+    SLANG_MATRIX_BINARY_OP(T, ||)\
+    SLANG_MATRIX_BINARY_OP(T, ^)\
+    SLANG_MATRIX_BINARY_OP(T, %)\
+    SLANG_MATRIX_UNARY_OP(T, !)\
+    SLANG_MATRIX_UNARY_OP(T, ~)
+#define SLANG_FLOAT_MATRIX_OPS(T) \
+    SLANG_MATRIX_BINARY_OP(T, +)\
+    SLANG_MATRIX_BINARY_OP(T, -)\
+    SLANG_MATRIX_BINARY_OP(T, *)\
+    SLANG_MATRIX_BINARY_OP(T, /)\
+    SLANG_MATRIX_UNARY_OP(T, -)
+SLANG_INT_MATRIX_OPS(int)
+SLANG_INT_MATRIX_OPS(uint)
+SLANG_INT_MATRIX_OPS(short)
+SLANG_INT_MATRIX_OPS(ushort)
+SLANG_INT_MATRIX_OPS(char)
+SLANG_INT_MATRIX_OPS(uchar)
+SLANG_INT_MATRIX_OPS(longlong)
+SLANG_INT_MATRIX_OPS(ulonglong)
+SLANG_FLOAT_MATRIX_OPS(float)
+SLANG_FLOAT_MATRIX_OPS(double)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_FLOAT_MATRIX_OPS(__half)
+#endif
+#define SLANG_MATRIX_INT_NEG_OP(T) \
+    template<int R, int C>\
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, R, C> operator-(Matrix<T, R, C> thisVal) \
+    { \
+        Matrix<T, R, C> result;\
+        for (int i = 0; i < R; i++) \
+            for (int j = 0; j < C; j++) \
+                *_slang_vector_get_element_ptr(result.rows+i,j) = 0 - _slang_vector_get_element(thisVal.rows[i], j); \
+        return result;\
+    }
+    SLANG_MATRIX_INT_NEG_OP(int)
+    SLANG_MATRIX_INT_NEG_OP(uint)
+    SLANG_MATRIX_INT_NEG_OP(short)
+    SLANG_MATRIX_INT_NEG_OP(ushort)
+    SLANG_MATRIX_INT_NEG_OP(char)
+    SLANG_MATRIX_INT_NEG_OP(uchar)
+    SLANG_MATRIX_INT_NEG_OP(longlong)
+    SLANG_MATRIX_INT_NEG_OP(ulonglong)
+
+#define SLANG_FLOAT_MATRIX_MOD(T)\
+    template<int R, int C> \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, R, C> operator%(Matrix<T, R, C> left, Matrix<T, R, C> right) \
+    {\
+        Matrix<T, R, C> result;\
+        for (int i = 0; i < R; i++) \
+            for (int j = 0; j < C; j++) \
+                *_slang_vector_get_element_ptr(result.rows+i,j) = _slang_fmod(_slang_vector_get_element(left.rows[i], j), _slang_vector_get_element(right.rows[i], j)); \
+        return result;\
+    }
+
+    SLANG_FLOAT_MATRIX_MOD(float)
+    SLANG_FLOAT_MATRIX_MOD(double)
+#if SLANG_CUDA_ENABLE_HALF
+    template<int R, int C> 
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<__half, R, C> operator%(Matrix<__half, R, C> left, Matrix<__half, R, C> right)
+    {
+        Matrix<__half, R, C> result;
+        for (int i = 0; i < R; i++) 
+            for (int j = 0; j < C; j++) 
+                * _slang_vector_get_element_ptr(result.rows + i, j) = __float2half(_slang_fmod(__half2float(_slang_vector_get_element(left.rows[i], j)), __half2float(_slang_vector_get_element(right.rows[i], j))));
+        return result;
+    }
+#endif
+#undef SLANG_FLOAT_MATRIX_MOD
+#undef SLANG_MATRIX_BINARY_OP
+#undef SLANG_MATRIX_UNARY_OP
+#undef SLANG_INT_MATRIX_OPS
+#undef SLANG_FLOAT_MATRIX_OPS
+#undef SLANG_MATRIX_INT_NEG_OP
+#undef SLANG_FLOAT_MATRIX_MOD
+
 //
 // Half support
 // 
 
 #if SLANG_CUDA_ENABLE_HALF
-
-// Add the other vector half types
-struct __half3 { __half2 xy; __half z; };
-struct __half4 { __half2 xy; __half2 zw; };
-
-// *** convert ***
-
-// half -> other
-
-// float
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 convert_float2(const __half2& v) { return __half22float2(v); } 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float3 convert_float3(const __half3& v) { const float2 xy = __half22float2(v.xy); return float3{xy.x, xy.y, __half2float(v.z)}; } 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 convert_float4(const __half4& v) { const float2 xy = __half22float2(v.xy); const float2 zw = __half22float2(v.zw); return float4{xy.x, xy.y, zw.x, zw.y}; }
-
-// double
-SLANG_FORCE_INLINE SLANG_CUDA_CALL double2 convert_double2(const __half2& v) { const float2 xy = __half22float2(v); return double2{ xy.x, xy.y }; } 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL double3 convert_double3(const __half3& v) { const float2 xy = __half22float2(v.xy); return double3{ xy.x, xy.y, __half2float(v.z)}; } 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL double4 convert_double4(const __half4& v) { const float2 xy = __half22float2(v.xy); const float2 zw = __half22float2(v.zw); return double4{xy.x, xy.y, zw.x, zw.y}; }
-
-// int
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int2 convert_int2(const __half2& v) { return int2 { __half2int_rz(v.x), __half2int_rz(v.y) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int3 convert_int3(const __half3& v) { return int3 { __half2int_rz(v.xy.x), __half2int_rz(v.xy.y), __half2int_rz(v.z) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int4 convert_int4(const __half4& v) { return int4 { __half2int_rz(v.xy.x), __half2int_rz(v.xy.y), __half2int_rz(v.zw.x), __half2int_rz(v.zw.y)}; }
-
-// uint
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint2 convert_uint2(const __half2& v) { return uint2 { __half2uint_rz(v.x), __half2uint_rz(v.y) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint3 convert_uint3(const __half3& v) { return uint3 { __half2uint_rz(v.xy.x), __half2uint_rz(v.xy.y), __half2uint_rz(v.z) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4 convert_uint4(const __half4& v) { return uint4 { __half2uint_rz(v.xy.x), __half2uint_rz(v.xy.y), __half2uint_rz(v.zw.x), __half2uint_rz(v.zw.y)}; }
-
-// other -> half
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 convert___half2(const float2& v) { return __float22half2_rn(v); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 convert___half3(const float3& v) { return __half3{ __float22half2_rn(float2{v.x, v.y}), __float2half_rn(v.z) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 convert___half4(const float4& v) { return __half4{ __float22half2_rn(float2{v.x, v.y}), __float22half2_rn(float2{v.z, v.w}) }; }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 convert___half2(const int2& v) { return __half2{ __int2half_rz(v.x), __int2half_rz(v.y) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 convert___half3(const int3& v) { return __half3{ __half2{__int2half_rz(v.x), __int2half_rz(v.y)}, __int2half_rz(v.z) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 convert___half4(const int4& v) { return __half4{ __half2{__int2half_rz(v.x), __int2half_rz(v.y)}, __half2{__int2half_rz(v.z),  __int2half_rz(v.w)} }; }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 convert___half2(const uint2& v) { return __half2{ __uint2half_rz(v.x), __uint2half_rz(v.y) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 convert___half3(const uint3& v) { return __half3{ __half2{__uint2half_rz(v.x), __uint2half_rz(v.y)}, __uint2half_rz(v.z) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 convert___half4(const uint4& v) { return __half4{ __half2{__uint2half_rz(v.x), __uint2half_rz(v.y)}, __half2{__uint2half_rz(v.z),  __uint2half_rz(v.w)} }; }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 convert___half2(const double2& v) { return __float22half2_rn(float2{v.x, v.y}); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 convert___half3(const double3& v) { return __half3{ __float22half2_rn(float2{v.x, v.y}), __float2half_rn(v.z) }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 convert___half4(const double4& v) { return __half4{ __float22half2_rn(float2{v.x, v.y}), __float22half2_rn(float2{v.z, v.w}) }; }
-
-// *** make ***
-
-// Mechanism to make half vectors
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 make___half2(__half x, __half y) { return __halves2half2(x, y); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 make___half3(__half x, __half y, __half z) { return __half3{ __halves2half2(x, y), z }; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 make___half4(__half x, __half y, __half z, __half w) { return __half4{ __halves2half2(x, y), __halves2half2(z, w)}; }
-
-// *** constructFromScalar ***
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 constructFromScalar___half2(half x) { return __half2half2(x); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 constructFromScalar___half3(half x) { return __half3{__half2half2(x), x}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 constructFromScalar___half4(half x) { const __half2 v = __half2half2(x); return __half4{v, v}; }
-
-// *** half2 ***
-
-// half2 maths ops
-
-// NOTE! That by default these are in cuda_fp16.hpp, but we disable them, because we need to define the comparison operators
-// as we need versions that will return vector<bool>
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __half2& rh) { return __hadd2(lh, rh); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __half2& rh) { return __hsub2(lh, rh); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, const __half2& rh) { return __hmul2(lh, rh); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(const __half2& lh, const __half2& rh) { return __h2div(lh, rh); }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator+=(__half2& lh, const __half2& rh) { lh = __hadd2(lh, rh); return lh; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator-=(__half2& lh, const __half2& rh) { lh = __hsub2(lh, rh); return lh; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator*=(__half2& lh, const __half2& rh) { lh = __hmul2(lh, rh); return lh; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator/=(__half2& lh, const __half2& rh) { lh = __h2div(lh, rh); return lh; }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 &operator++(__half2 &h)      { __half2_raw one; one.x = 0x3C00; one.y = 0x3C00; h = __hadd2(h, one); return h; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 &operator--(__half2 &h)      { __half2_raw one; one.x = 0x3C00; one.y = 0x3C00; h = __hsub2(h, one); return h; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2  operator++(__half2 &h, int) { __half2 ret = h; __half2_raw one; one.x = 0x3C00; one.y = 0x3C00; h = __hadd2(h, one); return ret; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2  operator--(__half2 &h, int) { __half2 ret = h; __half2_raw one; one.x = 0x3C00; one.y = 0x3C00; h = __hsub2(h, one); return ret; }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2 &h) { return h; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2 &h) { return __hneg2(h); }
-
-// vec op scalar
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, __half rh) { return __hadd2(lh, __half2half2(rh)); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, __half rh) { return __hsub2(lh, __half2half2(rh)); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, __half rh) { return __hmul2(lh, __half2half2(rh)); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(const __half2& lh, __half rh) { return __h2div(lh, __half2half2(rh)); }
-
-// scalar op vec
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(__half lh, const __half2& rh) { return __hadd2(__half2half2(lh), rh); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(__half lh, const __half2& rh) { return __hsub2(__half2half2(lh), rh); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(__half lh, const __half2& rh) { return __hmul2(__half2half2(lh), rh); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(__half lh, const __half2& rh) { return __h2div(__half2half2(lh), rh); }
-
-// *** half3 ***
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator+(const __half3& lh, const __half3& rh) { return __half3{__hadd2(lh.xy, rh.xy), __hadd(lh.z, rh.z)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator-(const __half3& lh, const __half3& rh) { return __half3{__hsub2(lh.xy, rh.xy), __hsub(lh.z, rh.z)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator*(const __half3& lh, const __half3& rh) { return __half3{__hmul2(lh.xy, rh.xy), __hmul(lh.z, rh.z)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator/(const __half3& lh, const __half3& rh) { return __half3{__h2div(lh.xy, rh.xy), __hdiv(lh.z, rh.z)}; }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator-(const __half3& h) { return __half3{__hneg2(h.xy), __hneg(h.z)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator+(const __half3& h) { return h; }
-
-// vec op scalar
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator+(const __half3& lh, __half rh) { return __half3{__hadd2(lh.xy, __half2half2(rh)), __hadd(lh.z, rh)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator-(const __half3& lh, __half rh) { return __half3{__hsub2(lh.xy, __half2half2(rh)), __hsub(lh.z, rh)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator*(const __half3& lh, __half rh) { return __half3{__hmul2(lh.xy, __half2half2(rh)), __hmul(lh.z, rh)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator/(const __half3& lh, __half rh) { return __half3{__h2div(lh.xy, __half2half2(rh)), __hdiv(lh.z, rh)}; }
-
-// scalar op vec
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator+(__half lh, const __half3& rh) { return __half3{__hadd2(__half2half2(lh), rh.xy), __hadd(lh, rh.z)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator-(__half lh, const __half3& rh) { return __half3{__hsub2(__half2half2(lh), rh.xy), __hsub(lh, rh.z)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator*(__half lh, const __half3& rh) { return __half3{__hmul2(__half2half2(lh), rh.xy), __hmul(lh, rh.z)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator/(__half lh, const __half3& rh) { return __half3{__h2div(__half2half2(lh), rh.xy), __hdiv(lh, rh.z)}; }
-
-// *** half4 ***
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator+(const __half4& lh, const __half4& rh) { return __half4{__hadd2(lh.xy, rh.xy), __hadd2(lh.zw, rh.zw)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator-(const __half4& lh, const __half4& rh) { return __half4{__hsub2(lh.xy, rh.xy), __hsub2(lh.zw, rh.zw)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator*(const __half4& lh, const __half4& rh) { return __half4{__hmul2(lh.xy, rh.xy), __hmul2(lh.zw, rh.zw)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator/(const __half4& lh, const __half4& rh) { return __half4{__h2div(lh.xy, rh.xy), __h2div(lh.zw, rh.zw)}; }
-
-// vec op scalar
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator+(const __half4& lh, __half rh) { const __half2 rhv = __half2half2(rh); return __half4{__hadd2(lh.xy, rhv), __hadd2(lh.zw, rhv)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator-(const __half4& lh, __half rh) { const __half2 rhv = __half2half2(rh); return __half4{__hsub2(lh.xy, rhv), __hsub2(lh.zw, rhv)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator*(const __half4& lh, __half rh) { const __half2 rhv = __half2half2(rh); return __half4{__hmul2(lh.xy, rhv), __hmul2(lh.zw, rhv)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator/(const __half4& lh, __half rh) { const __half2 rhv = __half2half2(rh); return __half4{__h2div(lh.xy, rhv), __h2div(lh.zw, rhv)}; }
-
-// scalar op vec
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator+(__half lh, const __half4& rh) { const __half2 lhv = __half2half2(lh); return __half4{__hadd2(lhv, rh.xy), __hadd2(lhv, rh.zw)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator-(__half lh, const __half4& rh) { const __half2 lhv = __half2half2(lh); return __half4{__hsub2(lhv, rh.xy), __hsub2(lhv, rh.zw)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator*(__half lh, const __half4& rh) { const __half2 lhv = __half2half2(lh); return __half4{__hmul2(lhv, rh.xy), __hmul2(lhv, rh.zw)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator/(__half lh, const __half4& rh) { const __half2 lhv = __half2half2(lh); return __half4{__h2div(lhv, rh.xy), __h2div(lhv, rh.zw)}; }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator-(const __half4& h) { return __half4{__hneg2(h.xy), __hneg2(h.zw)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator+(const __half4& h) { return h; }
-
 // Convenience functions ushort -> half
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 __ushort_as_half(const ushort2& i) { return __halves2half2(__ushort_as_half(i.x), __ushort_as_half(i.y)); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 __ushort_as_half(const ushort3& i) { return __half3{__halves2half2(__ushort_as_half(i.x), __ushort_as_half(i.y)), __ushort_as_half(i.z)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 __ushort_as_half(const ushort4& i) { return __half4{ __halves2half2(__ushort_as_half(i.x), __ushort_as_half(i.y)), __halves2half2(__ushort_as_half(i.z), __ushort_as_half(i.w)) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 __ushort_as_half(const ushort3& i) { return __half3{__ushort_as_half(i.x), __ushort_as_half(i.y), __ushort_as_half(i.z)}; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 __ushort_as_half(const ushort4& i) { return __half4{ __ushort_as_half(i.x), __ushort_as_half(i.y), __ushort_as_half(i.z), __ushort_as_half(i.w) }; }
 
 // Convenience functions half -> ushort
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort2 __half_as_ushort(const __half2& i) { return make_ushort2(__half_as_ushort(i.x), __half_as_ushort(i.y)); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort3 __half_as_ushort(const __half3& i) { return make_ushort3(__half_as_ushort(i.xy.x), __half_as_ushort(i.xy.y), __half_as_ushort(i.z)); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort4 __half_as_ushort(const __half4& i) { return make_ushort4(__half_as_ushort(i.xy.x), __half_as_ushort(i.xy.y), __half_as_ushort(i.zw.x), __half_as_ushort(i.zw.y)); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort3 __half_as_ushort(const __half3& i) { return make_ushort3(__half_as_ushort(i.x), __half_as_ushort(i.y), __half_as_ushort(i.z)); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort4 __half_as_ushort(const __half4& i) { return make_ushort4(__half_as_ushort(i.x), __half_as_ushort(i.y), __half_as_ushort(i.z), __half_as_ushort(i.w)); }
 
 // This is a little bit of a hack. Fortunately CUDA has the definitions of the templated types in 
 // include/surface_indirect_functions.h
@@ -438,7 +796,7 @@ template <> \
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 FUNC_NAME##_convert<float4>(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode) \
 { \
     const __half4 v = __ushort_as_half(FUNC_NAME<ushort4>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
-    return float4{v.xy.x, v.xy.y, v.zw.x, v.zw.y}; \
+    return float4{v.x, v.y, v.z, v.w}; \
 }
 
 SLANG_SURFACE_READ_HALF_CONVERT(surf1Dread, (int x), (x)) 

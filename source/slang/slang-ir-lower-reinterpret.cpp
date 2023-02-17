@@ -12,7 +12,6 @@ struct ReinterpretLoweringContext
     TargetRequest* targetReq;
     DiagnosticSink* sink;
     IRModule* module;
-    SharedIRBuilder sharedBuilderStorage;
     OrderedHashSet<IRInst*> workList;
 
     void addToWorkList(IRInst* inst)
@@ -37,12 +36,6 @@ struct ReinterpretLoweringContext
 
     void processModule()
     {
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-
-        // Deduplicate equivalent types.
-        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
         addToWorkList(module->getModuleInst());
 
         while (workList.Count() != 0)
@@ -77,7 +70,7 @@ struct ReinterpretLoweringContext
         }
         SlangInt anyValueSize = Math::Max(fromTypeSize, toTypeSize);
 
-        IRBuilder builder(sharedBuilderStorage);
+        IRBuilder builder(module);
         builder.setInsertBefore(inst);
         auto anyValueType = builder.getAnyValueType(builder.getIntValue(builder.getUIntType(), anyValueSize));
         auto packInst = builder.emitPackAnyValue(

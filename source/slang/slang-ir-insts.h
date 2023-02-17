@@ -2457,131 +2457,44 @@ struct IRLiveRangeEnd : IRLiveRangeMarker
     IR_LEAF_ISA(LiveRangeEnd);
 };
 
-// Description of an instruction to be used for global value numbering
-struct IRInstKey
-{
-    IRInst* inst;
-
-    HashCode getHashCode();
-};
-
-bool operator==(IRInstKey const& left, IRInstKey const& right);
-
-struct IRConstantKey
-{
-    IRConstant* inst;
-
-    bool operator==(const IRConstantKey& rhs) const { return inst->equal(rhs.inst); }
-    HashCode getHashCode() const { return inst->getHashCode(); }
-};
-
-struct SharedIRBuilder
-{
-public:
-    SharedIRBuilder()
-    {}
-
-    explicit SharedIRBuilder(IRModule* module)
-    {
-        init(module);
-    }
-
-    void init(IRModule* module)
-    {
-        m_module = module;
-        m_session = module->getSession();
-
-        m_globalValueNumberingMap.Clear();
-        m_constantMap.Clear();
-    }
-
-    IRModule* getModule()
-    {
-        return m_module;
-    }
-
-    Session* getSession()
-    {
-        return m_session;
-    }
-
-    void insertBlockAlongEdge(IREdge const& edge);
-
-    // Rebuilds `globalValueNumberingMap`. This is necessary if any existing
-    // keys are modified (thus its hash code is changed).
-    void deduplicateAndRebuildGlobalNumberingMap();
-
-    // Replaces all uses of oldInst with newInst, and ensures the global numbering map is valid after the replacement.
-    void replaceGlobalInst(IRInst* oldInst, IRInst* newInst);
-
-    typedef Dictionary<IRInstKey, IRInst*> GlobalValueNumberingMap;
-    typedef Dictionary<IRConstantKey, IRConstant*> ConstantMap;
-
-    GlobalValueNumberingMap& getGlobalValueNumberingMap() { return m_globalValueNumberingMap; }
-    ConstantMap& getConstantMap() { return m_constantMap; }
-
-    bool isGloballyNumberedInst(IRInst* inst);
-
-private:
-    // The module that will own all of the IR
-    IRModule* m_module;
-
-    // The parent compilation session
-    Session* m_session;
-
-    GlobalValueNumberingMap m_globalValueNumberingMap;
-    ConstantMap m_constantMap;
-};
-
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
 {
 private:
-        /// Shared state for all IR builders working on the same module
-    SharedIRBuilder*    m_sharedBuilder = nullptr;
+    /// Deduplication context from the module.
+    IRDeduplicationContext* m_dedupContext = nullptr;
 
-        /// Default location for inserting new instructions as they are emitted
+    IRModule* m_module = nullptr;
+
+    /// Default location for inserting new instructions as they are emitted
     IRInsertLoc m_insertLoc;
 
-        /// Information that controls how source locations are associatd with instructions that get emitted
+    /// Information that controls how source locations are associatd with instructions that get emitted
     IRBuilderSourceLocRAII* m_sourceLocInfo = nullptr;
 
 public:
     IRBuilder()
     {}
 
-    explicit IRBuilder(SharedIRBuilder* sharedBuilder)
-        : m_sharedBuilder(sharedBuilder)
+    explicit IRBuilder(IRModule* module)
+        : m_module(module)
+        , m_dedupContext(module->getDeduplicationContext())
     {}
 
-    explicit IRBuilder(SharedIRBuilder& sharedBuilder)
-        : m_sharedBuilder(&sharedBuilder)
+    explicit IRBuilder(IRInst* inst)
+        : m_module(inst->getModule())
+        , m_dedupContext(inst->getModule()->getDeduplicationContext())
     {}
-
-    void init(SharedIRBuilder* sharedBuilder)
-    {
-        *this = IRBuilder(sharedBuilder);
-    }
-
-    void init(SharedIRBuilder& sharedBuilder)
-    {
-        *this = IRBuilder(sharedBuilder);
-    }
-
-    SharedIRBuilder* getSharedBuilder() const
-    {
-        return m_sharedBuilder;
-    }
 
     Session* getSession() const
     {
-        return m_sharedBuilder->getSession();
+        return m_module->getSession();
     }
 
     IRModule* getModule() const
     {
-        return m_sharedBuilder->getModule();
+        return m_module;
     }
 
     IRInsertLoc const& getInsertLoc() const { return m_insertLoc; }
@@ -2618,6 +2531,18 @@ public:
     IRConstant* _findOrEmitConstant(
         IRConstant&     keyInst);
 
+        /// Implements a special case of inst creation (intended only for calling from `_createInst`)
+        /// that returns an matching existing hoistable inst if it exists, otherwise it creates the inst and
+        /// add it to the global numbering map.
+    IRInst* _findOrEmitHoistableInst(
+        IRType* type,
+        IROp op,
+        Int fixedArgCount,
+        IRInst* const* fixedArgs,
+        Int varArgListCount,
+        Int const* listArgCounts,
+        IRInst* const* const* listArgs);
+
         /// Create a new instruction with the given `type` and `op`, with an allocated
         /// size of at least `minSizeInBytes`, and with its operand list initialized
         /// from the provided lists of "fixed" and "variable" operands.
@@ -2636,7 +2561,8 @@ public:
         /// size.
         ///
         /// Note: This is an extremely low-level operation and clients of an `IRBuilder`
-        /// should not be using it when other options are available.
+        /// should not be using it when other options are available. This is also where
+        /// all insts creation are bottlenecked through.
         ///
     IRInst* _createInst(
         size_t                  minSizeInBytes,
@@ -2674,6 +2600,12 @@ public:
     //
 
     void addInst(IRInst* inst);
+
+    // Replace the operand of a potentially hoistable inst.
+    // If the hoistable inst become duplicate of an existing inst,
+    // all uses of the original user will be replaced with the existing inst.
+    // The function returns the new user after any potential updates.
+    IRInst* replaceOperand(IRUse* use, IRInst* newValue);
 
     IRInst* getBoolValue(bool value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
@@ -2939,6 +2871,20 @@ public:
         UInt            argCount,
         IRInst* const*  args);
 
+    IRInst* createIntrinsicInst(
+        IRType* type,
+        IROp            op,
+        IRInst* operand,
+        UInt            operandCount,
+        IRInst* const* operands);
+
+    IRInst* createIntrinsicInst(
+        IRType* type,
+        IROp op,
+        UInt operandListCount,
+        UInt const* listOperandCounts,
+        IRInst* const* const* listOperands);
+
     IRInst* emitIntrinsicInst(
         IRType*         type,
         IROp            op,
@@ -3022,6 +2968,10 @@ public:
         UInt            argCount,
         IRInst* const* args);
 
+    IRInst* emitMakeMatrixFromScalar(
+        IRType* type,
+        IRInst* scalarValue);
+
     IRInst* emitMakeArray(
         IRType*         type,
         UInt            argCount,
@@ -3086,31 +3036,6 @@ public:
     IRUndefined* emitUndefined(IRType* type);
 
     IRInst* emitReinterpret(IRInst* type, IRInst* value);
-
-    IRInst* findOrAddInst(
-         IRType*                 type,
-         IROp                    op,
-         UInt                    operandListCount,
-         UInt const*             listOperandCounts,
-         IRInst* const* const*   listOperands);
-
-    IRInst* findOrEmitHoistableInst(
-        IRType*                 type,
-        IROp                    op,
-        UInt                    operandListCount,
-        UInt const*             listOperandCounts,
-        IRInst* const* const*   listOperands);
-    IRInst* findOrEmitHoistableInst(
-        IRType*         type,
-        IROp            op,
-        UInt            operandCount,
-        IRInst* const*  operands);
-    IRInst* findOrEmitHoistableInst(
-        IRType*         type,
-        IROp            op,
-        IRInst*         operand,
-        UInt            operandCount,
-        IRInst* const*  operands);
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
@@ -3187,7 +3112,7 @@ public:
         ///
     IRBlock* emitBlock();
 
-    
+    static void insertBlockAlongEdge(IRModule* module, IREdge const& edge);
 
     IRParam* createParam(
         IRType* type);
@@ -3871,10 +3796,6 @@ public:
         addDecoration(value, d, maxCount);
     }
 };
-
-void addHoistableInst(
-    IRBuilder*  builder,
-    IRInst*     inst);
 
 // Helper to establish the source location that will be used
 // by an IRBuilder.

@@ -786,6 +786,8 @@ __generic<T = float, let R : int = 4, let C : int = 4>
 __magic_type(Matrix)
 struct matrix
 {
+    __intrinsic_op($(kIROp_MakeMatrixFromScalar))
+    __init(T val);
 }
 
 ${{{{
@@ -1092,9 +1094,6 @@ __generic<T:__BuiltinFloatingPointType, let R: int, let C: int>
 extension matrix<T, R, C> : IDifferentiable
 {
     typedef matrix<T, R, C> Differential;
-
-    __intrinsic_op($(kIROp_MakeMatrixFromScalar))
-    __init(T val);
 
     [__unsafeForceInlineEarly]
     static Differential dzero()

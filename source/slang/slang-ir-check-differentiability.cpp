@@ -11,7 +11,6 @@ struct CheckDifferentiabilityPassContext : public InstPassBase
 public:
     DiagnosticSink* sink;
     AutoDiffSharedContext sharedContext;
-    SharedIRBuilder* sharedBuilder;
 
     enum DifferentiableLevel
     {
@@ -19,8 +18,8 @@ public:
     };
     Dictionary<IRInst*, DifferentiableLevel> differentiableFunctions;
 
-    CheckDifferentiabilityPassContext(SharedIRBuilder* inSharedBuilder, IRModule* inModule, DiagnosticSink* inSink)
-        : InstPassBase(inModule), sharedBuilder(inSharedBuilder), sink(inSink), sharedContext(inModule->getModuleInst())
+    CheckDifferentiabilityPassContext(IRModule* inModule, DiagnosticSink* inSink)
+        : InstPassBase(inModule), sink(inSink), sharedContext(inModule->getModuleInst())
     {}
 
     bool _isFuncMarkedForAutoDiff(IRInst* func)
@@ -165,7 +164,6 @@ public:
 
         HashSet<IRInst*> produceDiffSet;
         HashSet<IRInst*> expectDiffSet;
-        int differentiableInputs = 0;
         int differentiableOutputs = 0;
         for (auto param : funcInst->getFirstBlock()->getParams())
         {
@@ -173,8 +171,6 @@ public:
             {
                 if (as<IROutTypeBase>(param->getFullType()))
                     differentiableOutputs++;
-                if (!as<IROutType>(param->getFullType()))
-                    differentiableInputs++;
                 produceDiffSet.Add(param);
             }
         }
@@ -186,8 +182,6 @@ public:
 
         if (differentiableOutputs == 0)
             sink->diagnose(funcInst, Diagnostics::differentiableFuncMustHaveOutput);
-        if (differentiableInputs == 0)
-            sink->diagnose(funcInst, Diagnostics::differentiableFuncMustHaveInput);
 
         DifferentiableLevel requiredDiffLevel = DifferentiableLevel::Forward;
         if (isBackwardDifferentiableFunc(funcInst))
@@ -402,9 +396,9 @@ public:
     }
 };
 
-void checkAutoDiffUsages(SharedIRBuilder* sharedBuilder, IRModule* module, DiagnosticSink* sink)
+void checkAutoDiffUsages(IRModule* module, DiagnosticSink* sink)
 {
-    CheckDifferentiabilityPassContext context(sharedBuilder, module, sink);
+    CheckDifferentiabilityPassContext context(module, sink);
     context.processModule();
 }
 

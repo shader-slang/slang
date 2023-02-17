@@ -101,11 +101,6 @@ struct SynthesizeActiveMaskForModuleContext
     IRModule* m_module;
     DiagnosticSink* m_sink;
 
-    // We use a single shared IR builder for the entire pass, to
-    // make sure we deduplicate types/values as much as possible.
-    //
-    SharedIRBuilder m_sharedBuilder;
-
     // Because we are introducing explicit masks, it is important
     // for all the code to agree on the type of mask that will be
     // used.
@@ -114,11 +109,6 @@ struct SynthesizeActiveMaskForModuleContext
 
     void processModule()
     {
-        // When asked to process an IR module, our pass first
-        // sets up the shared state.
-        //
-        m_sharedBuilder.init(m_module);
-
         // We use the plain 32-bit `uint` type masks we
         // generate here since it matches the current
         // definition of `WaveMask` in the standard library.
@@ -128,7 +118,7 @@ struct SynthesizeActiveMaskForModuleContext
         // so that the pass is compatible with all targets that
         // support  a wave mask.
         //
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         m_maskType = builder.getBasicType(BaseType::UInt);
 
         // With the setup out of the way, the job of the module
@@ -329,7 +319,7 @@ struct SynthesizeActiveMaskForModuleContext
             //      mask = waveGetActiveMask();
             //      callee(arg0, arg1, arg2, ..., m);
             //
-            IRBuilder builder(m_sharedBuilder);
+            IRBuilder builder(m_module);
             builder.setInsertBefore(call);
 
             // First we synthesize the mask to pass down by
@@ -399,10 +389,7 @@ struct SynthesizeActiveMaskForFunctionContext
     //
     IRFunc* m_func;
 
-    // Some of the state used for building up mask operations is
-    // passed down form the module-level pass.
-    //
-    SharedIRBuilder* m_sharedBuilder;
+    IRModule* m_module;
     IRType* m_maskType;
 
     void transformFunc()
@@ -533,7 +520,7 @@ struct SynthesizeActiveMaskForFunctionContext
         //
         for( auto& edge : edgesToBreak )
         {
-            m_sharedBuilder->insertBlockAlongEdge(edge);
+            IRBuilder::insertBlockAlongEdge(m_module, edge);
         }
     }
 
@@ -731,7 +718,7 @@ struct SynthesizeActiveMaskForFunctionContext
             //
             // We will insert the code we generate at the start of the entry block.
             //
-            IRBuilder builder(m_sharedBuilder);
+            IRBuilder builder(m_module);
             builder.setInsertBefore(funcEntryBlock->getFirstOrdinaryInst());
             //
             // A naive approach would be to set the active mask to an all-ones
@@ -829,7 +816,7 @@ struct SynthesizeActiveMaskForFunctionContext
         //
         SLANG_ASSERT(doesBlockNeedActiveMask(block));
 
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(block->getFirstOrdinaryInst());
 
         auto activeMaskParam = builder.emitParam(m_maskType);
@@ -1220,7 +1207,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 // code can take responsibility for computing the mask
                 // value to use for both `trueBlock` and `falseBlock`.
                 //
-                IRBuilder builder(m_sharedBuilder);
+                IRBuilder builder(m_module);
 
                 // To establish the mask value for `trueBlock` we will
                 // insert a `waveMaskBallot` before the branch:
@@ -1452,7 +1439,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 // Next, we need to establish a mask value that will
                 // represent the active mask on entry to a given `case`.
                 //
-                IRBuilder builder(m_sharedBuilder);
+                IRBuilder builder(m_module);
                 builder.setInsertBefore(switchInst);
 
                 // For now we are computing a simple-but-inaccurate version
@@ -1685,7 +1672,7 @@ struct SynthesizeActiveMaskForFunctionContext
     //
     void transformUnconditionalEdge(RegionInfo* fromRegion, IRTerminatorInst* terminator, IRBlock* toBlock, IRInst* fromActiveMask)
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(terminator);
 
         // The context here is that the `terminator` instruction,
@@ -2078,7 +2065,7 @@ void SynthesizeActiveMaskForModuleContext::transformFuncUsingActiveMask(IRFunc* 
 {
     SynthesizeActiveMaskForFunctionContext context;
     context.m_func = func;
-    context.m_sharedBuilder = &m_sharedBuilder;
+    context.m_module = m_module;
     context.m_maskType = m_maskType;
 
     context.transformFunc();

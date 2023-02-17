@@ -381,9 +381,7 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
-            SharedIRBuilder sharedBuilder(irModule);
-            sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
-            if (!unrollLoopsInModule(&sharedBuilder, irModule, codeGenContext->getSink()))
+            if (!unrollLoopsInModule(irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }
 
@@ -1022,7 +1020,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         auto irModule = linkedIR.module;
         
         // Perform final simplifications to help emit logic to generate more compact code.
-        simplifyForEmit(irModule);
+        simplifyForEmit(irModule, targetRequest);
 
         metadata = linkedIR.metadata;
 

@@ -41,7 +41,7 @@ void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
     }
 }
 
-void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder& sharedBuilder)
+void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module)
 {
     auto slices = pool.getAdded();
     if (slices.getCount() == 0)
@@ -49,11 +49,8 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder&
         return;
     }
 
-    IRBuilder builder(sharedBuilder);
+    IRBuilder builder(module);
     
-    // 
-    IRModule* module = builder.getModule();
-
     // We need to add a global instruction that references all of these string literals
     builder.setInsertInto(module->getModuleInst());
 

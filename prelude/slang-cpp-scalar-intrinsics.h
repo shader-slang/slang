@@ -490,6 +490,17 @@ void InterlockedAdd(uint32_t* dest, uint32_t value, uint32_t* oldValue)
 
 #endif // SLANG_LLVM
 
+
+// ----------------------- fmod --------------------------
+SLANG_FORCE_INLINE float _slang_fmod(float x, float y)
+{
+    return F32_fmod(x, y);
+}
+SLANG_FORCE_INLINE double _slang_fmod(double x, double y)
+{
+    return F64_fmod(x, y);
+}
+
 #ifdef SLANG_PRELUDE_NAMESPACE
 } 
 #endif

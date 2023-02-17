@@ -20,7 +20,6 @@ struct DesugarUnionTypesContext
     // state that we will initialize once and then use throughout the pass.
     //
     IRModule* module;
-    SharedIRBuilder sharedBuilderStorage;
     IRBuilder builderStorage;
     IRBuilder* getBuilder() { return &builderStorage; }
 
@@ -39,8 +38,7 @@ struct DesugarUnionTypesContext
     {
         // We start by initializing our IR building state.
         //
-        sharedBuilderStorage.init(module);
-        builderStorage.init(sharedBuilderStorage);
+        builderStorage = IRBuilder(module);
 
         // Next, we will search for any instruction that create or use
         // union types, and process them accordingingly (usually by

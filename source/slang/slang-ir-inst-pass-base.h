@@ -12,8 +12,6 @@ namespace Slang
     {
     protected:
         IRModule* module;
-        SharedIRBuilder sharedBuilderStorage;
-
         List<IRInst*> workList;
         HashSet<IRInst*> workListSet;
         void addToWorkList(IRInst* inst)

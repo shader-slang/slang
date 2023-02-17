@@ -72,28 +72,28 @@ IRInst* cloneInstAndOperands(
     auto oldType = oldInst->getFullType();
     auto newType = (IRType*) findCloneForOperand(env, oldType);
 
-    // Next we will create an empty shell of the instruction,
-    // with space for the operands, but no actual operand
-    // values attached.
-    //
-    UInt operandCount = oldInst->getOperandCount();
-    auto newInst = builder->emitIntrinsicInst(
-        newType,
-        oldInst->getOp(),
-        operandCount,
-        nullptr);
-
-    // Finally we will iterate over the operands of `oldInst`
+    // Next we will iterate over the operands of `oldInst`
     // to find their replacements and install them as
     // the operands of `newInst`.
     //
-    for(UInt ii = 0; ii < operandCount; ++ii)
+    UInt operandCount = oldInst->getOperandCount();
+
+    ShortList<IRInst*> newOperands;
+    newOperands.setCount(operandCount);
+    for (UInt ii = 0; ii < operandCount; ++ii)
     {
         auto oldOperand = oldInst->getOperand(ii);
         auto newOperand = findCloneForOperand(env, oldOperand);
 
-        newInst->getOperands()[ii].init(newInst, newOperand);
+        newOperands[ii] = newOperand;
     }
+
+    // Finally we create the inst with the updated operands.
+    auto newInst = builder->emitIntrinsicInst(
+        newType,
+        oldInst->getOp(),
+        operandCount,
+        newOperands.getArrayView().getBuffer());
 
     newInst->sourceLoc = oldInst->sourceLoc;
 
@@ -124,19 +124,18 @@ struct IRCloningOldNewPair
 //
 static void _cloneInstDecorationsAndChildren(
     IRCloneEnv*         env,
-    SharedIRBuilder*    sharedBuilder,
+    IRModule*           module,
     IRInst*             oldInst,
     IRInst*             newInst)
 {
     SLANG_ASSERT(env);
-    SLANG_ASSERT(sharedBuilder);
     SLANG_ASSERT(oldInst);
     SLANG_ASSERT(newInst);
 
     // We will set up an IR builder that inserts
     // into the new parent instruction.
     //
-    IRBuilder builderStorage(sharedBuilder);
+    IRBuilder builderStorage(module);
     auto builder = &builderStorage;
     builder->setInsertInto(newInst);
 
@@ -202,7 +201,7 @@ static void _cloneInstDecorationsAndChildren(
         auto oldChild = pair.oldInst;
         auto newChild = pair.newInst;
 
-        _cloneInstDecorationsAndChildren(env, sharedBuilder, oldChild, newChild);
+        _cloneInstDecorationsAndChildren(env, module, oldChild, newChild);
     }
 }
 
@@ -214,11 +213,11 @@ static void _cloneInstDecorationsAndChildren(
 //
 void cloneInstDecorationsAndChildren(
     IRCloneEnv*         env,
-    SharedIRBuilder*    sharedBuilder,
+    IRModule*           module,
     IRInst*             oldInst,
     IRInst*             newInst)
 {
-    SLANG_ASSERT(sharedBuilder);
+    SLANG_ASSERT(module);
     SLANG_ASSERT(oldInst);
     SLANG_ASSERT(newInst);
 
@@ -233,7 +232,7 @@ void cloneInstDecorationsAndChildren(
         subEnv = &subEnvStorage;
         subEnv->parent = env;
     }
-    _cloneInstDecorationsAndChildren(subEnv, sharedBuilder, oldInst, newInst);
+    _cloneInstDecorationsAndChildren(subEnv, module, oldInst, newInst);
 }
 
 // The convenience function `cloneInst` just sequences the
@@ -273,7 +272,7 @@ IRInst* cloneInst(
     env->mapOldValToNew.Add(oldInst, newInst);
 
     cloneInstDecorationsAndChildren(
-        env, builder->getSharedBuilder(), oldInst, newInst);
+        env, builder->getModule(), oldInst, newInst);
 
     return newInst;
 }
@@ -284,8 +283,7 @@ void cloneDecoration(
     IRInst*         newParent,
     IRModule*       module)
 {
-    SharedIRBuilder sharedBuilder(module);
-    IRBuilder builder(sharedBuilder);
+    IRBuilder builder(module);
 
     if(auto first = newParent->getFirstDecorationOrChild())
         builder.setInsertBefore(first);

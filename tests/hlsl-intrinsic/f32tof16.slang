@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features half 
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features half 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

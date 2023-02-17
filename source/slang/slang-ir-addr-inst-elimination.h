@@ -5,7 +5,6 @@
 
 namespace Slang
 {
-struct SharedIRBuilder;
 class DiagnosticSink;
 
 struct AddressConversionPolicy
@@ -13,7 +12,6 @@ struct AddressConversionPolicy
     virtual bool shouldConvertAddrInst(IRInst* addrInst) = 0;
 };
 SlangResult eliminateAddressInsts(
-    SharedIRBuilder* sharedBuilder,
     AddressConversionPolicy* policy,
     IRFunc* func,
     DiagnosticSink* sink);

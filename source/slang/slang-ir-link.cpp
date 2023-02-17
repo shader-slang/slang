@@ -54,7 +54,6 @@ struct IRSharedSpecContext
     typedef Dictionary<String, RefPtr<IRSpecSymbol>> SymbolDictionary;
     SymbolDictionary symbols;
 
-    SharedIRBuilder sharedBuilderStorage;
     IRBuilder builderStorage;
 
     // The "global" specialization environment.
@@ -229,11 +228,14 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     switch (originalValue->getOp())
     {
     case kIROp_StructType:
+    case kIROp_ClassType:
     case kIROp_Func:
     case kIROp_Generic:
     case kIROp_GlobalVar:
     case kIROp_GlobalParam:
+    case kIROp_GlobalConstant:
     case kIROp_StructKey:
+    case kIROp_InterfaceRequirementEntry:
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
     case kIROp_InterfaceType:
@@ -277,26 +279,34 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
         }
         break;
 
+    case kIROp_VoidLit:
+        {
+            return builder->getVoidValue();
+        }
+        break;
+
     default:
         {
             // In the default case, assume that we have some sort of "hoistable"
             // instruction that requires us to create a clone of it.
 
             UInt argCount = originalValue->getOperandCount();
-            IRInst* clonedValue = builder->createIntrinsicInst(
-                cloneType(this, originalValue->getFullType()),
-                originalValue->getOp(),
-                argCount, nullptr);
-            registerClonedValue(this, clonedValue, originalValue);
+            ShortList<IRInst*> newArgs;
+            newArgs.setCount(argCount);
             for (UInt aa = 0; aa < argCount; ++aa)
             {
                 IRInst* originalArg = originalValue->getOperand(aa);
                 IRInst* clonedArg = cloneValue(this, originalArg);
-                clonedValue->getOperands()[aa].init(clonedValue, clonedArg);
+                newArgs[aa] = clonedArg;
             }
+            IRInst* clonedValue = builder->createIntrinsicInst(
+                cloneType(this, originalValue->getFullType()),
+                originalValue->getOp(),
+                argCount, newArgs.getArrayView().getBuffer());
+            registerClonedValue(this, clonedValue, originalValue);
+            
             cloneDecorationsAndChildren(this, clonedValue, originalValue);
-
-            addHoistableInst(builder, clonedValue);
+            builder->addInst(clonedValue);
 
             return clonedValue;
         }
@@ -524,6 +534,8 @@ IRGlobalConstant* cloneGlobalConstantImpl(
     IRGlobalConstant*               originalVal,
     IROriginalValuesForClone const& originalValues)
 {
+    auto oldBuilder = context->builder;
+    context->builder = builder;
     auto clonedType = cloneType(context, originalVal->getFullType());
     IRGlobalConstant* clonedVal = nullptr;
     if(auto originalInitVal = originalVal->getValue())
@@ -537,7 +549,7 @@ IRGlobalConstant* cloneGlobalConstantImpl(
     }
 
     cloneSimpleGlobalValueImpl(context, originalVal, originalValues, clonedVal);
-
+    context->builder = oldBuilder;
     return clonedVal;
 }
 
@@ -1174,21 +1186,24 @@ IRInst* cloneInst(
     // instruction with the right number of operands, intialize
     // it, and then add it to the sequence.
     UInt argCount = originalInst->getOperandCount();
-    IRInst* clonedInst = builder->createIntrinsicInst(
-        cloneType(context, originalInst->getFullType()),
-        originalInst->getOp(),
-        argCount, nullptr);
-    registerClonedValue(context, clonedInst, originalValues);
+    ShortList<IRInst*> newArgs;
+    newArgs.setCount(argCount);
     auto oldBuilder = context->builder;
     context->builder = builder;
     for (UInt aa = 0; aa < argCount; ++aa)
     {
         IRInst* originalArg = originalInst->getOperand(aa);
         IRInst* clonedArg = cloneValue(context, originalArg);
-        clonedInst->getOperands()[aa].init(clonedInst, clonedArg);
+        newArgs[aa] = clonedArg;
     }
-    builder->addInst(clonedInst);
     context->builder = oldBuilder;
+
+    IRInst* clonedInst = builder->createIntrinsicInst(
+        cloneType(context, originalInst->getFullType()),
+        originalInst->getOp(),
+        argCount, newArgs.getArrayView().getBuffer());
+    builder->addInst(clonedInst);
+    registerClonedValue(context, clonedInst, originalValues);
     cloneDecorationsAndChildren(context, clonedInst, originalInst);
     cloneExtraDecorations(context, clonedInst, originalValues);
     return clonedInst;
@@ -1353,19 +1368,13 @@ void initializeSharedSpecContext(
     CodeGenTarget           target,
     TargetRequest*          targetReq)
 {
-
-    SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-
-    IRBuilder* builder = &sharedContext->builderStorage;
-
     RefPtr<IRModule> module = inModule;
     if( !module )
     {
         module = IRModule::create(session);
     }
 
-    sharedBuilder->init(module);
-    builder->init(sharedBuilder);
+    sharedContext->builderStorage = IRBuilder(module);
 
     sharedContext->module = module;
     sharedContext->target = target;
@@ -1490,12 +1499,11 @@ LinkedIR linkIR(
     // Combine all of the contents of IRGlobalHashedStringLiterals
     {
         StringSlicePool pool(StringSlicePool::Style::Empty);
-        IRBuilder& builder = sharedContext->builderStorage;
         for (IRModule* irModule : irModules)
         {
             findGlobalHashedStringLiterals(irModule, pool);
         }
-        addGlobalHashedStringLiterals(pool, *builder.getSharedBuilder());
+        addGlobalHashedStringLiterals(pool, state->irModule);
     }
 
     // Set up shared and builder insert point

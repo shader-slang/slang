@@ -872,36 +872,31 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
 
 // Test if all components are non-zero (HLSL SM 1.0)
 __generic<T : __BuiltinType>
+__target_intrinsic(cpp, "bool($0)")
+__target_intrinsic(cuda, "bool($0)")
 __target_intrinsic(glsl, "bool($0)")
 bool all(T x);
 
 __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "all(bvec$N0($0))")
-bool all(vector<T,N> x);
-// TODO: implementation of `all()` in the stdlib is
-// blocked on fixing implementation of `bool` vector
-// `getAt` on the CUDA codegen path.
-/*
+bool all(vector<T,N> x)
 {
     bool result = true;
     for(int i = 0; i < N; ++i)
         result = result && all(x[i]);
     return result;
 }
-*/
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl)
-bool all(matrix<T,N,M> x);
-/*
+bool all(matrix<T,N,M> x)
 {
     bool result = true;
     for(int i = 0; i < N; ++i)
         result = result && all(x[i]);
     return result;
 }
-*/
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 __target_intrinsic(glsl, "memoryBarrier(), groupMemoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
@@ -916,42 +911,39 @@ void AllMemoryBarrierWithGroupSync();
 // Test if any components is non-zero (HLSL SM 1.0)
 
 __generic<T : __BuiltinType>
+__target_intrinsic(cpp, "bool($0)")
+__target_intrinsic(cuda, "bool($0)")
 __target_intrinsic(glsl, "bool($0)")
 bool any(T x);
 
 __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "any(bvec$N0($0))")
-bool any(vector<T, N> x);
-// TODO: implementation of `any()` in the stdlib is
-// blocked on fixing implementation of `bool` vector
-// `getAt` on the CUDA codegen path.
-/*
+bool any(vector<T, N> x)
 {
     bool result = false;
     for(int i = 0; i < N; ++i)
         result = result || any(x[i]);
     return result;
 }
-*/
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl)
-bool any(matrix<T, N, M> x);
-/*
+bool any(matrix<T, N, M> x)
 {
     bool result = false;
     for(int i = 0; i < N; ++i)
         result = result || any(x[i]);
     return result;
 }
-*/
 
 
 // Reinterpret bits as a double (HLSL SM 5.0)
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "packDouble2x32(uvec2($0, $1))")
+__target_intrinsic(cpp, "$P_asdouble($0, $1)")
+__target_intrinsic(cuda, "$P_asdouble($0, $1)")
 __target_intrinsic(spirv_direct, "%v = OpCompositeConstruct _type(uint2) resultId _0 _1; OpExtInst resultType resultId glsl450 59 %v")
 __glsl_extension(GL_ARB_gpu_shader5)
 double asdouble(uint lowbits, uint highbits);
@@ -960,11 +952,15 @@ double asdouble(uint lowbits, uint highbits);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "intBitsToFloat")
+__target_intrinsic(cpp, "$P_asfloat($0)")
+__target_intrinsic(cuda, "$P_asfloat($0)")
 __target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
 float asfloat(int x);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uintBitsToFloat")
+__target_intrinsic(cpp, "$P_asfloat($0)")
+__target_intrinsic(cuda, "$P_asfloat($0)")
 __target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
 float asfloat(uint x);
 
@@ -1044,11 +1040,15 @@ matrix<T, N, M> asin(matrix<T, N, M> x)
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToInt")
+__target_intrinsic(cpp, "$P_asint($0)")
+__target_intrinsic(cuda, "$P_asint($0)")
 __target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
 int asint(float x);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "int($0)")
+__target_intrinsic(cpp, "$P_asint($0)")
+__target_intrinsic(cuda, "$P_asint($0)")
 __target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
 int asint(uint x);
 
@@ -1104,6 +1104,8 @@ matrix<int,N,M> asint(matrix<int,N,M> x)
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "{ uvec2 v = unpackDouble2x32($0); $1 = v.x; $2 = v.y; }")
 __glsl_extension(GL_ARB_gpu_shader5)
+__target_intrinsic(cpp, "$P_asuint($0, $1, $2)")
+__target_intrinsic(cuda, "$P_asuint($0, $1, $2)")
 void asuint(double value, out uint lowbits, out uint highbits);
 
 // Reinterpret bits as a uint (HLSL SM 4.0)
@@ -1111,11 +1113,15 @@ void asuint(double value, out uint lowbits, out uint highbits);
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToUint")
 __target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(cpp, "$P_asuint($0)")
+__target_intrinsic(cuda, "$P_asuint($0)")
 uint asuint(float x);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uint($0)")
 __target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(cpp, "$P_asuint($0)")
+__target_intrinsic(cuda, "$P_asuint($0)")
 uint asuint(int x);
 
 __generic<let N : int>
@@ -1812,7 +1818,7 @@ __target_intrinsic(glsl, "unpackHalf2x16($0).x")
 __glsl_version(420)
 __target_intrinsic(hlsl)
 __cuda_sm_version(6.0)
-__target_intrinsic(cuda, "__half2float(__short_as_half($0))")
+__target_intrinsic(cuda, "__half2float(__ushort_as_half($0))")
 float f16tof32(uint value);
 
 __generic<let N : int>
@@ -5688,10 +5694,10 @@ Ref<T> __hitObjectAttributes<T>()
 // Next is the custom intrinsic that will compute the hitObjectAttributes location
 // for GLSL-based targets.
 //
-__generic<Payload>
+__generic<Attributes>
 __target_intrinsic(__glslRayTracing, "$XH")
 [__readNone]
-int __hitObjectAttributesLocation(__ref Payload payload);
+int __hitObjectAttributesLocation(__ref Attributes attributes);
 
     /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,
     /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
@@ -6471,3 +6477,18 @@ __target_intrinsic(hlsl, "NvReorderThread")
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __target_intrinsic(glsl, "reorderThreadNV")
 void ReorderThread( HitObject HitOrMiss );
+
+
+///
+/// DebugBreak support 
+///
+/// There doesn't appear to be an equivalent for debugBreak for HLSL
+
+__target_intrinsic(hlsl, "/* debugBreak() not currently supported for HLSL */")
+__target_intrinsic(cuda,"__brkpt()")
+__target_intrinsic(cpp, "SLANG_BREAKPOINT(0)")
+void debugBreak();
+
+__specialized_for_target(glsl)
+[[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
+void debugBreak();

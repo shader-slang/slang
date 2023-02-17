@@ -17,9 +17,7 @@ struct SingleReturnContext : public InstPassBase
     {}
     void processFunc(IRGlobalValueWithCode* func)
     {
-        SharedIRBuilder sharedBuilder;
-        sharedBuilder.init(module);
-        IRBuilder builder(&sharedBuilder);
+        IRBuilder builder(module);
         simplifyCFG(func);
 
         // We make use of the `eliminate-multi-level-break` pass to implement the transformation.

@@ -10,8 +10,6 @@ namespace Slang
     {
         IRModule* module;
 
-        SharedIRBuilder sharedBuilderStorage;
-
         List<IRInst*> workList;
         HashSet<IRInst*> workListSet;
 
@@ -51,7 +49,7 @@ namespace Slang
                     }
                     if (newArgs.getCount() != (Index)inst->getOperandCount())
                     {
-                        IRBuilder builder(&sharedBuilderStorage);
+                        IRBuilder builder(module);
                         builder.setInsertBefore(inst);
                         auto newCall = builder.emitIntrinsicInst(inst->getFullType(), inst->getOp(), newArgs.getCount(), newArgs.getBuffer());
                         inst->replaceUsesWith(newCall);
@@ -72,7 +70,7 @@ namespace Slang
                             paramsToRemove.add(param);
                         }
                     }
-                    IRBuilder builder(&sharedBuilderStorage);
+                    IRBuilder builder(module);
                     builder.setInsertBefore(func);
                     for (auto param : paramsToRemove)
                     {
@@ -97,7 +95,7 @@ namespace Slang
                     }
                     if (newOperands.getCount() != (Index)funcType->getParamCount())
                     {
-                        IRBuilder builder(&sharedBuilderStorage);
+                        IRBuilder builder(module);
                         builder.setInsertBefore(funcType);
                         auto newFuncType = builder.getFuncType(newOperands.getCount(), (IRType**)newOperands.getBuffer(), funcType->getResultType());
                         if (newFuncType != funcType)
@@ -143,7 +141,7 @@ namespace Slang
             case kIROp_GetResultValue:
                 if (inst->getDataType()->getOp() == kIROp_VoidType)
                 {
-                    IRBuilder builder(&sharedBuilderStorage);
+                    IRBuilder builder(module);
                     builder.setInsertBefore(inst);
                     inst->replaceUsesWith(builder.getVoidValue());
                 }
@@ -152,12 +150,6 @@ namespace Slang
 
         void processModule()
         {
-            SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-            sharedBuilder->init(module);
-
-            // Deduplicate equivalent types.
-            sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
             addToWorkList(module->getModuleInst());
 
             while (workList.getCount() != 0)

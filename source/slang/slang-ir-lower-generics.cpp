@@ -27,7 +27,7 @@ namespace Slang
         uint32_t id = 0;
         for (auto rtti : sharedContext->mapTypeToRTTIObject)
         {
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
+            IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(rtti.Value);
             IRUse* nextUse = nullptr;
             auto uint2Type = builder.getVectorType(
@@ -61,7 +61,7 @@ namespace Slang
                 // fall through
             case kIROp_RTTIHandleType:
                 {
-                    IRBuilder builder(sharedContext->sharedBuilderStorage);
+                    IRBuilder builder(sharedContext->module);
                     builder.setInsertBefore(inst);
                     auto uint2Type = builder.getVectorType(
                         builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
@@ -78,7 +78,7 @@ namespace Slang
     // Remove all interface types from module.
     void cleanUpInterfaceTypes(SharedGenericsLoweringContext* sharedContext)
     {
-        IRBuilder builder(sharedContext->sharedBuilderStorage);
+        IRBuilder builder(sharedContext->module);
         builder.setInsertInto(sharedContext->module->getModuleInst());
         auto dummyInterfaceObj = builder.getIntValue(builder.getIntType(), 0);
         List<IRInst*> interfaceInsts;
@@ -107,7 +107,7 @@ namespace Slang
                 auto witnessTableType = as<IRWitnessTableTypeBase>(inst->getValueWitness()->getDataType());
                 if (witnessTableType && isComInterfaceType((IRType*)witnessTableType->getConformanceType()))
                     return;
-                IRBuilder builder(sharedContext->sharedBuilderStorage);
+                IRBuilder builder(sharedContext->module);
                 builder.setInsertBefore(inst);
                 auto eqlInst = builder.emitEql(builder.emitGetSequentialIDInst(inst->getValueWitness()),
                     builder.emitGetSequentialIDInst(inst->getTargetWitness()));
@@ -133,9 +133,7 @@ namespace Slang
         if (sink->getErrorCount() != 0)
             return;
 
-        sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
         sharedContext->mapInterfaceRequirementKeyValue.Clear();
-
 
         specializeRTTIObjectReferences(sharedContext);
 

@@ -12,7 +12,7 @@ namespace Slang
 
 struct AddressInstEliminationContext
 {
-    SharedIRBuilder* sharedBuilder;
+    IRModule* module;
     DiagnosticSink* sink;
 
     IRInst* getValue(IRBuilder& builder, IRInst* addr)
@@ -73,7 +73,7 @@ struct AddressInstEliminationContext
         auto addr = use->get();
         auto load = as<IRLoad>(use->getUser());
 
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(use->getUser());
         auto value = getValue(builder, addr);
         load->replaceUsesWith(value);
@@ -85,7 +85,7 @@ struct AddressInstEliminationContext
         auto addr = use->get();
         auto store = as<IRStore>(use->getUser());
 
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(use->getUser());
         storeValue(builder, addr, store->getVal());
         store->removeAndDeallocate();
@@ -96,7 +96,7 @@ struct AddressInstEliminationContext
         auto addr = use->get();
         auto call = as<IRCall>(use->getUser());
 
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
         auto callee = getResolvedInstForDecorations(call->getCallee());
@@ -121,15 +121,13 @@ struct AddressInstEliminationContext
     }
 
     SlangResult eliminateAddressInstsImpl(
-        SharedIRBuilder* inSharedBuilder,
         AddressConversionPolicy* policy,
         IRFunc* func,
         DiagnosticSink* inSink)
     {
-        sharedBuilder = inSharedBuilder;
         sink = inSink;
 
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(func->getModule());
 
         List<IRInst*> workList;
         for (auto block : func->getBlocks())
@@ -184,13 +182,14 @@ struct AddressInstEliminationContext
 };
 
 SlangResult eliminateAddressInsts(
-    SharedIRBuilder* sharedBuilder,
     AddressConversionPolicy* policy,
     IRFunc* func,
     DiagnosticSink* sink)
 {
     AddressInstEliminationContext ctx;
-    return ctx.eliminateAddressInstsImpl(sharedBuilder, policy, func, sink);
+    ctx.module = func->getModule();
+    ctx.sink = sink;
+    return ctx.eliminateAddressInstsImpl(policy, func, sink);
 }
 
 } // namespace Slang

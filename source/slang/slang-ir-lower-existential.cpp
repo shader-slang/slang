@@ -17,7 +17,7 @@ namespace Slang
 
         void processMakeExistential(IRMakeExistentialWithRTTI* inst)
         {
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
             auto value = inst->getWrappedValue();
@@ -55,7 +55,7 @@ namespace Slang
         // existential value.
         void processCreateExistentialObject(IRCreateExistentialObject* inst)
         {
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -105,7 +105,7 @@ namespace Slang
 
         void processExtractExistentialElement(IRInst* extractInst, UInt elementId)
         {
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(extractInst);
 
@@ -140,7 +140,7 @@ namespace Slang
 
         void processGetValueFromBoundInterface(IRGetValueFromBoundInterface* inst)
         {
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
             if (inst->getDataType()->getOp() == kIROp_ClassType)
@@ -219,13 +219,6 @@ namespace Slang
 
         void processModule()
         {
-            // We start by initializing our shared IR building state,
-            // since we will re-use that state for any code we
-            // generate along the way.
-            //
-            SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->init(sharedContext->module);
-
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
             while (sharedContext->workList.getCount() != 0)

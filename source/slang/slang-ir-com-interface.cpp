@@ -56,10 +56,7 @@ void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, Diagnosti
 
     // For all interfaces found replace uses
     {
-        SharedIRBuilder sharedBuilder;
-        sharedBuilder.init(module);
-
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertInto(module->getModuleInst());
 
         List<IRUse*> uses;
@@ -105,7 +102,7 @@ void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, Diagnosti
             for (auto use : uses)
             {
                 // Do the replacement
-                use->set(result);
+                builder.replaceOperand(use, result);
             }
         }
     }
