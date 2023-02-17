@@ -503,7 +503,8 @@ struct DiffUnzipPass
         if (as<IRParam>(inst))
         {
             SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
-            builder->setInsertBefore(as<IRBlock>(inst->getParent())->getFirstOrdinaryInst());
+            auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
+            builder->setInsertAfter(lastParam);
         }
         else
         {
@@ -516,7 +517,8 @@ struct DiffUnzipPass
         if (as<IRParam>(inst))
         {
             SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
-            builder->setInsertBefore(as<IRBlock>(inst->getParent())->getFirstOrdinaryInst());
+            auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
+            builder->setInsertAfter(lastParam);
         }
         else
         {
