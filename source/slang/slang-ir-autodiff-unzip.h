@@ -10,6 +10,7 @@
 #include "slang-ir-autodiff-propagate.h"
 #include "slang-ir-autodiff-transcriber-base.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-ssa.h"
 
 namespace Slang
 {
@@ -255,20 +256,45 @@ struct DiffUnzipPass
         // 
         for (auto block : mixedBlocks)
         {
-            auto primalBlock = primalMap[block];
-            
             if (isBlockIndexed(block))
-            {
                 processIndexedFwdBlock(block);
-            }
         }
+
+        // We're going to do something weird here, mixed blocks have been split
+        // at this point so we don't need them, but deallocating them will cause problems
+        // since we're still using them as dictionary keys, so we remove them from
+        // the function here, and then deallocate them all later.
+        // 
+        for (auto block : mixedBlocks)
+            block->removeFromParent();
+
+        // Reduce counter variables to SSA temporaries
+        List<IRVar*> varsToReduce;
+        for (auto indexRegion : indexRegions)
+        {
+            varsToReduce.add(indexRegion->primalCountVar);
+            varsToReduce.add(indexRegion->diffCountVar);
+        }
+        
+        constructSSA(autodiffContext->sharedBuilder, func, varsToReduce);
 
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
 
+        // Tag the new phi temporaries as primal values.
+        tagNewParams(builder, func);
+
+        // Process blocks _again_ because the primal counters may now be used
+        // in indexed differential blocks, and need to be hoisted.
+        // 
+        for (auto block : mixedBlocks)
+        {   
+            if (isBlockIndexed(block))
+                processIndexedFwdBlock(block);
+        }
+
         cleanupIndexRegionInfo();
 
-        // Remove old blocks.
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
     }
@@ -320,18 +346,6 @@ struct DiffUnzipPass
         }
     }
 
-    // Make a primal value *available* to the differential block.
-    // This can get quite involved, and we're going to rely on
-    // constructSSA to do most of the heavy-lifting & optimization
-    // For now, we'll simply create a variable in the top-most
-    // primal block, then load it in the last primal block
-    // 
-    //void hoistValue(IRInst* primalInst)
-    //{
-    //    IRBlock* terminalPrimalBlock = getTerminalPrimalBlock();
-    //    IRBlock* firstPrimalBlock = getFirstPrimalBlock();
-    //}
-
     void lowerIndexedRegions()
     {
         IRBuilder builder(autodiffContext->sharedBuilder);
@@ -368,7 +382,8 @@ struct DiffUnzipPass
             // which we're praying turns into the reverse initializer block)
             // initialized to the final value of the primal counter.
             // 
-            builder.setInsertBefore(as<IRBlock>(diffMap[breakBlock])->getTerminator());
+            
+            /*builder.setInsertBefore(as<IRBlock>(diffMap[breakBlock])->getTerminator());
             //auto primalCounterValue = builder.emitLoad(region->primalCountVar);
             auto primalCounterCurrValue = builder.emitLoad(region->primalCountVar);
             auto primalCounterLastValue = builder.emitSub(
@@ -382,7 +397,7 @@ struct DiffUnzipPass
             builder.addLoopCounterDecoration(diffCountInit);
             builder.addLoopCounterDecoration(region->diffCountVar);
             builder.addLoopCounterDecoration(primalCounterCurrValue);
-            builder.addLoopCounterDecoration(primalCounterLastValue);
+            builder.addLoopCounterDecoration(primalCounterLastValue);*/
             
             IRBlock* updateBlock = getUpdateBlock(region);
             
@@ -405,7 +420,7 @@ struct DiffUnzipPass
                 builder.addLoopCounterDecoration(incStore);
             }
 
-            {
+            /*{
                 IRBlock* firstLoopBlock = getFirstLoopBodyBlock(region);
                 auto diffFirstLoopBlock = as<IRBlock>(diffMap[firstLoopBlock]);
 
@@ -445,8 +460,46 @@ struct DiffUnzipPass
 
                 builder.addLoopCounterDecoration(diffCounterVal);
                 builder.addLoopCounterDecoration(diffCounterCmp);
+            }*/
+
+            {
+                builder.setInsertBefore(as<IRBlock>(diffMap[region->initBlock])->getTerminator());
+
+                auto primalCounterValue = builder.emitLoad(region->primalCountVar);
+                auto primalCounterCurrValue = builder.emitLoad(region->primalCountVar);
+                auto primalCounterLastValue = builder.emitSub(
+                    primalCounterCurrValue->getDataType(),
+                    primalCounterCurrValue,
+                    builder.getIntValue(builder.getIntType(), 1));
+
+                region->diffCountVar = builder.emitVar(builder.getIntType());
+                auto diffCountInit = builder.emitStore(region->diffCountVar, primalCounterLastValue);
+
+                auto diffLoopInst = as<IRLoop>(region->initBlock->getTerminator());
+                builder.addLoopCounterLastIndexDecoration(diffLoopInst, primalCounterLastValue);
+
+
+                builder.setInsertBefore(as<IRBlock>(diffMap[updateBlock])->getTerminator());
+
+                auto counterVal = builder.emitLoad(region->diffCountVar);
+                auto incCounterVal = builder.emitAdd(
+                    builder.getIntType(), 
+                    counterVal,
+                    builder.getIntValue(builder.getIntType(), 1));
+
+                auto incStore = builder.emitStore(region->diffCountVar, incCounterVal);
             }
 
+        }
+    }
+
+    void tagNewParams(IRBuilder* builder, IRFunc* func)
+    {
+        for (auto block : func->getBlocks())
+        {
+            for (auto param = block->getFirstParam(); param; param = param->getNextParam())
+                if (!param->findDecoration<IRAutodiffInstDecoration>())
+                    builder->markInstAsPrimal(param);
         }
     }
 
@@ -1317,11 +1370,6 @@ struct DiffUnzipPass
 
         // Nothing should be left in the original block.
         SLANG_ASSERT(block->getFirstChild() == block->getTerminator());
-
-        // Branch from primal to differential block.
-        // Functionally, the new blocks should produce the same output as the
-        // old block.
-        // primalBuilder.emitBranch(diffBlock);
     }
 };
 

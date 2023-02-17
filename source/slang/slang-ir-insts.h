@@ -712,7 +712,6 @@ struct IRPrimalInstDecoration : IRAutodiffInstDecoration
     IR_LEAF_ISA(PrimalInstDecoration)
 };
 
-
 struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
 {
     enum
@@ -724,6 +723,16 @@ struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
     IR_LEAF_ISA(MixedDifferentialInstDecoration)
 
     IRType* getPairType() { return as<IRType>(getOperand(0)); }
+};
+
+struct IRPrimalValueAccessDecoration : IRAutodiffInstDecoration
+{
+    enum
+    {
+        kOp = kIROp_PrimalValueAccessDecoration
+    };
+
+    IR_LEAF_ISA(PrimalValueAccessDecoration)
 };
 
 struct IRPrimalValueStructKeyDecoration : IRDecoration
@@ -3549,6 +3558,11 @@ public:
     void addLoopMaxItersDecoration(IRInst* value, IntegerLiteralValue iters)
     {
         addDecoration(value, kIROp_LoopMaxItersDecoration, getIntValue(getIntType(), iters));
+    }
+
+    void addLoopCounterLastIndexDecoration(IRInst* value, IRInst* lastIndex)
+    {
+        addDecoration(value, kIROp_LoopCounterLastIndexDecoration, lastIndex);
     }
 
     void addLoopForceUnrollDecoration(IRInst* value, IntegerLiteralValue iters)

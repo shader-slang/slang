@@ -709,7 +709,7 @@ struct DiffTransposePass
         builder.setInsertInto(revBlock);
 
         // Check if this block has any 'outputs' (in the form of phi args
-        // sent to the successor bvock)
+        // sent to the successor block)
         // 
         if (auto branchInst = as<IRUnconditionalBranch>(fwdBlock->getTerminator()))
         {
@@ -718,16 +718,30 @@ struct DiffTransposePass
                 auto arg = branchInst->getArg(ii);
                 if (isDifferentialInst(arg))
                 {
+                    // If the arg is a differential, emit a parameter
+                    // to accept it's reverse-mode differential as an input
+                    // 
+
                     auto diffType = arg->getDataType();
                     auto revParam = builder.emitParam(diffType);
 
                     addRevGradientForFwdInst(
-                        arg, 
+                        arg,
                         RevGradient(
                             RevGradient::Flavor::Simple,
                             arg,
                             revParam,
                             nullptr));
+                }
+                else
+                {
+                    // If the output arg is a primal, emit a parameter
+                    // to accept it as an _input_ for the reverse-mode
+                    // 
+                    auto primalType = arg->getDataType();
+                    auto primalInvParam = builder.emitParam(primalType);
+
+                    setInverseForPrimalInst(arg, primalInvParam);
                 }
             }
         }
@@ -746,9 +760,9 @@ struct DiffTransposePass
         {  
             auto nextChild = child->getNextInst();
 
-            if (child->findDecoration<IRLoopCounterDecoration>())
+            if (child->findDecoration<IRPrimalValueAccessDecoration>())
             {
-                // Loop counter insts should not have any gradients.
+                // Primal value accesses should not have any gradients.
                 SLANG_ASSERT(!hasRevGradients(child));
                 child->insertAtEnd(revBlock);
             }
@@ -787,8 +801,11 @@ struct DiffTransposePass
             if (as<IRDecoration>(child) || as<IRParam>(child))
                 continue;
 
-            
-            transposeInst(&builder, child);
+            if (isDifferentialInst(child))
+                transposeInst(&builder, child);
+            else if (isPrimalInst(child))
+                invertInst(&builder, child);
+
         }
 
         // After processing the block's instructions, we 'flush' any remaining gradients 
@@ -896,6 +913,34 @@ struct DiffTransposePass
         // Record any phi gradients for the CFG reversal pass.
         phiGradsMap[fwdBlock] = phiParamRevGradInsts;
 
+    }
+
+    List<IRInst*> invertInst(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
+    {
+        switch (primalInst->getOp())
+        {
+            case kIROp_Add:
+            case kIROp_Sub:
+                invertOffsetArithmetic(builder, primalInst, invOutput);
+            
+            default:
+                SLANG_UNIMPLEMENTED_X("Unhandled inst type for inversion");
+        }
+    }
+
+    void invertInst(IRBuilder* builder, IRInst* primalInst)
+    {
+        // Look for an available inverse entry for this primalInst's *output*
+        if (hasInverse(primalInst))
+        {
+            auto invOutput = popInverse(primalInst);
+
+            invertInst(builder, primalInst, invOutput);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Could not find value for the output of inst. Unable to invert");
+        }
     }
 
     void transposeInst(IRBuilder* builder, IRInst* inst)

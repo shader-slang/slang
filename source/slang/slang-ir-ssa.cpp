@@ -1056,7 +1056,10 @@ bool constructSSA(ConstructSSAContext* context)
 
     // Figure out what variables we can promote to
     // SSA temporaries.
-    identifyPromotableVars(context);
+    if (!context->promotableVars.getCount() > 0)
+    {
+        identifyPromotableVars(context);
+    }
 
     // If none of the variables are promote-able,
     // then we can exit without making any changes
@@ -1226,6 +1229,27 @@ bool constructSSA(SharedIRBuilder* sharedBuilder, IRGlobalValueWithCode* globalV
 
     context.builder.init(sharedBuilder);
     context.builder.setInsertInto(sharedBuilder->getModule());
+
+    return constructSSA(&context);
+}
+
+// Construct SSA form for a global value with code and reuse 
+// an existing sharedBuilder
+//
+bool constructSSA(
+    SharedIRBuilder* sharedBuilder,
+    IRGlobalValueWithCode* globalVal,
+    List<IRVar*> promotableVars)
+{
+    ConstructSSAContext context;
+    context.globalVal = globalVal;
+    
+    context.sharedBuilder = sharedBuilder;
+
+    context.builder.init(sharedBuilder);
+    context.builder.setInsertInto(sharedBuilder->getModule());
+
+    context.promotableVars = promotableVars;
 
     return constructSSA(&context);
 }

@@ -9,6 +9,10 @@ namespace Slang
     struct SharedIRBuilder;
     bool constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal);
     bool constructSSA(SharedIRBuilder* sharedBuilder, IRGlobalValueWithCode* globalVal);
+    bool constructSSA(
+        SharedIRBuilder* sharedBuilder,
+        IRGlobalValueWithCode* globalVal,
+        List<IRVar*> promotableVars);
     bool constructSSA(IRModule* module);
     bool constructSSA(IRInst* globalVal);
 }

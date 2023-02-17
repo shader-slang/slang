@@ -463,6 +463,7 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_PrimalInstDecoration:
             case kIROp_DifferentialInstDecoration:
             case kIROp_MixedDifferentialInstDecoration:
+            case kIROp_PrimalValueAccessDecoration:
             case kIROp_BackwardDerivativeDecoration:
             case kIROp_BackwardDerivativeIntermediateTypeDecoration:
             case kIROp_BackwardDerivativePropagateDecoration:
