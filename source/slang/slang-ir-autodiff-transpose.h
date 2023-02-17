@@ -1050,8 +1050,6 @@ struct DiffTransposePass
 
         IRBlock* revLoopCondBlock = revBlockMap[firstLoopBlock];
         builder->setInsertBefore(revLoopCondBlock->getTerminator());
-
-        auto loopBaseCondition = as<IRIfElse>(revLoopCondBlock->getTerminator())->getCondition();
         
         // Convert the loop from a 'for' into a 'do-while' by skipping the first check
 
@@ -1066,11 +1064,7 @@ struct DiffTransposePass
 
         builder->emitStore(firstLoopCheckSkipVar, builder->getBoolValue(false));
 
-        loopBaseCondition = builder->emitIntrinsicInst(
-                builder->getBoolType(),
-                kIROp_Or,
-                2,
-                List<IRInst*>(firstLoopCheckSkipVal, loopBaseCondition).getBuffer());
+        auto loopBaseCondition = firstLoopCheckSkipVal;
 
         // Add a terminating condition based on the loop counter's initial primal value
 
@@ -1108,7 +1102,6 @@ struct DiffTransposePass
             kIROp_And,
             2,
             List<IRInst*>(paramBoundsCheck, loopBaseCondition).getBuffer());
-
 
         as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(loopBaseCondition);
     }
