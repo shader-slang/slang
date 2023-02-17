@@ -1363,8 +1363,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_Neq:
         return transcribeBinaryLogic(builder, origInst);
 
-    case kIROp_CastIntToFloat:
-    case kIROp_CastFloatToInt:
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
@@ -1470,6 +1468,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_PackAnyValue:
     case kIROp_UnpackAnyValue:
     case kIROp_GetNativePtr:
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,
         // so we treat this inst as non differentiable.
         // We can extend the frontend and IR with a separate op-code that can provide an explicit diff value.

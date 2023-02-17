@@ -173,8 +173,8 @@ struct DifferentiableTypeConformanceContext
         case kIROp_FloatType:
         case kIROp_HalfType:
         case kIROp_DoubleType:
-        case kIROp_VectorType:
             return origType;
+            
         case kIROp_ArrayType:
         {
             auto diffElementType = (IRType*)getDifferentialForType(
