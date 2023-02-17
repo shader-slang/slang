@@ -1064,8 +1064,6 @@ struct DiffTransposePass
 
         builder->emitStore(firstLoopCheckSkipVar, builder->getBoolValue(false));
 
-        auto loopBaseCondition = firstLoopCheckSkipVal;
-
         // Add a terminating condition based on the loop counter's initial primal value
 
         IRParam* loopCounterParam = nullptr;
@@ -1096,14 +1094,8 @@ struct DiffTransposePass
                 List<IRInst*>(
                     hoistPrimalInst(builder, loopCounterParam),
                     hoistPrimalInst(builder, loopCounterInitVal)).getBuffer());
-            
-        loopBaseCondition = builder->emitIntrinsicInst(
-            builder->getBoolType(),
-            kIROp_And,
-            2,
-            List<IRInst*>(paramBoundsCheck, loopBaseCondition).getBuffer());
 
-        as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(loopBaseCondition);
+        as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(paramBoundsCheck);
     }
 
     List<InvInstPair> invertInst(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
