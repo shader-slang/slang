@@ -879,7 +879,7 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
 
 IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst)
 {
-    // If a differential intstruction is already mapped for 
+    // If a differential instruction is already mapped for 
     // this original inst, return that.
     //
     if (auto diffInst = lookupDiffInst(origInst, nullptr))

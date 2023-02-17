@@ -170,11 +170,6 @@ struct DifferentiableTypeConformanceContext
     {
         switch (origType->getOp())
         {
-        case kIROp_FloatType:
-        case kIROp_HalfType:
-        case kIROp_DoubleType:
-            return origType;
-            
         case kIROp_ArrayType:
         {
             auto diffElementType = (IRType*)getDifferentialForType(
