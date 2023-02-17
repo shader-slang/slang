@@ -4856,15 +4856,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Loop);
         }
+
+        if( auto maxItersAttr = stmt->findModifier<MaxItersAttribute>() )
+        {
+            getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
+        }
         else if (auto inferredMaxItersAttr = stmt->findModifier<InferredMaxItersAttribute>())
         {
             getBuilder()->addLoopMaxItersDecoration(inst, inferredMaxItersAttr->value);
         }
-        else if( auto maxItersAttr = stmt->findModifier<MaxItersAttribute>() )
-        {
-            getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
-        }
-        else if (auto forceUnrollAttr = stmt->findModifier<ForceUnrollAttribute>())
+
+        if (auto forceUnrollAttr = stmt->findModifier<ForceUnrollAttribute>())
         {
             getBuilder()->addLoopForceUnrollDecoration(inst, forceUnrollAttr->maxIterations);
         }
