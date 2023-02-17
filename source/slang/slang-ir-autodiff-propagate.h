@@ -15,6 +15,11 @@ inline bool isDifferentialInst(IRInst* inst)
     return inst->findDecoration<IRDifferentialInstDecoration>();
 }
 
+inline bool isPrimalInst(IRInst* inst)
+{
+    return inst->findDecoration<IRPrimalInstDecoration>() || (as<IRConstant>(inst) != nullptr);
+}
+
 inline bool isMixedDifferentialInst(IRInst* inst)
 {
     return inst->findDecoration<IRMixedDifferentialInstDecoration>();

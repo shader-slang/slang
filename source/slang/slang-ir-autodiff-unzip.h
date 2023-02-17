@@ -10,6 +10,7 @@
 #include "slang-ir-autodiff-propagate.h"
 #include "slang-ir-autodiff-transcriber-base.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-ssa.h"
 
 namespace Slang
 {
@@ -55,8 +56,10 @@ struct DiffUnzipPass
         // After lowering, store references to the count
         // variables associated with this region
         //
-        IRVar*         primalCountVar   = nullptr;
-        IRVar*         diffCountVar     = nullptr;
+        IRInst*         primalCountParam   = nullptr;
+        IRInst*         diffCountParam     = nullptr;
+
+        IRVar*          primalCountLastVar   = nullptr;
 
         enum CountStatus
         {
@@ -76,8 +79,8 @@ struct DiffUnzipPass
             firstBlock(nullptr),
             breakBlock(nullptr),
             continueBlock(nullptr),
-            primalCountVar(nullptr),
-            diffCountVar(nullptr),
+            primalCountParam(nullptr),
+            diffCountParam(nullptr),
             status(CountStatus::Unresolved),
             maxIters(-1)
         { }
@@ -93,8 +96,8 @@ struct DiffUnzipPass
             firstBlock(firstBlock),
             breakBlock(breakBlock),
             continueBlock(continueBlock),
-            primalCountVar(nullptr),
-            diffCountVar(nullptr),
+            primalCountParam(nullptr),
+            diffCountParam(nullptr),
             status(CountStatus::Unresolved),
             maxIters(-1)
         { }
@@ -254,20 +257,15 @@ struct DiffUnzipPass
         // 
         for (auto block : mixedBlocks)
         {
-            auto primalBlock = primalMap[block];
-            
             if (isBlockIndexed(block))
-            {
                 processIndexedFwdBlock(block);
-            }
         }
-
+        
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
 
         cleanupIndexRegionInfo();
 
-        // Remove old blocks.
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
     }
@@ -319,17 +317,78 @@ struct DiffUnzipPass
         }
     }
 
-    // Make a primal value *available* to the differential block.
-    // This can get quite involved, and we're going to rely on
-    // constructSSA to do most of the heavy-lifting & optimization
-    // For now, we'll simply create a variable in the top-most
-    // primal block, then load it in the last primal block
-    // 
-    //void hoistValue(IRInst* primalInst)
-    //{
-    //    IRBlock* terminalPrimalBlock = getTerminalPrimalBlock();
-    //    IRBlock* firstPrimalBlock = getFirstPrimalBlock();
-    //}
+    UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
+    {
+        SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(block->getTerminator()));
+        
+        auto branchInst = as<IRUnconditionalBranch>(block->getTerminator());
+        List<IRInst*> phiArgs;
+        
+        for (UIndex ii = 0; ii < branchInst->getArgCount(); ii++)
+            phiArgs.add(branchInst->getArg(ii));
+        
+        phiArgs.add(arg);
+
+        builder->setInsertInto(block);
+        switch (branchInst->getOp())
+        {
+            case kIROp_unconditionalBranch:
+                builder->emitBranch(branchInst->getTargetBlock(), phiArgs.getCount(), phiArgs.getBuffer());
+                break;
+            
+            case kIROp_loop:
+                builder->emitLoop(
+                    as<IRLoop>(branchInst)->getTargetBlock(),
+                    as<IRLoop>(branchInst)->getBreakBlock(),
+                    as<IRLoop>(branchInst)->getContinueBlock(),
+                    phiArgs.getCount(),
+                    phiArgs.getBuffer());
+                break;
+            
+            default:
+                break;
+        }
+
+        branchInst->removeAndDeallocate();
+        return phiArgs.getCount() - 1;
+    }
+
+    IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type)
+    {
+        builder->setInsertInto(block);
+        return builder->emitParam(type);
+    }
+
+    IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type, UIndex index)
+    {
+        List<IRParam*> params;
+        for (auto param : block->getParams())
+            params.add(param);
+
+        SLANG_RELEASE_ASSERT(index == (UCount)params.getCount());
+
+        return addPhiInputParam(builder, block, type);
+    }
+
+    IRBlock* getBlock(IRInst* inst)
+    {
+        SLANG_RELEASE_ASSERT(inst);
+
+        if (auto block = as<IRBlock>(inst))
+            return block;
+
+        return getBlock(inst->getParent());
+    }
+
+    IRInst* getInstInBlock(IRInst* inst)
+    {
+        SLANG_RELEASE_ASSERT(inst);
+
+        if (auto block = as<IRBlock>(inst->getParent()))
+            return inst;
+
+        return getInstInBlock(inst->getParent());
+    }
 
     void lowerIndexedRegions()
     {
@@ -337,114 +396,131 @@ struct DiffUnzipPass
 
         for (auto region : indexRegions)
         {
-
-            //IRBlock* initializerBlock = getInitializerBlock(region);
-            IRBlock* breakBlock = region->breakBlock;
-
             // Grab first primal block.
             IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
-            
-            // Make variable in the top-most block (so it's visible to diff blocks)
             builder.setInsertBefore(firstPrimalBlock->getTerminator());
-            region->primalCountVar = builder.emitVar(builder.getIntType());
-            builder.emitStore(
-                region->primalCountVar, 
-                builder.getIntValue(builder.getIntType(), 0));
 
-            // NOTE: This is a hacky shortcut we're taking here.
-            // Technically the unzip pass should not affect the
-            // correctness (it must still compute the proper fwd-mode derivative)
-            // However, we're currently making the loop counter go backwards to
-            // make it easier on the transposition pass, so the output from
-            // the unzip pass is neither fwd-mode or rev-mode until the transposition
-            // step is complete.
-            // 
-            // TODO: Ideally this needs to be replaced with a small inversion step
-            // within the transposition pass.
-            //
-            // Emit the diff counter into the diff *break* block (
-            // which we're praying turns into the reverse initializer block)
-            // initialized to the final value of the primal counter.
-            // 
-            builder.setInsertBefore(as<IRBlock>(diffMap[breakBlock])->getTerminator());
-            //auto primalCounterValue = builder.emitLoad(region->primalCountVar);
-            auto primalCounterCurrValue = builder.emitLoad(region->primalCountVar);
-            auto primalCounterLastValue = builder.emitSub(
-                primalCounterCurrValue->getDataType(),
-                primalCounterCurrValue,
-                builder.getIntValue(builder.getIntType(), 1));
-
-            region->diffCountVar = builder.emitVar(builder.getIntType());
-            auto diffCountInit = builder.emitStore(region->diffCountVar, primalCounterLastValue);
-
-            builder.addLoopCounterDecoration(diffCountInit);
-            builder.addLoopCounterDecoration(region->diffCountVar);
-            builder.addLoopCounterDecoration(primalCounterCurrValue);
-            builder.addLoopCounterDecoration(primalCounterLastValue);
-            
-            IRBlock* updateBlock = getUpdateBlock(region);
+            // Make variable in the top-most block (so it's visible to diff blocks)
+            region->primalCountLastVar = builder.emitVar(builder.getIntType());
             
             {
-                // TODO: Figure out if the counter update needs to go before or after
-                // the rest of the update block.
-                // 
-                builder.setInsertBefore(as<IRBlock>(primalMap[updateBlock])->getTerminator());
+                IRBlock* primalInitBlock = as<IRBlock>(primalMap[region->initBlock]);
+                
+                auto primalCondBlock = as<IRUnconditionalBranch>(
+                    primalInitBlock->getTerminator())->getTargetBlock();
+                builder.setInsertBefore(primalCondBlock->getTerminator());
 
-                auto counterVal = builder.emitLoad(region->primalCountVar);
+                auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
+                    &builder,
+                    primalInitBlock, 
+                    builder.getIntValue(builder.getIntType(), 0));
+
+                region->primalCountParam = addPhiInputParam(
+                    &builder,
+                    primalCondBlock,
+                    builder.getIntType(),
+                    phiCounterArgLoopEntryIndex);
+                builder.addLoopCounterDecoration(region->primalCountParam);
+                builder.markInstAsPrimal(region->primalCountParam);
+                
+                IRBlock* primalUpdateBlock = as<IRBlock>(primalMap[getUpdateBlock(region)]);
+                builder.setInsertBefore(primalUpdateBlock->getTerminator());
+
                 auto incCounterVal = builder.emitAdd(
                     builder.getIntType(), 
-                    counterVal,
+                    region->primalCountParam,
                     builder.getIntValue(builder.getIntType(), 1));
+                builder.markInstAsPrimal(incCounterVal);
 
-                auto incStore = builder.emitStore(region->primalCountVar, incCounterVal);
+                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, primalUpdateBlock, incCounterVal);
 
-                builder.addLoopCounterDecoration(counterVal);
-                builder.addLoopCounterDecoration(incCounterVal);
-                builder.addLoopCounterDecoration(incStore);
+                SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
+
+                IRBlock* primalBreakBlock = as<IRBlock>(primalMap[region->breakBlock]);
+                builder.setInsertBefore(primalBreakBlock->getTerminator());
+                
+                builder.emitStore(region->primalCountLastVar, region->primalCountParam);
             }
 
             {
-                IRBlock* firstLoopBlock = getFirstLoopBodyBlock(region);
-                auto diffFirstLoopBlock = as<IRBlock>(diffMap[firstLoopBlock]);
-
-                builder.setInsertBefore(diffFirstLoopBlock->getTerminator());
-
-                auto counterVal = builder.emitLoad(region->diffCountVar);
-                auto decCounterVal = builder.emitSub(
-                    builder.getIntType(), 
-                    counterVal,
-                    builder.getIntValue(builder.getIntType(), 1));
-
-                auto decStore = builder.emitStore(region->diffCountVar, decCounterVal);
-
-                // Mark insts as loop counter insts to avoid removing them.
-                //
-                builder.addLoopCounterDecoration(counterVal);
-                builder.addLoopCounterDecoration(decCounterVal);
-                builder.addLoopCounterDecoration(decStore);
-
-                // TODO:
-                // This is another hack here to avoid the counter from going negative 
-                // (since they are not valid indices)
-                //
-                IRBlock* diffCondBlock = as<IRBlock>(diffMap[region->firstBlock]);
-
-                builder.setInsertBefore(diffCondBlock->getTerminator());
-                IRInst* diffCounterVal = builder.emitLoad(region->diffCountVar);
-                IRInst* diffCounterCmp = builder.emitIntrinsicInst(
-                        builder.getBoolType(),
-                        kIROp_Geq,
-                        2,
-                        List<IRInst*>(
-                            diffCounterVal,
-                            builder.getIntValue(builder.getIntType(), 0)).getBuffer());
+                IRBlock* diffInitBlock = as<IRBlock>(diffMap[region->initBlock]);
                 
-                as<IRIfElse>(diffCondBlock->getTerminator())->condition.set(diffCounterCmp);
+                auto diffCondBlock = as<IRUnconditionalBranch>(
+                    diffInitBlock->getTerminator())->getTargetBlock();
+                builder.setInsertBefore(diffCondBlock->getTerminator());
 
-                builder.addLoopCounterDecoration(diffCounterVal);
-                builder.addLoopCounterDecoration(diffCounterCmp);
+                auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
+                    &builder,
+                    diffInitBlock, 
+                    builder.getIntValue(builder.getIntType(), 0));
+
+                region->diffCountParam = addPhiInputParam(
+                    &builder,
+                    diffCondBlock,
+                    builder.getIntType(),
+                    phiCounterArgLoopEntryIndex);
+                builder.addLoopCounterDecoration(region->diffCountParam);
+                builder.markInstAsPrimal(region->diffCountParam);
+                
+                IRBlock* diffUpdateBlock = as<IRBlock>(diffMap[getUpdateBlock(region)]);
+                builder.setInsertBefore(diffUpdateBlock->getTerminator());
+
+                auto incCounterVal = builder.emitAdd(
+                    builder.getIntType(), 
+                    region->diffCountParam,
+                    builder.getIntValue(builder.getIntType(), 1));
+                builder.markInstAsPrimal(incCounterVal);
+
+                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, diffUpdateBlock, incCounterVal);
+
+                SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
+
+                auto loopInst = as<IRLoop>(diffInitBlock->getTerminator());
+
+                builder.setInsertBefore(loopInst);
+
+                auto primalCounterLastVal = builder.emitLoad(region->primalCountLastVar);
+                builder.markInstAsPrimal(primalCounterLastVal);
+                builder.addPrimalValueAccessDecoration(primalCounterLastVal);
+
+                builder.addLoopExitPrimalValueDecoration(loopInst, region->diffCountParam, primalCounterLastVal);
             }
+        }
+    }
 
+    void tagNewParams(IRBuilder* builder, IRFunc* func)
+    {
+        for (auto block : func->getBlocks())
+        {
+            for (auto param = block->getFirstParam(); param; param = param->getNextParam())
+                if (!param->findDecoration<IRAutodiffInstDecoration>())
+                    builder->markInstAsPrimal(param);
+        }
+    }
+
+    void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
+    {
+        if (as<IRParam>(inst))
+        {
+            SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
+            builder->setInsertBefore(as<IRBlock>(inst->getParent())->getFirstOrdinaryInst());
+        }
+        else
+        {
+            builder->setInsertBefore(inst);
+        }
+    }
+
+    void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
+    {
+        if (as<IRParam>(inst))
+        {
+            SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
+            builder->setInsertBefore(as<IRBlock>(inst->getParent())->getFirstOrdinaryInst());
+        }
+        else
+        {
+            builder->setInsertAfter(inst);
         }
     }
 
@@ -520,10 +596,15 @@ struct DiffUnzipPass
             
             auto storageVar = builder.emitVar(arrayType);
 
+            // TODO(sai) STOPPED HERE: For some reason, we still have a direct param access
+            // when trying to cover up the access to last value of loop counter.
+            // Maybe we need a different way to access this? (use a var)
+            // Special case?
+
             // 3. Store current value into the array and replace uses with a load.
             // TODO: If an index is missing, use the 'last' value of the primal index.
             {
-                builder.setInsertAfter(inst);
+                setInsertAfterOrdinaryInst(&builder, inst);
                 
                 IRInst* storeAddr = storageVar;
                 IRType* currType = as<IRPtrTypeBase>(storageVar->getDataType())->getValueType();
@@ -535,12 +616,12 @@ struct DiffUnzipPass
                     storeAddr = builder.emitElementAddress(
                         builder.getPtrType(currType),
                         storeAddr, 
-                        builder.emitLoad(region->primalCountVar));
+                        region->primalCountParam);
                 }
 
                 builder.emitStore(storeAddr, inst);
             }
-
+ 
             // 4. Replace uses in differential blocks with loads from the array.
             List<IRInst*> instsToTag;
             {
@@ -548,17 +629,20 @@ struct DiffUnzipPass
                 for (auto use = inst->firstUse; use; use = use->nextUse)
                 {   
                     if (as<IRDecoration>(use->getUser()))
-                        continue;
+                    {
+                        if (!as<IRLoopExitPrimalValueDecoration>(use->getUser()))
+                            continue;
+                    }
 
-                    IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+                    IRBlock* useBlock = getBlock(use->getUser());
                     if (useBlock && isDifferentialInst(useBlock))
                         diffUses.add(use);
                 }
 
                 for (auto use : diffUses)
                 {
-                    IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
-                    builder.setInsertBefore(use->getUser());
+                    IRBlock* useBlock = getBlock(use->getUser());
+                    setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
 
                     IRInst* loadAddr = storageVar;
                     IRType* currType = as<IRPtrTypeBase>(storageVar->getDataType())->getValueType();
@@ -583,8 +667,7 @@ struct DiffUnzipPass
                             // If the use-block is under the same region, use the 
                             // differential counter variable
                             //
-                            auto diffCounterCurrValue = builder.emitLoad(region->diffCountVar);
-                            instsToTag.add(diffCounterCurrValue);
+                            auto diffCounterCurrValue = region->diffCountParam;
 
                             loadAddr = builder.emitElementAddress(
                                 builder.getPtrType(currType),
@@ -596,7 +679,7 @@ struct DiffUnzipPass
                             // If the use-block is outside this region, use the
                             // last available value (by indexing with primal counter minus 1)
                             // 
-                            auto primalCounterCurrValue = builder.emitLoad(region->primalCountVar);
+                            auto primalCounterCurrValue = builder.emitLoad(region->primalCountLastVar);
                             auto primalCounterLastValue = builder.emitSub(
                                 primalCounterCurrValue->getDataType(),
                                 primalCounterCurrValue,
@@ -621,11 +704,11 @@ struct DiffUnzipPass
                 }
             }
 
-            // TODO: Loop-counter is not really the right decoration..
-            // replace with primal-inst when it's ready.
-            // 
             for (auto instToTag : instsToTag)
-                builder.addLoopCounterDecoration(instToTag);
+            {
+                builder.addPrimalValueAccessDecoration(instToTag);
+                builder.markInstAsPrimal(instToTag);
+            }
         }
     }
 
@@ -1306,11 +1389,6 @@ struct DiffUnzipPass
 
         // Nothing should be left in the original block.
         SLANG_ASSERT(block->getFirstChild() == block->getTerminator());
-
-        // Branch from primal to differential block.
-        // Functionally, the new blocks should produce the same output as the
-        // old block.
-        // primalBuilder.emitBranch(diffBlock);
     }
 };
 
