@@ -381,9 +381,7 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
-            SharedIRBuilder sharedBuilder(irModule);
-            sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
-            if (!unrollLoopsInModule(&sharedBuilder, irModule, codeGenContext->getSink()))
+            if (!unrollLoopsInModule(irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }
 

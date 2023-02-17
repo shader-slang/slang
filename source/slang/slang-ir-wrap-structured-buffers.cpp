@@ -83,9 +83,7 @@ struct WrapStructuredBuffersContext
         // Having found a `*StructuredBuffer<M>` we will now
         // need an IR builder to help us construct the wrapper code.
         //
-        SharedIRBuilder sharedBuilderStorage(m_module);
-        auto sharedBuilder = &sharedBuilderStorage;
-        IRBuilder builderStorage(sharedBuilder);
+        IRBuilder builderStorage(m_module);
         auto builder = &builderStorage;
 
         // We begin by constructing a structure type that wraps

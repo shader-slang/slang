@@ -35,7 +35,7 @@ struct SimplifyForEmitContext : public InstPassBase
             auto user = use->getUser();
             if (auto store = as<IRStore>(user))
             {                
-                IRBuilder builder(sharedBuilderStorage);
+                IRBuilder builder(module);
                 builder.setInsertBefore(user);
                 UInt i = 0;
                 for (auto field : structType->getFields())
@@ -68,7 +68,7 @@ struct SimplifyForEmitContext : public InstPassBase
             auto user = use->getUser();
             if (auto store = as<IRStore>(user))
             {
-                IRBuilder builder(sharedBuilderStorage);
+                IRBuilder builder(module);
                 builder.setInsertBefore(user);
                 for (UInt i = 0; i < makeArray->getOperandCount(); i++)
                 {
@@ -102,7 +102,7 @@ struct SimplifyForEmitContext : public InstPassBase
             auto user = use->getUser();
             if (auto store = as<IRStore>(user))
             {
-                IRBuilder builder(sharedBuilderStorage);
+                IRBuilder builder(module);
                 builder.setInsertBefore(user);
                 for (IRIntegerValue i = 0; i < arraySize->getValue(); i++)
                 {
@@ -135,7 +135,7 @@ struct SimplifyForEmitContext : public InstPassBase
         }
 
         // If we reach here, it is OK to defer the load at use site.
-        IRBuilder builder(sharedBuilderStorage);
+        IRBuilder builder(module);
         builder.setInsertBefore(user);
         auto newLoad = builder.emitLoad(load->getPtr());
         builder.replaceOperand(use, newLoad);
@@ -176,7 +176,7 @@ struct SimplifyForEmitContext : public InstPassBase
                 continue;
             }
 
-            IRBuilder builder(sharedBuilderStorage);
+            IRBuilder builder(module);
             builder.setInsertBefore(user);
             List<IRInst*> args;
             for (UInt i = 0; i < inst->getOperandCount(); i++)
@@ -451,7 +451,6 @@ struct SimplifyForEmitContext : public InstPassBase
 
     void processModule()
     {
-        sharedBuilderStorage.init(module);
         processInstsOfType<IRFunc>(kIROp_Func, [this](IRFunc* f) { processFunc(f); });
     }
 };

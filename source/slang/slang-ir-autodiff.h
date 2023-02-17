@@ -61,8 +61,6 @@ struct AutoDiffSharedContext
 {
     IRModuleInst* moduleInst = nullptr;
 
-    SharedIRBuilder* sharedBuilder = nullptr;
-
     // A reference to the builtin IDifferentiable interface type.
     // We use this to look up all the other types (and type exprs)
     // that conform to a base type.

@@ -13,8 +13,6 @@ struct ErrorHandlingLoweringContext
     IRModule* module;
     DiagnosticSink* diagnosticSink;
 
-    SharedIRBuilder sharedBuilder;
-
     List<IRInst*> workList;
     HashSet<IRInst*> workListSet;
 
@@ -32,7 +30,7 @@ struct ErrorHandlingLoweringContext
         auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
         if (!throwAttr)
             return;
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(funcType);
         auto resultType =
             builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
@@ -44,7 +42,7 @@ struct ErrorHandlingLoweringContext
             paramTypes.add(funcType->getParamType(i));
         }
         auto newFuncType = builder.getFuncType(paramTypes, resultType);
-        sharedBuilder.replaceGlobalInst(funcType, newFuncType);
+        funcType->replaceUsesWith(newFuncType);
     }
 
     void processTryCall(IRTryCall* tryCall)
@@ -80,7 +78,7 @@ struct ErrorHandlingLoweringContext
         }
         auto errorType = throwAttr->getErrorType();
 
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(tryCall);
 
         auto resultType = builder.getResultType(resultValueType, errorType);
@@ -127,7 +125,7 @@ struct ErrorHandlingLoweringContext
 
         // If we are in a throwing function and sees a `return(val)` inst,
         // replace it with a `return makeResultValue(val)`, so that it returns a `Result<T,E>` type.
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(ret);
         auto resultType =
             builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
@@ -148,7 +146,7 @@ struct ErrorHandlingLoweringContext
 
         // If we are in a throwing function and sees a `throw(e)` inst,
         // replace it with a `return makeResultError(e)`.
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(throwInst);
         auto resultType =
             builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
@@ -197,9 +195,6 @@ struct ErrorHandlingLoweringContext
 
     void processModule()
     {
-        // Deduplicate equivalent types.
-        sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();   
-
         // Translate all IRTryCall, IRThrow, IRReturn.
         processInsts();
 
@@ -230,7 +225,6 @@ void lowerErrorHandling(IRModule* module, DiagnosticSink* sink)
     ErrorHandlingLoweringContext context;
     context.module = module;
     context.diagnosticSink = sink;
-    context.sharedBuilder.init(module);
     return context.processModule();
 }
 }

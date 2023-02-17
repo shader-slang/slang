@@ -80,10 +80,7 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
 
 void legalizeArrayReturnType(IRModule* module)
 {
-    SharedIRBuilder builderStorage;
-    builderStorage.init(module);
-    builderStorage.deduplicateAndRebuildGlobalNumberingMap();
-    IRBuilder builder(&builderStorage);
+    IRBuilder builder(module);
 
     for (auto inst : module->getGlobalInsts())
     {

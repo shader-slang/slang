@@ -8,12 +8,12 @@ namespace Slang
 
 struct ExtractPrimalFuncContext
 {
-    SharedIRBuilder* sharedBuilder;
+    IRModule* module;
     AutoDiffTranscriberBase* backwardPrimalTranscriber;
 
-    void init(SharedIRBuilder* inSharedBuilder, AutoDiffTranscriberBase* transcriber)
+    void init(IRModule* inModule, AutoDiffTranscriberBase* transcriber)
     {
-        sharedBuilder = inSharedBuilder;
+        module = inModule;
         backwardPrimalTranscriber = transcriber;
     }
 
@@ -35,7 +35,7 @@ struct ExtractPrimalFuncContext
 
     IRInst* createGenericIntermediateType(IRGeneric* gen)
     {
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(gen);
         IRCloneEnv intermediateTypeCloneEnv;
         auto clonedGen = cloneGenericHeader(builder, intermediateTypeCloneEnv, gen);
@@ -55,7 +55,7 @@ struct ExtractPrimalFuncContext
     {
         if (func->getOp() == kIROp_Generic)
             return createGenericIntermediateType(as<IRGeneric>(func));
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(func);
         auto intermediateType = builder.createStructType();
         if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
@@ -71,7 +71,7 @@ struct ExtractPrimalFuncContext
     IRInst* generatePrimalFuncType(
         IRGlobalValueWithCode* destFunc, IRGlobalValueWithCode* originalFunc, IRInst*& outIntermediateType)
     {
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(destFunc);
         IRFuncType* originalFuncType = nullptr;
         outIntermediateType = createIntermediateType(destFunc);
@@ -243,7 +243,7 @@ struct ExtractPrimalFuncContext
 
     IRStructField* addIntermediateContextField(IRInst* type, IRInst* intermediateOutput)
     {
-        IRBuilder genTypeBuilder(sharedBuilder);
+        IRBuilder genTypeBuilder(module);
         auto ptrStructType = as<IRPtrTypeBase>(intermediateOutput->getDataType());
         SLANG_RELEASE_ASSERT(ptrStructType);
         auto structType = as<IRStructType>(ptrStructType->getValueType());
@@ -283,7 +283,7 @@ struct ExtractPrimalFuncContext
 
     IRFunc* turnUnzippedFuncIntoPrimalFunc(IRFunc* unzippedFunc, IRFunc* originalFunc, HashSet<IRInst*>& primalParams, IRInst*& outIntermediateType)
     {
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
 
         IRFunc* func = unzippedFunc;
         IRInst* intermediateType = nullptr;
@@ -411,7 +411,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     ParameterBlockTransposeInfo& paramInfo,
     IRInst*& intermediateType)
 {
-    IRBuilder builder(this->autodiffContext->sharedBuilder);
+    IRBuilder builder(autodiffContext->moduleInst);
     builder.setInsertBefore(func);
 
     IRCloneEnv subEnv;
@@ -440,7 +440,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     }
 
     ExtractPrimalFuncContext context;
-    context.init(autodiffContext->sharedBuilder, autodiffContext->transcriberSet.primalTranscriber);
+    context.init(autodiffContext->moduleInst->getModule(), autodiffContext->transcriberSet.primalTranscriber);
 
     intermediateType = nullptr;
     auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, newPrimalParams, intermediateType);

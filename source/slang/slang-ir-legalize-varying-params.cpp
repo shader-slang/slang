@@ -199,12 +199,6 @@ public:
         // process, to avoid having state changes on one builder
         // affect other builders that might be in use.
         //
-        // All of those builders will need to have a common
-        // shared builder to avoid unnecessary duplication of
-        // types/constants.
-        //
-        SharedIRBuilder sharedBuilderStorage(module);
-        m_sharedBuilder = &sharedBuilderStorage;
 
         // Once the basic initialization is done, we will allow
         // the subtype to implement its own initialization logic
@@ -258,7 +252,6 @@ protected:
 
     IRModule*           m_module        = nullptr;
     DiagnosticSink*     m_sink          = nullptr;
-    SharedIRBuilder*    m_sharedBuilder = nullptr;
 
     IRFunc*     m_entryPointFunc    = nullptr;
     IRBlock*    m_firstBlock        = nullptr;
@@ -323,7 +316,7 @@ protected:
             // any `returnVal(r)` instructions in the function body to
             // instead assign `r` to `legalResult` and then `returnVoid`.
             //
-            IRBuilder builder(m_sharedBuilder);
+            IRBuilder builder(m_module);
             for( auto block : entryPointFunc->getBlocks() )
             {
                 auto returnValInst = as<IRReturn>(block->getTerminator());
@@ -465,7 +458,7 @@ protected:
         // The replacement variable will be declared at the top of
         // the function.
         //
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
 
         auto localVar = builder.emitVar(valueType);
@@ -550,7 +543,7 @@ protected:
         // for things like indexing into varying arrays, but at the
         // cost of more accesses to the input parameter data.
         //
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
         IRInst* materialized = materialize(builder, legalVal);
 
@@ -1149,7 +1142,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         // definitions once per module, instead of once per
         // entry point.
         //
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertInto(m_module->getModuleInst());
 
         // We begin by looking up the `uint` and `uint3` types.
@@ -1204,7 +1197,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     IRInst* dispatchThreadID = nullptr;
     void beginEntryPointImpl() SLANG_OVERRIDE
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
 
         // Note that we can use the built-in `blockDim`
@@ -1272,7 +1265,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         switch (layoutResourceKind)
         {
         case LayoutResourceKind::RayPayload: {
-            IRBuilder builder(m_sharedBuilder);
+            IRBuilder builder(m_module);
             builder.setInsertBefore(m_firstOrdinaryInst);
             IRPtrType* ptrType = builder.getPtrType(info.type);
             IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
@@ -1290,7 +1283,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             }*/ 
         }
         case LayoutResourceKind::HitAttributes: {
-            IRBuilder builder(m_sharedBuilder);
+            IRBuilder builder(m_module);
             builder.setInsertBefore(m_firstOrdinaryInst);
             int ioBaseAttributeIndex = 0;
             IRInst* getHitAttributes = emitOptiXAttributeFetch(/*ioBaseAttributeIndex*/ ioBaseAttributeIndex, /* type to fetch */info.type, /*the builder in use*/ &builder);
@@ -1330,7 +1323,7 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
     void beginModuleImpl() SLANG_OVERRIDE
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertInto(m_module->getModuleInst());
 
         uintType = builder.getBasicType(BaseType::UInt);
@@ -1377,7 +1370,7 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         groupThreadID = nullptr;
         dispatchThreadID = nullptr;
 
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         auto varyingInputParam = builder.createParam(varyingInputStructPtrType);
         varyingInputParam->insertBefore(m_firstBlock->getFirstChild());

@@ -750,8 +750,7 @@ namespace Slang
         auto irModule = func->getModule();
         SLANG_ASSERT(irModule);
 
-        SharedIRBuilder sharedBuilder(irModule);
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(irModule);
         builder.setInsertBefore(func);
 
         List<IRType*> paramTypes;
@@ -1221,7 +1220,7 @@ namespace Slang
         auto user = use->getUser();
         if (user->getModule())
         {
-            user->getModule()->getSharedBuilder()->getInstReplacementMap().TryGetValue(newValue, newValue);
+            user->getModule()->getDeduplicationContext()->getInstReplacementMap().TryGetValue(newValue, newValue);
         }
 
         if (!getIROpInfo(user->getOp()).isHoistable())
@@ -1234,7 +1233,7 @@ namespace Slang
         // perform the update, then try to reinsert it back to the global number map.
         // If we find an equivalent entry already exists in the global number map,
         // we return the existing entry.
-        auto builder = user->getModule()->getSharedBuilder();
+        auto builder = user->getModule()->getDeduplicationContext();
         builder->_removeGlobalNumberingEntry(user);
         use->init(user, newValue);
 
@@ -1693,7 +1692,7 @@ namespace Slang
         Int const*              listArgCounts,
         IRInst* const* const*   listArgs)
     {
-        m_sharedBuilder->getInstReplacementMap().TryGetValue((IRInst*)(type), *(IRInst**)&type);
+        m_dedupContext->getInstReplacementMap().TryGetValue((IRInst*)(type), *(IRInst**)&type);
 
         if (getIROpInfo(op).flags & kIROpFlag_Hoistable)
         {
@@ -1727,7 +1726,7 @@ namespace Slang
             if (fixedArgs)
             {
                 auto arg = fixedArgs[aa];
-                m_sharedBuilder->getInstReplacementMap().TryGetValue(arg, arg);
+                m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
                 operand->init(inst, arg);
             }
             else
@@ -1745,7 +1744,7 @@ namespace Slang
                 if (listArgs[ii])
                 {
                     auto arg = listArgs[ii][jj];
-                    m_sharedBuilder->getInstReplacementMap().TryGetValue(arg, arg);
+                    m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
                     operand->init(inst, arg);
                 }
                 else
@@ -2140,7 +2139,7 @@ namespace Slang
         key.inst = &keyInst;
 
         IRConstant* irValue = nullptr;
-        if( getSharedBuilder()->getConstantMap().TryGetValue(key, irValue) )
+        if (m_dedupContext->getConstantMap().TryGetValue(key, irValue))
         {
             // We found a match, so just use that.
             return irValue;
@@ -2207,7 +2206,7 @@ namespace Slang
         }
 
         key.inst = irValue;
-        getSharedBuilder()->getConstantMap().Add(key, irValue);
+        m_dedupContext->getConstantMap().Add(key, irValue);
 
         addHoistableInst(this, irValue);
 
@@ -2414,7 +2413,7 @@ namespace Slang
             for (Int ii = 0; ii < fixedArgCount; ++ii)
             {
                 auto arg = fixedArgs[ii];
-                m_sharedBuilder->getInstReplacementMap().TryGetValue(arg, arg);
+                m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
                 operand->usedValue = arg;
                 operand++;
             }
@@ -2424,7 +2423,7 @@ namespace Slang
                 for (UInt jj = 0; jj < listOperandCount; ++jj)
                 {
                     auto arg = listArgs[ii][jj];
-                    m_sharedBuilder->getInstReplacementMap().TryGetValue(arg, arg);
+                    m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
                     operand->usedValue = arg;
                     operand++;
                 }
@@ -2436,7 +2435,7 @@ namespace Slang
             IRInstKey key = { inst };
 
             // Ideally we would add if not found, else return if was found instead of testing & then adding.
-            IRInst** found = getSharedBuilder()->getGlobalValueNumberingMap().TryGetValueOrAdd(key, inst);
+            IRInst** found = m_dedupContext->getGlobalValueNumberingMap().TryGetValueOrAdd(key, inst);
             SLANG_ASSERT(endCursor == memoryArena.getCursor());
             // If it's found, just return, and throw away the instruction
             if (found)
@@ -6497,7 +6496,7 @@ namespace Slang
 
     static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
     {
-        SharedIRBuilder* sharedBuilder = nullptr;
+        IRDeduplicationContext* dedupContext = nullptr;
 
         struct WorkItem
         {
@@ -6535,12 +6534,12 @@ namespace Slang
 
             if (getIROpInfo(thisInst->getOp()).isHoistable())
             {
-                if (!sharedBuilder)
+                if (!dedupContext)
                 {
                     SLANG_ASSERT(thisInst->getModule());
-                    sharedBuilder = thisInst->getModule()->getSharedBuilder();
+                    dedupContext = thisInst->getModule()->getDeduplicationContext();
                 }
-                sharedBuilder->getInstReplacementMap()[thisInst] = other;
+                dedupContext->getInstReplacementMap()[thisInst] = other;
             }
 
             // We will walk through the list of uses for the current
@@ -6564,12 +6563,12 @@ namespace Slang
                 bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable();
                 if (userIsHoistable)
                 {
-                    if (!sharedBuilder)
+                    if (!dedupContext)
                     {
                         SLANG_ASSERT(user->getModule());
-                        sharedBuilder = user->getModule()->getSharedBuilder();
+                        dedupContext = user->getModule()->getDeduplicationContext();
                     }
-                    sharedBuilder->_removeGlobalNumberingEntry(user);
+                    dedupContext->_removeGlobalNumberingEntry(user);
                 }
                 
                 // Swap this use over to use the other value.
@@ -6580,13 +6579,13 @@ namespace Slang
                     // Is the updated inst already exists in the global numbering map?
                     // If so, we need to continue work on replacing the updated inst with the existing value.
                     IRInst* existingVal = nullptr;
-                    if (sharedBuilder->getGlobalValueNumberingMap().TryGetValue(IRInstKey{ user }, existingVal))
+                    if (dedupContext->getGlobalValueNumberingMap().TryGetValue(IRInstKey{ user }, existingVal))
                     {
                         addToWorkList(user, existingVal);
                     }
                     else
                     {
-                        sharedBuilder->_addGlobalNumberingEntry(user);
+                        dedupContext->_addGlobalNumberingEntry(user);
                     }
                 }
 
@@ -6797,13 +6796,13 @@ namespace Slang
         {
             if (getIROpInfo(getOp()).isHoistable())
             {
-                module->getSharedBuilder()->removeHoistableInstFromGlobalNumberingMap(this);
+                module->getDeduplicationContext()->removeHoistableInstFromGlobalNumberingMap(this);
             }
             else if (auto constInst = as<IRConstant>(this))
             {
-                module->getSharedBuilder()->getConstantMap().Remove(IRConstantKey{ constInst });
+                module->getDeduplicationContext()->getConstantMap().Remove(IRConstantKey{ constInst });
             }
-            module->getSharedBuilder()->getInstReplacementMap().Remove(this);
+            module->getDeduplicationContext()->getInstReplacementMap().Remove(this);
         }
         removeArguments();
         removeAndDeallocateAllDecorationsAndChildren();

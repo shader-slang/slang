@@ -221,7 +221,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
 
         // We will set up an IR builder so that we are ready to generate code.
         //
-        IRBuilder builderStorage(m_sharedBuilder);
+        IRBuilder builderStorage(m_module);
         auto builder = &builderStorage;
 
         if(m_options.alwaysCreateCollectedParam)
@@ -380,7 +380,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         if(paramStructType)
             return;
 
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         // First we create the structure to hold the parameters.
         //
@@ -427,7 +427,7 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
 
         // We will set up an IR builder so that we are ready to generate code.
         //
-        IRBuilder builderStorage(m_sharedBuilder);
+        IRBuilder builderStorage(m_module);
         auto builder = &builderStorage;
 
         builder->setInsertBefore(entryPointFunc);

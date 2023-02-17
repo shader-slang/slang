@@ -23,10 +23,8 @@ struct GLSLLivenessContext
     void processModule();
 
     GLSLLivenessContext(IRModule* module):
-        m_module(module)
+        m_module(module), m_builder(module)
     {
-        m_sharedBuilder.init(module);
-        m_builder.init(m_sharedBuilder);
     }
 
     void _replaceMarker(IRLiveRangeMarker* liveMarker);
@@ -64,7 +62,6 @@ struct GLSLLivenessContext
     IRType* m_spirvIntLiteralType = nullptr;                ///< Int type that emits as `spirv_literal`
 
     IRModule* m_module;
-    SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
 };
 

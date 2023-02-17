@@ -6,9 +6,9 @@
 namespace Slang
 {
 
-void initializeLocalVariables(SharedIRBuilder* sharedBuilder, IRGlobalValueWithCode* func)
+void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
 {
-    IRBuilder builder(sharedBuilder);
+    IRBuilder builder(module);
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())

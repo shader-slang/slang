@@ -8,8 +8,6 @@ struct AugmentMakeExistentialContext
 {
     IRModule* module;
 
-    SharedIRBuilder sharedBuilderStorage;
-
     List<IRInst*> workList;
     HashSet<IRInst*> workListSet;
 
@@ -24,7 +22,7 @@ struct AugmentMakeExistentialContext
 
     void processMakeExistential(IRMakeExistential* inst)
     {
-        IRBuilder builderStorage(sharedBuilderStorage);
+        IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(inst);
 
@@ -51,9 +49,6 @@ struct AugmentMakeExistentialContext
 
     void processModule()
     {
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-
         addToWorkList(module->getModuleInst());
 
         while (workList.getCount() != 0)

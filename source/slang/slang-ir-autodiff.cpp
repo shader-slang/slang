@@ -214,7 +214,7 @@ IRStructKey* DifferentialPairTypeBuilder::_getOrCreateDiffStructKey()
 {
     if (!this->globalDiffKey)
     {
-        IRBuilder builder(sharedContext->sharedBuilder);
+        IRBuilder builder(sharedContext->moduleInst);
         // Insert directly at top level (skip any generic scopes etc.)
         builder.setInsertInto(sharedContext->moduleInst);
 
@@ -230,7 +230,7 @@ IRStructKey* DifferentialPairTypeBuilder::_getOrCreatePrimalStructKey()
     if (!this->globalPrimalKey)
     {
         // Insert directly at top level (skip any generic scopes etc.)
-        IRBuilder builder(sharedContext->sharedBuilder);
+        IRBuilder builder(sharedContext->moduleInst);
         builder.setInsertInto(sharedContext->moduleInst);
 
         this->globalPrimalKey = builder.createStructKey();
@@ -252,7 +252,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
         break;
     }
 
-    IRBuilder builder(sharedContext->sharedBuilder);
+    IRBuilder builder(sharedContext->moduleInst);
     builder.setInsertBefore(diffType);
 
     auto pairStructType = builder.createStructType();
@@ -537,8 +537,6 @@ struct StripNoDiffTypeAttributePass : InstPassBase
                     }
                 }
             });
-        sharedBuilderStorage.init(module);
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
     }
 };
 
@@ -576,7 +574,7 @@ struct AutoDiffPass : public InstPassBase
         // TODO(sai): Move this call.
         forwardTranscriber.differentiableTypeConformanceContext.buildGlobalWitnessDictionary();
 
-        IRBuilder builderStorage(&sharedBuilderStorage);
+        IRBuilder builderStorage(module);
         IRBuilder* builder = &builderStorage;
 
         // Process all ForwardDifferentiate and BackwardDifferentiate instructions by 
@@ -808,7 +806,6 @@ struct AutoDiffPass : public InstPassBase
 
         if (lowerIntermediateContextType(builder))
         {
-            sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
             hasChanges = true;
         }
 
@@ -817,7 +814,7 @@ struct AutoDiffPass : public InstPassBase
 
     IRStringLit* getDerivativeFuncName(IRInst* func, const char* postFix)
     {
-        IRBuilder builder(&sharedBuilderStorage);
+        IRBuilder builder(autodiffContext->moduleInst);
         builder.setInsertBefore(func);
 
         IRStringLit* name = nullptr;
@@ -846,23 +843,17 @@ struct AutoDiffPass : public InstPassBase
     AutoDiffPass(AutoDiffSharedContext* context, DiagnosticSink* sink) :
         InstPassBase(context->moduleInst->getModule()),
         sink(sink),
-        forwardTranscriber(context, &sharedBuilderStorage, sink),
-        backwardPrimalTranscriber(context, &sharedBuilderStorage, sink),
-        backwardPropagateTranscriber(context, &sharedBuilderStorage, sink),
-        backwardTranscriber(context, &sharedBuilderStorage, sink),
+        forwardTranscriber(context, sink),
+        backwardPrimalTranscriber(context, sink),
+        backwardPropagateTranscriber(context, sink),
+        backwardTranscriber(context, sink),
         pairBuilderStorage(context),
         autodiffContext(context)
     {
-
         // We start by initializing our shared IR building state,
         // since we will re-use that state for any code we
         // generate along the way.
         //
-        sharedBuilderStorage.init(module);
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
-
-        context->sharedBuilder = &sharedBuilderStorage;
-
         forwardTranscriber.pairBuilder = &pairBuilderStorage;
         backwardPrimalTranscriber.pairBuilder = &pairBuilderStorage;
         backwardPropagateTranscriber.pairBuilder = &pairBuilderStorage;
@@ -923,12 +914,6 @@ bool finalizeAutoDiffPass(IRModule* module)
 
     // Create shared context for all auto-diff related passes
     AutoDiffSharedContext autodiffContext(module->getModuleInst());
-
-    SharedIRBuilder sharedBuilder;
-    sharedBuilder.init(module);
-    sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
-
-    autodiffContext.sharedBuilder = &sharedBuilder;
 
     // Replaces IRDifferentialPairType with an auto-generated struct,
     // IRDifferentialPairGetDifferential with 'differential' field access,

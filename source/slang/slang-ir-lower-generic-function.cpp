@@ -46,7 +46,7 @@ namespace Slang
                 return genericValue;
             }
             IRCloneEnv cloneEnv;
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
+            IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(genericParent);
             // Do not clone func type (which would break IR def-use rules if we do it here)
             // This is OK since we will lower the type immediately after the clone.
@@ -103,7 +103,7 @@ namespace Slang
                     }
                 }
             }
-            cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage, func, loweredFunc);
+            cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module, func, loweredFunc);
 
             auto block = as<IRBlock>(loweredFunc->getFirstChild());
             for (auto param : clonedParams)
@@ -177,7 +177,7 @@ namespace Slang
                 (IRType*)newOperands[0]);
 
             IRCloneEnv cloneEnv;
-            cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage, funcType, newFuncType);
+            cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module, funcType, newFuncType);
             return newFuncType;
         }
 
@@ -197,7 +197,7 @@ namespace Slang
 
             List<IRInterfaceRequirementEntry*> newEntries;
 
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
+            IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(interfaceType);
 
             // Translate IRFuncType in interface requirements.
@@ -240,7 +240,7 @@ namespace Slang
             loweredType = builder.createInterfaceType(newEntries.getCount(), (IRInst**)newEntries.getBuffer());
             loweredType->sourceLoc = interfaceType->sourceLoc;
             IRCloneEnv cloneEnv;
-            cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage,
+            cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module,
                 interfaceType, loweredType);
             sharedContext->loweredInterfaceTypes.Add(interfaceType, loweredType);
             sharedContext->mapLoweredInterfaceToOriginal[loweredType] = interfaceType;
@@ -259,7 +259,7 @@ namespace Slang
         void lowerWitnessTable(IRWitnessTable* witnessTable)
         {
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTable->getConformanceType()));
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(witnessTable);
             if (interfaceType != witnessTable->getConformanceType())
@@ -359,20 +359,11 @@ namespace Slang
             {
                  lowered.Key->replaceUsesWith(lowered.Value);
             }
-            // Update hash keys of globalNumberingMap, since the types are modified.
-            sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
             sharedContext->mapInterfaceRequirementKeyValue.Clear();
         }
 
         void processModule()
         {
-            // We start by initializing our shared IR building state,
-            // since we will re-use that state for any code we
-            // generate along the way.
-            //
-            SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->init(sharedContext->module);
-
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
             while (sharedContext->workList.getCount() != 0)

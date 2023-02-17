@@ -13,13 +13,11 @@ struct DllExportContext
     IRModule* module;
     DiagnosticSink* diagnosticSink;
 
-    SharedIRBuilder sharedBuilder;
-
     void processFunc(IRFunc* func, IRDllExportDecoration* dllExportDecoration)
     {
         NativeCallMarshallingContext marshalContext;
         marshalContext.diagnosticSink = diagnosticSink;
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         auto wrapper = marshalContext.generateDLLExportWrapperFunc(builder, func);
         dllExportDecoration->removeFromParent();
         dllExportDecoration->insertAtStart(wrapper);
@@ -65,7 +63,6 @@ void generateDllExportFuncs(IRModule* module, DiagnosticSink* sink)
     DllExportContext context;
     context.module = module;
     context.diagnosticSink = sink;
-    context.sharedBuilder.init(module);
     return context.processModule();
 }
 

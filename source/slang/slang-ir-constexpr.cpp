@@ -13,7 +13,6 @@ struct PropagateConstExprContext
 
     DiagnosticSink* sink;
 
-    SharedIRBuilder sharedBuilder;
     IRBuilder builder;
 
     List<IRInst*> workList;
@@ -21,7 +20,7 @@ struct PropagateConstExprContext
 
     IRBuilder* getBuilder() { return &builder; }
 
-    Session* getSession() { return sharedBuilder.getSession(); }
+    Session* getSession() { return module->getSession(); }
 
     DiagnosticSink* getSink() { return sink; }
 };
@@ -278,9 +277,7 @@ bool propagateConstExprBackward(
     PropagateConstExprContext*  context,
     IRGlobalValueWithCode*      code)
 {
-    SharedIRBuilder sharedBuilder(context->getModule());
-
-    IRBuilder builder(sharedBuilder);
+    IRBuilder builder(context->getModule());
     builder.setInsertInto(code);
 
     bool anyChanges = false;
@@ -503,8 +500,7 @@ void propagateConstExpr(
     PropagateConstExprContext context;
     context.module = module;
     context.sink = sink;
-    context.sharedBuilder.init(module);
-    context.builder.init(context.sharedBuilder);
+    context.builder = IRBuilder(module);
 
     // We need to propagate information both forward and backward.
     //

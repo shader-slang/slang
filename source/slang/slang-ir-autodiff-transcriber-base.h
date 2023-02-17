@@ -33,12 +33,9 @@ struct AutoDiffTranscriberBase
 
     DifferentiableTypeConformanceContext    differentiableTypeConformanceContext;
 
-    SharedIRBuilder* sharedBuilder;
-
-    AutoDiffTranscriberBase(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
+    AutoDiffTranscriberBase(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
         : autoDiffSharedContext(shared)
         , differentiableTypeConformanceContext(shared)
-        , sharedBuilder(inSharedBuilder)
         , sink(inSink)
     {
         cloneEnv.squashChildrenMapping = true;
