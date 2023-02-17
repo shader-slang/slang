@@ -1050,19 +1050,6 @@ struct DiffTransposePass
 
         IRBlock* revLoopCondBlock = revBlockMap[firstLoopBlock];
         builder->setInsertBefore(revLoopCondBlock->getTerminator());
-        
-        // Convert the loop from a 'for' into a 'do-while' by skipping the first check
-
-        IRBlock* revLoopStartBlock = revBlockMap[as<IRBlock>(loopInst->getBreakBlock())];
-        builder->setInsertBefore(revLoopStartBlock->getTerminator());
-
-        auto firstLoopCheckSkipVar = builder->emitVar(builder->getBoolType());
-        builder->emitStore(firstLoopCheckSkipVar, builder->getBoolValue(true));
-
-        builder->setInsertBefore(revLoopCondBlock->getTerminator());
-        auto firstLoopCheckSkipVal = builder->emitLoad(firstLoopCheckSkipVar);
-
-        builder->emitStore(firstLoopCheckSkipVar, builder->getBoolValue(false));
 
         // Add a terminating condition based on the loop counter's initial primal value
 
