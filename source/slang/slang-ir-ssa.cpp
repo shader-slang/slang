@@ -1056,10 +1056,7 @@ bool constructSSA(ConstructSSAContext* context)
 
     // Figure out what variables we can promote to
     // SSA temporaries.
-    if (!(context->promotableVars.getCount() > 0))
-    {
-        identifyPromotableVars(context);
-    }
+    identifyPromotableVars(context);
 
     // If none of the variables are promote-able,
     // then we can exit without making any changes
