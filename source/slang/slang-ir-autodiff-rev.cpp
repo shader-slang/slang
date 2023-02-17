@@ -295,9 +295,6 @@ namespace Slang
     // Create an empty func to represent the transcribed func of `origFunc`.
     InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc)
     {
-        if (auto bwdDiffFunc = findExistingDiffFunc(origFunc))
-            return InstPair(origFunc, bwdDiffFunc);
-
         if (!isBackwardDifferentiableFunc(origFunc))
             return InstPair(nullptr, nullptr);
 
@@ -379,11 +376,15 @@ namespace Slang
 
     InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
     {
+        if (auto bwdDiffFunc = findExistingDiffFunc(origFunc))
+            return InstPair(origFunc, bwdDiffFunc);
+
         auto header = transcribeFuncHeaderImpl(inBuilder, origFunc);
         if (!header.differential)
             return header;
-
+            
         IRBuilder builder = *inBuilder;
+
         builder.setInsertInto(header.differential);
         builder.emitBlock();
         auto origFuncType = as<IRFuncType>(origFunc->getFullType());
