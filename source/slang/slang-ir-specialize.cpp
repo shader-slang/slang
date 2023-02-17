@@ -204,10 +204,6 @@ struct SpecializationContext
     typedef IRSimpleSpecializationKey Key;
     Dictionary<Key, IRInst*> genericSpecializations;
 
-    // We will also use some shared IR building state across
-    // all of our specialization/cloning steps.
-    //
-    SharedIRBuilder sharedBuilderStorage;
 
     // Now let's look at the task of finding or generation a
     // specialization of some generic `g`, given a specialization
@@ -418,7 +414,7 @@ struct SpecializationContext
                         for (UIndex ii = 0; ii < argCount; ii++)
                             args.add(specInst->getArg(ii));
 
-                        IRBuilder builder(&sharedBuilderStorage);
+                        IRBuilder builder(module);
 
                         // Specialize the custom derivative function type with the original arguments.
                         builder.setInsertInto(module);
@@ -782,7 +778,7 @@ struct SpecializationContext
     template<typename TDict>
     void _writeSpecializationDictionaryImpl(TDict& dict, IROp dictOp, IRInst* moduleInst)
     {
-        IRBuilder builder(&sharedBuilderStorage);
+        IRBuilder builder(moduleInst);
         builder.setInsertInto(moduleInst);
         auto dictInst = builder.emitIntrinsicInst(nullptr, dictOp, 0, nullptr);
         builder.setInsertInto(dictInst);
@@ -817,18 +813,10 @@ struct SpecializationContext
     //
     void processModule()
     {
-        // We start by initializing our shared IR building state,
-        // since we will re-use that state for any code we
-        // generate along the way.
-        //
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-
         // Read specialization dictionary from module if it is defined.
         // This prevents us from generating duplicated specializations
         // when this pass is invoked iteratively.
         readSpecializationDictionaries();
-        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         // The unspecialized IR we receive as input will have
         // `IRBindGlobalGenericParam` instructions that associate
@@ -897,7 +885,8 @@ struct SpecializationContext
                     // specialization opportunities (generic specialization,
                     // existential specialization, simplifications, etc.)
                     //
-                    iterChanged |= maybeSpecializeInst(inst);
+                    if (inst->hasUses() || inst->mightHaveSideEffects())
+                        iterChanged |= maybeSpecializeInst(inst);
 
                     // Finally, we need to make our logic recurse through
                     // the whole IR module, so we want to add the children
@@ -995,7 +984,7 @@ struct SpecializationContext
     {
         auto oldSpecialize = cast<IRSpecialize>(oldSpecializedCallee);
         SLANG_ASSERT(oldSpecialize->getArgCount() == 1);
-        IRBuilder builder(sharedBuilderStorage);
+        IRBuilder builder(module);
         builder.setInsertBefore(oldSpecializedCallee);
         auto calleeType = builder.getFuncType(1, &newContainerType, newElementType);
         auto newSpecialize = builder.emitSpecializeInst(
@@ -1025,7 +1014,7 @@ struct SpecializationContext
                     auto resultType = inst->getFullType();
                     auto elementType = sbType->getElementType();
 
-                    IRBuilder builder(sharedBuilderStorage);
+                    IRBuilder builder(module);
                     builder.setInsertBefore(inst);
 
                     List<IRInst*> args;
@@ -1041,7 +1030,6 @@ struct SpecializationContext
                     // The old callee should be in the form of `specialize(.operator[], IInterfaceType)`,
                     // we should update it to be `specialize(.operator[], elementType)`, so the return type
                     // of the load call is `elementType`.
-                    auto oldCallee = inst->getCallee();
 
                     // A subscript operation on mutable buffers returns a ptr type instead of a value type.
                     // We need to make sure the pointer-ness is preserved correctly.
@@ -1057,9 +1045,6 @@ struct SpecializationContext
                     inst->replaceUsesWith(newWrapExistential);
                     workList.Remove(inst);
                     inst->removeAndDeallocate();
-                    SLANG_ASSERT(!oldCallee->hasUses());
-                    workList.Remove(oldCallee);
-                    oldCallee->removeAndDeallocate();
                     addUsersToWorkList(newWrapExistential);
 
                     workList.Remove(wrapExistential);
@@ -1265,7 +1250,7 @@ struct SpecializationContext
         // Now that we've built up our argument list, it is simple enough
         // to construct a new `call` instruction.
         //
-        IRBuilder builderStorage(sharedBuilderStorage);
+        IRBuilder builderStorage(module);
         auto builder = &builderStorage;
 
         builder->setInsertBefore(inst);
@@ -1424,7 +1409,7 @@ struct SpecializationContext
         // We also need some IR building state, for any
         // new instructions we will emit.
         //
-        IRBuilder builderStorage(sharedBuilderStorage);
+        IRBuilder builderStorage(module);
         auto builder = &builderStorage;
 
         // We will start out by determining what the parameters
@@ -1564,7 +1549,7 @@ struct SpecializationContext
         //
         cloneInstDecorationsAndChildren(
             &cloneEnv,
-            builder->getSharedBuilder(),
+            builder->getModule(),
             oldFunc,
             newFunc);
 
@@ -1743,7 +1728,7 @@ struct SpecializationContext
             //
             auto resultType = inst->getFullType();
 
-            IRBuilder builder(sharedBuilderStorage);
+            IRBuilder builder(module);
             builder.setInsertBefore(inst);
 
             // We'd *like* to replace this instruction with
@@ -1847,7 +1832,7 @@ struct SpecializationContext
             //
             auto resultType = inst->getFullType();
 
-            IRBuilder builder(sharedBuilderStorage);
+            IRBuilder builder(module);
             builder.setInsertBefore(inst);
 
             // We'd *like* to replace this instruction with
@@ -1934,7 +1919,7 @@ struct SpecializationContext
             //
             auto resultType = inst->getFullType();
 
-            IRBuilder builder(sharedBuilderStorage);
+            IRBuilder builder(module);
             builder.setInsertBefore(inst);
 
             // We'd *like* to replace this instruction with
@@ -2021,7 +2006,7 @@ struct SpecializationContext
             auto val = wrapInst->getWrappedValue();
             auto resultType = inst->getFullType();
 
-            IRBuilder builder(sharedBuilderStorage);
+            IRBuilder builder(module);
             builder.setInsertBefore(inst);
 
             auto elementType = cast<IRArrayTypeBase>(val->getDataType())->getElementType();
@@ -2064,7 +2049,7 @@ struct SpecializationContext
 
             auto resultType = inst->getFullType();
 
-            IRBuilder builder(sharedBuilderStorage);
+            IRBuilder builder(module);
             builder.setInsertBefore(inst);
 
             List<IRInst*> slotOperands;
@@ -2138,7 +2123,7 @@ struct SpecializationContext
         auto baseType = type->getBaseType();
         UInt slotOperandCount = type->getExistentialArgCount();
 
-        IRBuilder builder(sharedBuilderStorage);
+        IRBuilder builder(module);
         builder.setInsertBefore(type);
 
         if( auto baseInterfaceType = as<IRInterfaceType>(baseType) )
@@ -2408,8 +2393,7 @@ IRInst* specializeGenericImpl(
     // into the global scope, at the same location
     // as the original generic.
     //
-    SharedIRBuilder sharedBuilderStorage(module);
-    IRBuilder builderStorage(sharedBuilderStorage);
+    IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;
     builder->setInsertBefore(genericVal);
 
@@ -2443,7 +2427,7 @@ IRInst* specializeGenericImpl(
                 // Clone decorations on the orignal `specialize` inst over to the newly specialized
                 // value.
                 cloneInstDecorationsAndChildren(
-                    &env, &sharedBuilderStorage, specializeInst, specializedVal);
+                    &env, module, specializeInst, specializedVal);
                 return specializedVal;
             }
 

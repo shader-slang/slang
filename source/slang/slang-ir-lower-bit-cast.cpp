@@ -11,7 +11,6 @@ struct BitCastLoweringContext
 {
     TargetRequest* targetReq;
     IRModule* module;
-    SharedIRBuilder sharedBuilderStorage;
     OrderedHashSet<IRInst*> workList;
 
     void addToWorkList(IRInst* inst)
@@ -42,12 +41,6 @@ struct BitCastLoweringContext
 
     void processModule()
     {
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-
-        // Deduplicate equivalent types.
-        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
         addToWorkList(module->getModuleInst());
 
         while (workList.Count() != 0)
@@ -246,7 +239,7 @@ struct BitCastLoweringContext
             return;
         }
         // Enumerate all fields in to-type and obtain its value from operand object.
-        IRBuilder builder(sharedBuilderStorage);
+        IRBuilder builder(module);
         builder.setInsertBefore(inst);
         auto finalObject = readObject(builder, operand, toType, 0);
         inst->replaceUsesWith(finalObject);

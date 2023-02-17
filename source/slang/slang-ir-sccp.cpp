@@ -15,7 +15,6 @@ namespace Slang {
 struct SharedSCCPContext
 {
     IRModule*       module;
-    SharedIRBuilder* sharedBuilder;
 };
 //
 // Next we have a context struct that will be applied for each function (or other
@@ -1234,7 +1233,7 @@ struct SCCPContext
     // Run the constant folding on global scope only.
     bool applyOnGlobalScope(IRModule* module)
     {
-        builderStorage.init(shared->sharedBuilder);
+        builderStorage = IRBuilder(shared->module);
         for (auto child : module->getModuleInst()->getChildren())
         {
             // Only consider evaluable opcodes.
@@ -1274,8 +1273,6 @@ struct SCCPContext
             changed = true;
             for (auto inst : instsToRemove)
                 inst->removeAndDeallocate();
-            // Rebuild global value map.
-            builderStorage.getSharedBuilder()->deduplicateAndRebuildGlobalNumberingMap();
         }
         return changed;
     }
@@ -1287,7 +1284,7 @@ struct SCCPContext
         bool changed = false;
         // We start with the busy-work of setting up our IR builder.
         //
-        builderStorage.init(shared->sharedBuilder);
+        builderStorage = IRBuilder(shared->module);
 
         // We expect the caller to have filtered out functions with
         // no bodies, so there should always be at least one basic block.
@@ -1663,10 +1660,6 @@ bool applySparseConditionalConstantPropagation(
 {
     SharedSCCPContext shared;
     shared.module = module;
-    SharedIRBuilder sharedBuilderStorage;
-    shared.sharedBuilder = &sharedBuilderStorage;
-    sharedBuilderStorage.init(module);
-    sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
 
     // First we fold constants at global scope.
     SCCPContext globalContext;
@@ -1685,10 +1678,6 @@ bool applySparseConditionalConstantPropagation(IRInst* func)
 {
     SharedSCCPContext shared;
     shared.module = func->getModule();
-    SharedIRBuilder sharedBuilderStorage;
-    shared.sharedBuilder = &sharedBuilderStorage;
-    sharedBuilderStorage.init(shared.module);
-    sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
 
     SCCPContext globalContext;
     globalContext.shared = &shared;
@@ -1698,15 +1687,14 @@ bool applySparseConditionalConstantPropagation(IRInst* func)
     return applySparseConditionalConstantPropagationRec(globalContext, func);
 }
 
-IRInst* tryConstantFoldInst(SharedIRBuilder* sharedBuilder, IRInst* inst)
+IRInst* tryConstantFoldInst(IRModule* module, IRInst* inst)
 {
     SharedSCCPContext shared;
-    shared.module = inst->getModule();
-    shared.sharedBuilder = sharedBuilder;
+    shared.module = module;
     SCCPContext instContext;
     instContext.shared = &shared;
     instContext.code = nullptr;
-    instContext.builderStorage.init(sharedBuilder);
+    instContext.builderStorage = IRBuilder(module);
     auto foldResult = instContext.interpretOverLattice(inst);
     if (!foldResult.value)
     {

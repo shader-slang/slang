@@ -151,8 +151,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
     // Lazily generated region tree.
     CFGSimplificationContext simplificationContext;
 
-    SharedIRBuilder sharedBuilder(func->getModule());
-    IRBuilder builder(&sharedBuilder);
+    IRBuilder builder(func->getModule());
 
     bool changed = false;
     for (;;)

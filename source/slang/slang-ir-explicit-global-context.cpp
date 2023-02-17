@@ -16,7 +16,6 @@ struct IntroduceExplicitGlobalContextPass
     IRModule*       m_module = nullptr;
     CodeGenTarget   m_target = CodeGenTarget::Unknown;
 
-    SharedIRBuilder*    m_sharedBuilder         = nullptr;
     IRStructType*       m_contextStructType     = nullptr;
     IRPtrType*          m_contextStructPtrType  = nullptr;
 
@@ -26,10 +25,7 @@ struct IntroduceExplicitGlobalContextPass
 
     void processModule()
     {
-        SharedIRBuilder sharedBuilder(m_module);
-        m_sharedBuilder = &sharedBuilder;
-
-        IRBuilder builder(&sharedBuilder);
+        IRBuilder builder(m_module);
 
         // The transformation we will perform will need to affect
         // global variables, global shader parameters, and entry-point
@@ -231,7 +227,7 @@ struct IntroduceExplicitGlobalContextPass
         // Creating a field in the context struct to represent
         // `originalInst` is straightforward.
 
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(m_contextStructType);
 
         // We create a "key" for the new field, and then a field
@@ -272,7 +268,7 @@ struct IntroduceExplicitGlobalContextPass
         if(!firstBlock)
             return;
 
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         // The code we introduce will all be added to the start
         // of the first block of the function.
@@ -346,7 +342,7 @@ struct IntroduceExplicitGlobalContextPass
 
     void replaceUsesOfGlobalParam(IRGlobalParam* globalParam)
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         // A global shader parameter was mapped to a field
         // in the context structure, so we find the appropriate key.
@@ -384,7 +380,7 @@ struct IntroduceExplicitGlobalContextPass
 
     void replaceUsesOfGlobalVar(IRGlobalVar* globalVar)
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         // A global variable was mapped to a field
         // in the context structure, so we find the appropriate key.
@@ -457,7 +453,7 @@ struct IntroduceExplicitGlobalContextPass
         // explicit parameter to `func` to represent the
         // context.
         //
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         // We can safely assume that `func` has a body, because
         // otherwise we wouldn't be getting a request for the
@@ -551,7 +547,7 @@ struct IntroduceExplicitGlobalContextPass
     //
     void addKernelContextNameHint(IRInst* inst)
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.addNameHintDecoration(inst, UnownedTerminatedStringSlice("kernelContext"));
     }
 };

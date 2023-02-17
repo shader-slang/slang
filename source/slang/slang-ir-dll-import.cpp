@@ -15,15 +15,13 @@ struct DllImportContext
     DiagnosticSink* diagnosticSink;
     TargetRequest* targetReq;
 
-    SharedIRBuilder sharedBuilder;
-
     IRFunc* loadDllFunc = nullptr;
     IRFunc* loadFuncPtrFunc = nullptr;
     IRFunc* stringGetBufferFunc = nullptr;
 
     IRFunc* createBuiltinIntrinsicFunc(UInt paramCount, IRType** paramTypes, IRType* resultType, UnownedStringSlice targetIntrinsic)
     {
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertInto(module->getModuleInst());
         IRFunc* result = builder.createFunc();
         builder.setInsertInto(result);
@@ -38,7 +36,7 @@ struct DllImportContext
     {
         if (!loadDllFunc)
         {
-            IRBuilder builder(sharedBuilder);
+            IRBuilder builder(module);
             builder.setInsertInto(module->getModuleInst());
             IRType* stringType = builder.getStringType();
             loadDllFunc = createBuiltinIntrinsicFunc(
@@ -54,7 +52,7 @@ struct DllImportContext
     {
         if (!loadFuncPtrFunc)
         {
-            IRBuilder builder(sharedBuilder);
+            IRBuilder builder(module);
             builder.setInsertInto(module->getModuleInst());
 
             IRType* stringType = builder.getStringType();
@@ -73,7 +71,7 @@ struct DllImportContext
     {
         if (!stringGetBufferFunc)
         {
-            IRBuilder builder(sharedBuilder);
+            IRBuilder builder(module);
             builder.setInsertInto(module->getModuleInst());
 
             IRType* stringType = builder.getStringType();
@@ -103,7 +101,7 @@ struct DllImportContext
     {
         assert(func->getFirstBlock() == nullptr);
 
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         NativeCallMarshallingContext marshalContext;
 
         auto nativeType = marshalContext.getNativeFuncType(builder, func->getDataType());
@@ -196,7 +194,6 @@ void generateDllImportFuncs(TargetRequest* targetReq, IRModule* module, Diagnost
     context.module = module;
     context.targetReq = targetReq;
     context.diagnosticSink = sink;
-    context.sharedBuilder.init(module);
     return context.processModule();
 }
 

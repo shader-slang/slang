@@ -86,8 +86,7 @@ struct DeadCodeEliminationContext
     {
         if (!undefInst)
         {
-            SharedIRBuilder builderStorage(module);
-            IRBuilder builder(&builderStorage);
+            IRBuilder builder(module);
             if (auto firstChild = module->getModuleInst()->getFirstChild())
                 builder.setInsertBefore(firstChild);
             else
@@ -237,14 +236,16 @@ struct DeadCodeEliminationContext
             // might still be dead.
             //
             // The biggest wrinkle is that we walk the linked list of
-            // children/decorations a bit carefully, using a temporary
-            // to hold the next node, in case we eliminate one of
-            // the children as we go.
+            // children/decorations a bit carefully, because eliminating one inst
+            // may cause the other nodes to be hoisted out of the current scope.
+            // We need to cache all children in a work list to ensure they are
+            // properly traversed.
             //
-            IRInst* next = nullptr;
-            for( IRInst* child = inst->getFirstDecorationOrChild(); child; child = next )
+            List<IRInst*> children;
+            for (auto child : inst->getDecorationsAndChildren())
+                children.add(child);
+            for(IRInst* child : children)
             {
-                next = child->getNextInst();
                 changed |= eliminateDeadInstsRec(child);
             }
         }

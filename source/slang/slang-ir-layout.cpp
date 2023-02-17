@@ -155,9 +155,7 @@ static Result _calcNaturalSizeAndAlignment(
                     // cache the field offset on the IR field
                     // instruction.
                     //
-                    SharedIRBuilder sharedBuilder(module);
-
-                    IRBuilder builder(sharedBuilder);
+                    IRBuilder builder(module);
 
                     auto intType = builder.getIntType();
                     builder.addDecoration(
@@ -247,8 +245,7 @@ static Result _calcNaturalSizeAndAlignment(
             auto matType = cast<IRMatrixType>(type);
             auto rowCount = getIntegerValueFromInst(matType->getRowCount());
             auto colCount = getIntegerValueFromInst(matType->getColumnCount());
-            SharedIRBuilder sharedBuilder(type->getModule());
-            IRBuilder builder(sharedBuilder);
+            IRBuilder builder(type->getModule());
 
             return _calcNaturalArraySizeAndAlignment(
                 target, matType->getElementType(),
@@ -307,9 +304,7 @@ Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAnd
 
     if( auto module = type->getModule() )
     {
-        SharedIRBuilder sharedBuilder(module);
-
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
 
         auto intType = builder.getIntType();
         builder.addDecoration(

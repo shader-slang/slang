@@ -40,8 +40,6 @@ struct MoveGlobalVarInitializationToEntryPointsPass
 {
     IRModule* m_module;
 
-    SharedIRBuilder* m_sharedBuilder;
-
     // In the Slang IR, a global variable represents a pointer
     // to the storage for the variable but it *also* encodes
     // the logic used to compute the initial value of that
@@ -71,9 +69,6 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     void processModule(IRModule* module)
     {
         m_module = module;
-
-        SharedIRBuilder sharedBuilder(module);
-        m_sharedBuilder = &sharedBuilder;
 
         // We start by looking for global variables with
         // initialization logic in the IR, and processing
@@ -120,7 +115,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
 
     void processGlobalVarWithInit(IRGlobalVar* globalVar, IRBlock* firstBlock)
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(globalVar);
 
         // Becaue an `IRGlobalVar` reprsents a pointer to the storage
@@ -174,7 +169,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // We are going to insert initiailization logic at the start
         // of the first block of the entry point.
         //
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
 
         for( auto globalVarInfo : m_globalVarsWithInit )

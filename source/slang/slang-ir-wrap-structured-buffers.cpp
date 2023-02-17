@@ -83,9 +83,7 @@ struct WrapStructuredBuffersContext
         // Having found a `*StructuredBuffer<M>` we will now
         // need an IR builder to help us construct the wrapper code.
         //
-        SharedIRBuilder sharedBuilderStorage(m_module);
-        auto sharedBuilder = &sharedBuilderStorage;
-        IRBuilder builderStorage(sharedBuilder);
+        IRBuilder builderStorage(m_module);
         auto builder = &builderStorage;
 
         // We begin by constructing a structure type that wraps
@@ -134,7 +132,7 @@ struct WrapStructuredBuffersContext
         // scanning through its IR uses, since values of that
         // type are using it as a (type) operand.
         //
-        for( auto typeUse = newStructuredBufferType->firstUse; typeUse; typeUse = typeUse->nextUse )
+        traverseUses(newStructuredBufferType, [&](IRUse* typeUse)
         {
             // There might be uses of `newStructuredBufferType` where
             // it isn't being used as the type of a value, so we
@@ -142,7 +140,7 @@ struct WrapStructuredBuffersContext
             //
             auto valueOfStructuredBufferType = typeUse->getUser();
             if(valueOfStructuredBufferType->getFullType() != newStructuredBufferType)
-                continue;
+                return;
 
             // Now we have some `valueOfStructuredBufferType`. In our running
             // example, this might be `gBuffer`, which is an `IRGlobalParam`.
@@ -155,7 +153,7 @@ struct WrapStructuredBuffersContext
             // because these could be calls to intrinsic functions like
             // `RWStructuredBuffer.Load`
             //
-            for( auto valueUse = valueOfStructuredBufferType->firstUse; valueUse; valueUse = valueUse->nextUse )
+            traverseUses(valueOfStructuredBufferType, [&](IRUse* valueUse)
             {
                 // we are only interested in instructions that are calls,
                 // with at least one argument, where the first argument
@@ -165,11 +163,11 @@ struct WrapStructuredBuffersContext
                 //
                 auto call = as<IRCall>(valueUse->getUser());
                 if(!call)
-                    continue;
+                    return;
                 if(call->getArgCount() == 0)
-                    continue;
+                    return;
                 if(call->getArg(0) != valueOfStructuredBufferType)
-                    continue;
+                    return;
 
                 // At this point we have a candidate `call` instruction,
                 // but we need to determine whether it is a call to
@@ -196,7 +194,7 @@ struct WrapStructuredBuffersContext
                 //
                 auto callee = call->getCallee();
                 if(!as<IRSpecialize>(callee))
-                    continue;
+                    return;
 
                 // At this point it seems likely we have one of the calls
                 // we want to rewrite, but there are still intrinsics
@@ -285,8 +283,8 @@ struct WrapStructuredBuffersContext
                         newVal->setOperand(0, call);
                     }
                 }
-            }
-        }
+            });
+        });
     }
 
         /// Get the struture field "key" to use for generated wrappers

@@ -127,8 +127,8 @@ struct CollectGlobalUniformParametersContext
         // the collected global-scope parameters. The `IRBuilder` we construct
         // for this will also be used when replacing the individual parameters.
         //
-        SharedIRBuilder sharedBuilder(module);
-        IRBuilder builderStorage(sharedBuilder);
+
+        IRBuilder builderStorage(module);
         IRBuilder* builder = &builderStorage;
         builder->setInsertInto(module->getModuleInst());
 
@@ -192,7 +192,8 @@ struct CollectGlobalUniformParametersContext
             // per-field layout information to reference the key we created
             // instead of the existing parameter (which we will be removing).
             //
-            fieldLayoutAttr->setOperand(0, fieldKey);
+            fieldLayoutAttr = as<IRStructFieldLayoutAttr>(
+                builder->replaceOperand(fieldLayoutAttr->getOperands(), fieldKey));
 
             // If the given parameter doesn't contribute to uniform/ordinary usage, then
             // we can safely leave it at the global scope and potentially avoid a lot
@@ -266,7 +267,7 @@ struct CollectGlobalUniformParametersContext
                 //
                 if(auto layoutAttr = as<IRStructFieldLayoutAttr>(user))
                 {
-                    layoutAttr->setOperand(0, fieldKey);
+                    builder->replaceOperand(layoutAttr->getOperands(), fieldKey);
                     continue;
                 }
 

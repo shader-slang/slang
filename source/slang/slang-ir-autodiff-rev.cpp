@@ -383,7 +383,7 @@ namespace Slang
         if (!header.differential)
             return header;
 
-        IRBuilder builder(inBuilder->getSharedBuilder());
+        IRBuilder builder = *inBuilder;
         builder.setInsertInto(header.differential);
         builder.emitBlock();
         auto origFuncType = as<IRFuncType>(origFunc->getFullType());
@@ -482,7 +482,7 @@ namespace Slang
     // Puts parameters into their own block.
     void BackwardDiffTranscriberBase::makeParameterBlock(IRBuilder* inBuilder, IRFunc* func)
     {
-        IRBuilder builder(inBuilder->getSharedBuilder());
+        IRBuilder builder = *inBuilder;
 
         auto firstBlock = func->getFirstBlock();
         IRParam* param = func->getFirstParam();
@@ -513,9 +513,9 @@ namespace Slang
         builder.emitBranch(firstBlock);
     }
 
-    void insertTempVarForMutableParams(SharedIRBuilder* sharedBuilder, IRFunc* func)
+    void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     {
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         auto firstBlock = func->getFirstBlock();
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
         
@@ -586,13 +586,13 @@ namespace Slang
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
 
         IRCFGNormalizationPass cfgPass = {this->getSink()};
-        normalizeCFG(autoDiffSharedContext->sharedBuilder, func);
+        normalizeCFG(autoDiffSharedContext->moduleInst->getModule(), func);
 
-        insertTempVarForMutableParams(sharedBuilder, func);
+        insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
 
         AutoDiffAddressConversionPolicy cvtPolicty;
         cvtPolicty.diffTypeContext = &diffTypeContext;
-        auto result = eliminateAddressInsts(sharedBuilder, &cvtPolicty, func, sink);
+        auto result = eliminateAddressInsts(&cvtPolicty, func, sink);
 
         if (SLANG_SUCCEEDED(result))
         {
@@ -623,9 +623,7 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
-        
-        autoDiffSharedContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
+ 
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
@@ -837,8 +835,8 @@ namespace Slang
             builder->addBackwardDerivativePrimalDecoration(primalFunc, specializedBackwardPrimalFunc);
         }
 
-        initializeLocalVariables(builder->getSharedBuilder(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
-        initializeLocalVariables(builder->getSharedBuilder(), diffPropagateFunc);
+        initializeLocalVariables(builder->getModule(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
+        initializeLocalVariables(builder->getModule(), diffPropagateFunc);
     }
 
     ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(
@@ -1235,7 +1233,7 @@ namespace Slang
         }
         SLANG_RELEASE_ASSERT(returnInst);
 
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(autoDiffSharedContext->moduleInst);
         builder.setInsertBefore(returnInst);
         for (auto& wb : info.outDiffWritebacks)
         {

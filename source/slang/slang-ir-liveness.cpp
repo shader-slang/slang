@@ -207,13 +207,11 @@ struct LivenessContext
     
     LivenessContext(IRModule* module, LivenessMode mode):
         m_module(module),
-        m_livenessMode(mode)
+        m_livenessMode(mode),
+        m_builder(module)
     {
         // Disable warning if not used
         SLANG_UNUSED(&LivenessContext::_isAnyRunInst);
-        
-        m_sharedBuilder.init(module);
-        m_builder.init(m_sharedBuilder);
     }
 
         /// For a given live range start find it's end/s and insert a LiveRangeEnd/s
@@ -346,7 +344,6 @@ struct LivenessContext
     List<IRLiveRangeEnd*> m_rangeEnds;              ///< All of the ends added
 
     IRModule* m_module;
-    SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
 
     LivenessMode m_livenessMode;
@@ -1572,11 +1569,7 @@ static void _processFunction(IRFunc* funcInst, List<IRVar*>& ioVars)
     // When we process liveness, is prior to output for a target
     // So post specialization
 
-    SharedIRBuilder sharedBuilder;
-    IRBuilder builder;
-
-    sharedBuilder.init(module);
-    builder.init(sharedBuilder);
+    IRBuilder builder(module);
 
     // Storage for found vars
     List<IRVar*> vars;

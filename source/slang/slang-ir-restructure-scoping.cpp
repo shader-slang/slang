@@ -254,9 +254,7 @@ static void fixValueScopingForInst(
     //
     IRModule* module = regionTree->irCode->getModule();
 
-    SharedIRBuilder sharedBuilder(module);
-
-    IRBuilder builder(sharedBuilder);
+    IRBuilder builder(module);
 
     // Because we will be changing some of the uses of `def`
     // to use other values while we iterate the list, we

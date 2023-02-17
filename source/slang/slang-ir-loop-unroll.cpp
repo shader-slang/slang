@@ -112,7 +112,7 @@ static void _foldAndSimplifyLoopIteration(
         {
             for (auto inst : b->getChildren())
             {
-                tryReplaceInstUsesWithSimplifiedValue(builder.getSharedBuilder(), inst);
+                tryReplaceInstUsesWithSimplifiedValue(builder.getModule(), inst);
             }
         }
 
@@ -120,7 +120,7 @@ static void _foldAndSimplifyLoopIteration(
         // the phi arguments for next iteration evaluated (args in the new loop inst).
         for (auto inst : firstIterationBreakBlock->getChildren())
         {
-            tryReplaceInstUsesWithSimplifiedValue(builder.getSharedBuilder(), inst);
+            tryReplaceInstUsesWithSimplifiedValue(builder.getModule(), inst);
         }
 
         // Fold conditional branches into unconditional branches if the condition is known.
@@ -182,13 +182,13 @@ static void _foldAndSimplifyLoopIteration(
 // Returns true if we can statically determine that the loop terminated within the iteration limit.
 // This operation assumes the loop does not have `continue` jumps, i.e. continueBlock == targetBlock.
 static bool _unrollLoop(
-    SharedIRBuilder* sharedBuilder,
+    IRModule* module,
     IRLoop* loopInst,
     List<IRBlock*>& blocks)
 {
     if (blocks.getCount() == 0)
     {
-        IRBuilder subBuilder(sharedBuilder);
+        IRBuilder subBuilder(module);
         subBuilder.setInsertBefore(loopInst);
         subBuilder.emitBranch(loopInst->getBreakBlock());
         loopInst->removeAndDeallocate();
@@ -211,7 +211,7 @@ static bool _unrollLoop(
     // After this transform, the original break block of the loop will serve as the break block for the
     // outer breakable region.
 
-    IRBuilder builder(sharedBuilder);
+    IRBuilder builder(module);
     
     auto unreachableBlock = builder.createBlock();
     builder.setInsertInto(unreachableBlock);
@@ -468,7 +468,7 @@ List<IRLoop*> collectLoopsInFunc(IRGlobalValueWithCode* func, const TFunc& filte
 }
 
 bool unrollLoopsInFunc(
-    SharedIRBuilder* sharedBuilder,
+    IRModule* module,
     IRGlobalValueWithCode* func,
     DiagnosticSink* sink)
 {
@@ -481,7 +481,7 @@ bool unrollLoopsInFunc(
     for (auto loop : loops)
     {
         // Remove any continue jumps from the loop.
-        eliminateContinueBlocks(sharedBuilder, loop);
+        eliminateContinueBlocks(module, loop);
 
         auto postOrderReverseCFG = getPostorderOnReverseCFG(func);
         Dictionary<IRBlock*, int> blockOrdering;
@@ -493,7 +493,7 @@ bool unrollLoopsInFunc(
 
         auto blocks = _collectBlocksInLoop(blockOrdering, loop);
         auto loopLoc = loop->sourceLoc;
-        if (!_unrollLoop(sharedBuilder, loop, blocks))
+        if (!_unrollLoop(module, loop, blocks))
         {
             if (sink)
                 sink->diagnose(loopLoc, Diagnostics::cannotUnrollLoop);
@@ -508,7 +508,7 @@ bool unrollLoopsInFunc(
     return true;
 }
 
-bool unrollLoopsInModule(SharedIRBuilder* sharedBuilder, IRModule* module, DiagnosticSink* sink)
+bool unrollLoopsInModule(IRModule* module, DiagnosticSink* sink)
 {
     for (auto inst : module->getGlobalInsts())
     {
@@ -516,14 +516,14 @@ bool unrollLoopsInModule(SharedIRBuilder* sharedBuilder, IRModule* module, Diagn
         {
             if (auto func = as<IRGlobalValueWithCode>(findGenericReturnVal(genFunc)))
             {
-                bool result = unrollLoopsInFunc(sharedBuilder, func, sink);
+                bool result = unrollLoopsInFunc(module, func, sink);
                 if (!result)
                     return false;
             }
         }
         else if (auto func = as<IRGlobalValueWithCode>(inst))
         {
-            bool result = unrollLoopsInFunc(sharedBuilder, func, sink);
+            bool result = unrollLoopsInFunc(module, func, sink);
             if (!result)
                 return false;
         }
@@ -548,7 +548,7 @@ static void _moveParams(IRBlock* dest, IRBlock* src)
     }
 }
 
-void eliminateContinueBlocks(SharedIRBuilder* sharedBuilder, IRLoop* loopInst)
+void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
 {
     // Eliminate the continue jumps by turning a loop in the form of:
     //   for (;;)
@@ -585,7 +585,7 @@ void eliminateContinueBlocks(SharedIRBuilder* sharedBuilder, IRLoop* loopInst)
     // We have determined that there is really a non-trivial continue block in the loop body,
     // we will now introduce a breakable region for each iteration.
 
-    IRBuilder builder(sharedBuilder);
+    IRBuilder builder(module);
    
     auto targetBlock = loopInst->getTargetBlock();
 
@@ -613,7 +613,7 @@ void eliminateContinueBlocks(SharedIRBuilder* sharedBuilder, IRLoop* loopInst)
     builder.emitBranch(continueBlock);
 }
 
-void eliminateContinueBlocksInFunc(SharedIRBuilder* sharedBuilder, IRGlobalValueWithCode* func)
+void eliminateContinueBlocksInFunc(IRModule* module, IRGlobalValueWithCode* func)
 {
     List<IRLoop*> loops = collectLoopsInFunc(
         func, [](IRLoop* l) { return l->getContinueBlock() != l->getTargetBlock(); });
@@ -623,7 +623,7 @@ void eliminateContinueBlocksInFunc(SharedIRBuilder* sharedBuilder, IRGlobalValue
 
     for (auto loop : loops)
     {
-        eliminateContinueBlocks(sharedBuilder, loop);
+        eliminateContinueBlocks(module, loop);
     }
 }
 

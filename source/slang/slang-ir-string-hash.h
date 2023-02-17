@@ -9,8 +9,6 @@ namespace Slang
 {
 
 struct IRModule;
-struct SharedIRBuilder;
-
 class DiagnosticSink;
 
 // Finds the global GlobalHashedStringLiterals instruction for the module if there is one, and then
@@ -18,7 +16,7 @@ class DiagnosticSink;
 void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& ioPool);
 
 // Given a pool, with > 0 strings adds a GlobalHashedStringLiterals to the module. 
-void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder& sharedBuilder);
+void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module);
 
 // Find all of the IRGetStringHash instructions within the module
 void findGetStringHashInsts(IRModule* module, List<IRGetStringHash*>& outInsts);

@@ -9,7 +9,6 @@ namespace Slang
 {
 struct IRBuilder;
 struct IRInst;
-struct SharedIRBuilder;
 
 // This file provides an interface to simplify the task of
 // correcting "cloning" IR code, whether individual
@@ -107,7 +106,7 @@ IRInst* cloneInstAndOperands(
     ///
 void cloneInstDecorationsAndChildren(
     IRCloneEnv*         env,
-    SharedIRBuilder*    sharedBuilder,
+    IRModule*           module,
     IRInst*             oldInst,
     IRInst*             newInst);
 

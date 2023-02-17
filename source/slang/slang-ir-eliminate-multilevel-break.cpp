@@ -196,9 +196,7 @@ struct EliminateMultiLevelBreakContext
         if (funcInfo.multiLevelBreaks.getCount() == 0)
             return;
 
-        SharedIRBuilder sharedBuilder;
-        sharedBuilder.init(irModule);
-        IRBuilder builder(&sharedBuilder);
+        IRBuilder builder(irModule);
         builder.setInsertInto(func);
 
         OrderedHashSet<BreakableRegionInfo*> skippedOverRegions;

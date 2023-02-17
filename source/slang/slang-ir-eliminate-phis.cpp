@@ -66,14 +66,12 @@ struct PhiEliminationContext
     // a builder it can use to generate code.
     //
     IRModule* m_module = nullptr;
-    SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
     LivenessMode m_livenessMode;
 
     PhiEliminationContext(LivenessMode livenessMode, IRModule* module)
         : m_module(module)
-        , m_sharedBuilder(module)
-        , m_builder(m_sharedBuilder)
+        , m_builder(module)
         , m_livenessMode(livenessMode)
     {}
 
@@ -140,7 +138,7 @@ struct PhiEliminationContext
 
     void convertInstDefToRegisterAssignment()
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         for (auto instAlloc : m_registerAllocation.mapInstToRegister)
         {
@@ -178,7 +176,7 @@ struct PhiEliminationContext
 
     void replaceInstUseWithRegisterLoad()
     {
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         for (auto instAlloc : m_registerAllocation.mapInstToRegister)
         {

@@ -80,7 +80,7 @@ namespace Slang
 
         IRStringLit* _getWitnessTableWrapperFuncName(IRFunc* func)
         {
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(func);
             if (auto linkageDecoration = func->findDecoration<IRLinkageDecoration>())
@@ -98,7 +98,7 @@ namespace Slang
         {
             auto funcTypeInInterface = cast<IRFuncType>(interfaceRequirementVal);
 
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(func);
 
@@ -219,13 +219,6 @@ namespace Slang
 
         void processModule()
         {
-            // We start by initializing our shared IR building state,
-            // since we will re-use that state for any code we
-            // generate along the way.
-            //
-            SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->init(sharedContext->module);
-
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
             while (sharedContext->workList.getCount() != 0)

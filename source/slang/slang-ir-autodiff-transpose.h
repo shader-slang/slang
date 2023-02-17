@@ -160,7 +160,7 @@ struct DiffTransposePass
         // We shouldn't already have a terminator for this block
         SLANG_ASSERT(revBlock->getTerminator() == nullptr);
 
-        IRBuilder builder(autodiffContext->sharedBuilder);
+        IRBuilder builder(autodiffContext->moduleInst->getModule());
 
         auto currentBlock = block;
         while (!isBlockLastInRegion(currentBlock, endBlocks))
@@ -503,8 +503,7 @@ struct DiffTransposePass
         // look for insts/blocks marked with IRDifferentialInstDecoration,
         // and transpose them in the revDiffFunc.
         //
-        IRBuilder builder;
-        builder.init(autodiffContext->sharedBuilder);
+        IRBuilder builder(autodiffContext->moduleInst);
 
         // Insert after the last block.
         builder.setInsertInto(revDiffFunc);
@@ -632,7 +631,7 @@ struct DiffTransposePass
 
             terminalPrimalBlock->getTerminator()->removeAndDeallocate();
             
-            IRBuilder subBuilder(builder.getSharedBuilder());
+            IRBuilder subBuilder = builder;
             subBuilder.setInsertInto(terminalPrimalBlock);
 
             // There should be no parameters in the first reverse-mode block.
@@ -688,7 +687,7 @@ struct DiffTransposePass
         if (revAccumulatorVarMap.ContainsKey(fwdInst))
             return revAccumulatorVarMap[fwdInst];
         
-        IRBuilder tempVarBuilder(autodiffContext->sharedBuilder);
+        IRBuilder tempVarBuilder(autodiffContext->moduleInst->getModule());
         
         IRBlock* firstDiffBlock = firstRevDiffBlockMap[as<IRFunc>(fwdInst->getParent()->getParent())];
 
@@ -756,8 +755,7 @@ struct DiffTransposePass
     
     void transposeBlock(IRBlock* fwdBlock, IRBlock* revBlock)
     {
-        IRBuilder builder;
-        builder.init(autodiffContext->sharedBuilder);
+        IRBuilder builder(autodiffContext->moduleInst);
  
         // Insert into our reverse block.
         builder.setInsertInto(revBlock);
@@ -1619,7 +1617,7 @@ struct DiffTransposePass
 
     IRBlock* insertPhiBlockBefore(IRBlock* revBlock, List<IRInst*> phiArgs)
     {
-        IRBuilder phiBlockBuilder(autodiffContext->sharedBuilder);
+        IRBuilder phiBlockBuilder(autodiffContext->moduleInst->getModule());
         phiBlockBuilder.setInsertBefore(revBlock);
 
         auto phiBlock = phiBlockBuilder.emitBlock();

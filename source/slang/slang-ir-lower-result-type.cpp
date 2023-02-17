@@ -11,8 +11,6 @@ namespace Slang
         IRModule* module;
         DiagnosticSink* sink;
 
-        SharedIRBuilder sharedBuilderStorage;
-
         List<IRInst*> workList;
         HashSet<IRInst*> workListSet;
 
@@ -113,7 +111,7 @@ namespace Slang
             default:
                 SLANG_ASSERT_FAILURE("error type is not lowered to an integer type.");
             }
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertInto(module);
             return builder->getIntValue(type, 0);
@@ -121,7 +119,7 @@ namespace Slang
 
         void processMakeResultValue(IRMakeResultValue* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -144,7 +142,7 @@ namespace Slang
 
         void processMakeResultError(IRMakeResultError* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -184,7 +182,7 @@ namespace Slang
 
         void processGetResultError(IRGetResultError* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -196,7 +194,7 @@ namespace Slang
 
         void processGetResultValue(IRGetResultValue* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -214,7 +212,7 @@ namespace Slang
 
         void processIsResultError(IRIsResultError* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -233,7 +231,7 @@ namespace Slang
 
         void processResultType(IRResultType* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -271,12 +269,6 @@ namespace Slang
 
         void processModule()
         {
-            SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-            sharedBuilder->init(module);
-
-            // Deduplicate equivalent types.
-            sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
             addToWorkList(module->getModuleInst());
 
             while (workList.getCount() != 0)
