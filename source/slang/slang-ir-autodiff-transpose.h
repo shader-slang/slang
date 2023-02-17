@@ -1051,27 +1051,6 @@ struct DiffTransposePass
         IRBlock* revLoopCondBlock = revBlockMap[firstLoopBlock];
         builder->setInsertBefore(revLoopCondBlock->getTerminator());
 
-        auto loopBaseCondition = as<IRIfElse>(revLoopCondBlock->getTerminator())->getCondition();
-        
-        // Convert the loop from a 'for' into a 'do-while' by skipping the first check
-
-        IRBlock* revLoopStartBlock = revBlockMap[as<IRBlock>(loopInst->getBreakBlock())];
-        builder->setInsertBefore(revLoopStartBlock->getTerminator());
-
-        auto firstLoopCheckSkipVar = builder->emitVar(builder->getBoolType());
-        builder->emitStore(firstLoopCheckSkipVar, builder->getBoolValue(true));
-
-        builder->setInsertBefore(revLoopCondBlock->getTerminator());
-        auto firstLoopCheckSkipVal = builder->emitLoad(firstLoopCheckSkipVar);
-
-        builder->emitStore(firstLoopCheckSkipVar, builder->getBoolValue(false));
-
-        loopBaseCondition = builder->emitIntrinsicInst(
-                builder->getBoolType(),
-                kIROp_Or,
-                2,
-                List<IRInst*>(firstLoopCheckSkipVal, loopBaseCondition).getBuffer());
-
         // Add a terminating condition based on the loop counter's initial primal value
 
         IRParam* loopCounterParam = nullptr;
@@ -1080,7 +1059,7 @@ struct DiffTransposePass
         {   
             if (param->findDecoration<IRLoopCounterDecoration>())
             {
-                // There really should be two (or more) loop counter params.
+                // There really not should be two (or more) loop counter params.
                 SLANG_RELEASE_ASSERT(loopCounterParam == nullptr);
                 loopCounterParam = param;
             }
@@ -1102,15 +1081,8 @@ struct DiffTransposePass
                 List<IRInst*>(
                     hoistPrimalInst(builder, loopCounterParam),
                     hoistPrimalInst(builder, loopCounterInitVal)).getBuffer());
-            
-        loopBaseCondition = builder->emitIntrinsicInst(
-            builder->getBoolType(),
-            kIROp_And,
-            2,
-            List<IRInst*>(paramBoundsCheck, loopBaseCondition).getBuffer());
 
-
-        as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(loopBaseCondition);
+        as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(paramBoundsCheck);
     }
 
     List<InvInstPair> invertInst(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
