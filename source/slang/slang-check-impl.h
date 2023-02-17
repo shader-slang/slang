@@ -508,7 +508,7 @@ namespace Slang
         Type* TranslateTypeNode(Expr* node);
         TypeExp TranslateTypeNodeForced(TypeExp const& typeExp);
         TypeExp TranslateTypeNode(TypeExp const& typeExp);
-
+        Type* getRemovedModifierType(ModifiedType* type, ModifierVal* modifier);
         DeclRefType* getExprDeclRefType(Expr * expr);
 
             /// Is `decl` usable as a static member?
