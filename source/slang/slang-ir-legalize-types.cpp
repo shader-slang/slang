@@ -98,11 +98,8 @@ IRTypeLegalizationContext::IRTypeLegalizationContext(
     session = inModule->getSession();
     module = inModule;
 
-    auto sharedBuilder = &sharedBuilderStorage;
-    sharedBuilder->init(module);
-
+    builderStorage = IRBuilder(inModule);
     builder = &builderStorage;
-    builder->init(sharedBuilder);
 }
 
 static void registerLegalizedValue(

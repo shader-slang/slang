@@ -8,9 +8,6 @@ void PerEntryPointPass::processModule(IRModule* module)
 {
     m_module = module;
 
-    SharedIRBuilder sharedBuilder(module);
-    m_sharedBuilder = &sharedBuilder;
-
     // Note that we are only looking at true global-scope
     // functions and not functions nested inside of
     // IR generics. When using generic entry points, this

@@ -2,16 +2,16 @@
 
 namespace Slang
 {
-    void SharedIRBuilder::deduplicateAndRebuildGlobalNumberingMap()
+    void IRDeduplicationContext::init(IRModule* module)
     {
+        m_module = module;
+        m_session = module->getSession();
+
+        m_globalValueNumberingMap.Clear();
+        m_constantMap.Clear();
     }
 
-    void SharedIRBuilder::replaceGlobalInst(IRInst* oldInst, IRInst* newInst)
-    {
-        oldInst->replaceUsesWith(newInst);
-    }
-
-    void SharedIRBuilder::removeHoistableInstFromGlobalNumberingMap(IRInst* instToRemove)
+    void IRDeduplicationContext::removeHoistableInstFromGlobalNumberingMap(IRInst* instToRemove)
     {
         HashSet<IRInst*> userWorkListSet;
         List<IRInst*> userWorkList;
@@ -39,7 +39,7 @@ namespace Slang
         IRBuilder* builder,
         IRInst* inst);
 
-    void SharedIRBuilder::tryHoistInst(IRInst* inst)
+    void IRDeduplicationContext::tryHoistInst(IRInst* inst)
     {
         List<IRInst*> workList;
         HashSet<IRInst*> workListSet;

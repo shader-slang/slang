@@ -19,8 +19,7 @@ struct ConvertEntryPointPtrParamsToRawPtrsPass
 
     void processModule()
     {
-        SharedIRBuilder sharedBuilder(m_module);
-        IRBuilder builder(&sharedBuilder);
+        IRBuilder builder(m_module);
 
         // We start by getting and caching the raw pointer type.
         //

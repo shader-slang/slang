@@ -8,9 +8,7 @@ namespace Slang
 
 void legalizeMeshOutputTypes(IRModule* module)
 {
-    SharedIRBuilder builderStorage;
-    builderStorage.init(module);
-    IRBuilder builder(&builderStorage);
+    IRBuilder builder(module);
 
     for (auto inst : module->getGlobalInsts())
     {

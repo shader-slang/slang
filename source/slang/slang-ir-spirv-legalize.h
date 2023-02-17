@@ -15,13 +15,11 @@ class TargetRequest;
 
 struct SPIRVEmitSharedContext
 {
-    SharedIRBuilder m_sharedIRBuilder;
-    Dictionary<IRTargetIntrinsicDecoration*, RefPtr<SpvSnippet>> m_parsedSpvSnippets;
+    IRModule* m_irModule;
     TargetRequest* m_targetRequest;
-
+    Dictionary<IRTargetIntrinsicDecoration*, RefPtr<SpvSnippet>> m_parsedSpvSnippets;
     SPIRVEmitSharedContext(IRModule* module, TargetRequest* target)
-        : m_sharedIRBuilder(module)
-        , m_targetRequest(target)
+        : m_irModule(module), m_targetRequest(target)
     {}
 
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic)

@@ -127,8 +127,8 @@ struct CollectGlobalUniformParametersContext
         // the collected global-scope parameters. The `IRBuilder` we construct
         // for this will also be used when replacing the individual parameters.
         //
-        SharedIRBuilder sharedBuilder(module);
-        IRBuilder builderStorage(sharedBuilder);
+
+        IRBuilder builderStorage(module);
         IRBuilder* builder = &builderStorage;
         builder->setInsertInto(module->getModuleInst());
 

@@ -126,8 +126,7 @@ struct DiffUnzipPass
     {
         diffTypeContext.setFunc(func);
 
-        IRBuilder builderStorage;
-        builderStorage.init(autodiffContext->sharedBuilder);
+        IRBuilder builderStorage(autodiffContext->moduleInst->getModule());
         
         IRBuilder* builder = &builderStorage;
 
@@ -334,8 +333,7 @@ struct DiffUnzipPass
 
     void lowerIndexedRegions()
     {
-        IRBuilder builder(autodiffContext->sharedBuilder);
-
+        IRBuilder builder(autodiffContext->moduleInst->getModule());
 
         for (auto region : indexRegions)
         {
@@ -467,7 +465,7 @@ struct DiffUnzipPass
         for (auto child = primalBlock->getFirstChild(); child; child = child->getNextInst())
             primalInsts.add(child);
 
-        IRBuilder builder(autodiffContext->sharedBuilder);
+        IRBuilder builder(autodiffContext->moduleInst->getModule());
 
         // Build list of indices that this block is affected by.
         List<IndexedRegion*> regions;
@@ -646,8 +644,7 @@ struct DiffUnzipPass
 
     InstPair splitCall(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRCall* mixedCall)
     {
-        IRBuilder globalBuilder;
-        globalBuilder.init(autodiffContext->sharedBuilder);
+        IRBuilder globalBuilder(autodiffContext->moduleInst->getModule());
 
         auto fwdCalleeType = mixedCall->getCallee()->getDataType();
         auto baseFn = _getOriginalFunc(mixedCall);
@@ -1247,12 +1244,10 @@ struct DiffUnzipPass
     void splitBlock(IRBlock* block, IRBlock* primalBlock, IRBlock* diffBlock)
     {
         // Make two builders for primal and differential blocks.
-        IRBuilder primalBuilder;
-        primalBuilder.init(autodiffContext->sharedBuilder);
+        IRBuilder primalBuilder(autodiffContext->moduleInst->getModule());
         primalBuilder.setInsertInto(primalBlock);
 
-        IRBuilder diffBuilder;
-        diffBuilder.init(autodiffContext->sharedBuilder);
+        IRBuilder diffBuilder(autodiffContext->moduleInst->getModule());
         diffBuilder.setInsertInto(diffBlock);
 
         List<IRInst*> splitInsts;

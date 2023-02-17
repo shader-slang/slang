@@ -1267,7 +1267,7 @@ void ForwardDiffTranscriber::checkAutodiffInstDecorations(IRFunc* fwdFunc)
 // Transcribe a function definition.
 InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
 {
-    IRBuilder builder(inBuilder->getSharedBuilder());
+    IRBuilder builder = *inBuilder;
     builder.setInsertInto(diffFunc);
 
     differentiableTypeConformanceContext.setFunc(primalFunc);

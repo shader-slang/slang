@@ -54,7 +54,6 @@ struct IRSharedSpecContext
     typedef Dictionary<String, RefPtr<IRSpecSymbol>> SymbolDictionary;
     SymbolDictionary symbols;
 
-    SharedIRBuilder sharedBuilderStorage;
     IRBuilder builderStorage;
 
     // The "global" specialization environment.
@@ -1369,19 +1368,13 @@ void initializeSharedSpecContext(
     CodeGenTarget           target,
     TargetRequest*          targetReq)
 {
-
-    SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-
-    IRBuilder* builder = &sharedContext->builderStorage;
-
     RefPtr<IRModule> module = inModule;
     if( !module )
     {
         module = IRModule::create(session);
     }
 
-    sharedBuilder->init(module);
-    builder->init(sharedBuilder);
+    sharedContext->builderStorage = IRBuilder(module);
 
     sharedContext->module = module;
     sharedContext->target = target;
@@ -1506,12 +1499,11 @@ LinkedIR linkIR(
     // Combine all of the contents of IRGlobalHashedStringLiterals
     {
         StringSlicePool pool(StringSlicePool::Style::Empty);
-        IRBuilder& builder = sharedContext->builderStorage;
         for (IRModule* irModule : irModules)
         {
             findGlobalHashedStringLiterals(irModule, pool);
         }
-        addGlobalHashedStringLiterals(pool, *builder.getSharedBuilder());
+        addGlobalHashedStringLiterals(pool, state->irModule);
     }
 
     // Set up shared and builder insert point

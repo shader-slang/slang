@@ -79,7 +79,7 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
 
         // We will set up an IR builder so that we are ready to generate code.
         //
-        IRBuilder builderStorage(m_sharedBuilder);
+        IRBuilder builderStorage(m_module);
         auto builder = &builderStorage;
 
         // We will be removing any uniform parameters we run into, so we
@@ -234,7 +234,7 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         if (paramStructType)
             return;
 
-        IRBuilder builder(m_sharedBuilder);
+        IRBuilder builder(m_module);
 
         // First we create the structure to hold the parameters.
         //

@@ -47,7 +47,7 @@ struct BreakableRegionInfo
 
 struct CFGNormalizationContext
 {
-    SharedIRBuilder* sharedBuilder;
+    IRModule* module;
     DiagnosticSink*  sink;
 };
 
@@ -155,7 +155,7 @@ struct CFGNormalizationPass
         if (afterBlocks.contains(currentBlock))
             return RegionEndpoint(currentBlock, currBreakRegion, currBaseRegion, true);
         
-        IRBuilder builder(cfgContext.sharedBuilder);
+        IRBuilder builder(cfgContext.module);
 
         List<IRBlock*> pendingAfterBlocks;
 
@@ -391,7 +391,7 @@ struct CFGNormalizationPass
     IRBlock* normalizeBreakableRegion(
         IRInst* branchInst)
     {
-        IRBuilder builder(cfgContext.sharedBuilder);
+        IRBuilder builder(cfgContext.module);
 
         switch (branchInst->getOp())
         {
@@ -577,7 +577,7 @@ struct CFGNormalizationPass
 };
 
 void normalizeCFG(
-    SharedIRBuilder*                  sharedBuilder,
+    IRModule*                         module,
     IRGlobalValueWithCode*            func,
     IRCFGNormalizationPass const&     options)
 {
@@ -586,7 +586,7 @@ void normalizeCFG(
     // 
     eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func);
 
-    CFGNormalizationContext context = {sharedBuilder, options.sink};   
+    CFGNormalizationContext context = {module, options.sink};   
     CFGNormalizationPass cfgPass(context);
     
     List<IRBlock*> workList;
@@ -615,7 +615,7 @@ void normalizeCFG(
     }
 
     disableIRValidationAtInsert();
-    constructSSA(sharedBuilder, func);
+    constructSSA(module, func);
     enableIRValidationAtInsert();
 }
 

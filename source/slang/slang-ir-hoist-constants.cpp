@@ -14,8 +14,6 @@ struct HoistConstantPass : InstPassBase
 
     void processModule()
     {
-        sharedBuilderStorage.init(module);
-
         processAllInsts([this](IRInst* inst)
             {
                 

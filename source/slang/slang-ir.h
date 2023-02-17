@@ -1911,13 +1911,12 @@ struct IRConstantKey
     HashCode getHashCode() const { return inst->getHashCode(); }
 };
 
-struct SharedIRBuilder
+// State owned by IRModule for global value deduplication.
+// Not supposed to be used/instantiated outside IRModule.
+struct IRDeduplicationContext
 {
 public:
-    SharedIRBuilder()
-    {}
-
-    explicit SharedIRBuilder(IRModule* module)
+    IRDeduplicationContext(IRModule* module)
     {
         init(module);
     }
@@ -1933,15 +1932,6 @@ public:
     {
         return m_session;
     }
-
-    void insertBlockAlongEdge(IREdge const& edge);
-
-    // Rebuilds `globalValueNumberingMap`. This is necessary if any existing
-    // keys are modified (thus its hash code is changed).
-    void deduplicateAndRebuildGlobalNumberingMap();
-
-    // Replaces all uses of oldInst with newInst, and ensures the global numbering map is valid after the replacement.
-    void replaceGlobalInst(IRInst* oldInst, IRInst* newInst);
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
 
@@ -2003,7 +1993,7 @@ public:
     SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst;  }
     SLANG_FORCE_INLINE MemoryArena& getMemoryArena() { return m_memoryArena; }
 
-    SharedIRBuilder* getSharedBuilder() const { return &m_sharedBuilder; }
+    IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
 
@@ -2048,7 +2038,7 @@ private:
     IRModule(Session* session)
         : m_session(session)
         , m_memoryArena(kMemoryArenaBlockSize)
-        , m_sharedBuilder(this)
+        , m_deduplicationContext(this)
     {
     }
 
@@ -2067,8 +2057,8 @@ private:
         /// The memory arena from which all IR instructions (and any associated state) in this module are allocated.
     MemoryArena m_memoryArena;
 
-        /// Shared contexts for constructing and maintaining the IR.
-    mutable SharedIRBuilder m_sharedBuilder;
+        /// Shared contexts for constructing and deduplicating the IR.
+    mutable IRDeduplicationContext m_deduplicationContext;
 };
 
 struct IRSpecializationDictionaryItem : public IRInst

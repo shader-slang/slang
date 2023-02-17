@@ -11,8 +11,6 @@ namespace Slang
         IRModule* module;
         DiagnosticSink* sink;
 
-        SharedIRBuilder sharedBuilderStorage;
-
         List<IRInst*> workList;
         HashSet<IRInst*> workListSet;
 
@@ -85,7 +83,7 @@ namespace Slang
 
         void processMakeTuple(IRMakeTuple* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -103,7 +101,7 @@ namespace Slang
 
         void processGetTupleElement(IRGetTupleElement* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -121,7 +119,7 @@ namespace Slang
 
         void processTupleType(IRTupleType* inst)
         {
-            IRBuilder builderStorage(sharedBuilderStorage);
+            IRBuilder builderStorage(module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
 
@@ -150,12 +148,6 @@ namespace Slang
 
         void processModule()
         {
-            SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-            sharedBuilder->init(module);
-
-            // Deduplicate equivalent types.
-            sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
             addToWorkList(module->getModuleInst());
 
             while (workList.getCount() != 0)

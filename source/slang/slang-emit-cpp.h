@@ -5,9 +5,6 @@
 #include "slang-emit-c-like.h"
 #include "slang-ir-clone.h"
 
-#include "slang-ir-type-set.h"
-#include "slang-hlsl-intrinsic-set.h"
-
 #include "../core/slang-string-slice-pool.h"
 
 namespace Slang

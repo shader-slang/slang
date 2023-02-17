@@ -236,8 +236,7 @@ struct InliningPassBase
         // and will set it up to insert before the `call` that
         // is going to be replaced.
         //
-        SharedIRBuilder sharedBuilder(m_module);
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(m_module);
         builder.setInsertBefore(call);
 
         // If callee is an intrinsic op, just issue that intrinsic and be done.

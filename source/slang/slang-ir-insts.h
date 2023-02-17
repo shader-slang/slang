@@ -2441,8 +2441,8 @@ struct IRBuilderSourceLocRAII;
 struct IRBuilder
 {
 private:
-    /// Shared state for all IR builders working on the same module
-    SharedIRBuilder* m_sharedBuilder = nullptr;
+    /// Deduplication context from the module.
+    IRDeduplicationContext* m_dedupContext = nullptr;
 
     IRModule* m_module = nullptr;
 
@@ -2458,31 +2458,13 @@ public:
 
     explicit IRBuilder(IRModule* module)
         : m_module(module)
-        , m_sharedBuilder(module->getSharedBuilder())
+        , m_dedupContext(module->getDeduplicationContext())
     {}
 
-    explicit IRBuilder(SharedIRBuilder* sharedBuilder)
-        : IRBuilder(sharedBuilder->getModule())
+    explicit IRBuilder(IRInst* inst)
+        : m_module(inst->getModule())
+        , m_dedupContext(inst->getModule()->getDeduplicationContext())
     {}
-
-    explicit IRBuilder(SharedIRBuilder& sharedBuilder)
-        : IRBuilder(sharedBuilder.getModule())
-    {}
-
-    void init(SharedIRBuilder* sharedBuilder)
-    {
-        *this = IRBuilder(sharedBuilder);
-    }
-
-    void init(SharedIRBuilder& sharedBuilder)
-    {
-        *this = IRBuilder(sharedBuilder);
-    }
-
-    SharedIRBuilder* getSharedBuilder() const
-    {
-        return m_module->getSharedBuilder();
-    }
 
     Session* getSession() const
     {
@@ -3109,7 +3091,7 @@ public:
         ///
     IRBlock* emitBlock();
 
-    
+    static void insertBlockAlongEdge(IRModule* module, IREdge const& edge);
 
     IRParam* createParam(
         IRType* type);

@@ -86,8 +86,7 @@ struct DeadCodeEliminationContext
     {
         if (!undefInst)
         {
-            SharedIRBuilder builderStorage(module);
-            IRBuilder builder(&builderStorage);
+            IRBuilder builder(module);
             if (auto firstChild = module->getModuleInst()->getFirstChild())
                 builder.setInsertBefore(firstChild);
             else

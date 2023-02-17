@@ -1532,7 +1532,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto irFunc = getBuilder()->createFunc();
                 irSatisfyingVal = irFunc;
 
-                IRBuilder subBuilderStorage(getBuilder()->getSharedBuilder());
+                IRBuilder subBuilderStorage = *getBuilder();
                 auto subBuilder = &subBuilderStorage;
                 subBuilder->setInsertInto(irFunc);
 
@@ -7593,7 +7593,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //       return f : ftype;
             //    }
             // ```
-            IRBuilder typeBuilder(subBuilder->getSharedBuilder());
+            IRBuilder typeBuilder(subBuilder->getModule());
             IRCloneEnv cloneEnv = {};
             if (returnType)
             {
@@ -8587,7 +8587,7 @@ LoweredValInfo ensureDecl(
         SLANG_UNEXPECTED("Generic type/value shouldn't be handled here!");
     }
 
-    IRBuilder subIRBuilder(context->irBuilder->getSharedBuilder());
+    IRBuilder subIRBuilder(context->irBuilder->getModule());
     subIRBuilder.setInsertInto(subIRBuilder.getModule());
 
     IRGenEnv subEnv;
@@ -9025,10 +9025,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     RefPtr<IRModule> module = IRModule::create(session);
 
-    SharedIRBuilder sharedBuilderStorage(module);
-    SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-
-    IRBuilder builderStorage(sharedBuilder);
+    IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;
 
     context->irBuilder = builder;
@@ -9149,7 +9146,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     checkForMissingReturns(module, compileRequest->getSink());
 
     // Check for invalid differentiable function body.
-    checkAutoDiffUsages(sharedBuilder, module, compileRequest->getSink());
+    checkAutoDiffUsages(module, compileRequest->getSink());
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
@@ -9248,10 +9245,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 
         RefPtr<IRModule> module = IRModule::create(session);
 
-        SharedIRBuilder sharedBuilderStorage(module);
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-
-        IRBuilder builderStorage(sharedBuilder);
+        IRBuilder builderStorage(module);
         builder = &builderStorage;
 
         builder->setInsertInto(module);
@@ -9385,10 +9379,7 @@ struct TypeConformanceIRGenContext
 
         RefPtr<IRModule> module = IRModule::create(session);
 
-        SharedIRBuilder sharedBuilderStorage(module);
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-
-        IRBuilder builderStorage(sharedBuilder);
+        IRBuilder builderStorage(module);
         builder = &builderStorage;
 
         builder->setInsertInto(module);
@@ -9733,10 +9724,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     RefPtr<IRModule> irModule = IRModule::create(session);
 
-    SharedIRBuilder sharedBuilderStorage(irModule);
-    auto sharedBuilder = &sharedBuilderStorage;
-
-    IRBuilder builderStorage(sharedBuilder);
+    IRBuilder builderStorage(irModule);
     auto builder = &builderStorage;
 
     builder->setInsertInto(irModule);

@@ -156,7 +156,7 @@ namespace Slang
             for (UInt i = 0; i < funcType->getParamCount(); i++)
                 paramTypes.add(funcType->getParamType(i));
 
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(callInst);
 
@@ -288,7 +288,7 @@ namespace Slang
             if (isBuiltin(interfaceType))
                 return;
 
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(callInst);
 
@@ -348,13 +348,6 @@ namespace Slang
 
         void processModule()
         {
-            // We start by initializing our shared IR building state,
-            // since we will re-use that state for any code we
-            // generate along the way.
-            //
-            SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->init(sharedContext->module);
-
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
             while (sharedContext->workList.getCount() != 0)

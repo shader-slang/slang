@@ -275,8 +275,7 @@ struct BindExistentialSlots
 
         auto fullType = inst->getFullType();
 
-        SharedIRBuilder sharedBuilder(module);
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
 
         // Every argument that is filling an existential
         // type param/slot comprises both a type and

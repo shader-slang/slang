@@ -116,8 +116,7 @@ void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
 
 void legalizeImageSubscriptForGLSL(IRModule* module)
 {
-    SharedIRBuilder shared(module);
-    IRBuilder builder(shared);
+    IRBuilder builder(module);
     for (auto globalInst : module->getModuleInst()->getChildren())
     {
         auto func = as<IRFunc>(globalInst);
@@ -152,8 +151,7 @@ IRGlobalParam* addGlobalParam(
     IRModule*   module,
     IRType*     valueType)
 {
-    SharedIRBuilder shared(module);
-    IRBuilder builder(shared);
+    IRBuilder builder(module);
 
     return builder.createGlobalParam(valueType);
 }
@@ -2345,7 +2343,7 @@ void legalizeEntryPointParameterForGLSL(
             // disrupt the source location it is using for inserting
             // temporary variables at the top of the function.
             //
-            IRBuilder terminatorBuilder(builder->getSharedBuilder());
+            IRBuilder terminatorBuilder(func);
             terminatorBuilder.setInsertBefore(terminatorInst);
 
             // Assign from the local variabel to the global output
@@ -2415,8 +2413,7 @@ void legalizeEntryPointForGLSL(
     //
     // TODO: make some of these free functions...
     //
-    SharedIRBuilder shared(module);
-    IRBuilder builder(shared);
+    IRBuilder builder(module);
     builder.setInsertInto(func);
 
     context.builder = &builder;
