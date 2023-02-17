@@ -1291,6 +1291,16 @@ namespace Slang
         {
             checkExtensionExternVarAttribute(varDecl, extensionExternAttr);
         }
+
+        // If a var decl has no_diff type, move the no_diff modifier from the type to the var.
+        if (auto modifiedType = as<ModifiedType>(varDecl->type.type))
+        {
+            if (auto nodiffModifier = modifiedType->findModifier<NoDiffModifierVal>())
+            {
+                varDecl->type.type = getRemovedModifierType(modifiedType, nodiffModifier);
+                addModifier(varDecl, m_astBuilder->getOrCreate<NoDiffModifier>());
+            }
+        }
     }
 
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -1527,6 +1537,8 @@ namespace Slang
         // Go through all var members.
         for (auto member : context->parentDecl->getMembersOfType<VarDeclBase>())
         {
+            if (member->hasModifier<NoDiffModifier>())
+                continue;
             auto diffType = tryGetDifferentialType(m_astBuilder, member->type.type);
             if (!diffType)
                 continue;

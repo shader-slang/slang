@@ -3320,6 +3320,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo getSimpleDefaultVal(IRType* type)
     {
+        type = (IRType*)unwrapAttributedType(type);
         if(auto basicType = as<IRBasicType>(type))
         {
             switch( basicType->getBaseType() )
@@ -3355,8 +3356,18 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    Type* getOriginalTypeFromModifiedType(Type* type)
+    {
+        auto innerType = type;
+        while (auto modifiedType = as<ModifiedType>(innerType))
+            innerType = modifiedType->base;
+        return innerType;
+    }
+
     LoweredValInfo getDefaultVal(Type* type)
     {
+        type = getOriginalTypeFromModifiedType(type);
+
         auto irType = lowerType(context, type);
         if (auto basicType = as<BasicExpressionType>(type))
         {
@@ -7909,6 +7920,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isClassType(IRType* type)
     {
+        type = (IRType*)unwrapAttributedType(type);
         if (auto specialize = as<IRSpecialize>(type))
         {
             return findSpecializeReturnVal(specialize)->getOp() == kIROp_ClassType;
