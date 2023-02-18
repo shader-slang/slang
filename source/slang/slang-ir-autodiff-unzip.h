@@ -794,6 +794,7 @@ struct DiffUnzipPass
 
         auto primalVal = primalBuilder->emitCallInst(primalType, primalFn, primalArgs);
         primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
+        primalBuilder->markInstAsPrimal(primalVal);
 
         SLANG_RELEASE_ASSERT(mixedCall->getArgCount() <= primalFuncType->getParamCount());
 
@@ -1377,6 +1378,11 @@ struct DiffUnzipPass
         // Remove insts that were split.
         for (auto inst : splitInsts)
         {
+            if (!isDifferentiableType(diffTypeContext, inst->getDataType()))
+            {
+                inst->replaceUsesWith(lookupPrimalInst(inst));
+            }
+
             // Consistency check.
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {

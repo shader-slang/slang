@@ -1151,16 +1151,15 @@ namespace Slang
                     while (refUse)
                     {
                         auto nextUse = refUse->nextUse;
-                        switch (refUse->getUser()->getOp())
+                        // Is this use the dest operand of a store inst?
+                        // If so, replace it with writeRefReplacement, otherwise, refReplacement.
+                        if (refUse->getUser()->getOp() == kIROp_Store && refUse == refUse->getUser()->getOperands())
                         {
-                        case kIROp_Load:
-                            refUse->set(diffRefReplacement);
-                            break;
-                        case kIROp_Store:
+                            SLANG_RELEASE_ASSERT(diffWriteRefReplacement);
                             refUse->set(diffWriteRefReplacement);
-                            break;
-                        default:
-                            SLANG_RELEASE_ASSERT(!diffWriteRefReplacement);
+                        }
+                        else
+                        {
                             refUse->set(diffRefReplacement);
                         }
                         refUse = nextUse;
