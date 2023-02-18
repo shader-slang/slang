@@ -588,7 +588,7 @@ struct DiffUnzipPass
                     arrayType,
                     builder.getIntValue(
                         builder.getUIntType(),
-                        region->maxIters));
+                        region->maxIters + 1));
             }
 
             // Reverse the list since the indices needs to be 
