@@ -15,11 +15,26 @@ jobs:
       matrix:
         configuration: ['Debug', 'Release']
         platform: ['Win32', 'x64']
+        include:
+          - platform: Win32
+            testPlatform: x86
+          - platform: x64
+            testPlatform: x64
+          - testCategory: quick
+          - platform: x64
+            testCategory: full
+          - configuration: Debug
+            testCategory: smoke
     steps:
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
         fetch-depth: '0'
+    - uses: robinraju/release-downloader@v1.7
+      with:
+        latest: true
+        repository: "shader-slang/swiftshader"
+        fileName: "vk_swiftshader_windows_${{matrix.testPlatform}}.zip"
     - name: setup-msbuild
       uses: microsoft/setup-msbuild@v1
     - name: build
@@ -47,24 +62,8 @@ jobs:
           docs/*.md
     - name: test
       run: |
-        if ("${{matrix.configuration}}" -eq "Debug") {
-          $testCategory = "smoke";
-        }
-        elseif("${{matrix.platform}}" -eq "x64") {
-          $testCategory = "full";
-        }
-        else {
-          $testCategory = "quick";
-        }
-        if ("${{matrix.platform}}" -eq "Win32") {
-          $testPlatform = "x86";
-        }
-        else {
-          $testPlatform = "x64";
-        }
-        $slangTestBinDir = ".\bin\windows-$testPlatform\${{matrix.configuration}}\";
+        $slangTestBinDir = ".\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\";
         $env:Path += ";$slangTestBinDir";
-        Invoke-WebRequest -uri "https://github.com/shader-slang/swiftshader/releases/download/v1.0/vk_swiftshader_windows_$testPlatform.zip" -Method "GET"  -Outfile "swiftshader.zip";
-        Expand-Archive "swiftshader.zip" -DestinationPath $slangTestBinDir;
-        & "$slangTestBinDir\slang-test.exe" -api all-dx12 -appveyor -bindir "$slangTestBinDir\" -platform $testPlatform -configuration ${{matrix.configuration}} -category $testCategory 2>&1;
+        Expand-Archive "vk_swiftshader_windows_${{matrix.testPlatform}}.zip" -DestinationPath $slangTestBinDir;
+        & "$slangTestBinDir\slang-test.exe" -api all-dx12 -appveyor -bindir "$slangTestBinDir\" -platform $testPlatform -configuration ${{matrix.configuration}} -category ${{matrix.testCategory}} 2>&1;
     
