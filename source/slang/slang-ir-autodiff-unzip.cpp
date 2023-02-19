@@ -137,39 +137,8 @@ struct ExtractPrimalFuncContext
             return false;
         }
 
-        // Only store allowed types.
-        if (isScalarIntegerType(inst->getDataType()))
-        {
-        }
-        else if (as<IRResourceTypeBase>(inst->getDataType()))
-        {
-        }
-        else
-        {
-            switch (inst->getDataType()->getOp())
-            {
-            case kIROp_StructType:
-            case kIROp_OptionalType:
-            case kIROp_TupleType:
-            case kIROp_ArrayType:
-            case kIROp_DifferentialPairType:
-            case kIROp_InterfaceType:
-            case kIROp_AnyValueType:
-            case kIROp_ClassType:
-            case kIROp_FloatType:
-            case kIROp_HalfType:
-            case kIROp_DoubleType:
-            case kIROp_VectorType:
-            case kIROp_MatrixType:
-            case kIROp_BoolType:
-            case kIROp_Param:
-            case kIROp_Specialize:
-            case kIROp_LookupWitness:
-                break;
-            default:
-                return false;
-            }
-        }
+        if (!canInstBeStored(inst))
+            return false;
 
         // Never store certain opcodes.
         switch (inst->getOp())
