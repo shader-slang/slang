@@ -13,6 +13,7 @@
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-init-local-var.h"
 #include "slang-ir-redundancy-removal.h"
+#include "slang-ir-dominators.h"
 
 namespace Slang
 {
@@ -674,6 +675,58 @@ namespace Slang
         return fwdDiffFunc;
     }
 
+    void BackwardDiffTranscriberBase::insertVariableForRecomputedPrimalInsts(IRFunc* diffPropFunc)
+    {
+        RefPtr<IRDominatorTree> domTree = computeDominatorTree(diffPropFunc);
+        auto firstBlock = diffPropFunc->getFirstBlock();
+        if (!firstBlock)
+            return;
+        Dictionary<IRInst*, IRVar*> instVars;
+        auto storeInstAsLocalVar = [&](IRInst* inst)
+        {
+            IRVar* var = nullptr;
+            if (instVars.TryGetValue(inst, var))
+                return var;
+            IRBuilder builder(diffPropFunc);
+            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+            var = builder.emitVar(inst->getDataType());
+            builder.emitStore(var, builder.emitDefaultConstruct(inst->getDataType()));
+
+            setInsertAfterOrdinaryInst(&builder, inst);
+            builder.emitStore(var, inst);
+            instVars[inst] = var;
+            return var;
+        };
+
+        IRBuilder builder(diffPropFunc);
+        for (auto block : diffPropFunc->getBlocks())
+        {
+            if (!block->findDecoration<IRDifferentialInstDecoration>())
+                continue;
+            for (auto inst : block->getChildren())
+            {
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    auto operand = inst->getOperand(i);
+                    auto operandParent = inst->getOperand(i)->getParent();
+                    if (!operandParent)
+                        continue;
+                    if (operandParent->parent != diffPropFunc)
+                        continue;
+                    if (domTree->dominates(operandParent, block))
+                        continue;
+
+                    // The def site of the operand does not dominate the use.
+                    // We need to insert a local variable to store this var.
+                    auto var = storeInstAsLocalVar(operand);
+                    builder.setInsertBefore(inst);
+                    auto operandReplacement = builder.emitLoad(var);
+                    builder.replaceOperand(inst->getOperands() + i, operandReplacement);
+                }
+            }
+        }
+    }
+
     InstPair BackwardDiffTranscriberBase::transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
     {
         SLANG_UNUSED(primalType);
@@ -838,6 +891,8 @@ namespace Slang
 
         initializeLocalVariables(builder->getModule(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
         initializeLocalVariables(builder->getModule(), diffPropagateFunc);
+        insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
+        stripTempDecorations(diffPropagateFunc);
     }
 
     ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(

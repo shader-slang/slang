@@ -507,11 +507,19 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                 else
                 {
                     // Orindary value.
-                    auto val = builder.emitFieldExtract(
-                        inst->getFullType(),
-                        intermediateVar,
-                        structKeyDecor->getStructKey());
-                    inst->replaceUsesWith(val);
+                    // We insert a fieldExtract at each use site instead of before `inst`,
+                    // since at this stage of autodiff pass, `inst` does not necessarily
+                    // dominate all the use sites if `inst` is defined in partial branch
+                    // in a primal block.
+                    while (auto iuse = inst->firstUse)
+                    {
+                        builder.setInsertBefore(iuse->getUser());
+                        auto val = builder.emitFieldExtract(
+                            inst->getFullType(),
+                            intermediateVar,
+                            structKeyDecor->getStructKey());
+                        iuse->set(val);
+                    }
                 }
                 instsToRemove.add(inst);
             }
@@ -529,8 +537,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     {
         inst->removeAndDeallocate();
     }
-    
-    stripTempDecorations(func);
 
     return primalFunc;
 }

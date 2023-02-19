@@ -498,34 +498,6 @@ struct DiffUnzipPass
         }
     }
 
-    void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
-    {
-        if (as<IRParam>(inst))
-        {
-            SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
-            auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
-            builder->setInsertAfter(lastParam);
-        }
-        else
-        {
-            builder->setInsertBefore(inst);
-        }
-    }
-
-    void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
-    {
-        if (as<IRParam>(inst))
-        {
-            SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
-            auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
-            builder->setInsertAfter(lastParam);
-        }
-        else
-        {
-            builder->setInsertAfter(inst);
-        }
-    }
-
     void processIndexedFwdBlock(IRBlock* fwdBlock)
     {
         if (!isBlockIndexed(fwdBlock))
