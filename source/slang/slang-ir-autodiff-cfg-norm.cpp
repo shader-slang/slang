@@ -473,14 +473,36 @@ struct CFGNormalizationPass
                     loopEndPoint = falseEndPoint;
                     isLoopOnTrueSide = false;
                 }
-                
-                SLANG_RELEASE_ASSERT(loopEndPoint.exitBlock);
 
-                // Special case.. the if-else of a loop needs it's
-                // after block to be pointing at the last block before
-                // it loops back to the if-else.
+                // Right now, we only support loops where the loop is on the true side of
+                // the condition. If we ever encounter the other case, fill in logic to 
+                // flip the condition.
+                //
+                SLANG_RELEASE_ASSERT(isLoopOnTrueSide);
+                
+                // Expect atleast one basic block (other than the condition block), in
+                // the loop.
+                //
+                SLANG_RELEASE_ASSERT(loopEndPoint.exitBlock);
+                SLANG_RELEASE_ASSERT(!loopEndPoint.isRegionEmpty);
+
+                // Normalize the 'continue' region. 
+                // (i.e if there is no unique continue block, add one)
                 // 
-                // ifElse->afterBlock.set(loopEndPoint.exitBlock);
+                if (as<IRLoop>(branchInst)->getContinueBlock() == condBlock)
+                {
+                    auto loopExitBranch = as<IRUnconditionalBranch>(loopEndPoint.exitBlock->getTerminator());
+                    SLANG_RELEASE_ASSERT(loopExitBranch);
+
+                    IREdge edge = loopEndPoint.exitBlock->getSuccessors().begin().getEdge();
+                    builder.insertBlockAlongEdge(branchInst->getModule(), edge);
+
+                    auto newLoopExitBranch = as<IRUnconditionalBranch>(loopEndPoint.exitBlock->getTerminator());
+                    
+                    auto newCountinueBlock = newLoopExitBranch->getTargetBlock();
+                    
+                    as<IRLoop>(branchInst)->continueBlock.set(newCountinueBlock);
+                }
 
                 // Does the loop endpoint have both 'break' and 'base'
                 // control flows?
