@@ -486,24 +486,6 @@ struct CFGNormalizationPass
                 SLANG_RELEASE_ASSERT(loopEndPoint.exitBlock);
                 SLANG_RELEASE_ASSERT(!loopEndPoint.isRegionEmpty);
 
-                // Normalize the 'continue' region. 
-                // (i.e if there is no unique continue block, add one)
-                // 
-                if (as<IRLoop>(branchInst)->getContinueBlock() == condBlock)
-                {
-                    auto loopExitBranch = as<IRUnconditionalBranch>(loopEndPoint.exitBlock->getTerminator());
-                    SLANG_RELEASE_ASSERT(loopExitBranch);
-
-                    IREdge edge = loopEndPoint.exitBlock->getSuccessors().begin().getEdge();
-                    builder.insertBlockAlongEdge(branchInst->getModule(), edge);
-
-                    auto newLoopExitBranch = as<IRUnconditionalBranch>(loopEndPoint.exitBlock->getTerminator());
-                    
-                    auto newCountinueBlock = newLoopExitBranch->getTargetBlock();
-                    
-                    as<IRLoop>(branchInst)->continueBlock.set(newCountinueBlock);
-                }
-
                 // Does the loop endpoint have both 'break' and 'base'
                 // control flows?
                 // 
