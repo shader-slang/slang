@@ -466,6 +466,27 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
     return undefInst;
 }
 
+IROp getSwapSideComparisonOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Eql:
+        return kIROp_Eql;
+    case kIROp_Neq:
+        return kIROp_Neq;
+    case kIROp_Leq:
+        return kIROp_Geq;
+    case kIROp_Geq:
+        return kIROp_Leq;
+    case kIROp_Less:
+        return kIROp_Greater;
+    case kIROp_Greater:
+        return kIROp_Less;
+    default:
+        return kIROp_Nop;
+    }
+}
+
 bool isPureFunctionalCall(IRCall* call)
 {
     auto callee = getResolvedInstForDecorations(call->getCallee());

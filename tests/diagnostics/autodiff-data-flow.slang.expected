@@ -6,6 +6,9 @@ tests/diagnostics/autodiff-data-flow.slang(15): error 41020: derivative cannot b
 tests/diagnostics/autodiff-data-flow.slang(22): error 41021: a differentiable function must have at least one differentiable output.
 void g(float x)
      ^
+tests/diagnostics/autodiff-data-flow.slang(28): error 30510: loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute.
+    for (int i = 0; i < 5; i++) // Not ok, we can't infer the loop iterations because the body modifies induction var.
+    ^~~
 }
 standard output = {
 }

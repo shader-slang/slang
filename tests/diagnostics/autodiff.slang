@@ -11,6 +11,21 @@ float f(float x)
     float val = 0;
     if (x > 5)
         val = x + 1;
+
+    // warning: dynamic loop without [MaxIters] or [ForceUnroll]
+    for (int i = 0; i < (int)x; i++) 
+    {
+    }
+
+    [MaxIters(2)]
+    for (int i = 0; i < (int)x; i++) // OK
+    {
+    }
+
+    for (int i = 0; i < 5; i++) // OK
+    {
+    }
+
     return val;
 }
 
