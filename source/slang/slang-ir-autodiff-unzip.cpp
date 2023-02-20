@@ -137,39 +137,8 @@ struct ExtractPrimalFuncContext
             return false;
         }
 
-        // Only store allowed types.
-        if (isScalarIntegerType(inst->getDataType()))
-        {
-        }
-        else if (as<IRResourceTypeBase>(inst->getDataType()))
-        {
-        }
-        else
-        {
-            switch (inst->getDataType()->getOp())
-            {
-            case kIROp_StructType:
-            case kIROp_OptionalType:
-            case kIROp_TupleType:
-            case kIROp_ArrayType:
-            case kIROp_DifferentialPairType:
-            case kIROp_InterfaceType:
-            case kIROp_AnyValueType:
-            case kIROp_ClassType:
-            case kIROp_FloatType:
-            case kIROp_HalfType:
-            case kIROp_DoubleType:
-            case kIROp_VectorType:
-            case kIROp_MatrixType:
-            case kIROp_BoolType:
-            case kIROp_Param:
-            case kIROp_Specialize:
-            case kIROp_LookupWitness:
-                break;
-            default:
-                return false;
-            }
-        }
+        if (!canInstBeStored(inst))
+            return false;
 
         // Never store certain opcodes.
         switch (inst->getOp())
@@ -507,11 +476,19 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                 else
                 {
                     // Orindary value.
-                    auto val = builder.emitFieldExtract(
-                        inst->getFullType(),
-                        intermediateVar,
-                        structKeyDecor->getStructKey());
-                    inst->replaceUsesWith(val);
+                    // We insert a fieldExtract at each use site instead of before `inst`,
+                    // since at this stage of autodiff pass, `inst` does not necessarily
+                    // dominate all the use sites if `inst` is defined in partial branch
+                    // in a primal block.
+                    while (auto iuse = inst->firstUse)
+                    {
+                        builder.setInsertBefore(iuse->getUser());
+                        auto val = builder.emitFieldExtract(
+                            inst->getFullType(),
+                            intermediateVar,
+                            structKeyDecor->getStructKey());
+                        iuse->set(val);
+                    }
                 }
                 instsToRemove.add(inst);
             }
@@ -529,8 +506,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     {
         inst->removeAndDeallocate();
     }
-    
-    stripTempDecorations(func);
 
     return primalFunc;
 }

@@ -303,6 +303,8 @@ bool isBackwardDifferentiableFunc(IRInst* func);
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
 
+bool canInstBeStored(IRInst* inst);
+
 inline bool isRelevantDifferentialPair(IRType* type)
 {
     if (as<IRDifferentialPairType>(type))

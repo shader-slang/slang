@@ -488,7 +488,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
     if (!diffReturnType)
     {
-        diffReturnType = argBuilder.getVoidType();
+        diffReturnType = (IRType*)findOrTranscribePrimalInst(&argBuilder, origCall->getFullType());
     }
 
     auto callInst = argBuilder.emitCallInst(
@@ -501,7 +501,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
     *builder = afterBuilder;
 
-    if (diffReturnType->getOp() != kIROp_VoidType)
+    if (diffReturnType->getOp() == kIROp_DifferentialPairType)
     {
         IRInst* primalResultValue = afterBuilder.emitDifferentialPairGetPrimal(callInst);
         auto diffType = differentiateType(&afterBuilder, origCall->getFullType());
@@ -510,8 +510,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
     else
     {
-        // Return the inst itself if the return value is void.
-        // This is fine since these values should never actually be used anywhere.
+        // Return the inst itself if the return value is non-differentiable.
+        // This is fine since these values should only be used by non-differentiable code.
         // 
         return InstPair(callInst, callInst);
     }

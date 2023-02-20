@@ -1024,6 +1024,23 @@ namespace Slang
                         });
                 }
             }
+            for (auto subst = declRefType->declRef.substitutions.substitutions; subst; subst = subst->outer)
+            {
+                if (auto genSubst = as<GenericSubstitution>(subst))
+                {
+                    for (auto arg : genSubst->getArgs())
+                    {
+                        if (auto typeArg = as<Type>(arg))
+                        {
+                            maybeRegisterDifferentiableTypeRecursive(m_astBuilder, typeArg, workingSet);
+                        }
+                    }
+                }
+                else if (auto thisSubst = as<ThisTypeSubstitution>(subst))
+                {
+                    maybeRegisterDifferentiableTypeRecursive(m_astBuilder, thisSubst->witness->sub, workingSet);
+                }
+            }
             return;
         }
     }

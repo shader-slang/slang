@@ -563,6 +563,30 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
     return false;
 }
 
+bool canInstBeStored(IRInst* inst)
+{
+    if (as<IRBasicType>(inst->getDataType()))
+        return true;
+
+    switch (inst->getDataType()->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_OptionalType:
+    case kIROp_TupleType:
+    case kIROp_ArrayType:
+    case kIROp_DifferentialPairType:
+    case kIROp_InterfaceType:
+    case kIROp_AnyValueType:
+    case kIROp_ClassType:
+    case kIROp_FloatType:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 struct AutoDiffPass : public InstPassBase
 {
     DiagnosticSink* getSink()

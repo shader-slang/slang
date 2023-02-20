@@ -770,26 +770,6 @@ struct TriangleStream
 // Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 void abort();
 
-// Detach and set derivatives to zero
-
-__generic<T : __BuiltinFloatingPointType>
-T detach(T x)
-{
-    return x;
-}
-
-__generic<T : __BuiltinFloatingPointType, let N : int>
-vector<T, N> detach(vector<T, N> x)
-{
-    return x;
-}
-
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-matrix<T, N, M> detach(matrix<T, N, M> x)
-{
-    return x;
-}
-
 // Absolute value (HLSL SM 1.0)
 
 __generic<T : __BuiltinIntegerType>

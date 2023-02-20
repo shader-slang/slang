@@ -498,34 +498,6 @@ struct DiffUnzipPass
         }
     }
 
-    void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
-    {
-        if (as<IRParam>(inst))
-        {
-            SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
-            auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
-            builder->setInsertAfter(lastParam);
-        }
-        else
-        {
-            builder->setInsertBefore(inst);
-        }
-    }
-
-    void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
-    {
-        if (as<IRParam>(inst))
-        {
-            SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
-            auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
-            builder->setInsertAfter(lastParam);
-        }
-        else
-        {
-            builder->setInsertAfter(inst);
-        }
-    }
-
     void processIndexedFwdBlock(IRBlock* fwdBlock)
     {
         if (!isBlockIndexed(fwdBlock))
@@ -794,6 +766,7 @@ struct DiffUnzipPass
 
         auto primalVal = primalBuilder->emitCallInst(primalType, primalFn, primalArgs);
         primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
+        primalBuilder->markInstAsPrimal(primalVal);
 
         SLANG_RELEASE_ASSERT(mixedCall->getArgCount() <= primalFuncType->getParamCount());
 
@@ -1377,6 +1350,11 @@ struct DiffUnzipPass
         // Remove insts that were split.
         for (auto inst : splitInsts)
         {
+            if (!isDifferentiableType(diffTypeContext, inst->getDataType()))
+            {
+                inst->replaceUsesWith(lookupPrimalInst(inst));
+            }
+
             // Consistency check.
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {

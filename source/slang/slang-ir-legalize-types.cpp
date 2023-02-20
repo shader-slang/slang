@@ -701,6 +701,61 @@ static LegalVal legalizeRetVal(
     return LegalVal();
 }
 
+static void _addVal(List<IRInst*>& rs, const LegalVal& legalVal)
+{
+    switch (legalVal.flavor)
+    {
+    case LegalVal::Flavor::simple:
+        rs.add(legalVal.getSimple());
+        break;
+    case LegalVal::Flavor::tuple:
+        for (auto element : legalVal.getTuple()->elements)
+            _addVal(rs, element.val);
+        break;
+    case LegalVal::Flavor::pair:
+        _addVal(rs, legalVal.getPair()->ordinaryVal);
+        _addVal(rs, legalVal.getPair()->specialVal);
+        break;
+    case LegalVal::Flavor::none:
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled legalized val flavor");
+    }
+}
+
+static LegalVal legalizeUnconditionalBranch(
+    IRTypeLegalizationContext* context,
+    ArrayView<LegalVal>        args,
+    IRUnconditionalBranch*     branchInst)
+{
+    List<IRInst*> newArgs;
+    for (auto arg : args)
+    {
+        switch (arg.flavor)
+        {
+            case LegalVal::Flavor::none:
+                break;
+            case LegalVal::Flavor::simple:
+                newArgs.add(arg.getSimple());
+                break;
+            case LegalVal::Flavor::pair:
+                _addVal(newArgs, arg.getPair()->ordinaryVal);
+                _addVal(newArgs, arg.getPair()->specialVal);
+                break;
+            case LegalVal::Flavor::tuple:
+                for (auto element : arg.getTuple()->elements)
+                {
+                    _addVal(newArgs, element.val);
+                }
+                break;
+            default:
+                SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor.");
+        }
+    }
+    context->builder->emitBranch(branchInst->getTargetBlock(), newArgs.getCount() - 1, newArgs.getBuffer() + 1);
+    return LegalVal();
+}
+
 static LegalVal legalizeLoad(
     IRTypeLegalizationContext*    context,
     LegalVal                    legalPtrVal)
@@ -1610,11 +1665,69 @@ static LegalVal legalizeMakeStruct(
     }
 }
 
+static LegalVal legalizeDefaultConstruct(
+    IRTypeLegalizationContext* context,
+    LegalType                  legalType)
+{
+    auto builder = context->builder;
+
+    switch (legalType.flavor)
+    {
+    case LegalType::Flavor::none:
+        return LegalVal();
+
+    case LegalType::Flavor::simple:
+    {
+        return LegalVal::simple(
+            builder->emitDefaultConstruct(legalType.getSimple()));
+    }
+
+    case LegalType::Flavor::pair:
+    {
+        auto pairType = legalType.getPair();
+        auto pairInfo = pairType->pairInfo;
+        LegalType ordinaryType = pairType->ordinaryType;
+        LegalType specialType = pairType->specialType;
+
+        LegalVal ordinaryVal = legalizeDefaultConstruct(
+            context,
+            ordinaryType);
+
+        LegalVal specialVal = legalizeDefaultConstruct(
+            context,
+            specialType);
+
+        return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
+    }
+    break;
+
+    case LegalType::Flavor::tuple:
+    {
+        auto tupleType = legalType.getTuple();
+
+        RefPtr<TuplePseudoVal> resTupleInfo = new TuplePseudoVal();
+        for (auto typeElem : tupleType->elements)
+        {
+            auto elemKey = typeElem.key;
+            TuplePseudoVal::Element resElem;
+            resElem.key = elemKey;
+            resElem.val = legalizeDefaultConstruct(context, typeElem.type);
+            resTupleInfo->elements.add(resElem);
+        }
+        return LegalVal::tuple(resTupleInfo);
+    }
+
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
+    }
+}
+
 static LegalVal legalizeInst(
     IRTypeLegalizationContext*    context,
     IRInst*                     inst,
     LegalType                   type,
-    LegalVal const*             args)
+    ArrayView<LegalVal>         args)
 {
     switch (inst->getOp())
     {
@@ -1647,8 +1760,14 @@ static LegalVal legalizeInst(
         return legalizeMakeStruct(
             context,
             type,
-            args,
+            args.getBuffer(),
             inst->getOperandCount());
+    case kIROp_DefaultConstruct:
+        return legalizeDefaultConstruct(
+            context,
+            type);
+    case kIROp_unconditionalBranch:
+        return legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);
     case kIROp_undefined:
         return LegalVal();
     case kIROp_GpuForeach:
@@ -1896,7 +2015,7 @@ static LegalVal legalizeInst(
         context,
         inst,
         legalType,
-        legalArgs.getBuffer());
+        legalArgs.getArrayView());
 
     if (legalVal.flavor == LegalVal::Flavor::simple)
     {
