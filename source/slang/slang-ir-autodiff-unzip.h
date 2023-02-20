@@ -582,11 +582,6 @@ struct DiffUnzipPass
             
             auto storageVar = builder.emitVar(arrayType);
 
-            // TODO(sai) STOPPED HERE: For some reason, we still have a direct param access
-            // when trying to cover up the access to last value of loop counter.
-            // Maybe we need a different way to access this? (use a var)
-            // Special case?
-
             // 3. Store current value into the array and replace uses with a load.
             // TODO: If an index is missing, use the 'last' value of the primal index.
             {
