@@ -5662,9 +5662,9 @@ namespace Slang
 #if SLANG_ENABLE_IR_BREAK_ALLOC
         if (context->options.flags & IRDumpOptions::Flag::DumpDebugIds)
         {
-            dump(context, "[#");
+            dump(context, "{");
             dump(context, String(inst->_debugUID));
-            dump(context, "]");
+            dump(context, "}\t");
         }
 #else
         SLANG_UNUSED(context);
@@ -5691,7 +5691,6 @@ namespace Slang
         {
             dump(context, "_");
         }
-        dumpDebugID(context, inst);
     }
     
     static void dumpEncodeString(
@@ -5819,6 +5818,7 @@ namespace Slang
         IRBlock*        block)
     {
         context->indent--;
+        dumpDebugID(context, block);
         dump(context, "block ");
         dumpID(context, block);
 
@@ -6050,7 +6050,6 @@ namespace Slang
         }
 
         dump(context, opInfo.name);
-        dumpDebugID(context, inst);
         dumpInstOperandList(context, inst);
     }
 
@@ -6067,6 +6066,8 @@ namespace Slang
         auto op = inst->getOp();
 
         dumpIRDecorations(context, inst);
+
+        dumpDebugID(context, inst);
 
         // There are several ops we want to special-case here,
         // so that they will be more pleasant to look at.
@@ -6204,7 +6205,10 @@ namespace Slang
         context.options = options;
         context.sourceManager = sourceManager;
 
-        dumpInst(&context, globalVal);
+        if (globalVal->getOp() == kIROp_Module)
+            dumpIRModule(&context, globalVal->getModule());
+        else
+            dumpInst(&context, globalVal);
 
         writer->write(sb.getBuffer(), sb.getLength());
         writer->flush();

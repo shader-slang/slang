@@ -585,6 +585,7 @@ namespace Slang
 
     void SemanticsStmtVisitor::checkLoopInDifferentiableFunc(Stmt* stmt)
     {
+        SLANG_UNUSED(stmt);
         if (getParentDifferentiableAttribute())
         {
             if (!getParentFunc())
@@ -601,16 +602,6 @@ namespace Slang
                 return;
             if (getParentFunc()->findModifier<BackwardDerivativeAttribute>())
                 return;
-
-            // For all ordinary differentiable functions, we require either a `[MaxIters]` attribute,
-            // or a `[ForceUnroll]` attribet on loops.
-            if (stmt->hasModifier<MaxItersAttribute>() || stmt->hasModifier<ForceUnrollAttribute>() || stmt->hasModifier<InferredMaxItersAttribute>())
-            {
-            }
-            else
-            {
-                getSink()->diagnose(stmt, Diagnostics::loopInDiffFuncRequireUnrollOrMaxIters);
-            }
         }
     }
 

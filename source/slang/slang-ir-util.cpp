@@ -224,7 +224,7 @@ String dumpIRToString(IRInst* root)
     StringBuilder sb;
     StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
     IRDumpOptions options = {};
-#if 0
+#if 1
     options.flags = IRDumpOptions::Flag::DumpDebugIds;
 #endif
     dumpIR(root, options, nullptr, &writer);
@@ -484,6 +484,34 @@ IROp getSwapSideComparisonOp(IROp op)
         return kIROp_Less;
     default:
         return kIROp_Nop;
+    }
+}
+
+void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
+{
+    if (as<IRParam>(inst))
+    {
+        SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
+        auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
+        builder->setInsertAfter(lastParam);
+    }
+    else
+    {
+        builder->setInsertBefore(inst);
+    }
+}
+
+void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
+{
+    if (as<IRParam>(inst))
+    {
+        SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
+        auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
+        builder->setInsertAfter(lastParam);
+    }
+    else
+    {
+        builder->setInsertAfter(inst);
     }
 }
 
