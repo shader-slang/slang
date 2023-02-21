@@ -1356,6 +1356,7 @@ struct DiffTransposePass
                 // to inform us this case. Here we just need to generate a load of the derivative variable
                 // and use it as the final argument.
                 args.add(builder->emitLoad(arg->getOperand(0)));
+                argTypes.add(args.getLast()->getDataType());
                 argRequiresLoad.add(false);
             }
             else if (auto instPair = as<IRReverseGradientDiffPairRef>(arg))
@@ -1370,6 +1371,7 @@ struct DiffTransposePass
                 auto pairVal = builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
                 builder->emitStore(tempVar, pairVal);
                 args.add(tempVar);
+                argTypes.add(builder->getInOutType(pairType));
                 argRequiresLoad.add(false);
                 writebacks.add(DiffValWriteBack{instPair->getDiff(), tempVar});
             }
