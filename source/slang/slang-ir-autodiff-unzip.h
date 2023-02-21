@@ -277,14 +277,26 @@ struct DiffUnzipPass
 
     IRBlock* getUpdateBlock(IndexedRegion* region)
     {
-        // TODO: What if the 'continue' region has multiple
-        // blocks?
-        // We ideally want the _last_ block before control loops back.
-        // 
-        SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(
-            region->continueBlock->getTerminator())->getTargetBlock() == region->firstBlock);
+        auto initBlock = getInitializerBlock(region);
 
-        return region->continueBlock;
+        auto condBlock = region->firstBlock;
+
+        IRBlock* lastLoopBlock = nullptr;
+
+        for (auto predecessor : condBlock->getPredecessors())
+        {
+            if (predecessor != initBlock)
+                lastLoopBlock = predecessor;
+        }
+
+        // Should find atleast one predecessor that is _not_ the 
+        // init block (that contains the loop info). This 
+        // predecessor would be the last block in the loop
+        // before looping back to the condition.
+        // 
+        SLANG_RELEASE_ASSERT(lastLoopBlock);
+
+        return lastLoopBlock;
     }
 
     IRBlock* getFirstLoopBodyBlock(IndexedRegion* region)

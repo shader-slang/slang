@@ -473,14 +473,18 @@ struct CFGNormalizationPass
                     loopEndPoint = falseEndPoint;
                     isLoopOnTrueSide = false;
                 }
-                
-                SLANG_RELEASE_ASSERT(loopEndPoint.exitBlock);
 
-                // Special case.. the if-else of a loop needs it's
-                // after block to be pointing at the last block before
-                // it loops back to the if-else.
-                // 
-                // ifElse->afterBlock.set(loopEndPoint.exitBlock);
+                // Right now, we only support loops where the loop is on the true side of
+                // the condition. If we ever encounter the other case, fill in logic to 
+                // flip the condition.
+                //
+                SLANG_RELEASE_ASSERT(isLoopOnTrueSide);
+                
+                // Expect atleast one basic block (other than the condition block), in
+                // the loop.
+                //
+                SLANG_RELEASE_ASSERT(loopEndPoint.exitBlock);
+                SLANG_RELEASE_ASSERT(!loopEndPoint.isRegionEmpty);
 
                 // Does the loop endpoint have both 'break' and 'base'
                 // control flows?
