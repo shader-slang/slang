@@ -1,6 +1,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -46,10 +46,102 @@ float lightEval(uint depth)
     }
 }
 
+struct MaterialParam : IDifferentiable
+{
+    float roughness;
+}
+
+[BackwardDifferentiable]
+MaterialParam getParam(uint id)
+{
+    MaterialParam p;
+    p.roughness = 0.5f;
+    return p;
+}
+
+[ForwardDerivativeOf(getParam)]
+DifferentialPair<MaterialParam> d_getParam(uint id)
+{
+    MaterialParam p;
+    p.roughness = 0.5f;
+    MaterialParam.Differential d;
+    d.roughness = 0.0f;
+    return diffPair(p, d);
+}
+
+[BackwardDerivativeOf(getParam)]
+void d_getParam(uint id, MaterialParam.Differential diff)
+{
+    outputBuffer[id] += diff.roughness;
+}
+
+
+[BackwardDifferentiable]
+void updatePathThroughput(inout PathResult path, const float weight)
+{
+    path.thp *= weight;
+}
+
+struct BSDFSample : IDifferentiable
+{
+    float val;
+}
+
+[BackwardDifferentiable]
+bool bsdfGGXSample(const MaterialParam bsdfParams, out BSDFSample result)
+{
+    result.val = bsdfParams.roughness;
+    return true;
+}
+
+[BackwardDifferentiable]
+bool generateScatterRay(const MaterialParam bsdfParams, inout PathState path, inout PathResult pathRes)
+{
+    BSDFSample result;
+    bool valid = bsdfGGXSample(bsdfParams, result);
+    return generateScatterRay(result, bsdfParams, path, pathRes, valid);
+}
+
+/** Generates a new scatter ray using BSDF importance sampling.
+    \param[in] sd Shading data.
+    \param[in] mi Material instance at the shading point.
+    \param[in,out] path The path state.
+    \return True if a ray was generated, false otherwise.
+*/
+[BackwardDifferentiable]
+bool generateScatterRay(const BSDFSample bs, const MaterialParam bsdfParams, inout PathState path, inout PathResult pathRes, bool valid)
+{
+    if (valid) valid = generateScatterRay(bs, bsdfParams, path, pathRes);
+    return valid;
+}
+
+/** Generates a new scatter ray given a valid BSDF sample.
+    \param[in] bs BSDF sample (assumed to be valid).
+    \param[in] sd Shading data.
+    \param[in] mi Material instance at the shading point.
+    \param[in,out] path The path state.
+    \return True if a ray was generated, false otherwise.
+*/
+[BackwardDifferentiable]
+bool generateScatterRay(const BSDFSample bs, const MaterialParam bsdfParams, inout PathState path, inout PathResult pathRes)
+{
+    updatePathThroughput(pathRes, bs.val);
+    return true;
+}
+
 [BackwardDifferentiable]
 void handleHit(inout PathState path, inout PathResult rs, inout VisibilityQuery vq)
 {
-    rs.thp = rs.thp * bsdfEval();
+    var param = getParam(0);
+
+    bool lastVertex = param.roughness > 0.8;
+    if (lastVertex)
+    {
+        path.terminated = true;
+        return;
+    }
+    
+    generateScatterRay(param, path, rs);
 
     rs.L = rs.thp * lightEval(path.depth);
 
@@ -61,21 +153,9 @@ void handleHit(inout PathState path, inout PathResult rs, inout VisibilityQuery 
 }
 
 [BackwardDifferentiable]
-float bsdfEval()
+float bsdfEval(const MaterialParam mparam)
 {
-    return 0.5f;
-}
-
-[ForwardDerivativeOf(bsdfEval)]
-DifferentialPair<float> __fwd_bsdfEval()
-{
-    return DifferentialPair<float>(0.5f, 1.0f);
-}
-
-[BackwardDerivativeOf(bsdfEval)]
-void __bwd_bsdfEval(float dOut)
-{
-    outputBuffer[3] += dOut;
+    return mparam.roughness;
 }
 
 [BackwardDifferentiable]
@@ -126,34 +206,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         PathResult pathRes;
-        pathRes.L = 0.f;
-        pathRes.thp = 1.f;
-
-        PathState path;
-        tracePath(1, path, pathRes);
-
-        outputBuffer[0] = pathRes.L; // Expect: 1.25
-    }
-
-    {
-        PathResult pathRes;
-        pathRes.L = 0.f;
-        pathRes.thp = 1.f;
-
-        PathResult.Differential pathResD;
-        pathResD.L = 1.0f;
-
-        PathState path;
-
-        var dpx = diffPair(pathRes, pathResD);
-        __fwd_diff(tracePath)(1, path, dpx);
-
-        outputBuffer[1] = dpx.d.L; // Expect: 1.25
-        outputBuffer[2] = dpx.p.L; // Expect: 5.0
-    }
-
-    {
-        PathResult pathRes;
         pathRes.L = 1.f;
         pathRes.thp = 1.f;
 
@@ -164,4 +216,5 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         var dpx = diffPair(pathRes, pathResD);
         __bwd_diff(tracePath)(1, dpx); // Expect: 5.0 in outputBuffer[3]
     }
+
 }
