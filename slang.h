@@ -4068,10 +4068,6 @@ namespace slang
             */
         SlangFloatingPointMode  floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
 
-            /** Optimization level to use for the target.
-            */
-        SlangOptimizationLevel optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
-
             /** The line directive mode for output source code.
             */
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
