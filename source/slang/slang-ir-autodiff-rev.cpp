@@ -596,7 +596,9 @@ namespace Slang
 
         if (SLANG_SUCCEEDED(result))
         {
+            disableIRValidationAtInsert();
             simplifyFunc(func);
+            enableIRValidationAtInsert();
         }
         return result;
     }
