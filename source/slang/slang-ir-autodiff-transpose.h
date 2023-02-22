@@ -375,8 +375,8 @@ struct DiffTransposePass
                         builder.setInsertInto(revLoopStartBlock);
                         builder.emitBranch(
                             revPreCondBlock,
-                            getPhiGrads(falseBlock).getCount(),
-                            getPhiGrads(falseBlock).getBuffer());
+                            getPhiGrads(breakBlock).getCount(),
+                            getPhiGrads(breakBlock).getBuffer());
                     }
                     else
                     {
