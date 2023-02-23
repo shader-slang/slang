@@ -707,7 +707,6 @@ namespace Slang
             break;
         default:
             SLANG_UNEXPECTED("unhandled unconditional branch opcode");
-            UNREACHABLE_RETURN(0);
         }
     }
 
