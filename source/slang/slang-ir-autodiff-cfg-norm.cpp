@@ -409,6 +409,7 @@ struct CFGNormalizationPass
                 // false -> atleast one break statement hit.
                 //
                 info.breakVar = builder.emitVar(builder.getBoolType());
+                builder.addNameHintDecoration(info.breakVar, UnownedStringSlice("_bflag"));
                 builder.emitStore(info.breakVar, builder.getBoolValue(true));
 
                 // If the loop is trivial (i.e. single iteration, with no
