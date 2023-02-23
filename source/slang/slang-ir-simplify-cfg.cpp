@@ -143,7 +143,7 @@ static bool removeDeadBlocks(IRGlobalValueWithCode* func)
     return changed;
 }
 
-static bool isTrivialIfElse(IRIfElse* condBranch)
+static bool isTrivialIfElse(IRIfElse* condBranch, List<IRInst*>& outArgs)
 {
     bool isTrueBranchTrivial = false;
     IRUnconditionalBranch* trueBlockBranch = nullptr;
@@ -196,6 +196,7 @@ static bool isTrivialIfElse(IRIfElse* condBranch)
         }
         for (UInt i = 0; i < trueBlockBranch->getArgCount(); i++)
         {
+            outArgs.add(trueBlockBranch->getArg(i));
             if (trueBlockBranch->getArg(i) != falseBlockBranch->getArg(i))
             {
                 // argument is different, the if-else is non-trivial.
@@ -445,11 +446,11 @@ static bool processFunc(IRGlobalValueWithCode* func)
                     // If both branches of `if-else` are trivial jumps into after block,
                     // we can get rid of the entire conditional branch and replace it
                     // with a jump into the after block.
-                    
-                    if (isTrivialIfElse(condBranch))
+                    List<IRInst*> args;
+                    if (isTrivialIfElse(condBranch, args))
                     {
                         builder.setInsertBefore(condBranch);
-                        builder.emitBranch(condBranch->getAfterBlock());
+                        builder.emitBranch(condBranch->getAfterBlock(), (Int)args.getCount(), args.getBuffer());
                         condBranch->removeAndDeallocate();
                         changed = true;
                     }
