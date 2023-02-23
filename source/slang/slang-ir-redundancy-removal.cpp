@@ -169,7 +169,8 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                 if (!isChildInstOf(store->getPtr(), func))
                     hasAddrUse = true;
 
-                for (auto next = store->getNextInst(); next; next = next->getNextInst())
+                HashSet<IRBlock*> visitedBlocks;
+                for (auto next = store->getNextInst(); next;)
                 {
                     if (auto nextStore = as<IRStore>(next))
                     {
@@ -202,6 +203,19 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                     }
                     if (hasAddrUse)
                         break;
+
+                    // If we are at the end of the current block and see a unconditional branch,
+                    // we can follow the path and check the subsequent block.
+                    if (auto branch = as<IRUnconditionalBranch>(next))
+                    {
+                        auto nextBlock = branch->getTargetBlock();
+                        if (visitedBlocks.Add(nextBlock))
+                        {
+                            next = nextBlock->getFirstInst();
+                            continue;
+                        }
+                    }
+                    next = next->getNextInst();
                 }
 
                 if (!hasAddrUse && hasOverridingStore)

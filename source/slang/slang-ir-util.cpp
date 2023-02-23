@@ -426,6 +426,22 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             }
         }
         break;
+    case kIROp_unconditionalBranch:
+    case kIROp_loop:
+        {
+            auto branch = as<IRUnconditionalBranch>(inst);
+            // If any pointer typed argument of the branch inst may overlap addr, return true.
+            for (UInt i = 0; i < branch->getArgCount(); i++)
+            {
+                SLANG_RELEASE_ASSERT(branch->getArg(i)->getDataType());
+                if (isPtrLikeOrHandleType(branch->getArg(i)->getDataType()))
+                {
+                    if (canAddressesPotentiallyAlias(func, branch->getArg(i), addr))
+                        return true;
+                }
+            }
+        }
+        break;
     case kIROp_CastPtrToInt:
     case kIROp_Reinterpret:
     case kIROp_BitCast:
