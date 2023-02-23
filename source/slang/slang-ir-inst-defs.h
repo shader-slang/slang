@@ -665,8 +665,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A `[keepAlive]` decoration marks an instruction that should not be eliminated.
     INST(KeepAliveDecoration,              keepAlive,             0, 0)
 
-        /// A `[NoSideEffect]` decoration marks a callee to be side-effect free.
-    INST(NoSideEffectDecoration,           noSideEffect, 0, 0)
 
     INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
 

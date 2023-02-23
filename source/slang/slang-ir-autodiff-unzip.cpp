@@ -555,13 +555,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                 }
                 instsToRemove.add(inst);
             }
-            else if (auto primalCtx = inst->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
-            {
-                if (inst->getOp() == kIROp_Call)
-                {
-                    builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
-                }
-            }
         }
     }
 

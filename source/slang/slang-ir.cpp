@@ -43,7 +43,9 @@ namespace Slang
             case kIROp_PreciseDecoration: 
             case kIROp_PublicDecoration: 
             case kIROp_HLSLExportDecoration: 
-            case kIROp_ReadNoneDecoration: 
+            case kIROp_ReadNoneDecoration:
+            case kIROp_ForwardDifferentiableDecoration:
+            case kIROp_BackwardDifferentiableDecoration:
             case kIROp_RequiresNVAPIDecoration: 
             case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
             case kIROp_TriangleInputPrimitiveTypeDecoration:
@@ -6916,8 +6918,6 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
-                if (call->findDecoration<IRNoSideEffectDecoration>())
-                    return false;
                 return !isPureFunctionalCall(call);
             }
             break;
@@ -7039,12 +7039,6 @@ namespace Slang
         case kIROp_BackwardDifferentiate:
         case kIROp_BackwardDifferentiatePrimal:
         case kIROp_BackwardDifferentiatePropagate:
-            return false;
-        }
-
-        // Check if the calle has been marked with a catch-all no-side-effect decoration.
-        if (findDecoration<IRNoSideEffectDecoration>())
-        {
             return false;
         }
         return true;

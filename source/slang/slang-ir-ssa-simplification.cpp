@@ -10,6 +10,7 @@
 #include "slang-ir-deduplicate-generic-children.h"
 #include "slang-ir-remove-unused-generic-param.h"
 #include "slang-ir-redundancy-removal.h"
+#include "slang-ir-propagate-func-properties.h"
 
 namespace Slang
 {
@@ -29,6 +30,7 @@ namespace Slang
             changed |= peepholeOptimize(module);
             changed |= removeRedundancy(module);
             changed |= simplifyCFG(module);
+            changed |= propagateFuncProperties(module);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.

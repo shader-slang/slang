@@ -212,6 +212,7 @@ static bool isTrivialIfElse(IRIfElse* condBranch, bool& isTrueBranchTrivial, boo
     return false;
 }
 
+#if 0
 static bool tryMoveFalseBranchToTrueBranch(IRBuilder& builder, IRIfElse* ifElseInst)
 {
     auto falseBlock = ifElseInst->getFalseBlock();
@@ -226,6 +227,7 @@ static bool tryMoveFalseBranchToTrueBranch(IRBuilder& builder, IRIfElse* ifElseI
     ifElseInst->condition.set(newCondition);
     return true;
 }
+#endif
 
 static bool tryEliminateFalseBranch(IRIfElse* ifElseInst)
 {
@@ -261,7 +263,9 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
     else if (isTrueBranchTrivial)
     {
         // If true branch is empty, we move false branch to true branch and invert the condition.
-        return tryMoveFalseBranchToTrueBranch(builder, ifElseInst);
+        // TODO: diabled for now since our auto-diff pass can't handle loops whose body is on the false
+        // side of condition.
+        //return tryMoveFalseBranchToTrueBranch(builder, ifElseInst);
     }
     else if (isFalseBranchTrivial)
     {

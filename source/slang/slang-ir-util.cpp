@@ -402,8 +402,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             {
                 auto callee = call->getCallee();
                 if (callee &&
-                    callee->findDecoration<IRReadNoneDecoration>() &&
-                    callee->findDecoration<IRNoSideEffectDecoration>())
+                    callee->findDecoration<IRReadNoneDecoration>())
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.
@@ -535,10 +534,6 @@ bool isPureFunctionalCall(IRCall* call)
 {
     auto callee = getResolvedInstForDecorations(call->getCallee());
     if (callee->findDecoration<IRReadNoneDecoration>())
-    {
-        return true;
-    }
-    if (callee->findDecoration<IRNoSideEffectDecoration>())
     {
         // If the function has no side effect and is not writing to any outputs,
         // we can safely treat the call as a normal inst.

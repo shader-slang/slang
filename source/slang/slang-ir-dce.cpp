@@ -326,7 +326,31 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     // when it is executed, then we should keep it around.
     //
     if (inst->mightHaveSideEffects())
-        return true;
+    {
+        // If the inst has side effect, we should keep it alive.
+        // An exception is if we have a call to a pure function
+        // that writes its output to a local variable, but we
+        // don't have any uses of that local variable.
+        auto call = as<IRCall>(inst);
+        if (!call)
+            return true;
+        if (!getResolvedInstForDecorations(call->getCallee())->findDecoration<IRReadNoneDecoration>())
+            return true;
+        auto parentFunc = getParentFunc(inst);
+        if (!parentFunc)
+            return true;
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            auto arg = call->getArg(i);
+            if (getParentFunc(arg) != parentFunc)
+                return true;
+            if (arg->getOp() != kIROp_Var)
+                return true;
+            if (arg->hasMoreThanOneUse())
+                return true;
+        }
+        return false;
+    }
     //
     // The `mightHaveSideEffects` query is conservative, and will
     // return `true` as its default mode, so once we are past that
