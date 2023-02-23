@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-restructure.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -142,6 +143,245 @@ static bool removeDeadBlocks(IRGlobalValueWithCode* func)
     return changed;
 }
 
+static bool isTrivialIfElse(IRIfElse* condBranch)
+{
+    bool isTrueBranchTrivial = false;
+    IRUnconditionalBranch* trueBlockBranch = nullptr;
+    if (condBranch->getTrueBlock() != condBranch->getAfterBlock())
+    {
+        if (auto br = as<IRUnconditionalBranch>(condBranch->getTrueBlock()->getFirstOrdinaryInst()))
+        {
+            if (br->getTargetBlock() == condBranch->getAfterBlock() && br->getOp() == kIROp_unconditionalBranch)
+            {
+                isTrueBranchTrivial = true;
+                trueBlockBranch = br;
+            }
+        }
+    }
+    else
+    {
+        isTrueBranchTrivial = true;
+    }
+    bool isFalseBranchTrivial = false;
+    IRUnconditionalBranch* falseBlockBranch = nullptr;
+    if (condBranch->getFalseBlock() != condBranch->getAfterBlock())
+    {
+        if (auto br = as<IRUnconditionalBranch>(condBranch->getFalseBlock()->getFirstOrdinaryInst()))
+        {
+            if (br->getTargetBlock() == condBranch->getAfterBlock() && br->getOp() == kIROp_unconditionalBranch)
+            {
+                isFalseBranchTrivial = true;
+                falseBlockBranch = br;
+            }
+        }
+    }
+    else
+    {
+        isFalseBranchTrivial = true;
+    }
+    if (isTrueBranchTrivial && isFalseBranchTrivial)
+    {
+        // If one of the branch target is afterBlock itself, and the other branch
+        // is a trivial block that jumps into the afterBlock, this if-else is trivial.
+        // In this case the argCount must be 0 because a block with phi parameters can't
+        // be used as targets in a conditional branch.
+        if (!trueBlockBranch || !falseBlockBranch)
+            return true;
+
+        // If both branches are trivial blocks, we must compare the arguments.
+        if (trueBlockBranch->getArgCount() != falseBlockBranch->getArgCount())
+        {
+            // This should never happen, return false now to be safe.
+            return false;
+        }
+        for (UInt i = 0; i < trueBlockBranch->getArgCount(); i++)
+        {
+            if (trueBlockBranch->getArg(i) != falseBlockBranch->getArg(i))
+            {
+                // argument is different, the if-else is non-trivial.
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+static bool isTrueLit(IRInst* lit)
+{
+    if (auto boolLit = as<IRBoolLit>(lit))
+        return boolLit->getValue();
+    return false;
+}
+static bool isFalseLit(IRInst* lit)
+{
+    if (auto boolLit = as<IRBoolLit>(lit))
+        return !boolLit->getValue();
+    return false;
+}
+
+static bool simplifyBoolPhiParam(IRIfElse* ifElse, Array<IRBlock*, 2>& preds, IRParam* param, UInt paramIndex)
+{
+    // For bool params where its value is assigned from the same `if-else` statement,
+    // we can simplify it into an expression of the condition of the source `if-else`.
+
+    if (!param->getDataType() || param->getDataType()->getOp() != kIROp_BoolType)
+        return false;
+
+    auto branch0 = as<IRUnconditionalBranch>(preds[0]->getTerminator());
+    if (!branch0)
+        return false;
+    if (branch0->getArgCount() <= paramIndex)
+        return false;
+    auto branch1 = as<IRUnconditionalBranch>(preds[1]->getTerminator());
+    if (!branch1)
+        return false;
+    if (branch1->getArgCount() <= paramIndex)
+        return false;
+
+    IRInst* replacement = nullptr;
+    if (isTrueLit(branch0->getArg(paramIndex)) && isFalseLit(branch1->getArg(paramIndex)))
+    {
+        replacement = ifElse->getCondition();
+    }
+    else if (isFalseLit(branch0->getArg(paramIndex)) && isTrueLit(branch1->getArg(paramIndex)))
+    {
+        IRBuilder builder(param);
+        setInsertBeforeOrdinaryInst(&builder, param);
+        replacement = builder.emitNot(builder.getBoolType(), ifElse->getCondition());
+    }
+    if (replacement)
+    {
+        param->replaceUsesWith(replacement);
+        param->removeAndDeallocate();
+        branch0->removeArgument(paramIndex);
+        branch1->removeArgument(paramIndex);
+        return true;
+    }
+    return false;
+}
+
+static bool simplifyBoolPhiParams(IRBlock* block)
+{
+    if (!block)
+        return false;
+
+    if (block->getPredecessors().getCount() != 2)
+        return false;
+
+    Array<IRBlock*, 2> preds;
+    for (auto pred : block->getPredecessors())
+        preds.add(pred);
+
+    IRBlock* ifElseBlock = nullptr;
+    if (preds[0]->getPredecessors().getCount() != 1)
+        return false;
+    ifElseBlock = *(preds[0]->getPredecessors().begin());
+    if (preds[1]->getPredecessors().getCount() != 1)
+        return false;
+    auto p = *(preds[1]->getPredecessors().begin());
+    if (p != ifElseBlock)
+        return false;
+
+    auto ifElse = as<IRIfElse>(ifElseBlock->getTerminator());
+    if (!ifElse)
+        return false;
+
+    if (ifElse->getTrueBlock() == preds[1])
+    {
+        Swap(preds[0], preds[1]);
+    }
+    SLANG_ASSERT(ifElse->getTrueBlock() == preds[0] && ifElse->getFalseBlock() == preds[1]);
+
+    List<IRParam*> params;
+    for (auto param : block->getParams())
+        params.add(param);
+    bool changed = false;
+    for (Index i = params.getCount() - 1; i >= 0; i--)
+    {
+        changed |= simplifyBoolPhiParam(ifElse, preds, params[i], (UInt)i);
+    }
+    return changed;
+}
+
+static bool removeTrivialPhiParams(IRBlock* block)
+{
+    // We can remove a phi parmeter if:
+    // 1. all arguments to a parameter is the same (not really a phi).
+    // 2. the arguments to the parameter is always the same as arguments to another existing parameter (duplicate phi).
+
+    bool changed = false;
+    List<IRParam*> params;
+    struct ParamState
+    {
+        bool areKnownValueSame = true;
+        IRInst* knownValue = nullptr;
+        OrderedHashSet<UInt> sameAsParamSet;
+    };
+    List<ParamState> args;
+    List<IRUnconditionalBranch*> termInsts;
+    for (auto param : block->getParams())
+    {
+        params.add(param);
+        args.add(ParamState());
+    }
+
+    if (!params.getCount())
+        return false;
+
+    for (UInt i = 1; i < (UInt)args.getCount(); i++)
+        for (UInt j = 0; j < i; j++)
+            args[i].sameAsParamSet.Add(j);
+
+    for (auto pred : block->getPredecessors())
+    {
+        auto termInst = as<IRUnconditionalBranch>(pred->getTerminator());
+        if (!termInst)
+            return false;
+        SLANG_ASSERT(termInst->getArgCount() == (UInt)args.getCount());
+        termInsts.add(termInst);
+        for (UInt i = 0; i < termInst->getArgCount(); i++)
+        {
+            if (args[i].areKnownValueSame)
+            {
+                if (args[i].knownValue == nullptr)
+                    args[i].knownValue = termInst->getArg(i);
+                else if (args[i].knownValue != termInst->getArg(i))
+                    args[i].areKnownValueSame = false;
+            }
+            for (UInt j = 0; j < i; j++)
+            {
+                if (termInst->getArg(i) != termInst->getArg(j))
+                {
+                    args[i].sameAsParamSet.Remove(j);
+                }
+            }
+        }
+    }
+    for (Index i = args.getCount() - 1; i >= 0; i--)
+    {
+        IRInst* targetVal = nullptr;
+        if (args[i].areKnownValueSame)
+        {
+            targetVal = args[i].knownValue;
+        }
+        else if (args[i].sameAsParamSet.Count())
+        {
+            auto targetParamId = *args[i].sameAsParamSet.begin();
+            targetVal = params[targetParamId];
+        }
+        if (targetVal)
+        {
+            params[i]->replaceUsesWith(args[i].knownValue);
+            params[i]->removeAndDeallocate();
+            for (auto termInst : termInsts)
+                termInst->removeArgument((UInt)i);
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 static bool processFunc(IRGlobalValueWithCode* func)
 {
     auto firstBlock = func->getFirstBlock();
@@ -165,6 +405,14 @@ static bool processFunc(IRGlobalValueWithCode* func)
             workList.fastRemoveAt(0);
             while (block)
             {
+                // If all arguments to a phi parameter are the known to be the same,
+                // we can safely replace the phi parameter with the argument.
+                if (block != func->getFirstBlock())
+                {
+                    changed |= simplifyBoolPhiParams(block);
+                    changed |= removeTrivialPhiParams(block);
+                }
+
                 if (auto loop = as<IRLoop>(block->getTerminator()))
                 {
                     // If continue block is unreachable, remove it.
@@ -189,6 +437,21 @@ static bool processFunc(IRGlobalValueWithCode* func)
                         }
                         builder.emitBranch(targetBlock, args.getCount(), args.getBuffer());
                         loop->removeAndDeallocate();
+                        changed = true;
+                    }
+                }
+                else if (auto condBranch = as<IRIfElse>(block->getTerminator()))
+                {
+                    // If both branches of `if-else` are trivial jumps into after block,
+                    // we can get rid of the entire conditional branch and replace it
+                    // with a jump into the after block.
+                    
+                    if (isTrivialIfElse(condBranch))
+                    {
+                        builder.setInsertBefore(condBranch);
+                        builder.emitBranch(condBranch->getAfterBlock());
+                        condBranch->removeAndDeallocate();
+                        changed = true;
                     }
                 }
 
@@ -225,6 +488,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
                 branch->removeAndDeallocate();
                 assert(!successor->hasUses());
                 successor->removeAndDeallocate();
+                break;
             }
             for (auto successor : block->getSuccessors())
             {

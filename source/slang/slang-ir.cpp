@@ -695,6 +695,22 @@ namespace Slang
         }
     }
 
+    void IRUnconditionalBranch::removeArgument(UInt index)
+    {
+        switch (getOp())
+        {
+        case kIROp_unconditionalBranch:
+            removeOperand(1 + index);
+            break;
+        case kIROp_loop:
+            removeOperand(3 + index);
+            break;
+        default:
+            SLANG_UNEXPECTED("unhandled unconditional branch opcode");
+            UNREACHABLE_RETURN(0);
+        }
+    }
+
     IRInst* IRUnconditionalBranch::getArg(UInt index)
     {
         return getArgs()[index].usedValue;
@@ -5109,6 +5125,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitNot(IRType* type, IRInst* value)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Not,
+            type,
+            value);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitAdd(IRType* type, IRInst* left, IRInst* right)
     {
         auto inst = createInst<IRInst>(
@@ -6790,6 +6817,17 @@ namespace Slang
             IRUse& use = getOperands()[aa];
             use.clear();
         }
+    }
+
+    void IRInst::removeOperand(Index index)
+    {
+        for (Index i = index; i < operandCount - 1; i++)
+        {
+            getOperands()[i].set(getOperand(i + 1));
+        }
+        getOperands()[operandCount - 1].clear();
+        operandCount--;
+        return;
     }
 
     // Remove this instruction from its parent block,

@@ -207,6 +207,24 @@ struct DeadCodeEliminationContext
         return processInst(module->getModuleInst());
     }
 
+    void removePhiArgs(IRInst* phiParam)
+    {
+        auto block = cast<IRBlock>(phiParam->getParent());
+        UInt paramIndex = 0;
+        for (auto p = block->getFirstParam(); p; p = p->getNextParam())
+        {
+            if (p == phiParam)
+                break;
+            paramIndex++;
+        }
+        for (auto predBlock : block->getPredecessors())
+        {
+            auto termInst = as<IRUnconditionalBranch>(predBlock->getTerminator());
+            SLANG_ASSERT(paramIndex < termInst->getArgCount());
+            termInst->removeArgument(paramIndex);
+        }
+    }
+
     bool eliminateDeadInstsRec(IRInst* inst)
     {
         bool changed = false;
@@ -225,6 +243,12 @@ struct DeadCodeEliminationContext
             if (inst->hasUses())
             {
                 inst->replaceUsesWith(getUndefInst());
+            }
+
+            if (inst->getOp() == kIROp_Param)
+            {
+                // For Phi parameters, we need to update all branch arguments.
+                removePhiArgs(inst);
             }
             inst->removeAndDeallocate();
             changed = true;
@@ -260,6 +284,16 @@ struct DeadCodeEliminationContext
         return Slang::shouldInstBeLiveIfParentIsLive(inst, options);
     }
 };
+
+bool isFirstBlock(IRInst* inst)
+{
+    auto block = as<IRBlock>(inst);
+    if (!block)
+        return false;
+    if (!block->getParent())
+        return false;
+    return block->getParent()->getFirstBlock() == block;
+}
 
 bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options)
 {
@@ -352,17 +386,10 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     switch (inst->getOp())
     {
         // Function parameters obviously shouldn't get eliminated,
-        // even if nothing references them, and block parameters
-        // (phi nodes) will be considered live when their block is,
-        // just so that we don't have to deal with any complications
-        // around re-writing the relevant inter-block argument passing.
-        //
-        // TODO: A smarter DCE pass could deal with this case more
-        // carefully, or we could improve the interprocedural SCCP
-        // pass to deal with block parameters instead.
+        // even if nothing references them.
         //
     case kIROp_Param:
-        return true;
+        return isFirstBlock(inst->getParent());
 
         // IR struct types and witness tables are currently kludged
         // so that they have child instructions that represent their

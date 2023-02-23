@@ -39,6 +39,7 @@
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
+#include "slang-ir-redundancy-removal.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-arrays.h"
@@ -892,6 +893,7 @@ Result linkAndOptimizeIR(
     }
 
     // Run a final round of DCE to clean up unused things after phi-elimination.
+    removeRedundancy(irModule);
     eliminateDeadCode(irModule);
 
     // We include one final step to (optionally) dump the IR and validate

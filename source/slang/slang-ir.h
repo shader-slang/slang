@@ -744,6 +744,11 @@ struct IRInst
     // for those values.
     void removeArguments();
 
+    // Remove operand `index` from operand list.
+    // For example, if the inst is `op(a,b,c)`, calling removeOperand(inst, 1) will result
+    // `op(a,c)`.
+    void removeOperand(Index index);
+
         /// Transfer any decorations of this instruction to the `target` instruction.
     void transferDecorationsTo(IRInst* target);
 
