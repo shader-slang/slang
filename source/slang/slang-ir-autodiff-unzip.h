@@ -525,7 +525,32 @@ struct DiffUnzipPass
 
         List<IRInst*> primalInsts;
         for (auto child = primalBlock->getFirstChild(); child; child = child->getNextInst())
+        {
+            // TODO: This might be a decent place to enforce that each load has a single 
+            // corresponding store (i.e. that everything is SSAd properly)?
+
+            // We're only interested in insts that generate values.
+            if (child->getDataType() == nullptr || 
+                as<IRVoidType>(child->getDataType()) ||
+                as<IRFuncType>(child->getDataType()) ||
+                as<IRTypeKind>(child->getDataType()))
+                continue;
+            
+            // We also don't care about pointer types (only Loads)
+            if (auto ptrType = as<IRPtrTypeBase>(child->getDataType()))
+            {
+                // There's an exception to this, if the var is an intermediate context type
+                // variable since there won't be a load from this yet (the load will
+                // be inserted later during the transposition process)
+                //
+                if (as<IRBackwardDiffIntermediateContextType>(ptrType->getValueType()))
+                    primalInsts.add(child);
+                
+                continue;
+            }
+
             primalInsts.add(child);
+        }
 
         IRBuilder builder(autodiffContext->moduleInst->getModule());
 
@@ -545,7 +570,7 @@ struct DiffUnzipPass
             bool shouldStore = false;
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {
-                IRBlock* useBlock = as<IRBlock>(use->getUser()->getParent());
+                IRBlock* useBlock = getBlock(use->getUser());
 
                 if (isDifferentialInst(useBlock))
                 {
@@ -561,7 +586,14 @@ struct DiffUnzipPass
             builder.setInsertBefore(firstPrimalBlock->getTerminator());
 
             IRType* arrayType = inst->getDataType();
-            SLANG_ASSERT(!as<IRPtrTypeBase>(arrayType)); // can't store pointers.
+            bool isPtrType = false;
+
+            if (auto ptrType = as<IRPtrTypeBase>(arrayType))
+            {
+                SLANG_RELEASE_ASSERT(as<IRBackwardDiffIntermediateContextType>(ptrType->getValueType()));
+                arrayType = ptrType->getValueType();
+                isPtrType = true;
+            }
 
             for (auto region : regions)
             {
@@ -581,11 +613,6 @@ struct DiffUnzipPass
             regions.reverse();
             
             auto storageVar = builder.emitVar(arrayType);
-
-            // TODO(sai) STOPPED HERE: For some reason, we still have a direct param access
-            // when trying to cover up the access to last value of loop counter.
-            // Maybe we need a different way to access this? (use a var)
-            // Special case?
 
             // 3. Store current value into the array and replace uses with a load.
             // TODO: If an index is missing, use the 'last' value of the primal index.
@@ -616,7 +643,8 @@ struct DiffUnzipPass
                 {   
                     if (as<IRDecoration>(use->getUser()))
                     {
-                        if (!as<IRLoopExitPrimalValueDecoration>(use->getUser()))
+                        if (!as<IRLoopExitPrimalValueDecoration>(use->getUser()) &&
+                            !as<IRBackwardDerivativePrimalContextDecoration>(use->getUser()))
                             continue;
                     }
 
@@ -683,10 +711,17 @@ struct DiffUnzipPass
                         instsToTag.add(loadAddr);
                     }
 
-                    auto loadedValue = builder.emitLoad(loadAddr);
-                    instsToTag.add(loadedValue);
+                    if (!isPtrType)
+                    {
+                        auto loadedValue = builder.emitLoad(loadAddr);
+                        instsToTag.add(loadedValue);
 
-                    use->set(loadedValue);
+                        use->set(loadedValue);
+                    }
+                    else
+                    {
+                        use->set(loadAddr);
+                    }
                 }
             }
 
@@ -744,6 +779,8 @@ struct DiffUnzipPass
         }
 
         auto intermediateVar = primalBuilder->emitVar((IRType*)intermediateType);
+        primalBuilder->markInstAsPrimal(intermediateVar);
+        
         primalBuilder->addBackwardDerivativePrimalContextDecoration(intermediateVar, intermediateVar);
 
         auto primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst(primalFuncType, baseFn);
