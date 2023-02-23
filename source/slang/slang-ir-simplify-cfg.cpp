@@ -143,67 +143,130 @@ static bool removeDeadBlocks(IRGlobalValueWithCode* func)
     return changed;
 }
 
-static bool isTrivialIfElse(IRIfElse* condBranch, List<IRInst*>& outArgs)
+// Return the true of the if-else branch block if the branch is a trivial jump
+// to after block with no other insts.
+static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
 {
-    bool isTrueBranchTrivial = false;
-    IRUnconditionalBranch* trueBlockBranch = nullptr;
-    if (condBranch->getTrueBlock() != condBranch->getAfterBlock())
+    if (branchBlock != condBranch->getAfterBlock())
     {
-        if (auto br = as<IRUnconditionalBranch>(condBranch->getTrueBlock()->getFirstOrdinaryInst()))
+        if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
         {
             if (br->getTargetBlock() == condBranch->getAfterBlock() && br->getOp() == kIROp_unconditionalBranch)
             {
-                isTrueBranchTrivial = true;
-                trueBlockBranch = br;
+                return true;
             }
         }
     }
     else
     {
-        isTrueBranchTrivial = true;
+        return true;
     }
-    bool isFalseBranchTrivial = false;
-    IRUnconditionalBranch* falseBlockBranch = nullptr;
-    if (condBranch->getFalseBlock() != condBranch->getAfterBlock())
-    {
-        if (auto br = as<IRUnconditionalBranch>(condBranch->getFalseBlock()->getFirstOrdinaryInst()))
-        {
-            if (br->getTargetBlock() == condBranch->getAfterBlock() && br->getOp() == kIROp_unconditionalBranch)
-            {
-                isFalseBranchTrivial = true;
-                falseBlockBranch = br;
-            }
-        }
-    }
-    else
-    {
-        isFalseBranchTrivial = true;
-    }
-    if (isTrueBranchTrivial && isFalseBranchTrivial)
-    {
-        // If one of the branch target is afterBlock itself, and the other branch
-        // is a trivial block that jumps into the afterBlock, this if-else is trivial.
-        // In this case the argCount must be 0 because a block with phi parameters can't
-        // be used as targets in a conditional branch.
-        if (!trueBlockBranch || !falseBlockBranch)
-            return true;
+    return false;
+}
 
-        // If both branches are trivial blocks, we must compare the arguments.
-        if (trueBlockBranch->getArgCount() != falseBlockBranch->getArgCount())
+static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
+{
+    // If one of the branch target is afterBlock itself, and the other branch
+    // is a trivial block that jumps into the afterBlock, this if-else is trivial.
+    // In this case the argCount must be 0 because a block with phi parameters can't
+    // be used as targets in a conditional branch.
+    auto branch1 = ifElse->getTrueBlock();
+    auto branch2 = ifElse->getFalseBlock();
+    auto afterBlock = ifElse->getAfterBlock();
+
+    if (branch1 == afterBlock) return true;
+    if (branch2 == afterBlock) return true;
+
+    auto branchInst1 = as<IRUnconditionalBranch>(branch1->getTerminator());
+    auto branchInst2 = as<IRUnconditionalBranch>(branch2->getTerminator());
+    if (!branchInst1) return false;
+    if (!branchInst2) return false;
+
+    // If both branches are trivial blocks, we must compare the arguments.
+    if (branchInst1->getArgCount() != branchInst2->getArgCount())
+    {
+        // This should never happen, return false now to be safe.
+        return false;
+    }
+    
+    for (UInt i = 0; i < branchInst1->getArgCount(); i++)
+    {
+        if (branchInst1->getArg(i) != branchInst2->getArg(i))
         {
-            // This should never happen, return false now to be safe.
+            // argument is different, the if-else is non-trivial.
             return false;
         }
-        for (UInt i = 0; i < trueBlockBranch->getArgCount(); i++)
+    }
+    return true;
+}
+
+static bool isTrivialIfElse(IRIfElse* condBranch, bool& isTrueBranchTrivial, bool& isFalseBranchTrivial)
+{
+    isTrueBranchTrivial = isTrivialIfElseBranch(condBranch, condBranch->getTrueBlock());
+    isFalseBranchTrivial = isTrivialIfElseBranch(condBranch, condBranch->getFalseBlock());
+    if (isTrueBranchTrivial && isFalseBranchTrivial)
+    {
+        if (arePhiArgsEquivalentInBranches(condBranch))
+            return true;
+    }
+    return false;
+}
+
+static bool tryMoveFalseBranchToTrueBranch(IRBuilder& builder, IRIfElse* ifElseInst)
+{
+    auto falseBlock = ifElseInst->getFalseBlock();
+    if (falseBlock == ifElseInst->getAfterBlock())
+        return false;
+    if (!arePhiArgsEquivalentInBranches(ifElseInst))
+        return false;
+    ifElseInst->trueBlock.set(falseBlock);
+    ifElseInst->falseBlock.set(ifElseInst->getAfterBlock());
+    builder.setInsertBefore(ifElseInst);
+    auto newCondition = builder.emitNot(builder.getBoolType(), ifElseInst->getCondition());
+    ifElseInst->condition.set(newCondition);
+    return true;
+}
+
+static bool tryEliminateFalseBranch(IRIfElse* ifElseInst)
+{
+    auto falseBlock = ifElseInst->getFalseBlock();
+    if (falseBlock == ifElseInst->getAfterBlock())
+        return false;
+    if (!arePhiArgsEquivalentInBranches(ifElseInst))
+        return false;
+    ifElseInst->falseBlock.set(ifElseInst->getAfterBlock());
+    return true;
+}
+
+static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
+{
+    bool isTrueBranchTrivial = false;
+    bool isFalseBranchTrivial = false;
+    if (isTrivialIfElse(ifElseInst, isTrueBranchTrivial, isFalseBranchTrivial))
+    {
+        // If both branches of `if-else` are trivial jumps into after block,
+        // we can get rid of the entire conditional branch and replace it
+        // with a jump into the after block.
+        if (auto termInst = as<IRUnconditionalBranch>(ifElseInst->getTrueBlock()->getTerminator()))
         {
-            outArgs.add(trueBlockBranch->getArg(i));
-            if (trueBlockBranch->getArg(i) != falseBlockBranch->getArg(i))
-            {
-                // argument is different, the if-else is non-trivial.
-                return false;
-            }
+            List<IRInst*> args;
+            for (UInt i = 0; i < termInst->getArgCount(); i++)
+                args.add(termInst->getArg(i));
+            builder.setInsertBefore(ifElseInst);
+            builder.emitBranch(ifElseInst->getAfterBlock(), (Int)args.getCount(), args.getBuffer());
+            ifElseInst->removeAndDeallocate();
+            return true;
         }
-        return true;
+    }
+    else if (isTrueBranchTrivial)
+    {
+        // If true branch is empty, we move false branch to true branch and invert the condition.
+        return tryMoveFalseBranchToTrueBranch(builder, ifElseInst);
+    }
+    else if (isFalseBranchTrivial)
+    {
+        // If false branch is empty, we set it to afterBlock.
+        return tryEliminateFalseBranch(ifElseInst);
     }
     return false;
 }
@@ -443,17 +506,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
                 }
                 else if (auto condBranch = as<IRIfElse>(block->getTerminator()))
                 {
-                    // If both branches of `if-else` are trivial jumps into after block,
-                    // we can get rid of the entire conditional branch and replace it
-                    // with a jump into the after block.
-                    List<IRInst*> args;
-                    if (isTrivialIfElse(condBranch, args))
-                    {
-                        builder.setInsertBefore(condBranch);
-                        builder.emitBranch(condBranch->getAfterBlock(), (Int)args.getCount(), args.getBuffer());
-                        condBranch->removeAndDeallocate();
-                        changed = true;
-                    }
+                    changed |= trySimplifyIfElse(builder, condBranch);
                 }
 
                 // If `block` does not end with an unconditional branch, bail.

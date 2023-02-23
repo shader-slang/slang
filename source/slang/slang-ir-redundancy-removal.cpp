@@ -125,6 +125,101 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     return context.removeRedundancyInBlock(deduplicateCtx, root);
 }
 
+bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
+{
+    // We perform a quick and conservative check:
+    // A store is redundant if it is followed by another store to the same address in
+    // the same basic block, and there are no instructions that may use any addresses
+    // related to this address.
+    bool hasAddrUse = false;
+    bool hasOverridingStore = false;
+
+    // Stores to global variables will never get removed.
+    if (!isChildInstOf(store->getPtr(), func))
+        hasAddrUse = true;
+
+    // A store can be removed if it stores into a local variable
+    // that has no other uses than store.
+    if (auto varInst = as<IRVar>(store->getPtr()))
+    {
+        bool hasNonStoreUse = false;
+            for (auto use = varInst->firstUse; use; use = use->nextUse)
+            {
+                if (as<IRDecoration>(use->getUser()))
+                    continue;
+                    if (use->getUser()->getOp() != kIROp_Store)
+                    {
+                        hasNonStoreUse = true;
+                            break;
+                    }
+            }
+        if (!hasNonStoreUse)
+        {
+            store->removeAndDeallocate();
+            return true;
+        }
+    }
+
+    // A store can be removed if there are subsequent stores to the same variable,
+    // and there are no insts in between the stores that can read the variable.
+
+    HashSet<IRBlock*> visitedBlocks;
+    for (auto next = store->getNextInst(); next;)
+    {
+        if (auto nextStore = as<IRStore>(next))
+        {
+            if (nextStore->getPtr() == store->getPtr())
+            {
+                hasOverridingStore = true;
+                break;
+            }
+        }
+
+        // If we see any insts that have reads or modifies the address before seeing
+        // an overriding store, don't remove the store.
+        // We can make the test more accurate by collecting all addresses related to
+        // the target address first, and only bail out if any of the related addresses
+        // are involved.
+        switch (next->getOp())
+        {
+        case kIROp_Load:
+            if (canAddressesPotentiallyAlias(func, next->getOperand(0), store->getPtr()))
+            {
+                hasAddrUse = true;
+            }
+            break;
+        default:
+            if (canInstHaveSideEffectAtAddress(func, next, store->getPtr()))
+            {
+                hasAddrUse = true;
+            }
+            break;
+        }
+        if (hasAddrUse)
+            break;
+
+        // If we are at the end of the current block and see a unconditional branch,
+        // we can follow the path and check the subsequent block.
+        if (auto branch = as<IRUnconditionalBranch>(next))
+        {
+            auto nextBlock = branch->getTargetBlock();
+            if (visitedBlocks.Add(nextBlock))
+            {
+                next = nextBlock->getFirstInst();
+                continue;
+            }
+        }
+        next = next->getNextInst();
+    }
+
+    if (!hasAddrUse && hasOverridingStore)
+    {
+        store->removeAndDeallocate();
+        return true;
+    }
+    return false;
+}
+
 bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
 {
     bool changed = false;
@@ -158,71 +253,7 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             }
             else if (auto store = as<IRStore>(inst))
             {
-                // We perform a quick and conservative check:
-                // A store is redundant if it is followed by another store to the same address in
-                // the same basic block, and there are no instructions that may use any addresses
-                // related to this address.
-                bool hasAddrUse = false;
-                bool hasOverridingStore = false;
-
-                // Stores to global variables will never get removed.
-                if (!isChildInstOf(store->getPtr(), func))
-                    hasAddrUse = true;
-
-                HashSet<IRBlock*> visitedBlocks;
-                for (auto next = store->getNextInst(); next;)
-                {
-                    if (auto nextStore = as<IRStore>(next))
-                    {
-                        if (nextStore->getPtr() == store->getPtr())
-                        {
-                            hasOverridingStore = true;
-                            break;
-                        }
-                    }
-
-                    // If we see any insts that have reads or modifies the address before seeing
-                    // an overriding store, don't remove the store.
-                    // We can make the test more accurate by collecting all addresses related to
-                    // the target address first, and only bail out if any of the related addresses
-                    // are involved.
-                    switch (next->getOp())
-                    {
-                    case kIROp_Load:
-                        if (canAddressesPotentiallyAlias(func, next->getOperand(0), store->getPtr()))
-                        {
-                            hasAddrUse = true;
-                        }
-                        break;
-                    default:
-                        if (canInstHaveSideEffectAtAddress(func, next, store->getPtr()))
-                        {
-                            hasAddrUse = true;
-                        }
-                        break;
-                    }
-                    if (hasAddrUse)
-                        break;
-
-                    // If we are at the end of the current block and see a unconditional branch,
-                    // we can follow the path and check the subsequent block.
-                    if (auto branch = as<IRUnconditionalBranch>(next))
-                    {
-                        auto nextBlock = branch->getTargetBlock();
-                        if (visitedBlocks.Add(nextBlock))
-                        {
-                            next = nextBlock->getFirstInst();
-                            continue;
-                        }
-                    }
-                    next = next->getNextInst();
-                }
-
-                if (!hasAddrUse && hasOverridingStore)
-                {
-                    store->removeAndDeallocate();
-                    changed = true;
-                }
+                changed |= tryRemoveRedundantStore(func, store);
             }
             inst = nextInst;
         }
