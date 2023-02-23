@@ -6820,7 +6820,7 @@ namespace Slang
 
     void IRInst::removeOperand(Index index)
     {
-        for (Index i = index; i < operandCount - 1; i++)
+        for (Index i = index; i < (Index)operandCount - 1; i++)
         {
             getOperands()[i].set(getOperand(i + 1));
         }
