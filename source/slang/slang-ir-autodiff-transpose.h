@@ -1138,7 +1138,11 @@ struct DiffTransposePass
 
     IRInst* hoistPrimalInst(IRBuilder* revBuilder, IRInst* inst)
     {
-        SLANG_RELEASE_ASSERT(isPrimalInst(inst));
+        if (as<IRBlock>(inst->getParent()) && 
+            isDifferentialInst(as<IRBlock>(inst->getParent())))
+        {
+            SLANG_RELEASE_ASSERT(isPrimalInst(inst));
+        }
 
         // Are the operands of this primal inst also available in the reverse-mode context?
         // If not, move/load them.
@@ -1379,7 +1383,7 @@ struct DiffTransposePass
                 // In order to perform the call, we need a temporary var to store the DiffPair.
                 auto pairType = as<IRPtrTypeBase>(arg->getDataType())->getValueType();
                 auto tempVar = builder->emitVar(pairType);
-                auto primalVal = builder->emitLoad(instPair->getPrimal());
+                auto primalVal = builder->emitLoad(hoistPrimalInst(builder, instPair->getPrimal()));
                 auto diffVal = builder->emitLoad(instPair->getDiff());
                 auto pairVal = builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
                 builder->emitStore(tempVar, pairVal);

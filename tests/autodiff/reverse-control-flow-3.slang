@@ -65,7 +65,7 @@ DifferentialPair<MaterialParam> d_getParam(uint id)
     MaterialParam p;
     p.roughness = 0.5f;
     MaterialParam.Differential d;
-    d.roughness = 0.0f;
+    d.roughness = 1.0f;
     return diffPair(p, d);
 }
 
@@ -140,7 +140,7 @@ void handleHit(inout PathState path, inout PathResult rs, inout VisibilityQuery 
         path.terminated = true;
         return;
     }
-    
+     
     generateScatterRay(param, path, rs);
 
     rs.L = rs.thp * lightEval(path.depth);
@@ -179,7 +179,6 @@ bool tracePath(uint pathID, out PathState path, inout PathResult pathRes)
     float thp = pathRes.thp;
     float L = pathRes.L;
 
-    [ForceUnroll]
     for (int i = 0; i < 3; ++i)
     {
         if (path.isHit())
