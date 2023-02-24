@@ -1045,6 +1045,8 @@ class DifferentiableAttribute : public Attribute
 
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
     OrderedDictionary<DeclRefBase, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+
+    SLANG_UNREFLECTED ValSet m_typeRegistrationWorkingSet;
 };
 
 class DllImportAttribute : public Attribute

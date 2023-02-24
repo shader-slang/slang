@@ -21,15 +21,14 @@ void AutoDiffTranscriberBase::mapDifferentialInst(IRInst* origInst, IRInst* diff
 {
     if (hasDifferentialInst(origInst))
     {
-        if (lookupDiffInst(origInst) != diffInst)
+        auto existingDiffInst = lookupDiffInst(origInst);
+        if (existingDiffInst != diffInst)
         {
             SLANG_UNEXPECTED("Inconsistent differential mappings");
         }
     }
-    else
-    {
-        instMapD.Add(origInst, diffInst);
-    }
+
+    instMapD[origInst] = diffInst;
 }
 
 void AutoDiffTranscriberBase::mapPrimalInst(IRInst* origInst, IRInst* primalInst)

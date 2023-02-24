@@ -424,40 +424,6 @@ protected:
 
 };
 
-struct ValSet
-{
-    struct ValItem
-    {
-        Val* val = nullptr;
-        ValItem() = default;
-        ValItem(Val* v) : val(v) {}
-
-        HashCode getHashCode()
-        {
-            return val ? val->getHashCode() : 0;
-        }
-        bool operator==(ValItem other)
-        {
-            if (val == other.val)
-                return true;
-            if (val)
-                return val->equalsVal(other.val);
-            else if (other.val)
-                return other.val->equalsVal(val);
-            return false;
-        }
-    };
-    HashSet<ValItem> set;
-    bool add(Val* val)
-    {
-        return set.Add(ValItem(val));
-    }
-    bool contains(Val* val)
-    {
-        return set.Contains(ValItem(val));
-    }
-};
-
 } // namespace Slang
 
 #endif
