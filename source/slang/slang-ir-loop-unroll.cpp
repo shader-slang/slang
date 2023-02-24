@@ -47,7 +47,7 @@ static bool _eliminateDeadBlocks(List<IRBlock*>& blocks, IRBlock* unreachableBlo
     return changed;
 }
 
-List<IRBlock*> _collectBlocksInLoop(Dictionary<IRBlock*, int>& blockOrdering, IRLoop* loopInst)
+List<IRBlock*> _collectBlocksInLoop(IRDominatorTree* dom, IRLoop* loopInst)
 {
     List<IRBlock*> loopBlocks;
     HashSet<IRBlock*> loopBlocksSet;
@@ -58,7 +58,6 @@ List<IRBlock*> _collectBlocksInLoop(Dictionary<IRBlock*, int>& blockOrdering, IR
     };
     auto firstBlock = as<IRBlock>(loopInst->block.get());
     auto breakBlock = as<IRBlock>(loopInst->breakBlock.get());
-    auto breakBlockOrdering = blockOrdering[breakBlock].GetValue();
 
     addBlock(firstBlock);
     for (Index i = 0; i < loopBlocks.getCount(); i++)
@@ -68,16 +67,8 @@ List<IRBlock*> _collectBlocksInLoop(Dictionary<IRBlock*, int>& blockOrdering, IR
         {
             if (succ == breakBlock)
                 continue;
-            int ordering = 0;
-            if (blockOrdering.TryGetValue(block, ordering))
-            {
-                // The target must be post-dominated by the break block in order to be considered
-                // the body of the loop.
-                // Since we don't support arbitrary goto or multi-level continue, the simple
-                // ordering comparison is sufficient to serve as a post-dominance check.
-                if (ordering < breakBlockOrdering)
-                    addBlock(succ);
-            }
+            if (dom->dominates(firstBlock, succ) && !dom->dominates(breakBlock, succ))
+                addBlock(succ);
         }
     }
     return loopBlocks;
@@ -85,14 +76,8 @@ List<IRBlock*> _collectBlocksInLoop(Dictionary<IRBlock*, int>& blockOrdering, IR
 
 List<IRBlock*> collectBlocksInLoop(IRGlobalValueWithCode* func,  IRLoop* loopInst)
 {
-    auto postOrderReverseCFG = getPostorderOnReverseCFG(func);
-    Dictionary<IRBlock*, int> blockOrdering;
-
-    for (Index i = 0; i < postOrderReverseCFG.getCount(); i++)
-    {
-        blockOrdering[postOrderReverseCFG[i]] = (int)i;
-    }
-    return _collectBlocksInLoop(blockOrdering, loopInst);
+    auto dom = computeDominatorTree(func);
+    return _collectBlocksInLoop(dom, loopInst);
 }
 
 static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
@@ -498,15 +483,7 @@ bool unrollLoopsInFunc(
         // Remove any continue jumps from the loop.
         eliminateContinueBlocks(module, loop);
 
-        auto postOrderReverseCFG = getPostorderOnReverseCFG(func);
-        Dictionary<IRBlock*, int> blockOrdering;
-        
-        for (Index i = 0; i < postOrderReverseCFG.getCount(); i++)
-        {
-            blockOrdering[postOrderReverseCFG[i]] = (int)i;
-        }
-
-        auto blocks = _collectBlocksInLoop(blockOrdering, loop);
+        auto blocks = collectBlocksInLoop(func, loop);
         auto loopLoc = loop->sourceLoc;
         if (!_unrollLoop(module, loop, blocks))
         {
