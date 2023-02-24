@@ -43,6 +43,7 @@ struct BreakableRegionInfo
 {
     IRVar*   breakVar;
     IRBlock* breakBlock;
+    IRBlock* headerBlock;
 };
 
 struct CFGNormalizationContext
@@ -159,6 +160,20 @@ struct CFGNormalizationPass
         return false;
     }
 
+    void _moveVarsToRegionHeader(BreakableRegionInfo* region, IRBlock* block)
+    {
+        for (auto child = block->getFirstChild(); child;)
+        {
+            auto nextChild = child->getNextInst();
+
+            if (as<IRVar>(child))
+            {
+                child->insertBefore(region->headerBlock->getTerminator());
+            }
+
+            child = nextChild;
+        }
+    }
 
     RegionEndpoint getNormalizedRegionEndpoint(
         BreakableRegionInfo* parentRegion,
@@ -166,6 +181,7 @@ struct CFGNormalizationPass
         List<IRBlock*> afterBlocks)
     {
         IRBlock* currentBlock = entryBlock;
+        _moveVarsToRegionHeader(parentRegion, currentBlock);
 
         // By default a region starts off with the 'base' control flow
         // and not in the 'break' control flow
@@ -369,6 +385,8 @@ struct CFGNormalizationPass
                     SLANG_UNEXPECTED("Unhandled control flow inst");
                     break;
             }
+
+            _moveVarsToRegionHeader(parentRegion, currentBlock);
         }
 
         // Resolve all intermediate after-blocks
@@ -425,6 +443,7 @@ struct CFGNormalizationPass
             {
                 BreakableRegionInfo info;
                 info.breakBlock = as<IRLoop>(branchInst)->getBreakBlock();
+                info.headerBlock = as<IRBlock>(branchInst->getParent());
 
                 // Emit var into parent block.
                 builder.setInsertBefore(
