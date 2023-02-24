@@ -830,28 +830,51 @@ struct DiffUnzipPass
         {
             auto func = findSpecializeReturnVal(specialize);
             auto outerGen = findOuterGeneric(func);
-            intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(outerGen);
-            List<IRInst*> args;
-            for (UInt i = 0; i < specialize->getArgCount(); i++)
-                args.add(specialize->getArg(i));
-            intermediateType = primalBuilder->emitSpecializeInst(
-                primalBuilder->getTypeKind(),
-                intermediateType,
-                args.getCount(),
-                args.getBuffer());
+            if (func->getOp() == kIROp_LookupWitness)
+            {
+                // An interface method won't have intermediate type.
+                intermediateType = primalBuilder->getVoidType();
+            }
+            else
+            {
+                intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(outerGen);
+                List<IRInst*> args;
+                for (UInt i = 0; i < specialize->getArgCount(); i++)
+                    args.add(specialize->getArg(i));
+                intermediateType = primalBuilder->emitSpecializeInst(
+                    primalBuilder->getTypeKind(),
+                    intermediateType,
+                    args.getCount(),
+                    args.getBuffer());
+            }
         }
         else
         {
-            intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(baseFn);
+            if (baseFn->getOp() == kIROp_LookupWitness)
+                intermediateType = primalBuilder->getVoidType();
+            else
+                intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(baseFn);
         }
 
-        auto intermediateVar = primalBuilder->emitVar((IRType*)intermediateType);
-        primalBuilder->markInstAsPrimal(intermediateVar);
+        IRVar* intermediateVar = nullptr;
+        if (!as<IRVoidType>(intermediateType))
+        {
+            intermediateVar = primalBuilder->emitVar((IRType*)intermediateType);
+            primalBuilder->markInstAsPrimal(intermediateVar);
+        }
         
-        primalBuilder->addBackwardDerivativePrimalContextDecoration(intermediateVar, intermediateVar);
-
-        auto primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst(primalFuncType, baseFn);
-
+        IRInst* primalFn = nullptr;
+        if (intermediateVar)
+        {
+            primalBuilder->addBackwardDerivativePrimalContextDecoration(intermediateVar, intermediateVar);
+            primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst(primalFuncType, baseFn);
+        }
+        else
+        {
+            // If we decided not to use diff-primal func that stores an reuse context,
+            // we can just call the original function instead.
+            primalFn = baseFn;
+        }
         List<IRInst*> primalArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
@@ -865,7 +888,8 @@ struct DiffUnzipPass
                 primalArgs.add(arg);
             }
         }
-        primalArgs.add(intermediateVar);
+        if (intermediateType->getOp() != kIROp_VoidType)
+            primalArgs.add(intermediateVar);
 
         auto mixedDecoration = mixedCall->findDecoration<IRMixedDifferentialInstDecoration>();
         SLANG_ASSERT(mixedDecoration);
@@ -881,7 +905,8 @@ struct DiffUnzipPass
         }
 
         auto primalVal = primalBuilder->emitCallInst(primalType, primalFn, primalArgs);
-        primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
+        if (intermediateVar)
+            primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
         primalBuilder->markInstAsPrimal(primalVal);
 
         SLANG_RELEASE_ASSERT(mixedCall->getArgCount() <= primalFuncType->getParamCount());
@@ -960,9 +985,12 @@ struct DiffUnzipPass
             diffArgs);
         diffBuilder->markInstAsDifferential(callInst, primalType);
 
-        disableIRValidationAtInsert();
-        diffBuilder->addBackwardDerivativePrimalContextDecoration(callInst, intermediateVar);
-        enableIRValidationAtInsert();
+        if (intermediateVar)
+        {
+            disableIRValidationAtInsert();
+            diffBuilder->addBackwardDerivativePrimalContextDecoration(callInst, intermediateVar);
+            enableIRValidationAtInsert();
+        }
 
         IRInst* diffVal = nullptr;
         if (as<IRDifferentialPairType>(callInst->getDataType()))
