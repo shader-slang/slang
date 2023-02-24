@@ -1083,6 +1083,14 @@ class RequiresNVAPIAttribute : public Attribute
     SLANG_AST_CLASS(RequiresNVAPIAttribute)
 };
 
+
+    /// A `[__AlwaysFoldIntoUseSite]` attribute indicates that the calls into the modified
+    /// function should always be folded into use sites during source emit.
+class AlwaysFoldIntoUseSiteAttribute :public Attribute
+{
+    SLANG_AST_CLASS(AlwaysFoldIntoUseSiteAttribute)
+};
+
     /// The `[ForwardDifferentiable]` attribute indicates that a function can be forward-differentiated.
 class ForwardDifferentiableAttribute : public DifferentiableAttribute
 {

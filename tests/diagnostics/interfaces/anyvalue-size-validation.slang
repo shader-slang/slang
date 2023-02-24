@@ -21,9 +21,11 @@ T test<T:IInterface>(T s)
     return s;
 }
 
+RWStructuredBuffer<uint> output;
+
 [numthreads(4, 1, 1)]
 void main()
 {
     S s;
-    test(s);
+    output[0] = test(s).a;
 }

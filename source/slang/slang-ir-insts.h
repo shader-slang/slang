@@ -325,6 +325,7 @@ IR_SIMPLE_DECORATION(HLSLExportDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
+IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {

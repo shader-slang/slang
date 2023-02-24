@@ -5054,6 +5054,7 @@ void __executeCallable(uint shaderIndex, int payloadLocation);
 __generic<Payload>
 __target_intrinsic(__glslRayTracing, "$XC")
 [__readNone]
+[__AlwaysFoldIntoUseSiteAttribute]
 int __callablePayloadLocation(__ref Payload payload);
 
 // Now we provide a hard-coded definition of `CallShader()` for GLSL-based
@@ -5109,6 +5110,7 @@ void __traceRay(
 __generic<Payload>
 __target_intrinsic(__glslRayTracing, "$XP")
 [__readNone]
+[__AlwaysFoldIntoUseSiteAttribute]
 int __rayPayloadLocation(__ref Payload payload);
 
 __generic<payload_t>
@@ -5952,6 +5954,7 @@ Ref<T> __hitObjectAttributes<T>()
 __generic<Attributes>
 __target_intrinsic(__glslRayTracing, "$XH")
 [__readNone]
+[__AlwaysFoldIntoUseSiteAttribute]
 int __hitObjectAttributesLocation(__ref Attributes attributes);
 
     /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,

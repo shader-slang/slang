@@ -1244,13 +1244,23 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
             return true;
     }
 
+    // Always hold if inst is a call into an [__alwaysFoldIntoUseSite] function.
+    if (auto call = as<IRCall>(inst))
+    {
+        auto callee = call->getCallee();
+        if (getResolvedInstForDecorations(callee)->findDecoration<IRAlwaysFoldIntoUseSiteDecoration>())
+        {
+            return true;
+        }
+    }
+
     // Having dealt with all of the cases where we *must* fold things
     // above, we can now deal with the more general cases where we
     // *should not* fold things.
-
     // Don't fold something with no users:
     if(!inst->hasUses())
         return false;
+
 
     // Don't fold something that has multiple users:
     if(inst->hasMoreThanOneUse())
