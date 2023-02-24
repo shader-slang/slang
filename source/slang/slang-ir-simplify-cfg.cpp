@@ -111,9 +111,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
         {
             if (getParentFunc(chainNode) != func)
                 return true;
-            if (addr->getOp() == kIROp_Param)
-                return true;
-            for (auto use = addr->firstUse; use; use = use->nextUse)
+            for (auto use = chainNode->firstUse; use; use = use->nextUse)
             {
                 if (!loopBlocks.Contains(as<IRBlock>(use->getUser()->getParent())))
                     return true;
@@ -124,8 +122,10 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
             case kIROp_FieldAddress:
                 chainNode = chainNode->getOperand(0);
                 continue;
-            default:
+            case kIROp_Var:
                 break;
+            default:
+                return true;
             }
             break;
         }

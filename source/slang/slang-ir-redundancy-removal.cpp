@@ -16,7 +16,8 @@ struct RedundancyRemovalContext
         case kIROp_Sub:
         case kIROp_Mul:
         case kIROp_Div:
-        case kIROp_Module:
+        case kIROp_FRem:
+        case kIROp_IRem:
         case kIROp_Lsh:
         case kIROp_Rsh:
         case kIROp_And:
