@@ -5037,7 +5037,6 @@ namespace Slang
                 auto thisType = calcThisType(parentDeclRef);
                 maybeRegisterDifferentiableType(m_astBuilder, thisType);
             }
-            completeDifferentiableTypeDictionary();
             m_parentDifferentiableAttr = oldAttr;
         }
 
