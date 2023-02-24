@@ -8304,6 +8304,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addSimpleDecoration<IRRequiresNVAPIDecoration>(irFunc);
         }
 
+        if (decl->findModifier<AlwaysFoldIntoUseSiteAttribute>())
+        {
+            getBuilder()->addSimpleDecoration<IRAlwaysFoldIntoUseSiteDecoration>(irFunc);
+        }
+
         if (decl->findModifier<NoInlineAttribute>())
         {
             getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);

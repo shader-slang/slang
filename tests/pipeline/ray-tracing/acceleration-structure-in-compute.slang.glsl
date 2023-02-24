@@ -1,6 +1,7 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
-
+layout(row_major) uniform;
+layout(row_major) buffer;
 int helper_0(accelerationStructureEXT a_0, int b_0)
 {
     return b_0;

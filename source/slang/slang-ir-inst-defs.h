@@ -728,6 +728,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
     INST(NoInlineDecoration, noInline, 0, 0)
 
+        /// A call to the decorated function should always be folded into its use site.
+    INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
+
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */

@@ -1,16 +1,8 @@
 // anyhit.slang.glsl
 #version 460
-
-#if USE_NV_RT
-#extension GL_NV_ray_tracing : require
-#define hitAttributeEXT hitAttributeNV
-#define rayPayloadInEXT rayPayloadInNV
-#define terminateRayEXT terminateRayNV
-#define ignoreIntersectionEXT ignoreIntersectionNV
-#else
 #extension GL_EXT_ray_tracing : require
-#endif
-
+layout(row_major) uniform;
+layout(row_major) buffer;
 struct Params_0
 {
     int mode_0;
@@ -47,16 +39,15 @@ void main()
         float val_0 = textureLod(
             sampler2D(gParams_alphaMap_0, gParams_sampler_0),
             _S2.normal_0.xy,
-            float(0)).x;
+            (0.0)).x;
 
-
-        if(val_0 > float(0))
+        if(val_0 > 0.0)
         {
-            terminateRayEXT;
+            terminateRayEXT;;
         }
         else
         {
-            ignoreIntersectionEXT;
+            ignoreIntersectionEXT;;
         }
     }
 

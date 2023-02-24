@@ -51,9 +51,8 @@ layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
-    uint _S4 = uint(index_0);
-    int _S5 = calcThing_0(index_0);
-    ((outputBuffer_0)._data[(_S4)]) = _S5;
+    int _S4 = calcThing_0(index_0);
+    ((outputBuffer_0)._data[(uint(index_0))]) = _S4;
     return;
 }
 

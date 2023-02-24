@@ -2525,21 +2525,25 @@ int __SyntaxError();
 __generic<T>
 __target_intrinsic(cuda, "sizeof($G0)")
 __target_intrinsic(cpp, "sizeof($G0)")
+[__readNone]
 int __sizeOf();
 
 __generic<T>
 __target_intrinsic(cuda, "sizeof($T0)")
 __target_intrinsic(cpp, "sizeof($T0)")
+[__readNone]
 int __sizeOf(T v);
 
 __generic<T>
 __target_intrinsic(cuda, "SLANG_ALIGN_OF($G0)")
 __target_intrinsic(cpp, "SLANG_ALIGN_OF($G0)")
+[__readNone]
 int __alignOf();
 
 __generic<T>
 __target_intrinsic(cuda, "SLANG_ALIGN_OF($T0)")
 __target_intrinsic(cpp, "SLANG_ALIGN_OF($T0)")
+[__readNone]
 int __alignOf(T v);
 
 // It would be nice to have offsetof equivalent, but it's not clear how that would work in terms of the Slang language.
@@ -2547,6 +2551,7 @@ int __alignOf(T v);
 __generic<T,F>
 __target_intrinsic(cuda, "int(((char*)&($1)) - ((char*)&($0)))")
 __target_intrinsic(cpp, "int(((char*)&($1)) - ((char*)&($0))")
+[__readNone]
 int __offsetOf(in T t, in F field);
 
 /// Mark beginning of "interlocked" operations in a fragment shader.
@@ -2959,6 +2964,9 @@ attribute_syntax [builtin] : BuiltinAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [__AlwaysFoldIntoUseSiteAttribute] : AlwaysFoldIntoUseSiteAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [noinline] : NoInlineAttribute;

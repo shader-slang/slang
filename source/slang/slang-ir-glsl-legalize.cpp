@@ -2027,8 +2027,8 @@ void legalizeMeshOutputParam(
 
             IRBuilderInsertLocScope locScope{builder};
             builder->setInsertBefore(p);
-            auto e = builder->emitElementAddress(meshOutputBlockType, blockParam, p->getIndex());
-            auto a = builder->emitFieldAddress(builtin.type, e, builtin.key);
+            auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, p->getIndex());
+            auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
 
             p->replaceUsesWith(a);
         });
