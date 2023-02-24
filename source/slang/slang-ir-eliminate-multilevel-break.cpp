@@ -175,6 +175,57 @@ struct EliminateMultiLevelBreakContext
         }
     };
 
+    
+    void insertBlockBetween(IRBlock* block, IRBlock* successor)
+    {
+        IRBuilder builder(block->getModule());
+
+        List<IRUse*> relevantUses;
+        for (auto use = successor->firstUse; use; use = use->nextUse)
+        {
+            if (auto terminator = as<IRTerminatorInst>(use->getUser()))
+            {
+                if (as<IRBlock>(terminator->getParent()) == block)
+                {
+                    relevantUses.add(use);
+                }
+            }
+        }
+
+        SLANG_RELEASE_ASSERT(relevantUses.getCount() == 1);
+
+        builder.insertBlockAlongEdge(block->getModule(), IREdge(relevantUses[0]));
+    }
+
+    bool normalizeBranchesIntoBreakBlocks(IRGlobalValueWithCode* func)
+    {
+        bool changed = false;
+        
+        List<IRBlock*> workList;
+
+        for (auto block : func->getBlocks())
+            workList.add(block);
+        
+        for (auto block : workList)
+        {
+            if (auto loop = as<IRLoop>(block->getTerminator()))
+            {
+                auto breakBlock = loop->getBreakBlock();
+                
+                for (auto predecessor : breakBlock->getPredecessors())
+                {
+                    if (!as<IRUnconditionalBranch>(predecessor->getTerminator()))
+                    {
+                        insertBlockBetween(predecessor, breakBlock);
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        return changed;
+    }
+
     void processFunc(IRGlobalValueWithCode* func)
     {
         // If func does not have any multi-level breaks, return.
@@ -185,6 +236,8 @@ struct EliminateMultiLevelBreakContext
             if (funcInfo.multiLevelBreaks.getCount() == 0)
                 return;
         }
+
+        normalizeBranchesIntoBreakBlocks(func);
 
         // To make things easy, eliminate Phis before perform transformations.
         eliminatePhisInFunc(LivenessMode::Disabled, irModule, func);

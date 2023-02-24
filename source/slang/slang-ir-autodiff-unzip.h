@@ -409,8 +409,6 @@ struct DiffUnzipPass
         for (auto region : indexRegions)
         {
             // Grab first primal block.
-            //IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
-            //builder.setInsertBefore(firstPrimalBlock->getTerminator());
             IRBlock* primalInitBlock = as<IRBlock>(primalMap[region->initBlock]);
             builder.setInsertBefore(primalInitBlock->getTerminator());
 
@@ -418,9 +416,7 @@ struct DiffUnzipPass
             region->primalCountLastVar = builder.emitVar(builder.getIntType());
             builder.addNameHintDecoration(region->primalCountLastVar, UnownedStringSlice("_pc_last_var"));
             
-            {
-                // IRBlock* primalInitBlock = as<IRBlock>(primalMap[region->initBlock]);
-                
+            {   
                 auto primalCondBlock = as<IRUnconditionalBranch>(
                     primalInitBlock->getTerminator())->getTargetBlock();
                 builder.setInsertBefore(primalCondBlock->getTerminator());

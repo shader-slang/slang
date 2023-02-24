@@ -575,56 +575,6 @@ namespace Slang
         }
     };
 
-    void insertBlockBetween(IRBlock* block, IRBlock* successor)
-    {
-        IRBuilder builder(block->getModule());
-
-        List<IRUse*> relevantUses;
-        for (auto use = successor->firstUse; use; use = use->nextUse)
-        {
-            if (auto terminator = as<IRTerminatorInst>(use->getUser()))
-            {
-                if (as<IRBlock>(terminator->getParent()) == block)
-                {
-                    relevantUses.add(use);
-                }
-            }
-        }
-
-        SLANG_RELEASE_ASSERT(relevantUses.getCount() == 1);
-
-        builder.insertBlockAlongEdge(block->getModule(), IREdge(relevantUses[0]));
-    }
-
-    bool normalizeBranchesIntoBreakBlocks(IRFunc* func)
-    {
-        bool changed = false;
-        
-        List<IRBlock*> workList;
-
-        for (auto block : func->getBlocks())
-            workList.add(block);
-        
-        for (auto block : workList)
-        {
-            if (auto loop = as<IRLoop>(block->getTerminator()))
-            {
-                auto breakBlock = loop->getBreakBlock();
-
-                for (auto predecessor : breakBlock->getPredecessors())
-                {
-                    if (!as<IRUnconditionalBranch>(predecessor->getTerminator()))
-                    {
-                        insertBlockBetween(predecessor, breakBlock);
-                        changed = true;
-                    }
-                }
-            }
-        }
-
-        return changed;
-    }
-
     SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func)
     {
         DifferentiableTypeConformanceContext diffTypeContext(autoDiffSharedContext);
@@ -636,8 +586,6 @@ namespace Slang
         }
 
         eliminateContinueBlocksInFunc(func->getModule(), func);
-
-        normalizeBranchesIntoBreakBlocks(func);
 
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
 
