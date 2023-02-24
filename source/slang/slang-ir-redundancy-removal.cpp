@@ -230,11 +230,13 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
                     continue;
                 if (knownAccessChain.Contains(use->getUser()))
                     continue;
-                if (use->getUser()->getOp() != kIROp_Store)
+                if (use->getUser()->getOp() == kIROp_Store && 
+                    use == use->getUser()->getOperands())
                 {
-                    hasNonStoreUse = true;
-                    break;
+                    continue;
                 }
+                hasNonStoreUse = true;
+                break;
             }
             if (hasNonStoreUse)
                 break;

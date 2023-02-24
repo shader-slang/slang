@@ -157,6 +157,30 @@ IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecaili
     return genericToSpecailize;
 }
 
+bool isValueType(IRInst* dataType)
+{
+    if (as<IRBasicType>(dataType))
+        return true;
+    switch (dataType->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_InterfaceType:
+    case kIROp_ClassType:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+    case kIROp_TupleType:
+    case kIROp_ResultType:
+    case kIROp_OptionalType:
+    case kIROp_DifferentialPairType:
+    case kIROp_DynamicType:
+    case kIROp_AnyValueType:
+    case kIROp_ArrayType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
 {
     auto outerGeneric = as<IRGeneric>(findOuterGeneric(value));
@@ -540,11 +564,13 @@ bool isPureFunctionalCall(IRCall* call)
         bool hasOutArg = false;
         for (UInt i = 0; i < call->getArgCount(); i++)
         {
-            if (as<IRPtrTypeBase>(call->getArg(i)->getDataType()))
-            {
-                hasOutArg = true;
-                break;
-            }
+            auto dataType = getResolvedInstForDecorations(unwrapAttributedType(call->getArg(i)->getDataType()));
+            if (isValueType(dataType))
+                continue;
+            // If the argument type is not a known value type,
+            // assume it is a pointer or handle through which side effect can take place.
+            hasOutArg = true;
+            break;
         }
         return !hasOutArg;
     }

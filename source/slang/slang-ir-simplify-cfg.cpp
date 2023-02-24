@@ -159,7 +159,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
                 for (UInt i = 0; i < call->getArgCount(); i++)
                 {
                     auto arg = call->getArg(i);
-                    if (as<IRPtrTypeBase>(arg->getDataType()))
+                    if (!isValueType(arg->getDataType()))
                     {
                         if (addressHasOutOfLoopUses(arg))
                             return true;

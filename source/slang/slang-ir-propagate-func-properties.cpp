@@ -15,9 +15,6 @@ bool propagateFuncProperties(IRModule* module)
 
     auto addToWorkList = [&](IRFunc* f)
     {
-        // Never propagate to functions without a body.
-        if (f->getFirstBlock() == nullptr)
-            return;
         if (workListSet.Add(f))
             workList.add(f);
     };
@@ -93,10 +90,37 @@ bool propagateFuncProperties(IRModule* module)
             bool hasSideEffectCall = false;
             if (f->findDecoration<IRReadNoneDecoration>())
                 continue;
+            // Never propagate to functions without a body.
+            if (f->getFirstBlock() == nullptr)
+                continue;
+            if (f->findDecoration<IRTargetIntrinsicDecoration>())
+                continue;
             for (auto block : f->getBlocks())
             {
                 for (auto inst : block->getChildren())
                 {
+                    // Is this inst known to not have global side effect/analyzable?
+                    if (inst->mightHaveSideEffects())
+                    {
+                        switch (inst->getOp())
+                        {
+                        case kIROp_ifElse:
+                        case kIROp_unconditionalBranch:
+                        case kIROp_Switch:
+                        case kIROp_Return:
+                        case kIROp_loop:
+                        case kIROp_Store:
+                        case kIROp_Call:
+                        case kIROp_Param:
+                        case kIROp_Unreachable:
+                            break;
+                        default:
+                            // We have a inst that has side effect and is not understood by this method.
+                            // e.g. bufferStore, discard, etc.
+                            return true;
+                        }
+                    }
+
                     if (auto call = as<IRCall>(inst))
                     {
                         auto callee = getResolvedInstForDecorations(call->getCallee());
@@ -115,6 +139,7 @@ bool propagateFuncProperties(IRModule* module)
                             }
                         }
                     }
+                    
                     // Are any operands defined in global scope?
                     for (UInt o = 0; o < inst->getOperandCount(); o++)
                     {

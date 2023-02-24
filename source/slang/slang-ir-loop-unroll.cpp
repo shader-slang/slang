@@ -68,13 +68,16 @@ List<IRBlock*> _collectBlocksInLoop(Dictionary<IRBlock*, int>& blockOrdering, IR
         {
             if (succ == breakBlock)
                 continue;
-            auto successorOrdering = blockOrdering[block].GetValue();
-            // The target must be post-dominated by the break block in order to be considered
-            // the body of the loop.
-            // Since we don't support arbitrary goto or multi-level continue, the simple
-            // ordering comparison is sufficient to serve as a post-dominance check.
-            if (successorOrdering < breakBlockOrdering)
-                addBlock(succ);
+            int ordering = 0;
+            if (blockOrdering.TryGetValue(block, ordering))
+            {
+                // The target must be post-dominated by the break block in order to be considered
+                // the body of the loop.
+                // Since we don't support arbitrary goto or multi-level continue, the simple
+                // ordering comparison is sufficient to serve as a post-dominance check.
+                if (ordering < breakBlockOrdering)
+                    addBlock(succ);
+            }
         }
     }
     return loopBlocks;

@@ -2,6 +2,7 @@
 #extension GL_EXT_ray_tracing : require
 layout(row_major) uniform;
 layout(row_major) buffer;
+
 struct ReflectionRay_0
 {
     float color_0;
@@ -47,6 +48,7 @@ layout(std140) uniform _S1
 {
     Uniforms_0 _data;
 } ubo_0;
+
 struct RayDesc_0
 {
     vec3 Origin_0;
@@ -58,7 +60,10 @@ struct RayDesc_0
 void TraceRay_0(accelerationStructureEXT AccelerationStructure_0, uint RayFlags_0, uint InstanceInclusionMask_0, uint RayContributionToHitGroupIndex_0, uint MultiplierForGeometryContributionToHitGroupIndex_0, uint MissShaderIndex_0, RayDesc_0 Ray_0, inout ShadowRay_0 Payload_0)
 {
     p_1 = Payload_0;
-    traceRayEXT(AccelerationStructure_0, RayFlags_0, InstanceInclusionMask_0, RayContributionToHitGroupIndex_0, MultiplierForGeometryContributionToHitGroupIndex_0, MissShaderIndex_0, Ray_0.Origin_0, Ray_0.TMin_0, Ray_0.Direction_0, Ray_0.TMax_0, (1));
+
+    int _S2 = (1);
+    traceRayEXT(AccelerationStructure_0, RayFlags_0, InstanceInclusionMask_0, RayContributionToHitGroupIndex_0, MultiplierForGeometryContributionToHitGroupIndex_0, MissShaderIndex_0, Ray_0.Origin_0, Ray_0.TMin_0, Ray_0.Direction_0, Ray_0.TMax_0, _S2);
+
     Payload_0 = p_1;
     return;
 }
@@ -66,7 +71,10 @@ void TraceRay_0(accelerationStructureEXT AccelerationStructure_0, uint RayFlags_
 void TraceRay_1(accelerationStructureEXT AccelerationStructure_1, uint RayFlags_1, uint InstanceInclusionMask_1, uint RayContributionToHitGroupIndex_1, uint MultiplierForGeometryContributionToHitGroupIndex_1, uint MissShaderIndex_1, RayDesc_0 Ray_1, inout ReflectionRay_0 Payload_1)
 {
     p_0 = Payload_1;
-    traceRayEXT(AccelerationStructure_1, RayFlags_1, InstanceInclusionMask_1, RayContributionToHitGroupIndex_1, MultiplierForGeometryContributionToHitGroupIndex_1, MissShaderIndex_1, Ray_1.Origin_0, Ray_1.TMin_0, Ray_1.Direction_0, Ray_1.TMax_0, (0));
+
+    int _S3 = (0);
+    traceRayEXT(AccelerationStructure_1, RayFlags_1, InstanceInclusionMask_1, RayContributionToHitGroupIndex_1, MultiplierForGeometryContributionToHitGroupIndex_1, MissShaderIndex_1, Ray_1.Origin_0, Ray_1.TMin_0, Ray_1.Direction_0, Ray_1.TMax_0, _S3);
+
     Payload_1 = p_0;
     return;
 }
@@ -76,8 +84,7 @@ uniform accelerationStructureEXT as_0;
 
 float saturate_0(float x_0)
 {
-    float _S2 = clamp(x_0, 0.0, 1.0);
-    return _S2;
+    return clamp(x_0, 0.0, 1.0);
 }
 
 layout(rgba32f)
@@ -86,24 +93,24 @@ uniform image2D outputImage_0;
 
 void main()
 {
-    uvec3 _S3 = ((gl_LaunchIDEXT));
-    float _S4 = float(_S3.x) + 0.5;
-    uvec3 _S5 = ((gl_LaunchSizeEXT));
-    float _S6 = _S4 / float(_S5.x);
-    uvec3 _S7 = ((gl_LaunchIDEXT));
-    float _S8 = float(_S7.y) + 0.5;
-    uvec3 _S9 = ((gl_LaunchSizeEXT));
-    float _S10 = _S8 / float(_S9.y);
-    vec2 inUV_0 = vec2(_S6, _S10);
-    vec4 _S11 = (texture(sampler2D(samplerPosition_0,sampler_0), (inUV_0)));
-    vec3 P_0 = _S11.xyz;
-    vec4 _S12 = (texture(sampler2D(samplerNormal_0,sampler_0), (inUV_0)));
-    vec3 N_0 = _S12.xyz * 2.0 - 1.0;
+    uvec3 _S4 = ((gl_LaunchIDEXT));
+    float _S5 = float(_S4.x) + 0.5;
+    uvec3 _S6 = ((gl_LaunchSizeEXT));
+    float _S7 = _S5 / float(_S6.x);
+    uvec3 _S8 = ((gl_LaunchIDEXT));
+    float _S9 = float(_S8.y) + 0.5;
+    uvec3 _S10 = ((gl_LaunchSizeEXT));
+    float _S11 = _S9 / float(_S10.y);
+    vec2 inUV_0 = vec2(_S7, _S11);
+    vec4 _S12 = (texture(sampler2D(samplerPosition_0,sampler_0), (inUV_0)));
+    vec3 P_0 = _S12.xyz;
+    vec4 _S13 = (texture(sampler2D(samplerNormal_0,sampler_0), (inUV_0)));
+    vec3 N_0 = _S13.xyz * 2.0 - 1.0;
 
     vec3 lightDelta_0 = ubo_0._data.light_0.position_0.xyz - P_0;
     float lightDist_0 = length(lightDelta_0);
     vec3 L_0 = normalize(lightDelta_0);
-    float _S13 = 1.0 / (lightDist_0 * lightDist_0);
+    float _S14 = 1.0 / (lightDist_0 * lightDist_0);
     RayDesc_0 ray_0;
     ray_0.Origin_0 = P_0;
     ray_0.TMin_0 = 0.00000099999999747524;
@@ -120,17 +127,14 @@ void main()
     }
     else
     {
-        atten_0 = _S13;
+        atten_0 = _S14;
     }
-    vec3 _S14 = ubo_0._data.light_0.color_1.xyz;
-    float _S15 = dot(N_0, L_0);
-    float _S16 = saturate_0(_S15);
-    vec3 color_2 = _S14 * _S16 * atten_0;
+    vec3 color_2 = ubo_0._data.light_0.color_1.xyz * saturate_0(dot(N_0, L_0)) * atten_0;
 
     ReflectionRay_0 reflectionRay_0;
     TraceRay_1(as_0, 1U, 255U, 0U, 0U, 2U, ray_0, reflectionRay_0);
     vec3 color_3 = color_2 + reflectionRay_0.color_0;
-    uvec3 _S17 = ((gl_LaunchIDEXT));
-    imageStore((outputImage_0), ivec2((uvec2(ivec2(_S17.xy)))), vec4(color_3, 1.0));
+    uvec3 _S15 = ((gl_LaunchIDEXT));
+    imageStore((outputImage_0), ivec2((uvec2(ivec2(_S15.xy)))), vec4(color_3, 1.0));
     return;
 }
