@@ -328,18 +328,6 @@ struct DiffTransposePass
                         getPhiGrads(trueBlock).getCount(),
                         getPhiGrads(trueBlock).getBuffer());
                     
-                    // Old false-side starting block becomes end block 
-                    // for the new pre-cond region (which could be empty)
-                    // 
-                    IRBlock* revPreCondEndBlock = revBlockMap[falseBlock];
-                    if (!falseRegionInfo.isTrivial)
-                    {
-                        builder.setInsertInto(revPreCondEndBlock);
-                        builder.emitBranch(
-                            revCondBlock,
-                            getPhiGrads(falseBlock).getCount(),
-                            getPhiGrads(falseBlock).getBuffer());
-                    }
 
                     IRBlock* revBreakRegionExitBlock = revBlockMap[firstLoopBlock];
                     if (!preCondRegionInfo.isTrivial)
@@ -366,17 +354,42 @@ struct DiffTransposePass
                         ifElse->getCondition(),
                         revTrueBlock,
                         revFalseBlock,
-                        revLoopEndBlock);
+                        revTrueBlock);
                     
-                    // Emit loop into rev-version of the break block.
-                    auto revLoopBlock = revBlockMap[breakBlock];
-                    builder.setInsertInto(revLoopBlock);
-                    builder.emitLoop(
-                        revPreCondBlock,
-                        revBreakBlock,
-                        revLoopEndBlock,
-                        getPhiGrads(breakBlock).getCount(),
-                        getPhiGrads(breakBlock).getBuffer());
+                    // Old false-side starting block becomes end block 
+                    // for the new pre-cond region (which could be empty)
+                    // 
+                    
+                    if (!falseRegionInfo.isTrivial)
+                    {
+                        IRBlock* revPreCondEndBlock = revBlockMap[falseBlock];
+                        builder.setInsertInto(revPreCondEndBlock);
+                        builder.emitLoop(
+                            revCondBlock,
+                            revBreakBlock,
+                            revLoopEndBlock,
+                            getPhiGrads(falseBlock).getCount(),
+                            getPhiGrads(falseBlock).getBuffer());
+                        
+                        auto revLoopStartBlock = revBlockMap[breakBlock];
+                        builder.setInsertInto(revLoopStartBlock);
+                        builder.emitBranch(
+                            revPreCondBlock,
+                            getPhiGrads(breakBlock).getCount(),
+                            getPhiGrads(breakBlock).getBuffer());
+                    }
+                    else
+                    {
+                        // Emit loop into rev-version of the break block.
+                        auto revLoopBlock = revBlockMap[breakBlock];
+                        builder.setInsertInto(revLoopBlock);
+                        builder.emitLoop(
+                            revPreCondBlock,
+                            revBreakBlock,
+                            revLoopEndBlock,
+                            getPhiGrads(breakBlock).getCount(),
+                            getPhiGrads(breakBlock).getBuffer());
+                    }
 
                     currentBlock = breakBlock;
                     break;
@@ -1125,7 +1138,11 @@ struct DiffTransposePass
 
     IRInst* hoistPrimalInst(IRBuilder* revBuilder, IRInst* inst)
     {
-        SLANG_RELEASE_ASSERT(isPrimalInst(inst));
+        if (as<IRBlock>(inst->getParent()) && 
+            isDifferentialInst(as<IRBlock>(inst->getParent())))
+        {
+            SLANG_RELEASE_ASSERT(isPrimalInst(inst));
+        }
 
         // Are the operands of this primal inst also available in the reverse-mode context?
         // If not, move/load them.
@@ -1366,7 +1383,7 @@ struct DiffTransposePass
                 // In order to perform the call, we need a temporary var to store the DiffPair.
                 auto pairType = as<IRPtrTypeBase>(arg->getDataType())->getValueType();
                 auto tempVar = builder->emitVar(pairType);
-                auto primalVal = builder->emitLoad(instPair->getPrimal());
+                auto primalVal = builder->emitLoad(hoistPrimalInst(builder, instPair->getPrimal()));
                 auto diffVal = builder->emitLoad(instPair->getDiff());
                 auto pairVal = builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
                 builder->emitStore(tempVar, pairVal);
@@ -1436,9 +1453,13 @@ struct DiffTransposePass
             argRequiresLoad.add(false);
         }
 
-        args.add(builder->emitLoad(primalContextDecor->getBackwardDerivativePrimalContextVar()));
+        // Ensure availability of the primal context var
+        auto primalContextVar = hoistPrimalInst(builder, primalContextDecor->getBackwardDerivativePrimalContextVar());
+        SLANG_RELEASE_ASSERT(primalContextVar);
+
+        args.add(builder->emitLoad(primalContextVar));
         argTypes.add(as<IRPtrTypeBase>(
-                primalContextDecor->getBackwardDerivativePrimalContextVar()->getDataType())
+                primalContextVar->getDataType())
                 ->getValueType());
         argRequiresLoad.add(false);
 

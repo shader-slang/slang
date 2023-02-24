@@ -568,11 +568,9 @@ namespace Slang
     {
         DifferentiableTypeConformanceContext* diffTypeContext;
 
-        virtual bool shouldConvertAddrInst(IRInst* addrInst) override
+        virtual bool shouldConvertAddrInst(IRInst*) override
         {
-            if (isDifferentiableType(*diffTypeContext, addrInst->getDataType()))
-                return true;
-            return false;
+            return true;
         }
     };
 
@@ -598,7 +596,9 @@ namespace Slang
 
         if (SLANG_SUCCEEDED(result))
         {
+            disableIRValidationAtInsert();
             simplifyFunc(func);
+            enableIRValidationAtInsert();
         }
         return result;
     }
