@@ -409,15 +409,17 @@ struct DiffUnzipPass
         for (auto region : indexRegions)
         {
             // Grab first primal block.
-            IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
-            builder.setInsertBefore(firstPrimalBlock->getTerminator());
+            //IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[region->breakBlock->getParent()->getFirstBlock()->getNextBlock()]);
+            //builder.setInsertBefore(firstPrimalBlock->getTerminator());
+            IRBlock* primalInitBlock = as<IRBlock>(primalMap[region->initBlock]);
+            builder.setInsertBefore(primalInitBlock->getTerminator());
 
             // Make variable in the top-most block (so it's visible to diff blocks)
             region->primalCountLastVar = builder.emitVar(builder.getIntType());
             builder.addNameHintDecoration(region->primalCountLastVar, UnownedStringSlice("_pc_last_var"));
             
             {
-                IRBlock* primalInitBlock = as<IRBlock>(primalMap[region->initBlock]);
+                // IRBlock* primalInitBlock = as<IRBlock>(primalMap[region->initBlock]);
                 
                 auto primalCondBlock = as<IRUnconditionalBranch>(
                     primalInitBlock->getTerminator())->getTargetBlock();
@@ -664,8 +666,8 @@ struct DiffUnzipPass
                     storageVar);
 
             // 4. Store current value into the array and replace uses with a load.
-            // TODO: If an index is missing, use the 'last' value of the primal index.
-           
+            //    If an index is missing, use the 'last' value of the primal index.
+            
             {
                 if (!isIntermediateContext)
                     setInsertAfterOrdinaryInst(&builder, valueToStore);
