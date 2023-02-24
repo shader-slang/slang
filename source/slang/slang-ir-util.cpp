@@ -159,6 +159,7 @@ IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecaili
 
 bool isValueType(IRInst* dataType)
 {
+    dataType = getResolvedInstForDecorations(unwrapAttributedType(dataType));
     if (as<IRBasicType>(dataType))
         return true;
     switch (dataType->getOp())
@@ -175,6 +176,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_DynamicType:
     case kIROp_AnyValueType:
     case kIROp_ArrayType:
+    case kIROp_FuncType:
         return true;
     default:
         return false;
@@ -446,6 +448,11 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
                     if (canAddressesPotentiallyAlias(func, call->getArg(i), addr))
                         return true;
                 }
+                else if (!isValueType(call->getArg(i)->getDataType()))
+                {
+                    // This is some unknown handle type, we assume it can have any side effects.
+                    return true;
+                }
             }
         }
         break;
@@ -462,6 +469,11 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
                     if (canAddressesPotentiallyAlias(func, branch->getArg(i), addr))
                         return true;
                 }
+                else if (!isValueType(branch->getArg(i)->getDataType()))
+                {
+                    // This is some unknown handle type, we assume it can have any side effects.
+                    return true;
+                }
             }
         }
         break;
@@ -473,6 +485,11 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             if (isPtrLikeOrHandleType(inst->getOperand(0)->getDataType()) &&
                 canAddressesPotentiallyAlias(func, inst->getOperand(0), addr))
                 return true;
+            else if (!isValueType(inst->getOperand(0)->getDataType()))
+            {
+                // This is some unknown handle type, we assume it can have any side effects.
+                return true;
+            }
         }
         break;
     default:
@@ -564,8 +581,7 @@ bool isPureFunctionalCall(IRCall* call)
         bool hasOutArg = false;
         for (UInt i = 0; i < call->getArgCount(); i++)
         {
-            auto dataType = getResolvedInstForDecorations(unwrapAttributedType(call->getArg(i)->getDataType()));
-            if (isValueType(dataType))
+            if (isValueType(call->getArg(i)->getDataType()))
                 continue;
             // If the argument type is not a known value type,
             // assume it is a pointer or handle through which side effect can take place.
