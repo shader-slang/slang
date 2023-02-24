@@ -26,8 +26,7 @@ uniform accelerationStructureEXT scene_0;
 
 SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_0)
 {
-    int attributeLocation_0 = (0);
-    hitObjectGetAttributesNV((this_0), (attributeLocation_0));
+    hitObjectGetAttributesNV((this_0), ((0)));
     return t_0;
 }
 
@@ -79,11 +78,10 @@ void main()
     p_0.a_0 = idx_0;
     p_0.b_0 = _S6;
     hitObjectNV hitObj_0;
-    int _S8 = (0);
-    hitObjectTraceRayNV(hitObj_0, scene_0, 20U, 255U, 0U, 4U, 0U, _S7.Origin_0, _S7.TMin_0, _S7.Direction_0, _S7.TMax_0, _S8);
-    uint _S9 = uint(idx_0);
-    uint _S10 = calcValue_0(hitObj_0);
-    ((outputBuffer_0)._data[(_S9)]) = _S10;
+    hitObjectTraceRayNV(hitObj_0, scene_0, 20U, 255U, 0U, 4U, 0U, _S7.Origin_0, _S7.TMin_0, _S7.Direction_0, _S7.TMax_0, (0));
+    uint _S8 = uint(idx_0);
+    uint _S9 = calcValue_0(hitObj_0);
+    ((outputBuffer_0)._data[(_S8)]) = _S9;
     return;
 }
 
