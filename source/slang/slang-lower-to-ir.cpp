@@ -6899,14 +6899,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             op = kIROp_BackwardDerivativeDecoration;
         }
-        else if (as<BackwardDerivativePropagateRequirementDecl>(requirementDecl))
-        {
-            op = kIROp_BackwardDerivativePropagateDecoration;
-        }
-        else if (as<BackwardDerivativePrimalRequirementDecl>(requirementDecl))
-        {
-            op = kIROp_BackwardDerivativePrimalDecoration;
-        }
         else if (as<ForwardDerivativeRequirementDecl>(requirementDecl))
         {
             op = kIROp_ForwardDerivativeDecoration;
@@ -8532,12 +8524,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
-    }
-
-    LoweredValInfo visitBackwardDerivativeIntermediateTypeRequirementDecl(BackwardDerivativeIntermediateTypeRequirementDecl* decl)
-    {
-        SLANG_UNUSED(decl);
-        return LoweredValInfo(getBuilder()->getTypeKind());
     }
 
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)

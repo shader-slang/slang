@@ -851,6 +851,8 @@ struct DiffTransposePass
 
             if (as<IRDecoration>(child) || as<IRParam>(child))
                 continue;
+            if (as<IRType>(child))
+                continue;
 
             if (isDifferentialInst(child))
                 transposeInst(&builder, child);
@@ -1332,10 +1334,6 @@ struct DiffTransposePass
             }
         }
 
-        // The call must have been decorated with the continuation context after splitting.
-        auto primalContextDecor = fwdCall->findDecoration<IRBackwardDerivativePrimalContextDecoration>();
-        SLANG_RELEASE_ASSERT(primalContextDecor);
-
         auto baseFn = fwdDiffCallee->getBaseFn();
 
         List<IRInst*> args;
@@ -1453,20 +1451,52 @@ struct DiffTransposePass
             argRequiresLoad.add(false);
         }
 
-        // Ensure availability of the primal context var
-        auto primalContextVar = hoistPrimalInst(builder, primalContextDecor->getBackwardDerivativePrimalContextVar());
-        SLANG_RELEASE_ASSERT(primalContextVar);
+        // If the callee provides a primal implementation that produces continuation context for propagation phase
+        // we grab it and pass it as argument to the propagation function.
+        if (auto primalContextDecor = fwdCall->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+        {
+            // Ensure availability of the primal context var
+            auto primalContextVar = hoistPrimalInst(builder, primalContextDecor->getBackwardDerivativePrimalContextVar());
+            SLANG_RELEASE_ASSERT(primalContextVar);
 
-        args.add(builder->emitLoad(primalContextVar));
-        argTypes.add(as<IRPtrTypeBase>(
+            args.add(builder->emitLoad(primalContextVar));
+            argTypes.add(as<IRPtrTypeBase>(
                 primalContextVar->getDataType())
                 ->getValueType());
-        argRequiresLoad.add(false);
+            argRequiresLoad.add(false);
+        }
 
         auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
-        auto revCallee = builder->emitBackwardDifferentiatePropagateInst(
-            revFnType,
-            baseFn);
+        IRInst* revCallee = nullptr;
+        if (getResolvedInstForDecorations(baseFn)->getOp() == kIROp_LookupWitness)
+        {
+            // This is an interface method call, we can simply transcribe it here.
+            auto specialize = as<IRSpecialize>(baseFn);
+            auto innerFn = baseFn;
+            if (specialize)
+                innerFn = specialize->getBase();
+            auto lookupWitness = as<IRLookupWitnessMethod>(innerFn);
+            SLANG_RELEASE_ASSERT(lookupWitness);
+            auto diffDecor = lookupWitness->getRequirementKey()->findDecoration<IRBackwardDerivativeDecoration>();
+            SLANG_RELEASE_ASSERT(diffDecor);
+            auto diffKey = diffDecor->getBackwardDerivativeFunc();
+            revCallee = builder->emitLookupInterfaceMethodInst(builder->getTypeKind(), lookupWitness->getWitnessTable(), diffKey);
+            if (specialize)
+            {
+                List<IRInst*> specArgs;
+                for (UInt i = 0; i < specialize->getArgCount(); i++)
+                    specArgs.add(specialize->getArg(i));
+                revCallee = builder->emitSpecializeInst(builder->getTypeKind(), revCallee, specArgs.getCount(), specArgs.getBuffer());
+            }
+            revCallee->setFullType(revFnType);
+        }
+        else
+        {
+            // All other calls, we insert a `backwardDifferentiate` inst so we will process it in a follow-up iteration.
+            revCallee = builder->emitBackwardDifferentiatePropagateInst(
+                revFnType,
+                baseFn);
+        }
 
         List<IRInst*> callArgs;
         for (auto arg : args)
