@@ -5,6 +5,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-util.h"
+#include "slang-ir-loop-unroll.h"
 
 namespace Slang
 {
@@ -32,8 +33,7 @@ static BreakableRegion* findBreakableRegion(Region* region)
 // it is needed and hasn't been generated yet.
 static bool isTrivialSingleIterationLoop(
     IRGlobalValueWithCode* func,
-    IRLoop* loop,
-    CFGSimplificationContext& inoutContext)
+    IRLoop* loop)
 {
     auto targetBlock = loop->getTargetBlock();
     if (targetBlock->getPredecessors().getCount() != 1) return false;
@@ -53,14 +53,14 @@ static bool isTrivialSingleIterationLoop(
     // 
     // We need to verify this is a trivial loop by checking if there is any multi-level breaks
     // that skips out of this loop.
-
-    if (!inoutContext.domTree)
-        inoutContext.domTree = computeDominatorTree(func);
-    if (!inoutContext.regionTree)
-        inoutContext.regionTree = generateRegionTreeForFunc(func, nullptr);
+    CFGSimplificationContext context;
+    if (!context.domTree)
+        context.domTree = computeDominatorTree(func);
+    if (!context.regionTree)
+        context.regionTree = generateRegionTreeForFunc(func, nullptr);
 
     SimpleRegion* targetBlockRegion = nullptr;
-    if (!inoutContext.regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
+    if (!context.regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
         return false;
     BreakableRegion* loopBreakableRegion = findBreakableRegion(targetBlockRegion);
     LoopRegion* loopRegion = as<LoopRegion>(loopBreakableRegion);
@@ -68,18 +68,18 @@ static bool isTrivialSingleIterationLoop(
         return false;
     for (auto block : func->getBlocks())
     {
-        if (!inoutContext.domTree->dominates(loop->getTargetBlock(), block))
+        if (!context.domTree->dominates(loop->getTargetBlock(), block))
             continue;
-        if (inoutContext.domTree->dominates(loop->getBreakBlock(), block))
+        if (context.domTree->dominates(loop->getBreakBlock(), block))
             continue;
         SimpleRegion* region = nullptr;
-        if (!inoutContext.regionTree->mapBlockToRegion.TryGetValue(block, region))
+        if (!context.regionTree->mapBlockToRegion.TryGetValue(block, region))
             return false;
 
         for (auto branchTarget : block->getSuccessors())
         {
             SimpleRegion* targetRegion = nullptr;
-            if (!inoutContext.regionTree->mapBlockToRegion.TryGetValue(branchTarget, targetRegion))
+            if (!context.regionTree->mapBlockToRegion.TryGetValue(branchTarget, targetRegion))
                 return false;
             // If multi-level break out that skips over this loop exists, then this is not a trivial loop.
             if (targetRegion->isDescendentOf(loopRegion))
@@ -95,6 +95,104 @@ static bool isTrivialSingleIterationLoop(
     }
 
     return true;
+}
+
+static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
+{
+    auto blocks = collectBlocksInLoop(func, loopInst);
+    HashSet<IRBlock*> loopBlocks;
+    for (auto b : blocks)
+        loopBlocks.Add(b);
+    auto addressHasOutOfLoopUses = [&](IRInst* addr)
+    {
+        // The entire access chain of `addr` must have no uses out side the loop.
+        // The root variable must be a local var.
+        for (auto chainNode = addr; chainNode;)
+        {
+            if (getParentFunc(chainNode) != func)
+                return true;
+            if (addr->getOp() == kIROp_Param)
+                return true;
+            for (auto use = addr->firstUse; use; use = use->nextUse)
+            {
+                if (!loopBlocks.Contains(as<IRBlock>(use->getUser()->getParent())))
+                    return true;
+            }
+            switch (chainNode->getOp())
+            {
+            case kIROp_GetElementPtr:
+            case kIROp_FieldAddress:
+                chainNode = chainNode->getOperand(0);
+                continue;
+            default:
+                break;
+            }
+            break;
+        }
+        return false;
+    };
+
+    for (auto b : blocks)
+    {
+        for (auto inst : b->getChildren())
+        {
+            // Is this inst used anywhere outside the loop? If so the loop has side effect.
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                if (!loopBlocks.Contains(as<IRBlock>(use->getUser()->getParent())))
+                    return true;
+            }
+
+            // The inst can't possibly have side effect? Skip it.
+            if (!inst->mightHaveSideEffects())
+                continue;
+
+            // This inst might have side effect, try to prove that the
+            // side effect does not leak beyond the scope of the loop.
+            if (auto call = as<IRCall>(inst))
+            {
+                auto callee = getResolvedInstForDecorations(call->getCallee());
+                if (!callee || !callee->findDecoration<IRReadNoneDecoration>())
+                    return true;
+                // We are calling a pure function, check if any of the return
+                // variables are used outside the loop.
+                for (UInt i = 0; i < call->getArgCount(); i++)
+                {
+                    auto arg = call->getArg(i);
+                    if (as<IRPtrTypeBase>(arg->getDataType()))
+                    {
+                        if (addressHasOutOfLoopUses(arg))
+                            return true;
+                    }
+                }
+            }
+            else if (auto store = as<IRStore>(inst))
+            {
+                if (addressHasOutOfLoopUses(store->getPtr()))
+                    return true;
+            }
+            else if (auto branch = as<IRUnconditionalBranch>(inst))
+            {
+                if (loopBlocks.Contains(branch->getTargetBlock()))
+                    continue;
+                // Branching out of the loop with some argument is considered
+                // having a side effect.
+                if (branch->getArgCount() != 0)
+                    return true;
+            }
+            else if (as<IRIfElse>(inst) || as<IRSwitch>(inst) || as<IRLoop>(inst))
+            {
+                // We are starting a sub control flow.
+                // This is considered side effect free.
+            }
+            else
+            {
+                // For all other insts, we assume it has a global side effect.
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 static bool removeDeadBlocks(IRGlobalValueWithCode* func)
@@ -218,8 +316,12 @@ static bool tryMoveFalseBranchToTrueBranch(IRBuilder& builder, IRIfElse* ifElseI
     auto falseBlock = ifElseInst->getFalseBlock();
     if (falseBlock == ifElseInst->getAfterBlock())
         return false;
-    if (!arePhiArgsEquivalentInBranches(ifElseInst))
-        return false;
+    if (auto termInst = as<IRUnconditionalBranch>(falseBlock->getTerminator()))
+    {
+        // We can't fold a branch with arguments into the ifElse.
+        if (termInst->getArgCount() != 0)
+            return false;
+    }
     ifElseInst->trueBlock.set(falseBlock);
     ifElseInst->falseBlock.set(ifElseInst->getAfterBlock());
     builder.setInsertBefore(ifElseInst);
@@ -234,8 +336,12 @@ static bool tryEliminateFalseBranch(IRIfElse* ifElseInst)
     auto falseBlock = ifElseInst->getFalseBlock();
     if (falseBlock == ifElseInst->getAfterBlock())
         return false;
-    if (!arePhiArgsEquivalentInBranches(ifElseInst))
-        return false;
+    if (auto termInst = as<IRUnconditionalBranch>(falseBlock->getTerminator()))
+    {
+        // We can't fold a branch with arguments into the ifElse.
+        if (termInst->getArgCount() != 0)
+            return false;
+    }
     ifElseInst->falseBlock.set(ifElseInst->getAfterBlock());
     return true;
 }
@@ -456,9 +562,6 @@ static bool processFunc(IRGlobalValueWithCode* func)
     if (!firstBlock)
         return false;
 
-    // Lazily generated region tree.
-    CFGSimplificationContext simplificationContext;
-
     IRBuilder builder(func->getModule());
 
     bool changed = false;
@@ -495,7 +598,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
                     // break at the end of the loop, we can remove the header and turn it into
                     // a normal branch.
                     auto targetBlock = loop->getTargetBlock();
-                    if (isTrivialSingleIterationLoop(func, loop, simplificationContext))
+                    if (isTrivialSingleIterationLoop(func, loop))
                     {
                         builder.setInsertBefore(loop);
                         List<IRInst*> args;
@@ -504,6 +607,16 @@ static bool processFunc(IRGlobalValueWithCode* func)
                             args.add(loop->getArg(i));
                         }
                         builder.emitBranch(targetBlock, args.getCount(), args.getBuffer());
+                        loop->removeAndDeallocate();
+                        changed = true;
+                    }
+                    else if (!doesLoopHasSideEffect(func, loop))
+                    {
+                        // The loop isn't computing anything useful outside the loop.
+                        // We can delete the entire loop.
+                        builder.setInsertBefore(loop);
+                        SLANG_ASSERT(loop->getBreakBlock()->getFirstParam() == nullptr);
+                        builder.emitBranch(loop->getBreakBlock());
                         loop->removeAndDeallocate();
                         changed = true;
                     }

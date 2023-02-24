@@ -8,10 +8,117 @@ namespace Slang
 struct RedundancyRemovalContext
 {
     RefPtr<IRDominatorTree> dom;
-    bool removeRedundancyInBlock(DeduplicateContext& deduplicateContext, IRBlock* block)
+    bool isMovableInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_Div:
+        case kIROp_Module:
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_Not:
+        case kIROp_FieldExtract:
+        case kIROp_FieldAddress:
+        case kIROp_GetElement:
+        case kIROp_GetElementPtr:
+        case kIROp_UpdateElement:
+        case kIROp_OptionalHasValue:
+        case kIROp_GetOptionalValue:
+        case kIROp_MakeOptionalValue:
+        case kIROp_MakeTuple:
+        case kIROp_GetTupleElement:
+        case kIROp_MakeStruct:
+        case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
+        case kIROp_MakeVector:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_swizzle:
+        case kIROp_MatrixReshape:
+        case kIROp_MakeString:
+        case kIROp_MakeResultError:
+        case kIROp_MakeResultValue:
+        case kIROp_GetResultError:
+        case kIROp_GetResultValue:
+        case kIROp_CastFloatToInt:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastIntToPtr:
+        case kIROp_CastPtrToBool:
+        case kIROp_CastPtrToInt:
+        case kIROp_BitAnd:
+        case kIROp_BitNot:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_BitCast:
+        case kIROp_Reinterpret:
+        case kIROp_Greater:
+        case kIROp_Less:
+        case kIROp_Geq:
+        case kIROp_Leq:
+        case kIROp_Neq:
+        case kIROp_Eql:
+            return true;
+        case kIROp_Call:
+            return isPureFunctionalCall(as<IRCall>(inst));
+        default:
+            return false;
+        }
+    }
+
+    bool tryHoistInstToOuterMostLoop(IRGlobalValueWithCode* func, IRInst* inst)
+    {
+        bool changed = false;
+        for (auto parentBlock = dom->getImmediateDominator(as<IRBlock>(inst->getParent()));
+             parentBlock;
+             parentBlock = dom->getImmediateDominator(parentBlock))
+        {
+            auto terminatorInst = parentBlock->getTerminator();
+            if (terminatorInst->getOp() == kIROp_loop)
+            {
+                // Consider hoisting the inst into this block.
+                // This is only possible if all operands of the inst are dominating `parentBlock`.
+                bool canHoist = true;
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    auto operand = inst->getOperand(i);
+                    if (getParentFunc(operand) != func)
+                    {
+                        // Global value won't prevent hoisting.
+                        continue;
+                    }
+                    auto operandParent = as<IRBlock>(operand->getParent());
+                    if (!operandParent)
+                    {
+                        canHoist = false;
+                        break;
+                    }
+                    canHoist = dom->dominates(operandParent, parentBlock);
+                    if (!canHoist)
+                        break;
+                }
+                if (!canHoist)
+                    break;
+
+                // Move inst to parentBlock.
+                inst->insertBefore(terminatorInst);
+                changed = true;
+
+                // Continue to consider outer hoisting positions.
+            }
+        }
+        return changed;
+    }
+
+    bool removeRedundancyInBlock(DeduplicateContext& deduplicateContext, IRGlobalValueWithCode* func, IRBlock* block)
     {
         bool result = false;
-        for (auto instP : block->getChildren())
+        for (auto instP : block->getModifiableChildren())
         {
             auto resultInst = deduplicateContext.deduplicate(instP, [&](IRInst* inst)
                 {
@@ -20,75 +127,25 @@ struct RedundancyRemovalContext
                         return false;
                     if (dom->isUnreachable(parentBlock))
                         return false;
-
-                    switch (inst->getOp())
-                    {
-                    case kIROp_Add:
-                    case kIROp_Sub:
-                    case kIROp_Mul:
-                    case kIROp_Div:
-                    case kIROp_Module:
-                    case kIROp_Lsh:
-                    case kIROp_Rsh:
-                    case kIROp_And:
-                    case kIROp_Or:
-                    case kIROp_Not:
-                    case kIROp_FieldExtract:
-                    case kIROp_FieldAddress:
-                    case kIROp_GetElement:
-                    case kIROp_GetElementPtr:
-                    case kIROp_UpdateElement:
-                    case kIROp_OptionalHasValue:
-                    case kIROp_GetOptionalValue:
-                    case kIROp_MakeOptionalValue:
-                    case kIROp_MakeTuple:
-                    case kIROp_GetTupleElement:
-                    case kIROp_MakeStruct:
-                    case kIROp_MakeArray:
-                    case kIROp_MakeArrayFromElement:
-                    case kIROp_MakeVector:
-                    case kIROp_MakeMatrix:
-                    case kIROp_MakeMatrixFromScalar:
-                    case kIROp_MakeVectorFromScalar:
-                    case kIROp_swizzle:
-                    case kIROp_MatrixReshape:
-                    case kIROp_MakeString:
-                    case kIROp_MakeResultError:
-                    case kIROp_MakeResultValue:
-                    case kIROp_GetResultError:
-                    case kIROp_GetResultValue:
-                    case kIROp_CastFloatToInt:
-                    case kIROp_CastIntToFloat:
-                    case kIROp_CastIntToPtr:
-                    case kIROp_CastPtrToBool:
-                    case kIROp_CastPtrToInt:
-                    case kIROp_BitAnd:
-                    case kIROp_BitNot:
-                    case kIROp_BitOr:
-                    case kIROp_BitXor:
-                    case kIROp_BitCast:
-                    case kIROp_Reinterpret:
-                    case kIROp_Greater:
-                    case kIROp_Less:
-                    case kIROp_Geq:
-                    case kIROp_Leq:
-                    case kIROp_Neq:
-                    case kIROp_Eql:
-                        return true;
-                    case kIROp_Call:
-                        return isPureFunctionalCall(as<IRCall>(inst));
-                    default:
-                        return false;
-                    }
+                    return isMovableInst(inst);
                 });
             if (resultInst != instP)
+            {
+                instP->replaceUsesWith(resultInst);
                 result = true;
+            }
+            else if (isMovableInst(resultInst))
+            {
+                // This inst is unique, we should consider hoisting it
+                // if it is inside a loop.
+                result |= tryHoistInstToOuterMostLoop(func, resultInst);
+            }
         }
         for (auto child : dom->getImmediatelyDominatedBlocks(block))
         {
             DeduplicateContext subContext;
             subContext.deduplicateMap = deduplicateContext.deduplicateMap;
-            result |= removeRedundancyInBlock(subContext, child);
+            result |= removeRedundancyInBlock(subContext, func, child);
         }
         return result;
     }
@@ -122,7 +179,24 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     RedundancyRemovalContext context;
     context.dom = computeDominatorTree(func);
     DeduplicateContext deduplicateCtx;
-    return context.removeRedundancyInBlock(deduplicateCtx, root);
+    return context.removeRedundancyInBlock(deduplicateCtx, func, root);
+}
+
+static IRInst* _getRootVar(IRInst* inst)
+{
+    while (inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+            inst = inst->getOperand(0);
+            break;
+        default:
+            return inst;
+        }
+    }
+    return inst;
 }
 
 bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
@@ -135,24 +209,45 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     bool hasOverridingStore = false;
 
     // Stores to global variables will never get removed.
-    if (!isChildInstOf(store->getPtr(), func))
-        hasAddrUse = true;
+    auto rootVar = _getRootVar(store->getPtr());
+    if (!isChildInstOf(rootVar, func))
+        return false;
 
     // A store can be removed if it stores into a local variable
     // that has no other uses than store.
-    if (auto varInst = as<IRVar>(store->getPtr()))
+    if (auto varInst = as<IRVar>(rootVar))
     {
         bool hasNonStoreUse = false;
-            for (auto use = varInst->firstUse; use; use = use->nextUse)
+        // If the entire access chain doesn't non-store use, we can safely remove it.
+        HashSet<IRInst*> knownAccessChain;
+        for (auto accessChain = store->getPtr(); accessChain;)
+        {
+            knownAccessChain.Add(accessChain);
+            for (auto use = accessChain->firstUse; use; use = use->nextUse)
             {
                 if (as<IRDecoration>(use->getUser()))
                     continue;
-                    if (use->getUser()->getOp() != kIROp_Store)
-                    {
-                        hasNonStoreUse = true;
-                            break;
-                    }
+                if (knownAccessChain.Contains(use->getUser()))
+                    continue;
+                if (use->getUser()->getOp() != kIROp_Store)
+                {
+                    hasNonStoreUse = true;
+                    break;
+                }
             }
+            if (hasNonStoreUse)
+                break;
+            switch (accessChain->getOp())
+            {
+            case kIROp_GetElementPtr:
+            case kIROp_FieldAddress:
+                accessChain = accessChain->getOperand(0);
+                continue;
+            default:
+                break;
+            }
+            break;
+        }
         if (!hasNonStoreUse)
         {
             store->removeAndDeallocate();

@@ -80,6 +80,18 @@ List<IRBlock*> _collectBlocksInLoop(Dictionary<IRBlock*, int>& blockOrdering, IR
     return loopBlocks;
 }
 
+List<IRBlock*> collectBlocksInLoop(IRGlobalValueWithCode* func,  IRLoop* loopInst)
+{
+    auto postOrderReverseCFG = getPostorderOnReverseCFG(func);
+    Dictionary<IRBlock*, int> blockOrdering;
+
+    for (Index i = 0; i < postOrderReverseCFG.getCount(); i++)
+    {
+        blockOrdering[postOrderReverseCFG[i]] = (int)i;
+    }
+    return _collectBlocksInLoop(blockOrdering, loopInst);
+}
+
 static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
 {
     static constexpr int kMaxIterationsToAttempt = 100;

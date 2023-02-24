@@ -44,6 +44,7 @@ namespace Slang
             case kIROp_PublicDecoration: 
             case kIROp_HLSLExportDecoration: 
             case kIROp_ReadNoneDecoration:
+            case kIROp_NoSideEffectDecoration:
             case kIROp_ForwardDifferentiableDecoration:
             case kIROp_BackwardDifferentiableDecoration:
             case kIROp_RequiresNVAPIDecoration: 
@@ -6918,6 +6919,10 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
+                // If the call has been marked as no-side-effect, we
+                // will treat it so, by-passing all other checks.
+                if (call->findDecoration<IRNoSideEffectDecoration>())
+                    return false;
                 return !isPureFunctionalCall(call);
             }
             break;
