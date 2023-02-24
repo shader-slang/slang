@@ -43,7 +43,10 @@ namespace Slang
             case kIROp_PreciseDecoration: 
             case kIROp_PublicDecoration: 
             case kIROp_HLSLExportDecoration: 
-            case kIROp_ReadNoneDecoration: 
+            case kIROp_ReadNoneDecoration:
+            case kIROp_NoSideEffectDecoration:
+            case kIROp_ForwardDifferentiableDecoration:
+            case kIROp_BackwardDifferentiableDecoration:
             case kIROp_RequiresNVAPIDecoration: 
             case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
             case kIROp_TriangleInputPrimitiveTypeDecoration:
@@ -692,6 +695,21 @@ namespace Slang
         default:
             SLANG_UNEXPECTED("unhandled unconditional branch opcode");
             UNREACHABLE_RETURN(0);
+        }
+    }
+
+    void IRUnconditionalBranch::removeArgument(UInt index)
+    {
+        switch (getOp())
+        {
+        case kIROp_unconditionalBranch:
+            removeOperand(1 + index);
+            break;
+        case kIROp_loop:
+            removeOperand(3 + index);
+            break;
+        default:
+            SLANG_UNEXPECTED("unhandled unconditional branch opcode");
         }
     }
 
@@ -5109,6 +5127,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitNot(IRType* type, IRInst* value)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Not,
+            type,
+            value);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitAdd(IRType* type, IRInst* left, IRInst* right)
     {
         auto inst = createInst<IRInst>(
@@ -6792,6 +6821,17 @@ namespace Slang
         }
     }
 
+    void IRInst::removeOperand(Index index)
+    {
+        for (Index i = index; i < (Index)operandCount - 1; i++)
+        {
+            getOperands()[i].set(getOperand(i + 1));
+        }
+        getOperands()[operandCount - 1].clear();
+        operandCount--;
+        return;
+    }
+
     // Remove this instruction from its parent block,
     // and then destroy it (it had better have no uses!)
     void IRInst::removeAndDeallocate()
@@ -6879,6 +6919,8 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
+                // If the call has been marked as no-side-effect, we
+                // will treat it so, by-passing all other checks.
                 if (call->findDecoration<IRNoSideEffectDecoration>())
                     return false;
                 return !isPureFunctionalCall(call);
@@ -6894,6 +6936,7 @@ namespace Slang
         case kIROp_Func:
         case kIROp_Generic:
         case kIROp_Var:
+        case kIROp_Param:
         case kIROp_GlobalVar: // Note: the IRGlobalVar represents the *address*, so only a load/store would have side effects
         case kIROp_GlobalConstant:
         case kIROp_GlobalParam:
@@ -7001,12 +7044,6 @@ namespace Slang
         case kIROp_BackwardDifferentiate:
         case kIROp_BackwardDifferentiatePrimal:
         case kIROp_BackwardDifferentiatePropagate:
-            return false;
-        }
-
-        // Check if the calle has been marked with a catch-all no-side-effect decoration.
-        if (findDecoration<IRNoSideEffectDecoration>())
-        {
             return false;
         }
         return true;

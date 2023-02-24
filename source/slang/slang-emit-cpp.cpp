@@ -1557,6 +1557,46 @@ void CPPSourceEmitter::emitGlobalInstImpl(IRInst* inst)
     }
 }
 
+bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
+{
+    bool result = Super::shouldFoldInstIntoUseSites(inst);
+    if (!result)
+        return result;
+    if (as<IRVectorType>(inst->getDataType()) || as<IRMatrixType>(inst->getDataType()))
+    {
+        // If a vector value is being used in a reshape/cast,
+        // we should not fold it because the implementation of cast will have multiple references to it.
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            switch (use->getUser()->getOp())
+            {
+            case kIROp_MatrixReshape:
+            case kIROp_VectorReshape:
+            case kIROp_IntCast:
+            case kIROp_FloatCast:
+            case kIROp_CastIntToFloat:
+            case kIROp_CastFloatToInt:
+                return false;
+            default:
+                break;
+            }
+        }
+        switch (inst->getOp())
+        {
+        case kIROp_MatrixReshape:
+        case kIROp_VectorReshape:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+            return false;
+        default:
+            break;
+        }
+    }
+    return true;
+}
+
 static bool _isExported(IRInst* inst)
 {
     for (auto decoration : inst->getDecorations())

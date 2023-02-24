@@ -71,6 +71,7 @@ protected:
     virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* var) SLANG_OVERRIDE;
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
 
     const UnownedStringSlice* getVectorElementNames(BaseType elemType, Index elemCount);
     

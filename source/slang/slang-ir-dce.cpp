@@ -24,6 +24,11 @@ struct DeadCodeEliminationContext
     // These uses will be replaced with `undefInst`.
     IRInst* undefInst = nullptr;
 
+    // Track if we have removed any phi parameters.
+    // If so we need to rerun dce pass because after removing them
+    // there could be new DCE opportunities.
+    bool phiRemoved = false;
+
     // Our overall process is going to be to determine
     // which instructions in the module are "live"
     // and then eliminate anything that wasn't found to
@@ -98,104 +103,115 @@ struct DeadCodeEliminationContext
 
     bool processInst(IRInst* root)
     {
-        // First of all, we know that the root instruction
-        // should be considered as live, because otherwise
-        // we'd end up eliminating it, so that is a
-        // good place to start.
-        //
-        markInstAsLive(root);
-
-        // Ensure there is a global undef inst that is always alive.
-        // This undef inst will be used to fill in weak-referencing uses
-        // whose used value is marked as dead and eliminated.
-        // We always make sure this undef inst is available to prevent
-        // infiniate oscilating loops.
-        markInstAsLive(getUndefInst());
-
-        // Marking the module as live should have
-        // seeded our work list, so we can now start
-        // processing entries off of our work list
-        // until it goes dry.
-        //
-        while (workList.getCount())
+        bool result = false;
+        for (;;)
         {
-            auto inst = workList.getLast();
-            workList.removeLast();
+            liveInsts.Clear();
+            workList.clear();
 
-            if (!isChildInstOf(inst, root))
-                continue;
+            // First of all, we know that the root instruction
+            // should be considered as live, because otherwise
+            // we'd end up eliminating it, so that is a
+            // good place to start.
+            //
+            markInstAsLive(root);
 
-            // At this point we know that `inst` is live,
-            // and we want to start considering which other
-            // instructions must be live because of that
-            // knowlege.
-            //
-            // A first easy case is that the parent (if any)
-            // of a live instruction had better be live, or
-            // else we might delete the parent, and
-            // the child with it.
-            //
-            markInstAsLive(inst->getParent());
+            // Ensure there is a global undef inst that is always alive.
+            // This undef inst will be used to fill in weak-referencing uses
+            // whose used value is marked as dead and eliminated.
+            // We always make sure this undef inst is available to prevent
+            // infiniate oscilating loops.
+            markInstAsLive(getUndefInst());
 
-            // Next the type of a live instruction, and all
-            // of its operands must also be live, or else
-            // we won't be able to compute its value.
+            // Marking the module as live should have
+            // seeded our work list, so we can now start
+            // processing entries off of our work list
+            // until it goes dry.
             //
-            markInstAsLive(inst->getFullType());
-            UInt operandCount = inst->getOperandCount();
-            for (UInt ii = 0; ii < operandCount; ++ii)
+            while (workList.getCount())
             {
-                // There are some type of operands that needs to be treated as
-                // "weak" references -- they can never hold things alive, and
-                // whenever we delete the referenced value, these operands needs
-                // to be replaced with `undef`.
-                if (!isWeakReferenceOperand(inst, ii))
-                    markInstAsLive(inst->getOperand(ii));
-            }
+                auto inst = workList.getLast();
+                workList.removeLast();
 
-            // Finally, we need to consider the children
-            // and decorations of the instruction.
-            //
-            // Note that just because an instruction is
-            // live doesn't mean its children must be, or
-            // else we'd never eliminate *anything* (we
-            // marked the whole module as live, and everything
-            // is a transitive child of the module).
-            //
-            // Decorations, in contrast, are always live if their
-            // parents are (because we don't want to silently drop
-            // decorations). It is still important to *mark*
-            // decorations as live, because they have operands,
-            // and those operands need to be marked as live.
-            // We will fold decorations into the same loop
-            // as children for simplicity.
-            //
-            // To keep the code here simple, we'll defer the
-            // decision of whether a child (or decoration)
-            // should be live when its parent is to a subroutine.
-            //
-            for (auto child : inst->getDecorationsAndChildren())
-            {
-                if (shouldInstBeLiveIfParentIsLive(child))
+                if (!isChildInstOf(inst, root))
+                    continue;
+
+                // At this point we know that `inst` is live,
+                // and we want to start considering which other
+                // instructions must be live because of that
+                // knowlege.
+                //
+                // A first easy case is that the parent (if any)
+                // of a live instruction had better be live, or
+                // else we might delete the parent, and
+                // the child with it.
+                //
+                markInstAsLive(inst->getParent());
+
+                // Next the type of a live instruction, and all
+                // of its operands must also be live, or else
+                // we won't be able to compute its value.
+                //
+                markInstAsLive(inst->getFullType());
+                UInt operandCount = inst->getOperandCount();
+                for (UInt ii = 0; ii < operandCount; ++ii)
                 {
-                    // In this case, we know `inst` is live and
-                    // its `child` should be live if its parent is,
-                    // so the `child` must be live too.
-                    //
-                    markInstAsLive(child);
+                    // There are some type of operands that needs to be treated as
+                    // "weak" references -- they can never hold things alive, and
+                    // whenever we delete the referenced value, these operands needs
+                    // to be replaced with `undef`.
+                    if (!isWeakReferenceOperand(inst, ii))
+                        markInstAsLive(inst->getOperand(ii));
+                }
+
+                // Finally, we need to consider the children
+                // and decorations of the instruction.
+                //
+                // Note that just because an instruction is
+                // live doesn't mean its children must be, or
+                // else we'd never eliminate *anything* (we
+                // marked the whole module as live, and everything
+                // is a transitive child of the module).
+                //
+                // Decorations, in contrast, are always live if their
+                // parents are (because we don't want to silently drop
+                // decorations). It is still important to *mark*
+                // decorations as live, because they have operands,
+                // and those operands need to be marked as live.
+                // We will fold decorations into the same loop
+                // as children for simplicity.
+                //
+                // To keep the code here simple, we'll defer the
+                // decision of whether a child (or decoration)
+                // should be live when its parent is to a subroutine.
+                //
+                for (auto child : inst->getDecorationsAndChildren())
+                {
+                    if (shouldInstBeLiveIfParentIsLive(child))
+                    {
+                        // In this case, we know `inst` is live and
+                        // its `child` should be live if its parent is,
+                        // so the `child` must be live too.
+                        //
+                        markInstAsLive(child);
+                    }
                 }
             }
-        }
 
-        // If our work list runs dry, that means we've reached a steady
-        // state where everything that is transitively relevant to
-        // the "outputs" of the module has been marked as live.
-        //
-        // Now we can simply walk through all of our instructions
-        // recursively and eliminate those that are "dead" by
-        // virtue of not having been found live.
-        //
-        return eliminateDeadInstsRec(root);
+            // If our work list runs dry, that means we've reached a steady
+            // state where everything that is transitively relevant to
+            // the "outputs" of the module has been marked as live.
+            //
+            // Now we can simply walk through all of our instructions
+            // recursively and eliminate those that are "dead" by
+            // virtue of not having been found live.
+            //
+            phiRemoved = false;
+            result |= eliminateDeadInstsRec(root);
+            if (!phiRemoved)
+                break;
+        }
+        return result;
     }
 
     // Given the basic infrastructrure above, let's
@@ -205,6 +221,25 @@ struct DeadCodeEliminationContext
     bool processModule()
     {
         return processInst(module->getModuleInst());
+    }
+
+    void removePhiArgs(IRInst* phiParam)
+    {
+        auto block = cast<IRBlock>(phiParam->getParent());
+        UInt paramIndex = 0;
+        for (auto p = block->getFirstParam(); p; p = p->getNextParam())
+        {
+            if (p == phiParam)
+                break;
+            paramIndex++;
+        }
+        for (auto predBlock : block->getPredecessors())
+        {
+            auto termInst = as<IRUnconditionalBranch>(predBlock->getTerminator());
+            SLANG_ASSERT(paramIndex < termInst->getArgCount());
+            termInst->removeArgument(paramIndex);
+        }
+        phiRemoved = true;
     }
 
     bool eliminateDeadInstsRec(IRInst* inst)
@@ -225,6 +260,12 @@ struct DeadCodeEliminationContext
             if (inst->hasUses())
             {
                 inst->replaceUsesWith(getUndefInst());
+            }
+
+            if (inst->getOp() == kIROp_Param)
+            {
+                // For Phi parameters, we need to update all branch arguments.
+                removePhiArgs(inst);
             }
             inst->removeAndDeallocate();
             changed = true;
@@ -261,6 +302,16 @@ struct DeadCodeEliminationContext
     }
 };
 
+bool isFirstBlock(IRInst* inst)
+{
+    auto block = as<IRBlock>(inst);
+    if (!block)
+        return false;
+    if (!block->getParent())
+        return false;
+    return block->getParent()->getFirstBlock() == block;
+}
+
 bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options)
 {
     // The main source of confusion/complexity here is that
@@ -275,7 +326,31 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     // when it is executed, then we should keep it around.
     //
     if (inst->mightHaveSideEffects())
-        return true;
+    {
+        // If the inst has side effect, we should keep it alive.
+        // An exception is if we have a call to a pure function
+        // that writes its output to a local variable, but we
+        // don't have any uses of that local variable.
+        auto call = as<IRCall>(inst);
+        if (!call)
+            return true;
+        if (!getResolvedInstForDecorations(call->getCallee())->findDecoration<IRReadNoneDecoration>())
+            return true;
+        auto parentFunc = getParentFunc(inst);
+        if (!parentFunc)
+            return true;
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            auto arg = call->getArg(i);
+            if (getParentFunc(arg) != parentFunc)
+                return true;
+            if (arg->getOp() != kIROp_Var)
+                return true;
+            if (arg->hasMoreThanOneUse())
+                return true;
+        }
+        return false;
+    }
     //
     // The `mightHaveSideEffects` query is conservative, and will
     // return `true` as its default mode, so once we are past that
@@ -352,17 +427,10 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     switch (inst->getOp())
     {
         // Function parameters obviously shouldn't get eliminated,
-        // even if nothing references them, and block parameters
-        // (phi nodes) will be considered live when their block is,
-        // just so that we don't have to deal with any complications
-        // around re-writing the relevant inter-block argument passing.
-        //
-        // TODO: A smarter DCE pass could deal with this case more
-        // carefully, or we could improve the interprocedural SCCP
-        // pass to deal with block parameters instead.
+        // even if nothing references them.
         //
     case kIROp_Param:
-        return true;
+        return isFirstBlock(inst->getParent());
 
         // IR struct types and witness tables are currently kludged
         // so that they have child instructions that represent their

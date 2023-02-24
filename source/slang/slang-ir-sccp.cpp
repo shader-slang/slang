@@ -1439,7 +1439,9 @@ struct SCCPContext
                 inst->replaceUsesWith(constantVal);
                 if( !inst->mightHaveSideEffects() )
                 {
-                    instsToRemove.add(inst);
+                    // Don't delete phi parameters, they will be cleaned up in CFG simplification.
+                    if (inst->getOp() != kIROp_Param)
+                        instsToRemove.add(inst);
                 }
             }
         }
