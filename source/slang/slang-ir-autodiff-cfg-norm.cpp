@@ -83,11 +83,19 @@ IRBlock* getOrCreateTopLevelCondition(IRLoop* loopInst)
         // false side goes into the break block.
         // 
         condBuilder.setInsertInto(condBlock);
-        condBuilder.emitIfElse(
+        auto ifElse = as<IRIfElse>(condBuilder.emitIfElse(
             condBuilder.getBoolValue(true),
             firstBlock,
             loopInst->getBreakBlock(),
-            firstBlock);
+            firstBlock));
+        
+        // We'll insert a blank block between the condition and the
+        // break block, since otherwise, we might trip up the later
+        // parts of this pass.
+        //
+        condBuilder.insertBlockAlongEdge(
+            loopInst->getModule(),
+            IREdge(&ifElse->falseBlock));
         
         return condBlock;
     }
@@ -357,6 +365,25 @@ struct CFGNormalizationPass
                     // Do we need to split the after region?
                     if (afterBaseRegion && afterBreakRegion)
                     {
+                        // Before we split the afterBlock, we 
+                        // want to make sure the afterBlock is
+                        // firmly _inside_ the current region.
+                        // If it's part of the parent, add a 
+                        // dummy block.
+                        // 
+                        if (afterBlocks.contains(afterBlock))
+                        {
+                            auto newAfterBlock = builder.emitBlock();
+                            newAfterBlock->insertBefore(afterBlock);
+                            builder.emitBranch(afterBlock);
+                            
+                            ifElse->afterBlock.set(newAfterBlock);
+                            as<IRUnconditionalBranch>(trueEndPoint.exitBlock->getTerminator())->block.set(newAfterBlock);
+                            as<IRUnconditionalBranch>(falseEndPoint.exitBlock->getTerminator())->block.set(newAfterBlock);
+
+                            afterBlock = newAfterBlock;
+                        }
+
                         addBreakBypassBranch(afterBlock);
 
                         // Update current block.
