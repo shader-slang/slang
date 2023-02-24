@@ -2677,24 +2677,6 @@ namespace Slang
                 val->func = satisfyingMemberDeclRef;
                 witnessTable->add(bwdReq, RequirementWitness(val));
             }
-            else if (auto primalReq = as<BackwardDerivativePrimalRequirementDecl>(reqRefDecl->referencedDecl))
-            {
-                DifferentiateVal* val = m_astBuilder->create<BackwardDifferentiatePrimalVal>();
-                val->func = satisfyingMemberDeclRef;
-                witnessTable->add(primalReq, RequirementWitness(val));
-            }
-            else if (auto propReq = as<BackwardDerivativePropagateRequirementDecl>(reqRefDecl->referencedDecl))
-            {
-                DifferentiateVal* val = m_astBuilder->create<BackwardDifferentiatePropagateVal>();
-                val->func = satisfyingMemberDeclRef;
-                witnessTable->add(propReq, RequirementWitness(val));
-            }
-            else if (auto itypeReq = as<BackwardDerivativeIntermediateTypeRequirementDecl>(reqRefDecl->referencedDecl))
-            {
-                DifferentiateVal* val = m_astBuilder->create<BackwardDifferentiateIntermediateTypeVal>();
-                val->func = satisfyingMemberDeclRef;
-                witnessTable->add(itypeReq, RequirementWitness(val));
-            }
         }
         witnessTable->add(requiredMemberDeclRef, RequirementWitness(satisfyingMemberDeclRef));
     }
@@ -5037,7 +5019,6 @@ namespace Slang
                 auto thisType = calcThisType(parentDeclRef);
                 maybeRegisterDifferentiableType(m_astBuilder, thisType);
             }
-            completeDifferentiableTypeDictionary();
             m_parentDifferentiableAttr = oldAttr;
         }
 
@@ -5921,7 +5902,7 @@ namespace Slang
         if (auto interfaceDecl = findParentInterfaceDecl(decl))
         {
             bool isDiffFunc = false;
-            if (decl->hasModifier<ForwardDifferentiableAttribute>())
+            if (decl->hasModifier<ForwardDifferentiableAttribute>() || decl->hasModifier<BackwardDifferentiableAttribute>())
             {
                 auto reqDecl = m_astBuilder->create<ForwardDerivativeRequirementDecl>();
                 cloneModifiers(reqDecl, decl);
@@ -5955,55 +5936,6 @@ namespace Slang
                     reqRef->parentDecl = decl;
                     decl->members.add(reqRef);
                 }
-                // Requirement for backward derivative intermediate type.
-                auto intermediateTypeReqDecl = m_astBuilder->create<BackwardDerivativeIntermediateTypeRequirementDecl>();
-                auto intermediateType = m_astBuilder->getOrCreateDeclRefType(
-                    intermediateTypeReqDecl, createDefaultSubstitutions(m_astBuilder, this, decl));
-                {
-                    cloneModifiers(intermediateTypeReqDecl, decl);
-                    interfaceDecl->members.add(intermediateTypeReqDecl);
-                    intermediateTypeReqDecl->parentDecl = interfaceDecl;
-
-                    auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
-                    reqRef->referencedDecl = intermediateTypeReqDecl;
-                    reqRef->parentDecl = decl;
-                    decl->members.add(reqRef);
-                }
-                // Requirement for backward derivative primal func.
-                {
-                    auto reqDecl = m_astBuilder->create<BackwardDerivativePrimalRequirementDecl>();
-                    cloneModifiers(reqDecl, decl);
-                    FuncType* primalFuncType = m_astBuilder->create<FuncType>();
-                    primalFuncType->resultType = originalFuncType->resultType;
-                    primalFuncType->paramTypes.addRange(originalFuncType->paramTypes);
-                    auto outType = m_astBuilder->getOutType(intermediateType);
-                    primalFuncType->paramTypes.add(outType);
-                    setFuncTypeIntoRequirementDecl(reqDecl, primalFuncType);
-                    interfaceDecl->members.add(reqDecl);
-                    reqDecl->parentDecl = interfaceDecl;
-
-                    auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
-                    reqRef->referencedDecl = reqDecl;
-                    reqRef->parentDecl = decl;
-                    decl->members.add(reqRef);
-                }
-                // Requirement for backward derivative propagate func.
-                {
-                    auto reqDecl = m_astBuilder->create<BackwardDerivativePropagateRequirementDecl>();
-                    cloneModifiers(reqDecl, decl);
-                    interfaceDecl->members.add(reqDecl);
-                    reqDecl->parentDecl = interfaceDecl;
-                    FuncType* propagateFuncType = m_astBuilder->create<FuncType>();
-                    propagateFuncType->resultType = diffFuncType->resultType;
-                    propagateFuncType->paramTypes.addRange(diffFuncType->paramTypes);
-                    propagateFuncType->paramTypes.add(intermediateType);
-                    setFuncTypeIntoRequirementDecl(reqDecl, propagateFuncType);
-                    auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
-                    reqRef->referencedDecl = reqDecl;
-                    reqRef->parentDecl = decl;
-                    decl->members.add(reqRef);
-                }
-                
                 isDiffFunc = true;
             }
             if (isDiffFunc)

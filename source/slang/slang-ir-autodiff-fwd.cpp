@@ -283,8 +283,11 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
             else 
             {
                 auto operandDataType = origConstruct->getOperand(ii)->getDataType();
-                operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
-                diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+                if (auto diffOperandType = differentiateType(builder, operandDataType))
+                {
+                    operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
+                    diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+                }
             }
         }
         
@@ -293,7 +296,7 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
             builder->emitIntrinsicInst(
                 diffConstructType,
                 origConstruct->getOp(),
-                operandCount,
+                diffOperands.getCount(),
                 diffOperands.getBuffer()));
     }
     else
