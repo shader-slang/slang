@@ -83,6 +83,9 @@ inline bool isScalarIntegerType(IRType* type)
     return getTypeStyle(type->getOp()) == kIROp_IntType;
 }
 
+// No side effect can take place through a value of a "Value" type.
+bool isValueType(IRInst* type);
+
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)
 {
     while (inst)

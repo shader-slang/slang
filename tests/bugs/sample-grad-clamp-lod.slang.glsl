@@ -20,10 +20,10 @@ rayPayloadInEXT ShadowRay_0 _S1;
 
 void main()
 {
-    vec4 val_0 = (textureGradOffsetClampARB(sampler2DArray(t2D_0,samplerState_0), (vec3(_S1.hitDistance_0 * 0.20000000000000001110, _S1.hitDistance_0 * 0.29999999999999998890, 0.20000000000000001110)), (vec2(float(0), float(0))), (vec2(float(0), float(0))), (ivec2(0)), (0.50000000000000000000)));
+    const vec2 _S2 = vec2(0.0, 0.0);
 
-    float _S2 = dot(val_0, val_0);
+    vec4 val_0 = (textureGradOffsetClampARB(sampler2DArray(t2D_0,samplerState_0), (vec3(_S1.hitDistance_0 * 0.20000000298023223877, _S1.hitDistance_0 * 0.30000001192092895508, 0.20000000298023223877)), (_S2), (_S2), (ivec2(0)), (0.5)));
 
-    _S1.hitDistance_0 = _S2;
+    _S1.hitDistance_0 = dot(val_0, val_0);
     return;
 }

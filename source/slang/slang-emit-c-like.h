@@ -326,7 +326,7 @@ public:
 
     void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
     
-    bool shouldFoldInstIntoUseSites(IRInst* inst);
+    virtual bool shouldFoldInstIntoUseSites(IRInst* inst);
 
     void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec) { emitOperandImpl(inst, outerPrec); }
 
