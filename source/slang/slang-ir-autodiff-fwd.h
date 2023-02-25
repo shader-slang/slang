@@ -35,6 +35,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeBinaryLogic(IRBuilder* builder, IRInst* origLogic);
 
+    InstPair transcribeSelect(IRBuilder* builder, IRInst* origSelect);
+
     InstPair transcribeLoad(IRBuilder* builder, IRLoad* origLoad);
 
     InstPair transcribeStore(IRBuilder* builder, IRStore* origStore);
