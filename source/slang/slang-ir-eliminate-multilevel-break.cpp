@@ -228,6 +228,9 @@ struct EliminateMultiLevelBreakContext
 
     void processFunc(IRGlobalValueWithCode* func)
     {
+        
+        normalizeBranchesIntoBreakBlocks(func);
+        
         // If func does not have any multi-level breaks, return.
         {
             FuncContext funcInfo;
@@ -236,8 +239,6 @@ struct EliminateMultiLevelBreakContext
             if (funcInfo.multiLevelBreaks.getCount() == 0)
                 return;
         }
-
-        normalizeBranchesIntoBreakBlocks(func);
 
         // To make things easy, eliminate Phis before perform transformations.
         eliminatePhisInFunc(LivenessMode::Disabled, irModule, func);
