@@ -27,10 +27,8 @@ RWStructuredBuffer<float4 >  sb2_0[int(5)] : register(u0);
 ByteAddressBuffer  bb_0[int(6)] : register(t4);
 float4 main() : SV_TARGET
 {
-    float4 _S1 = cb_0[C_0.index_0].f_0;
-    S_0 _S2 = sb1_0[C_0.index_0][C_0.index_0];
-    float4 _S3 = _S1 + _S2.f_0;
-    float4 _S4 = _S3 + sb2_0[C_0.index_0][C_0.index_0];
-    uint _S5 = bb_0[C_0.index_0].Load(int(C_0.index_0 * 4U));
-    return _S4 + (float4)float(_S5);
+    S_0 _S1 = sb1_0[C_0.index_0][C_0.index_0];
+    float4 _S2 = cb_0[C_0.index_0].f_0 + _S1.f_0;
+    uint _S3 = bb_0[C_0.index_0].Load(int(C_0.index_0 * 4U));
+    return _S2 + sb2_0[C_0.index_0][C_0.index_0] + (float4)float(_S3);
 }
