@@ -12,11 +12,11 @@ void livenessStart_0(spirv_by_reference int  _0[2], spirv_literal int _1);
 spirv_instruction(id = 256)
 void livenessStart_1(spirv_by_reference int _0, spirv_literal int _1);
 
-spirv_instruction(id = 256)
-void livenessStart_2(spirv_by_reference int  _0[3], spirv_literal int _1);
-
 spirv_instruction(id = 257)
 void livenessEnd_0(spirv_by_reference int _0, spirv_literal int _1);
+
+spirv_instruction(id = 256)
+void livenessStart_2(spirv_by_reference int  _0[3], spirv_literal int _1);
 
 spirv_instruction(id = 257)
 void livenessEnd_1(spirv_by_reference int  _0[3], spirv_literal int _1);
@@ -46,6 +46,8 @@ int calcThing_0(int offset_0)
         }
         else
         {
+            livenessEnd_0(_S1, 0);
+            livenessEnd_0(k_0, 0);
             break;
         }
         int  idx_0[3];
@@ -69,6 +71,7 @@ int calcThing_0(int offset_0)
             }
             else
             {
+                livenessEnd_0(i_0, 0);
                 break;
             }
             int modRange_0 = i_0 % 3;
@@ -97,7 +100,6 @@ int calcThing_0(int offset_0)
             livenessEnd_0(_S6, 0);
             _S4 = _S10;
         }
-        livenessEnd_0(i_0, 0);
         livenessEnd_0(_S1, 0);
         livenessEnd_0(k_0, 0);
         if(_S3)
@@ -123,8 +125,6 @@ int calcThing_0(int offset_0)
         livenessStart_1(total_0, 0);
         total_0 = total_1;
     }
-    livenessEnd_0(_S1, 0);
-    livenessEnd_0(k_0, 0);
     livenessEnd_2(another_0, 0);
     int _S16 = total_0;
     livenessEnd_0(total_0, 0);
