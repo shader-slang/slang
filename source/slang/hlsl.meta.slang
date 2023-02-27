@@ -19,29 +19,39 @@ __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 struct ByteAddressBuffer
 {
     __target_intrinsic(glsl, "$1 = $0._data.length() * 4")
+    [__readNone]
     void GetDimensions(
         out uint dim);
 
     __target_intrinsic(glsl, "$0._data[$1/4]")
+    [__readNone]
     uint Load(int location);
 
+    [__readNone]
     uint Load(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec2($0._data[$1/4], $0._data[$1/4+1])")
+    [__readNone]
     uint2 Load2(int location);
 
+    [__readNone]
     uint2 Load2(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec3($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2])")
+    [__readNone]
     uint3 Load3(int location);
 
+    [__readNone]
     uint3 Load3(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec4($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2], $0._data[$1/4+3])")
+    [__readNone]
     uint4 Load4(int location);
 
+    [__readNone]
     uint4 Load4(int location, out uint status);
 
+    [__readNone]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location);
@@ -216,19 +226,24 @@ __intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct StructuredBuffer
 {
     __target_intrinsic(glsl, "$1 = $0._data.length(); $2 = 0")
+    [__readNone]
     void GetDimensions(
         out uint numStructs,
         out uint stride);
 
     __target_intrinsic(glsl, "$0._data[$1]")
     __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
+    [__readNone]
     T Load(int location);
+
+    [__readNone]
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
         __target_intrinsic(glsl, "$0._data[$1]")
         __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
+        [__readNone]
         get;
     };
 };
@@ -4923,6 +4938,7 @@ static const int kBaseBufferAccessLevelCount = sizeof(kBaseBufferAccessLevels) /
 for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
     auto access = kBaseBufferAccessLevels[aa].access;
+    bool isReadOnly = (access == SLANG_RESOURCE_ACCESS_READ);
     auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, access).flavor;
     sb << "__generic<T>\n";
     sb << "__magic_type(Texture," << int(flavor) << ")\n";
@@ -4930,19 +4946,22 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     sb << "struct ";
     sb << kBaseBufferAccessLevels[aa].name;
     sb << "Buffer {\n";
-
+    sb << "[__readNone]\n";
     sb << "void GetDimensions(out uint dim);\n";
 
     char const* glslLoadFuncName = (access == SLANG_RESOURCE_ACCESS_READ) ? "texelFetch" : "imageLoad";
 
     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
     sb << "__target_intrinsic(glsl, \"" << glslLoadFuncName << "($0, $1)$z\")\n";
+    if (isReadOnly) sb << "[__readNone]\n";
     sb << "T Load(int location);\n";
 
+    if (isReadOnly) sb << "[__readNone]\n";
     sb << "T Load(int location, out uint status);\n";
 
     sb << "__subscript(uint index) -> T {\n";
 
+    if (isReadOnly) sb << "[__readNone]\n";
     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
     sb << "__target_intrinsic(glsl, \"" << glslLoadFuncName << "($0, int($1))$z\") get;\n";
 

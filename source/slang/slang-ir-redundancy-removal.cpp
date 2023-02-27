@@ -28,6 +28,8 @@ struct RedundancyRemovalContext
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
         case kIROp_UpdateElement:
+        case kIROp_Specialize:
+        case kIROp_LookupWitness:
         case kIROp_OptionalHasValue:
         case kIROp_GetOptionalValue:
         case kIROp_MakeOptionalValue:
@@ -67,6 +69,21 @@ struct RedundancyRemovalContext
             return true;
         case kIROp_Call:
             return isPureFunctionalCall(as<IRCall>(inst));
+        case kIROp_Load:
+            // Load is generally not movable, an exception is loading a global constant buffer.
+            if (auto load = as<IRLoad>(inst))
+            {
+                auto addrType = load->getPtr()->getDataType();
+                switch (addrType->getOp())
+                {
+                case kIROp_ConstantBufferType:
+                case kIROp_ParameterBlockType:
+                    return true;
+                default:
+                    break;
+                }
+            }
+            return false;
         default:
             return false;
         }

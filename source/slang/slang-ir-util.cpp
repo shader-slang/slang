@@ -157,6 +157,7 @@ IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecaili
     return genericToSpecailize;
 }
 
+// Returns true if is not possible to produce side-effect from a value of `dataType`.
 bool isValueType(IRInst* dataType)
 {
     dataType = getResolvedInstForDecorations(unwrapAttributedType(dataType));
@@ -179,6 +180,15 @@ bool isValueType(IRInst* dataType)
     case kIROp_FuncType:
         return true;
     default:
+        // Read-only resource handles are considered as Value type.
+        if (auto resType = as<IRResourceTypeBase>(dataType))
+            return (resType->getAccess() == SLANG_RESOURCE_ACCESS_READ);
+        else if (as<IRSamplerStateTypeBase>(dataType))
+            return true;
+        else if (as<IRHLSLByteAddressBufferType>(dataType))
+            return true;
+        else if (as<IRHLSLStructuredBufferType>(dataType))
+            return true;
         return false;
     }
 }
