@@ -320,27 +320,8 @@ void mul(inout DifferentialPair<matrix<T, R, N>> left, inout DifferentialPair<ma
 // Detach and set derivatives to zero
 
 __generic<T : IDifferentiable>
-T detach(T x)
-{
-    return x;
-}
-
-__generic<T : IDifferentiable>
-[ForwardDerivativeOf(detach)]
-DifferentialPair<T> __d_detach(DifferentialPair<T> dpx)
-{
-    return DifferentialPair<T>(
-        dpx.p,
-        T.dzero()
-    );
-}
-
-__generic<T : IDifferentiable>
-[BackwardDerivativeOf(detach)]
-void __d_detach(inout DifferentialPair<T> dpx, T.Differential dOut)
-{
-    dpx = diffPair(dpx.p, T.dzero());
-}
+__intrinsic_op($(kIROp_DetachDerivative))
+T detach(T x);
 
 // Natural Exponent
 

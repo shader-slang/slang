@@ -313,6 +313,7 @@ INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
 
 INST(UpdateElement, updateElement, 2, 0)
+INST(DetachDerivative, detachDerivative, 1, 0)
 
 INST(PackAnyValue, packAnyValue, 1, 0)
 INST(UnpackAnyValue, unpackAnyValue, 1, 0)
