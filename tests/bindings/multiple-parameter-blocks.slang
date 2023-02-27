@@ -39,10 +39,11 @@ SamplerState p1_s_0 : register(s0, space1);
 
 float4 main(float v : V) : SV_TARGET
 {
-	return use(p_t_0,         	p_s_0)
-		 + use(p_ta_0[int(v)],  p_s_0)
-		 + use(p1_t_0,         	p1_s_0)
-		 + use(p1_ta_0[int(v)], p1_s_0);
+    int _S2 = int(v);
+    return use(p_t_0, p_s_0)
+		 + use(p_ta_0[_S2], p_s_0)
+		 + use(p1_t_0, p1_s_0)
+		 + use(p1_ta_0[_S2], p1_s_0);
 }
 
 #endif

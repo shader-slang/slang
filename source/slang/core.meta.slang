@@ -1189,6 +1189,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     continue;
                 }
 
+                bool isReadOnly = (access == SLANG_RESOURCE_ACCESS_READ);
                 // TODO: any constraints to enforce on what gets to be multisampled?
 
                 unsigned flavor = baseShape;
@@ -1318,6 +1319,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                     char const* t = isFloat ? "out float " : "out uint ";
 
+                    sb << "[__readNone]\n";
                     sb << "void GetDimensions(";
                     if(includeMipInfo)
                         sb << "uint mipLevel, ";
@@ -1487,6 +1489,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         }
                     }
 
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T Load(";
                     sb << "int" << loadCoordCount << " location";
                     if(isMultisample)
@@ -1516,8 +1520,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         sb << ", $2)$z\")\n";
                     }
 
-
-
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T Load(";
                     sb << "int" << loadCoordCount << " location";
                     if(isMultisample)
@@ -1527,7 +1531,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << ", constexpr int" << kBaseTextureTypes[tt].coordCount << " offset";
                     sb << ");\n";
 
-
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T Load(";
                     sb << "int" << loadCoordCount << " location";
                     if(isMultisample)
@@ -1632,6 +1637,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     }
 
                     // Output that has get
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << " get;\n";
 
                     // !!!!!!!!!!!!!!!!!!!! set !!!!!!!!!!!!!!!!!!!!!!!
@@ -1747,17 +1754,23 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         }
                     }
 
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T Sample(" << samplerStateParam;;
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
                         sb << "__target_intrinsic(glsl, \"$ctextureOffset($p, $2, $3)$z\")\n";
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "T Sample(" << samplerStateParam;;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                     }
 
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T Sample(" << samplerStateParam;
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
@@ -1766,6 +1779,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     }
                     sb << "float clamp);\n";
 
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T Sample(" << samplerStateParam;
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
@@ -1776,12 +1791,16 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                     // `SampleBias()`
                     sb << "__target_intrinsic(glsl, \"$ctexture($p, $2, $3)$z\")\n";
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T SampleBias(" << samplerStateParam;
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
 
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
                         sb << "__target_intrinsic(glsl, \"$ctextureOffset($p, $2, $3, $4)$z\")\n";
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "T SampleBias(" << samplerStateParam;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
                         sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -1792,11 +1811,15 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     {
                         // `SampleCmp()` and `SampleCmpLevelZero`
                         sb << "__target_intrinsic(glsl, \"texture($p, vec" << arrCoordCount + 1 << "($2, $3))\")";
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "float SampleCmp(SamplerComparisonState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float compareValue";
                         sb << ");\n";
                         sb << "__target_intrinsic(glsl, \"texture($p, vec" << arrCoordCount + 1 << "($2, $3))\")";
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float compareValue";
@@ -1851,12 +1874,15 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         // saying they only exclude `offset` for cube maps (which makes
                         // sense). I'm going to assume the documentation for `SampleCmp`
                         // is just wrong.
-
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "float SampleCmp(SamplerComparisonState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float compareValue, ";
                         sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float compareValue, ";
@@ -1867,6 +1893,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     // the dimension. On CUDA there is texNDGrad, but it always just takes ddx, ddy.
                     // I could just assume 0 for elements not supplied, and ignore z. For now will just leave                  
                     sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, $2, $3, $4)$z\")\n";
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T SampleGrad(" << samplerStateParam;
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1876,6 +1904,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
                         sb << "__target_intrinsic(glsl, \"$ctextureGradOffset($p, $2, $3, $4, $5)$z\")\n";
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "T SampleGrad(" << samplerStateParam;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1884,6 +1914,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                         sb << "__glsl_extension(GL_ARB_sparse_texture_clamp)";
                         sb << "__target_intrinsic(glsl, \"$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z\")\n";
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "T SampleGrad(" << samplerStateParam;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1939,7 +1971,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             sb << ", $3)\")\n";
                         }
                     }
-
+                    if (isReadOnly)
+                        sb << "[__readNone]\n";
                     sb << "T SampleLevel(" << samplerStateParam;
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float level);\n";
@@ -1947,6 +1980,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
                         sb << "__target_intrinsic(glsl, \"$ctextureLodOffset($p, $2, $3, $4)$z\")\n";
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << "T SampleLevel(" << samplerStateParam;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float level, ";
@@ -2026,21 +2061,29 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             // "It is based on the base type of DataType except when readMode is equal to cudaReadModeNormalizedFloat (see Texture Reference API), in which case it is always float4."
                             sb << "__target_intrinsic(cuda, \"tex2Dgather<$T0>($0, ($2).x, ($2).y, " << componentIndex << ")\")\n";
                         }
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         EMIT_LINE_DIRECTIVE();
                         sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
                         sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         EMIT_LINE_DIRECTIVE();
                         sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                         sb << "out uint status);\n";
 
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         EMIT_LINE_DIRECTIVE();
                         sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, int" << kBaseTextureTypes[tt].coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
                         sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
@@ -2050,6 +2093,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         sb << "int" << kBaseTextureTypes[tt].coordCount << " offset3, ";
                         sb << "int" << kBaseTextureTypes[tt].coordCount << " offset4);\n";
 
+                        if (isReadOnly)
+                            sb << "[__readNone]\n";
                         EMIT_LINE_DIRECTIVE();
                         sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";

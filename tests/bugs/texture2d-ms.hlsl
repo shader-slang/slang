@@ -3,8 +3,10 @@
 [[vk::binding(0, 0)]]
 Texture2DMS tex : register(t1);
 
+RWStructuredBuffer<float4> outBuffer;
+
 [numthreads(4, 4, 1)]
 void main(uint3 groupId : SV_GroupID)
 {
-    tex.Load(int2(groupId.xy), 0);
+    outBuffer[0] = tex.Load(int2(groupId.xy), 0);
 }
