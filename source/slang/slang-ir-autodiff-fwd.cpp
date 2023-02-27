@@ -177,6 +177,43 @@ InstPair ForwardDiffTranscriber::transcribeBinaryLogic(IRBuilder* builder, IRIns
     return InstPair(primalLogic, nullptr);
 }
 
+InstPair ForwardDiffTranscriber::transcribeSelect(IRBuilder* builder, IRInst* origSelect)
+{
+    auto primalCondition = lookupPrimalInst(builder, origSelect->getOperand(0));
+
+    auto origLeft = origSelect->getOperand(1);
+    auto origRight = origSelect->getOperand(2);
+
+    auto primalLeft = findOrTranscribePrimalInst(builder, origLeft);
+    auto primalRight = findOrTranscribePrimalInst(builder, origRight);
+
+    auto diffLeft = findOrTranscribeDiffInst(builder, origLeft);
+    auto diffRight = findOrTranscribeDiffInst(builder, origRight);
+
+    auto primalSelect = maybeCloneForPrimalInst(builder, origSelect);
+
+    auto resultType = primalCondition->getDataType();
+
+    // If both sides have no differential, skip
+    if (diffLeft || diffRight)
+    {
+        diffLeft = diffLeft ? diffLeft : getDifferentialZeroOfType(builder, primalLeft->getDataType());
+        diffRight = diffRight ? diffRight : getDifferentialZeroOfType(builder, primalRight->getDataType());
+
+        auto diffType = (IRType*) differentiableTypeConformanceContext.getDifferentialForType(builder, resultType);
+
+        return InstPair(
+            primalSelect,
+            builder->emitIntrinsicInst(
+                diffType,
+                kIROp_Select,
+                3,
+                List<IRInst*>(primalCondition, diffLeft, diffRight).getBuffer()));
+    }
+    
+    return InstPair(primalSelect, nullptr);
+}
+
 InstPair ForwardDiffTranscriber::transcribeLoad(IRBuilder* builder, IRLoad* origLoad)
 {
     auto origPtr = origLoad->getPtr();
@@ -1365,6 +1402,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_Eql:
     case kIROp_Neq:
         return transcribeBinaryLogic(builder, origInst);
+    
+    case kIROp_Select:
+        return transcribeSelect(builder, origInst);
 
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:

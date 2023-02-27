@@ -1,52 +1,31 @@
-//TEST_IGNORE_FILE:
-#version 450 core
-
-#define Test Test_0
-#define a a_0
-
-#define gTest gTest_0
-#define gTest_t gTest_t_0
-#define gTest_s gTest_s_0
-
-#define ParameterBlock_gTest _S1
-
-#define main_result _S2
-#define uv _S3
-
-#define temp_a _S4
-#define temp_sample _S5
-#define temp_add _S2
-
-struct Test
+#version 450
+layout(row_major) uniform;
+layout(row_major) buffer;
+struct Test_0
 {
-    vec4 a;
+    vec4 a_0;
 };
 
 layout(binding = 0)
-uniform ParameterBlock_gTest
+layout(std140) uniform _S1
 {
-    Test _data;
-} gTest;
-
+    Test_0 _data;
+} gTest_0;
 layout(binding = 1)
-uniform texture2D gTest_t;
+uniform texture2D gTest_t_0;
 
 layout(binding = 2)
-uniform sampler gTest_s;
+uniform sampler gTest_s_0;
 
 layout(location = 0)
-out vec4 main_result;
+out vec4 _S2;
 
 layout(location = 0)
-in vec2 uv;
+in vec2 _S3;
 
 void main()
 {
-	vec4 temp_a = gTest._data.a;
-
-    vec4 temp_sample = texture(sampler2D(gTest_t, gTest_s), uv);
-
-    main_result = temp_a + temp_sample;
-
-	return;
+    vec4 _S4 = (texture(sampler2D(gTest_t_0,gTest_s_0), (_S3)));
+    _S2 = gTest_0._data.a_0 + _S4;
+    return;
 }

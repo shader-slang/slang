@@ -1674,6 +1674,9 @@ struct DiffTransposePass
             case kIROp_Div: 
             case kIROp_Neg:
                 return transposeArithmetic(builder, fwdInst, revValue);
+            
+            case kIROp_Select:
+                return transposeSelect(builder, fwdInst, revValue);
 
             case kIROp_Call:
                 return transposeCall(builder, as<IRCall>(fwdInst), revValue);
@@ -2279,6 +2282,37 @@ struct DiffTransposePass
             builder->setInsertLoc(oldLoc);
             return fwdInst;
         }
+    }
+
+    
+    TranspositionResult transposeSelect(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
+    {
+        auto primalCondition = fwdInst->getOperand(0);
+
+        auto leftZero = emitDZeroOfDiffInstType(builder, tryGetPrimalTypeFromDiffInst(fwdInst->getOperand(1)));
+        auto leftGradientInst = builder->emitIntrinsicInst(
+            fwdInst->getOperand(1)->getDataType(),
+            kIROp_Select,
+            3,
+            List<IRInst*>(primalCondition, revValue, leftZero).getBuffer());
+        
+        auto rightZero = emitDZeroOfDiffInstType(builder, tryGetPrimalTypeFromDiffInst(fwdInst->getOperand(2)));
+        auto rightGradientInst = builder->emitIntrinsicInst(
+            fwdInst->getOperand(2)->getDataType(),
+            kIROp_Select,
+            3,
+            List<IRInst*>(primalCondition, rightZero, revValue).getBuffer());
+        
+        return TranspositionResult(
+                        List<RevGradient>(
+                            RevGradient(
+                                fwdInst->getOperand(1),
+                                leftGradientInst,
+                                fwdInst),
+                            RevGradient(
+                                fwdInst->getOperand(2),
+                                rightGradientInst,
+                                fwdInst)));
     }
 
     TranspositionResult transposeArithmetic(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
