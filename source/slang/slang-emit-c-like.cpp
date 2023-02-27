@@ -1348,20 +1348,23 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     if (auto call = as<IRCall>(inst))
     {
         auto callee = getResolvedInstForDecorations(call->getCallee());
-        auto funcType = as<IRFuncType>(callee->getDataType());
-        if (funcType)
+        if (callee->findDecoration<IRTargetIntrinsicDecoration>())
         {
-            if (funcType->getParamCount() > 0)
+            auto funcType = as<IRFuncType>(callee->getDataType());
+            if (funcType)
             {
-                auto firstParamType = funcType->getParamType(0);
-                if (as<IRResourceTypeBase>(firstParamType))
-                    return false;
-                if (as<IRHLSLStructuredBufferTypeBase>(firstParamType))
-                    return false;
-                if (as<IRUntypedBufferResourceType>(firstParamType))
-                    return false;
-                if (as<IRSamplerStateTypeBase>(firstParamType))
-                    return false;
+                if (funcType->getParamCount() > 0)
+                {
+                    auto firstParamType = funcType->getParamType(0);
+                    if (as<IRResourceTypeBase>(firstParamType))
+                        return false;
+                    if (as<IRHLSLStructuredBufferTypeBase>(firstParamType))
+                        return false;
+                    if (as<IRUntypedBufferResourceType>(firstParamType))
+                        return false;
+                    if (as<IRSamplerStateTypeBase>(firstParamType))
+                        return false;
+                }
             }
         }
     }
