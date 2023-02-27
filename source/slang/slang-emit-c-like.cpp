@@ -1344,6 +1344,27 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         }
     }
     
+    // If this is a call to a ResourceType's member function, don't fold for readability.
+    if (auto call = as<IRCall>(inst))
+    {
+        auto callee = getResolvedInstForDecorations(call->getCallee());
+        auto funcType = as<IRFuncType>(callee->getDataType());
+        if (funcType)
+        {
+            if (funcType->getParamCount() > 0)
+            {
+                auto firstParamType = funcType->getParamType(0);
+                if (as<IRResourceTypeBase>(firstParamType))
+                    return false;
+                if (as<IRHLSLStructuredBufferTypeBase>(firstParamType))
+                    return false;
+                if (as<IRUntypedBufferResourceType>(firstParamType))
+                    return false;
+                if (as<IRSamplerStateTypeBase>(firstParamType))
+                    return false;
+            }
+        }
+    }
     // We'd like to figure out if it is safe to fold our instruction into `user`
 
     // First, let's make sure they are in the same block/parent:
