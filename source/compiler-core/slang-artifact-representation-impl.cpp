@@ -98,6 +98,12 @@ void* SourceBlobWithPathInfoArtifactRepresentation::castAs(const Guid& guid)
 
 SlangResult SourceBlobWithPathInfoArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
 {
+    // We can convert into a blob only.
+    if (typeGuid != ISlangBlob::getTypeGuid())
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
     if (!m_blob)
     {
         return SLANG_E_NOT_AVAILABLE;
