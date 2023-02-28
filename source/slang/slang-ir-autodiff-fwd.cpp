@@ -1490,6 +1490,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_undefined:
         return transcribeUndefined(builder, origInst);
 
+        // Known non-differentiable insts.
     case kIROp_Not:
     case kIROp_BitAnd:
     case kIROp_BitNot:
@@ -1507,15 +1508,18 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_ImageSubscript:
     case kIROp_ImageLoad:
     case kIROp_ImageStore:
-    case kIROp_CreateExistentialObject:
     case kIROp_PackAnyValue:
     case kIROp_UnpackAnyValue:
     case kIROp_GetNativePtr:
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
+    case kIROp_DetachDerivative:
+        return trascribeNonDiffInst(builder, origInst);
+
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,
         // so we treat this inst as non differentiable.
         // We can extend the frontend and IR with a separate op-code that can provide an explicit diff value.
+    case kIROp_CreateExistentialObject:
         return trascribeNonDiffInst(builder, origInst);
 
     case kIROp_StructKey:

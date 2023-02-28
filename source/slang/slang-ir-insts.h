@@ -2253,6 +2253,12 @@ struct IRDifferentialPairGetPrimal : IRInst
     IRInst* getBase() { return getOperand(0); }
 };
 
+struct IRDetachDerivative : IRInst
+{
+    IR_LEAF_ISA(DetachDerivative)
+    IRInst* getBase() { return getOperand(0); }
+};
+
 struct IRUpdateElement : IRInst
 {
     IR_LEAF_ISA(UpdateElement)

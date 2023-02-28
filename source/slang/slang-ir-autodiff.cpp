@@ -933,6 +933,27 @@ bool processAutodiffCalls(
     return modified;
 }
 
+struct RemoveDetachInstsPass : InstPassBase
+{
+    RemoveDetachInstsPass(IRModule* module) :
+        InstPassBase(module)
+    {
+    }
+    void processModule()
+    {
+        processInstsOfType<IRDetachDerivative>(kIROp_DetachDerivative, [&](IRDetachDerivative* detach)
+            {
+                detach->replaceUsesWith(detach->getBase());
+            });
+    }
+};
+
+void removeDetachInsts(IRModule* module)
+{
+    RemoveDetachInstsPass pass(module);
+    pass.processModule();
+}
+
 bool finalizeAutoDiffPass(IRModule* module)
 {
     bool modified = false;
@@ -946,6 +967,8 @@ bool finalizeAutoDiffPass(IRModule* module)
     // IRMakeDifferentialPair with an IRMakeStruct.
     // 
     modified |= processPairTypes(&autodiffContext);
+
+    removeDetachInsts(module);
 
     stripNoDiffTypeAttribute(module);
 

@@ -7044,6 +7044,7 @@ namespace Slang
         case kIROp_BackwardDifferentiate:
         case kIROp_BackwardDifferentiatePrimal:
         case kIROp_BackwardDifferentiatePropagate:
+        case kIROp_DetachDerivative:
             return false;
         }
         return true;
