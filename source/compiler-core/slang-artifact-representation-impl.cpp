@@ -67,6 +67,46 @@ bool ExtFileArtifactRepresentation::exists()
     return SLANG_SUCCEEDED(res) && pathType == getPathType();
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SourceBlobWithPathArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* SourceBlobWithPathInfoArtifactRepresentation::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifactRepresentation::getTypeGuid() ||
+        guid == IPathArtifactRepresentation::getTypeGuid())
+    {
+        return static_cast<IPathArtifactRepresentation*>(this);
+    }
+    return nullptr;
+}
+
+void* SourceBlobWithPathInfoArtifactRepresentation::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+void* SourceBlobWithPathInfoArtifactRepresentation::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+SlangResult SourceBlobWithPathInfoArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
+{
+    if (!m_blob)
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    *outCastable = CastableUtil::getCastable(m_blob).detach();
+    return SLANG_OK;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* OSFileArtifactRepresentation::getInterface(const Guid& guid)
