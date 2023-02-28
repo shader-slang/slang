@@ -325,6 +325,7 @@ IR_SIMPLE_DECORATION(HLSLExportDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
+IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {
@@ -1925,7 +1926,7 @@ struct IRUnconditionalBranch : IRTerminatorInst
     UInt getArgCount();
     IRUse* getArgs();
     IRInst* getArg(UInt index);
-
+    void removeArgument(UInt index);
     IR_PARENT_ISA(UnconditionalBranch);
 };
 
@@ -1966,20 +1967,6 @@ struct IRConditionalBranch : IRTerminatorInst
     IRInst* getCondition() { return condition.get(); }
     IRBlock* getTrueBlock() { return (IRBlock*)trueBlock.get(); }
     IRBlock* getFalseBlock() { return (IRBlock*)falseBlock.get(); }
-};
-
-// A conditional branch that represent the test inside a loop
-struct IRLoopTest : IRConditionalBranch
-{
-};
-
-// A conditional branch that represents a one-sided `if`:
-//
-//     if( <condition> ) { <trueBlock> }
-//     <falseBlock>
-struct IRIf : IRConditionalBranch
-{
-    IRBlock* getAfterBlock() { return getFalseBlock(); }
 };
 
 // A conditional branch that represents a two-sided `if`:
@@ -2263,6 +2250,12 @@ struct IRDifferentialPairGetDifferential : IRInst
 struct IRDifferentialPairGetPrimal : IRInst
 {
     IR_LEAF_ISA(DifferentialPairGetPrimal)
+    IRInst* getBase() { return getOperand(0); }
+};
+
+struct IRDetachDerivative : IRInst
+{
+    IR_LEAF_ISA(DetachDerivative)
     IRInst* getBase() { return getOperand(0); }
 };
 
@@ -3361,6 +3354,7 @@ public:
     IRInst* emitBitOr(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitBitNot(IRType* type, IRInst* value);
     IRInst* emitNeg(IRType* type, IRInst* value);
+    IRInst* emitNot(IRType* type, IRInst* value);
 
     IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);

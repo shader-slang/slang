@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/autodiff-data-flow-3.slang(16): error 41024: derivative is lost during assignment to non-differentiable location. Use 'detach()' to clarify intention.
+    obj.fp.f = x * x; // Error, this location cannot hold derivative.
+             ^
+}
+standard output = {
+}

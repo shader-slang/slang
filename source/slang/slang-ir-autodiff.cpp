@@ -563,6 +563,30 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
     return false;
 }
 
+bool canInstBeStored(IRInst* inst)
+{
+    if (as<IRBasicType>(inst->getDataType()))
+        return true;
+
+    switch (inst->getDataType()->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_OptionalType:
+    case kIROp_TupleType:
+    case kIROp_ArrayType:
+    case kIROp_DifferentialPairType:
+    case kIROp_InterfaceType:
+    case kIROp_AnyValueType:
+    case kIROp_ClassType:
+    case kIROp_FloatType:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 struct AutoDiffPass : public InstPassBase
 {
     DiagnosticSink* getSink()
@@ -909,6 +933,27 @@ bool processAutodiffCalls(
     return modified;
 }
 
+struct RemoveDetachInstsPass : InstPassBase
+{
+    RemoveDetachInstsPass(IRModule* module) :
+        InstPassBase(module)
+    {
+    }
+    void processModule()
+    {
+        processInstsOfType<IRDetachDerivative>(kIROp_DetachDerivative, [&](IRDetachDerivative* detach)
+            {
+                detach->replaceUsesWith(detach->getBase());
+            });
+    }
+};
+
+void removeDetachInsts(IRModule* module)
+{
+    RemoveDetachInstsPass pass(module);
+    pass.processModule();
+}
+
 bool finalizeAutoDiffPass(IRModule* module)
 {
     bool modified = false;
@@ -922,6 +967,8 @@ bool finalizeAutoDiffPass(IRModule* module)
     // IRMakeDifferentialPair with an IRMakeStruct.
     // 
     modified |= processPairTypes(&autodiffContext);
+
+    removeDetachInsts(module);
 
     stripNoDiffTypeAttribute(module);
 

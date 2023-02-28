@@ -160,15 +160,9 @@ void main()
         d_0(gl_LocalInvocationIndex);
         e_0(gl_LocalInvocationIndex);
     }
-    else
-    {
-    }
     if(gl_LocalInvocationIndex < 1U)
     {
         gl_PrimitiveTriangleIndicesEXT[gl_LocalInvocationIndex] = uvec3(0U, 1U, 2U);
-    }
-    else
-    {
     }
     return;
 }

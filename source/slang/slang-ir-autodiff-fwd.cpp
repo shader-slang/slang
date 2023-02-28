@@ -177,6 +177,43 @@ InstPair ForwardDiffTranscriber::transcribeBinaryLogic(IRBuilder* builder, IRIns
     return InstPair(primalLogic, nullptr);
 }
 
+InstPair ForwardDiffTranscriber::transcribeSelect(IRBuilder* builder, IRInst* origSelect)
+{
+    auto primalCondition = lookupPrimalInst(builder, origSelect->getOperand(0));
+
+    auto origLeft = origSelect->getOperand(1);
+    auto origRight = origSelect->getOperand(2);
+
+    auto primalLeft = findOrTranscribePrimalInst(builder, origLeft);
+    auto primalRight = findOrTranscribePrimalInst(builder, origRight);
+
+    auto diffLeft = findOrTranscribeDiffInst(builder, origLeft);
+    auto diffRight = findOrTranscribeDiffInst(builder, origRight);
+
+    auto primalSelect = maybeCloneForPrimalInst(builder, origSelect);
+
+    auto resultType = primalCondition->getDataType();
+
+    // If both sides have no differential, skip
+    if (diffLeft || diffRight)
+    {
+        diffLeft = diffLeft ? diffLeft : getDifferentialZeroOfType(builder, primalLeft->getDataType());
+        diffRight = diffRight ? diffRight : getDifferentialZeroOfType(builder, primalRight->getDataType());
+
+        auto diffType = (IRType*) differentiableTypeConformanceContext.getDifferentialForType(builder, resultType);
+
+        return InstPair(
+            primalSelect,
+            builder->emitIntrinsicInst(
+                diffType,
+                kIROp_Select,
+                3,
+                List<IRInst*>(primalCondition, diffLeft, diffRight).getBuffer()));
+    }
+    
+    return InstPair(primalSelect, nullptr);
+}
+
 InstPair ForwardDiffTranscriber::transcribeLoad(IRBuilder* builder, IRLoad* origLoad)
 {
     auto origPtr = origLoad->getPtr();
@@ -283,8 +320,11 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
             else 
             {
                 auto operandDataType = origConstruct->getOperand(ii)->getDataType();
-                operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
-                diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+                if (auto diffOperandType = differentiateType(builder, operandDataType))
+                {
+                    operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
+                    diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+                }
             }
         }
         
@@ -293,7 +333,7 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
             builder->emitIntrinsicInst(
                 diffConstructType,
                 origConstruct->getOp(),
-                operandCount,
+                diffOperands.getCount(),
                 diffOperands.getBuffer()));
     }
     else
@@ -488,7 +528,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
     if (!diffReturnType)
     {
-        diffReturnType = argBuilder.getVoidType();
+        diffReturnType = (IRType*)findOrTranscribePrimalInst(&argBuilder, origCall->getFullType());
     }
 
     auto callInst = argBuilder.emitCallInst(
@@ -501,7 +541,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
     *builder = afterBuilder;
 
-    if (diffReturnType->getOp() != kIROp_VoidType)
+    if (diffReturnType->getOp() == kIROp_DifferentialPairType)
     {
         IRInst* primalResultValue = afterBuilder.emitDifferentialPairGetPrimal(callInst);
         auto diffType = differentiateType(&afterBuilder, origCall->getFullType());
@@ -510,8 +550,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
     else
     {
-        // Return the inst itself if the return value is void.
-        // This is fine since these values should never actually be used anywhere.
+        // Return the inst itself if the return value is non-differentiable.
+        // This is fine since these values should only be used by non-differentiable code.
         // 
         return InstPair(callInst, callInst);
     }
@@ -1362,6 +1402,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_Eql:
     case kIROp_Neq:
         return transcribeBinaryLogic(builder, origInst);
+    
+    case kIROp_Select:
+        return transcribeSelect(builder, origInst);
 
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
@@ -1447,6 +1490,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_undefined:
         return transcribeUndefined(builder, origInst);
 
+        // Known non-differentiable insts.
     case kIROp_Not:
     case kIROp_BitAnd:
     case kIROp_BitNot:
@@ -1464,15 +1508,18 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_ImageSubscript:
     case kIROp_ImageLoad:
     case kIROp_ImageStore:
-    case kIROp_CreateExistentialObject:
     case kIROp_PackAnyValue:
     case kIROp_UnpackAnyValue:
     case kIROp_GetNativePtr:
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
+    case kIROp_DetachDerivative:
+        return trascribeNonDiffInst(builder, origInst);
+
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,
         // so we treat this inst as non differentiable.
         // We can extend the frontend and IR with a separate op-code that can provide an explicit diff value.
+    case kIROp_CreateExistentialObject:
         return trascribeNonDiffInst(builder, origInst);
 
     case kIROp_StructKey:

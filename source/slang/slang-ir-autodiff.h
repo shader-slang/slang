@@ -212,20 +212,12 @@ struct DifferentiableTypeConformanceContext
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);
-        if (result && !result->findDecoration<IRNoSideEffectDecoration>())
-        {
-            builder->addDecoration(result, kIROp_NoSideEffectDecoration);
-        }
         return result;
     }
 
     IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
     {
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->addMethodStructKey);
-        if (result && !result->findDecoration<IRNoSideEffectDecoration>())
-        {
-            builder->addDecoration(result, kIROp_NoSideEffectDecoration);
-        }
         return result;
     }
 };
@@ -302,6 +294,8 @@ void stripDerivativeDecorations(IRInst* inst);
 bool isBackwardDifferentiableFunc(IRInst* func);
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
+
+bool canInstBeStored(IRInst* inst);
 
 inline bool isRelevantDifferentialPair(IRType* type)
 {

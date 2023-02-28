@@ -24,5 +24,11 @@ float h(float x)
     float val = 0;
     // no diagnostic by clarifying intention.
     val = no_diff(f(x + 1));
+
+    // error: dynamic loop without [MaxIters] or [ForceUnroll]
+    for (int i = 0; i < (int)x; i++)
+    {
+    }
+
     return val;
 }

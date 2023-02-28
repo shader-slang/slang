@@ -83,7 +83,7 @@ struct ExtractPrimalFuncContext
 
         SLANG_RELEASE_ASSERT(originalFuncType);
         List<IRType*> paramTypes;
-        for (UInt i = 0; i < originalFuncType->getParamCount() - 1; i++)
+        for (Index i = 0; i < ((Count) originalFuncType->getParamCount()) - 1; i++)
             paramTypes.add((IRType*)migrationContext.cloneInst(&builder, originalFuncType->getParamType(i)));
         paramTypes.add(builder.getInOutType((IRType*)outIntermediateType));
         auto resultType = (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getResultType());
@@ -130,6 +130,91 @@ struct ExtractPrimalFuncContext
         }
     }
 
+    bool doesInstHaveDiffUse(IRInst* inst)
+    {
+        bool hasDiffUser = false;
+        
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (isDiffInst(user))
+            {
+                // Ignore uses that is a return or MakeDiffPair
+                switch (user->getOp())
+                {
+                case kIROp_Return:
+                    continue;
+                case kIROp_MakeDifferentialPair:
+                    if (!user->hasMoreThanOneUse() && user->firstUse &&
+                        user->firstUse->getUser()->getOp() == kIROp_Return)
+                        continue;
+                    break;
+                default:
+                    break;
+                }
+                hasDiffUser = true;
+                break;
+            }
+        }
+        
+        return hasDiffUser;
+    }
+
+    bool doesInstHaveStore(IRInst* inst)
+    {
+        SLANG_RELEASE_ASSERT(as<IRPtrTypeBase>(inst->getDataType()));
+
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRStore>(use->getUser()))
+                return true;
+            
+            if (as<IRPtrTypeBase>(use->getUser()->getDataType()))
+            {
+                if (doesInstHaveStore(use->getUser()))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool isIntermediateContextType(IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_BackwardDiffIntermediateContextType:
+            return true;
+        case kIROp_PtrType:
+            return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());
+        case kIROp_ArrayType:
+            return isIntermediateContextType(as<IRArrayType>(type)->getElementType()); 
+        }
+
+        return false;
+    }
+
+    bool shouldStoreVar(IRVar* var)
+    {
+        // Always store intermediate context var.
+        if (var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+        {
+            return true;
+        }
+
+        if (isIntermediateContextType(var->getDataType()))
+        {
+            return true;
+        }
+
+        // For now the store policy is simple, we use two conditions:
+        // 1. Is the var used in a differential block and,
+        // 2. Does the var have a store
+        // 
+        
+        return (doesInstHaveDiffUse(var) && doesInstHaveStore(var));
+    }
+
     bool shouldStoreInst(IRInst* inst)
     {
         if (!inst->getDataType())
@@ -137,39 +222,8 @@ struct ExtractPrimalFuncContext
             return false;
         }
 
-        // Only store allowed types.
-        if (isScalarIntegerType(inst->getDataType()))
-        {
-        }
-        else if (as<IRResourceTypeBase>(inst->getDataType()))
-        {
-        }
-        else
-        {
-            switch (inst->getDataType()->getOp())
-            {
-            case kIROp_StructType:
-            case kIROp_OptionalType:
-            case kIROp_TupleType:
-            case kIROp_ArrayType:
-            case kIROp_DifferentialPairType:
-            case kIROp_InterfaceType:
-            case kIROp_AnyValueType:
-            case kIROp_ClassType:
-            case kIROp_FloatType:
-            case kIROp_HalfType:
-            case kIROp_DoubleType:
-            case kIROp_VectorType:
-            case kIROp_MatrixType:
-            case kIROp_BoolType:
-            case kIROp_Param:
-            case kIROp_Specialize:
-            case kIROp_LookupWitness:
-                break;
-            default:
-                return false;
-            }
-        }
+        if (!canInstBeStored(inst))
+            return false;
 
         // Never store certain opcodes.
         switch (inst->getOp())
@@ -212,29 +266,7 @@ struct ExtractPrimalFuncContext
         }
 
         // Only store if the inst has differential inst user.
-        bool hasDiffUser = false;
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (isDiffInst(user))
-            {
-                // Ignore uses that is a return or MakeDiffPair
-                switch (user->getOp())
-                {
-                case kIROp_Return:
-                    continue;
-                case kIROp_MakeDifferentialPair:
-                    if (!user->hasMoreThanOneUse() && user->firstUse &&
-                        user->firstUse->getUser()->getOp() == kIROp_Return)
-                        continue;
-                    break;
-                default:
-                    break;
-                }
-                hasDiffUser = true;
-                break;
-            }
-        }
+        bool hasDiffUser = doesInstHaveDiffUse(inst);
         if (!hasDiffUser)
             return false;
 
@@ -334,8 +366,7 @@ struct ExtractPrimalFuncContext
                 }
                 else if (inst->getOp() == kIROp_Var)
                 {
-                    // Always store intermediate context var.
-                    if (inst->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+                    if (shouldStoreVar(as<IRVar>(inst)))
                     {
                         auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
                         builder.setInsertBefore(inst);
@@ -344,6 +375,7 @@ struct ExtractPrimalFuncContext
                         inst->replaceUsesWith(fieldAddr);
                         builder.addPrimalValueStructKeyDecoration(inst, field->getKey());
                     }
+                    
                 }
             }
         }
@@ -507,11 +539,19 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                 else
                 {
                     // Orindary value.
-                    auto val = builder.emitFieldExtract(
-                        inst->getFullType(),
-                        intermediateVar,
-                        structKeyDecor->getStructKey());
-                    inst->replaceUsesWith(val);
+                    // We insert a fieldExtract at each use site instead of before `inst`,
+                    // since at this stage of autodiff pass, `inst` does not necessarily
+                    // dominate all the use sites if `inst` is defined in partial branch
+                    // in a primal block.
+                    while (auto iuse = inst->firstUse)
+                    {
+                        builder.setInsertBefore(iuse->getUser());
+                        auto val = builder.emitFieldExtract(
+                            inst->getFullType(),
+                            intermediateVar,
+                            structKeyDecor->getStructKey());
+                        iuse->set(val);
+                    }
                 }
                 instsToRemove.add(inst);
             }
@@ -519,6 +559,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
             {
                 if (inst->getOp() == kIROp_Call)
                 {
+                    // The primal calls should be marked as no side effect so they can be DCE'd if possible.
                     builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
                 }
             }
@@ -529,8 +570,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     {
         inst->removeAndDeallocate();
     }
-    
-    stripTempDecorations(func);
 
     return primalFunc;
 }

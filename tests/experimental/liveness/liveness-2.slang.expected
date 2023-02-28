@@ -32,12 +32,12 @@ int calcThing_0(int offset_0)
         }
         else
         {
+            livenessEnd_0(i_0, 0);
             break;
         }
         idx_0[i_0] = offset_0 + i_0;
         i_0 = i_0 + 1;
     }
-    livenessEnd_0(i_0, 0);
     int _S1 = idx_0[0] + idx_0[1];
     int _S2 = idx_0[2];
     livenessEnd_1(idx_0, 0);
@@ -51,9 +51,8 @@ layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
-    uint _S4 = uint(index_0);
-    int _S5 = calcThing_0(index_0);
-    ((outputBuffer_0)._data[(_S4)]) = _S5;
+    int _S4 = calcThing_0(index_0);
+    ((outputBuffer_0)._data[(uint(index_0))]) = _S4;
     return;
 }
 

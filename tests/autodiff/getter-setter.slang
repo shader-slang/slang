@@ -45,7 +45,7 @@ typedef DifferentialPair<A> dpA;
 A f(A a)
 {
     A aout;
-    aout.y = 2 * a.x;
+    aout.y = detach(2 * a.x);
     aout.x = 5 * a.x;
 
     return aout;

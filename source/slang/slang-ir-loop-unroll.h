@@ -1,18 +1,22 @@
 // slang-ir-loop-unroll.h
 #pragma once
 
+#include "../core/slang-list.h"
+
 namespace Slang
 {
     struct IRLoop;
     struct IRGlobalValueWithCode;
     class DiagnosticSink;
     struct IRModule;
+    struct IRBlock;
 
     // Return true if successfull, false if errors occurred.
     bool unrollLoopsInFunc(IRModule* module, IRGlobalValueWithCode* func, DiagnosticSink* sink);
 
     bool unrollLoopsInModule(IRModule* module, DiagnosticSink* sink);
 
+    List<IRBlock*> collectBlocksInLoop(IRGlobalValueWithCode* func, IRLoop* loop);
 
     // Turn a loop with continue block into a loop with only back jumps and breaks.
     // Each iteration will be wrapped in a breakable region, where everything before `continue`

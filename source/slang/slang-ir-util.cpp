@@ -157,6 +157,42 @@ IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecaili
     return genericToSpecailize;
 }
 
+// Returns true if is not possible to produce side-effect from a value of `dataType`.
+bool isValueType(IRInst* dataType)
+{
+    dataType = getResolvedInstForDecorations(unwrapAttributedType(dataType));
+    if (as<IRBasicType>(dataType))
+        return true;
+    switch (dataType->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_InterfaceType:
+    case kIROp_ClassType:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+    case kIROp_TupleType:
+    case kIROp_ResultType:
+    case kIROp_OptionalType:
+    case kIROp_DifferentialPairType:
+    case kIROp_DynamicType:
+    case kIROp_AnyValueType:
+    case kIROp_ArrayType:
+    case kIROp_FuncType:
+        return true;
+    default:
+        // Read-only resource handles are considered as Value type.
+        if (auto resType = as<IRResourceTypeBase>(dataType))
+            return (resType->getAccess() == SLANG_RESOURCE_ACCESS_READ);
+        else if (as<IRSamplerStateTypeBase>(dataType))
+            return true;
+        else if (as<IRHLSLByteAddressBufferType>(dataType))
+            return true;
+        else if (as<IRHLSLStructuredBufferType>(dataType))
+            return true;
+        return false;
+    }
+}
+
 IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
 {
     auto outerGeneric = as<IRGeneric>(findOuterGeneric(value));
@@ -224,7 +260,7 @@ String dumpIRToString(IRInst* root)
     StringBuilder sb;
     StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
     IRDumpOptions options = {};
-#if 0
+#if 1
     options.flags = IRDumpOptions::Flag::DumpDebugIds;
 #endif
     dumpIR(root, options, nullptr, &writer);
@@ -402,8 +438,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             {
                 auto callee = call->getCallee();
                 if (callee &&
-                    callee->findDecoration<IRReadNoneDecoration>() &&
-                    callee->findDecoration<IRNoSideEffectDecoration>())
+                    callee->findDecoration<IRReadNoneDecoration>())
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.
@@ -423,6 +458,32 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
                     if (canAddressesPotentiallyAlias(func, call->getArg(i), addr))
                         return true;
                 }
+                else if (!isValueType(call->getArg(i)->getDataType()))
+                {
+                    // This is some unknown handle type, we assume it can have any side effects.
+                    return true;
+                }
+            }
+        }
+        break;
+    case kIROp_unconditionalBranch:
+    case kIROp_loop:
+        {
+            auto branch = as<IRUnconditionalBranch>(inst);
+            // If any pointer typed argument of the branch inst may overlap addr, return true.
+            for (UInt i = 0; i < branch->getArgCount(); i++)
+            {
+                SLANG_RELEASE_ASSERT(branch->getArg(i)->getDataType());
+                if (isPtrLikeOrHandleType(branch->getArg(i)->getDataType()))
+                {
+                    if (canAddressesPotentiallyAlias(func, branch->getArg(i), addr))
+                        return true;
+                }
+                else if (!isValueType(branch->getArg(i)->getDataType()))
+                {
+                    // This is some unknown handle type, we assume it can have any side effects.
+                    return true;
+                }
             }
         }
         break;
@@ -434,6 +495,11 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             if (isPtrLikeOrHandleType(inst->getOperand(0)->getDataType()) &&
                 canAddressesPotentiallyAlias(func, inst->getOperand(0), addr))
                 return true;
+            else if (!isValueType(inst->getOperand(0)->getDataType()))
+            {
+                // This is some unknown handle type, we assume it can have any side effects.
+                return true;
+            }
         }
         break;
     default:
@@ -466,25 +532,71 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
     return undefInst;
 }
 
+IROp getSwapSideComparisonOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Eql:
+        return kIROp_Eql;
+    case kIROp_Neq:
+        return kIROp_Neq;
+    case kIROp_Leq:
+        return kIROp_Geq;
+    case kIROp_Geq:
+        return kIROp_Leq;
+    case kIROp_Less:
+        return kIROp_Greater;
+    case kIROp_Greater:
+        return kIROp_Less;
+    default:
+        return kIROp_Nop;
+    }
+}
+
+void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
+{
+    if (as<IRParam>(inst))
+    {
+        SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
+        auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
+        builder->setInsertAfter(lastParam);
+    }
+    else
+    {
+        builder->setInsertBefore(inst);
+    }
+}
+
+void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
+{
+    if (as<IRParam>(inst))
+    {
+        SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
+        auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
+        builder->setInsertAfter(lastParam);
+    }
+    else
+    {
+        builder->setInsertAfter(inst);
+    }
+}
+
 bool isPureFunctionalCall(IRCall* call)
 {
     auto callee = getResolvedInstForDecorations(call->getCallee());
     if (callee->findDecoration<IRReadNoneDecoration>())
-    {
-        return true;
-    }
-    if (callee->findDecoration<IRNoSideEffectDecoration>())
     {
         // If the function has no side effect and is not writing to any outputs,
         // we can safely treat the call as a normal inst.
         bool hasOutArg = false;
         for (UInt i = 0; i < call->getArgCount(); i++)
         {
-            if (as<IRPtrTypeBase>(call->getArg(i)->getDataType()))
-            {
-                hasOutArg = true;
-                break;
-            }
+            if (isValueType(call->getArg(i)->getDataType()))
+                continue;
+            // If the argument type is not a known value type,
+            // assume it is a pointer or handle through which side effect can take place.
+            hasOutArg = true;
+            break;
         }
         return !hasOutArg;
     }

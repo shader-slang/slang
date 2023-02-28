@@ -366,6 +366,15 @@ DIAGNOSTIC(30310, Error, typeIsNotDifferentiable, "type '$0' is not differentiab
 // Interop
 DIAGNOSTIC(30400, Error, cannotDefinePtrTypeToManagedResource, "pointer to a managed resource is invalid, use `NativeRef<T>` instead")
 
+// Control flow
+DIAGNOSTIC(30500, Warning, forLoopSideEffectChangingDifferentVar, "the for loop initializes and checks variable '$0' but the side effect expression is modifying '$1'.")
+DIAGNOSTIC(30501, Warning, forLoopPredicateCheckingDifferentVar, "the for loop initializes and modifies variable '$0' but the predicate expression is checking '$1'.")
+DIAGNOSTIC(30502, Warning, forLoopChangingIterationVariableInOppsoiteDirection, "the for loop is modifiying variable '$0' in the opposite direction from loop exit condition.")
+DIAGNOSTIC(30503, Warning, forLoopNotModifyingIterationVariable, "the for loop is not modifiying variable '$0' because the step size evaluates to 0.")
+DIAGNOSTIC(30504, Warning, forLoopTerminatesInFewerIterationsThanMaxIters, "the for loop is statically determined to terminate within $0 iterations, which is less than what [MaxIters] specifies.")
+DIAGNOSTIC(30505, Warning, loopRunsForZeroIterations, "the loop runs for 0 iterations and will be removed.")
+DIAGNOSTIC(30510, Error, loopInDiffFuncRequireUnrollOrMaxIters, "loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute.")
+
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(39999, Error, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
@@ -579,6 +588,7 @@ DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in 
 DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
 DIAGNOSTIC(41012, Error, typeCannotBePackedIntoAnyValue, "type '$0' contains fields that cannot be packed into an AnyValue.")
 DIAGNOSTIC(41020, Error, lossOfDerivativeDueToCallOfNonDifferentiableFunction, "derivative cannot be propagated through call to non-$1-differentiable function `$0`, use 'no_diff' to clarify intention.")
+DIAGNOSTIC(41024, Error, lossOfDerivativeAssigningToNonDifferentiableLocation, "derivative is lost during assignment to non-differentiable location. Use 'detach()' to clarify intention.")
 DIAGNOSTIC(41021, Error, differentiableFuncMustHaveOutput, "a differentiable function must have at least one differentiable output.")
 DIAGNOSTIC(41022, Error, differentiableFuncMustHaveInput, "a differentiable function must have at least one differentiable input.")
 DIAGNOSTIC(41023, Error, getStringHashMustBeOnStringLiteral, "getStringHash can only be called when argument is statically resolvable to a string literal")

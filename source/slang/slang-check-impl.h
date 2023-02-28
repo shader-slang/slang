@@ -759,9 +759,8 @@ namespace Slang
         /// Registers a type as conforming to IDifferentiable, along with a witness 
         /// describing the relationship.
         ///
-        void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
-        void maybeRegisterDifferentiableTypeRecursive(ASTBuilder* builder, Type* type, ValSet& workingSet);
-        void completeDifferentiableTypeDictionary();
+        void addDifferentiableTypeToDiffTypeRegistry(DeclRefType* type, SubtypeWitness* witness);
+        void maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type);
 
         // Construct the differential for 'type', if it exists.
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
@@ -2023,6 +2022,11 @@ namespace Slang
         void visitGpuForeachStmt(GpuForeachStmt *stmt);
 
         void visitExpressionStmt(ExpressionStmt *stmt);
+
+        // Try to infer the max number of iterations the loop will run.
+        void tryInferLoopMaxIterations(ForStmt* stmt);
+
+        void checkLoopInDifferentiableFunc(Stmt* stmt);
     };
 
     struct SemanticsDeclVisitorBase

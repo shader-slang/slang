@@ -83,6 +83,9 @@ inline bool isScalarIntegerType(IRType* type)
     return getTypeStyle(type->getOp()) == kIROp_IntType;
 }
 
+// No side effect can take place through a value of a "Value" type.
+bool isValueType(IRInst* type);
+
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)
 {
     while (inst)
@@ -169,6 +172,15 @@ bool isPtrLikeOrHandleType(IRInst* type);
 bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
 
 IRInst* getUndefInst(IRBuilder builder, IRModule* module);
+
+// The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<) ==> (>).
+IROp getSwapSideComparisonOp(IROp op);
+
+// Set IRBuilder to insert before `inst`. If `inst` is a param, it will insert after the last param.
+void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst);
+
+// Set IRBuilder to insert after `inst`. If `inst` is a param, it will insert after the last param.
+void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst);
 
 }
 
