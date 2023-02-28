@@ -240,7 +240,7 @@ struct CFGNormalizationPass
                 breakFlagValue,
                 block,
                 afterSplitAfterBlock,
-                afterSplitAfterBlock);
+                afterSplitAfterBlock); 
 
             // At this point, we need to place afterSplitAfterBlock between
             // at the _end_ of this region, but we aren't there yet (and 
@@ -374,7 +374,18 @@ struct CFGNormalizationPass
                         if (afterBlocks.contains(afterBlock))
                         {
                             auto newAfterBlock = builder.emitBlock();
-                            newAfterBlock->insertBefore(afterBlock);
+
+                            // TODO: This is a hack. Ideally we should be putting
+                            // the new after block 'before' the old after block,
+                            // but if the latter is a loop condition block, it dominates
+                            // the former, which may depend on parameters in the loop
+                            // condition block. (This eventually causes cloneInst to fail,
+                            // since it is currently order-dependent)
+                            // Remove this once cloneInst is order-independent.
+                            // 
+                            // newAfterBlock->insertBefore(afterBlock);
+                            newAfterBlock->insertAfter(falseEndPoint.exitBlock);
+
                             builder.emitBranch(afterBlock);
                             
                             ifElse->afterBlock.set(newAfterBlock);
