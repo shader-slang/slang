@@ -123,7 +123,7 @@ public:
     SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return false; }
 
     // IPathArtifactRepresentation
-    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_pathInfo.getMostUniqueIdentity().getBuffer(); }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_pathInfo.getName().getBuffer(); }
     virtual SLANG_NO_THROW SlangPathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return SLANG_PATH_TYPE_FILE; }
 
     SourceBlobWithPathInfoArtifactRepresentation(const PathInfo& pathInfo, ISlangBlob* sourceBlob) :
