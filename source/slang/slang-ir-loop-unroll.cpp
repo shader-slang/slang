@@ -603,6 +603,16 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     builder.setInsertInto(innerBreakableRegionBreakBlock);
     _moveParams(innerBreakableRegionBreakBlock, continueBlock);
     builder.emitBranch(continueBlock);
+
+    // If the original loop can be executed up to N times, the new loop may be executed
+    // upto N+1 times (although most insts are skipped in the last traversal)
+    // 
+    if (auto maxItersDecoration = loopInst->findDecoration<IRLoopMaxItersDecoration>())
+    {
+        auto maxIters = maxItersDecoration->getMaxIters();
+        maxItersDecoration->removeAndDeallocate();
+        builder.addLoopMaxItersDecoration(loopInst, maxIters + 1);
+    }
 }
 
 void eliminateContinueBlocksInFunc(IRModule* module, IRGlobalValueWithCode* func)

@@ -32,12 +32,12 @@ int calcThing_0(int offset_0)
         }
         else
         {
+            livenessEnd_0(i_0, 0);
             break;
         }
         idx_0[i_0] = offset_0 + i_0;
         i_0 = i_0 + 1;
     }
-    livenessEnd_0(i_0, 0);
     int _S1 = idx_0[0] + idx_0[1];
     int _S2 = idx_0[2];
     livenessEnd_1(idx_0, 0);
