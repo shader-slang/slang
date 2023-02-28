@@ -96,8 +96,11 @@ namespace Slang
 
 #if SLANG_WINDOWS_FAMILY
         static const char kOSCanonicalPathDelimiter = '\\';
+        static const char kOSAlternativePathDelimiter = '/';
+
 #else
         static const char kOSCanonicalPathDelimiter = '/';
+        static const char kOSAlternativePathDelimiter = '/';
 #endif
 
             /// Finds all all the items in the specified directory, that matches the pattern.
