@@ -14,6 +14,7 @@
 #include "slang-ir-init-local-var.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-loop-unroll.h"
 
 namespace Slang
 {
@@ -583,6 +584,9 @@ namespace Slang
         {
             convertFuncToSingleReturnForm(func->getModule(), func);
         }
+
+        eliminateContinueBlocksInFunc(func->getModule(), func);
+
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
 
         IRCFGNormalizationPass cfgPass = {this->getSink()};

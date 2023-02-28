@@ -34,6 +34,7 @@ int calcThing_0(int offset_0)
         }
         else
         {
+            livenessEnd_0(k_0, 0);
             break;
         }
         int _S1 = (k_0 + 7) % 5;
@@ -49,12 +50,12 @@ int calcThing_0(int offset_0)
             }
             else
             {
+                livenessEnd_0(i_0, 0);
                 break;
             }
             another_0[i_0 & 1] = another_0[i_0 & 1] + (k_0 + i_0);
             i_0 = i_0 + 1;
         }
-        livenessEnd_0(i_0, 0);
         livenessEnd_0(k_0, 0);
         if(_S2)
         {
@@ -64,7 +65,6 @@ int calcThing_0(int offset_0)
         livenessStart_1(k_0, 0);
         k_0 = k_1;
     }
-    livenessEnd_0(k_0, 0);
     livenessEnd_1(another_0, 0);
     return -2;
 }

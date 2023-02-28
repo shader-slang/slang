@@ -13,10 +13,10 @@ spirv_instruction(id = 256)
 void livenessStart_1(spirv_by_reference int _0, spirv_literal int _1);
 
 spirv_instruction(id = 257)
-void livenessEnd_0(spirv_by_reference uint _0, spirv_literal int _1);
+void livenessEnd_0(spirv_by_reference int _0, spirv_literal int _1);
 
 spirv_instruction(id = 257)
-void livenessEnd_1(spirv_by_reference int _0, spirv_literal int _1);
+void livenessEnd_1(spirv_by_reference uint _0, spirv_literal int _1);
 
 int someSlowFunc_0(int a_0)
 {
@@ -35,18 +35,18 @@ int someSlowFunc_0(int a_0)
         }
         else
         {
+            livenessEnd_0(i_0, 0);
             break;
         }
         uint _S3 = v_0 >> 1;
         uint _S4 = v_0;
-        livenessEnd_0(v_0, 0);
+        livenessEnd_1(v_0, 0);
         uint _S5 = (_S3 | _S4 << 31) * uint(i_0);
         int i_1 = i_0 + 1;
         livenessStart_0(v_0, 0);
         v_0 = _S5;
         i_0 = i_1;
     }
-    livenessEnd_1(i_0, 0);
     return int(v_0);
 }
 
@@ -111,6 +111,7 @@ void main()
         }
         else
         {
+            livenessEnd_0(i_2, 0);
             break;
         }
         SomeStruct_0 s_3;
@@ -153,15 +154,14 @@ void main()
         livenessEnd_2(s_3, 0);
         int _S22 = _S20 + _S21;
         int _S23 = res_0;
-        livenessEnd_1(res_0, 0);
+        livenessEnd_0(res_0, 0);
         int res_1 = _S23 + _S22;
         i_2 = i_2 + 1;
         livenessStart_1(res_0, 0);
         res_0 = res_1;
     }
-    livenessEnd_1(i_2, 0);
     int _S24 = res_0;
-    livenessEnd_1(res_0, 0);
+    livenessEnd_0(res_0, 0);
     ((outputBuffer_0)._data[(uint(index_0))]) = _S24;
     return;
 }
