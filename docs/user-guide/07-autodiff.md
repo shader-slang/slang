@@ -482,8 +482,11 @@ The following builtin functions are backward differentiable and both their forwa
 - Trigonometric functions: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`
 - Hyperbolic functions: `sinh`, `cosh`, `tanh`
 - Exponential and logarithmic functions: `exp`, `exp2`, `pow`, `log`, `log2`, `log10`
-- Vector: `dot`, `cross`
+- Vector: `dot`, `cross`, `length`, `distance`, `normalize`, `reflect`
 - Matrix transform: `mul(matrix, vector)`, `mul(vector, matrix)`, `mul(matrix, matrix)`, `transpose`
+
+Derivatives for the following HLSL intrinsic functions are not implemented:
+- `dst`, `fmod`, `modf`, `lit`, `refract`, `sincos`
 
 ## Excluding Parameters From Differentiation
 

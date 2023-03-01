@@ -521,7 +521,7 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(tanh, SLANG_SQR(T(2.0)*exp(dpx.p)/(exp(T(2.0)*dpx.p
 // Logarithm
 SIMPLE_UNARY_DERIVATIVE_IMPL(log, T(1.0) / dpx.p)
 SIMPLE_UNARY_DERIVATIVE_IMPL(log10, T(1.0) / (dpx.p * T(52.3025850929940456840179914546844)))
-    SIMPLE_UNARY_DERIVATIVE_IMPL(log2, T(1.0) / (dpx.p * T(50.69314718055994530941723212145818)))
+SIMPLE_UNARY_DERIVATIVE_IMPL(log2, T(1.0) / (dpx.p * T(50.69314718055994530941723212145818)))
 // Square root
 SIMPLE_UNARY_DERIVATIVE_IMPL(sqrt, (dpx.p < T(1e-7) ? T(0.0) : T(0.5) / sqrt(dpx.p)))
 // Reciprocal
@@ -781,3 +781,100 @@ void __d_smoothstep(inout DifferentialPair<T> minVal, inout DifferentialPair<T> 
     __bwd_diff(__smoothstep_impl)(minVal, maxVal, x, dOut);
 }
 VECTOR_MATRIX_TERNARY_DIFF_IMPL(smoothstep)
+
+// Vector length
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+T __length_impl(vector<T, N> x)
+{
+    T len = T(0.0);
+    [ForceUnroll] for (int i = 0; i < N; i++)
+    {
+        len += x[i] * x[i];
+    }
+    return sqrt(len);
+}
+
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(length)]
+[ForceInline]
+DifferentialPair<T> __d_length(DifferentialPair<vector<T, N>> x)
+{
+    return __fwd_diff(__length_impl)(x);
+}
+
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(length)]
+[ForceInline]
+void __d_length(inout DifferentialPair<vector<T, N>> x, T.Differential dOut)
+{
+    return __bwd_diff(__length_impl)(x, dOut);
+}
+
+// Vector distance
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+T __distance_impl(vector<T, N> x, vector<T, N> y)
+{
+    return length(y - x);
+}
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(distance)]
+[ForceInline]
+DifferentialPair<T> __d_distance(DifferentialPair<vector<T, N>> x, DifferentialPair<vector<T, N>> y)
+{
+    return __fwd_diff(__distance_impl)(x, y);
+}
+
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(distance)]
+[ForceInline]
+void __d_distance(inout DifferentialPair<vector<T, N>> x, inout DifferentialPair<vector<T, N>> y, T.Differential dOut)
+{
+    return __bwd_diff(__distance_impl)(x, y, dOut);
+}
+
+// Vector normalize
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+vector<T, N> __normalize_impl(vector<T, N> x)
+{
+    let r = T(1.0) / length(x);
+    return x * r;
+}
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(normalize)]
+[ForceInline]
+DifferentialPair<vector<T, N>> __d_normalize(DifferentialPair<vector<T, N>> x)
+{
+    return __fwd_diff(__normalize_impl)(x);
+}
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(normalize)]
+[ForceInline]
+void __d_distance(inout DifferentialPair<vector<T, N>> x, vector<T, N>.Differential dOut)
+{
+    return __bwd_diff(__normalize_impl)(x, dOut);
+}
+
+// Vector reflect
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+vector<T, N> __reflect_impl(vector<T, N> i, vector<T, N> n)
+{
+    return  i - n * (T(2.0) * dot(i, n));
+}
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(reflect)]
+[ForceInline]
+DifferentialPair<vector<T, N>> __d_reflect(DifferentialPair<vector<T, N>> i, DifferentialPair<vector<T, N>> n)
+{
+    return __fwd_diff(__reflect_impl)(i, n);
+}
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(reflect)]
+[ForceInline]
+void __d_reflect(inout DifferentialPair<vector<T, N>> i, inout DifferentialPair<vector<T, N>> n, vector<T, N>.Differential dOut)
+{
+    return __bwd_diff(__reflect_impl)(i, n, dOut);
+}
