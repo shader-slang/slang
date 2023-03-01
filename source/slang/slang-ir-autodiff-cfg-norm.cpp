@@ -83,11 +83,19 @@ IRBlock* getOrCreateTopLevelCondition(IRLoop* loopInst)
         // false side goes into the break block.
         // 
         condBuilder.setInsertInto(condBlock);
-        condBuilder.emitIfElse(
+        auto ifElse = as<IRIfElse>(condBuilder.emitIfElse(
             condBuilder.getBoolValue(true),
             firstBlock,
             loopInst->getBreakBlock(),
-            firstBlock);
+            firstBlock));
+        
+        // We'll insert a blank block between the condition and the
+        // break block, since otherwise, we might trip up the later
+        // parts of this pass.
+        //
+        condBuilder.insertBlockAlongEdge(
+            loopInst->getModule(),
+            IREdge(&ifElse->falseBlock));
         
         return condBlock;
     }
@@ -232,7 +240,7 @@ struct CFGNormalizationPass
                 breakFlagValue,
                 block,
                 afterSplitAfterBlock,
-                afterSplitAfterBlock);
+                afterSplitAfterBlock); 
 
             // At this point, we need to place afterSplitAfterBlock between
             // at the _end_ of this region, but we aren't there yet (and 
@@ -357,6 +365,36 @@ struct CFGNormalizationPass
                     // Do we need to split the after region?
                     if (afterBaseRegion && afterBreakRegion)
                     {
+                        // Before we split the afterBlock, we 
+                        // want to make sure the afterBlock is
+                        // firmly _inside_ the current region.
+                        // If it's part of the parent, add a 
+                        // dummy block.
+                        // 
+                        if (afterBlocks.contains(afterBlock))
+                        {
+                            auto newAfterBlock = builder.emitBlock();
+
+                            // TODO: This is a hack. Ideally we should be putting
+                            // the new after block 'before' the old after block,
+                            // but if the latter is a loop condition block, it dominates
+                            // the former, which may depend on parameters in the loop
+                            // condition block. (This eventually causes cloneInst to fail,
+                            // since it is currently order-dependent)
+                            // Remove this once cloneInst is order-independent.
+                            // 
+                            // newAfterBlock->insertBefore(afterBlock);
+                            newAfterBlock->insertAfter(falseEndPoint.exitBlock);
+
+                            builder.emitBranch(afterBlock);
+                            
+                            ifElse->afterBlock.set(newAfterBlock);
+                            as<IRUnconditionalBranch>(trueEndPoint.exitBlock->getTerminator())->block.set(newAfterBlock);
+                            as<IRUnconditionalBranch>(falseEndPoint.exitBlock->getTerminator())->block.set(newAfterBlock);
+
+                            afterBlock = newAfterBlock;
+                        }
+
                         addBreakBypassBranch(afterBlock);
 
                         // Update current block.
