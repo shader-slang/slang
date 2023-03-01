@@ -468,6 +468,23 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         }                                                                                    \
         return DifferentialPair<vector<T, N>>(result, d_result);                             \
     }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [ForwardDerivativeOf(NAME)]                                                              \
+    DifferentialPair<matrix<T, M, N>> __d_##NAME##_m(DifferentialPair<matrix<T, M, N>> dpx)  \
+    {                                                                                        \
+        matrix<T, M, N> result;                                                              \
+        matrix<T, M, N>.Differential d_result;                                               \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
+               DifferentialPair<T>(dpx.p[i][j],                                              \
+                                   __slang_noop_cast<T.Differential>(dpx.d[i][j])));         \
+            result[i][j] = dp_elem.p;                                                        \
+            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
+        }                                                                                    \
+        return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
+    }                                                                                        \
     __generic<T : __BuiltinFloatingPointType>                                                \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME(inout DifferentialPair<T> dpx, T.Differential dOut)                      \
@@ -485,6 +502,21 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             DifferentialPair<T> dp_elem = diffPair(dpx.p[i], T.dzero());                     \
             __d_##NAME(dp_elem, __slang_noop_cast<T.Differential>(dOut[i]));                 \
             d_result[i] = __slang_noop_cast<T>(dp_elem.d);                                   \
+        }                                                                                    \
+        dpx = diffPair(dpx.p, d_result);                                                     \
+    }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [BackwardDerivativeOf(NAME)]                                                             \
+    void __d_##NAME##_matrix(                                                                \
+            inout DifferentialPair<matrix<T, M, N>> dpx, matrix<T, M, N>.Differential dOut)  \
+    {                                                                                        \
+        matrix<T, M, N>.Differential d_result;                                               \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> dp_elem = diffPair(dpx.p[i][j], T.dzero());                  \
+            __d_##NAME(dp_elem, __slang_noop_cast<T.Differential>(dOut[i][j]));              \
+            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
         }                                                                                    \
         dpx = diffPair(dpx.p, d_result);                                                     \
     }
@@ -517,7 +549,7 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(cos, -sin(dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(cosh, sinh(dpx.p))
 // tan, tanh
 SIMPLE_UNARY_DERIVATIVE_IMPL(tan, T(1.0) / (cos(dpx.p) * cos(dpx.p)))
-SIMPLE_UNARY_DERIVATIVE_IMPL(tanh, SLANG_SQR(T(2.0)*exp(dpx.p)/(exp(T(2.0)*dpx.p) + T(1.0))))
+SIMPLE_UNARY_DERIVATIVE_IMPL(tanh, T(1.0) / (cosh(dpx.p) * cosh(dpx.p)))
 // Logarithm
 SIMPLE_UNARY_DERIVATIVE_IMPL(log, T(1.0) / dpx.p)
 SIMPLE_UNARY_DERIVATIVE_IMPL(log10, T(1.0) / (dpx.p * T(52.3025850929940456840179914546844)))
@@ -556,6 +588,22 @@ void __d_atan2(inout DifferentialPair<T> dpy, inout DifferentialPair<T> dpx, T.D
 }
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(atan2)
+
+// fmod
+__generic<T : __BuiltinFloatingPointType>
+[ForwardDerivativeOf(fmod)]
+DifferentialPair<T> __d_fmod(DifferentialPair<T> x, DifferentialPair<T> y)
+{
+    return DifferentialPair<T>(fmod(x.p, y.p), x.d);
+}
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDerivativeOf(fmod)]
+void __d_fmod(inout DifferentialPair<T> x, inout DifferentialPair<T> y, T.Differential dOut)
+{
+    x = diffPair(x.p, dOut);
+    y = diffPair(y.p);
+}
+VECTOR_MATRIX_BINARY_DIFF_IMPL(fmod)
 
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
@@ -878,3 +926,105 @@ void __d_reflect(inout DifferentialPair<vector<T, N>> i, inout DifferentialPair<
 {
     return __bwd_diff(__reflect_impl)(i, n, dOut);
 }
+
+// Vector refract
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+vector<T, N> __refract_impl(vector<T, N> i, vector<T, N> n, T eta)
+{
+    let k = T(1.0) - eta * eta * (T(1.0) - dot(n, i) * dot(n, i));
+    return (k < T(0.0)) ? vector<T, N>(T(0.0)) : eta * i - (eta * dot(n, i) + sqrt(max(T(0.0),k))) * n;
+}
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(refract)]
+[ForceInline]
+DifferentialPair<vector<T, N>> __d_refract(DifferentialPair<vector<T, N>> i, DifferentialPair<vector<T, N>> n, DifferentialPair<T> eta)
+{
+    return __fwd_diff(__refract_impl)(i, n, eta);
+}
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(refract)]
+[ForceInline]
+void __d_refract(inout DifferentialPair<vector<T, N>> i, inout DifferentialPair<vector<T, N>> n, inout DifferentialPair<T> eta, vector<T, N>.Differential dOut)
+{
+    return __bwd_diff(__refract_impl)(i, n, eta, dOut);
+}
+
+// Sine and cosine
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDifferentiable]
+void __sincos_impl(T x, out T s, out T c)
+{
+    s = sin(x);
+    c = cos(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+void __sincos_impl(vector<T, N> x, out vector<T, N> s, out vector<T, N> c)
+{
+    s = sin(x);
+    c = cos(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[BackwardDifferentiable]
+void __sincos_impl(matrix<T, N, M> x, out matrix<T, N, M> s, out matrix<T, N, M> c)
+{
+    s = sin(x);
+    c = cos(x);
+}
+
+__generic<T: __BuiltinFloatingPointType>
+[ForwardDerivativeOf(sincos)]
+[ForceInline]
+void __d_sincos(DifferentialPair<T> x, out DifferentialPair<T> s, out DifferentialPair<T> c)
+{
+    __fwd_diff(__sincos_impl)(x, s, c);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(sincos)]
+[ForceInline]
+void __d_sincos(DifferentialPair<vector<T, N>> x, out DifferentialPair<vector<T, N>> s, out DifferentialPair<vector<T, N>> c)
+{
+    __fwd_diff(__sincos_impl)(x, s, c);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[ForwardDerivativeOf(sincos)]
+[ForceInline]
+void __d_sincos(DifferentialPair<matrix<T, N, M>> x, out DifferentialPair<matrix<T, N, M>> s, out DifferentialPair<matrix<T, N, M>> c)
+{
+    __fwd_diff(__sincos_impl)(x, s, c);
+}
+
+#if 0
+// TODO: this is not working right now since our type system can't resolve
+// the overload to `sincos` in `[BackwardDerivativeOf]` attribute. We need to implement
+// a proper overload resolver for custom backward derivatives.
+
+__generic<T: __BuiltinFloatingPointType>
+[BackwardDerivativeOf(sincos)]
+[ForceInline]
+void __d_sincos(inout DifferentialPair<T> x, T.Differential dS, T.Differential dC)
+{
+    __bwd_diff(__sincos_impl)(x, s, c);
+}
+__generic<T: __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(sincos)]
+[ForceInline]
+void __d_sincos(inout DifferentialPair<vector<T, N>> x, vector<T, N>.Differential dS, vector<T, N>.Differential dC)
+{
+    __bwd_diff(__sincos_impl)(x, s, c);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[BackwardDerivativeOf(sincos)]
+[ForceInline]
+void __d_sincos(inout DifferentialPair<matrix<T, N, M>> x, matrix<T, N, M>.Differential dS, matrix<T, N, M>.Differential dC)
+{
+    __bwd_diff(__sincos_impl)(x, s, c);
+}
+
+#endif
