@@ -36,12 +36,12 @@ struct DiffUnzipPass
     // might run into an issue here?
     IRBlock*                                firstDiffBlock;
 
-    struct _IndexedRegion
+    struct IndexedRegion
     {
         IRLoop* loop;
-        _IndexedRegion* parent;
+        IndexedRegion* parent;
 
-        _IndexedRegion(IRLoop* loop, _IndexedRegion* parent) : loop(loop), parent(parent)
+        IndexedRegion(IRLoop* loop, IndexedRegion* parent) : loop(loop), parent(parent)
         { }
 
         IRBlock* getInitializerBlock() { return as<IRBlock>(loop->getParent()); }
@@ -82,18 +82,18 @@ struct DiffUnzipPass
     
     struct IndexedRegionMap : public RefObject
     {
-        Dictionary<IRBlock*, _IndexedRegion*> map;
-        List<_IndexedRegion*> regions;
+        Dictionary<IRBlock*, IndexedRegion*> map;
+        List<IndexedRegion*> regions;
 
-        _IndexedRegion* newRegion(IRLoop* loop, _IndexedRegion* parent)
+        IndexedRegion* newRegion(IRLoop* loop, IndexedRegion* parent)
         {
-            auto region = new _IndexedRegion(loop, parent);
+            auto region = new IndexedRegion(loop, parent);
             regions.add(region);
 
             return region;
         }
 
-        void mapBlock(IRBlock* block, _IndexedRegion* region)
+        void mapBlock(IRBlock* block, IndexedRegion* region)
         {
             map.Add(block, region);
         }
@@ -103,16 +103,16 @@ struct DiffUnzipPass
             return map.ContainsKey(block);
         }
 
-        _IndexedRegion* getRegion(IRBlock* block)
+        IndexedRegion* getRegion(IRBlock* block)
         {
             return map[block];
         }
 
-        List<_IndexedRegion*> getAllAncestorRegions(IRBlock* block)
+        List<IndexedRegion*> getAllAncestorRegions(IRBlock* block)
         {
-            List<_IndexedRegion*> regionList;
+            List<IndexedRegion*> regionList;
 
-            _IndexedRegion* region = getRegion(block);
+            IndexedRegion* region = getRegion(block);
             for (; region; region = region->parent)
                 regionList.add(region);
 
@@ -206,7 +206,7 @@ struct DiffUnzipPass
         Count          maxIters         = -1;
     };
 
-    Dictionary<_IndexedRegion*, RefPtr<IndexTrackingInfo>> indexInfoMap;
+    Dictionary<IndexedRegion*, RefPtr<IndexTrackingInfo>> indexInfoMap;
 
 
     DiffUnzipPass(
@@ -340,10 +340,10 @@ struct DiffUnzipPass
             for (auto block : workList)
             {
                 if (primalMap.ContainsKey(block))
-                    indexRegionMap->map[as<IRBlock>(primalMap[block])] = (_IndexedRegion*)indexRegionMap->map[block];
+                    indexRegionMap->map[as<IRBlock>(primalMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
                 
                 if (diffMap.ContainsKey(block))
-                    indexRegionMap->map[as<IRBlock>(diffMap[block])] = (_IndexedRegion*)indexRegionMap->map[block];
+                    indexRegionMap->map[as<IRBlock>(diffMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
             }
         }
 
@@ -363,7 +363,7 @@ struct DiffUnzipPass
             block->removeAndDeallocate();
     }
 
-    void tryInferMaxIndex(_IndexedRegion* region, IndexTrackingInfo* info)
+    void tryInferMaxIndex(IndexedRegion* region, IndexTrackingInfo* info)
     {
         if (info->status != IndexTrackingInfo::CountStatus::Unresolved)
             return;
