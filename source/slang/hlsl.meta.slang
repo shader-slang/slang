@@ -1526,7 +1526,7 @@ uint countbits(uint value);
 
 // Cross product
 // TODO: SPIRV does not support integer vectors.
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cross _0 _1")
@@ -1534,6 +1534,19 @@ __target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cross _0
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
     return vector<T,3>(
+        left.y * right.z - left.z * right.y,
+        left.z * right.x - left.x * right.z,
+        left.x * right.y - left.y * right.x);
+}
+
+__generic<T : __BuiltinIntegerType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cross _0 _1")
+[__readNone]
+vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
+{
+    return vector<T, 3>(
         left.y * right.z - left.z * right.y,
         left.z * right.x - left.x * right.z,
         left.x * right.y - left.y * right.x);
@@ -2696,7 +2709,7 @@ matrix<T,N,M> log2(matrix<T,N,M> x)
 
 // multiply-add
 
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
 __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
@@ -2705,7 +2718,7 @@ __target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _
 [__readNone]
 T mad(T mvalue, T avalue, T bvalue);
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
 __target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
@@ -2715,13 +2728,41 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
     VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
 matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
 {
     MATRIX_MAP_TRINARY(T, N, M, mad, mvalue, avalue, bvalue);
 }
+
+__generic<T : __BuiltinIntegerType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, fma)
+__target_intrinsic(cuda, "$P_fma($0, $1, $2)")
+__target_intrinsic(cpp, "$P_fma($0, $1, $2)")
+__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
+[__readNone]
+T mad(T mvalue, T avalue, T bvalue);
+
+__generic<T : __BuiltinIntegerType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, fma)
+__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
+[__readNone]
+vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
+{
+    VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
+}
+
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+[__readNone]
+matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
+{
+    MATRIX_MAP_TRINARY(T, N, M, mad, mvalue, avalue, bvalue);
+}
+
 
 // maximum
 __generic<T : __BuiltinIntegerType>
@@ -3763,7 +3804,7 @@ matrix<T,N,M> tanh(matrix<T,N,M> x)
 }
 
 // Matrix transpose
-__generic<T : __BuiltinType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 [__readNone]
@@ -3772,6 +3813,30 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     matrix<T,M,N> result;
     for(int r = 0; r < M; ++r)
         for(int c = 0; c < N; ++c)
+            result[r][c] = x[c][r];
+    return result;
+}
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+[__readNone]
+matrix<T, M, N> transpose(matrix<T, N, M> x)
+{
+    matrix<T, M, N> result;
+    for (int r = 0; r < M; ++r)
+        for (int c = 0; c < N; ++c)
+            result[r][c] = x[c][r];
+    return result;
+}
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+[__readNone]
+matrix<T, M, N> transpose(matrix<T, N, M> x)
+{
+    matrix<T, M, N> result;
+    for (int r = 0; r < M; ++r)
+        for (int c = 0; c < N; ++c)
             result[r][c] = x[c][r];
     return result;
 }
