@@ -10,6 +10,8 @@
 #include "../core/slang-com-object.h"
 #include "../core/slang-memory-arena.h"
 
+#include "slang-source-loc.h"
+
 namespace Slang
 {
 
@@ -104,6 +106,43 @@ protected:
 
     String m_path;
     ComPtr<ISlangFileSystemExt> m_fileSystem;
+};
+
+class SourceBlobWithPathInfoArtifactRepresentation : public ComBaseObject, public IPathArtifactRepresentation
+{
+public:
+    typedef SourceBlobWithPathInfoArtifactRepresentation ThisType;
+
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IArtifactRepresentation
+    SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
+    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return false; }
+
+    // IPathArtifactRepresentation
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_pathInfo.getName().getBuffer(); }
+    virtual SLANG_NO_THROW SlangPathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return SLANG_PATH_TYPE_FILE; }
+
+    SourceBlobWithPathInfoArtifactRepresentation(const PathInfo& pathInfo, ISlangBlob* sourceBlob) :
+        m_pathInfo(pathInfo),
+        m_blob(sourceBlob)
+    {
+    }
+
+    static ComPtr<IPathArtifactRepresentation> create(const PathInfo& pathInfo, ISlangBlob* sourceBlob)
+    {
+        return ComPtr<IPathArtifactRepresentation>(new ThisType(pathInfo, sourceBlob));
+    }
+
+protected:
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    PathInfo m_pathInfo;
+    ComPtr<ISlangBlob> m_blob;
 };
 
 /* This allows wrapping any object to be an artifact representation. 
