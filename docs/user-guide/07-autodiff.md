@@ -477,11 +477,16 @@ void back_prop(
 
 The following builtin functions are backward differentiable and both their forward-derivative and backward-propagation functions are already defined in the builtin library:
 
-- Arithmetic functions:  `abs`, `max`, `min`, `sqrt`
-- Trigonometric functions: `sin`, `cos`, `tan`
-- Exponential and logarithmic functions: `exp`, `pow`, `log`, `log2`
-- Vector: `dot`, `cross`
+- Arithmetic functions:  `abs`, `max`, `min`, `sqrt`, `rcp`, `rsqrt`,  `fma`, `mad`, `fmod`, `frac`, `radians`, `degrees`
+- Interpolation and clamping functions: `lerp`, `smoothstep`, `clamp`, `saturate`
+- Trigonometric functions: `sin`, `cos`, `sincos`, `tan`, `asin`, `acos`, `atan`, `atan2`
+- Hyperbolic functions: `sinh`, `cosh`, `tanh`
+- Exponential and logarithmic functions: `exp`, `exp2`, `pow`, `log`, `log2`, `log10`
+- Vector functions: `dot`, `cross`, `length`, `distance`, `normalize`, `reflect`, `refract`
 - Matrix transform: `mul(matrix, vector)`, `mul(vector, matrix)`, `mul(matrix, matrix)`, `transpose`
+
+Derivatives for the following legacy HLSL intrinsic functions are not implemented:
+- `dst`, `lit`, 
 
 ## Excluding Parameters From Differentiation
 
