@@ -18,9 +18,22 @@ float g(float x)
 }
 
 [BackwardDifferentiable]
+void diffOut(inout float x)
+{
+    x = 2;
+}
+
+float noDiffFunc(float x)
+{
+    return 0.0;
+}
+
+[BackwardDifferentiable]
 float h(float x)
 {
     NoDiffField obj;
     obj.fp.f = detach(x * x); // OK.
+    obj.fp.f = noDiffFunc(x); // OK.
+    diffOut(obj.fp.f); // Error.
     return obj.fp.f;
 }
