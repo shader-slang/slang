@@ -36,7 +36,7 @@ struct DiffUnzipPass
     // might run into an issue here?
     IRBlock*                                firstDiffBlock;
 
-    struct IndexedRegion
+    struct IndexedRegion : public RefObject
     {
         IRLoop* loop;
         IndexedRegion* parent;
@@ -83,7 +83,7 @@ struct DiffUnzipPass
     struct IndexedRegionMap : public RefObject
     {
         Dictionary<IRBlock*, IndexedRegion*> map;
-        List<IndexedRegion*> regions;
+        List<RefPtr<IndexedRegion>> regions;
 
         IndexedRegion* newRegion(IRLoop* loop, IndexedRegion* parent)
         {
@@ -117,14 +117,6 @@ struct DiffUnzipPass
                 regionList.add(region);
 
             return regionList;
-        }
-
-        ~IndexedRegionMap()
-        {
-            for (auto region : regions)
-                delete region;
-            regions.clearAndDeallocate();
-            map.Clear();
         }
     };
 
