@@ -450,7 +450,7 @@ namespace Slang
 					return dict->hashMap[pos.ObjectPosition].Value;
 				}
 				else
-                    SLANG_ASSERT_FAILURE("The key does not exists in dictionary.");
+                    SLANG_ASSERT_FAILURE("The key does not exist in dictionary.");
 			}
 			inline TValue & operator()() const
 			{
