@@ -348,7 +348,9 @@ struct DiffTransposePass
 
                     // Emit condition into the new cond block.
                     builder.setInsertInto(revCondBlock);
-                    hoistPrimalInst(&builder, ifElse->getCondition());
+
+                    // TODO: Need to defer this until after the CFG reversal is complete.
+                    hoistPrimalInst(&builder, ifElse->getCondition()); 
 
                     builder.emitIfElse(
                         ifElse->getCondition(),
@@ -2205,18 +2207,17 @@ struct DiffTransposePass
         {
             // current type should be a scalar.
             SLANG_RELEASE_ASSERT(!as<IRVectorType>(currentType->getDataType()));
-
-            auto targetVectorType = as<IRVectorType>(targetType);
             
-            List<IRInst*> operands;
-            for (Index ii = 0; ii < as<IRIntLit>(targetVectorType->getElementCount())->getValue(); ii++)
-            {
-                operands.add(inst);
-            }
+            return builder->emitMakeVectorFromScalar(targetType, inst);
+        }
 
-            IRInst* newInst = builder->emitMakeVector(targetType, operands.getCount(), operands.getBuffer());
+        case kIROp_MatrixType:
+        {
+            // current type should be a scalar.
+            SLANG_RELEASE_ASSERT(!as<IRVectorType>(currentType->getDataType()) && 
+                !as<IRMatrixType>(currentType->getDataType()));
             
-            return newInst;
+            return builder->emitMakeMatrixFromScalar(targetType, inst);
         }
         
         default:
