@@ -9,6 +9,13 @@
 namespace Slang
 {
     
+    struct InversionInfo
+    {
+        IRInst* instToInvert;
+        List<IRInst*> requiredOperands;
+        IRUse* targetUse;
+    };
+
     struct HoistResult
     {
         enum Mode
@@ -23,10 +30,28 @@ namespace Slang
         Mode mode;
 
         // This inst that will produce the value
-        IRInst* valueSrcInst;
+        union 
+        {
+            IRInst* instToStore;
+            IRInst* instToRecompute;
+            InversionInfo inversionInfo;
+        };
 
         HoistResult(Mode mode, IRInst* target) :
-            mode(mode), valueSrcInst(target)
+            mode(mode)
+        { 
+            if (mode == Mode::Store)
+                instToStore = target;
+            else if (mode == Mode::Recompute)
+                instToRecompute = target;
+            else if (mode == Mode::Invert)
+            {
+                SLANG_ASSERT("Wrong constructor for HoistResult::Mode::Invert");
+            }
+        }
+
+        HoistResult(InversionInfo info) : 
+            mode(Mode::Invert), inversionInfo(info)
         { }
 
         static HoistResult store(IRInst* inst)
@@ -39,9 +64,9 @@ namespace Slang
             return HoistResult(Mode::Recompute, inst);
         }
 
-        static HoistResult invert(IRInst* inst)
+        static HoistResult invert(InversionInfo inst)
         {
-            return HoistResult(Mode::Invert, inst);
+            return HoistResult(inst);
         }
     };
 
@@ -54,7 +79,7 @@ namespace Slang
             : func(func), module(func->getModule())
         { }
 
-        void processFunc(IRGlobalValueWithCode* func);
+        void processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* info);
 
         // Do pre-processing on the function (mainly for 
         // 'global' checkpointing methods that consider the entire
@@ -72,12 +97,11 @@ namespace Slang
         IRGlobalValueWithCode*  func;
         IRModule*               module;
 
-        List<IRInst*>           storedInsts;
-        List<IRInst*>           recomputedInsts;
-        List<IRInst*>           invertedInsts;
+        HashSet<IRInst*>        storeSet;
+        HashSet<IRInst*>        recomputeSet;
+        HashSet<IRInst*>        invertSet;
 
-        HashSet<IRInst*>        storedInstSet;
-        HashSet<IRInst*>        recomputedInstSet;
+        Dictionary<IRUse*, InversionInfo>   invertInfoMap;
 
         HashSet<IRInst*>        instsWithDiffUses; 
     };
@@ -108,8 +132,7 @@ namespace Slang
         PrimalHoistContext(IRGlobalValueWithCode* func) : 
             func(func),
             module(func->getModule()),
-            domTree(computeDominatorTree(func)),
-
+            domTree(computeDominatorTree(func))
         { 
             // TODO: Populate set of primal insts to consider as 
             // being used in a differential inst.
@@ -119,7 +142,7 @@ namespace Slang
 
     struct BlockSplitInfo
     {
-        Dictionary<IRBlock*, IRBlock*> primalBlockMap;
+        // Maps primal to differential blocks from the unzip step.
         Dictionary<IRBlock*, IRBlock*> diffBlockMap;
     };
 

@@ -53,25 +53,32 @@ bool containsOperand(IRInst* inst, IRInst* operand)
 // Current plan: 
 // Call moveToDiffBlock() by re-traversing the blocks, checking if insts
 // are in the recomputeSet
-// _after_ calling apply() on _all_ insts. Use BlockSplitInfo
-// to simply move the insts to top-of-diifferential-block
+// _after_ calling apply() on _all_ *uses*. Use BlockSplitInfo
+// to simply move the insts to top-of-differential-block
 // 
 // Then we traverse through the primal blocks _again_ looking for 
-// insts in the invertSet, make a _clone_ of these and insert them into
-// the diff block. Use hoistBeforeDiffBlockUses() for this. TODO: But we also have
-// to insert _after_ operands are available created.. 
-// Find the block which is _dominated_ by all operand sites.
+// insts in the invertSet, find the inverted-use-site (the specific use of 
+// the specific operand for which we're inverting this inst), clone that
+// inst and place it into the differential block _after_ the inverted-use-site
+// For now, we'll assert out if there are multiple inverted-use-sites
 //
 // Then call ensurePrimalInstAvailability(inst) on all the insts in 
 // storeSet. This will use a dominator tree to check if the inst can
 // be accessed. If not, create a var based on the level of indexing.
 // Any Load/GetElementPtr inst lowered into the diff blocks will be
 // tagged as 'PrimalRecompute'
-// 
+//  
+// During transposition: insts marked 'PrimalInvert' will be inverted as we go,
+// hoistPrimalOperands() will be called on each differential inst which will
+// recursively pull any 'PrimalRecompute' operands into the reverse-mode blocks as needed,
+// and load from inverse-buffer for 'PrimalInvert' insts.
 // 
 
-void AutodiffCheckpointPolicyBase::processFunc(IRGlobalValueWithCode* func)
+void AutodiffCheckpointPolicyBase::processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* splitInfo)
 {
+    // Populate recompute/store/invert sets with insts, by applying the policy
+    // to them.
+    // 
     for (auto block : func->getBlocks())
     {
         // Skip parameter block.
@@ -115,25 +122,90 @@ void AutodiffCheckpointPolicyBase::processFunc(IRGlobalValueWithCode* func)
 
             if (result.mode == HoistResult::Mode::Store)
             {
-                SLANG_ASSERT(!recomputedInstSet.Contains(result.valueSrcInst));
-                storedInsts.add(result.valueSrcInst);
-                storedInstSet.Add(result.valueSrcInst);
+                SLANG_ASSERT(!recomputeSet.Contains(result.instToStore));
+                storeSet.Add(result.instToStore);
             }
             else if (result.mode == HoistResult::Mode::Recompute)
             {
-                SLANG_ASSERT(!storedInstSet.Contains(result.valueSrcInst));
-                recomputedInsts.add(result.valueSrcInst);
-                recomputedInstSet.Add(result.valueSrcInst);
+                SLANG_ASSERT(!storeSet.Contains(result.instToRecompute));
+                recomputeSet.Add(result.instToRecompute);
 
-                addPrimalOperandsToWorkList(result.valueSrcInst);
-
-                // How do we actually move the recompute inst to the right place?
-                moveInstToBeforeDiffUses()
+                if (!as<IRParam>(result.instToRecompute))
+                {
+                    if (as<IRVar>(result.instToRecompute))
+                    {
+                        // TODO: First immediate store and add to worklist
+                    }
+                    else
+                    {
+                        addPrimalOperandsToWorkList(result.instToRecompute);
+                    }
+                }
+                else
+                {
+                    // TODO: Add all branch args to worklist.
+                }
             }
             else if (result.mode == HoistResult::Mode::Invert)
             {
-                SLANG_ASSERT(containsOperand(result.valueSrcInst, use));
-                invertedInsts.add(result.valueSrcInst);
+                SLANG_ASSERT(containsOperand(result.inversionInfo.instToInvert, use->getUser()));
+                invertSet.Add(result.inversionInfo.instToInvert);
+                invertInfoMap[use] = result.inversionInfo;
+            }
+        }
+    }
+
+    // Go back over the insts and move/clone them accoridngly.
+    for (auto block : func->getBlocks())
+    {
+        // Skip parameter block.
+        if (block == func->getFirstBlock())
+            continue;
+
+        if (!block->findDecoration<IRDifferentialInstDecoration>())
+            continue;
+        
+        //IRBuilder builder(func->getModule());
+        //builder.setInsertB();
+        
+        auto firstDiffInst = as<IRBlock>(splitInfo->diffBlockMap[block])->getFirstOrdinaryInst();
+
+        auto firstParam = block->getFirstParam();
+
+        IRBuilder invBuilder(func->getModule());
+
+        for (auto child : block->getChildren())
+        {
+            if (recomputeSet.Contains(child))
+            {
+                if (!as<IRParam>(child))
+                {
+                    auto loc = IRInsertLoc::before(firstDiffInst);
+                    child->insertAt(loc);
+                }
+                else
+                {
+                    auto loc = IRInsertLoc::before(firstParam);
+                    child->insertAt(loc);
+                }
+            }
+            else if (storeSet.Contains(child))
+            {
+                // Do nothing here..
+            }
+            else if (invertSet.Contains(child))
+            {
+                IRCloneEnv cloneEnv;
+
+                // Handle this later
+                // Have a 'pendingUses' set that
+                // we fill as soon as we finish cloning.
+                // TODO: We do need a way to detect circular inversion dependencies.
+                // But we could leave all this for later.
+                //
+                
+                invBuilder.setInsertAfter()
+                auto clonedInst = cloneInst(&builder, cloneEnv, child);
             }
         }
     }
