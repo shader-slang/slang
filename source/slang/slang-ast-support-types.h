@@ -1537,9 +1537,22 @@ namespace Slang
         DMulFunc, ///< The `IDifferentiable.dmul` function requirement 
     };
 
+    enum class FunctionDifferentiableLevel
+    {
+        None,
+        Forward,
+        Backward
+    };
+
     /// Get the inner most expr from an higher order expr chain, e.g. `__fwd_diff(__fwd_diff(f))`'s
     /// inner most expr is `f`.
-    Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr);
+    Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLevel& outDiffLevel);
+    inline Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr)
+    {
+        FunctionDifferentiableLevel level;
+        return getInnerMostExprFromHigherOrderExpr(expr, level);
+    }
+
 
     /// Get the operator name from the higher order invoke expr.
     UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr);

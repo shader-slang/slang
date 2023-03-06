@@ -11,12 +11,6 @@
 
 namespace Slang
 {
-    enum class FunctionDifferentiableLevel
-    {
-        None,
-        Forward,
-        Backward
-    };
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);

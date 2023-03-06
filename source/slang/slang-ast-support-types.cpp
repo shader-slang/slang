@@ -36,11 +36,16 @@ void removeModifier(ModifiableSyntaxNode* syntax, Modifier* toRemove)
     }
 }
 
-Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr)
+Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLevel& outLevel)
 {
     HashSet<Expr*> workListSet;
+    outLevel = FunctionDifferentiableLevel::None;
     while (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
     {
+        if (as<BackwardDifferentiateExpr>(expr))
+            outLevel = FunctionDifferentiableLevel::Backward;
+        else if (as<ForwardDifferentiateExpr>(expr) && outLevel == FunctionDifferentiableLevel::None)
+            outLevel = FunctionDifferentiableLevel::Forward;
         if (workListSet.Add(higherOrder))
         {
             expr = higherOrder->baseFunction;
