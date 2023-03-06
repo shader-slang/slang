@@ -448,7 +448,7 @@ class OpenRefExpr : public Expr
 class HigherOrderInvokeExpr : public Expr
 {
     SLANG_ABSTRACT_AST_CLASS(HigherOrderInvokeExpr)
-        Expr* baseFunction;
+    Expr* baseFunction;
     List<Name*> newParameterNames;
 };
 

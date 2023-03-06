@@ -1622,10 +1622,10 @@ namespace Slang
             else
             {
                 // Unhandled case for the inner expr.
-                funcExpr->type = this->getASTBuilder()->getErrorType();
                 getSink()->diagnose(funcExpr->loc,
                     Diagnostics::expectedFunction,
                     funcExpr->type);
+                funcExpr->type = this->getASTBuilder()->getErrorType();
             }
            
         }

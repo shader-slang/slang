@@ -999,24 +999,19 @@ void __d_sincos(DifferentialPair<matrix<T, N, M>> x, out DifferentialPair<matrix
     __fwd_diff(__sincos_impl)(x, s, c);
 }
 
-#if 0
-// TODO: this is not working right now since our type system can't resolve
-// the overload to `sincos` in `[BackwardDerivativeOf]` attribute. We need to implement
-// a proper overload resolver for custom backward derivatives.
-
 __generic<T: __BuiltinFloatingPointType>
 [BackwardDerivativeOf(sincos)]
 [ForceInline]
 void __d_sincos(inout DifferentialPair<T> x, T.Differential dS, T.Differential dC)
 {
-    __bwd_diff(__sincos_impl)(x, s, c);
+    __bwd_diff(__sincos_impl)(x, dS, dC);
 }
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDerivativeOf(sincos)]
 [ForceInline]
 void __d_sincos(inout DifferentialPair<vector<T, N>> x, vector<T, N>.Differential dS, vector<T, N>.Differential dC)
 {
-    __bwd_diff(__sincos_impl)(x, s, c);
+    __bwd_diff(__sincos_impl)(x, dS, dC);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -1024,7 +1019,5 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [ForceInline]
 void __d_sincos(inout DifferentialPair<matrix<T, N, M>> x, matrix<T, N, M>.Differential dS, matrix<T, N, M>.Differential dC)
 {
-    __bwd_diff(__sincos_impl)(x, s, c);
+    __bwd_diff(__sincos_impl)(x, dS, dC);
 }
-
-#endif
