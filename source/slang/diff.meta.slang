@@ -380,6 +380,24 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         }                                                                                    \
         return DifferentialPair<vector<T, N>>(result, d_result);                             \
     }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [ForwardDerivativeOf(NAME)]                                                              \
+    DifferentialPair<matrix<T, M, N>> __d_##NAME##_matrix(                                   \
+        DifferentialPair<matrix<T, M, N>> dpx, DifferentialPair<matrix<T, M, N>> dpy)        \
+    {                                                                                        \
+        matrix<T, M, N> result;                                                              \
+        matrix<T, M, N>.Differential d_result;                                               \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
+                DifferentialPair<T>(dpx.p[i][j], __slang_noop_cast<T.Differential>(dpx.d[i][j])),  \
+                DifferentialPair<T>(dpy.p[i][j], __slang_noop_cast<T.Differential>(dpy.d[i][j]))); \
+            result[i][j] = dp_elem.p;                                                        \
+            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
+        }                                                                                    \
+        return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
+    }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME##_vector(                                                                \
@@ -398,6 +416,26 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         }                                                                                    \
         dpx = diffPair(dpx.p, left_d_result);                                                \
         dpy = diffPair(dpy.p, right_d_result);                                               \
+    }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [BackwardDerivativeOf(NAME)]                                                             \
+    void __d_##NAME##_matrix(                                                                \
+            inout DifferentialPair<matrix<T, M, N>> dpx,                                     \
+            inout DifferentialPair<matrix<T, M, N>> dpy,                                     \
+            matrix<T, M, N>.Differential dOut)                                               \
+    {                                                                                        \
+        matrix<T, M, N>.Differential left_d_result, right_d_result;                          \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> left_dp = diffPair(dpx.p[i][j], T.dzero());                  \
+            DifferentialPair<T> right_dp = diffPair(dpy.p[i][j], T.dzero());                 \
+            __d_##NAME(left_dp, right_dp, __slang_noop_cast<T.Differential>(dOut[i][j]));    \
+            left_d_result[i][j] = __slang_noop_cast<T>(left_dp.d);                           \
+            right_d_result[i][j] = __slang_noop_cast<T>(right_dp.d);                         \
+        }                                                                                    \
+        dpx = diffPair(dpx.p, left_d_result);                                                \
+        dpy = diffPair(dpy.p, right_d_result);                                               \
     }
 
 #define VECTOR_MATRIX_TERNARY_DIFF_IMPL(NAME)                                                \
@@ -407,7 +445,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         DifferentialPair<vector<T, N>> dpx,                                                  \
         DifferentialPair<vector<T, N>> dpy,                                                  \
         DifferentialPair<vector<T, N>> dpz)                                                  \
-{                                                                                            \
+    {                                                                                        \
         vector<T, N> result;                                                                 \
         vector<T, N>.Differential d_result;                                                  \
         [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
@@ -420,6 +458,27 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             d_result[i] = __slang_noop_cast<T>(dp_elem.d);                                   \
         }                                                                                    \
         return DifferentialPair<vector<T, N>>(result, d_result);                             \
+    }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [ForwardDerivativeOf(NAME)]                                                              \
+    DifferentialPair<matrix<T, M, N>> __d_##NAME##_matrix(                                  \
+        DifferentialPair<matrix<T, M, N>> dpx,                                               \
+        DifferentialPair<matrix<T, M, N>> dpy,                                               \
+        DifferentialPair<matrix<T, M, N>> dpz)                                               \
+    {                                                                                        \
+        matrix<T, M, N> result;                                                              \
+        matrix<T, M, N>.Differential d_result;                                               \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
+                DifferentialPair<T>(dpx.p[i][j], __slang_noop_cast<T.Differential>(dpx.d[i][j])),  \
+                DifferentialPair<T>(dpy.p[i][j], __slang_noop_cast<T.Differential>(dpy.d[i][j])),  \
+                DifferentialPair<T>(dpz.p[i][j], __slang_noop_cast<T.Differential>(dpz.d[i][j]))); \
+            result[i][j] = dp_elem.p;                                                        \
+            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
+        }                                                                                    \
+        return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
     [BackwardDerivativeOf(NAME)]                                                             \
@@ -440,6 +499,31 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             left_d_result[i] = __slang_noop_cast<T>(left_dp.d);                              \
             middle_d_result[i] = __slang_noop_cast<T>(middle_dp.d);                          \
             right_d_result[i] = __slang_noop_cast<T>(right_dp.d);                            \
+        }                                                                                    \
+        dpx = diffPair(dpx.p, left_d_result);                                                \
+        dpy = diffPair(dpy.p, middle_d_result);                                              \
+        dpz = diffPair(dpz.p, right_d_result);                                               \
+    }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [BackwardDerivativeOf(NAME)]                                                             \
+    void __d_##NAME##_matrix(                                                                \
+            inout DifferentialPair<matrix<T, M, N>> dpx,                                     \
+            inout DifferentialPair<matrix<T, M, N>> dpy,                                     \
+            inout DifferentialPair<matrix<T, M, N>> dpz,                                     \
+            matrix<T, M, N>.Differential dOut)                                               \
+    {                                                                                        \
+        matrix<T, M, N>.Differential left_d_result, middle_d_result, right_d_result;         \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> left_dp = diffPair(dpx.p[i][j], T.dzero());                  \
+            DifferentialPair<T> middle_dp = diffPair(dpy.p[i][j], T.dzero());                \
+            DifferentialPair<T> right_dp = diffPair(dpz.p[i][j], T.dzero());                 \
+            __d_##NAME(left_dp, middle_dp, right_dp,                                         \
+                __slang_noop_cast<T.Differential>(dOut[i][j]));                              \
+            left_d_result[i][j] = __slang_noop_cast<T>(left_dp.d);                           \
+            middle_d_result[i][j] = __slang_noop_cast<T>(middle_dp.d);                       \
+            right_d_result[i][j] = __slang_noop_cast<T>(right_dp.d);                         \
         }                                                                                    \
         dpx = diffPair(dpx.p, left_d_result);                                                \
         dpy = diffPair(dpy.p, middle_d_result);                                              \
