@@ -2619,7 +2619,7 @@ float4 lit(float n_dot_l, float n_dot_h, float m)
 {
     let ambient = 1.0f;
     let diffuse = max(n_dot_l, 0.0f);
-    let specular = step(0.0f, n_dot_l) * max(n_dot_h * m, 0.0f);
+    let specular = step(0.0f, n_dot_l) * max(pow(n_dot_h, m), 0.0f);
     return float4(ambient, diffuse, specular, 1.0f);
 }
 

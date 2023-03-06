@@ -1105,3 +1105,54 @@ void __d_sincos(inout DifferentialPair<matrix<T, N, M>> x, matrix<T, N, M>.Diffe
 {
     __bwd_diff(__sincos_impl)(x, dS, dC);
 }
+
+// dst (obsolete)
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDifferentiable]
+vector<T, 4> __dst_impl(vector<T, 4> src0, vector<T, 4> src1)
+{
+    vector<T, 4> dest;
+    dest.x = T(1.0);
+    dest.y = src0.y * src1.y;
+    dest.z = src0.z;
+    dest.w = src1.w; ;
+    return dest;
+}
+__generic<T : __BuiltinFloatingPointType>
+[ForwardDerivativeOf(dst)]
+[ForceInline]
+DifferentialPair<vector<T, 4>> __d_dst(DifferentialPair<vector<T, 4>> src0, DifferentialPair<vector<T, 4>> src1)
+{
+    return __fwd_diff(__dst_impl)(src0, src1);
+}
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDerivativeOf(dst)]
+[ForceInline]
+void __d_dst(inout DifferentialPair<vector<T, 4>> src0, inout DifferentialPair<vector<T, 4>> src1, vector<T, 4>.Differential dOut)
+{
+    __bwd_diff(__dst_impl)(src0, src1, dOut);
+}
+
+// Legacy lighting function (obsolete)
+__target_intrinsic(hlsl)
+[__readNone]
+[BackwardDifferentiable]
+float4 __lit_impl(float n_dot_l, float n_dot_h, float m)
+{
+    let ambient = 1.0f;
+    let diffuse = max(n_dot_l, 0.0f);
+    let specular = ((n_dot_l < 0.0f || n_dot_h < 0.0) ? 0.0 : pow(n_dot_h, m));
+    return float4(ambient, diffuse, specular, 1.0f);
+}
+[ForwardDerivativeOf(lit)]
+[ForceInline]
+DifferentialPair<float4> __d_lit(DifferentialPair<float> n_dot_l, DifferentialPair<float> n_dot_h, DifferentialPair<float> m)
+{
+    return __fwd_diff(__lit_impl)(n_dot_l, n_dot_h, m);
+}
+[BackwardDerivativeOf(lit)]
+[ForceInline]
+void __d_lit(inout DifferentialPair<float> n_dot_l, inout DifferentialPair<float> n_dot_h, inout DifferentialPair<float> m, float4 dOut)
+{
+    __bwd_diff(__lit_impl)(n_dot_l, n_dot_h, m, dOut);
+}
