@@ -84,7 +84,7 @@ namespace Slang
             SemanticsVisitor* semanticsVisitor;
             static void callback(DeclRefBase declRef, void* userData)
             {
-                (*((*(Helper*)userData).userFunc))(_getSpecializedDeclRef((*(Helper*)userData).semanticsVisitor->getASTBuilder(), declRef.decl, declRef.substitutions).as<T>());
+                (*((*(Helper*)userData).userFunc))(_getSpecializedDeclRef((*(Helper*)userData).semanticsVisitor->getASTBuilder(), declRef.decl, declRef.substitutions).template as<T>());
             }
         };
         Helper helper;
