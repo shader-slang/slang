@@ -70,6 +70,8 @@ namespace Slang
         void                            (*callback)(DeclRefBase, void*),
         void const*                     userData);
 
+    DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst);
+
     template<typename T, typename F>
     inline void foreachDirectOrExtensionMemberOfType(
         SemanticsVisitor*               semantics,
@@ -82,7 +84,7 @@ namespace Slang
             SemanticsVisitor* semanticsVisitor;
             static void callback(DeclRefBase declRef, void* userData)
             {
-                (*((*(Helper*)userData).userFunc))((*(Helper*)userData).semanticsVisitor->getASTBuilder()->getSpecializedDeclRef<T>((T*)declRef.decl, declRef.substitutions));
+                (*((*(Helper*)userData).userFunc))(_getSpecializedDeclRef((*(Helper*)userData).semanticsVisitor->getASTBuilder(), declRef.decl, declRef.substitutions).as<T>());
             }
         };
         Helper helper;

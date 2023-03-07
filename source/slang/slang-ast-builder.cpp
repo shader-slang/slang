@@ -480,4 +480,9 @@ HashCode ASTBuilder::NodeDesc::getHashCode() const
     return hasher.getResult();
 }
 
+DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst)
+{
+    return builder->getSpecializedDeclRef(decl, subst);
+}
+
 } // namespace Slang

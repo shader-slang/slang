@@ -1071,7 +1071,12 @@ namespace Slang
 
         DeclRef<T> getFirstOrNull() { return isEmpty() ? DeclRef<T>() : (*this)[0]; }
 
-        DeclRef<T> operator[](Index index) const;
+        DeclRef<T> operator[](Index index) const
+        {
+             Decl*const* decl = getFilterCursorByIndex<T>(m_filterStyle, m_decls.begin(), m_decls.end(), index);
+             SLANG_ASSERT(decl);
+             return _getSpecializedDeclRef(m_astBuilder, (T*)*decl, m_substitutions).as<T>();
+        }
 
         List<DeclRef<T>> toArray() const
         {
@@ -1105,7 +1110,7 @@ namespace Slang
 
             void operator++() { m_ptr = adjustFilterCursor<T>(m_filterStyle, m_ptr + 1, m_end); }
 
-            DeclRef<T> operator*();
+            DeclRef<T> operator*() { return _getSpecializedDeclRef(m_list->m_astBuilder, (T*)*m_ptr, m_list->m_substitutions).as<T>(); }
         };
 
         Iterator begin() const { return Iterator(this, adjustFilterCursor<T>(m_filterStyle, m_decls.begin(), m_decls.end()), m_decls.end(), m_filterStyle); }
