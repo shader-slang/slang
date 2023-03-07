@@ -883,7 +883,7 @@ static LoweredValInfo lowerStorageReference(
 {
     DeclRef<GetterDecl> getterDeclRef;
     bool justAGetter = true;
-    for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(storageDeclRef, MemberFilterStyle::Instance))
+    for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(context->astBuilder, storageDeclRef, MemberFilterStyle::Instance))
     {
         // We want to track whether this storage has any accessors other than
         // `get` (assuming that everything except `get` can be used for setting...).
@@ -1018,7 +1018,7 @@ top:
             // in case the `get` operation has a natural translation for
             // a target, while the general `ref` case does not...)
 
-            auto getters = getMembersOfType<GetterDecl>(boundStorageInfo->declRef, MemberFilterStyle::Instance);
+            auto getters = getMembersOfType<GetterDecl>(context->astBuilder, boundStorageInfo->declRef, MemberFilterStyle::Instance);
             if (getters.getCount())
             {
                 auto getter = *getters.begin();
@@ -1031,7 +1031,7 @@ top:
                 goto top;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(boundStorageInfo->declRef, MemberFilterStyle::Instance);
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(context->astBuilder, boundStorageInfo->declRef, MemberFilterStyle::Instance);
             if(refAccessors.getCount())
             {
                 auto refAccessor = *refAccessors.begin();
@@ -1643,7 +1643,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // Now we will iterate over the requirements (members) of the
         // interface and try to synthesize an appropriate value for each.
         //
-        for( auto reqDeclRef : getMembers(supInterfaceDeclRef) )
+        for( auto reqDeclRef : getMembers(context->astBuilder, supInterfaceDeclRef) )
         {
             // TODO: if there are any members we shouldn't process as a requirement,
             // then we should detect and skip them here.
@@ -1707,7 +1707,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 // mapped to the correct witness value).
                 //
                 List<IRParam*> irParams;
-                for( auto paramDeclRef : getMembersOfType<ParamDecl>(callableDeclRef) )
+                for( auto paramDeclRef : getMembersOfType<ParamDecl>(context->astBuilder, callableDeclRef) )
                 {
                     // TODO: need to handle `out` and `in out` here. Over all
                     // there is a lot of duplication here with the existing logic
@@ -2889,13 +2889,13 @@ Type* getThisParamTypeForCallable(
     IRGenContext*   context,
     DeclRef<Decl>   callableDeclRef)
 {
-    auto parentDeclRef = callableDeclRef.getParent();
+    auto parentDeclRef = callableDeclRef.getParent(context->astBuilder);
 
     if(auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
-        parentDeclRef = subscriptDeclRef.getParent();
+        parentDeclRef = subscriptDeclRef.getParent(context->astBuilder);
 
     if(auto genericDeclRef = parentDeclRef.as<GenericDecl>())
-        parentDeclRef = genericDeclRef.getParent();
+        parentDeclRef = genericDeclRef.getParent(context->astBuilder);
 
     return getThisParamTypeForContainer(context, parentDeclRef);
 }
@@ -3033,7 +3033,7 @@ void collectParameterLists(
     // The parameters introduced by any "parent" declarations
     // will need to come first, so we'll deal with that
     // logic here.
-    if( auto parentDeclRef = declRef.getParent() )
+    if( auto parentDeclRef = declRef.getParent(context->astBuilder) )
     {
         // Compute the mode to use when collecting parameters from
         // the outer declaration. The most important question here
@@ -3077,7 +3077,7 @@ void collectParameterLists(
         // we are in a `static` context.
         if( mode == kParameterListCollectMode_Default )
         {
-            for( auto paramDeclRef : getParameters(callableDeclRef) )
+            for( auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef) )
             {
                 ioParameterLists->params.add(getParameterInfo(context, paramDeclRef));
             }
@@ -3645,7 +3645,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     }
                 }
 
-                for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef, MemberFilterStyle::Instance))
+                for (auto ff : getMembersOfType<VarDecl>(getASTBuilder(), aggTypeDeclRef, MemberFilterStyle::Instance))
                 {
                     auto irFieldVal = getSimpleVal(context, getDefaultVal(ff));
                     args.add(irFieldVal);
@@ -3792,7 +3792,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     }
                 }
 
-                for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef, MemberFilterStyle::Instance))
+                for (auto ff : getMembersOfType<VarDecl>(getASTBuilder(), aggTypeDeclRef, MemberFilterStyle::Instance))
                 {
                     UInt argIndex = argCounter++;
                     if (argIndex < argCount)
@@ -4016,7 +4016,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<OutArgumentFixup>* ioFixups)
     {
         Count argCounter = 0;
-        for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
+        for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
             IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
@@ -6004,14 +6004,14 @@ LoweredValInfo tryGetAddress(
             // where we really want/need a pointer to be able to make progress.
             //
             if(mode != TryGetAddressMode::Aggressive
-                && getMembersOfType<SetterDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance).isNonEmpty())
+                && getMembersOfType<SetterDecl>(context->astBuilder, subscriptInfo->declRef, MemberFilterStyle::Instance).isNonEmpty())
             {
                 // There is a setter that we should consider using,
                 // so don't go and aggressively collapse things just yet.
                 return val;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(context->astBuilder, subscriptInfo->declRef, MemberFilterStyle::Instance);
             if(refAccessors.isNonEmpty())
             {
                 auto refAccessor = *refAccessors.begin();
@@ -6378,7 +6378,7 @@ top:
             auto subscriptInfo = left.getBoundStorageInfo();
 
             // Search for an appropriate "setter" declaration
-            auto setters = getMembersOfType<SetterDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
+            auto setters = getMembersOfType<SetterDecl>(context->astBuilder, subscriptInfo->declRef, MemberFilterStyle::Instance);
             if (setters.isNonEmpty())
             {
                 auto setter = *setters.begin();
@@ -6404,7 +6404,7 @@ top:
                 return;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(context->astBuilder, subscriptInfo->declRef, MemberFilterStyle::Instance);
             if(refAccessors.isNonEmpty())
             {
                 auto refAccessor = *refAccessors.begin();

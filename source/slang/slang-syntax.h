@@ -52,15 +52,15 @@ namespace Slang
         DeclRef<AggTypeDecl> const& declRef,
         SemanticsVisitor*           semantics);
 
-    inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
+    inline FilteredMemberRefList<Decl> getMembers(ASTBuilder* astBuilder, DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<Decl>(declRef.getDecl()->members, declRef.substitutions, filterStyle);
+        return FilteredMemberRefList<Decl>(astBuilder, declRef.getDecl()->members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>
-    inline FilteredMemberRefList<T> getMembersOfType( DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
+    inline FilteredMemberRefList<T> getMembersOfType(ASTBuilder* astBuilder, DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<T>(declRef.getDecl()->members, declRef.substitutions, filterStyle);
+        return FilteredMemberRefList<T>(astBuilder, declRef.getDecl()->members, declRef.substitutions, filterStyle);
     }
 
     void _foreachDirectOrExtensionMemberOfType(
@@ -78,12 +78,17 @@ namespace Slang
     {
         struct Helper
         {
+            const F* userFunc;
+            SemanticsVisitor* semanticsVisitor;
             static void callback(DeclRefBase declRef, void* userData)
             {
-                (*(F*)userData)(DeclRef<T>((T*) declRef.decl, declRef.substitutions));
+                (*((*(Helper*)userData).userFunc))((*(Helper*)userData).semanticsVisitor->getASTBuilder()->getSpecializedDeclRef<T>((T*)declRef.decl, declRef.substitutions));
             }
         };
-        _foreachDirectOrExtensionMemberOfType(semantics, declRef, getClass<T>(), &Helper::callback, &func);
+        Helper helper;
+        helper.userFunc = &func;
+        helper.semanticsVisitor = semantics;
+        _foreachDirectOrExtensionMemberOfType(semantics, declRef, getClass<T>(), &Helper::callback, &helper);
     }
 
         /// The the user-level name for a variable that might be a shader parameter.
@@ -135,9 +140,9 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->targetType.Ptr());
     }
     
-    inline FilteredMemberRefList<VarDecl> getFields(DeclRef<StructDecl> const& declRef, MemberFilterStyle filterStyle)
+    inline FilteredMemberRefList<VarDecl> getFields(ASTBuilder* astBuilder, DeclRef<StructDecl> const& declRef, MemberFilterStyle filterStyle)
     {
-        return getMembersOfType<VarDecl>(declRef, filterStyle);
+        return getMembersOfType<VarDecl>(astBuilder, declRef, filterStyle);
     }
 
             /// If the given `structTypeDeclRef` inherits from another struct type, return that base type
@@ -178,9 +183,9 @@ namespace Slang
         }
     }
 
-    inline FilteredMemberRefList<ParamDecl> getParameters(DeclRef<CallableDecl> const& declRef)
+    inline FilteredMemberRefList<ParamDecl> getParameters(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
     {
-        return getMembersOfType<ParamDecl>(declRef);
+        return getMembersOfType<ParamDecl>(astBuilder, declRef);
     }
 
     inline Decl* getInner(DeclRef<GenericDecl> const& declRef)

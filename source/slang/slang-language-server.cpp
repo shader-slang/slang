@@ -707,7 +707,7 @@ SlangResult LanguageServer::hover(
     }
     else if (auto decl = as<Decl>(leafNode))
     {
-        fillDeclRefHoverInfo(DeclRef<Decl>(decl, nullptr));
+        fillDeclRefHoverInfo(DeclRef<Decl>(decl));
     }
     else if (auto attr = as<Attribute>(leafNode))
     {
@@ -1320,7 +1320,7 @@ SlangResult LanguageServer::signatureHelp(
             // Look for initializers
             for (auto member : aggDecl->getMembersOfType<ConstructorDecl>())
             {
-                addDeclRef(DeclRef<Decl>(member, declRefExpr->declRef.substitutions));
+                addDeclRef(version->linkage->getASTBuilder()->getSpecializedDeclRef<Decl>(member, declRefExpr->declRef.substitutions));
             }
         }
         else

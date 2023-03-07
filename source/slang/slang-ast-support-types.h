@@ -740,6 +740,7 @@ namespace Slang
 
     template<typename T>
     struct DeclRef;
+    Module* getModule(Decl* decl);
 
     // A reference to a declaration, which may include
     // substitutions for generic parameters.
@@ -759,17 +760,22 @@ namespace Slang
         
         DeclRefBase(Decl* decl)
             :decl(decl)
-        {}
+        {
+        }
 
-        DeclRefBase(Decl* decl, SubstitutionSet subst)
+        DeclRefBase(ASTBuilder* astBuilder, Decl* decl, SubstitutionSet subst)
             :decl(decl),
             substitutions(subst)
-        {}
+        {
+            SLANG_ASSERT(astBuilder);
+        }
 
-        DeclRefBase(Decl* decl, Substitutions* subst)
+        DeclRefBase(ASTBuilder* astBuilder, Decl* decl, Substitutions* subst)
             : decl(decl)
             , substitutions(subst)
-        {}
+        {
+            SLANG_ASSERT(astBuilder);
+        }
 
         // Apply substitutions to a type or declaration
         Type* substitute(ASTBuilder* astBuilder, Type* type) const;
@@ -801,7 +807,7 @@ namespace Slang
         Name* getName() const;
         SourceLoc getNameLoc() const;
         SourceLoc getLoc() const;
-        DeclRefBase getParent() const;
+        DeclRefBase getParent(ASTBuilder* astBuilder) const;
 
         HashCode getHashCode() const;
 
@@ -819,24 +825,31 @@ namespace Slang
     template<typename T>
     struct DeclRef : DeclRefBase
     {
+        friend class ASTBuilder;
+    private:
+        DeclRef(ASTBuilder* builder, T* decl, SubstitutionSet subst)
+            : DeclRefBase(builder, decl, subst)
+        {}
+
+        DeclRef(ASTBuilder* builder, T* decl, Substitutions* subst)
+            : DeclRefBase(builder, decl, SubstitutionSet(subst))
+        {}
+    public:
         typedef T DeclType;
 
         DeclRef()
         {}
-        
-        DeclRef(T* decl, SubstitutionSet subst)
-            : DeclRefBase(decl, subst)
-        {}
 
-        DeclRef(T* decl, Substitutions* subst)
-            : DeclRefBase(decl, SubstitutionSet(subst))
+        DeclRef(T* decl)
+            : DeclRefBase(decl)
         {}
 
         template <typename U>
         DeclRef(DeclRef<U> const& other,
             typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
-            : DeclRefBase(other.decl, other.substitutions)
         {
+            this->decl = other.decl;
+            this->substitutions = other.substitutions;
         }
 
         T* getDecl() const
@@ -852,7 +865,10 @@ namespace Slang
         //
         static DeclRef<T> unsafeInit(DeclRefBase const& declRef)
         {
-            return DeclRef<T>((T*) declRef.decl, declRef.substitutions);
+            DeclRef<T> rs;
+            rs.decl = declRef.decl;
+            rs.substitutions = declRef.substitutions;
+            return rs;
         }
 
         Type* substitute(ASTBuilder* astBuilder, Type* type) const
@@ -878,9 +894,9 @@ namespace Slang
             return DeclRef<T>::unsafeInit(DeclRefBase::substituteImpl(astBuilder, subst, ioDiff));
         }
 
-        DeclRef<ContainerDecl> getParent() const
+        DeclRef<ContainerDecl> getParent(ASTBuilder* astBuilder) const
         {
-            return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::getParent());
+            return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::getParent(astBuilder));
         }
     };
 
@@ -902,7 +918,7 @@ namespace Slang
     template<typename T>
     inline DeclRef<T> makeDeclRef(T* decl)
     {
-        return DeclRef<T>(decl, nullptr);
+        return DeclRef<T>(decl);
     }
 
     enum class MemberFilterStyle
@@ -1033,14 +1049,17 @@ namespace Slang
         List<Decl*> const&	m_decls;
         SubstitutionSet		m_substitutions;
         MemberFilterStyle   m_filterStyle;
+        ASTBuilder* m_astBuilder;
 
         FilteredMemberRefList(
+            ASTBuilder* astBuilder,
             List<Decl*> const&	decls,
             SubstitutionSet		substitutions,
             MemberFilterStyle   filterStyle = MemberFilterStyle::All)
             : m_decls(decls)
             , m_substitutions(substitutions)
             , m_filterStyle(filterStyle)
+            , m_astBuilder(astBuilder)
         {}
 
         Index getCount() const { return getFilterCount<T>(m_filterStyle, m_decls.begin(), m_decls.end()); }
@@ -1056,7 +1075,7 @@ namespace Slang
         {
              Decl*const* decl = getFilterCursorByIndex<T>(m_filterStyle, m_decls.begin(), m_decls.end(), index);
              SLANG_ASSERT(decl);
-             return DeclRef<T>((T*) *decl, m_substitutions);
+             return m_astBuilder->getSpecializedDeclRef<T>((T*) *decl, m_substitutions);
         }
 
         List<DeclRef<T>> toArray() const
@@ -1091,7 +1110,7 @@ namespace Slang
 
             void operator++() { m_ptr = adjustFilterCursor<T>(m_filterStyle, m_ptr + 1, m_end); }
 
-            DeclRef<T> operator*() { return DeclRef<T>((T*)*m_ptr, m_list->m_substitutions); }
+            DeclRef<T> operator*() { return m_list->m_astBuilder->getSpecializedDeclRef<T>((T*)*m_ptr, m_list->m_substitutions); }
         };
 
         Iterator begin() const { return Iterator(this, adjustFilterCursor<T>(m_filterStyle, m_decls.begin(), m_decls.end()), m_decls.end(), m_filterStyle); }

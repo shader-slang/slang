@@ -1577,8 +1577,9 @@ namespace Slang
             {
                 Val* valResult = m_astBuilder->getOrCreate<GenericParamIntVal>(
                     declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
-                    genericValParamRef.getDecl(),
-                    genericValParamRef.substitutions.substitutions);
+                    m_astBuilder->getSpecializedDeclRef(
+                        genericValParamRef.getDecl(),
+                        genericValParamRef.substitutions.substitutions));
                 valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
                 return as<IntVal>(valResult);
             }
@@ -2472,7 +2473,7 @@ namespace Slang
                 if (auto baseFuncGenericDeclRef = declRefExpr->declRef.as<GenericDecl>())
                 {
                     // Get inner function
-                    DeclRef<Decl> unspecializedInnerRef = DeclRef<Decl>(
+                    DeclRef<Decl> unspecializedInnerRef = astBuilder->getSpecializedDeclRef<Decl>(
                         getInner(baseFuncGenericDeclRef),
                         baseFuncGenericDeclRef.substitutions);
                     auto callableDeclRef = unspecializedInnerRef.as<CallableDecl>();
@@ -3576,7 +3577,7 @@ namespace Slang
             for (auto lookupResult : overloadedExpr->lookupResult2)
             {
                 bool shouldRemove = false;
-                if (lookupResult.declRef.getParent().as<InterfaceDecl>())
+                if (lookupResult.declRef.getParent(m_astBuilder).as<InterfaceDecl>())
                 {
                     shouldRemove = true;
                 }

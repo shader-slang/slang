@@ -167,7 +167,7 @@ static void _lookUpDirectAndTransparentMembers(
             AddToLookupResult(
                 result,
                 CreateLookupResultItem(
-                    DeclRef<Decl>(member, containerDeclRef.substitutions), inBreadcrumbs));
+                    astBuilder->getSpecializedDeclRef<Decl>(member, containerDeclRef.substitutions), inBreadcrumbs));
         }
     }
     else
@@ -186,7 +186,7 @@ static void _lookUpDirectAndTransparentMembers(
                 continue;
 
             // The declaration passed the test, so add it!
-            AddToLookupResult(result, CreateLookupResultItem(DeclRef<Decl>(m, containerDeclRef.substitutions), inBreadcrumbs));
+            AddToLookupResult(result, CreateLookupResultItem(astBuilder->getSpecializedDeclRef<Decl>(m, containerDeclRef.substitutions), inBreadcrumbs));
         }
     }
 
@@ -196,7 +196,7 @@ static void _lookUpDirectAndTransparentMembers(
     {
         // The reference to the transparent member should use whatever
         // substitutions we used in referring to its outer container
-        DeclRef<Decl> transparentMemberDeclRef(transparentInfo.decl, containerDeclRef.substitutions);
+        DeclRef<Decl> transparentMemberDeclRef = astBuilder->getSpecializedDeclRef(transparentInfo.decl, containerDeclRef.substitutions);
 
         // We need to leave a breadcrumb so that we know that the result
         // of lookup involves a member lookup step here
@@ -307,7 +307,7 @@ static Type* _maybeSpecializeSuperType(
             thisTypeSubst->witness = subIsSuperWitness;
             thisTypeSubst->outer = superInterfaceDeclRef.substitutions.substitutions;
 
-            auto specializedInterfaceDeclRef = DeclRef<Decl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
+            auto specializedInterfaceDeclRef = astBuilder->getSpecializedDeclRef<Decl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
 
             auto specializedInterfaceType = DeclRefType::create(astBuilder, specializedInterfaceDeclRef);
             return specializedInterfaceType;
@@ -432,10 +432,10 @@ static void _lookUpMembersInSuperTypeDeclImpl(
         // then the members it provides can only be discovered by looking
         // at the constraints that are placed on that type.
 
-        auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
+        auto genericDeclRef = genericTypeParamDeclRef.getParent(astBuilder).as<GenericDecl>();
         assert(genericDeclRef);
 
-        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
+        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDeclRef))
         {
             if( semantics )
             {
@@ -467,7 +467,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     }
     else if (declRef.as<AssocTypeDecl>() || declRef.as<GlobalGenericParamDecl>())
     {
-        for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.as<ContainerDecl>()))
+        for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(astBuilder, declRef.as<ContainerDecl>()))
         {
             _lookUpMembersInSuperType(
                 astBuilder,
@@ -534,7 +534,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             // through the declared inheritance relationships on each declaration.
             //
             ensureDecl(semantics, aggTypeDeclBaseRef.getDecl(), DeclCheckState::CanEnumerateBases);
-            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclBaseRef))
+            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(astBuilder, aggTypeDeclBaseRef))
             {
                 ensureDecl(semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
 
@@ -801,7 +801,7 @@ static void _lookUpInScopes(
             // just a decl.
             //
             DeclRef<ContainerDecl> containerDeclRef =
-                DeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, request.semantics, containerDecl)).as<ContainerDecl>();
+                astBuilder->getSpecializedDeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, request.semantics, containerDecl)).as<ContainerDecl>();
 
             // If the container we are looking into represents a type
             // or an `extension` of a type, then we need to treat

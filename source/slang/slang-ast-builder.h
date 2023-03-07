@@ -114,16 +114,21 @@ public:
     {
         union
         {
-            NodeBase* nodeOperand;
-            int64_t intOperand;
+            NodeBase* nodeOperand[2];
+            int64_t intOperand[2];
         } values;
-        NodeOperand() { values.nodeOperand = nullptr; }
-        NodeOperand(NodeBase* node) { values.nodeOperand = node; }
+        NodeOperand()
+        {
+            values.nodeOperand[0] = nullptr;
+            values.nodeOperand[1] = nullptr;
+        }
+        NodeOperand(NodeBase* node) { values.nodeOperand[0] = node; values.nodeOperand[1] = nullptr; }
         template<typename EnumType>
         NodeOperand(EnumType intVal)
         {
             static_assert(sizeof(EnumType) <= sizeof(values), "size of operand must be less than pointer size.");
-            values.intOperand = 0;
+            values.intOperand[0] = 0;
+            values.intOperand[1] = 0;
             memcpy(&values, &intVal, sizeof(intVal));
         }
     };
@@ -249,6 +254,18 @@ public:
             });
     }
 
+    template<typename T>
+    DeclRef<T> getSpecializedDeclRef(T* decl, Substitutions* subst)
+    {
+        return DeclRef<T>(this, decl, subst);
+    }
+
+    template<typename T>
+    DeclRef<T> getSpecializedDeclRef(T* decl, SubstitutionSet subst)
+    {
+        return DeclRef<T>(this, decl, subst);
+    }
+
     ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
     {
         return getOrCreate<ConstantIntVal>(type, value);
@@ -263,7 +280,7 @@ public:
         {
             desc.operands.add(outer);
         }
-        auto result = (DeclRefType*)_getOrCreateImpl(desc, [&]() {return create<DeclRefType>(decl, outer); });
+        auto result = (DeclRefType*)_getOrCreateImpl(desc, [&]() {return create<DeclRefType>(getSpecializedDeclRef(decl, outer)); });
         return result;
     }
 

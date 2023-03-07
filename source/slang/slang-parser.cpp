@@ -1371,7 +1371,7 @@ namespace Slang
 
                 auto paramType = DeclRefType::create(
                     parser->astBuilder,
-                    DeclRef<Decl>(paramDecl, nullptr));
+                    DeclRef<Decl>(paramDecl));
 
                 auto paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
                 paramTypeExpr->loc = paramDecl->loc;
@@ -3107,7 +3107,7 @@ namespace Slang
                 parser->FillPosition(paramConstraint);
 
                 // substitution needs to be filled during check
-                DeclRefType* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl, nullptr));
+                DeclRefType* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
                 SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
                 paramTypeExpr->loc = decl->loc;
@@ -4320,7 +4320,7 @@ namespace Slang
             {
                 // TODO(JS):
                 // Is it valid to always have empty substitution set here?
-                DeclRef<ContainerDecl> declRef(aggTypeDecl, SubstitutionSet());
+                DeclRef<ContainerDecl> declRef(aggTypeDecl);
 
                 auto lookupResult = lookUpDirectAndTransparentMembers(
                     parser->astBuilder,
