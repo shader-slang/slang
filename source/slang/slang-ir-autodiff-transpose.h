@@ -1140,6 +1140,21 @@ struct DiffTransposePass
             builder->emitStore(invVar, invInst);
     }
 
+    bool shouldInstBeInverted(IRInst* inst)
+    {
+        if (isPrimalInst(inst) && 
+            as<IRBlock>(inst->getParent()) && 
+            isDifferentialInst(as<IRBlock>(inst->getParent())))
+        {
+            if (!inst->findDecoration<IRPrimalValueAccessDecoration>())
+            {
+                return true; 
+            }
+        }
+
+        return false;
+    }
+
     IRInst* hoistPrimalInst(IRBuilder* revBuilder, IRInst* inst)
     {
         if (as<IRBlock>(inst->getParent()) && 
@@ -1147,21 +1162,64 @@ struct DiffTransposePass
         {
             SLANG_RELEASE_ASSERT(isPrimalInst(inst));
         }
-
-        // Are the operands of this primal inst also available in the reverse-mode context?
-        // If not, move/load them.
-        // 
-        hoistPrimalOperands(revBuilder, inst);
-
-        if (isPrimalInst(inst) && 
-            as<IRBlock>(inst->getParent()) && 
-            isDifferentialInst(as<IRBlock>(inst->getParent())))
+        
+        if (shouldInstBeInverted(inst))
         {
-            if (!inst->findDecoration<IRPrimalValueAccessDecoration>())
-            {
-                return getInverse(revBuilder, inst);
+            return getInverse(revBuilder, inst);
+        }
+        else
+        {
+            primalInstsToHoist.Add(inst);
+        }
+
+        return inst;
+    }
+
+    IRInst* finishPrimalInstHoisting(IRBuilder* revBuider, IRInst* inst)
+    {
+        List<IRInst*> workList;
+        HashSet<IRInst*> processedSet;
+        
+        for (auto inst : primalInstsToHoist)
+            workList.add(inst);
+        
+        auto addPrimalOperandsToWorkList = [&](IRInst* inst)
+        {
+            UIndex opIndex = 0;
+            for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
+            {   
+                if (!operand->get()->findDecoration<IRDifferentialInstDecoration>())
+                    workList.add(operand->get());
             }
-            else
+        };
+
+        for (workList.getCount() > 0)
+        {
+            // TODO: pop work item
+            auto inst = workList.getLast();
+            workList.removeLast();
+
+            if (processedSet.Contains(inst))
+                continue;
+
+            processedSet.Add(inst);
+
+            // Are the operands of this primal inst also available in the reverse-mode context?
+            // If not, move/load them.
+            // 
+            addPrimalOperandsToWorkList(inst);
+
+            if (as<IRBlock>(inst->getParent()) && 
+                isDifferentialInst(as<IRBlock>(inst->getParent())))
+            {
+                if (!isDifferentialInst(inst))
+                {
+                    // TODO: STOPPED HERE   
+                }
+            }
+
+            if ( && 
+                )
             {
                 auto block = as<IRBlock>(inst->getParent());
                 SLANG_RELEASE_ASSERT(block);
@@ -1180,7 +1238,7 @@ struct DiffTransposePass
             }
         }
 
-        return inst;
+            return inst;
     }
 
     void hoistPrimalOperands(IRBuilder* revBuilder, IRInst* fwdInst)

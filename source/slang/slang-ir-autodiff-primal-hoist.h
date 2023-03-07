@@ -8,12 +8,51 @@
 
 namespace Slang
 {
-    
+    struct IROutOfOrderCloneContext : public RefObject
+    {
+        IRCloneEnv cloneEnv;
+        HashSet<IRUse*> pendingUses;
+
+        IRInst* cloneInstOutOfOrder(IRBuilder* builder, IRInst* inst)
+        {
+            IRInst* clonedInst = cloneInst(&cloneEnv, builder, inst);
+
+            UInt operandCount = clonedInst->getOperandCount();
+            for (UInt ii = 0; ii < operandCount; ++ii)
+            {
+                auto oldOperand = inst->getOperand(ii);
+                auto newOperand = clonedInst->getOperand(ii);
+
+                if (oldOperand == newOperand)
+                    pendingUses.Add(&inst->getOperands()[ii]);
+            }
+
+            for (auto use = inst->firstUse; use;)
+            {
+                auto nextUse = use->nextUse;
+                
+                if (pendingUses.Contains(use))
+                    use->set(clonedInst);
+                
+                use = nextUse;
+            }
+        }
+    };
+
     struct InversionInfo
     {
         IRInst* instToInvert;
         List<IRInst*> requiredOperands;
         IRUse* targetUse;
+    };
+
+    struct HoistedPrimalsInfo : public RefObject
+    {
+        HashSet<IRInst*> storeSet;
+        HashSet<IRInst*> recomputeSet;
+        HashSet<IRInst*> invertSet;
+
+        Dictionary<IRInst*, InversionInfo> invertInfoMap;
     };
 
     struct HoistResult
@@ -70,6 +109,20 @@ namespace Slang
         }
     };
 
+    
+    // Information on which insts are to be stored, recomputed
+    // and inverted within a single function.
+    // This data structure also holds a map of raw HoistResult
+    // objects to provide more information to later passes.
+    // 
+    struct CheckpointSetInfo : public RefObject
+    {
+        HashSet<IRInst*> storeSet;
+        HashSet<IRInst*> recomputeSet;
+        HashSet<IRInst*> invertSet;
+
+        Dictionary<IRUse*, HoistResult> hoistModeMap;
+    };
 
     class AutodiffCheckpointPolicyBase
     {
@@ -79,7 +132,8 @@ namespace Slang
             : func(func), module(func->getModule())
         { }
 
-        void processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* info);
+        
+        RefPtr<CheckpointSetInfo> processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* info);
 
         // Do pre-processing on the function (mainly for 
         // 'global' checkpointing methods that consider the entire
@@ -87,23 +141,22 @@ namespace Slang
         // 
         virtual void preparePolicy(IRGlobalValueWithCode* func) = 0;
 
-        virtual HoistResult apply(IRUse* diffBlockUse);
+        virtual HoistResult classify(IRUse* diffBlockUse);
 
-        // Utility method to populate instsWithDiffUses
-        void findInstsWithDiffUses();
+        RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
+            CheckpointSetInfo* checkpointInfo,
+            IRGlobalValueWithCode* func,
+            BlockSplitInfo* splitInfo);
+        
+        RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
+            HoistedPrimalsInfo* hoistInfo,
+            IRGlobalValueWithCode* func,
+            Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlockInfo);
 
         protected:
 
         IRGlobalValueWithCode*  func;
         IRModule*               module;
-
-        HashSet<IRInst*>        storeSet;
-        HashSet<IRInst*>        recomputeSet;
-        HashSet<IRInst*>        invertSet;
-
-        Dictionary<IRUse*, InversionInfo>   invertInfoMap;
-
-        HashSet<IRInst*>        instsWithDiffUses; 
     };
 
     class DefaultCheckpointPolicy : public AutodiffCheckpointPolicyBase
