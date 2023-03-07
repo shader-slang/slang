@@ -767,14 +767,14 @@ namespace Slang
             :decl(decl),
             substitutions(subst)
         {
-            SLANG_ASSERT(astBuilder);
+            SLANG_RELEASE_ASSERT(astBuilder);
         }
 
         DeclRefBase(ASTBuilder* astBuilder, Decl* decl, Substitutions* subst)
             : decl(decl)
             , substitutions(subst)
         {
-            SLANG_ASSERT(astBuilder);
+            SLANG_RELEASE_ASSERT(astBuilder);
         }
 
         // Apply substitutions to a type or declaration
