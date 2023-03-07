@@ -1156,3 +1156,50 @@ void __d_lit(inout DifferentialPair<float> n_dot_l, inout DifferentialPair<float
 {
     __bwd_diff(__lit_impl)(n_dot_l, n_dot_h, m, dOut);
 }
+
+// Matrix determinant
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+[__readNone]
+T __determinant_impl(matrix<T,N,N> m)
+{
+    if (N == 1)
+        return m[0][0];
+    else if (N == 2)
+        return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+    else if (N == 3)
+    {
+        return  m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2])
+		      - m[1][0] * (m[0][1] * m[2][2] - m[2][1] * m[0][2])
+			  + m[2][0] * (m[0][1] * m[1][2] - m[1][1] * m[0][2]);
+    }
+    else if (N == 4)
+    {
+    	T s00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
+		T s01 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
+		T s02 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
+		T s03 = m[2][0] * m[3][3] - m[3][0] * m[2][3];
+		T s04 = m[2][0] * m[3][2] - m[3][0] * m[2][2];
+		T s05 = m[2][0] * m[3][1] - m[3][0] * m[2][1];
+
+		return m[0][0] * (m[1][1] * s00 - m[1][2] * s01 + m[1][3] * s02)
+			 - m[0][1] * (m[1][0] * s00 - m[1][2] * s03 + m[1][3] * s04)
+			 + m[0][2] * (m[1][0] * s01 - m[1][1] * s03 + m[1][3] * s05)
+			 - m[0][3] * (m[1][0] * s02 - m[1][1] * s04 + m[1][2] * s05);
+    }
+    return T(0.0);
+}
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(determinant)]
+[ForceInline]
+DifferentialPair<T> __determinant_impl(DifferentialPair<matrix<T,N,N>> m)
+{
+    return __fwd_diff(__determinant_impl)(m);
+}
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDerivativeOf(determinant)]
+[ForceInline]
+void __d_determinant(inout DifferentialPair<matrix<T,N,N>> m, T.Differential dOut)
+{
+    __bwd_diff(__determinant_impl)(m, dOut);
+}
