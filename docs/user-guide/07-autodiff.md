@@ -483,10 +483,9 @@ The following builtin functions are backward differentiable and both their forwa
 - Hyperbolic functions: `sinh`, `cosh`, `tanh`
 - Exponential and logarithmic functions: `exp`, `exp2`, `pow`, `log`, `log2`, `log10`
 - Vector functions: `dot`, `cross`, `length`, `distance`, `normalize`, `reflect`, `refract`
-- Matrix transform: `mul(matrix, vector)`, `mul(vector, matrix)`, `mul(matrix, matrix)`, `transpose`
-
-Derivatives for the following legacy HLSL intrinsic functions are not implemented:
-- `dst`, `lit`, 
+- Matrix transforms: `mul(matrix, vector)`, `mul(vector, matrix)`, `mul(matrix, matrix)`
+- Matrix operations: `transpose`, `determinant`
+- Legacy blending and lighting intrinsics: `dst`, `lit`
 
 ## Excluding Parameters From Differentiation
 

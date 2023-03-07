@@ -680,16 +680,7 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             SLANG_ASSERT(as<Decl>(attrTarget));
-
-            // Ensure that the argument is a reference to a function definition or declaration.
-            auto primalFunc = CheckTerm(attr->args[0]);
-            if (primalFunc->type == getASTBuilder()->getErrorType())
-            {
-                // Could not resolve the term.
-                getSink()->diagnose(primalFunc, Slang::Diagnostics::invalidCustomDerivative, as<Decl>(attrTarget));
-                return false;
-            }
-            derivativeOfAttr->funcExpr = primalFunc;
+            derivativeOfAttr->funcExpr = attr->args[0];
         }
         else if (auto comInterfaceAttr = as<ComInterfaceAttribute>(attr))
         {
