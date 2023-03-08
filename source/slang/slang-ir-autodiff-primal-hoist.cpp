@@ -184,7 +184,7 @@ RefPtr<CheckpointSetInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValu
 
 }
 
-RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::applyCheckpointSet(
+RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
     CheckpointSetInfo* checkpointInfo,
     IRGlobalValueWithCode* func,
     BlockSplitInfo* splitInfo)
@@ -215,32 +215,21 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::applyCheckpointSet(
             {
                 if (!as<IRParam>(child))
                 {
-                    // auto loc = IRInsertLoc::before(firstDiffInst);
                     builder.setInsertBefore(firstDiffInst);
                     hoistInfo->recomputeSet.Add(cloneCtx->cloneInstOutOfOrder(&builder, child));
                 }
                 else
                 {
-                    // auto loc = IRInsertLoc::before(firstParam);
                     builder.setInsertBefore(firstParam);
                     hoistInfo->recomputeSet.Add(cloneCtx->cloneInstOutOfOrder(&builder, child));
                 }
-                
-                // builder.addPrimalValueRecomputeDecoration(child);
             }
             else if (checkpointInfo->storeSet.Contains(child))
             {
-                // builder.addPrimalValueStoreDecoration(child);
-                // Do nothing..
                 hoistInfo->storeSet.Add(cloneCtx->cloneInstOutOfOrder(&builder, child));
             }
             else if (checkpointInfo->invertSet.Contains(child))
             {
-                // Handle this later
-                // Have a 'pendingUses' set that
-                // we fill as soon as we finish cloning.
-                // TODO: We also need a way to detect circular inversion dependencies.
-                //
                 SLANG_UNIMPLEMENTED_X("Inverted insts not currently handled");
             }
         }
@@ -398,7 +387,7 @@ bool areIndicesEqual(
     return true;
 }
 
-RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::ensurePrimalAvailability(
+RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     HoistedPrimalsInfo* hoistInfo,
     IRGlobalValueWithCode* func,
     Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlockInfo)
@@ -453,8 +442,10 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::ensurePrimalAvailabilit
             SLANG_RELEASE_ASSERT(varToStore);
             
             auto storeUse = findUniqueStoredVal(varToStore);
+            
+            List<IndexTrackingInfo*> defBlockIndices = indexedBlockInfo[defBlock];
 
-            bool isIndexedStore = (storeUse && indexedBlockInfo[getBlock(storeUse->getUser())].getCount() > 0);
+            bool isIndexedStore = (storeUse && defBlockIndices.getCount() > 0);
 
             if (!isIndexedStore)
             {
@@ -467,8 +458,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::ensurePrimalAvailabilit
 
             setInsertAfterOrdinaryInst(&builder, storeInst);
 
-            List<IndexTrackingInfo*> defBlockIndices = indexedBlockInfo[instBlock];
-
             IRVar* localVar = emitLocalVarForValue(defaultVarBlock, storeInst, defBlockIndices);
             IRInst* storeAddr = emitIndexedStoreAddressForVar(&builder, localVar, defBlockIndices);
 
@@ -478,6 +467,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::ensurePrimalAvailabilit
             {
                 setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
                 
+                List<IndexTrackingInfo*> useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
+
                 IRInst* loadAddr = emitIndexedLoadAddressForVar(&builder, localVar, defBlockIndices, useBlockIndices);
                 builder.replaceOperand(use, loadAddr);
             }
@@ -488,7 +479,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::ensurePrimalAvailabilit
         {  
             setInsertAfterOrdinaryInst(&builder, instToStore);
 
-            List<IndexTrackingInfo*> defBlockIndices = indexedBlockInfo[instBlock];
+            List<IndexTrackingInfo*> defBlockIndices = indexedBlockInfo[defBlock];
             auto localVar = storeIndexedValue(&builder, defaultVarBlock, instToStore, defBlockIndices);
             
             for (auto use : outOfScopeUses)

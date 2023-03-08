@@ -8,6 +8,8 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-cfg-norm.h"
+#include "slang-ir-autodiff-primal-hoist.h"
+#include "slang-ir-dominators.h"
 
 namespace Slang
 {
@@ -78,6 +80,11 @@ struct DiffTransposePass
         // of the *output* of the function.
         // 
         IRInst* dOutInst;
+
+        // Information from the unzip pass on how primal insts
+        // are split across the primal and differential blocks.
+        // 
+        HoistedPrimalsInfo* hoistedPrimalsInfo;
     };
 
     struct PendingBlockTerminatorEntry
@@ -506,6 +513,13 @@ struct DiffTransposePass
         IRFunc* revDiffFunc,
         FuncTranspositionInfo transposeInfo)
     {
+        // TODO (sai): We really to make this method stateless 
+        // (i.e. not store per-func info in 'this')
+        // since it is reused for every reverse-mode call.
+        //
+
+        hoistedPrimalsInfo = transposeInfo.hoistedPrimalsInfo;
+
         // Grab all differentiable type information.
         diffTypeContext.setFunc(revDiffFunc);
         
@@ -656,6 +670,16 @@ struct DiffTransposePass
 
             subBuilder.addBackwardDerivativePrimalReturnDecoration(branch, retVal);
         }
+
+        // Remove fwd-mode blocks from the func to 
+        // prepare func for primal inst hoisting
+        // 
+        for (auto block : workList)
+        {
+            block->removeFromParent();
+        }
+
+        finishHoistingPrimalInsts(revDiffFunc);
 
         // At this point, the only block left without terminator insts
         // should be the last one. Add a void return to complete it.
@@ -1169,76 +1193,175 @@ struct DiffTransposePass
         }
         else
         {
-            primalInstsToHoist.Add(inst);
+            primalInstsToHoist.add(inst);
         }
 
         return inst;
     }
 
-    IRInst* finishPrimalInstHoisting(IRBuilder* revBuider, IRInst* inst)
+    void finishHoistingPrimalInsts(IRGlobalValueWithCode* func)
     {
         List<IRInst*> workList;
-        HashSet<IRInst*> processedSet;
+        HashSet<IRInst*> hoistedSet;
+
+        RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
         
+        // Load up pending insts into workList.
         for (auto inst : primalInstsToHoist)
             workList.add(inst);
         
-        auto addPrimalOperandsToWorkList = [&](IRInst* inst)
+        primalInstsToHoist.clear();
+
+        auto isRelevantDiffUse = [&](IRUse* use)
+        {
+            return (!use->get()->findDecoration<IRDifferentialInstDecoration>() && 
+                getBlock(use->get())->findDecoration<IRDifferentialInstDecoration>());
+        };
+
+        auto maybeReplacePrimalOperands = [&](IRInst* inst)
         {
             UIndex opIndex = 0;
             for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
             {   
                 if (!operand->get()->findDecoration<IRDifferentialInstDecoration>())
-                    workList.add(operand->get());
+                {
+                    
+                }
+            }
+        };
+        
+        auto maybeAddPrimalOperandsToWorkList = [&](IRInst* inst)
+        {
+            UIndex opIndex = 0;
+            for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
+            {   
+                if (!hoistPrimalsInfo->invertSet.Contains(operand))
+                {
+                    // TODO: Stopped here... 
+                    // Store _use_ sets and not _inst_ sets
+                    // when we see a use in the invertset, look for the inst in
+                    // inversion set.
+                    // 
+                }
+
+                if (!operand->get()->findDecoration<IRDifferentialInstDecoration>())
+                {
+                    if (!hoistedSet.Contains(operand->get()))
+                    {
+                        workList.add(operand->get());
+                    }
+                }
             }
         };
 
-        for (workList.getCount() > 0)
+        auto maybeAddUsesToWorkList = [&](IRInst* inst)
         {
-            // TODO: pop work item
+            UIndex opIndex = 0;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {   
+                if (isRelevantDiffUse(use))
+                {
+                    // Uses that haven't already been hoisted into reverse-mode 
+                    // blocks are pending uses.
+                    // 
+                    if (!hoistedSet.Contains(use->get()))
+                        workList.add(use->get());
+                }
+            }
+        };
+
+        auto doesInstHavePendingUses = [&](IRInst* inst)
+        {
+            UIndex opIndex = 0;
+            UCount numPendingUses = 0;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {   
+                if (isRelevantDiffUse(use))
+                {
+                    // Uses that haven't already been hoisted into reverse-mode 
+                    // blocks are pending uses.
+                    // 
+                    if (!hoistedSet.Contains(use->get()))
+                        return true;
+                }
+            }
+
+            return false;
+        };
+
+        while (workList.getCount() > 0)
+        {
+            // Pop work item
             auto inst = workList.getLast();
             workList.removeLast();
 
-            if (processedSet.Contains(inst))
-                continue;
-
-            processedSet.Add(inst);
-
-            // Are the operands of this primal inst also available in the reverse-mode context?
-            // If not, move/load them.
+            // Already hoisted to reverse-mode block.
+            // ignore..
             // 
-            addPrimalOperandsToWorkList(inst);
-
-            if (as<IRBlock>(inst->getParent()) && 
-                isDifferentialInst(as<IRBlock>(inst->getParent())))
+            if (hoistedSet.Contains(inst))
+                continue;
+            
+            // Are the uses of this primal inst already hoisted into the reverse-mode
+            // blocks? We cannot hoist this inst unless the uses are hoisted.
+            // 
+            if (doesInstHavePendingUses(inst))
             {
-                if (!isDifferentialInst(inst))
-                {
-                    // TODO: STOPPED HERE   
-                }
+                // Add inst back to work list.
+                workList.add(inst);
+
+                // Then, add all the pending use to the top of 
+                // list, ensuring they are processed before we see 
+                // inst again.
+                // 
+                maybeAddUsesToWorkList(inst);
             }
 
-            if ( && 
-                )
+            // Move this inst to after it's diff uses.
+            // 
             {
-                auto block = as<IRBlock>(inst->getParent());
-                SLANG_RELEASE_ASSERT(block);
+                IRBlock* block = as<IRBlock>(inst->getParent());
+                IRBlock* currTopBlock = revBlockMap[block];
 
-                if (block == revBuilder->getBlock())
+                for (auto use = inst->firstUse; use; use = use->nextUse)
                 {
-                    // Already in block..
-                    return inst;
+                    // Ignore if the use is not already in a reverse-mode
+                    // block..
+                    //
+                    if (!hoistedSet.Contains(use->get()))
+                        continue;
+
+                    // If the current 'top' block dominates the use-block, then
+                    // we're good,
+                    // Otherwise, make the use-block the top-block, and keep going.
+                    // 
+                    IRBlock* useBlock = getBlock(use->getUser());
+                    if (!domTree->dominates(currTopBlock, useBlock))
+                    {
+                        currTopBlock = useBlock;
+                    }
                 }
 
-                // Otherwise, move our inst to the the current builder location.
-                inst->removeFromParent();
-                revBuilder->addInst(inst);
+                SLANG_RELEASE_ASSERT(currTopBlock);
+                
+                // Consistency check: currTopBlock should dominate all relevant use sites.
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                {
+                    IRBlock* useBlock = getBlock(use->getUser());
+                    SLANG_RELEASE_ASSERT(domTree->dominates(currTopBlock, useBlock));
+                }
 
-                return inst;
+                // More consistency checks
+                SLANG_RELEASE_ASSERT(currTopBlock->getFirstOrdinaryInst() != nullptr);
+                SLANG_RELEASE_ASSERT(currTopBlock->getParent() != nullptr);
+                SLANG_RELEASE_ASSERT(isDifferentialInst(currTopBlock));
+
+                // Insert at top.
+                inst->insertBefore(currTopBlock->getFirstOrdinaryInst());
             }
+
+            // Finish up..
+            hoistedSet.Add(inst);
         }
-
-            return inst;
     }
 
     void hoistPrimalOperands(IRBuilder* revBuilder, IRInst* fwdInst)
@@ -2912,6 +3035,8 @@ struct DiffTransposePass
 
     DifferentialPairTypeBuilder                          pairBuilder;
 
+    HoistedPrimalsInfo*                                  hoistedPrimalsInfo;
+
     Dictionary<IRInst*, List<RevGradient>>               gradientsMap;
 
     Dictionary<IRInst*, IRVar*>                          revAccumulatorVarMap;
@@ -2931,6 +3056,8 @@ struct DiffTransposePass
     Dictionary<IRBlock*, List<IRInst*>>                  phiGradsMap;
     
     Dictionary<IRInst*, IRInst*>                         inverseValueMap;
+
+    List<IRInst*>                                        primalInstsToHoist;
 };
 
 

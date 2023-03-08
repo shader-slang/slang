@@ -24,7 +24,7 @@ namespace Slang
                 auto newOperand = clonedInst->getOperand(ii);
 
                 if (oldOperand == newOperand)
-                    pendingUses.Add(&inst->getOperands()[ii]);
+                    pendingUses.Add(&clonedInst->getOperands()[ii]);
             }
 
             for (auto use = inst->firstUse; use;)
@@ -32,7 +32,10 @@ namespace Slang
                 auto nextUse = use->nextUse;
                 
                 if (pendingUses.Contains(use))
-                    use->set(clonedInst);
+                {
+                    pendingUses.Remove(use);
+                    builder->replaceOperand(use, clonedInst);
+                }
                 
                 use = nextUse;
             }
@@ -132,7 +135,6 @@ namespace Slang
             : func(func), module(func->getModule())
         { }
 
-        
         RefPtr<CheckpointSetInfo> processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* info);
 
         // Do pre-processing on the function (mainly for 
@@ -142,16 +144,6 @@ namespace Slang
         virtual void preparePolicy(IRGlobalValueWithCode* func) = 0;
 
         virtual HoistResult classify(IRUse* diffBlockUse);
-
-        RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
-            CheckpointSetInfo* checkpointInfo,
-            IRGlobalValueWithCode* func,
-            BlockSplitInfo* splitInfo);
-        
-        RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
-            HoistedPrimalsInfo* hoistInfo,
-            IRGlobalValueWithCode* func,
-            Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlockInfo);
 
         protected:
 
@@ -210,4 +202,15 @@ namespace Slang
     // (Does not actually materialize the inverse)
     //
     bool isInstInvertible(IRInst* primalInst);
+
+    RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
+        CheckpointSetInfo* checkpointInfo,
+        IRGlobalValueWithCode* func,
+        BlockSplitInfo* splitInfo);
+
+    RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
+        HoistedPrimalsInfo* hoistInfo,
+        IRGlobalValueWithCode* func,
+        Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlockInfo);
+
 };

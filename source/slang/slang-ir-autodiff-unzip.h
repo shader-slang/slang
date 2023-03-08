@@ -10,6 +10,7 @@
 #include "slang-ir-autodiff-propagate.h"
 #include "slang-ir-autodiff-transcriber-base.h"
 #include "slang-ir-autodiff-region.h"
+#include "slang-ir-autodiff-primal-hoist.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-ssa.h"
 
@@ -156,6 +157,10 @@ struct DiffUnzipPass
         // Emit counter variables and other supporting
         // instructions for all regions.
         // 
+        // TODO: Create and pass along a HoistedPrimalsInfo* to this too.
+        // TODO: Need to have maxIndex in _both_ IndexTrackingInfo & IndexedRegionInfo.
+        // That way, we can do the various passes _before_ lowerIndexedRegions()
+        // 
         lowerIndexedRegions();
 
         // Copy regions from fwd-block to their split blocks
@@ -182,17 +187,24 @@ struct DiffUnzipPass
         // Process intermediate insts in indexed blocks
         // into array loads/stores.
         // 
-        for (auto block : mixedBlocks)
+        /*for (auto block : mixedBlocks)
         {
             if (indexRegionMap->getRegion(block) != nullptr)
                 processIndexedFwdBlock(block);
-        }
+        }*/
         
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
 
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
+
+        // Run the three checkpointing passes to hoist/clone primal insts
+        // to the right spots.
+        // 
+        {
+
+        }
     }
 
     void tryInferMaxIndex(IndexedRegion* region, IndexTrackingInfo* info)
@@ -266,26 +278,6 @@ struct DiffUnzipPass
         SLANG_RELEASE_ASSERT(index == (UCount)params.getCount());
 
         return addPhiInputParam(builder, block, type);
-    }
-
-    IRBlock* getBlock(IRInst* inst)
-    {
-        SLANG_RELEASE_ASSERT(inst);
-
-        if (auto block = as<IRBlock>(inst))
-            return block;
-
-        return getBlock(inst->getParent());
-    }
-
-    IRInst* getInstInBlock(IRInst* inst)
-    {
-        SLANG_RELEASE_ASSERT(inst);
-
-        if (auto block = as<IRBlock>(inst->getParent()))
-            return inst;
-
-        return getInstInBlock(inst->getParent());
     }
 
     void lowerIndexedRegions()

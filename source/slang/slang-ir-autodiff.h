@@ -289,6 +289,8 @@ bool processAutodiffCalls(
 
 bool finalizeAutoDiffPass(IRModule* module);
 
+// Utility methods
+
 void stripDerivativeDecorations(IRInst* inst);
 
 bool isBackwardDifferentiableFunc(IRInst* func);
@@ -312,5 +314,26 @@ inline bool isRelevantDifferentialPair(IRType* type)
     }
     return false;
 }
+
+IRBlock* getBlock(IRInst* inst)
+{
+    SLANG_RELEASE_ASSERT(inst);
+
+    if (auto block = as<IRBlock>(inst))
+        return block;
+
+    return getBlock(inst->getParent());
+}
+
+IRInst* getInstInBlock(IRInst* inst)
+{
+    SLANG_RELEASE_ASSERT(inst);
+
+    if (auto block = as<IRBlock>(inst->getParent()))
+        return inst;
+
+    return getInstInBlock(inst->getParent());
+}
+
 
 };
