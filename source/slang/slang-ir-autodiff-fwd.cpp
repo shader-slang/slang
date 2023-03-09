@@ -455,9 +455,6 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 builder, primalCallee, as<IRFuncType>(primalCallee->getFullType())),
             primalCallee);
     }
-    else
-    {
-    }
 
     if (!diffCallee)
     {
