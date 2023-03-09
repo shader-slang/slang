@@ -138,10 +138,16 @@ static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const Unowned
     return SLANG_OK;
 }
 
-
-
-SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
+SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
+    if (!isVersionCompatible(inOptions))
+    {
+        // Not possible to compile with this version of the interface.
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    CompileOptions options = getCompatibleVersion(&inOptions);
+
     // This compiler can only handle a single artifact
     if (options.sourceArtifacts.count != 1)
     {
