@@ -39,30 +39,30 @@ attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 
 __generic<T : IDifferentiable>
 __magic_type(DifferentialPairType)
-__intrinsic_type($(kIROp_DifferentialPairType))
+__intrinsic_type($(kIROp_DifferentialPairUserCodeType))
 struct DifferentialPair : IDifferentiable
 {
     typedef DifferentialPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
 
-    __intrinsic_op($(kIROp_MakeDifferentialPair))
+    __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
     __init(T _primal, T.Differential _differential);
 
     property p : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
         get;
     }
 
     property v : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
         get;
     }
 
     property d : T.Differential
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
+        __intrinsic_op($(kIROp_DifferentialPairGetDifferentialUserCode))
         get;
     }
 
@@ -105,7 +105,7 @@ struct DifferentialPair : IDifferentiable
 };
 
 __generic<T: IDifferentiable>
-__intrinsic_op($(kIROp_MakeDifferentialPair))
+__intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
 DifferentialPair<T> diffPair(T primal, T.Differential diff);
 
 __generic<T: IDifferentiable>

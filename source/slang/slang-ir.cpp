@@ -2459,6 +2459,26 @@ namespace Slang
             if (found)
             {
                 memoryArena.rewindToCursor(cursor);
+
+                // If the found inst is defined in the same parent as current insert location but
+                // is located after the insert location, we need to move it to the insert location.
+                auto foundInst = *found;
+                if (foundInst->getParent() == getInsertLoc().getParent() &&
+                    getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+                {
+                    auto insertLoc = getInsertLoc().getInst();
+                    bool isAfter = false;
+                    for (auto cur = insertLoc; cur; cur = cur->next)
+                    {
+                        if (cur == foundInst)
+                        {
+                            isAfter = true;
+                            break;
+                        }
+                    }
+                    if (isAfter)
+                        foundInst->insertBefore(insertLoc);
+                }
                 return *found;
             }
         }
@@ -2775,6 +2795,17 @@ namespace Slang
         IRInst* operands[] = { valueType, witnessTable };
         return (IRDifferentialPairType*)getType(
             kIROp_DifferentialPairType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
+    IRDifferentialPairUserCodeType* IRBuilder::getDifferentialPairUserCodeType(
+        IRType* valueType,
+        IRInst* witnessTable)
+    {
+        IRInst* operands[] = { valueType, witnessTable };
+        return (IRDifferentialPairUserCodeType*)getType(
+            kIROp_DifferentialPairUserCodeType,
             sizeof(operands) / sizeof(operands[0]),
             operands);
     }
@@ -3158,6 +3189,18 @@ namespace Slang
         IRInst* args[] = {primal, differential};
         auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
             this, kIROp_MakeDifferentialPair, type, 2, args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential)
+    {
+        SLANG_RELEASE_ASSERT(as<IRDifferentialPairTypeBase>(type));
+        SLANG_RELEASE_ASSERT(as<IRDifferentialPairTypeBase>(type)->getValueType() != nullptr);
+
+        IRInst* args[] = { primal, differential };
+        auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
+            this, kIROp_MakeDifferentialPairUserCode, type, 2, args);
         addInst(inst);
         return inst;
     }
@@ -3751,6 +3794,25 @@ namespace Slang
             &diffPair);
     }
 
+    IRInst* IRBuilder::emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair)
+    {
+        SLANG_ASSERT(as<IRDifferentialPairTypeBase>(diffPair->getDataType()));
+        return emitIntrinsicInst(
+            diffType,
+            kIROp_DifferentialPairGetDifferentialUserCode,
+            1,
+            &diffPair);
+    }
+
+    IRInst* IRBuilder::emitDifferentialPairGetPrimalUserCode(IRInst* diffPair)
+    {
+        auto valueType = cast<IRDifferentialPairTypeBase>(diffPair->getDataType())->getValueType();
+        return emitIntrinsicInst(
+            valueType,
+            kIROp_DifferentialPairGetPrimalUserCode,
+            1, 
+            &diffPair);
+    }
 
     IRInst* IRBuilder::emitMakeMatrix(
         IRType*         type,

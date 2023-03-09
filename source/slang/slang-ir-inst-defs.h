@@ -62,6 +62,9 @@ INST(Nop, nop, 0, 0)
     INST(OptionalType, Optional, 1, HOISTABLE)
 
     INST(DifferentialPairType, DiffPair, 1, HOISTABLE)
+    INST(DifferentialPairUserCodeType, DiffPairUserCode, 1, HOISTABLE)
+    INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPairUserCodeType)
+
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 
     /* BindExistentialsTypeBase */
@@ -278,8 +281,16 @@ INST(undefined, undefined, 0, 0)
 INST(DefaultConstruct, defaultConstruct, 0, 0)
 
 INST(MakeDifferentialPair, MakeDiffPair, 2, 0)
+INST(MakeDifferentialPairUserCode, MakeDiffPairUserCode, 2, 0)
+INST_RANGE(MakeDifferentialPairBase, MakeDifferentialPair, MakeDifferentialPairUserCode)
+
 INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
+INST(DifferentialPairGetDifferentialUserCode, GetDifferentialUserCode, 1, 0)
+INST_RANGE(DifferentialPairGetDifferentialBase, DifferentialPairGetDifferential, DifferentialPairGetDifferentialUserCode)
+
 INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
+INST(DifferentialPairGetPrimalUserCode, GetPrimalUserCode, 1, 0)
+INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, DifferentialPairGetPrimalUserCode)
 
 INST(Specialize, specialize, 2, HOISTABLE)
 INST(LookupWitness, lookupWitness, 2, HOISTABLE)
