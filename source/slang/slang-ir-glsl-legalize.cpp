@@ -116,8 +116,7 @@ void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
 
 void legalizeImageSubscriptForGLSL(IRModule* module)
 {
-    SharedIRBuilder shared(module);
-    IRBuilder builder(shared);
+    IRBuilder builder(module);
     for (auto globalInst : module->getModuleInst()->getChildren())
     {
         auto func = as<IRFunc>(globalInst);
@@ -152,8 +151,7 @@ IRGlobalParam* addGlobalParam(
     IRModule*   module,
     IRType*     valueType)
 {
-    SharedIRBuilder shared(module);
-    IRBuilder builder(shared);
+    IRBuilder builder(module);
 
     return builder.createGlobalParam(valueType);
 }
@@ -1791,7 +1789,7 @@ void legalizeMeshOutputParam(
     // the writes may only be writing to parts of the output struct, or may not
     // be writes at all (i.e. being passed as an out paramter).
     //
-    traverseUses(g, [&](IRInst* u)
+    traverseUsers(g, [&](IRInst* u)
     {
         auto l = as<IRLoad>(u);
         SLANG_EXPECT(l, "Mesh Output sentinel parameter wasn't used in a load");
@@ -1811,7 +1809,7 @@ void legalizeMeshOutputParam(
                 return;
             }
             // Otherwise, go through the uses one by one and see what we can do
-            traverseUses(a, [&](IRInst* s)
+            traverseUsers(a, [&](IRInst* s)
             {
                 IRBuilderInsertLocScope locScope{builder};
                 builder->setInsertBefore(s);
@@ -2022,15 +2020,15 @@ void legalizeMeshOutputParam(
 
     for(auto builtin : builtins)
     {
-        traverseUses(builtin.param, [&](IRInst* u)
+        traverseUsers(builtin.param, [&](IRInst* u)
         {
             auto p = as<IRGetElementPtr>(u);
             SLANG_EXPECT(p, "Mesh Output sentinel parameter wasn't used as an array");
 
             IRBuilderInsertLocScope locScope{builder};
             builder->setInsertBefore(p);
-            auto e = builder->emitElementAddress(meshOutputBlockType, blockParam, p->getIndex());
-            auto a = builder->emitFieldAddress(builtin.type, e, builtin.key);
+            auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, p->getIndex());
+            auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
 
             p->replaceUsesWith(a);
         });
@@ -2345,7 +2343,7 @@ void legalizeEntryPointParameterForGLSL(
             // disrupt the source location it is using for inserting
             // temporary variables at the top of the function.
             //
-            IRBuilder terminatorBuilder(builder->getSharedBuilder());
+            IRBuilder terminatorBuilder(func);
             terminatorBuilder.setInsertBefore(terminatorInst);
 
             // Assign from the local variabel to the global output
@@ -2415,8 +2413,7 @@ void legalizeEntryPointForGLSL(
     //
     // TODO: make some of these free functions...
     //
-    SharedIRBuilder shared(module);
-    IRBuilder builder(shared);
+    IRBuilder builder(module);
     builder.setInsertInto(func);
 
     context.builder = &builder;

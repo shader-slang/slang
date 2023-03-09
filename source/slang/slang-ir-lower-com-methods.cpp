@@ -25,7 +25,7 @@ struct ComMethodLoweringContext : public InstPassBase
 
     void processComCall(IRCall* comCall)
     {
-        IRBuilder builder(&sharedBuilderStorage);
+        IRBuilder builder(module);
         builder.setInsertBefore(comCall);
         auto callee = as<IRLookupWitnessMethod>(comCall->getCallee());
         SLANG_ASSERT(callee);
@@ -101,7 +101,7 @@ struct ComMethodLoweringContext : public InstPassBase
     {
         if (!interfaceType->findDecoration<IRComInterfaceDecoration>())
             return;
-        IRBuilder builder(&sharedBuilderStorage);
+        IRBuilder builder(module);
         for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
         {
             auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
@@ -123,7 +123,7 @@ struct ComMethodLoweringContext : public InstPassBase
             return;
         auto interfaceReqDict = buildInterfaceRequirementDict(interfaceType);
 
-        IRBuilder builder(&sharedBuilderStorage);
+        IRBuilder builder(module);
         NativeCallMarshallingContext marshalContext;
         marshalContext.diagnosticSink = diagnosticSink;
         for (auto entry : witnessTable->getEntries())
@@ -148,18 +148,13 @@ struct ComMethodLoweringContext : public InstPassBase
 
     void processModule()
     {
-        sharedBuilderStorage.init(module);
-
-        // Deduplicate equivalent types.
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();   
-
         // Translate all Calls to interface methods.
         processInstsOfType<IRCall>(kIROp_Call, [this](IRCall* inst) { processCall(inst); });
 
         // Update functypes of com callees.
         for (auto callee : comCallees)
         {
-            IRBuilder builder(&sharedBuilderStorage);
+            IRBuilder builder(module);
             builder.setInsertBefore(callee);
             auto nativeType = marshal.getNativeFuncType(builder, as<IRFuncType>(callee->getDataType()));
             callee->setFullType(nativeType);

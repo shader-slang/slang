@@ -10,7 +10,7 @@ interface IInterface
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<uint> gOutputBuffer;
-//TEST_INPUT: set gCb = new StructuredBuffer<IInterface>{new MyImpl{Texture2D(size=8, content = one)}}
+//TEST_INPUT: set gCb = new StructuredBuffer<IInterface>{new MyImpl{Texture2D(size=8, content = one), Sampler}}
 StructuredBuffer<IInterface> gCb;
 
 [numthreads(4, 1, 1)]

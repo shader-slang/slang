@@ -89,11 +89,6 @@ struct FunctionParameterSpecializationContext
     //
     List<IRCall*>   workList;
 
-    // Because we may need to generate specialized functions
-    // and generate new calls to those functions, we'll
-    // need some IR building state to get our work done.
-    //
-    SharedIRBuilder sharedBuilderStorage;
     IRBuilder       builderStorage;
     IRBuilder* getBuilder() { return &builderStorage; }
 
@@ -104,8 +99,7 @@ struct FunctionParameterSpecializationContext
     {
         // We will start by initializing our IR building state.
         //
-        sharedBuilderStorage.init(module);
-        builderStorage.init(sharedBuilderStorage);
+        builderStorage = IRBuilder(module);
 
         // Next we will populate our initial work list by
         // recursively finding every single call site in the module.
@@ -798,7 +792,7 @@ struct FunctionParameterSpecializationContext
         //
         cloneInstDecorationsAndChildren(
             &cloneEnv,
-            builder->getSharedBuilder(),
+            builder->getModule(),
             oldFunc,
             newFunc);
 
@@ -826,6 +820,12 @@ struct FunctionParameterSpecializationContext
 
                 if (as<IRLinkageDecoration>(decoration))
                 {
+                    decoration->removeAndDeallocate();
+                }
+                else if (as<IRReadNoneDecoration>(decoration))
+                {
+                    // After specialization, the function may no longer be side effect free
+                    // because the parameter we substituted in maybe a global param. 
                     decoration->removeAndDeallocate();
                 }
             }

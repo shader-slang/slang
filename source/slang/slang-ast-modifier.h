@@ -635,6 +635,14 @@ class MaxItersAttribute : public Attribute
     int32_t value = 0;
 };
 
+// An inferred max iteration count on a loop.
+class InferredMaxItersAttribute : public Attribute
+{
+    SLANG_AST_CLASS(InferredMaxItersAttribute)
+    DeclRef<Decl> inductionVar;
+    int32_t value = 0;
+};
+
 class LoopAttribute : public Attribute 
 {
     SLANG_AST_CLASS(LoopAttribute)
@@ -1037,6 +1045,8 @@ class DifferentiableAttribute : public Attribute
 
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
     OrderedDictionary<DeclRefBase, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+
+    SLANG_UNREFLECTED ValSet m_typeRegistrationWorkingSet;
 };
 
 class DllImportAttribute : public Attribute
@@ -1073,6 +1083,14 @@ class ComInterfaceAttribute : public Attribute
 class RequiresNVAPIAttribute : public Attribute
 {
     SLANG_AST_CLASS(RequiresNVAPIAttribute)
+};
+
+
+    /// A `[__AlwaysFoldIntoUseSite]` attribute indicates that the calls into the modified
+    /// function should always be folded into use sites during source emit.
+class AlwaysFoldIntoUseSiteAttribute :public Attribute
+{
+    SLANG_AST_CLASS(AlwaysFoldIntoUseSiteAttribute)
 };
 
     /// The `[ForwardDifferentiable]` attribute indicates that a function can be forward-differentiated.
@@ -1131,6 +1149,24 @@ class BackwardDerivativeAttribute : public UserDefinedDerivativeAttribute
 class BackwardDerivativeOfAttribute : public DerivativeOfAttribute
 {
     SLANG_AST_CLASS(BackwardDerivativeOfAttribute)
+};
+
+    /// The `[PrimalSubstitute(function)]` attribute specifies a custom function that should
+    /// be used as the primal function substitute when differentiating code that calls the primal function.
+class PrimalSubstituteAttribute : public Attribute
+{
+    SLANG_AST_CLASS(PrimalSubstituteAttribute)
+    Expr* funcExpr;
+};
+
+    /// The `[PrimalSubstituteOf(primalFunction)]` attribute marks the decorated function as
+    /// the substitute primal function in a forward or backward derivative function.
+class PrimalSubstituteOfAttribute : public Attribute
+{
+    SLANG_AST_CLASS(PrimalSubstituteOfAttribute)
+
+    Expr* funcExpr;
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
     /// The `[NoDiffThis]` attribute is used to specify that the `this` parameter should not be

@@ -41,8 +41,6 @@ namespace Slang
         // Map from interface requirement keys to its corresponding dispatch method.
         OrderedDictionary<IRInst*, IRFunc*> mapInterfaceRequirementKeyToDispatchMethods;
 
-        SharedIRBuilder sharedBuilderStorage;
-
         // We will use a single work list of instructions that need
         // to be considered for lowering.
         //
@@ -111,9 +109,6 @@ namespace Slang
     template<typename TFunc>
     void workOnModule(SharedGenericsLoweringContext* sharedContext, const TFunc& func)
     {
-        SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-        sharedBuilder->init(sharedContext->module);
-
         sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
         while (sharedContext->workList.getCount() != 0)
@@ -135,9 +130,6 @@ namespace Slang
     template<typename TFunc>
     void workOnCallGraph(SharedGenericsLoweringContext* sharedContext, const TFunc& func)
     {
-        SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-        sharedBuilder->init(sharedContext->module);
-
         sharedContext->addToWorkList(sharedContext->module->getModuleInst());
         IRDeadCodeEliminationOptions dceOptions;
         dceOptions.keepExportsAlive = true;

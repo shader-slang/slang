@@ -11,8 +11,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     // Pending values to write back to inout params at the end of the current function.
     OrderedDictionary<IRInst*, InstPair> mapInOutParamToWriteBackValue;
 
-    ForwardDiffTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
-        : AutoDiffTranscriberBase(shared, inSharedBuilder, inSink)
+    ForwardDiffTranscriber(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
+        : AutoDiffTranscriberBase(shared, inSink)
     {
     }
 
@@ -34,6 +34,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     InstPair transcribeBinaryArith(IRBuilder* builder, IRInst* origArith);
 
     InstPair transcribeBinaryLogic(IRBuilder* builder, IRInst* origLogic);
+
+    InstPair transcribeSelect(IRBuilder* builder, IRInst* origSelect);
 
     InstPair transcribeLoad(IRBuilder* builder, IRLoad* origLoad);
 

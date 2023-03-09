@@ -13,15 +13,15 @@ cbuffer C_0 : register(b0)
     SLANG_ParameterGroup_C_0 C_0;
 }
 
-static const int  kArray_0[16] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+static const int kArray_0[int(16)] = { int(1), int(2), int(3), int(4), int(5), int(6), int(7), int(8), int(9), int(10), int(11), int(12), int(13), int(14), int(15), int(16) };
 
 int test_0(int val_0)
 {
     return kArray_0[val_0];
 }
 
-vector<float,4> main() : SV_TARGET
+float4 main() : SV_TARGET
 {
     int _S1 = test_0(C_0.index_0);
-    return (vector<float,4>) _S1;
+    return (float4) float(_S1);
 }

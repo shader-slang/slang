@@ -115,19 +115,12 @@ struct ResourceOutputSpecializationPass
     TargetRequest*  targetRequest;
     IRModule*       module;
 
-    SharedIRBuilder sharedBuilder;
-    SharedIRBuilder* getSharedBuilder() { return &sharedBuilder; }
-
     // Functions that requires specialization but are currently unspecializable.
     List<IRFunc*>* unspecializableFuncs;
 
     bool processModule()
     {
         bool changed = false;
-
-        // We start by setting up the shared IR building state.
-        //
-        sharedBuilder.init(module);
 
         // The main logic consists of iterating over all functions
         // (which must appear at the global level) and specializing
@@ -173,7 +166,7 @@ struct ResourceOutputSpecializationPass
         // We start the specialization process by making a clone of the
         // original function.
         //
-        IRBuilder builder(&sharedBuilder);
+        IRBuilder builder(module);
         builder.setInsertBefore(oldFunc);
         IRFunc* newFunc = builder.createFunc();
         newFunc->setFullType(oldFunc->getFullType());
@@ -181,7 +174,7 @@ struct ResourceOutputSpecializationPass
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(
             &cloneEnv,
-            &sharedBuilder,
+            module,
             oldFunc,
             newFunc);
 
@@ -256,16 +249,16 @@ struct ResourceOutputSpecializationPass
         // the aid of this pass.
         //
         List<IRCall*> calls;
-        for( auto use = oldFunc->firstUse; use; use = use->nextUse )
-        {
-            auto user = use->getUser();
-            auto call = as<IRCall>(user);
-            if(!call)
-                continue;
-            if(call->getCallee() != oldFunc)
-                continue;
-            calls.add(call);
-        }
+        traverseUses(oldFunc, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                auto call = as<IRCall>(user);
+                if (!call)
+                    return;
+                if (call->getCallee() != oldFunc)
+                    return;
+                calls.add(call);
+            });
 
         // Once we have identified the calls to `oldFunc`, we will set about replacing
         // them with calls to `newFunc`.
@@ -560,7 +553,7 @@ struct ResourceOutputSpecializationPass
 
             auto value = returnInst->getVal();
 
-            IRBuilder builder(getSharedBuilder());
+            IRBuilder builder(module);
             builder.setInsertBefore(returnInst);
 
             // Given the `value` being returned, we need to determine
@@ -750,14 +743,14 @@ struct ResourceOutputSpecializationPass
         // replacements, and we want any replacements to end up
         // at the same point in the function signature.
         //
-        IRBuilder paramsBuilder(getSharedBuilder());
+        IRBuilder paramsBuilder(module);
         paramsBuilder.setInsertBefore(param);
 
         // We also need to introduce new instructions into the function
         // body, as part of the entry block.
         //
         IRBlock* block = as<IRBlock>(param->getParent());
-        IRBuilder bodyBuilder(getSharedBuilder());
+        IRBuilder bodyBuilder(module);
         bodyBuilder.setInsertBefore(block->getFirstOrdinaryInst());
 
         // No matter what, we create a local variable that will be
@@ -833,16 +826,16 @@ struct ResourceOutputSpecializationPass
         // `out`/`inout` parameters that doesn't have as many "gotcha" cases.
         //
         List<IRStore*> stores;
-        for( auto use = param->firstUse; use; use = use->nextUse )
-        {
-            auto user = use->getUser();
-            auto store = as<IRStore>(user);
-            if(!store)
-                continue;
-            if(store->ptr.get() != param)
-                continue;
-            stores.add(store);
-        }
+        traverseUses(param, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                auto store = as<IRStore>(user);
+                if (!store)
+                    return;
+                if (store->ptr.get() != param)
+                    return;
+                stores.add(store);
+            });
 
         // Having identified the places where a value is stored to
         // the output parameter, we iterate over those values to
@@ -882,7 +875,7 @@ struct ResourceOutputSpecializationPass
         // Given an existing call, we will insert a new call right before
         // it and then remove the old one.
         //
-        IRBuilder builder(getSharedBuilder());
+        IRBuilder builder(module);
         builder.setInsertBefore(oldCall);
 
         // The new callee may have additional `out` parameters that
@@ -1194,16 +1187,16 @@ bool specializeResourceUsage(
         // Inline unspecializable resource output functions and then continue trying.
         for (auto func : unspecializableFuncs)
         {
-            for (auto use = func->firstUse; use; use = use->nextUse)
+            traverseUses(func, [&](IRUse* use)
             {
                 auto user = use->getUser();
                 auto call = as<IRCall>(user);
                 if (!call)
-                    continue;
+                    return;
                 if (call->getCallee() != func)
-                    continue;
+                    return;
                 inlineCall(call);
-            }
+            });
         }
         simplifyIR(irModule);
     }

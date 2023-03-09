@@ -11,12 +11,6 @@
 
 namespace Slang
 {
-    enum class FunctionDifferentiableLevel
-    {
-        None,
-        Forward,
-        Backward
-    };
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);
@@ -293,10 +287,11 @@ namespace Slang
 
         void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
-        List<DeclAssociation> const& getAssociatedDeclsForDecl(Decl* decl);
+        List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
 
         bool isDifferentiableFunc(FunctionDeclBase* func);
         bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
+        FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(FunctionDeclBase* func, int recurseLimit);
         FunctionDifferentiableLevel getFuncDifferentiableLevel(FunctionDeclBase* func);
         
     private:
@@ -508,7 +503,7 @@ namespace Slang
         Type* TranslateTypeNode(Expr* node);
         TypeExp TranslateTypeNodeForced(TypeExp const& typeExp);
         TypeExp TranslateTypeNode(TypeExp const& typeExp);
-
+        Type* getRemovedModifierType(ModifiedType* type, ModifierVal* modifier);
         DeclRefType* getExprDeclRefType(Expr * expr);
 
             /// Is `decl` usable as a static member?
@@ -759,9 +754,8 @@ namespace Slang
         /// Registers a type as conforming to IDifferentiable, along with a witness 
         /// describing the relationship.
         ///
-        void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
-        void maybeRegisterDifferentiableTypeRecursive(ASTBuilder* builder, Type* type, ValSet& workingSet);
-        void completeDifferentiableTypeDictionary();
+        void addDifferentiableTypeToDiffTypeRegistry(DeclRefType* type, SubtypeWitness* witness);
+        void maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type);
 
         // Construct the differential for 'type', if it exists.
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
@@ -1958,6 +1952,8 @@ namespace Slang
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
         Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
+        Expr* visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr);
+
         Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
@@ -2023,6 +2019,11 @@ namespace Slang
         void visitGpuForeachStmt(GpuForeachStmt *stmt);
 
         void visitExpressionStmt(ExpressionStmt *stmt);
+
+        // Try to infer the max number of iterations the loop will run.
+        void tryInferLoopMaxIterations(ForStmt* stmt);
+
+        void checkLoopInDifferentiableFunc(Stmt* stmt);
     };
 
     struct SemanticsDeclVisitorBase

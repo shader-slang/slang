@@ -52,7 +52,7 @@ namespace Slang
             if (auto typeInfo = generatedAnyValueTypes.TryGetValue(size))
                 return typeInfo->Ptr();
             RefPtr<AnyValueTypeInfo> info = new AnyValueTypeInfo();
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
+            IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(type);
             auto structType = builder.createStructType();
             info->type = structType;
@@ -359,7 +359,7 @@ namespace Slang
 
         IRFunc* generatePackingFunc(IRType* type, IRAnyValueType* anyValueType)
         {
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
+            IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(type);
             auto anyValInfo = ensureAnyValueType(anyValueType);
 
@@ -519,7 +519,7 @@ namespace Slang
 
         IRFunc* generateUnpackingFunc(IRType* type, IRAnyValueType* anyValueType)
         {
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
+            IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(type);
             auto anyValInfo = ensureAnyValueType(anyValueType);
 
@@ -574,7 +574,7 @@ namespace Slang
             auto func = ensureMarshallingFunc(
                 operand->getDataType(),
                 cast<IRAnyValueType>(packInst->getDataType()));
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(packInst);
             auto callInst = builder->emitCallInst(packInst->getDataType(), func.packFunc, 1, &operand);
@@ -588,7 +588,7 @@ namespace Slang
             auto func = ensureMarshallingFunc(
                 unpackInst->getDataType(),
                 cast<IRAnyValueType>(operand->getDataType()));
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(unpackInst);
             auto callInst = builder->emitCallInst(unpackInst->getDataType(), func.unpackFunc, 1, &operand);
@@ -620,9 +620,6 @@ namespace Slang
             // since we will re-use that state for any code we
             // generate along the way.
             //
-            SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->init(sharedContext->module);
-
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
             while (sharedContext->workList.getCount() != 0)
@@ -646,10 +643,6 @@ namespace Slang
                 if (auto anyValueType = as<IRAnyValueType>(inst))
                     processAnyValueType(anyValueType);
             }
-            // Because we replaced all `AnyValueType` uses, some old type definitions (e.g. PtrType(AnyValueType))
-            // will become duplicates with new types we introduced (e.g. PtrType(AnyValueStruct)), and therefore
-            // invalidates our `globalValueNumberingMap` hash map. We need to rebuild it.
-            sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
             sharedContext->mapInterfaceRequirementKeyValue.Clear();
         }
     };

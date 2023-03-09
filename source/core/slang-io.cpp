@@ -286,7 +286,23 @@ namespace Slang
             // If ioBuilder doesn't end in a delimiter, add one
             if (!isDelimiter(ioBuilder[ioBuilder.getLength() - 1]))
             {
-                ioBuilder.append(kPathDelimiter);
+                // Determine the preferred delimiter to use based on existing path.
+                char preferedDelimiter = kOSCanonicalPathDelimiter;
+                if (kOSAlternativePathDelimiter != preferedDelimiter)
+                {
+                    // If we found the existing path uses the alternative delimiter, we will
+                    // use that instead of the canonical one.
+                    constexpr Index kMaxDelimiterSearchRange = 32;
+                    for (Index i = 0; i < Math::Min(kMaxDelimiterSearchRange, ioBuilder.getLength()); i++)
+                    {
+                        if (ioBuilder[i] == kOSAlternativePathDelimiter)
+                        {
+                            preferedDelimiter = kOSAlternativePathDelimiter;
+                            break;
+                        }
+                    }
+                }
+                ioBuilder.append(preferedDelimiter);
             }
             // Check that path doesn't start with a path delimiter
             SLANG_ASSERT(!isDelimiter(path[0]));

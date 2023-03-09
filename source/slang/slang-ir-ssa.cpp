@@ -83,8 +83,7 @@ struct ConstructSSAContext
     // Information about each basic block
     Dictionary<IRBlock*, RefPtr<SSABlockInfo>> blockInfos;
 
-    // IR building state to use during the operation
-    SharedIRBuilder* sharedBuilder;
+    IRModule* module;
 
     // Instructions to remove during cleanup
     List<IRInst*> instsToRemove;
@@ -923,14 +922,15 @@ IRBlock* IREdge::getSuccessor() const
     return cast<IRBlock>(getUse()->get());
 }
 
-void SharedIRBuilder::insertBlockAlongEdge(
+void IRBuilder::insertBlockAlongEdge(
+    IRModule* module,
     IREdge const&       edge)
 {
     auto pred = edge.getPredecessor();
     auto succ = edge.getSuccessor();
     auto edgeUse = edge.getUse();
 
-    IRBuilder builder(this);
+    IRBuilder builder(module);
     builder.setInsertInto(pred);
 
     // Create a new block that will sit "along" the edge
@@ -1043,7 +1043,7 @@ static void breakCriticalEdges(
 
     for (auto edge : criticalEdges)
     {
-        context->sharedBuilder->insertBlockAlongEdge(edge);
+        IRBuilder::insertBlockAlongEdge(context->module, edge);
     }
 }
 
@@ -1073,7 +1073,7 @@ bool constructSSA(ConstructSSAContext* context)
         auto blockInfo = new SSABlockInfo();
         blockInfo->block = bb;
 
-        blockInfo->builder.init(context->sharedBuilder);
+        blockInfo->builder = IRBuilder(context->module);
         blockInfo->builder.setInsertBefore(bb->getLastInst());
 
         context->blockInfos.Add(bb, blockInfo);
@@ -1199,34 +1199,16 @@ bool constructSSA(ConstructSSAContext* context)
     return true;
 }
 
-// Construct SSA form for a global value with code
+// Construct SSA form for a global value with code and reuse 
+// an existing sharedBuilder
+//
 bool constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
 {
     ConstructSSAContext context;
     context.globalVal = globalVal;
-
-    SharedIRBuilder sharedBuilder(module);
-    context.sharedBuilder = &sharedBuilder;
-
-    context.builder.init(context.sharedBuilder);
+    context.module = module;
+    context.builder = IRBuilder(module);
     context.builder.setInsertInto(module);
-
-    return constructSSA(&context);
-}
-
-// Construct SSA form for a global value with code and reuse 
-// an existing sharedBuilder
-//
-bool constructSSA(SharedIRBuilder* sharedBuilder, IRGlobalValueWithCode* globalVal)
-{
-    ConstructSSAContext context;
-    context.globalVal = globalVal;
-    
-    context.sharedBuilder = sharedBuilder;
-
-    context.builder.init(sharedBuilder);
-    context.builder.setInsertInto(sharedBuilder->getModule());
-
     return constructSSA(&context);
 }
 

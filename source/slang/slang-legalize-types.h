@@ -603,7 +603,6 @@ struct IRTypeLegalizationContext
     IRModule*   module;
     IRBuilder*  builder;
 
-    SharedIRBuilder sharedBuilderStorage;
     IRBuilder builderStorage;
 
     IRTypeLegalizationContext(

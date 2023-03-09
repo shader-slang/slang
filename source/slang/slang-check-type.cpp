@@ -84,6 +84,15 @@ namespace Slang
         return TranslateTypeNodeForced(typeExp);
     }
 
+    Type* SemanticsVisitor::getRemovedModifierType(ModifiedType* modifiedType, ModifierVal* modifier)
+    {
+        if (modifiedType->modifiers.getCount() == 1)
+            return modifiedType->base;
+        auto newModifiers = modifiedType->modifiers;
+        newModifiers.remove(modifier);
+        return m_astBuilder->getModifiedType(modifiedType->base, newModifiers);
+    }
+
     Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
     {
         if (auto overloadedExpr = as<OverloadedExpr>(expr))

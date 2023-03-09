@@ -4,6 +4,7 @@
 namespace Slang
 {
     struct IRModule;
+    class TargetRequest;
 
-    void simplifyForEmit(IRModule* inModule);
+    void simplifyForEmit(IRModule* inModule, TargetRequest* req);
 }

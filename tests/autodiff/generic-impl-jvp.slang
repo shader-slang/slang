@@ -24,6 +24,7 @@ struct myvector : IDifferentiable
     
     __init(T c)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
             values[i] = c;
@@ -46,7 +47,7 @@ struct myvector : IDifferentiable
     static Differential dmul(This a, Differential b)
     {
         Differential output;
-        
+
         for (int i = 0; i < N; i++)
         {
             output.values[i] = T.dmul(a.values[i], b.values[i]);
@@ -73,6 +74,7 @@ __generic<T : IDFloat, let N : int>
 myvector<T, N> operator +(myvector<T, N> a, myvector<T, N> b)
 {
     myvector<T, N> output;
+    [ForceUnroll]
     for (int i = 0; i < N; i++)
     {
         output.values[i] = a.values[i] + b.values[i];
@@ -85,6 +87,7 @@ __generic<T : IDFloat, let N : int>
 myvector<T, N> operator *(myvector<T, N> a, myvector<T, N> b)
 {
     myvector<T, N> output;
+    [ForceUnroll]
     for (int i = 0; i < N; i++)
     {
         output.values[i] = a.values[i] * b.values[i];
@@ -97,6 +100,7 @@ __generic<T : IDFloat, let N : int>
 myvector<T, N> operator *(T a, myvector<T, N> b)
 {
     myvector<T, N> output;
+    [ForceUnroll]
     for (int i = 0; i < N; i++)
     {
         output.values[i] = a * b.values[i];
@@ -109,6 +113,7 @@ __generic<T : IDFloat, let N : int>
 T dot(myvector<T, N> a, myvector<T, N> b)
 {
     T curr = (T)0.0;
+    [ForceUnroll]
     for (int i = 0; i < N; i++)
     {
         curr = curr + (a.values[i] * b.values[i]);
@@ -125,6 +130,7 @@ DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
 {
     T.Differential curr_d = (T.dzero());
     T curr_p = (T)0.0;
+    [ForceUnroll]
     for (int i = 0; i < N; i++)
     {
         curr_p = curr_p + (a.p.values[i] * b.p.values[i]);
@@ -145,6 +151,7 @@ struct lineardvector : IDifferentiable
 
     __init(vector<Real.Differential, N> a)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
             val.values[i] = a[i];
@@ -204,6 +211,7 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
     [ForwardDifferentiable]
     __init(vector<Real, N> a)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
             val.values[i] = a[i];

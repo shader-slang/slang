@@ -29,7 +29,7 @@ namespace Slang
             if (as<IRType>(inst))
                 return;
 
-            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
+            IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
            
@@ -55,13 +55,6 @@ namespace Slang
 
         void processModule()
         {
-            // We start by initializing our shared IR building state,
-            // since we will re-use that state for any code we
-            // generate along the way.
-            //
-            SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->init(sharedContext->module);
-
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
             while (sharedContext->workList.getCount() != 0)
@@ -78,7 +71,6 @@ namespace Slang
                     sharedContext->addToWorkList(child);
                 }
             }
-            sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
             sharedContext->mapInterfaceRequirementKeyValue.Clear();
         }
     };

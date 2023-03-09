@@ -43,7 +43,10 @@ namespace Slang
             case kIROp_PreciseDecoration: 
             case kIROp_PublicDecoration: 
             case kIROp_HLSLExportDecoration: 
-            case kIROp_ReadNoneDecoration: 
+            case kIROp_ReadNoneDecoration:
+            case kIROp_NoSideEffectDecoration:
+            case kIROp_ForwardDifferentiableDecoration:
+            case kIROp_BackwardDifferentiableDecoration:
             case kIROp_RequiresNVAPIDecoration: 
             case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
             case kIROp_TriangleInputPrimitiveTypeDecoration:
@@ -148,7 +151,6 @@ namespace Slang
     void IRUse::init(IRInst* u, IRInst* v)
     {
         clear();
-
         user = u;
         usedValue = v;
         if(v)
@@ -170,6 +172,9 @@ namespace Slang
 
     void IRUse::set(IRInst* uv)
     {
+        // Normally we should never be modifying the operand of an hoistable inst.
+        // They can be modified by `replaceUsesWith`, or to be replaced by a new inst.
+        SLANG_ASSERT(!getIROpInfo(user->getOp()).isHoistable() || uv == usedValue);
         init(user, uv);
     }
 
@@ -693,6 +698,21 @@ namespace Slang
         }
     }
 
+    void IRUnconditionalBranch::removeArgument(UInt index)
+    {
+        switch (getOp())
+        {
+        case kIROp_unconditionalBranch:
+            removeOperand(1 + index);
+            break;
+        case kIROp_loop:
+            removeOperand(3 + index);
+            break;
+        default:
+            SLANG_UNEXPECTED("unhandled unconditional branch opcode");
+        }
+    }
+
     IRInst* IRUnconditionalBranch::getArg(UInt index)
     {
         return getArgs()[index].usedValue;
@@ -748,8 +768,7 @@ namespace Slang
         auto irModule = func->getModule();
         SLANG_ASSERT(irModule);
 
-        SharedIRBuilder sharedBuilder(irModule);
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(irModule);
         builder.setInsertBefore(func);
 
         List<IRType*> paramTypes;
@@ -1196,11 +1215,57 @@ namespace Slang
         return as<IRGlobalValueWithCode>(pp);
     }
 
+    void addHoistableInst(
+        IRBuilder* builder,
+        IRInst* inst);
+
     // Add an instruction into the current scope
     void IRBuilder::addInst(
         IRInst*     inst)
     {
-        inst->insertAt(m_insertLoc);
+        if (getIROpInfo(inst->getOp()).isGlobal())
+        {
+            addHoistableInst(this, inst);
+            return;
+        }
+
+        if (!inst->parent)
+            inst->insertAt(m_insertLoc);
+    }
+
+    IRInst* IRBuilder::replaceOperand(IRUse* use, IRInst* newValue)
+    {
+        auto user = use->getUser();
+        if (user->getModule())
+        {
+            user->getModule()->getDeduplicationContext()->getInstReplacementMap().TryGetValue(newValue, newValue);
+        }
+
+        if (!getIROpInfo(user->getOp()).isHoistable())
+        {
+            use->set(newValue);
+            return user;
+        }
+        
+        // If user is hoistable, we need to remove it from the global number map first,
+        // perform the update, then try to reinsert it back to the global number map.
+        // If we find an equivalent entry already exists in the global number map,
+        // we return the existing entry.
+        auto builder = user->getModule()->getDeduplicationContext();
+        builder->_removeGlobalNumberingEntry(user);
+        use->init(user, newValue);
+
+        IRInst* existingVal = nullptr;
+        if (builder->getGlobalValueNumberingMap().TryGetValue(IRInstKey{ user }, existingVal))
+        {
+            user->replaceUsesWith(existingVal);
+            return existingVal;
+        }
+        else
+        {
+            builder->_addGlobalNumberingEntry(user);
+            return user;
+        }
     }
 
     // Given two parent instructions, pick the better one to use as as
@@ -1645,6 +1710,13 @@ namespace Slang
         Int const*              listArgCounts,
         IRInst* const* const*   listArgs)
     {
+        m_dedupContext->getInstReplacementMap().TryGetValue((IRInst*)(type), *(IRInst**)&type);
+
+        if (getIROpInfo(op).flags & kIROpFlag_Hoistable)
+        {
+            return _findOrEmitHoistableInst(type, op, fixedArgCount, fixedArgs, varArgListCount, listArgCounts, listArgs);
+        }
+
         Int varArgCount = 0;
         for (Int ii = 0; ii < varArgListCount; ++ii)
         {
@@ -1671,7 +1743,9 @@ namespace Slang
         {
             if (fixedArgs)
             {
-                operand->init(inst, fixedArgs[aa]);
+                auto arg = fixedArgs[aa];
+                m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
+                operand->init(inst, arg);
             }
             else
             {
@@ -1687,7 +1761,9 @@ namespace Slang
             {
                 if (listArgs[ii])
                 {
-                    operand->init(inst, listArgs[ii][jj]);
+                    auto arg = listArgs[ii][jj];
+                    m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
+                    operand->init(inst, arg);
                 }
                 else
                 {
@@ -2081,7 +2157,7 @@ namespace Slang
         key.inst = &keyInst;
 
         IRConstant* irValue = nullptr;
-        if( getSharedBuilder()->getConstantMap().TryGetValue(key, irValue) )
+        if (m_dedupContext->getConstantMap().TryGetValue(key, irValue))
         {
             // We found a match, so just use that.
             return irValue;
@@ -2148,7 +2224,7 @@ namespace Slang
         }
 
         key.inst = irValue;
-        getSharedBuilder()->getConstantMap().Add(key, irValue);
+        m_dedupContext->getConstantMap().Add(key, irValue);
 
         addHoistableInst(this, irValue);
 
@@ -2309,21 +2385,23 @@ namespace Slang
             args.add(getIntValue(capabilityAtomType, Int(atom)));
         }
 
-        return findOrEmitHoistableInst(
+        return createIntrinsicInst(
             capabilitySetType, kIROp_CapabilitySet, args.getCount(), args.getBuffer());
     }
 
-    IRInst* IRBuilder::findOrEmitHoistableInst(
-        IRType*                 type,
-        IROp                    op,
-        UInt                    operandListCount,
-        UInt const*             listOperandCounts,
-        IRInst* const* const*   listOperands)
+    IRInst* IRBuilder::_findOrEmitHoistableInst(
+        IRType* type,
+        IROp op,
+        Int fixedArgCount,
+        IRInst* const* fixedArgs,
+        Int varArgListCount,
+        Int const* listArgCounts,
+        IRInst* const* const* listArgs)
     {
-        UInt operandCount = 0;
-        for (UInt ii = 0; ii < operandListCount; ++ii)
+        UInt operandCount = fixedArgCount;
+        for (Int ii = 0; ii < varArgListCount; ++ii)
         {
-            operandCount += listOperandCounts[ii];
+            operandCount += listArgCounts[ii];
         }
 
         auto& memoryArena = getModule()->getMemoryArena();
@@ -2350,12 +2428,21 @@ namespace Slang
         // Don't link up as we may free (if we already have this key)
         {
             IRUse* operand = inst->getOperands();
-            for (UInt ii = 0; ii < operandListCount; ++ii)
+            for (Int ii = 0; ii < fixedArgCount; ++ii)
             {
-                UInt listOperandCount = listOperandCounts[ii];
+                auto arg = fixedArgs[ii];
+                m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
+                operand->usedValue = arg;
+                operand++;
+            }
+            for (Int ii = 0; ii < varArgListCount; ++ii)
+            {
+                UInt listOperandCount = listArgCounts[ii];
                 for (UInt jj = 0; jj < listOperandCount; ++jj)
                 {
-                    operand->usedValue = listOperands[ii][jj];
+                    auto arg = listArgs[ii][jj];
+                    m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
+                    operand->usedValue = arg;
                     operand++;
                 }
             }
@@ -2366,7 +2453,7 @@ namespace Slang
             IRInstKey key = { inst };
 
             // Ideally we would add if not found, else return if was found instead of testing & then adding.
-            IRInst** found = getSharedBuilder()->getGlobalValueNumberingMap().TryGetValueOrAdd(key, inst);
+            IRInst** found = m_dedupContext->getGlobalValueNumberingMap().TryGetValueOrAdd(key, inst);
             SLANG_ASSERT(endCursor == memoryArena.getCursor());
             // If it's found, just return, and throw away the instruction
             if (found)
@@ -2403,135 +2490,12 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::findOrAddInst(
-        IRType*                 type,
-        IROp                    op,
-        UInt                    operandListCount,
-        UInt const*             listOperandCounts,
-        IRInst* const* const*   listOperands)
-    {
-        UInt operandCount = 0;
-        for (UInt ii = 0; ii < operandListCount; ++ii)
-        {
-            operandCount += listOperandCounts[ii];
-        }
-
-        auto& memoryArena = getModule()->getMemoryArena();
-        void* cursor = memoryArena.getCursor();
-
-        // We are going to create a 'dummy' instruction on the memoryArena
-        // which can be used as a key for lookup, so see if we
-        // already have an equivalent instruction available to use.
-        size_t keySize = sizeof(IRInst) + operandCount * sizeof(IRUse);
-        IRInst* inst = (IRInst*)memoryArena.allocateAndZero(keySize);
-
-        void* endCursor = memoryArena.getCursor();
-        // Mark as 'unused' cos it is unused on release builds. 
-        SLANG_UNUSED(endCursor);
-
-        new(inst) IRInst();
-#if SLANG_ENABLE_IR_BREAK_ALLOC
-        inst->_debugUID = _debugGetAndIncreaseInstCounter();
-#endif
-        inst->m_op = op;
-        inst->typeUse.usedValue = type;
-        inst->operandCount = (uint32_t)operandCount;
-
-        // Don't link up as we may free (if we already have this key)
-        {
-            IRUse* operand = inst->getOperands();
-            for (UInt ii = 0; ii < operandListCount; ++ii)
-            {
-                UInt listOperandCount = listOperandCounts[ii];
-                for (UInt jj = 0; jj < listOperandCount; ++jj)
-                {
-                    operand->usedValue = listOperands[ii][jj];
-                    operand++;
-                }
-            }
-        }
-
-        // Find or add the key/inst
-        {
-            IRInstKey key = { inst };
-
-            // Ideally we would add if not found, else return if was found instead of testing & then adding.
-            IRInst** found = getSharedBuilder()->getGlobalValueNumberingMap().TryGetValueOrAdd(key, inst);
-            SLANG_ASSERT(endCursor == memoryArena.getCursor());
-            // If it's found, just return, and throw away the instruction
-            if (found)
-            {
-                memoryArena.rewindToCursor(cursor);
-                return *found;
-            }
-        }
-
-        // Make the lookup 'inst' instruction into 'proper' instruction. Equivalent to
-        // IRInst* inst = createInstImpl<IRInst>(builder, op, type, 0, nullptr, operandListCount, listOperandCounts, listOperands);
-        {
-            if (type)
-            {
-                inst->typeUse.usedValue = nullptr;
-                inst->typeUse.init(inst, type);
-            }
-
-            _maybeSetSourceLoc(inst);
-
-            IRUse*const operands = inst->getOperands();
-            for (UInt i = 0; i < operandCount; ++i)
-            {
-                IRUse& operand = operands[i];
-                auto value = operand.usedValue;
-
-                operand.usedValue = nullptr;
-                operand.init(inst, value);
-            }
-        }
-
-        addInst(inst);
-        return inst;
-    }
-
-
-    IRInst* IRBuilder::findOrEmitHoistableInst(
-        IRType*         type,
-        IROp            op,
-        UInt            operandCount,
-        IRInst* const*  operands)
-    {
-        return findOrEmitHoistableInst(
-            type,
-            op,
-            1,
-            &operandCount,
-            &operands);
-    }
-
-    IRInst* IRBuilder::findOrEmitHoistableInst(
-        IRType*         type,
-        IROp            op,
-        IRInst*         operand,
-        UInt            operandCount,
-        IRInst* const*  operands)
-    {
-        UInt counts[] = { 1, operandCount };
-        IRInst* const* lists[] = { &operand, operands };
-
-        return findOrEmitHoistableInst(
-            type,
-            op,
-            2,
-            counts,
-            lists);
-    }
-
-
     IRType* IRBuilder::getType(
         IROp            op,
         UInt            operandCount,
         IRInst* const*  operands)
     {
-        return (IRType*) findOrEmitHoistableInst(
+        return (IRType*)createIntrinsicInst(
             nullptr,
             op,
             operandCount,
@@ -2831,7 +2795,7 @@ namespace Slang
         IRType* const*  paramTypes,
         IRType*         resultType)
     {
-        return (IRFuncType*) findOrEmitHoistableInst(
+        return (IRFuncType*)createIntrinsicInst(
             nullptr,
             kIROp_FuncType,
             resultType,
@@ -2844,13 +2808,13 @@ namespace Slang
     {
         UInt counts[3] = {1, paramCount, 1};
         IRInst** lists[3] = {(IRInst**)&resultType, (IRInst**)paramTypes, (IRInst**)&attribute};
-        return (IRFuncType*)findOrEmitHoistableInst(nullptr, kIROp_FuncType, 3, counts, lists);
+        return (IRFuncType*)createIntrinsicInst(nullptr, kIROp_FuncType, 3, counts, lists);
     }
 
     IRWitnessTableType* IRBuilder::getWitnessTableType(
         IRType* baseType)
     {
-        return (IRWitnessTableType*)findOrEmitHoistableInst(
+        return (IRWitnessTableType*)createIntrinsicInst(
             nullptr,
             kIROp_WitnessTableType,
             1,
@@ -2860,7 +2824,7 @@ namespace Slang
     IRWitnessTableIDType* IRBuilder::getWitnessTableIDType(
         IRType* baseType)
     {
-        return (IRWitnessTableIDType*)findOrEmitHoistableInst(
+        return (IRWitnessTableIDType*)createIntrinsicInst(
             nullptr,
             kIROp_WitnessTableIDType,
             1,
@@ -2914,7 +2878,7 @@ namespace Slang
         UInt            caseCount,
         IRType* const*  caseTypes)
     {
-        return (IRType*) findOrEmitHoistableInst(
+        return (IRType*)createIntrinsicInst(
             getTypeKind(),
             kIROp_TaggedUnionType,
             caseCount,
@@ -2947,7 +2911,7 @@ namespace Slang
             }
         }
 
-        return (IRType*) findOrEmitHoistableInst(
+        return (IRType*)createIntrinsicInst(
             getTypeKind(),
             kIROp_BindExistentialsType,
             baseType,
@@ -3142,6 +3106,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitPrimalSubstituteInst(IRType* type, IRInst* baseFn)
+    {
+        auto inst = createInst<IRPrimalSubstitute>(
+            this,
+            kIROp_PrimalSubstitute,
+            type,
+            baseFn);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn)
     {
         auto inst = createInst<IRBackwardDifferentiate>(
@@ -3197,7 +3172,7 @@ namespace Slang
 
         if (as<IRWitnessTable>(innerReturnVal))
         {
-            return findOrEmitHoistableInst(
+            return createIntrinsicInst(
                 type,
                 kIROp_Specialize,
                 genericVal,
@@ -3214,7 +3189,8 @@ namespace Slang
             argCount,
             args);
 
-        addInst(inst);
+        if (!inst->parent)
+            addInst(inst);
         return inst;
     }
 
@@ -3233,7 +3209,7 @@ namespace Slang
 
         IRInst* args[] = {witnessTableVal, interfaceMethodVal};
 
-        return findOrEmitHoistableInst(
+        return createIntrinsicInst(
             type,
             kIROp_LookupWitness,
             2,
@@ -3331,6 +3307,17 @@ namespace Slang
             args);
     }
 
+    IRInst* IRBuilder::createIntrinsicInst(
+        IRType* type, IROp op, IRInst* operand, UInt operandCount, IRInst* const* operands)
+    {
+        return createInstWithTrailingArgs<IRInst>(this, op, type, operand, operandCount, operands);
+    }
+
+    IRInst* IRBuilder::createIntrinsicInst(IRType* type, IROp op, UInt operandListCount, UInt const* listOperandCounts, IRInst* const* const* listOperands)
+    {
+        return createInstImpl<IRInst>(this, op, type, 0, nullptr, (Int)operandListCount, (Int const* )listOperandCounts, listOperands);
+    }
+
 
     IRInst* IRBuilder::emitIntrinsicInst(
         IRType*         type,
@@ -3343,7 +3330,8 @@ namespace Slang
             op,
             argCount,
             args);
-        addInst(inst);
+        if (!inst->parent)
+            addInst(inst);
         return inst;
     }
 
@@ -3772,6 +3760,13 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeMatrix, argCount, args);
     }
 
+    IRInst* IRBuilder::emitMakeMatrixFromScalar(
+        IRType* type,
+        IRInst* scalarValue)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeMatrixFromScalar, 1, &scalarValue);
+    }
+
     IRInst* IRBuilder::emitMakeArray(
         IRType*         type,
         UInt            argCount,
@@ -3938,7 +3933,7 @@ namespace Slang
             value->insertAtEnd(parent);
         }
     }
-    
+
     IRInst* IRBuilder::addDifferentiableTypeDictionaryDecoration(IRInst* target)
     {
         return addDecoration(target, kIROp_DifferentiableTypeDictionaryDecoration);
@@ -5056,7 +5051,7 @@ namespace Slang
             this,
             kIROp_GlobalConstant,
             type);
-        addInst(inst);
+        addGlobalValue(this, inst);
         return inst;
     }
 
@@ -5069,7 +5064,7 @@ namespace Slang
             kIROp_GlobalConstant,
             type,
             val);
-        addInst(inst);
+        addGlobalValue(this, inst);
         return inst;
     }
 
@@ -5137,6 +5132,17 @@ namespace Slang
         auto inst = createInst<IRInst>(
             this,
             kIROp_Neg,
+            type,
+            value);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitNot(IRType* type, IRInst* value)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Not,
             type,
             value);
         addInst(inst);
@@ -5349,7 +5355,7 @@ namespace Slang
 
         IRInst* operands[] = { kindInst, sizeInst };
 
-        return cast<IRTypeSizeAttr>(findOrEmitHoistableInst(
+        return cast<IRTypeSizeAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_TypeSizeAttr,
             SLANG_COUNT_OF(operands),
@@ -5376,7 +5382,7 @@ namespace Slang
             operands[operandCount++] = spaceInst;
         }
 
-        return cast<IRVarOffsetAttr>(findOrEmitHoistableInst(
+        return cast<IRVarOffsetAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_VarOffsetAttr,
             operandCount,
@@ -5388,7 +5394,7 @@ namespace Slang
     {
         IRInst* operands[] = { pendingLayout };
 
-        return cast<IRPendingLayoutAttr>(findOrEmitHoistableInst(
+        return cast<IRPendingLayoutAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_PendingLayoutAttr,
             SLANG_COUNT_OF(operands),
@@ -5401,7 +5407,7 @@ namespace Slang
     {
         IRInst* operands[] = { key, layout };
 
-        return cast<IRStructFieldLayoutAttr>(findOrEmitHoistableInst(
+        return cast<IRStructFieldLayoutAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_StructFieldLayoutAttr,
             SLANG_COUNT_OF(operands),
@@ -5413,7 +5419,7 @@ namespace Slang
     {
         IRInst* operands[] = { layout };
 
-        return cast<IRCaseTypeLayoutAttr>(findOrEmitHoistableInst(
+        return cast<IRCaseTypeLayoutAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_CaseTypeLayoutAttr,
             SLANG_COUNT_OF(operands),
@@ -5430,7 +5436,7 @@ namespace Slang
 
         IRInst* operands[] = { nameInst, indexInst };
 
-        return cast<IRSemanticAttr>(findOrEmitHoistableInst(
+        return cast<IRSemanticAttr>(createIntrinsicInst(
             getVoidType(),
             op,
             SLANG_COUNT_OF(operands),
@@ -5441,7 +5447,7 @@ namespace Slang
     {
         auto stageInst = getIntValue(getIntType(), IRIntegerValue(stage));
         IRInst* operands[] = { stageInst };
-        return cast<IRStageAttr>(findOrEmitHoistableInst(
+        return cast<IRStageAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_StageAttr,
             SLANG_COUNT_OF(operands),
@@ -5450,7 +5456,7 @@ namespace Slang
 
     IRAttr* IRBuilder::getAttr(IROp op, UInt operandCount, IRInst* const* operands)
     {
-        return cast<IRAttr>(findOrEmitHoistableInst(
+        return cast<IRAttr>(createIntrinsicInst(
             getVoidType(),
             op,
             operandCount,
@@ -5461,7 +5467,7 @@ namespace Slang
 
     IRTypeLayout* IRBuilder::getTypeLayout(IROp op, List<IRInst*> const& operands)
     {
-        return cast<IRTypeLayout>(findOrEmitHoistableInst(
+        return cast<IRTypeLayout>(createIntrinsicInst(
             getVoidType(),
             op,
             operands.getCount(),
@@ -5470,7 +5476,7 @@ namespace Slang
 
     IRVarLayout* IRBuilder::getVarLayout(List<IRInst*> const& operands)
     {
-        return cast<IRVarLayout>(findOrEmitHoistableInst(
+        return cast<IRVarLayout>(createIntrinsicInst(
             getVoidType(),
             kIROp_VarLayout,
             operands.getCount(),
@@ -5483,7 +5489,7 @@ namespace Slang
     {
         IRInst* operands[] = { paramsLayout, resultLayout };
 
-        return cast<IREntryPointLayout>(findOrEmitHoistableInst(
+        return cast<IREntryPointLayout>(createIntrinsicInst(
             getVoidType(),
             kIROp_EntryPointLayout,
             SLANG_COUNT_OF(operands),
@@ -5696,9 +5702,9 @@ namespace Slang
 #if SLANG_ENABLE_IR_BREAK_ALLOC
         if (context->options.flags & IRDumpOptions::Flag::DumpDebugIds)
         {
-            dump(context, "[#");
+            dump(context, "{");
             dump(context, String(inst->_debugUID));
-            dump(context, "]");
+            dump(context, "}\t");
         }
 #else
         SLANG_UNUSED(context);
@@ -5725,7 +5731,6 @@ namespace Slang
         {
             dump(context, "_");
         }
-        dumpDebugID(context, inst);
     }
     
     static void dumpEncodeString(
@@ -5853,6 +5858,7 @@ namespace Slang
         IRBlock*        block)
     {
         context->indent--;
+        dumpDebugID(context, block);
         dump(context, "block ");
         dumpID(context, block);
 
@@ -6084,7 +6090,6 @@ namespace Slang
         }
 
         dump(context, opInfo.name);
-        dumpDebugID(context, inst);
         dumpInstOperandList(context, inst);
     }
 
@@ -6101,6 +6106,8 @@ namespace Slang
         auto op = inst->getOp();
 
         dumpIRDecorations(context, inst);
+
+        dumpDebugID(context, inst);
 
         // There are several ops we want to special-case here,
         // so that they will be more pleasant to look at.
@@ -6238,7 +6245,10 @@ namespace Slang
         context.options = options;
         context.sourceManager = sourceManager;
 
-        dumpInst(&context, globalVal);
+        if (globalVal->getOp() == kIROp_Module)
+            dumpIRModule(&context, globalVal->getModule());
+        else
+            dumpInst(&context, globalVal);
 
         writer->write(sb.getBuffer(), sb.getLength());
         writer->flush();
@@ -6528,70 +6538,146 @@ namespace Slang
 
     void validateIRInstOperands(IRInst*);
 
+    static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
+    {
+        IRDeduplicationContext* dedupContext = nullptr;
+
+        struct WorkItem
+        {
+            IRInst* thisInst;
+            IRInst* otherInst;
+        };
+
+        // A work list of hoistable users for which we need
+        // to deduplicate/update their entry in the global numbering map.
+        List<WorkItem> workList;
+        HashSet<IRInst*> workListSet;
+
+        auto addToWorkList = [&](IRInst* src, IRInst* target)
+        {
+            if (workListSet.Add(src))
+            {
+                WorkItem item;
+                item.thisInst = src;
+                item.otherInst = target;
+                workList.add(item);
+            }
+        };
+
+        addToWorkList(thisInst, other);
+
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            auto workItem = workList[i];
+            thisInst = workItem.thisInst;
+            other = workItem.otherInst;
+
+            // Safety check: don't try to replace something with itself.
+            if (other == thisInst)
+                continue;
+
+            if (getIROpInfo(thisInst->getOp()).isHoistable())
+            {
+                if (!dedupContext)
+                {
+                    SLANG_ASSERT(thisInst->getModule());
+                    dedupContext = thisInst->getModule()->getDeduplicationContext();
+                }
+                dedupContext->getInstReplacementMap()[thisInst] = other;
+            }
+
+            // We will walk through the list of uses for the current
+            // instruction, and make them point to the other inst.
+            IRUse* ff = thisInst->firstUse;
+
+            // No uses? Nothing to do.
+            if (!ff)
+                continue;
+
+            //ff->debugValidate();
+
+            IRUse* uu = ff;
+            for (;;)
+            {
+                // The uses had better all be uses of this
+                // instruction, or invariants are broken.
+                SLANG_ASSERT(uu->get() == thisInst);
+
+                auto user = uu->getUser();
+                bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable();
+                if (userIsHoistable)
+                {
+                    if (!dedupContext)
+                    {
+                        SLANG_ASSERT(user->getModule());
+                        dedupContext = user->getModule()->getDeduplicationContext();
+                    }
+                    dedupContext->_removeGlobalNumberingEntry(user);
+                }
+                
+                // Swap this use over to use the other value.
+                uu->usedValue = other;
+
+                if (userIsHoistable)
+                {
+                    // Is the updated inst already exists in the global numbering map?
+                    // If so, we need to continue work on replacing the updated inst with the existing value.
+                    IRInst* existingVal = nullptr;
+                    if (dedupContext->getGlobalValueNumberingMap().TryGetValue(IRInstKey{ user }, existingVal))
+                    {
+                        addToWorkList(user, existingVal);
+                    }
+                    else
+                    {
+                        dedupContext->_addGlobalNumberingEntry(user);
+                    }
+                }
+
+                // Try to move to the next use, but bail
+                // out if we are at the last one.
+                IRUse* nn = uu->nextUse;
+                if (!nn)
+                    break;
+
+                uu = nn;
+            }
+
+            // We are at the last use (and there must
+            // be at least one, because we handled
+            // the case of an empty list earlier).
+            SLANG_ASSERT(uu);
+
+            // Our job at this point is to splice
+            // our list of uses onto the other
+            // value's uses.
+            //
+            // If the value already had uses, then
+            // we need to patch our new list onto
+            // the front.
+            if (auto nn = other->firstUse)
+            {
+                uu->nextUse = nn;
+                nn->prevLink = &uu->nextUse;
+            }
+
+            // No matter what, our list of
+            // uses will become the start
+            // of the list of uses for
+            // `other`
+            other->firstUse = ff;
+            ff->prevLink = &other->firstUse;
+
+            // And `this` will have no uses any more.
+            thisInst->firstUse = nullptr;
+
+            ff->debugValidate();
+        }
+
+    }
+
     void IRInst::replaceUsesWith(IRInst* other)
     {
-        // Safety check: don't try to replace something with itself.
-        if(other == this)
-            return;
-
-        // We will walk through the list of uses for the current
-        // instruction, and make them point to the other inst.
-        IRUse* ff = firstUse;
-
-        // No uses? Nothing to do.
-        if(!ff)
-            return;
-
-        ff->debugValidate();
-
-        IRUse* uu = ff;
-        for(;;)
-        {
-            // The uses had better all be uses of this
-            // instruction, or invariants are broken.
-            SLANG_ASSERT(uu->get() == this);
-
-            // Swap this use over to use the other value.
-            uu->usedValue = other;
-
-            // Try to move to the next use, but bail
-            // out if we are at the last one.
-            IRUse* nn = uu->nextUse;
-            if( !nn )
-                break;
-
-            uu = nn;
-        }
-
-        // We are at the last use (and there must
-        // be at least one, because we handled
-        // the case of an empty list earlier).
-        SLANG_ASSERT(uu);
-
-        // Our job at this point is to splice
-        // our list of uses onto the other
-        // value's uses.
-        //
-        // If the value already had uses, then
-        // we need to patch our new list onto
-        // the front.
-        if( auto nn = other->firstUse )
-        {
-            uu->nextUse = nn;
-            nn->prevLink = &uu->nextUse;
-        }
-
-        // No matter what, our list of
-        // uses will become the start
-        // of the list of uses for
-        // `other`
-        other->firstUse = ff;
-        ff->prevLink = &other->firstUse;
-
-        // And `this` will have no uses any more.
-        this->firstUse = nullptr;
-
-        ff->debugValidate();
+        _replaceInstUsesWith(this, other);
     }
 
     // Insert this instruction into the same basic block
@@ -6746,13 +6832,36 @@ namespace Slang
         }
     }
 
+    void IRInst::removeOperand(Index index)
+    {
+        for (Index i = index; i < (Index)operandCount - 1; i++)
+        {
+            getOperands()[i].set(getOperand(i + 1));
+        }
+        getOperands()[operandCount - 1].clear();
+        operandCount--;
+        return;
+    }
+
     // Remove this instruction from its parent block,
     // and then destroy it (it had better have no uses!)
     void IRInst::removeAndDeallocate()
     {
-        removeFromParent();
+        if (auto module = getModule())
+        {
+            if (getIROpInfo(getOp()).isHoistable())
+            {
+                module->getDeduplicationContext()->removeHoistableInstFromGlobalNumberingMap(this);
+            }
+            else if (auto constInst = as<IRConstant>(this))
+            {
+                module->getDeduplicationContext()->getConstantMap().Remove(IRConstantKey{ constInst });
+            }
+            module->getDeduplicationContext()->getInstReplacementMap().Remove(this);
+        }
         removeArguments();
         removeAndDeallocateAllDecorationsAndChildren();
+        removeFromParent();
 
         // Run destructor to be sure...
         this->~IRInst();
@@ -6821,6 +6930,8 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
+                // If the call has been marked as no-side-effect, we
+                // will treat it so, by-passing all other checks.
                 if (call->findDecoration<IRNoSideEffectDecoration>())
                     return false;
                 return !isPureFunctionalCall(call);
@@ -6836,6 +6947,7 @@ namespace Slang
         case kIROp_Func:
         case kIROp_Generic:
         case kIROp_Var:
+        case kIROp_Param:
         case kIROp_GlobalVar: // Note: the IRGlobalVar represents the *address*, so only a load/store would have side effects
         case kIROp_GlobalConstant:
         case kIROp_GlobalParam:
@@ -6919,7 +7031,6 @@ namespace Slang
         case kIROp_Not:
         case kIROp_BitNot:
         case kIROp_Select:
-        case kIROp_Dot:
         case kIROp_MakeExistential:
         case kIROp_ExtractExistentialType:
         case kIROp_ExtractExistentialValue:
@@ -6944,12 +7055,7 @@ namespace Slang
         case kIROp_BackwardDifferentiate:
         case kIROp_BackwardDifferentiatePrimal:
         case kIROp_BackwardDifferentiatePropagate:
-            return false;
-        }
-
-        // Check if the calle has been marked with a catch-all no-side-effect decoration.
-        if (findDecoration<IRNoSideEffectDecoration>())
-        {
+        case kIROp_DetachDerivative:
             return false;
         }
         return true;

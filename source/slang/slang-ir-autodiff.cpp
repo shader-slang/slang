@@ -214,7 +214,7 @@ IRStructKey* DifferentialPairTypeBuilder::_getOrCreateDiffStructKey()
 {
     if (!this->globalDiffKey)
     {
-        IRBuilder builder(sharedContext->sharedBuilder);
+        IRBuilder builder(sharedContext->moduleInst);
         // Insert directly at top level (skip any generic scopes etc.)
         builder.setInsertInto(sharedContext->moduleInst);
 
@@ -230,7 +230,7 @@ IRStructKey* DifferentialPairTypeBuilder::_getOrCreatePrimalStructKey()
     if (!this->globalPrimalKey)
     {
         // Insert directly at top level (skip any generic scopes etc.)
-        IRBuilder builder(sharedContext->sharedBuilder);
+        IRBuilder builder(sharedContext->moduleInst);
         builder.setInsertInto(sharedContext->moduleInst);
 
         this->globalPrimalKey = builder.createStructKey();
@@ -252,7 +252,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
         break;
     }
 
-    IRBuilder builder(sharedContext->sharedBuilder);
+    IRBuilder builder(sharedContext->moduleInst);
     builder.setInsertBefore(diffType);
 
     auto pairStructType = builder.createStructType();
@@ -463,6 +463,7 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_PrimalInstDecoration:
             case kIROp_DifferentialInstDecoration:
             case kIROp_MixedDifferentialInstDecoration:
+            case kIROp_PrimalValueAccessDecoration:
             case kIROp_BackwardDerivativeDecoration:
             case kIROp_BackwardDerivativeIntermediateTypeDecoration:
             case kIROp_BackwardDerivativePropagateDecoration:
@@ -537,8 +538,6 @@ struct StripNoDiffTypeAttributePass : InstPassBase
                     }
                 }
             });
-        sharedBuilderStorage.init(module);
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
     }
 };
 
@@ -564,6 +563,33 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
     return false;
 }
 
+bool canTypeBeStored(IRInst* type)
+{
+    if (!type)
+        return false;
+
+    if (as<IRBasicType>(type))
+        return true;
+
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_OptionalType:
+    case kIROp_TupleType:
+    case kIROp_ArrayType:
+    case kIROp_DifferentialPairType:
+    case kIROp_InterfaceType:
+    case kIROp_AnyValueType:
+    case kIROp_ClassType:
+    case kIROp_FloatType:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 struct AutoDiffPass : public InstPassBase
 {
     DiagnosticSink* getSink()
@@ -576,7 +602,7 @@ struct AutoDiffPass : public InstPassBase
         // TODO(sai): Move this call.
         forwardTranscriber.differentiableTypeConformanceContext.buildGlobalWitnessDictionary();
 
-        IRBuilder builderStorage(&sharedBuilderStorage);
+        IRBuilder builderStorage(module);
         IRBuilder* builder = &builderStorage;
 
         // Process all ForwardDifferentiate and BackwardDifferentiate instructions by 
@@ -693,6 +719,9 @@ struct AutoDiffPass : public InstPassBase
                             break;
                         }
                         break;
+                    case kIROp_PrimalSubstitute:
+                        // Explicit primal subst operator is not yet supported.
+                        SLANG_UNIMPLEMENTED_X("explicit primal_subst operator.");
                     default:
                         break;
                     }
@@ -808,7 +837,6 @@ struct AutoDiffPass : public InstPassBase
 
         if (lowerIntermediateContextType(builder))
         {
-            sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
             hasChanges = true;
         }
 
@@ -817,7 +845,7 @@ struct AutoDiffPass : public InstPassBase
 
     IRStringLit* getDerivativeFuncName(IRInst* func, const char* postFix)
     {
-        IRBuilder builder(&sharedBuilderStorage);
+        IRBuilder builder(autodiffContext->moduleInst);
         builder.setInsertBefore(func);
 
         IRStringLit* name = nullptr;
@@ -846,23 +874,17 @@ struct AutoDiffPass : public InstPassBase
     AutoDiffPass(AutoDiffSharedContext* context, DiagnosticSink* sink) :
         InstPassBase(context->moduleInst->getModule()),
         sink(sink),
-        forwardTranscriber(context, &sharedBuilderStorage, sink),
-        backwardPrimalTranscriber(context, &sharedBuilderStorage, sink),
-        backwardPropagateTranscriber(context, &sharedBuilderStorage, sink),
-        backwardTranscriber(context, &sharedBuilderStorage, sink),
+        forwardTranscriber(context, sink),
+        backwardPrimalTranscriber(context, sink),
+        backwardPropagateTranscriber(context, sink),
+        backwardTranscriber(context, sink),
         pairBuilderStorage(context),
         autodiffContext(context)
     {
-
         // We start by initializing our shared IR building state,
         // since we will re-use that state for any code we
         // generate along the way.
         //
-        sharedBuilderStorage.init(module);
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
-
-        context->sharedBuilder = &sharedBuilderStorage;
-
         forwardTranscriber.pairBuilder = &pairBuilderStorage;
         backwardPrimalTranscriber.pairBuilder = &pairBuilderStorage;
         backwardPropagateTranscriber.pairBuilder = &pairBuilderStorage;
@@ -917,6 +939,27 @@ bool processAutodiffCalls(
     return modified;
 }
 
+struct RemoveDetachInstsPass : InstPassBase
+{
+    RemoveDetachInstsPass(IRModule* module) :
+        InstPassBase(module)
+    {
+    }
+    void processModule()
+    {
+        processInstsOfType<IRDetachDerivative>(kIROp_DetachDerivative, [&](IRDetachDerivative* detach)
+            {
+                detach->replaceUsesWith(detach->getBase());
+            });
+    }
+};
+
+void removeDetachInsts(IRModule* module)
+{
+    RemoveDetachInstsPass pass(module);
+    pass.processModule();
+}
+
 bool finalizeAutoDiffPass(IRModule* module)
 {
     bool modified = false;
@@ -924,18 +967,14 @@ bool finalizeAutoDiffPass(IRModule* module)
     // Create shared context for all auto-diff related passes
     AutoDiffSharedContext autodiffContext(module->getModuleInst());
 
-    SharedIRBuilder sharedBuilder;
-    sharedBuilder.init(module);
-    sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
-
-    autodiffContext.sharedBuilder = &sharedBuilder;
-
     // Replaces IRDifferentialPairType with an auto-generated struct,
     // IRDifferentialPairGetDifferential with 'differential' field access,
     // IRDifferentialPairGetPrimal with 'primal' field access, and
     // IRMakeDifferentialPair with an IRMakeStruct.
     // 
     modified |= processPairTypes(&autodiffContext);
+
+    removeDetachInsts(module);
 
     stripNoDiffTypeAttribute(module);
 

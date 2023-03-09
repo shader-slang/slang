@@ -84,7 +84,7 @@ struct PeepholeContext : InstPassBase
                 }
                 else if (remainingKeys.getCount() > 0)
                 {
-                    IRBuilder builder(&sharedBuilderStorage);
+                    IRBuilder builder(module);
                     builder.setInsertBefore(inst);
                     auto newValue = builder.emitElementExtract(updateInst->getElementValue(), remainingKeys);
                     inst->replaceUsesWith(newValue);
@@ -94,7 +94,7 @@ struct PeepholeContext : InstPassBase
             }
             else if (isAccessChainNotEqual)
             {
-                IRBuilder builder(&sharedBuilderStorage);
+                IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto newInst = builder.emitElementExtract(updateInst->getOldValue(), chainKey.getArrayView());
                 inst->replaceUsesWith(newInst);
@@ -189,7 +189,7 @@ struct PeepholeContext : InstPassBase
                 {
                     if (vectorType->getElementType() != replacement->getFullType())
                         return false;
-                    IRBuilder builder(sharedBuilderStorage);
+                    IRBuilder builder(module);
                     builder.setInsertBefore(inst);
                     replacement = builder.emitMakeVectorFromScalar(inst->getFullType(), replacement);
                 }
@@ -319,14 +319,14 @@ struct PeepholeContext : InstPassBase
         case kIROp_IsResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
-                IRBuilder builder(&sharedBuilderStorage);
+                IRBuilder builder(module);
                 inst->replaceUsesWith(builder.getBoolValue(true));
                 maybeRemoveOldInst(inst);
                 changed = true;
             }
             else if (inst->getOperand(0)->getOp() == kIROp_MakeResultValue)
             {
-                IRBuilder builder(&sharedBuilderStorage);
+                IRBuilder builder(module);
                 inst->replaceUsesWith(builder.getBoolValue(false));
                 maybeRemoveOldInst(inst);
                 changed = true;
@@ -432,7 +432,7 @@ struct PeepholeContext : InstPassBase
                         }
                         if (args.getCount() == arraySize->getValue())
                         {
-                            IRBuilder builder(&sharedBuilderStorage);
+                            IRBuilder builder(module);
                             builder.setInsertBefore(inst);
                             auto makeArray = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
                             inst->replaceUsesWith(makeArray);
@@ -471,7 +471,7 @@ struct PeepholeContext : InstPassBase
                         }
                         if (isValid)
                         {
-                            IRBuilder builder(&sharedBuilderStorage);
+                            IRBuilder builder(module);
                             builder.setInsertBefore(inst);
                             auto makeStruct = builder.emitMakeStruct(structType, (UInt)args.getCount(), args.getBuffer());
                             inst->replaceUsesWith(makeStruct);
@@ -485,7 +485,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_CastPtrToBool:
             {
                 auto ptr = inst->getOperand(0);
-                IRBuilder builder(&sharedBuilderStorage);
+                IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto neq = builder.emitNeq(ptr, builder.getNullVoidPtrValue());
                 inst->replaceUsesWith(neq);
@@ -499,7 +499,7 @@ struct PeepholeContext : InstPassBase
                 auto actualType = isTypeInst->getValue()->getDataType();
                 if (isTypeEqual(actualType, (IRType*)isTypeInst->getTypeOperand()))
                 {
-                    IRBuilder builder(&sharedBuilderStorage);
+                    IRBuilder builder(module);
                     builder.setInsertBefore(inst);
                     auto trueVal = builder.getBoolValue(true);
                     inst->replaceUsesWith(trueVal);
@@ -559,7 +559,7 @@ struct PeepholeContext : InstPassBase
             {
                 if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
                 {
-                    IRBuilder builder(&sharedBuilderStorage);
+                    IRBuilder builder(module);
                     builder.setInsertBefore(inst);
                     auto trueVal = builder.getBoolValue(true);
                     inst->replaceUsesWith(trueVal);
@@ -568,7 +568,7 @@ struct PeepholeContext : InstPassBase
                 }
                 else if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalNone)
                 {
-                    IRBuilder builder(&sharedBuilderStorage);
+                    IRBuilder builder(module);
                     builder.setInsertBefore(inst);
                     auto falseVal = builder.getBoolValue(false);
                     inst->replaceUsesWith(falseVal);
@@ -622,7 +622,7 @@ struct PeepholeContext : InstPassBase
             break;
         case kIROp_DefaultConstruct:
             {
-                IRBuilder builder(&sharedBuilderStorage);
+                IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 // See if we can replace the default construct inst with concrete values.
                 if (auto newCtor = builder.emitDefaultConstruct(inst->getFullType(), false))
@@ -693,9 +693,6 @@ struct PeepholeContext : InstPassBase
 
     bool processFunc(IRInst* func)
     {
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
         bool result = false;
 
         for (;;)
@@ -728,9 +725,9 @@ bool peepholeOptimize(IRInst* func)
     return context.processFunc(func);
 }
 
-bool tryReplaceInstUsesWithSimplifiedValue(SharedIRBuilder* sharedBuilder, IRInst* inst)
+bool tryReplaceInstUsesWithSimplifiedValue(IRModule* module, IRInst* inst)
 {
-    if (inst != tryConstantFoldInst(sharedBuilder, inst))
+    if (inst != tryConstantFoldInst(module, inst))
         return true;
 
     PeepholeContext context = PeepholeContext(inst->getModule());

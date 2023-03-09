@@ -160,7 +160,7 @@ struct DiffTransposePass
         // We shouldn't already have a terminator for this block
         SLANG_ASSERT(revBlock->getTerminator() == nullptr);
 
-        IRBuilder builder(autodiffContext->sharedBuilder);
+        IRBuilder builder(autodiffContext->moduleInst->getModule());
 
         auto currentBlock = block;
         while (!isBlockLastInRegion(currentBlock, endBlocks))
@@ -227,6 +227,9 @@ struct DiffTransposePass
                     IRBlock* revAfterBlock = revBlockMap[currentBlock];
                     
                     builder.setInsertInto(revCondBlock);
+                    
+                    hoistPrimalInst(&builder, ifElse->getCondition());
+
                     builder.emitIfElse(
                         ifElse->getCondition(),
                         revTrueEntryBlock,
@@ -325,18 +328,6 @@ struct DiffTransposePass
                         getPhiGrads(trueBlock).getCount(),
                         getPhiGrads(trueBlock).getBuffer());
                     
-                    // Old false-side starting block becomes end block 
-                    // for the new pre-cond region (which could be empty)
-                    // 
-                    IRBlock* revPreCondEndBlock = revBlockMap[falseBlock];
-                    if (!falseRegionInfo.isTrivial)
-                    {
-                        builder.setInsertInto(revPreCondEndBlock);
-                        builder.emitBranch(
-                            revCondBlock,
-                            getPhiGrads(falseBlock).getCount(),
-                            getPhiGrads(falseBlock).getBuffer());
-                    }
 
                     IRBlock* revBreakRegionExitBlock = revBlockMap[firstLoopBlock];
                     if (!preCondRegionInfo.isTrivial)
@@ -357,21 +348,48 @@ struct DiffTransposePass
 
                     // Emit condition into the new cond block.
                     builder.setInsertInto(revCondBlock);
+                    hoistPrimalInst(&builder, ifElse->getCondition());
+
                     builder.emitIfElse(
                         ifElse->getCondition(),
                         revTrueBlock,
                         revFalseBlock,
-                        revLoopEndBlock);
+                        revTrueBlock);
                     
-                    // Emit loop into rev-version of the break block.
-                    auto revLoopBlock = revBlockMap[breakBlock];
-                    builder.setInsertInto(revLoopBlock);
-                    builder.emitLoop(
-                        revPreCondBlock,
-                        revBreakBlock,
-                        revLoopEndBlock,
-                        getPhiGrads(breakBlock).getCount(),
-                        getPhiGrads(breakBlock).getBuffer());
+                    // Old false-side starting block becomes end block 
+                    // for the new pre-cond region (which could be empty)
+                    // 
+                    
+                    if (!falseRegionInfo.isTrivial)
+                    {
+                        IRBlock* revPreCondEndBlock = revBlockMap[falseBlock];
+                        builder.setInsertInto(revPreCondEndBlock);
+                        builder.emitLoop(
+                            revCondBlock,
+                            revBreakBlock,
+                            revLoopEndBlock,
+                            getPhiGrads(falseBlock).getCount(),
+                            getPhiGrads(falseBlock).getBuffer());
+                        
+                        auto revLoopStartBlock = revBlockMap[breakBlock];
+                        builder.setInsertInto(revLoopStartBlock);
+                        builder.emitBranch(
+                            revPreCondBlock,
+                            getPhiGrads(breakBlock).getCount(),
+                            getPhiGrads(breakBlock).getBuffer());
+                    }
+                    else
+                    {
+                        // Emit loop into rev-version of the break block.
+                        auto revLoopBlock = revBlockMap[breakBlock];
+                        builder.setInsertInto(revLoopBlock);
+                        builder.emitLoop(
+                            revPreCondBlock,
+                            revBreakBlock,
+                            revLoopEndBlock,
+                            getPhiGrads(breakBlock).getCount(),
+                            getPhiGrads(breakBlock).getBuffer());
+                    }
 
                     currentBlock = breakBlock;
                     break;
@@ -442,7 +460,11 @@ struct DiffTransposePass
                     }
 
                     auto revSwitchBlock = revBlockMap[breakBlock];
+
                     builder.setInsertInto(revSwitchBlock);
+
+                    hoistPrimalInst(&builder, switchInst->getCondition());
+
                     builder.emitSwitch(
                         switchInst->getCondition(),
                         revBreakBlock,
@@ -494,8 +516,7 @@ struct DiffTransposePass
         // look for insts/blocks marked with IRDifferentialInstDecoration,
         // and transpose them in the revDiffFunc.
         //
-        IRBuilder builder;
-        builder.init(autodiffContext->sharedBuilder);
+        IRBuilder builder(autodiffContext->moduleInst);
 
         // Insert after the last block.
         builder.setInsertInto(revDiffFunc);
@@ -589,6 +610,21 @@ struct DiffTransposePass
         auto firstFwdDiffBlock = branchInst->getTargetBlock();
         reverseCFGRegion(firstFwdDiffBlock, List<IRBlock*>());
 
+        // Lower any loop-exit-value decorations into initializations for loop intermediate vals, 
+        // and convert loop initial values into terminating conditions.
+        // 
+        // TODO: We need a way to confirm that all required vars have an initial value
+        // (is there a built-in dataflow tool for this?)
+        // 
+        for (auto block : workList)
+        {
+            if (auto loopInst = as<IRLoop>(block->getTerminator()))
+            {
+                lowerLoopExitValues(&builder, loopInst);
+                invertLoopCondition(&builder, loopInst);
+            }
+        }
+
         // Link the last differential fwd-mode block (which will be the first
         // rev-mode block) as the successor to the last primal block.
         // We assume that the original function is in single-return form
@@ -608,7 +644,7 @@ struct DiffTransposePass
 
             terminalPrimalBlock->getTerminator()->removeAndDeallocate();
             
-            IRBuilder subBuilder(builder.getSharedBuilder());
+            IRBuilder subBuilder = builder;
             subBuilder.setInsertInto(terminalPrimalBlock);
 
             // There should be no parameters in the first reverse-mode block.
@@ -664,7 +700,7 @@ struct DiffTransposePass
         if (revAccumulatorVarMap.ContainsKey(fwdInst))
             return revAccumulatorVarMap[fwdInst];
         
-        IRBuilder tempVarBuilder(autodiffContext->sharedBuilder);
+        IRBuilder tempVarBuilder(autodiffContext->moduleInst->getModule());
         
         IRBlock* firstDiffBlock = firstRevDiffBlockMap[as<IRFunc>(fwdInst->getParent()->getParent())];
 
@@ -687,6 +723,36 @@ struct DiffTransposePass
         return tempRevVar;
     }
 
+    IRVar* getOrCreateInverseVar(IRInst* primalInst)
+    {
+        // No need to store inverse values for constants.
+        if (as<IRConstant>(primalInst))
+            return nullptr;
+
+        // Check if we have a var already.
+        if (inverseVarMap.ContainsKey(primalInst))
+            return inverseVarMap[primalInst];
+        
+        IRBuilder tempVarBuilder(autodiffContext->moduleInst);
+        
+        IRBlock* firstDiffBlock = firstRevDiffBlockMap[as<IRFunc>(primalInst->getParent()->getParent())];
+
+        if (auto firstInst = firstDiffBlock->getFirstOrdinaryInst())
+            tempVarBuilder.setInsertBefore(firstInst);
+        else
+            tempVarBuilder.setInsertInto(firstDiffBlock);
+        
+        auto primalType = primalInst->getDataType();
+
+        // Emit a var in the top-level differential block to hold the inverse, 
+        // and initialize it.
+        auto tempInvVar = tempVarBuilder.emitVar(primalType);
+
+        inverseVarMap[primalInst] = tempInvVar;
+
+        return tempInvVar;
+    }
+
     bool isInstUsedOutsideParentBlock(IRInst* inst)
     {
         auto currBlock = inst->getParent();
@@ -702,14 +768,13 @@ struct DiffTransposePass
     
     void transposeBlock(IRBlock* fwdBlock, IRBlock* revBlock)
     {
-        IRBuilder builder;
-        builder.init(autodiffContext->sharedBuilder);
+        IRBuilder builder(autodiffContext->moduleInst);
  
         // Insert into our reverse block.
         builder.setInsertInto(revBlock);
 
         // Check if this block has any 'outputs' (in the form of phi args
-        // sent to the successor bvock)
+        // sent to the successor block)
         // 
         if (auto branchInst = as<IRUnconditionalBranch>(fwdBlock->getTerminator()))
         {
@@ -718,51 +783,48 @@ struct DiffTransposePass
                 auto arg = branchInst->getArg(ii);
                 if (isDifferentialInst(arg))
                 {
+                    // If the arg is a differential, emit a parameter
+                    // to accept it's reverse-mode differential as an input
+                    // 
+
                     auto diffType = arg->getDataType();
                     auto revParam = builder.emitParam(diffType);
 
                     addRevGradientForFwdInst(
-                        arg, 
+                        arg,
                         RevGradient(
                             RevGradient::Flavor::Simple,
                             arg,
                             revParam,
                             nullptr));
                 }
-            }
-        }
+                else if (isPrimalInst(arg))
+                {
+                    // If the output arg is a primal, emit a parameter
+                    // to accept it as an _input_ for the reverse-mode
+                    // 
+                    auto primalType = arg->getDataType();
+                    auto primalInvParam = builder.emitParam(primalType);
 
-        // Some special instructions simply need to be copied over.
-        // These do not deal with differentials.
-        // TODO: This will not work if there are any differential
-        // insts that rely on loop counter vars having a specific
-        // value. 
-        // The solution is to have primal insts appearing in 
-        // differential blocks be in their own special blocks that are
-        // ignored entirely, rather than dealing with them one inst 
-        // at a time.
-        // 
-        for (IRInst* child = fwdBlock->getFirstChild(); child;)
-        {  
-            auto nextChild = child->getNextInst();
-
-            if (child->findDecoration<IRLoopCounterDecoration>())
-            {
-                // Loop counter insts should not have any gradients.
-                SLANG_ASSERT(!hasRevGradients(child));
-                child->insertAtEnd(revBlock);
+                    setInverse(&builder, arg, primalInvParam);
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("Encountered inst not marked as primal or differential");
+                }
             }
-            
-            child = nextChild;
         }
 
         // Move pointer & reference insts to the top of the reverse-mode block.
         List<IRInst*> nonValueInsts;
         for (IRInst* child = fwdBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
         {
-            // If the instruction is pointer typed, it's not actually computing a value.
+            // If the instruction is a variable allocation (or reverse-gradient pair reference), 
+            // move to top.
+            // TODO: This is hacky.. Need a more principled way to handle this 
+            // (like primal inst hoisting)
             // 
-            if (as<IRPtrTypeBase>(child->getDataType()))
+            if (as<IRVar>(child) || as<IRReverseGradientDiffPairRef>(child))
                 nonValueInsts.add(child);
             
             // Slang doesn't support function values. So if we see a func-typed inst
@@ -784,11 +846,18 @@ struct DiffTransposePass
         // 
         for (IRInst* child = fwdBlock->getLastChild(); child; child = child->getPrevInst())
         {
-            if (as<IRDecoration>(child) || as<IRParam>(child))
+            if (child->findDecoration<IRPrimalValueAccessDecoration>())
                 continue;
 
-            
-            transposeInst(&builder, child);
+            if (as<IRDecoration>(child) || as<IRParam>(child))
+                continue;
+            if (as<IRType>(child))
+                continue;
+
+            if (isDifferentialInst(child))
+                transposeInst(&builder, child);
+            else if (isPrimalInst(child))
+                invertInst(&builder, child);
         }
 
         // After processing the block's instructions, we 'flush' any remaining gradients 
@@ -808,32 +877,47 @@ struct DiffTransposePass
         List<IRInst*> phiParamRevGradInsts;
         for (IRParam* param = fwdBlock->getFirstParam(); param; param = param->getNextParam())
         {
-            // This param might be used outside this block.
-            // If so, add/get an accumulator.
-            // 
-            if (isInstUsedOutsideParentBlock(param))
+            if (isDifferentialInst(param))
             {
-                auto accGradient = extractAccumulatorVarGradient(&builder, param);
-                addRevGradientForFwdInst(
-                    param, 
-                    RevGradient(param, accGradient, nullptr));
-            }
-            
-            if (hasRevGradients(param))
-            {
-                auto gradients = popRevGradients(param);
+                // This param might be used outside this block.
+                // If so, add/get an accumulator.
+                // 
+                if (isInstUsedOutsideParentBlock(param))
+                {
+                    auto accGradient = extractAccumulatorVarGradient(&builder, param);
+                    addRevGradientForFwdInst(
+                        param, 
+                        RevGradient(param, accGradient, nullptr));
+                }
+                if (hasRevGradients(param))
+                {
+                    auto gradients = popRevGradients(param);
 
-                auto gradInst = emitAggregateValue(
-                    &builder,
-                    tryGetPrimalTypeFromDiffInst(param),
-                    gradients);
-                
-                phiParamRevGradInsts.add(gradInst);
+                    auto gradInst = emitAggregateValue(
+                        &builder,
+                        tryGetPrimalTypeFromDiffInst(param),
+                        gradients);
+                    
+                    phiParamRevGradInsts.add(gradInst);
+                }
+                else
+                {
+                    phiParamRevGradInsts.add(
+                        emitDZeroOfDiffInstType(&builder, tryGetPrimalTypeFromDiffInst(param)));
+                }
+            }
+            else if (isPrimalInst(param))
+            {
+                if (hasInverse(param))
+                    phiParamRevGradInsts.add(getInverse(&builder, param));
+                else
+                {
+                    SLANG_UNEXPECTED("param is a primal inst but has no registered inverse");
+                }
             }
             else
             {
-                phiParamRevGradInsts.add(
-                    emitDZeroOfDiffInstType(&builder, tryGetPrimalTypeFromDiffInst(param)));
+                SLANG_UNEXPECTED("param is neither differential nor primal");
             }
         }
 
@@ -898,6 +982,242 @@ struct DiffTransposePass
 
     }
 
+    struct InvInstPair
+    {
+        IRInst* inst;
+        IRInst* invInst;
+
+        InvInstPair(IRInst* inst, IRInst* invInst) :
+            inst(inst), invInst(invInst)
+        { }
+
+        InvInstPair() : inst(nullptr), invInst(nullptr)
+        { }
+    };
+
+    List<InvInstPair> invertArithmetic(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
+    {
+        switch (primalInst->getOp())
+        {
+            case kIROp_Add:
+            {
+                SLANG_RELEASE_ASSERT(as<IRConstant>(primalInst->getOperand(1)));
+                return List<InvInstPair>(
+                    InvInstPair(
+                        primalInst->getOperand(0),
+                        builder->emitSub(
+                            primalInst->getOperand(0)->getDataType(),
+                            invOutput,
+                            primalInst->getOperand(1))));
+            }
+            case kIROp_Sub:
+            {
+                SLANG_RELEASE_ASSERT(as<IRConstant>(primalInst->getOperand(1)));
+                return List<InvInstPair>(
+                    InvInstPair(
+                        primalInst->getOperand(0),
+                        builder->emitAdd(
+                            primalInst->getOperand(0)->getDataType(),
+                            invOutput,
+                            primalInst->getOperand(1))));
+            }
+
+            default:
+                SLANG_UNEXPECTED("Unhandled arithmetic inst for inversion");
+        }
+    }
+
+    void lowerLoopExitValues(IRBuilder* builder, IRLoop* fwdLoop)
+    {
+        for (auto decoration : fwdLoop->getDecorations())
+        {
+            if (auto loopExitValueDecoration = as<IRLoopExitPrimalValueDecoration>(decoration))
+            {
+                IRBlock* revLoopInitBlock = revBlockMap[fwdLoop->getBreakBlock()];
+
+                if (auto revLoopInst = revLoopInitBlock->getTerminator())
+                    builder->setInsertBefore(revLoopInst);
+                else
+                    builder->setInsertInto(revLoopInitBlock);
+
+                hoistPrimalInst(builder, loopExitValueDecoration->getLoopExitValInst());
+
+                setInverse(builder, loopExitValueDecoration->getTargetInst(), loopExitValueDecoration->getLoopExitValInst());
+            }
+        }
+    }
+
+    void lowerLoopExitValues(IRBuilder* builder, IRBlock* block)
+    {
+        if (auto loopInst = as<IRLoop>(block->getTerminator()))
+            lowerLoopExitValues(builder, loopInst);
+    }
+
+    // Go through loop block phi-args, and look for loop counter
+    // arguments, which for a loop means inserting a check into
+    // loop condition block.
+    // This method also adds logic to skip the first iteration. 
+    // (a 'do-while' loop)
+    // 
+    void invertLoopCondition(IRBuilder* builder, IRLoop* loopInst)
+    {   
+        auto firstLoopBlock = loopInst->getTargetBlock();
+
+        IRBlock* revLoopCondBlock = revBlockMap[firstLoopBlock];
+        builder->setInsertBefore(revLoopCondBlock->getTerminator());
+
+        // Add a terminating condition based on the loop counter's initial primal value
+
+        IRParam* loopCounterParam = nullptr;
+        UIndex loopCounterParamIndex = 0;
+        for (auto param : firstLoopBlock->getParams())
+        {   
+            if (param->findDecoration<IRLoopCounterDecoration>())
+            {
+                // There really not should be two (or more) loop counter params.
+                SLANG_RELEASE_ASSERT(loopCounterParam == nullptr);
+                loopCounterParam = param;
+            }
+            else
+            {
+                loopCounterParamIndex++;
+            }
+        }
+
+        // Should see atleast one loop counter parameter on the first loop block.
+        SLANG_RELEASE_ASSERT(loopCounterParam);
+
+        IRInst* loopCounterInitVal = loopInst->getArg(loopCounterParamIndex);
+
+        auto paramBoundsCheck = builder->emitIntrinsicInst(
+                builder->getBoolType(),
+                kIROp_Neq,
+                2,
+                List<IRInst*>(
+                    hoistPrimalInst(builder, loopCounterParam),
+                    hoistPrimalInst(builder, loopCounterInitVal)).getBuffer());
+
+        as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(paramBoundsCheck);
+    }
+
+    List<InvInstPair> invertInst(IRBuilder* builder, IRInst* primalInst, IRInst* invOutput)
+    {
+        switch (primalInst->getOp())
+        {
+            case kIROp_Add:
+            case kIROp_Sub:
+                return invertArithmetic(builder, primalInst, invOutput);
+            
+            default:
+                SLANG_UNIMPLEMENTED_X("Unhandled inst type for inversion");
+        }
+    }
+
+    bool hasInverse(IRInst* primalInst)
+    {
+        if (getOrCreateInverseVar(primalInst))
+            return true;
+        else
+            return false;
+    }
+
+    IRInst* getInverse(IRBuilder* builder, IRInst* primalInst)
+    {
+        // Note: There are other possible cases here, although not important
+        // right now. For example, a value is available to load from the primal block.
+        // 
+        if (auto invVar = getOrCreateInverseVar(primalInst))
+            return builder->emitLoad(invVar);
+        
+        return nullptr;
+    }
+
+    void setInverse(IRBuilder* builder, IRInst* inst, IRInst* invInst)
+    {
+        if (auto invVar = getOrCreateInverseVar(inst))
+            builder->emitStore(invVar, invInst);
+    }
+
+    IRInst* hoistPrimalInst(IRBuilder* revBuilder, IRInst* inst)
+    {
+        if (as<IRBlock>(inst->getParent()) && 
+            isDifferentialInst(as<IRBlock>(inst->getParent())))
+        {
+            SLANG_RELEASE_ASSERT(isPrimalInst(inst));
+        }
+
+        // Are the operands of this primal inst also available in the reverse-mode context?
+        // If not, move/load them.
+        // 
+        hoistPrimalOperands(revBuilder, inst);
+
+        if (isPrimalInst(inst) && 
+            as<IRBlock>(inst->getParent()) && 
+            isDifferentialInst(as<IRBlock>(inst->getParent())))
+        {
+            if (!inst->findDecoration<IRPrimalValueAccessDecoration>())
+            {
+                return getInverse(revBuilder, inst);
+            }
+            else
+            {
+                auto block = as<IRBlock>(inst->getParent());
+                SLANG_RELEASE_ASSERT(block);
+
+                if (block == revBuilder->getBlock())
+                {
+                    // Already in block..
+                    return inst;
+                }
+
+                // Otherwise, move our inst to the the current builder location.
+                inst->removeFromParent();
+                revBuilder->addInst(inst);
+
+                return inst;
+            }
+        }
+
+        return inst;
+    }
+
+    void hoistPrimalOperands(IRBuilder* revBuilder, IRInst* fwdInst)
+    {
+        for (UIndex ii = 0; ii < fwdInst->getOperandCount(); ii++)
+        {
+            // For now we'll only hoist primal operands that are 
+            // generated in differential blocks.
+            // Eventually, we also want this method to move primal access
+            // insts to the reverse-mode blocks (i.e. this method will
+            // make sure all requried primal insts are moved to the right
+            // place)
+            // 
+            if (isPrimalInst(fwdInst->getOperand(ii)))
+            {
+                auto hoistedPrimalInst = hoistPrimalInst(revBuilder, fwdInst->getOperand(ii));
+                fwdInst->setOperand(ii, hoistedPrimalInst);
+            }
+        }
+    }
+
+    void invertInst(IRBuilder* builder, IRInst* primalInst)
+    {
+        // Look for an available inverse entry for this primalInst's *output*
+        if (hasInverse(primalInst))
+        {
+            auto invOutput = getInverse(builder, primalInst);
+
+            auto invEntries = invertInst(builder, primalInst, invOutput);
+
+            for (auto entry : invEntries)
+                setInverse(builder, entry.inst, entry.invInst);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Could not find value for the output of inst. Unable to invert");
+        }
+    }
+
     void transposeInst(IRBuilder* builder, IRInst* inst)
     {
         switch (inst->getOp())
@@ -932,7 +1252,7 @@ struct DiffTransposePass
                 if (auto pairType = as<IRDifferentialPairType>(loadInst->getDataType()))
                 {
                     primalType = pairType->getValueType();
-                }   
+                }
             }
         }
 
@@ -949,6 +1269,11 @@ struct DiffTransposePass
             // 
             SLANG_ASSERT(gradients.getCount() == 0);
         }
+
+        // Ensure primal operands are replaced with insts accessible in the 
+        // reverse-mode context.
+        // 
+        hoistPrimalOperands(builder, inst);
 
         // Is this inst used in another differential block?
         // Emit a function-scope accumulator variable, and include it's value.
@@ -1009,10 +1334,6 @@ struct DiffTransposePass
             }
         }
 
-        // The call must have been decorated with the continuation context after splitting.
-        auto primalContextDecor = fwdCall->findDecoration<IRBackwardDerivativePrimalContextDecoration>();
-        SLANG_RELEASE_ASSERT(primalContextDecor);
-
         auto baseFn = fwdDiffCallee->getBaseFn();
 
         List<IRInst*> args;
@@ -1050,6 +1371,8 @@ struct DiffTransposePass
                 // to inform us this case. Here we just need to generate a load of the derivative variable
                 // and use it as the final argument.
                 args.add(builder->emitLoad(arg->getOperand(0)));
+                argTypes.add(args.getLast()->getDataType());
+                argRequiresLoad.add(false);
             }
             else if (auto instPair = as<IRReverseGradientDiffPairRef>(arg))
             {
@@ -1058,11 +1381,13 @@ struct DiffTransposePass
                 // In order to perform the call, we need a temporary var to store the DiffPair.
                 auto pairType = as<IRPtrTypeBase>(arg->getDataType())->getValueType();
                 auto tempVar = builder->emitVar(pairType);
-                auto primalVal = builder->emitLoad(instPair->getPrimal());
+                auto primalVal = builder->emitLoad(hoistPrimalInst(builder, instPair->getPrimal()));
                 auto diffVal = builder->emitLoad(instPair->getDiff());
                 auto pairVal = builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
                 builder->emitStore(tempVar, pairVal);
                 args.add(tempVar);
+                argTypes.add(builder->getInOutType(pairType));
+                argRequiresLoad.add(false);
                 writebacks.add(DiffValWriteBack{instPair->getDiff(), tempVar});
             }
             else if (!as<IRPtrTypeBase>(arg->getDataType()) && getDiffPairType(arg->getDataType()))
@@ -1078,17 +1403,20 @@ struct DiffTransposePass
                 auto pairType = as<IRDifferentialPairType>(arg->getDataType());
                 auto var = builder->emitVar(arg->getDataType());
 
+                auto diffType = (IRType*)diffTypeContext.getDifferentialForType(builder, pairType->getValueType());
+                auto diffZero = builder->emitCallInst(
+                    diffType,
+                    diffTypeContext.getZeroMethodForType(builder, pairType->getValueType()),
+                    List<IRInst*>());
+
                 // Initialize this var to (arg.primal, 0).
                 builder->emitStore(
                     var,
                     builder->emitMakeDifferentialPair(
                         arg->getDataType(),
                         makePairArg->getPrimalValue(),
-                        builder->emitCallInst(
-                            (IRType*)diffTypeContext.getDifferentialForType(builder, pairType->getValueType()),
-                            diffTypeContext.getZeroMethodForType(builder, pairType->getValueType()),
-                            List<IRInst*>())));
-                
+                        diffZero));
+
                 args.add(var);
                 argTypes.add(builder->getInOutType(pairType));
                 argRequiresLoad.add(true);
@@ -1123,16 +1451,52 @@ struct DiffTransposePass
             argRequiresLoad.add(false);
         }
 
-        args.add(builder->emitLoad(primalContextDecor->getBackwardDerivativePrimalContextVar()));
-        argTypes.add(as<IRPtrTypeBase>(
-                primalContextDecor->getBackwardDerivativePrimalContextVar()->getDataType())
+        // If the callee provides a primal implementation that produces continuation context for propagation phase
+        // we grab it and pass it as argument to the propagation function.
+        if (auto primalContextDecor = fwdCall->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+        {
+            // Ensure availability of the primal context var
+            auto primalContextVar = hoistPrimalInst(builder, primalContextDecor->getBackwardDerivativePrimalContextVar());
+            SLANG_RELEASE_ASSERT(primalContextVar);
+
+            args.add(builder->emitLoad(primalContextVar));
+            argTypes.add(as<IRPtrTypeBase>(
+                primalContextVar->getDataType())
                 ->getValueType());
-        argRequiresLoad.add(false);
+            argRequiresLoad.add(false);
+        }
 
         auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
-        auto revCallee = builder->emitBackwardDifferentiatePropagateInst(
-            revFnType,
-            baseFn);
+        IRInst* revCallee = nullptr;
+        if (getResolvedInstForDecorations(baseFn)->getOp() == kIROp_LookupWitness)
+        {
+            // This is an interface method call, we can simply transcribe it here.
+            auto specialize = as<IRSpecialize>(baseFn);
+            auto innerFn = baseFn;
+            if (specialize)
+                innerFn = specialize->getBase();
+            auto lookupWitness = as<IRLookupWitnessMethod>(innerFn);
+            SLANG_RELEASE_ASSERT(lookupWitness);
+            auto diffDecor = lookupWitness->getRequirementKey()->findDecoration<IRBackwardDerivativeDecoration>();
+            SLANG_RELEASE_ASSERT(diffDecor);
+            auto diffKey = diffDecor->getBackwardDerivativeFunc();
+            revCallee = builder->emitLookupInterfaceMethodInst(builder->getTypeKind(), lookupWitness->getWitnessTable(), diffKey);
+            if (specialize)
+            {
+                List<IRInst*> specArgs;
+                for (UInt i = 0; i < specialize->getArgCount(); i++)
+                    specArgs.add(specialize->getArg(i));
+                revCallee = builder->emitSpecializeInst(builder->getTypeKind(), revCallee, specArgs.getCount(), specArgs.getBuffer());
+            }
+            revCallee->setFullType(revFnType);
+        }
+        else
+        {
+            // All other calls, we insert a `backwardDifferentiate` inst so we will process it in a follow-up iteration.
+            revCallee = builder->emitBackwardDifferentiatePropagateInst(
+                revFnType,
+                baseFn);
+        }
 
         List<IRInst*> callArgs;
         for (auto arg : args)
@@ -1283,7 +1647,7 @@ struct DiffTransposePass
 
     IRBlock* insertPhiBlockBefore(IRBlock* revBlock, List<IRInst*> phiArgs)
     {
-        IRBuilder phiBlockBuilder(autodiffContext->sharedBuilder);
+        IRBuilder phiBlockBuilder(autodiffContext->moduleInst->getModule());
         phiBlockBuilder.setInsertBefore(revBlock);
 
         auto phiBlock = phiBlockBuilder.emitBlock();
@@ -1310,6 +1674,9 @@ struct DiffTransposePass
             case kIROp_Div: 
             case kIROp_Neg:
                 return transposeArithmetic(builder, fwdInst, revValue);
+            
+            case kIROp_Select:
+                return transposeSelect(builder, fwdInst, revValue);
 
             case kIROp_Call:
                 return transposeCall(builder, as<IRCall>(fwdInst), revValue);
@@ -1917,6 +2284,37 @@ struct DiffTransposePass
         }
     }
 
+    
+    TranspositionResult transposeSelect(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
+    {
+        auto primalCondition = fwdInst->getOperand(0);
+
+        auto leftZero = emitDZeroOfDiffInstType(builder, tryGetPrimalTypeFromDiffInst(fwdInst->getOperand(1)));
+        auto leftGradientInst = builder->emitIntrinsicInst(
+            fwdInst->getOperand(1)->getDataType(),
+            kIROp_Select,
+            3,
+            List<IRInst*>(primalCondition, revValue, leftZero).getBuffer());
+        
+        auto rightZero = emitDZeroOfDiffInstType(builder, tryGetPrimalTypeFromDiffInst(fwdInst->getOperand(2)));
+        auto rightGradientInst = builder->emitIntrinsicInst(
+            fwdInst->getOperand(2)->getDataType(),
+            kIROp_Select,
+            3,
+            List<IRInst*>(primalCondition, rightZero, revValue).getBuffer());
+        
+        return TranspositionResult(
+                        List<RevGradient>(
+                            RevGradient(
+                                fwdInst->getOperand(1),
+                                leftGradientInst,
+                                fwdInst),
+                            RevGradient(
+                                fwdInst->getOperand(2),
+                                rightGradientInst,
+                                fwdInst)));
+    }
+
     TranspositionResult transposeArithmetic(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
         
@@ -2459,6 +2857,8 @@ struct DiffTransposePass
 
     Dictionary<IRInst*, IRVar*>                          revAccumulatorVarMap;
 
+    Dictionary<IRInst*, IRVar*>                          inverseVarMap;
+
     List<IRInst*>                                        usedPtrs;
 
     Dictionary<IRBlock*, IRBlock*>                       revBlockMap;
@@ -2470,9 +2870,8 @@ struct DiffTransposePass
     List<PendingBlockTerminatorEntry>                    pendingBlocks;
 
     Dictionary<IRBlock*, List<IRInst*>>                  phiGradsMap;
-
-    Dictionary<IRBlock*, IRBlock*>                       initializerBlockMap;
     
+    Dictionary<IRInst*, IRInst*>                         inverseValueMap;
 };
 
 

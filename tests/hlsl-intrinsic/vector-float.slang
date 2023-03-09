@@ -13,6 +13,32 @@ typedef vector<Float, 3> FloatVector;
 typedef vector<int, 3> IntVector;
 typedef vector<uint, 3> UIntVector;
 
+void subf(inout FloatVector ft, FloatVector f, int idx, Float vf)
+{
+
+    ft += log(f + 10.0);
+    ft += log2(f * 3 + 2);
+
+    {
+        float v[] = { 1, 10, 100, 1000 };
+        ft += IntVector(log10(FloatVector(v[idx] + vf) + 0.5f));
+    }
+
+    ft += abs(f * 4 - 2.0f);
+
+    ft += min(0.5, f);
+    ft += max(f, 0.75);
+
+    ft += pow(0.5, f);
+
+    ft += smoothstep(0.2, 0.7, f);
+    ft += lerp(-100, 100, f);
+
+    ft += clamp(f, 0.1, 0.3);
+
+    ft += step(f, 0.5);
+}
+
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -84,30 +110,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += floor(f * 10 - 7.01);
 
     ft += trunc(f * 7);
-   
-    ft += log(f + 10.0);
-    ft += log2(f * 3 + 2);
 
-
-    {
-        float v[] = { 1, 10, 100, 1000 };
-        ft += IntVector(log10(FloatVector(v[idx] + vf) + 0.5f));
-    }
-
-       
-    ft += abs(f * 4 - 2.0f);
-    
-    ft += min(0.5, f);
-    ft += max(f, 0.75);
-
-    ft += pow(0.5, f);
-
-    ft += smoothstep(0.2, 0.7, f);
-    ft += lerp(-100, 100, f);
-
-    ft += clamp(f, 0.1, 0.3);
-
-    ft += step(f, 0.5);
+    subf(ft, f, idx, vf);
 
     {
         IntVector vi = asint(f - f) + idx;

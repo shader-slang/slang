@@ -43,11 +43,12 @@ struct BreakableRegionInfo
 {
     IRVar*   breakVar;
     IRBlock* breakBlock;
+    IRBlock* headerBlock;
 };
 
 struct CFGNormalizationContext
 {
-    SharedIRBuilder* sharedBuilder;
+    IRModule* module;
     DiagnosticSink*  sink;
 };
 
@@ -57,13 +58,47 @@ IRBlock* getOrCreateTopLevelCondition(IRLoop* loopInst)
     // For now, we're going to naively assume the next block is the condition block.
     // Add in more support for more cases as necessary.
     // 
-
+    
     auto firstBlock = loopInst->getTargetBlock();
 
-    auto ifElse = as<IRIfElse>(firstBlock->getTerminator());
-    SLANG_RELEASE_ASSERT(ifElse);
+    if (as<IRIfElse>(firstBlock->getTerminator()))
+    {
+        return firstBlock;
+    }
+    else
+    {
+        // If there isn't a condition we need to make one with a dummy condition that
+        // always evaluates to true
+        //
 
-    return firstBlock;
+        IRBuilder condBuilder(loopInst->getModule());
+        
+        auto condBlock = condBuilder.emitBlock();
+        condBlock->insertAfter(as<IRBlock>(loopInst->getParent()));
+
+        // Make loop go into the condition block
+        firstBlock->replaceUsesWith(condBlock);
+
+        // Emit a condition: true side goes to the loop body, and
+        // false side goes into the break block.
+        // 
+        condBuilder.setInsertInto(condBlock);
+        auto ifElse = as<IRIfElse>(condBuilder.emitIfElse(
+            condBuilder.getBoolValue(true),
+            firstBlock,
+            loopInst->getBreakBlock(),
+            firstBlock));
+        
+        // We'll insert a blank block between the condition and the
+        // break block, since otherwise, we might trip up the later
+        // parts of this pass.
+        //
+        condBuilder.insertBlockAlongEdge(
+            loopInst->getModule(),
+            IREdge(&ifElse->falseBlock));
+        
+        return condBlock;
+    }
 }
 
 struct CFGNormalizationPass
@@ -133,6 +168,20 @@ struct CFGNormalizationPass
         return false;
     }
 
+    void _moveVarsToRegionHeader(BreakableRegionInfo* region, IRBlock* block)
+    {
+        for (auto child = block->getFirstChild(); child;)
+        {
+            auto nextChild = child->getNextInst();
+
+            if (as<IRVar>(child))
+            {
+                child->insertBefore(region->headerBlock->getTerminator());
+            }
+
+            child = nextChild;
+        }
+    }
 
     RegionEndpoint getNormalizedRegionEndpoint(
         BreakableRegionInfo* parentRegion,
@@ -140,6 +189,7 @@ struct CFGNormalizationPass
         List<IRBlock*> afterBlocks)
     {
         IRBlock* currentBlock = entryBlock;
+        _moveVarsToRegionHeader(parentRegion, currentBlock);
 
         // By default a region starts off with the 'base' control flow
         // and not in the 'break' control flow
@@ -155,7 +205,7 @@ struct CFGNormalizationPass
         if (afterBlocks.contains(currentBlock))
             return RegionEndpoint(currentBlock, currBreakRegion, currBaseRegion, true);
         
-        IRBuilder builder(cfgContext.sharedBuilder);
+        IRBuilder builder(cfgContext.module);
 
         List<IRBlock*> pendingAfterBlocks;
 
@@ -190,7 +240,7 @@ struct CFGNormalizationPass
                 breakFlagValue,
                 block,
                 afterSplitAfterBlock,
-                afterSplitAfterBlock);
+                afterSplitAfterBlock); 
 
             // At this point, we need to place afterSplitAfterBlock between
             // at the _end_ of this region, but we aren't there yet (and 
@@ -315,6 +365,36 @@ struct CFGNormalizationPass
                     // Do we need to split the after region?
                     if (afterBaseRegion && afterBreakRegion)
                     {
+                        // Before we split the afterBlock, we 
+                        // want to make sure the afterBlock is
+                        // firmly _inside_ the current region.
+                        // If it's part of the parent, add a 
+                        // dummy block.
+                        // 
+                        if (afterBlocks.contains(afterBlock))
+                        {
+                            auto newAfterBlock = builder.emitBlock();
+
+                            // TODO: This is a hack. Ideally we should be putting
+                            // the new after block 'before' the old after block,
+                            // but if the latter is a loop condition block, it dominates
+                            // the former, which may depend on parameters in the loop
+                            // condition block. (This eventually causes cloneInst to fail,
+                            // since it is currently order-dependent)
+                            // Remove this once cloneInst is order-independent.
+                            // 
+                            // newAfterBlock->insertBefore(afterBlock);
+                            newAfterBlock->insertAfter(falseEndPoint.exitBlock);
+
+                            builder.emitBranch(afterBlock);
+                            
+                            ifElse->afterBlock.set(newAfterBlock);
+                            as<IRUnconditionalBranch>(trueEndPoint.exitBlock->getTerminator())->block.set(newAfterBlock);
+                            as<IRUnconditionalBranch>(falseEndPoint.exitBlock->getTerminator())->block.set(newAfterBlock);
+
+                            afterBlock = newAfterBlock;
+                        }
+
                         addBreakBypassBranch(afterBlock);
 
                         // Update current block.
@@ -343,6 +423,8 @@ struct CFGNormalizationPass
                     SLANG_UNEXPECTED("Unhandled control flow inst");
                     break;
             }
+
+            _moveVarsToRegionHeader(parentRegion, currentBlock);
         }
 
         // Resolve all intermediate after-blocks
@@ -391,7 +473,7 @@ struct CFGNormalizationPass
     IRBlock* normalizeBreakableRegion(
         IRInst* branchInst)
     {
-        IRBuilder builder(cfgContext.sharedBuilder);
+        IRBuilder builder(cfgContext.module);
 
         switch (branchInst->getOp())
         {
@@ -399,6 +481,7 @@ struct CFGNormalizationPass
             {
                 BreakableRegionInfo info;
                 info.breakBlock = as<IRLoop>(branchInst)->getBreakBlock();
+                info.headerBlock = as<IRBlock>(branchInst->getParent());
 
                 // Emit var into parent block.
                 builder.setInsertBefore(
@@ -409,6 +492,7 @@ struct CFGNormalizationPass
                 // false -> atleast one break statement hit.
                 //
                 info.breakVar = builder.emitVar(builder.getBoolType());
+                builder.addNameHintDecoration(info.breakVar, UnownedStringSlice("_bflag"));
                 builder.emitStore(info.breakVar, builder.getBoolValue(true));
 
                 // If the loop is trivial (i.e. single iteration, with no
@@ -425,7 +509,7 @@ struct CFGNormalizationPass
                         &info,
                         firstLoopBlock,
                         List<IRBlock*>(info.breakBlock));
-                    
+                     
                     // Should not be empty.. but check anyway
                     SLANG_RELEASE_ASSERT(!preBreakEndPoint.isRegionEmpty);
 
@@ -473,14 +557,18 @@ struct CFGNormalizationPass
                     loopEndPoint = falseEndPoint;
                     isLoopOnTrueSide = false;
                 }
-                
-                SLANG_RELEASE_ASSERT(loopEndPoint.exitBlock);
 
-                // Special case.. the if-else of a loop needs it's
-                // after block to be pointing at the last block before
-                // it loops back to the if-else.
-                // 
-                // ifElse->afterBlock.set(loopEndPoint.exitBlock);
+                // Right now, we only support loops where the loop is on the true side of
+                // the condition. If we ever encounter the other case, fill in logic to 
+                // flip the condition.
+                //
+                SLANG_RELEASE_ASSERT(isLoopOnTrueSide);
+                
+                // Expect atleast one basic block (other than the condition block), in
+                // the loop.
+                //
+                SLANG_RELEASE_ASSERT(loopEndPoint.exitBlock);
+                SLANG_RELEASE_ASSERT(!loopEndPoint.isRegionEmpty);
 
                 // Does the loop endpoint have both 'break' and 'base'
                 // control flows?
@@ -490,7 +578,7 @@ struct CFGNormalizationPass
                     // Add a test for the break variable into the condition.
                     auto cond = ifElse->getCondition();
 
-                    builder.setInsertAfter(cond);
+                    builder.setInsertBefore(ifElse);
                     auto breakFlagVal = builder.emitLoad(info.breakVar);
 
                     // Need to invert the break flag if the loop is 
@@ -577,7 +665,7 @@ struct CFGNormalizationPass
 };
 
 void normalizeCFG(
-    SharedIRBuilder*                  sharedBuilder,
+    IRModule*                         module,
     IRGlobalValueWithCode*            func,
     IRCFGNormalizationPass const&     options)
 {
@@ -586,7 +674,7 @@ void normalizeCFG(
     // 
     eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func);
 
-    CFGNormalizationContext context = {sharedBuilder, options.sink};   
+    CFGNormalizationContext context = {module, options.sink};   
     CFGNormalizationPass cfgPass(context);
     
     List<IRBlock*> workList;
@@ -615,7 +703,7 @@ void normalizeCFG(
     }
 
     disableIRValidationAtInsert();
-    constructSSA(sharedBuilder, func);
+    constructSSA(module, func);
     enableIRValidationAtInsert();
 }
 

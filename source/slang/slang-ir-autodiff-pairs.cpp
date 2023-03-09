@@ -1,5 +1,4 @@
 #include "slang-ir-autodiff-pairs.h"
-#include "slang-ir-hoist-local-types.h"
 
 namespace Slang
 {
@@ -98,11 +97,6 @@ struct DiffPairLoweringPass : InstPassBase
     {
         bool modified = false;
 
-        // Hoist all pair types to global scope when possible.
-        hoistLocalTypes(module);
-
-        autodiffContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
         processAllInsts([&](IRInst* inst)
             {
                 // Make sure the builder is at the right level.
@@ -138,14 +132,13 @@ struct DiffPairLoweringPass : InstPassBase
             replacement.Key->replaceUsesWith(replacement.Value);
             replacement.Key->removeAndDeallocate();
         }
-        autodiffContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         return modified;
     }
 
     bool processModule()
     {
-        IRBuilder builder(autodiffContext->sharedBuilder);
+        IRBuilder builder(module);
         return processInstWithChildren(&builder, module->getModuleInst());
     }
 

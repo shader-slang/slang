@@ -61,8 +61,6 @@ struct AutoDiffSharedContext
 {
     IRModuleInst* moduleInst = nullptr;
 
-    SharedIRBuilder* sharedBuilder = nullptr;
-
     // A reference to the builtin IDifferentiable interface type.
     // We use this to look up all the other types (and type exprs)
     // that conform to a base type.
@@ -172,11 +170,6 @@ struct DifferentiableTypeConformanceContext
     {
         switch (origType->getOp())
         {
-        case kIROp_FloatType:
-        case kIROp_HalfType:
-        case kIROp_DoubleType:
-        case kIROp_VectorType:
-            return origType;
         case kIROp_ArrayType:
         {
             auto diffElementType = (IRType*)getDifferentialForType(
@@ -219,20 +212,12 @@ struct DifferentiableTypeConformanceContext
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);
-        if (result && !result->findDecoration<IRNoSideEffectDecoration>())
-        {
-            builder->addDecoration(result, kIROp_NoSideEffectDecoration);
-        }
         return result;
     }
 
     IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
     {
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->addMethodStructKey);
-        if (result && !result->findDecoration<IRNoSideEffectDecoration>())
-        {
-            builder->addDecoration(result, kIROp_NoSideEffectDecoration);
-        }
         return result;
     }
 };
@@ -309,6 +294,8 @@ void stripDerivativeDecorations(IRInst* inst);
 bool isBackwardDifferentiableFunc(IRInst* func);
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
+
+bool canTypeBeStored(IRInst* type);
 
 inline bool isRelevantDifferentialPair(IRType* type)
 {

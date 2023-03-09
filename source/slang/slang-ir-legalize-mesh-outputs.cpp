@@ -8,9 +8,7 @@ namespace Slang
 
 void legalizeMeshOutputTypes(IRModule* module)
 {
-    SharedIRBuilder builderStorage;
-    builderStorage.init(module);
-    IRBuilder builder(&builderStorage);
+    IRBuilder builder(module);
 
     for (auto inst : module->getGlobalInsts())
     {
@@ -25,7 +23,7 @@ void legalizeMeshOutputTypes(IRModule* module)
                 : as<IRPrimitivesType>(meshOutput) ? kIROp_PrimitivesDecoration
                 : (SLANG_UNREACHABLE("Missing case for IRMeshOutputType"), IROp(0));
             // Ensure that all params are marked up as vertices/indices/primitives
-            traverseUses<IRParam>(meshOutput, [&](IRParam* i)
+            traverseUsers<IRParam>(meshOutput, [&](IRParam* i)
                 {
                     builder.addMeshOutputDecoration(decorationOp, i, maxCount);
                 });

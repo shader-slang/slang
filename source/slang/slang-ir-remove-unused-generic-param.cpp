@@ -13,10 +13,7 @@ struct RemoveUnusedGenericParamContext : InstPassBase
 
     bool processModule()
     {
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         bool changed = false;
         for (auto inst : module->getModuleInst()->getChildren())
         {

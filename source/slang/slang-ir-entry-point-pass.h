@@ -31,8 +31,6 @@ protected:
     //
     IRModule* m_module = nullptr;
 
-    SharedIRBuilder* m_sharedBuilder = nullptr;
-
     EntryPointInfo m_entryPoint;
 };
 

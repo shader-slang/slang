@@ -2980,17 +2980,22 @@ RefPtr<Module> Linkage::loadModule(
     // Create an artifact for the source
     auto sourceArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Source, ArtifactPayload::Slang, ArtifactStyle::Unknown));
 
-    // Create with the 'friendly' name
-    if (filePathInfo.type == PathInfo::Type::Normal ||
+    if (sourceBlob)
+    {
+        // If the user has already provided a source blob, use that.
+        sourceArtifact->addRepresentation(new SourceBlobWithPathInfoArtifactRepresentation(filePathInfo, sourceBlob));
+    }
+    else if (
+        filePathInfo.type == PathInfo::Type::Normal ||
         filePathInfo.type == PathInfo::Type::FoundPath)
     {
+        // Create with the 'friendly' name
         // We create that it was loaded from the file system
         sourceArtifact->addRepresentation(new ExtFileArtifactRepresentation(filePathInfo.foundPath.getUnownedSlice(), getFileSystemExt()));
     }
     else
     {
-        // Else we say we don't know and just add the blob
-        sourceArtifact->addRepresentationUnknown(sourceBlob);
+        return nullptr;
     }
 
     translationUnit->addSourceArtifact(sourceArtifact);

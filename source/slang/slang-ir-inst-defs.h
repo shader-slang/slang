@@ -10,6 +10,8 @@
 
 #define PARENT kIROpFlag_Parent
 #define USE_OTHER kIROpFlag_UseOther
+#define HOISTABLE kIROpFlag_Hoistable
+#define GLOBAL kIROpFlag_Global
 
 INST(Nop, nop, 0, 0)
 
@@ -17,7 +19,7 @@ INST(Nop, nop, 0, 0)
 
     /* Basic Types */
 
-    #define DEFINE_BASE_TYPE_INST(NAME) INST(NAME ## Type, NAME, 0, 0)
+    #define DEFINE_BASE_TYPE_INST(NAME) INST(NAME ## Type, NAME, 0, HOISTABLE)
     FOREACH_BASE_TYPE(DEFINE_BASE_TYPE_INST)
     #undef DEFINE_BASE_TYPE_INST
     INST(AfterBaseType, afterBaseType, 0, 0)
@@ -25,42 +27,42 @@ INST(Nop, nop, 0, 0)
     INST_RANGE(BasicType, VoidType, AfterBaseType)
 
     /* StringTypeBase */
-        INST(StringType, String, 0, 0)
-        INST(NativeStringType, NativeString, 0, 0)
+        INST(StringType, String, 0, HOISTABLE)
+        INST(NativeStringType, NativeString, 0, HOISTABLE)
     INST_RANGE(StringTypeBase, StringType, NativeStringType)
 
-    INST(CapabilitySetType, CapabilitySet, 0, 0)
+    INST(CapabilitySetType, CapabilitySet, 0, HOISTABLE)
 
-    INST(DynamicType, DynamicType, 0, 0)
+    INST(DynamicType, DynamicType, 0, HOISTABLE)
 
-    INST(AnyValueType, AnyValueType, 1, 0)
+    INST(AnyValueType, AnyValueType, 1, HOISTABLE)
 
-    INST(RawPointerType, RawPointerType, 0, 0)
-    INST(RTTIPointerType, RTTIPointerType, 1, 0)
+    INST(RawPointerType, RawPointerType, 0, HOISTABLE)
+    INST(RTTIPointerType, RTTIPointerType, 1, HOISTABLE)
     INST(AfterRawPointerTypeBase, AfterRawPointerTypeBase, 0, 0)
     INST_RANGE(RawPointerTypeBase, RawPointerType, AfterRawPointerTypeBase)
 
 
     /* ArrayTypeBase */
-        INST(ArrayType, Array, 2, 0)
-        INST(UnsizedArrayType, UnsizedArray, 1, 0)
+        INST(ArrayType, Array, 2, HOISTABLE)
+        INST(UnsizedArrayType, UnsizedArray, 1, HOISTABLE)
     INST_RANGE(ArrayTypeBase, ArrayType, UnsizedArrayType)
 
-    INST(FuncType, Func, 0, 0)
-    INST(BasicBlockType, BasicBlock, 0, 0)
+    INST(FuncType, Func, 0, HOISTABLE)
+    INST(BasicBlockType, BasicBlock, 0, HOISTABLE)
 
-    INST(VectorType, Vec, 2, 0)
-    INST(MatrixType, Mat, 3, 0)
+    INST(VectorType, Vec, 2, HOISTABLE)
+    INST(MatrixType, Mat, 3, HOISTABLE)
 
-    INST(TaggedUnionType, TaggedUnion, 0, 0)
+    INST(TaggedUnionType, TaggedUnion, 0, HOISTABLE)
 
-    INST(ConjunctionType, Conjunction, 0, 0)
-    INST(AttributedType, Attributed, 0, 0)
-    INST(ResultType, Result, 2, 0)
-    INST(OptionalType, Optional, 1, 0)
+    INST(ConjunctionType, Conjunction, 0, HOISTABLE)
+    INST(AttributedType, Attributed, 0, HOISTABLE)
+    INST(ResultType, Result, 2, HOISTABLE)
+    INST(OptionalType, Optional, 1, HOISTABLE)
 
-    INST(DifferentialPairType, DiffPair, 1, 0)
-    INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, 0)
+    INST(DifferentialPairType, DiffPair, 1, HOISTABLE)
+    INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 
     /* BindExistentialsTypeBase */
 
@@ -70,58 +72,58 @@ INST(Nop, nop, 0, 0)
         // where each `Ti, wi` pair represents the concrete type
         // and witness table to plug in for parameter `i`.
         //
-        INST(BindExistentialsType, BindExistentials, 1, 0)
+        INST(BindExistentialsType, BindExistentials, 1, HOISTABLE)
 
         // An `BindInterface<B, T0, w0>` represents the special case
         // of a `BindExistentials` where the type `B` is known to be
         // an interface type.
         //
-        INST(BoundInterfaceType, BoundInterface, 3, 0)
+        INST(BoundInterfaceType, BoundInterface, 3, HOISTABLE)
 
     INST_RANGE(BindExistentialsTypeBase, BindExistentialsType, BoundInterfaceType)
 
     /* Rate */
-        INST(ConstExprRate, ConstExpr, 0, 0)
-        INST(GroupSharedRate, GroupShared, 0, 0)
-        INST(ActualGlobalRate, ActualGlobalRate, 0, 0)
+        INST(ConstExprRate, ConstExpr, 0, HOISTABLE)
+        INST(GroupSharedRate, GroupShared, 0, HOISTABLE)
+        INST(ActualGlobalRate, ActualGlobalRate, 0, HOISTABLE)
     INST_RANGE(Rate, ConstExprRate, GroupSharedRate)
 
-    INST(RateQualifiedType, RateQualified, 2, 0)
+    INST(RateQualifiedType, RateQualified, 2, HOISTABLE)
 
     // Kinds represent the "types of types."
     // They should not really be nested under `IRType`
     // in the overall hierarchy, but we can fix that later.
     //
     /* Kind */
-        INST(TypeKind, Type, 0, 0)
-        INST(RateKind, Rate, 0, 0)
-        INST(GenericKind, Generic, 0, 0)
+        INST(TypeKind, Type, 0, HOISTABLE)
+        INST(RateKind, Rate, 0, HOISTABLE)
+        INST(GenericKind, Generic, 0, HOISTABLE)
     INST_RANGE(Kind, TypeKind, GenericKind)
 
     /* PtrTypeBase */
-        INST(PtrType, Ptr, 1, 0)
-        INST(RefType, Ref, 1, 0)
+        INST(PtrType, Ptr, 1, HOISTABLE)
+        INST(RefType, Ref, 1, HOISTABLE)
         // A `PsuedoPtr<T>` logically represents a pointer to a value of type
         // `T` on a platform that cannot support pointers. The expectation
         // is that the "pointer" will be legalized away by storing a value
         // of type `T` somewhere out-of-line.
 
-        INST(PseudoPtrType, PseudoPtr, 1, 0)
+        INST(PseudoPtrType, PseudoPtr, 1, HOISTABLE)
 
         /* OutTypeBase */
-            INST(OutType, Out, 1, 0)
-            INST(InOutType, InOut, 1, 0)
+            INST(OutType, Out, 1, HOISTABLE)
+            INST(InOutType, InOut, 1, HOISTABLE)
         INST_RANGE(OutTypeBase, OutType, InOutType)
     INST_RANGE(PtrTypeBase, PtrType, InOutType)
 
     // A ComPtr<T> type is treated as a opaque type that represents a reference-counted handle to a COM object.
-    INST(ComPtrType, ComPtr, 1, 0)
+    INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
-    INST(NativePtrType, NativePtr, 1, 0)
+    INST(NativePtrType, NativePtr, 1, HOISTABLE)
 
     /* SamplerStateTypeBase */
-        INST(SamplerStateType, SamplerState, 0, 0)
-        INST(SamplerComparisonStateType, SamplerComparisonState, 0, 0)
+        INST(SamplerStateType, SamplerState, 0, HOISTABLE)
+        INST(SamplerComparisonStateType, SamplerComparisonState, 0, HOISTABLE)
     INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
 
     // TODO: Why do we have all this hierarchy here, when everything
@@ -131,11 +133,11 @@ INST(Nop, nop, 0, 0)
             /* TextureTypeBase */
                 // NOTE! TextureFlavor::Flavor is stored in 'other' bits for these types.
                 /* TextureType */
-                INST(TextureType, TextureType, 0, USE_OTHER)
+                INST(TextureType, TextureType, 0, USE_OTHER | HOISTABLE)
                 /* TextureSamplerType */
-                INST(TextureSamplerType, TextureSamplerType, 0, USE_OTHER)
+                INST(TextureSamplerType, TextureSamplerType, 0, USE_OTHER | HOISTABLE)
                 /* GLSLImageType */
-                INST(GLSLImageType, GLSLImageType, 0, USE_OTHER)
+                INST(GLSLImageType, GLSLImageType, 0, USE_OTHER | HOISTABLE)
             INST_RANGE(TextureTypeBase, TextureType, GLSLImageType)
         INST_RANGE(ResourceType, TextureType, GLSLImageType)
     INST_RANGE(ResourceTypeBase, TextureType, GLSLImageType)
@@ -143,53 +145,53 @@ INST(Nop, nop, 0, 0)
 
     /* UntypedBufferResourceType */
         /* ByteAddressBufferTypeBase */
-            INST(HLSLByteAddressBufferType,                     ByteAddressBuffer,   0, 0)
-            INST(HLSLRWByteAddressBufferType,                   RWByteAddressBuffer, 0, 0)
-            INST(HLSLRasterizerOrderedByteAddressBufferType,    RasterizerOrderedByteAddressBuffer, 0, 0)
+            INST(HLSLByteAddressBufferType,                     ByteAddressBuffer,   0, HOISTABLE)
+            INST(HLSLRWByteAddressBufferType,                   RWByteAddressBuffer, 0, HOISTABLE)
+            INST(HLSLRasterizerOrderedByteAddressBufferType,    RasterizerOrderedByteAddressBuffer, 0, HOISTABLE)
         INST_RANGE(ByteAddressBufferTypeBase, HLSLByteAddressBufferType, HLSLRasterizerOrderedByteAddressBufferType)
-        INST(RaytracingAccelerationStructureType, RaytracingAccelerationStructure, 0, 0)
+        INST(RaytracingAccelerationStructureType, RaytracingAccelerationStructure, 0, HOISTABLE)
     INST_RANGE(UntypedBufferResourceType, HLSLByteAddressBufferType, RaytracingAccelerationStructureType)
 
     /* HLSLPatchType */
-        INST(HLSLInputPatchType,    InputPatch,     2, 0)
-        INST(HLSLOutputPatchType,   OutputPatch,    2, 0)
+        INST(HLSLInputPatchType,    InputPatch,     2, HOISTABLE)
+        INST(HLSLOutputPatchType,   OutputPatch,    2, HOISTABLE)
     INST_RANGE(HLSLPatchType, HLSLInputPatchType, HLSLOutputPatchType)
 
-    INST(GLSLInputAttachmentType, GLSLInputAttachment, 0, 0)
+    INST(GLSLInputAttachmentType, GLSLInputAttachment, 0, HOISTABLE)
 
     /* BuiltinGenericType */
         /* HLSLStreamOutputType */
-            INST(HLSLPointStreamType,       PointStream,    1, 0)
-            INST(HLSLLineStreamType,        LineStream,     1, 0)
-            INST(HLSLTriangleStreamType,    TriangleStream, 1, 0)
+            INST(HLSLPointStreamType,       PointStream,    1, HOISTABLE)
+            INST(HLSLLineStreamType,        LineStream,     1, HOISTABLE)
+            INST(HLSLTriangleStreamType,    TriangleStream, 1, HOISTABLE)
         INST_RANGE(HLSLStreamOutputType, HLSLPointStreamType, HLSLTriangleStreamType)
 
         /* MeshOutputType */
-            INST(VerticesType,   Vertices, 2, 0)
-            INST(IndicesType,    Indices,  2, 0)
-            INST(PrimitivesType, Primitives, 2, 0)
+            INST(VerticesType,   Vertices, 2, HOISTABLE)
+            INST(IndicesType,    Indices,  2, HOISTABLE)
+            INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
         /* HLSLStructuredBufferTypeBase */
-            INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, 0)
-            INST(HLSLRWStructuredBufferType,                RWStructuredBuffer,                 0, 0)
-            INST(HLSLRasterizerOrderedStructuredBufferType, RasterizerOrderedStructuredBuffer,  0, 0)
-            INST(HLSLAppendStructuredBufferType,            AppendStructuredBuffer,             0, 0)
-            INST(HLSLConsumeStructuredBufferType,           ConsumeStructuredBuffer,            0, 0)
+            INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, HOISTABLE)
+            INST(HLSLRWStructuredBufferType,                RWStructuredBuffer,                 0, HOISTABLE)
+            INST(HLSLRasterizerOrderedStructuredBufferType, RasterizerOrderedStructuredBuffer,  0, HOISTABLE)
+            INST(HLSLAppendStructuredBufferType,            AppendStructuredBuffer,             0, HOISTABLE)
+            INST(HLSLConsumeStructuredBufferType,           ConsumeStructuredBuffer,            0, HOISTABLE)
         INST_RANGE(HLSLStructuredBufferTypeBase, HLSLStructuredBufferType, HLSLConsumeStructuredBufferType)
 
         /* PointerLikeType */
             /* ParameterGroupType */
                 /* UniformParameterGroupType */
-                    INST(ConstantBufferType, ConstantBuffer, 1, 0)
-                    INST(TextureBufferType, TextureBuffer, 1, 0)
-                    INST(ParameterBlockType, ParameterBlock, 1, 0)
-                    INST(GLSLShaderStorageBufferType, GLSLShaderStorageBuffer, 0, 0)
+                    INST(ConstantBufferType, ConstantBuffer, 1, HOISTABLE)
+                    INST(TextureBufferType, TextureBuffer, 1, HOISTABLE)
+                    INST(ParameterBlockType, ParameterBlock, 1, HOISTABLE)
+                    INST(GLSLShaderStorageBufferType, GLSLShaderStorageBuffer, 0, HOISTABLE)
                 INST_RANGE(UniformParameterGroupType, ConstantBufferType, GLSLShaderStorageBufferType)
             
                 /* VaryingParameterGroupType */
-                    INST(GLSLInputParameterGroupType, GLSLInputParameterGroup, 0, 0)
-                    INST(GLSLOutputParameterGroupType, GLSLOutputParameterGroup, 0, 0)
+                    INST(GLSLInputParameterGroupType, GLSLInputParameterGroup, 0, HOISTABLE)
+                    INST(GLSLOutputParameterGroupType, GLSLOutputParameterGroup, 0, HOISTABLE)
                 INST_RANGE(VaryingParameterGroupType, GLSLInputParameterGroupType, GLSLOutputParameterGroupType)
             INST_RANGE(ParameterGroupType, ConstantBufferType, GLSLOutputParameterGroupType)
         INST_RANGE(PointerLikeType, ConstantBufferType, GLSLOutputParameterGroupType)
@@ -209,28 +211,28 @@ INST(Nop, nop, 0, 0)
 //
 INST(StructType, struct, 0, PARENT)
 INST(ClassType, class, 0, PARENT)
-INST(InterfaceType, interface, 0, 0)
-INST(AssociatedType, associated_type, 0, 0)
-INST(ThisType, this_type, 0, 0)
-INST(RTTIType, rtti_type, 0, 0)
-INST(RTTIHandleType, rtti_handle_type, 0, 0)
-INST(TupleType, tuple_type, 0, 0)
+INST(InterfaceType, interface, 0, GLOBAL)
+INST(AssociatedType, associated_type, 0, HOISTABLE)
+INST(ThisType, this_type, 0, HOISTABLE)
+INST(RTTIType, rtti_type, 0, HOISTABLE)
+INST(RTTIHandleType, rtti_handle_type, 0, HOISTABLE)
+INST(TupleType, tuple_type, 0, HOISTABLE)
 
 // A type that identifies it's contained type as being emittable as `spirv_literal.
-INST(SPIRVLiteralType, spirvLiteralType, 1, 0)
+INST(SPIRVLiteralType, spirvLiteralType, 1, HOISTABLE)
 
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
-INST(TypeType, type_t, 0, 0)
+INST(TypeType, type_t, 0, HOISTABLE)
 
 /*IRWitnessTableTypeBase*/
     // An `IRWitnessTable` has type `WitnessTableType`.
-    INST(WitnessTableType, witness_table_t, 1, 0)
+    INST(WitnessTableType, witness_table_t, 1, HOISTABLE)
     // An integer type representing a witness table for targets where
     // witness tables are represented as integer IDs. This type is used
     // during the lower-generics pass while generating dynamic dispatch
     // code and will eventually lower into an uint type.
-    INST(WitnessTableIDType, witness_table_id_t, 1, 0)
+    INST(WitnessTableIDType, witness_table_id_t, 1, HOISTABLE)
 INST_RANGE(WitnessTableTypeBase, WitnessTableType, WitnessTableIDType)
 INST_RANGE(Type, VoidType, WitnessTableIDType)
 
@@ -240,14 +242,14 @@ INST_RANGE(Type, VoidType, WitnessTableIDType)
         INST(Generic, generic, 0, PARENT)
     INST_RANGE(GlobalValueWithParams, Func, Generic)
 
-    INST(GlobalVar, global_var, 0, 0)
+    INST(GlobalVar, global_var, 0, GLOBAL)
 INST_RANGE(GlobalValueWithCode, Func, GlobalVar)
 
-INST(GlobalParam, global_param, 0, 0)
-INST(GlobalConstant, globalConstant, 0, 0)
+INST(GlobalParam, global_param, 0, GLOBAL)
+INST(GlobalConstant, globalConstant, 0, GLOBAL)
 
-INST(StructKey, key, 0, 0)
-INST(GlobalGenericParam, global_generic_param, 0, 0)
+INST(StructKey, key, 0, GLOBAL)
+INST(GlobalGenericParam, global_generic_param, 0, GLOBAL)
 INST(WitnessTable, witness_table, 0, 0)
 
 INST(GlobalHashedStringLiterals, global_hashed_string_literals, 0, 0)
@@ -265,7 +267,7 @@ INST(Block, block, 0, PARENT)
     INST(VoidLit, void_constant, 0, 0)
 INST_RANGE(Constant, BoolLit, VoidLit)
 
-INST(CapabilitySet, capabilitySet, 0, 0)
+INST(CapabilitySet, capabilitySet, 0, HOISTABLE)
 
 INST(undefined, undefined, 0, 0)
 
@@ -279,10 +281,9 @@ INST(MakeDifferentialPair, MakeDiffPair, 2, 0)
 INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
 INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
 
-INST(Specialize, specialize, 2, 0)
-INST(LookupWitness, lookupWitness, 2, 0)
+INST(Specialize, specialize, 2, HOISTABLE)
+INST(LookupWitness, lookupWitness, 2, HOISTABLE)
 INST(GetSequentialID, GetSequentialID, 1, 0)
-INST(lookup_witness_table, lookup_witness_table, 2, 0)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
 INST(AllocObj, allocObj, 0, 0)
 
@@ -312,12 +313,13 @@ INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
 
 INST(UpdateElement, updateElement, 2, 0)
+INST(DetachDerivative, detachDerivative, 1, 0)
 
 INST(PackAnyValue, packAnyValue, 1, 0)
 INST(UnpackAnyValue, unpackAnyValue, 1, 0)
 
 INST(WitnessTableEntry, witness_table_entry, 2, 0)
-INST(InterfaceRequirementEntry, interface_req_entry, 2, 0)
+INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
 INST(Param, param, 0, 0)
 INST(StructField, field, 2, 0)
@@ -558,8 +560,6 @@ INST(BitNot, bitnot, 1, 0)
 
 INST(Select, select, 3, 0)
 
-INST(Dot, dot, 2, 0)
-
 INST(GetStringHash, getStringHash, 1, 0)
 
 INST(WaveGetActiveMask, waveGetActiveMask, 0, 0)
@@ -599,6 +599,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(LayoutDecoration,                  layout,                 1, 0)
     INST(LoopControlDecoration,             loopControl,            1, 0)
     INST(LoopMaxItersDecoration,            loopMaxIters,           1, 0)
+    INST(LoopInferredMaxItersDecoration,    loopInferredMaxIters,   2, 0)
+    INST(LoopExitPrimalValueDecoration,     loopExitPrimalValue,    2, 0)
     INST(IntrinsicOpDecoration, intrinsicOp, 1, 0)
     /* TargetSpecificDecoration */
         INST(TargetDecoration,              target,                 1, 0)
@@ -727,6 +729,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
     INST(NoInlineDecoration, noInline, 0, 0)
 
+        /// A call to the decorated function should always be folded into its use site.
+    INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
+
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
@@ -759,6 +764,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// generated derivative function.
     INST(BackwardDifferentiableDecoration, backwardDifferentiable, 1, 0)
 
+        /// Used by the auto-diff pass to hold a reference to the
+        /// primal substitute function.
+    INST(PrimalSubstituteDecoration, primalSubstFunc, 1, 0)
+
         /// Decorations to associate an original function with compiler generated backward derivative functions.
     INST(BackwardDerivativePrimalDecoration, backwardDiffPrimalReference, 1, 0)
     INST(BackwardDerivativePropagateDecoration, backwardDiffPropagateReference, 1, 0)
@@ -770,6 +779,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(BackwardDerivativePrimalReturnDecoration, BackwardDerivativePrimalReturnDecoration, 1, 0)
 
     INST(LoopCounterDecoration, loopCounterDecoration, 0, 0)
+    INST(PrimalValueAccessDecoration, primalValueAccessDecoration, 0, 0)
 
     /* Auto-diff inst decorations */
         /// Used by the auto-diff pass to mark insts that compute
@@ -876,44 +886,46 @@ INST(BackwardDifferentiatePropagate,         BackwardDifferentiatePropagate,  1,
 // replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
 INST(BackwardDifferentiate, BackwardDifferentiate, 1, 0)
 
+INST(PrimalSubstitute, PrimalSubstitute, 1, 0)
+
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
 
 /* Layout */
-    INST(VarLayout, varLayout, 1, 0)
+    INST(VarLayout, varLayout, 1, HOISTABLE)
 
     /* TypeLayout */
-        INST(TypeLayoutBase, typeLayout, 0, 0)
-        INST(ParameterGroupTypeLayout, parameterGroupTypeLayout, 2, 0)
-        INST(ArrayTypeLayout, arrayTypeLayout, 1, 0)
-        INST(StreamOutputTypeLayout, streamOutputTypeLayout, 1, 0)
-        INST(MatrixTypeLayout, matrixTypeLayout, 1, 0)
-        INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, 0)
-        INST(ExistentialTypeLayout, existentialTypeLayout, 0, 0)
-        INST(StructTypeLayout, structTypeLayout, 0, 0)
+        INST(TypeLayoutBase, typeLayout, 0, HOISTABLE)
+        INST(ParameterGroupTypeLayout, parameterGroupTypeLayout, 2, HOISTABLE)
+        INST(ArrayTypeLayout, arrayTypeLayout, 1, HOISTABLE)
+        INST(StreamOutputTypeLayout, streamOutputTypeLayout, 1, HOISTABLE)
+        INST(MatrixTypeLayout, matrixTypeLayout, 1, HOISTABLE)
+        INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, HOISTABLE)
+        INST(ExistentialTypeLayout, existentialTypeLayout, 0, HOISTABLE)
+        INST(StructTypeLayout, structTypeLayout, 0, HOISTABLE)
     INST_RANGE(TypeLayout, TypeLayoutBase, StructTypeLayout)
 
-    INST(EntryPointLayout, EntryPointLayout, 1, 0)
+    INST(EntryPointLayout, EntryPointLayout, 1, HOISTABLE)
 INST_RANGE(Layout, VarLayout, EntryPointLayout)
 
 /* Attr */
-    INST(PendingLayoutAttr, pendingLayout, 1, 0)
-    INST(StageAttr, stage, 1, 0)
-    INST(StructFieldLayoutAttr, fieldLayout, 2, 0)
-    INST(CaseTypeLayoutAttr, caseLayout, 1, 0)
-    INST(UNormAttr, unorm, 0, 0)
-    INST(SNormAttr, snorm, 0, 0)
-    INST(NoDiffAttr, no_diff, 0, 0)
+    INST(PendingLayoutAttr, pendingLayout, 1, HOISTABLE)
+    INST(StageAttr, stage, 1, HOISTABLE)
+    INST(StructFieldLayoutAttr, fieldLayout, 2, HOISTABLE)
+    INST(CaseTypeLayoutAttr, caseLayout, 1, HOISTABLE)
+    INST(UNormAttr, unorm, 0, HOISTABLE)
+    INST(SNormAttr, snorm, 0, HOISTABLE)
+    INST(NoDiffAttr, no_diff, 0, HOISTABLE)
 
     /* SemanticAttr */
-        INST(UserSemanticAttr, userSemantic, 2, 0)
-        INST(SystemValueSemanticAttr, systemValueSemantic, 2, 0)
+        INST(UserSemanticAttr, userSemantic, 2, HOISTABLE)
+        INST(SystemValueSemanticAttr, systemValueSemantic, 2, HOISTABLE)
     INST_RANGE(SemanticAttr, UserSemanticAttr, SystemValueSemanticAttr)
     /* LayoutResourceInfoAttr */
-        INST(TypeSizeAttr, size, 2, 0)
-        INST(VarOffsetAttr, offset, 2, 0)
+        INST(TypeSizeAttr, size, 2, HOISTABLE)
+        INST(VarOffsetAttr, offset, 2, HOISTABLE)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
-    INST(FuncThrowTypeAttr, FuncThrowType, 1, 0)
+    INST(FuncThrowTypeAttr, FuncThrowType, 1, HOISTABLE)
 INST_RANGE(Attr, PendingLayoutAttr, FuncThrowTypeAttr)
 
 /* Liveness */

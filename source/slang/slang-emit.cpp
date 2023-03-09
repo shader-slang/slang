@@ -381,9 +381,7 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
-            SharedIRBuilder sharedBuilder(irModule);
-            sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
-            if (!unrollLoopsInModule(&sharedBuilder, irModule, codeGenContext->getSink()))
+            if (!unrollLoopsInModule(irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }
 
@@ -893,8 +891,8 @@ Result linkAndOptimizeIR(
         }
     }
 
-    // Run a final round of DCE to clean up unused things after phi-elimination.
-    eliminateDeadCode(irModule);
+    // Run a final round of simplifications to clean up unused things after phi-elimination.
+    simplifyNonSSAIR(irModule);
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
@@ -1022,7 +1020,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         auto irModule = linkedIR.module;
         
         // Perform final simplifications to help emit logic to generate more compact code.
-        simplifyForEmit(irModule);
+        simplifyForEmit(irModule, targetRequest);
 
         metadata = linkedIR.metadata;
 

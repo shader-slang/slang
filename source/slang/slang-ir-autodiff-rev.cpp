@@ -13,6 +13,8 @@
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-init-local-var.h"
 #include "slang-ir-redundancy-removal.h"
+#include "slang-ir-dominators.h"
+#include "slang-ir-loop-unroll.h"
 
 namespace Slang
 {
@@ -295,9 +297,6 @@ namespace Slang
     // Create an empty func to represent the transcribed func of `origFunc`.
     InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc)
     {
-        if (auto bwdDiffFunc = findExistingDiffFunc(origFunc))
-            return InstPair(origFunc, bwdDiffFunc);
-
         if (!isBackwardDifferentiableFunc(origFunc))
             return InstPair(nullptr, nullptr);
 
@@ -379,11 +378,15 @@ namespace Slang
 
     InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
     {
+        if (auto bwdDiffFunc = findExistingDiffFunc(origFunc))
+            return InstPair(origFunc, bwdDiffFunc);
+
         auto header = transcribeFuncHeaderImpl(inBuilder, origFunc);
         if (!header.differential)
             return header;
+            
+        IRBuilder builder = *inBuilder;
 
-        IRBuilder builder(inBuilder->getSharedBuilder());
         builder.setInsertInto(header.differential);
         builder.emitBlock();
         auto origFuncType = as<IRFuncType>(origFunc->getFullType());
@@ -482,7 +485,7 @@ namespace Slang
     // Puts parameters into their own block.
     void BackwardDiffTranscriberBase::makeParameterBlock(IRBuilder* inBuilder, IRFunc* func)
     {
-        IRBuilder builder(inBuilder->getSharedBuilder());
+        IRBuilder builder = *inBuilder;
 
         auto firstBlock = func->getFirstBlock();
         IRParam* param = func->getFirstParam();
@@ -513,9 +516,9 @@ namespace Slang
         builder.emitBranch(firstBlock);
     }
 
-    void insertTempVarForMutableParams(SharedIRBuilder* sharedBuilder, IRFunc* func)
+    void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     {
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(module);
         auto firstBlock = func->getFirstBlock();
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
         
@@ -566,11 +569,9 @@ namespace Slang
     {
         DifferentiableTypeConformanceContext* diffTypeContext;
 
-        virtual bool shouldConvertAddrInst(IRInst* addrInst) override
+        virtual bool shouldConvertAddrInst(IRInst*) override
         {
-            if (isDifferentiableType(*diffTypeContext, addrInst->getDataType()))
-                return true;
-            return false;
+            return true;
         }
     };
 
@@ -583,20 +584,25 @@ namespace Slang
         {
             convertFuncToSingleReturnForm(func->getModule(), func);
         }
+
+        eliminateContinueBlocksInFunc(func->getModule(), func);
+
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
 
         IRCFGNormalizationPass cfgPass = {this->getSink()};
-        normalizeCFG(autoDiffSharedContext->sharedBuilder, func);
+        normalizeCFG(autoDiffSharedContext->moduleInst->getModule(), func);
 
-        insertTempVarForMutableParams(sharedBuilder, func);
+        insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
 
         AutoDiffAddressConversionPolicy cvtPolicty;
         cvtPolicty.diffTypeContext = &diffTypeContext;
-        auto result = eliminateAddressInsts(sharedBuilder, &cvtPolicty, func, sink);
+        auto result = eliminateAddressInsts(&cvtPolicty, func, sink);
 
         if (SLANG_SUCCEEDED(result))
         {
+            disableIRValidationAtInsert();
             simplifyFunc(func);
+            enableIRValidationAtInsert();
         }
         return result;
     }
@@ -623,9 +629,7 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
-        
-        autoDiffSharedContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
+ 
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
@@ -673,6 +677,106 @@ namespace Slang
         }
 
         return fwdDiffFunc;
+    }
+
+    void BackwardDiffTranscriberBase::insertVariableForRecomputedPrimalInsts(IRFunc* diffPropFunc)
+    {
+        RefPtr<IRDominatorTree> domTree = computeDominatorTree(diffPropFunc);
+        auto firstBlock = diffPropFunc->getFirstBlock();
+        if (!firstBlock)
+            return;
+        Dictionary<IRInst*, IRVar*> instVars;
+        Dictionary<IRBlock*, IRCloneEnv> cloneEnvs;
+        auto storeInstAsLocalVar = [&](IRInst* inst)
+        {
+            IRVar* var = nullptr;
+            if (instVars.TryGetValue(inst, var))
+                return var;
+            IRBuilder builder(diffPropFunc);
+            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+            var = builder.emitVar(inst->getDataType());
+            builder.emitStore(var, builder.emitDefaultConstruct(inst->getDataType()));
+
+            setInsertAfterOrdinaryInst(&builder, inst);
+            builder.emitStore(var, inst);
+            instVars[inst] = var;
+            return var;
+        };
+
+        IRBuilder builder(diffPropFunc);
+        List<IRInst*> workList;
+        for (auto block : diffPropFunc->getBlocks())
+        {
+            if (!block->findDecoration<IRDifferentialInstDecoration>())
+                continue;
+            cloneEnvs[block] = IRCloneEnv();
+            for (auto inst : block->getChildren())
+            {
+                workList.add(inst);
+            }
+        }
+
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            auto inst = workList[i];
+            for (UInt j = 0; j < inst->getOperandCount(); j++)
+            {
+                auto operand = inst->getOperand(j);
+                if (operand->getOp() == kIROp_Block)
+                    continue;
+                auto operandParent = inst->getOperand(j)->getParent();
+                if (!operandParent)
+                    continue;
+                if (operandParent->parent != diffPropFunc)
+                    continue;
+                if (domTree->dominates(operandParent, inst->parent))
+                    continue;
+
+                // The def site of the operand does not dominate the use.
+                // We need to insert a local variable to store this var.
+
+                IRInst* operandReplacement = nullptr;
+                if (canTypeBeStored(operand->getDataType()))
+                {
+                    auto var = storeInstAsLocalVar(operand);
+                    builder.setInsertBefore(inst);
+                    operandReplacement = builder.emitLoad(var);
+                }
+                else if (operand->getOp() == kIROp_Var)
+                {
+                    // Var can just be hoisted to first block.
+                    operand->insertBefore(firstBlock->getFirstOrdinaryInst());
+                }
+                else
+                {
+                    // For all other insts, we need to copy it to right before this inst.
+                    // Before actually copying it, check if we have already copied it to
+                    // any blocks that dominates this block.
+                    auto dom = as<IRBlock>(inst->getParent());
+                    while (dom)
+                    {
+                        auto subCloneEnv = cloneEnvs.TryGetValue(dom);
+                        if (!subCloneEnv) break;
+                        if (subCloneEnv->mapOldValToNew.TryGetValue(operand, operandReplacement))
+                        {
+                            break;
+                        }
+                        dom = domTree->getImmediateDominator(dom);
+                    }
+                    // We have not found an existing clone in dominators, so we need to copy it
+                    // to this block.
+                    if (!operandReplacement)
+                    {
+                        auto subCloneEnv = cloneEnvs.TryGetValue(as<IRBlock>(inst->getParent()));
+                        builder.setInsertBefore(inst);
+                        operandReplacement = cloneInst(subCloneEnv, &builder, operand);
+                        workList.add(operandReplacement);
+                    }
+                }
+                if (operandReplacement)
+                    builder.replaceOperand(inst->getOperands() + j, operandReplacement);
+            }
+        }
     }
 
     InstPair BackwardDiffTranscriberBase::transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
@@ -837,8 +941,10 @@ namespace Slang
             builder->addBackwardDerivativePrimalDecoration(primalFunc, specializedBackwardPrimalFunc);
         }
 
-        initializeLocalVariables(builder->getSharedBuilder(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
-        initializeLocalVariables(builder->getSharedBuilder(), diffPropagateFunc);
+        initializeLocalVariables(builder->getModule(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
+        initializeLocalVariables(builder->getModule(), diffPropagateFunc);
+        insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
+        stripTempDecorations(diffPropagateFunc);
     }
 
     ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(
@@ -1152,16 +1258,15 @@ namespace Slang
                     while (refUse)
                     {
                         auto nextUse = refUse->nextUse;
-                        switch (refUse->getUser()->getOp())
+                        // Is this use the dest operand of a store inst?
+                        // If so, replace it with writeRefReplacement, otherwise, refReplacement.
+                        if (refUse->getUser()->getOp() == kIROp_Store && refUse == refUse->getUser()->getOperands())
                         {
-                        case kIROp_Load:
-                            refUse->set(diffRefReplacement);
-                            break;
-                        case kIROp_Store:
+                            SLANG_RELEASE_ASSERT(diffWriteRefReplacement);
                             refUse->set(diffWriteRefReplacement);
-                            break;
-                        default:
-                            SLANG_RELEASE_ASSERT(!diffWriteRefReplacement);
+                        }
+                        else
+                        {
                             refUse->set(diffRefReplacement);
                         }
                         refUse = nextUse;
@@ -1235,7 +1340,7 @@ namespace Slang
         }
         SLANG_RELEASE_ASSERT(returnInst);
 
-        IRBuilder builder(sharedBuilder);
+        IRBuilder builder(autoDiffSharedContext->moduleInst);
         builder.setInsertBefore(returnInst);
         for (auto& wb : info.outDiffWritebacks)
         {
