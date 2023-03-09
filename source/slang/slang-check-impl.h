@@ -287,10 +287,11 @@ namespace Slang
 
         void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
-        List<DeclAssociation> const& getAssociatedDeclsForDecl(Decl* decl);
+        List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
 
         bool isDifferentiableFunc(FunctionDeclBase* func);
         bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
+        FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(FunctionDeclBase* func, int recurseLimit);
         FunctionDifferentiableLevel getFuncDifferentiableLevel(FunctionDeclBase* func);
         
     private:
@@ -1951,6 +1952,8 @@ namespace Slang
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
         Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
+        Expr* visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr);
+
         Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);

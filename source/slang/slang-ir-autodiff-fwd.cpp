@@ -344,6 +344,7 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
 
 static bool _isDifferentiableFunc(IRInst* func)
 {
+    func = getResolvedInstForDecorations(func);
     for (auto decor = func->getFirstDecoration(); decor; decor = decor->getNextDecoration())
     {
         switch (decor->getOp())
@@ -367,6 +368,37 @@ static IRFuncType* _getCalleeActualFuncType(IRInst* callee)
     if (auto specialize = as<IRSpecialize>(callee))
         return as<IRFuncType>(findGenericReturnVal(as<IRGeneric>(specialize->getBase()))->getFullType());
     return nullptr;
+}
+
+IRInst* tryFindPrimalSubstitute(IRBuilder* builder, IRInst* callee)
+{
+    if (auto func = as<IRFunc>(callee))
+    {
+        if (auto decor = func->findDecoration<IRPrimalSubstituteDecoration>())
+            return decor->getPrimalSubstituteFunc();
+    }
+    else if (auto specialize = as<IRSpecialize>(callee))
+    {
+        auto innerGen = as<IRGeneric>(specialize->getBase());
+        if (!innerGen)
+            return nullptr;
+        auto innerFunc = findGenericReturnVal(innerGen);
+        if (auto decor = innerFunc->findDecoration<IRPrimalSubstituteDecoration>())
+        {
+            auto substSpecialize = as<IRSpecialize>(decor->getPrimalSubstituteFunc());
+            SLANG_RELEASE_ASSERT(substSpecialize);
+            SLANG_RELEASE_ASSERT(substSpecialize->getArgCount() == specialize->getArgCount());
+            List<IRInst*> args;
+            for (UInt i = 0; i < specialize->getArgCount(); i++)
+                args.add(specialize->getArg(i));
+            return builder->emitSpecializeInst(
+                callee->getFullType(),
+                substSpecialize->getBase(),
+                (UInt)args.getCount(),
+                args.getBuffer());
+        }
+    }
+    return callee;
 }
 
 // Differentiating a call instruction here is primarily about generating
@@ -393,10 +425,20 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
 
     auto primalCallee = lookupPrimalInst(builder, origCallee, origCallee);
+    auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
 
     IRInst* diffCallee = nullptr;
+    if (substPrimalCallee == primalCallee)
+    {
+        instMapD.TryGetValue(origCallee, diffCallee);
+    }
+    else
+    {
+        instMapD.TryGetValue(substPrimalCallee, diffCallee);
+        primalCallee = substPrimalCallee;
+    }
 
-    if (instMapD.TryGetValue(origCallee, diffCallee))
+    if (diffCallee)
     {
     }
     else if (auto derivativeReferenceDecor = primalCallee->findDecoration<IRForwardDerivativeDecoration>())
@@ -749,6 +791,9 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
 
         // Make sure this isn't itself a specialize .
         SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
+
+        auto derivativeDecoration = genericInnerVal->findDecoration<IRForwardDerivativeDecoration>();
+        SLANG_RELEASE_ASSERT(derivativeDecoration);
 
         return InstPair(primalSpecialize, jvpFunc);
     }

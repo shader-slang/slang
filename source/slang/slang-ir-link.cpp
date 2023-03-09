@@ -443,6 +443,7 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_SequentialIDDecoration:
         case kIROp_ForwardDerivativeDecoration:
         case kIROp_UserDefinedBackwardDerivativeDecoration:
+        case kIROp_PrimalSubstituteDecoration:
         case kIROp_IntrinsicOpDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {

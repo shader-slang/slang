@@ -1549,7 +1549,7 @@ namespace Slang
                 // Base is a normal or fully specialized generic function.
                 OverloadCandidate candidate;
                 candidate.flavor = OverloadCandidate::Flavor::Expr;
-                if (auto diffExpr = as<DifferentiateExpr>(expr))
+                if (auto diffExpr = as<HigherOrderInvokeExpr>(expr))
                 {
                     candidate.funcType = as<FuncType>(diffExpr->type.type);
                 }

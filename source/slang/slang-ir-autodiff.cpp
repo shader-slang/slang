@@ -563,12 +563,15 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
     return false;
 }
 
-bool canInstBeStored(IRInst* inst)
+bool canTypeBeStored(IRInst* type)
 {
-    if (as<IRBasicType>(inst->getDataType()))
+    if (!type)
+        return false;
+
+    if (as<IRBasicType>(type))
         return true;
 
-    switch (inst->getDataType()->getOp())
+    switch (type->getOp())
     {
     case kIROp_StructType:
     case kIROp_OptionalType:
@@ -716,6 +719,9 @@ struct AutoDiffPass : public InstPassBase
                             break;
                         }
                         break;
+                    case kIROp_PrimalSubstitute:
+                        // Explicit primal subst operator is not yet supported.
+                        SLANG_UNIMPLEMENTED_X("explicit primal_subst operator.");
                     default:
                         break;
                     }

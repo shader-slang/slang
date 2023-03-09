@@ -608,6 +608,17 @@ struct IRForwardDerivativeDecoration : IRDecoration
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRPrimalSubstituteDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_PrimalSubstituteDecoration
+    };
+    IR_LEAF_ISA(PrimalSubstituteDecoration)
+
+    IRInst* getPrimalSubstituteFunc() { return getOperand(0); }
+};
+
 struct IRBackwardDerivativeIntermediateTypeDecoration : IRDecoration
 {
     enum
@@ -877,6 +888,20 @@ struct IRBackwardDifferentiate : IRInst
     IRInst* getBaseFn() { return getOperand(0); }
 
     IR_LEAF_ISA(BackwardDifferentiate)
+};
+
+// Retrieves the primal substitution function for the given function.
+struct IRPrimalSubstitute : IRInst
+{
+    enum
+    {
+        kOp = kIROp_PrimalSubstitute
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(PrimalSubstitute)
 };
 
 // Dictionary item mapping a type with a corresponding 
@@ -2804,6 +2829,7 @@ public:
     IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
 
@@ -3621,6 +3647,11 @@ public:
     void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalContextDecoration, ctx);
+    }
+
+    void addPrimalSubstituteDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_PrimalSubstituteDecoration, jvpFn);
     }
 
     void addLoopCounterDecoration(IRInst* value)
