@@ -452,10 +452,14 @@ class HigherOrderInvokeExpr : public Expr
     List<Name*> newParameterNames;
 };
 
+class PrimalSubstituteExpr : public HigherOrderInvokeExpr
+{
+    SLANG_AST_CLASS(PrimalSubstituteExpr)
+};
+
 class DifferentiateExpr : public HigherOrderInvokeExpr
 {
     SLANG_ABSTRACT_AST_CLASS(DifferentiateExpr)
-
 };
     /// An expression of the form `__fwd_diff(fn)` to access the 
     /// forward-mode derivative version of the function `fn`

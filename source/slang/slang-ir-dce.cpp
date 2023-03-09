@@ -379,25 +379,37 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     //
     if (options.keepExportsAlive)
     {
-        if (inst->findDecoration<IRExportDecoration>())
+        bool isImported = false;
+        bool shouldKeptAliveIfImported = false;
+        IRInst* innerInst = inst;
+        if (auto genInst = as<IRGeneric>(inst))
         {
-            return true;
+            innerInst = findInnerMostGenericReturnVal(genInst);
         }
-        if (inst->findDecoration<IRImportDecoration>())
+        for (auto decor : inst->getDecorations())
         {
-            if (inst->findDecoration<IRForwardDerivativeDecoration>())
-                return true;
-            if (inst->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
-                return true;
-            if (auto genInst = as<IRGeneric>(inst))
+            switch (decor->getOp())
             {
-                auto inner = findInnerMostGenericReturnVal(genInst);
-                if (inner->findDecoration<IRForwardDerivativeDecoration>())
-                    return true;
-                if (inner->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
-                    return true;
+            case kIROp_ExportDecoration:
+                return true;
+            case kIROp_ImportDecoration:
+                isImported = true;
+                break;
             }
         }
+        for (auto decor : innerInst->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_ForwardDerivativeDecoration:
+            case kIROp_UserDefinedBackwardDerivativeDecoration:
+            case kIROp_PrimalSubstituteDecoration:
+                shouldKeptAliveIfImported = true;
+                break;
+            }
+        }
+        if (isImported && shouldKeptAliveIfImported)
+            return true;
     }
 
     if (options.keepLayoutsAlive && inst->findDecoration<IRLayoutDecoration>())

@@ -1151,6 +1151,24 @@ class BackwardDerivativeOfAttribute : public DerivativeOfAttribute
     SLANG_AST_CLASS(BackwardDerivativeOfAttribute)
 };
 
+    /// The `[PrimalSubstitute(function)]` attribute specifies a custom function that should
+    /// be used as the primal function substitute when differentiating code that calls the primal function.
+class PrimalSubstituteAttribute : public Attribute
+{
+    SLANG_AST_CLASS(PrimalSubstituteAttribute)
+    Expr* funcExpr;
+};
+
+    /// The `[PrimalSubstituteOf(primalFunction)]` attribute marks the decorated function as
+    /// the substitute primal function in a forward or backward derivative function.
+class PrimalSubstituteOfAttribute : public Attribute
+{
+    SLANG_AST_CLASS(PrimalSubstituteOfAttribute)
+
+    Expr* funcExpr;
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
+};
+
     /// The `[NoDiffThis]` attribute is used to specify that the `this` parameter should not be
     /// included for differentiation.
 class NoDiffThisAttribute : public Attribute

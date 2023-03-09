@@ -764,6 +764,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// generated derivative function.
     INST(BackwardDifferentiableDecoration, backwardDifferentiable, 1, 0)
 
+        /// Used by the auto-diff pass to hold a reference to the
+        /// primal substitute function.
+    INST(PrimalSubstituteDecoration, primalSubstFunc, 1, 0)
+
         /// Decorations to associate an original function with compiler generated backward derivative functions.
     INST(BackwardDerivativePrimalDecoration, backwardDiffPrimalReference, 1, 0)
     INST(BackwardDerivativePropagateDecoration, backwardDiffPropagateReference, 1, 0)
@@ -881,6 +885,8 @@ INST(BackwardDifferentiatePropagate,         BackwardDifferentiatePropagate,  1,
 // Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
 // replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
 INST(BackwardDifferentiate, BackwardDifferentiate, 1, 0)
+
+INST(PrimalSubstitute, PrimalSubstitute, 1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)

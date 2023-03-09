@@ -736,7 +736,7 @@ namespace Slang
                 // We need to insert a local variable to store this var.
 
                 IRInst* operandReplacement = nullptr;
-                if (canInstBeStored(operand))
+                if (canTypeBeStored(operand->getDataType()))
                 {
                     auto var = storeInstAsLocalVar(operand);
                     builder.setInsertBefore(inst);

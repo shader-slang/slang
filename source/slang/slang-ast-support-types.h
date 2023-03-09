@@ -391,6 +391,10 @@ namespace Slang
             /// maybe synthesized and made available only after conformance checking.
         TypesFullyResolved,
 
+            /// All attributes are fully checked. This is the final step before
+            /// checking the function body.
+        AttributesChecked,
+
             /// The declaration is fully checked.
             ///
             /// This step includes any validation of the declaration that is
@@ -1500,12 +1504,12 @@ namespace Slang
 
     enum class DeclAssociationKind
     {
-        ForwardDerivativeFunc, BackwardDerivativeFunc,
+        ForwardDerivativeFunc, BackwardDerivativeFunc, PrimalSubstituteFunc
     };
 
-    struct DeclAssociation
+    struct DeclAssociation : SerialRefObject
     {
-        SLANG_VALUE_CLASS(DeclAssociation)
+        SLANG_OBJ_CLASS(DeclAssociation)
         DeclAssociationKind kind;
         Decl* decl;
     };
@@ -1516,7 +1520,7 @@ namespace Slang
     {
         SLANG_OBJ_CLASS(DeclAssociationList)
 
-        List<DeclAssociation> associations;
+        List<RefPtr<DeclAssociation>> associations;
     };
 
         /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`

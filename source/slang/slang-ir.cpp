@@ -3106,6 +3106,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitPrimalSubstituteInst(IRType* type, IRInst* baseFn)
+    {
+        auto inst = createInst<IRPrimalSubstitute>(
+            this,
+            kIROp_PrimalSubstitute,
+            type,
+            baseFn);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn)
     {
         auto inst = createInst<IRBackwardDifferentiate>(
