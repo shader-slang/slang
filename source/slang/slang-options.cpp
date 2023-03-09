@@ -1502,11 +1502,16 @@ struct OptionsParser
                 // just detect it as a prefix.
                 else if (argValue.startsWith("-g"))
                 {
-                    if (argValue == toSlice("-g") || (argValue.getLength() == 3 && argValue[2] >= '0' && argValue[2] <= '3'))
+                    if (argValue == toSlice("-g"))
                     {
-                        // The default level is 2. If the digit is set, extract and use
-                        const Index levelIndex = (argValue.getLength() == 3) ? (argValue[2] - '0') : 2;
-
+                        // The default is standard
+                        compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
+                    }
+                    else if (argValue.getLength() == 3 && argValue[2] >= '0' && argValue[2] <= '3')
+                    {
+                        // Extract the digit into an index
+                        const Index levelIndex = argValue[2] - '0';
+                        
                         // Map indices to enum values
                         const SlangDebugInfoLevel levels[] = 
                         {
@@ -1517,7 +1522,6 @@ struct OptionsParser
                         };
 
                         const auto level = levels[levelIndex];
-
                         compileRequest->setDebugInfoLevel(level);
                     }
                     else
