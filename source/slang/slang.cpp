@@ -4737,6 +4737,11 @@ void EndToEndCompileRequest::setDebugInfoLevel(SlangDebugInfoLevel level)
     getLinkage()->debugInfoLevel = DebugInfoLevel(level);
 }
 
+void EndToEndCompileRequest::setDebugInfoFormat(SlangDebugInfoFormat format)
+{
+    getLinkage()->debugInfoFormat = DebugInfoFormat(format);
+}
+
 void EndToEndCompileRequest::setOptimizationLevel(SlangOptimizationLevel level)
 {
     getLinkage()->optimizationLevel = OptimizationLevel(level);

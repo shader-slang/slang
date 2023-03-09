@@ -1,5 +1,6 @@
 
 #include "slang-type-text-util.h"
+#include "slang-array-view.h"
 
 #include "slang-string-util.h"
 
@@ -29,6 +30,14 @@ namespace Slang
         x(genericcpp, GENERIC_C_CPP) \
         x(nvrtc, NVRTC) \
         x(llvm, LLVM)
+
+#define SLANG_DEBUG_INFO_FORMATS(x) \
+    x(default-format, DEFAULT) \
+    x(c7, C7) \
+    x(pdb, PDB) \
+    x(stabs, STABS) \
+    x(coff, COFF) \
+    x(dwarf, DWARF) 
 
 namespace { // anonymous
 
@@ -108,6 +117,40 @@ static const ArchiveTypeInfo s_archiveTypeInfos[] =
     }
     return SLANG_ARCHIVE_TYPE_UNDEFINED;
 }
+
+struct DebugInfoFormatTable
+{
+    UnownedStringSlice entries[SLANG_DEBUG_INFO_FORMAT_COUNT_OF];
+
+    static DebugInfoFormatTable _makeTable()
+    {
+        DebugInfoFormatTable dst;
+#define SLANG_DEBUG_INFO_FORMAT_ENTRY(name, value) \
+        dst.entries[SLANG_DEBUG_INFO_FORMAT_##value] = toSlice(#name);
+        SLANG_DEBUG_INFO_FORMATS(SLANG_DEBUG_INFO_FORMAT_ENTRY)
+        return dst;
+    }
+
+    static Index findIndex(const UnownedStringSlice slice) { return makeConstArrayView(table.entries).indexOf(slice); }
+    static UnownedStringSlice getSlice(SlangDebugInfoFormat format) { return table.entries[Index(format)]; }
+
+    static const DebugInfoFormatTable table;
+};
+
+/* static */const DebugInfoFormatTable DebugInfoFormatTable::table = DebugInfoFormatTable::_makeTable();
+
+/* static */SlangResult TypeTextUtil::findDebugInfoFormat(const Slang::UnownedStringSlice& text, SlangDebugInfoFormat& out)
+{
+    const auto index = DebugInfoFormatTable::findIndex(text);
+    if (index >= 0)
+    {
+        out = SlangDebugInfoFormat(index);
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
+/* static */UnownedStringSlice TypeTextUtil::getDebugInfoFormatName(SlangDebugInfoFormat format) { return DebugInfoFormatTable::getSlice(format); }
 
 /* static */UnownedStringSlice TypeTextUtil::getScalarTypeName(slang::TypeReflection::ScalarType scalarType)
 {    

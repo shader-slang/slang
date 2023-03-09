@@ -753,6 +753,21 @@ extern "C"
         
     };
 
+    /* Describes the debugging information format produced during a compilation. */
+    typedef SlangUInt32 SlangDebugInfoFormatIntegral;
+    enum SlangDebugInfoFormat : SlangDebugInfoFormatIntegral
+    {
+        SLANG_DEBUG_INFO_FORMAT_DEFAULT,         ///< Use the default debugging format for the target 
+        SLANG_DEBUG_INFO_FORMAT_C7,              ///< CodeView C7 format (typically means debugging infomation is embedded in the binary)
+        SLANG_DEBUG_INFO_FORMAT_PDB,             ///< Program database
+        
+        SLANG_DEBUG_INFO_FORMAT_STABS,          ///< Stabs
+        SLANG_DEBUG_INFO_FORMAT_COFF,           ///< COFF debug info
+        SLANG_DEBUG_INFO_FORMAT_DWARF,          ///< DWARF debug info (we may want to support specifying the version)
+
+        SLANG_DEBUG_INFO_FORMAT_COUNT_OF,
+    };
+
     typedef SlangUInt32 SlangOptimizationLevelIntegral;
     enum SlangOptimizationLevel : SlangOptimizationLevelIntegral
     {
@@ -1526,6 +1541,11 @@ extern "C"
     SLANG_API void spSetDebugInfoLevel(
         SlangCompileRequest*    request,
         SlangDebugInfoLevel     level);
+
+    /*! @see slang::ICompileRequest::setDebugInfoFormat */
+    SLANG_API void spSetDebugInfoFormat(
+        SlangCompileRequest*    request,
+        SlangDebugInfoFormat        format);
 
     /*! @see slang::ICompileRequest::setOptimizationLevel */
     SLANG_API void spSetOptimizationLevel(
@@ -4041,6 +4061,9 @@ namespace slang
             /** Sets the flags of the request's diagnostic sink.
                 The previously specified flags are discarded. */
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) = 0;
+
+            /** Set the debug format to be used for debugging information */
+        virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat debugFormat) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
