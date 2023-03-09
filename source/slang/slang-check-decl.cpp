@@ -6880,6 +6880,11 @@ namespace Slang
     {
         return "BackwardDerivative";
     }
+    template<>
+    const char* getDerivativeAttrName<PrimalSubstituteAttribute>()
+    {
+        return "PrimalSubstitute";
+    }
 
     List<Expr*> getImaginaryArgsToFunc(ASTBuilder* astBuilder, FunctionDeclBase* func, SourceLoc loc)
     {
@@ -7025,6 +7030,7 @@ namespace Slang
                 getDerivativeAttrName<TDerivativeAttr>());
             visitor->getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef.getDecl());
         }
+
         derivativeOfAttr->funcExpr = calleeDeclRefExpr;
         auto derivativeAttr = visitor->getASTBuilder()->create<TDerivativeAttr>();
         derivativeAttr->loc = derivativeOfAttr->loc;
