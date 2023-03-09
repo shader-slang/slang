@@ -252,6 +252,9 @@ struct DownstreamCompileOptions
     /// NOTE! Not all downstream compilers can use the fileSystemExt/sourceManager. This option will be ignored in those scenarios.
     ISlangFileSystemExt* fileSystemExt = nullptr;
     SourceManager* sourceManager = nullptr;
+
+    // The debug info format to use. 
+    SlangDebugInfoFormat m_debugInfoFormat = SLANG_DEBUG_INFO_FORMAT_DEFAULT;
 };
 
 #define SLANG_ALIAS_DEPRECIATED_VERSION(name, id, firstField, lastField) \

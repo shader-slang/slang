@@ -66,7 +66,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
     if (flags & ProductFlag::Debug)
     {
         // TODO(JS): Could try and determine based on debug information
-        _addFile(modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::DebugInfo, targetDesc), lockFile, outArtifacts);
+        _addFile(modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::PdbDebugInfo, targetDesc), lockFile, outArtifacts);
     }
 
     return SLANG_OK;

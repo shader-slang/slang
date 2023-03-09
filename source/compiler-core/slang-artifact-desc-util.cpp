@@ -219,6 +219,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
         x(CompileResults, Base) \
         x(Metadata, Base) \
             x(DebugInfo, Metadata) \
+                x(PdbDebugInfo, DebugInfo) \
             x(Diagnostics, Metadata) \
         x(Miscellaneous, Base) \
             x(Log, Miscellaneous) \
@@ -549,6 +550,12 @@ static const KindExtension g_cpuKindExts[] =
         return ArtifactDesc::make(ArtifactKind::Assembly, ArtifactPayload::HostCPU);
     }
 
+    if (slice == toSlice("pdb"))
+    {
+        // Program database
+        return ArtifactDesc::make(ArtifactKind::Assembly, ArtifactPayload::PdbDebugInfo);
+    }
+
     for (const auto& kindExt : g_cpuKindExts)
     {
         if (slice == kindExt.ext)
@@ -612,6 +619,8 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
         case Payload::SlangIR:      return toSlice("slang-ir");
         
         case Payload::MetalAIR:     return toSlice("air");
+
+        case Payload::PdbDebugInfo: return toSlice("pdb");
 
         default: break;
     }

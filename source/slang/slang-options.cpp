@@ -1511,7 +1511,8 @@ struct OptionsParser
                     {
                         // Extract the digit into an index
                         const Index levelIndex = argValue[2] - '0';
-                        
+                        SLANG_ASSERT(index >= 0 && index <= 3);
+
                         // Map indices to enum values
                         const SlangDebugInfoLevel levels[] = 
                         {
