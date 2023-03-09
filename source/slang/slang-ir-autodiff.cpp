@@ -565,6 +565,9 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
 
 bool canTypeBeStored(IRInst* type)
 {
+    if (!type)
+        return false;
+
     if (as<IRBasicType>(type))
         return true;
 
