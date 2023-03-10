@@ -238,10 +238,13 @@ convention for interface methods.
 #   define SLANG_BREAKPOINT(id) __builtin_trap();
 #	define SLANG_ALIGN_OF(T)	__alignof__(T)
 
-// Use this macro instead of offsetof, because gcc produces warning if offsetof is used on a 
-// non POD type, even though it produces the correct result
-#   define SLANG_OFFSET_OF(T, ELEMENT) (size_t(&((T*)1)->ELEMENT) - 1)
+// Use the builtin directly so we don't need to have an include of stddef.h
+#   define SLANG_OFFSET_OF(T, ELEMENT) __builtin_offsetof(T, ELEMENT) 
 #endif // SLANG_GCC_FAMILY
+
+#ifndef SLANG_OFFSET_OF
+#   define SLANG_OFFSET_OF(T, ELEMENT) (size_t(&((T*)1)->ELEMENT) - 1)
+#endif
 
 // Microsoft VC specific
 #if SLANG_MICROSOFT_FAMILY
