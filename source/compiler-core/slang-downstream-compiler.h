@@ -44,8 +44,108 @@ struct DownstreamCompilerDesc
     SemanticVersion version;    ///< The version of the compiler
 };
 
+/* Placed at the start of structs that are versioned. 
+The id uniquely identifies a compatible set of versions. 
+The size indicates the struct size. It should be considered as a kind of version number.
+The larger the number for the target the newer the *compatible* version (assuming the identifiers
+match).
+
+Note that size versioning *only* works, if adding a field *doesn't* use any existing unused "pad" bytes. 
+This implies that any new members *must* take into account padding/alignment. Any additions that have alignment
+*less* than the alignment of struct may need padding. 
+*/
+struct VersionedStruct
+{
+    typedef VersionedStruct ThisType;
+    VersionedStruct(uint32_t inIdentifier, size_t inSize):
+        identifier(inIdentifier),
+        size(uint32_t(inSize))
+    {}
+
+        /// True if the versions are identical
+    bool operator==(const ThisType& rhs) const { return identifier == rhs.identifier && size == rhs.size;  }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    VersionedStruct(const ThisType& rhs) = default;
+    ThisType& operator=(const ThisType& rhs) = default;
+
+    uint32_t identifier;
+    uint32_t size;
+};
+
+template <typename T>
+T getCompatibleVersion(const T* inT)
+{
+    const VersionedStruct* in = &inT->version;
+
+    // It must be at the start of the struct
+    SLANG_ASSERT((void*)in == (void*)inT);
+
+    // Note that the struct is passed in by pointer rather than reference, because
+    // we must ensure that it is not sliced.
+    
+    // Must match
+    SLANG_ASSERT(T::kVersionIdentifier == in->identifier);
+
+    // If the same size we can just use what we have
+    if (in->size == sizeof(T))
+    {
+        return *inT;
+    }
+
+    // Initialize a new T to copy into
+    T t;
+
+    // Keep a copy of the version as will be overwritten
+    const auto currentVersion = t.version;
+
+    // If the size is smaller we just copy the bytes that we have.
+    // NOTE! This only works if care is taken with padding/end bytes of previous versions
+    // see above on VersionedStruct
+    if (in->size < sizeof(T))
+    {
+        // Copy up the size that's stored
+        ::memcpy(&t, in, in->size);
+    }
+    else
+    {
+        t = *inT;
+    }
+
+    t.version = currentVersion;
+    return t;
+}
+
+template <typename T>
+bool isVersionCompatible(const VersionedStruct& ver)
+{
+    return ver.identifier == T::kVersionIdentifier;
+}
+
+template <typename T>
+bool isVersionCompatible(const T& in)
+{
+    return isVersionCompatible<T>(in.version);
+}
+
+/* Downstream compile options
+
+NOTE! This type is trafficed across shared library boundaries and *versioned*. 
+In particular
+
+* The struct can only contain types that can be trivially memcpyd.
+* New fields can only be added to the end of the struct 
+* New fields must take into account alignment/padding such that they do not share bytes in previous version sizes
+*/
 struct DownstreamCompileOptions
 {
+    typedef DownstreamCompileOptions ThisType;
+
+    // A unique identifer for this particular struct kind. If the struct become incompatible 
+    // a new id should be used to identify a specific style. If the change is only to add members
+    // to the end, this should be handled via the version size at use sites. 
+    static const uint32_t kVersionIdentifier = 0x34296897;
+
     typedef uint32_t Flags;
     struct Flag
     {
@@ -105,6 +205,9 @@ struct DownstreamCompileOptions
         SemanticVersion version;
     };
 
+    // These members must be the first members of the struct!
+    VersionedStruct version = VersionedStruct(kVersionIdentifier, sizeof(ThisType));
+
     OptimizationLevel optimizationLevel = OptimizationLevel::Default;
     DebugInfoType debugInfoType = DebugInfoType::Standard;
     SlangCompileTarget targetType = SLANG_HOST_EXECUTABLE;
@@ -150,6 +253,16 @@ struct DownstreamCompileOptions
     ISlangFileSystemExt* fileSystemExt = nullptr;
     SourceManager* sourceManager = nullptr;
 };
+
+#define SLANG_ALIAS_DEPRECIATED_VERSION(name, id, firstField, lastField) \
+struct name##_AliasDepreciated##id \
+{ \
+    static const ptrdiff_t kStart = SLANG_OFFSET_OF(name, firstField); \
+    static const ptrdiff_t kEnd = SLANG_OFFSET_OF(name, lastField) + sizeof(name::lastField); \
+};
+
+// Specifies via kStart/kEnd a slice of a type that is the previous version.
+SLANG_ALIAS_DEPRECIATED_VERSION(DownstreamCompileOptions, 1, optimizationLevel, sourceManager)
 
 /* Used to indicate what kind of products are expected to be produced for a compilation. */
 typedef uint32_t DownstreamProductFlags;
