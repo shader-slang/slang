@@ -2463,12 +2463,12 @@ namespace Slang
                 // If the found inst is defined in the same parent as current insert location but
                 // is located after the insert location, we need to move it to the insert location.
                 auto foundInst = *found;
-                if (foundInst->getParent() == getInsertLoc().getParent() &&
+                if (foundInst->getParent() && foundInst->getParent() == getInsertLoc().getParent() &&
                     getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
                 {
                     auto insertLoc = getInsertLoc().getInst();
                     bool isAfter = false;
-                    for (auto cur = insertLoc; cur; cur = cur->next)
+                    for (auto cur = insertLoc->next; cur; cur = cur->next)
                     {
                         if (cur == foundInst)
                         {
