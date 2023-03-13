@@ -2259,23 +2259,48 @@ struct IRGetTupleElement : IRInst
 
 // An Instruction that creates a differential pair value from a
 // primal and differential.
-struct IRMakeDifferentialPair : IRInst
+
+struct IRMakeDifferentialPairBase : IRInst
 {
-    IR_LEAF_ISA(MakeDifferentialPair)
+    IR_PARENT_ISA(MakeDifferentialPairBase)
     IRInst* getPrimalValue() { return getOperand(0); }
     IRInst* getDifferentialValue() { return getOperand(1); }
 };
-
-struct IRDifferentialPairGetDifferential : IRInst
+struct IRMakeDifferentialPair : IRMakeDifferentialPairBase
 {
-    IR_LEAF_ISA(DifferentialPairGetDifferential)
-    IRInst* getBase() { return getOperand(0); }
+    IR_LEAF_ISA(MakeDifferentialPair)
+};
+struct IRMakeDifferentialPairUserCode : IRMakeDifferentialPairBase
+{
+    IR_LEAF_ISA(MakeDifferentialPairUserCode)
 };
 
-struct IRDifferentialPairGetPrimal : IRInst
+struct IRDifferentialPairGetDifferentialBase : IRInst
+{
+    IR_PARENT_ISA(DifferentialPairGetDifferentialBase)
+    IRInst* getBase() { return getOperand(0); }
+};
+struct IRDifferentialPairGetDifferential : IRDifferentialPairGetDifferentialBase
+{
+    IR_LEAF_ISA(DifferentialPairGetDifferential)
+};
+struct IRDifferentialPairGetDifferentialUserCode : IRDifferentialPairGetDifferentialBase
+{
+    IR_LEAF_ISA(DifferentialPairGetDifferentialUserCode)
+};
+
+struct IRDifferentialPairGetPrimalBase : IRInst
+{
+    IR_PARENT_ISA(DifferentialPairGetPrimalBase)
+    IRInst* getBase() { return getOperand(0); }
+};
+struct IRDifferentialPairGetPrimal : IRDifferentialPairGetPrimalBase
 {
     IR_LEAF_ISA(DifferentialPairGetPrimal)
-    IRInst* getBase() { return getOperand(0); }
+};
+struct IRDifferentialPairGetPrimalUserCode : IRDifferentialPairGetPrimalBase
+{
+    IR_LEAF_ISA(DifferentialPairGetPrimalUserCode)
 };
 
 struct IRDetachDerivative : IRInst
@@ -2717,6 +2742,10 @@ public:
         IRType* valueType,
         IRInst* witnessTable);
 
+    IRDifferentialPairUserCodeType* getDifferentialPairUserCodeType(
+        IRType* valueType,
+        IRInst* witnessTable);
+
     IRBackwardDiffIntermediateContextType* getBackwardDiffIntermediateContextType(IRInst* func);
 
     IRFuncType* getFuncType(
@@ -2832,6 +2861,7 @@ public:
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
+    IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
 
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
 
@@ -2966,6 +2996,8 @@ public:
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
+    IRInst* emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialPairGetPrimalUserCode(IRInst* diffPair);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,

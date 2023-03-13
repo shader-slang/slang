@@ -24,7 +24,7 @@ struct DiffTransposePass
             GetElement,
             GetDifferential,
             FieldExtract,
-
+            DifferentialPairGetElementUserCode,
             Invalid
         };
 
@@ -1704,7 +1704,16 @@ struct DiffTransposePass
 
             case kIROp_DifferentialPairGetDifferential:
                 return transposeGetDifferential(builder, as<IRDifferentialPairGetDifferential>(fwdInst), revValue);
-            
+
+            case kIROp_MakeDifferentialPairUserCode:
+                return transposeMakePairUserCode(builder, as<IRMakeDifferentialPairUserCode>(fwdInst), revValue);
+
+            case kIROp_DifferentialPairGetPrimalUserCode:
+                return transposeGetPrimalUserCode(builder, as<IRDifferentialPairGetPrimalUserCode>(fwdInst), revValue);
+
+            case kIROp_DifferentialPairGetDifferentialUserCode:
+                return transposeGetDifferentialUserCode(builder, as<IRDifferentialPairGetDifferentialUserCode>(fwdInst), revValue);
+
             case kIROp_MakeVector:
                 return transposeMakeVector(builder, fwdInst, revValue);
             case kIROp_MakeVectorFromScalar:
@@ -1876,6 +1885,47 @@ struct DiffTransposePass
                             fwdGetDiff->getBase(),
                             revValue,
                             fwdGetDiff)));
+    }
+
+    TranspositionResult transposeMakePairUserCode(IRBuilder* builder, IRMakeDifferentialPairUserCode* fwdMakePair, IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        gradients.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            fwdMakePair->getPrimalValue(),
+            builder->emitDifferentialPairGetPrimalUserCode(revValue),
+            fwdMakePair));
+        gradients.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            fwdMakePair->getDifferentialValue(),
+            builder->emitDifferentialPairGetDifferentialUserCode(
+                fwdMakePair->getDifferentialValue()->getFullType(), revValue),
+            fwdMakePair));
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeGetDifferentialUserCode(IRBuilder*, IRDifferentialPairGetDifferentialUserCode* fwdGetDiff, IRInst* revValue)
+    {
+        // (A = x.p) -> (dX = DiffPairUserCode(dA, 0))
+        return TranspositionResult(
+            List<RevGradient>(
+                RevGradient(
+                    RevGradient::Flavor::DifferentialPairGetElementUserCode,
+                    fwdGetDiff->getBase(),
+                    revValue,
+                    fwdGetDiff)));
+    }
+
+    TranspositionResult transposeGetPrimalUserCode(IRBuilder*, IRDifferentialPairGetPrimalUserCode* fwdGetPrimal, IRInst* revValue)
+    {
+        // (A = x.p) -> (dX = DiffPairUserCode(0, dA))
+        return TranspositionResult(
+            List<RevGradient>(
+                RevGradient(
+                    RevGradient::Flavor::DifferentialPairGetElementUserCode,
+                    fwdGetPrimal->getBase(),
+                    revValue,
+                    fwdGetPrimal)));
     }
 
     TranspositionResult transposeMakeVectorFromScalar(IRBuilder* builder, IRInst* fwdMakeVector, IRInst* revValue)
@@ -2497,6 +2547,40 @@ struct DiffTransposePass
         return materializeSimpleGradients(builder, aggPrimalType, simpleGradients);
     }
 
+    RevGradient materializeDifferentialPairUserCodeGetElementGradients(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
+    {
+        List<RevGradient> simpleGradients;
+
+        for (auto gradient : gradients)
+        {
+            // Peek at the fwd-mode get element inst to see what type we need to materialize.
+            if (auto fwdGetDiff = as<IRDifferentialPairGetDifferentialUserCode>(gradient.fwdGradInst))
+            {
+                auto baseType = as<IRDifferentialPairUserCodeType>(diffTypeContext.getDifferentialForType(
+                    builder,
+                    fwdGetDiff->getBase()->getDataType()));
+                simpleGradients.add(
+                    RevGradient(
+                        gradient.targetInst,
+                        builder->emitMakeDifferentialPairUserCode(baseType, emitDZeroOfDiffInstType(builder, baseType->getValueType()), gradient.revGradInst),
+                        gradient.fwdGradInst));
+            }
+            else if (auto fwdGetPrimal = as<IRDifferentialPairGetPrimalUserCode>(gradient.fwdGradInst))
+            {
+                auto baseType = as<IRDifferentialPairUserCodeType>(diffTypeContext.getDifferentialForType(
+                    builder,
+                    fwdGetPrimal->getBase()->getDataType()));
+                simpleGradients.add(
+                    RevGradient(
+                        gradient.targetInst,
+                        builder->emitMakeDifferentialPairUserCode(baseType, gradient.revGradInst, emitDZeroOfDiffInstType(builder, fwdGetPrimal->getFullType())),
+                        gradient.fwdGradInst));
+            }
+        }
+
+        return materializeSimpleGradients(builder, aggPrimalType, simpleGradients);
+    }
+
     RevGradient materializeGradientSet(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
     {
         switch (gradients[0].flavor)
@@ -2512,6 +2596,9 @@ struct DiffTransposePass
 
             case RevGradient::Flavor::GetElement:
                 return materializeGetElementGradients(builder, aggPrimalType, gradients);
+
+            case RevGradient::Flavor::DifferentialPairGetElementUserCode:
+                return materializeDifferentialPairUserCodeGetElementGradients(builder, aggPrimalType, gradients);
 
             default:
                 SLANG_ASSERT_FAILURE("Unhandled gradient flavor for materialization");
@@ -2773,6 +2860,16 @@ struct DiffTransposePass
             auto diffElementZero = emitDZeroOfDiffInstType(builder, arrayType->getElementType());
             return builder->emitMakeArrayFromElement(diffArrayType, diffElementZero);
         }
+        else if (auto diffPairUserType = as<IRDifferentialPairUserCodeType>(primalType))
+        {
+            auto primalZero = emitDZeroOfDiffInstType(builder, diffPairUserType->getValueType());
+            auto diffZero = primalZero;
+            auto diffType = primalZero->getFullType();
+            auto diffWitness = diffTypeContext.getDiffTypeWitnessFromPairType(builder, diffPairUserType);
+            auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
+            return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primalZero, diffZero);
+        }
+
         auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, primalType);
 
         // Should exist.
@@ -2810,6 +2907,23 @@ struct DiffTransposePass
                 SLANG_UNIMPLEMENTED_X("dadd of dynamic array.");
             }
         }
+        else if (auto diffPairUserType = as<IRDifferentialPairUserCodeType>(primalType))
+        {
+            auto diffType = (IRType*)diffTypeContext.getDiffTypeFromPairType(builder, diffPairUserType);
+            auto diffWitness = diffTypeContext.getDiffTypeWitnessFromPairType(builder, diffPairUserType);
+
+            auto primal1 = builder->emitDifferentialPairGetPrimalUserCode(op1);
+            auto primal2 = builder->emitDifferentialPairGetPrimalUserCode(op2);
+            auto primal = emitDAddOfDiffInstType(builder, diffPairUserType->getValueType(), primal1, primal2);
+
+            auto diff1 = builder->emitDifferentialPairGetDifferentialUserCode(diffType, op1);
+            auto diff2 = builder->emitDifferentialPairGetDifferentialUserCode(diffType, op2);
+            auto diff = emitDAddOfDiffInstType(builder, diffType, diff1, diff2);
+
+            auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
+            return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primal, diff);
+        }
+
         auto addMethod = diffTypeContext.getAddMethodForType(builder, primalType);
 
         // Should exist.

@@ -1506,19 +1506,37 @@ namespace Slang
             aggTypeDecl->members.add(diffField);
             aggTypeDecl->invalidateMemberDictionary();
 
+            // Inject a `DerivativeMember` modifier on the differential field to point to itself.
+            {
+                auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+                auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+                fieldLookupExpr->type.type = diffMemberType;
+                auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = differentialType;
+                auto baseTypeType = m_astBuilder->create<TypeType>();
+                baseTypeType->type = differentialType;
+                baseTypeExpr->type.type = baseTypeType;
+                fieldLookupExpr->baseExpression = baseTypeExpr;
+                fieldLookupExpr->declRef = makeDeclRef(diffField);
+                derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+                addModifier(diffField, derivativeMemberModifier);
+            }
+
             // Inject a `DerivativeMember` modifier on the original decl.
-            auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
-            auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
-            fieldLookupExpr->type.type = diffMemberType;
-            auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
-            baseTypeExpr->base.type = differentialType;
-            auto baseTypeType = m_astBuilder->create<TypeType>();
-            baseTypeType->type = differentialType;
-            baseTypeExpr->type.type = baseTypeType;
-            fieldLookupExpr->baseExpression = baseTypeExpr;
-            fieldLookupExpr->declRef = makeDeclRef(diffField);
-            derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
-            addModifier(member, derivativeMemberModifier);
+            {
+                auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+                auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+                fieldLookupExpr->type.type = diffMemberType;
+                auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = differentialType;
+                auto baseTypeType = m_astBuilder->create<TypeType>();
+                baseTypeType->type = differentialType;
+                baseTypeExpr->type.type = baseTypeType;
+                fieldLookupExpr->baseExpression = baseTypeExpr;
+                fieldLookupExpr->declRef = makeDeclRef(diffField);
+                derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+                addModifier(member, derivativeMemberModifier);
+            }
         };
 
         // Make the Differential type itself conform to `IDifferential` interface.
