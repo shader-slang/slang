@@ -482,6 +482,7 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_BackwardDerivativePrimalReturnDecoration:
             case kIROp_AutoDiffOriginalValueDecoration:
             case kIROp_UserDefinedBackwardDerivativeDecoration:
+            case kIROp_IntermediateContextFieldDifferentialTypeDecoration:
                 decor->removeAndDeallocate();
                 break;
             default:
@@ -631,6 +632,8 @@ struct AutoDiffPass : public InstPassBase
         {
             List<IRInst*> args;
             auto subBase = processIntermediateContextTypeBase(builder, spec->getBase());
+            if (!subBase)
+                return nullptr;
             for (UInt a = 0; a < spec->getArgCount(); a++)
                 args.add(spec->getArg(a));
             auto actualType = builder->emitSpecializeInst(
@@ -645,6 +648,9 @@ struct AutoDiffPass : public InstPassBase
             auto inner = findGenericReturnVal(baseGeneric);
             if (auto typeDecor = inner->findDecoration<IRBackwardDerivativeIntermediateTypeDecoration>())
             {
+                if (!isTypeFullyDifferentiated(typeDecor->getBackwardDerivativeIntermediateType()))
+                    return nullptr;
+
                 return typeDecor->getBackwardDerivativeIntermediateType();
             }
         }
@@ -652,6 +658,8 @@ struct AutoDiffPass : public InstPassBase
         {
             if (auto typeDecor = func->findDecoration<IRBackwardDerivativeIntermediateTypeDecoration>())
             {
+                if (!isTypeFullyDifferentiated(typeDecor->getBackwardDerivativeIntermediateType()))
+                    return nullptr;
                 return typeDecor->getBackwardDerivativeIntermediateType();
             }
         }
@@ -671,6 +679,10 @@ struct AutoDiffPass : public InstPassBase
     bool lowerIntermediateContextType(IRBuilder* builder)
     {
         bool changed = false;
+        OrderedHashSet<IRInst*> loweredIntermediateTypes;
+
+        // Replace all `BackwardDiffIntermediateContextType` insts with the struct type
+        // that we generated during backward diff pass.
         processAllInsts([&](IRInst* inst)
             {
                 switch (inst->getOp())
@@ -685,6 +697,7 @@ struct AutoDiffPass : public InstPassBase
                         auto type = processIntermediateContextTypeBase(&subBuilder, baseFunc);
                         if (type)
                         {
+                            loweredIntermediateTypes.Add(type);
                             inst->replaceUsesWith(type);
                             inst->removeAndDeallocate();
                             changed = true;
@@ -695,7 +708,392 @@ struct AutoDiffPass : public InstPassBase
                     break;
                 }
             });
+
+        // Now we generate the differential type for the intermediate context type
+        // to allow higher order differentiation.
+        generateDifferentialImplementationForContextType(loweredIntermediateTypes);
         return changed;
+    }
+
+    // Utility function for topology sorting the intermediate context types.
+    bool isIntermediateContextTypeReadyForProcess(OrderedHashSet<IRInst*>& contextTypes, OrderedHashSet<IRInst*>& sortedSet, IRInst* t)
+    {
+        if (!contextTypes.Contains(t))
+            return true;
+
+        switch (t->getOp())
+        {
+        case kIROp_StructType:
+            {
+                bool canAddNow = true;
+                for (auto f : as<IRStructType>(t)->getFields())
+                {
+                    if (!isIntermediateContextTypeReadyForProcess(contextTypes, sortedSet, f->getFieldType()))
+                    {
+                        canAddNow = false;
+                        break;
+                    }
+                }
+                return canAddNow;
+            }
+        case kIROp_Specialize:
+            return isIntermediateContextTypeReadyForProcess(contextTypes, sortedSet, as<IRSpecialize>(t)->getBase());
+        case kIROp_Generic:
+            return isIntermediateContextTypeReadyForProcess(contextTypes, sortedSet, findGenericReturnVal(as<IRGeneric>(t)));
+        default:
+            return true;
+        }
+    }
+
+    struct IntermediateContextTypeDifferentialInfo
+    {
+        IRInst* diffType = nullptr;
+        IRInst* diffWitness = nullptr;
+        IRInst* diffDiffWitness = nullptr;
+        IRInst* zeroMethod = nullptr;
+        IRInst* addMethod = nullptr;
+    };
+
+    // Register the differential type for an intermediate context type to the derivative functions that uses the type.
+    void registerDiffContextType(
+        IRBuilder& builder,
+        IRDifferentiableTypeDictionaryDecoration* diffDecor,
+        OrderedDictionary<IRInst*, IntermediateContextTypeDifferentialInfo>& diffTypes,
+        IRInst* origType)
+    {
+        HashSet<IRInst*> registeredType;
+        for (auto entry : diffDecor->getChildren())
+        {
+            if (auto e = as<IRDifferentiableTypeDictionaryItem>(entry))
+            {
+                registeredType.Add(e->getOperand(0));
+            }
+        }
+        // Use a work list to recursively walk through all sub fields of the struct type.
+        List<IRInst*> wlist;
+        wlist.add(origType);
+        for (Index i = 0; i < wlist.getCount(); i++)
+        {
+            auto t = wlist[i];
+            IntermediateContextTypeDifferentialInfo diffInfo;
+            if (!diffTypes.TryGetValue(t, diffInfo))
+                continue;
+            if (registeredType.Add(t))
+                builder.addDifferentiableTypeEntry(diffDecor, t, diffInfo.diffWitness);
+            else
+                continue;
+
+            if (auto structType = as<IRStructType>(getResolvedInstForDecorations(t)))
+            {
+                for (auto f : structType->getFields())
+                {
+                    wlist.add(f->getFieldType());
+                }
+            }
+        }
+    }
+
+    void generateDifferentialImplementationForContextType(OrderedHashSet<IRInst*>& contextTypes)
+    {
+        // First we are going to topology sort all intermediate context types.
+        OrderedHashSet<IRInst*> sortedContextTypes;
+        for (;;)
+        {
+            auto lastCount = sortedContextTypes.Count();
+            for (auto t : contextTypes)
+            {
+                if (sortedContextTypes.Contains(t))
+                    continue;
+                // Have all dependent types been added yet?
+                if (isIntermediateContextTypeReadyForProcess(contextTypes, sortedContextTypes, t))
+                    sortedContextTypes.Add(t);
+            }
+            if (lastCount == sortedContextTypes.Count())
+                break;
+        }
+
+        // After the types are sorted, we start to generate the differential type and IDifferentiable witnesses
+        // for them.
+
+        OrderedDictionary<IRInst*, IntermediateContextTypeDifferentialInfo> diffTypes;
+        IRBuilder builder(module);
+        for (auto t : sortedContextTypes)
+        {
+            if (t->getOp() == kIROp_Generic || t->getOp() == kIROp_StructType)
+            {
+                // For generics/struct types, we will generate a new generic/struct type representing the differntial.
+
+                SLANG_RELEASE_ASSERT(t->getParent() && t->getParent()->getOp() == kIROp_Module);
+                builder.setInsertBefore(t);
+                auto diffInfo = fillDifferentialTypeImplementation(diffTypes, t);
+                diffTypes[t] = diffInfo;
+            }
+            else if (auto specialize = as<IRSpecialize>(t))
+            {
+                // A specialize of a context type translates to a specialize of its differential type/witness.
+
+                IntermediateContextTypeDifferentialInfo baseInfo;
+                SLANG_RELEASE_ASSERT(diffTypes.TryGetValue(specialize->getBase(), baseInfo));
+                builder.setInsertBefore(t);
+                List<IRInst*> args;
+                for (UInt i = 0; i < specialize->getArgCount(); i++)
+                    args.add(specialize->getArg(i));
+                IntermediateContextTypeDifferentialInfo info;
+                info.diffType = builder.emitSpecializeInst(
+                    builder.getTypeKind(), baseInfo.diffType, (UInt)args.getCount(), args.getBuffer());
+                info.diffWitness = builder.emitSpecializeInst(
+                    builder.getWitnessTableType(autodiffContext->differentiableInterfaceType),
+                    baseInfo.diffWitness,
+                    (UInt)args.getCount(),
+                    args.getBuffer());
+                diffTypes[t] = info;
+            }
+            else
+            {
+                // If `t` is not a specialize, it'd better be processed by now.
+                // We currently don't support the `LookupInterfaceMethod` case, since it can't
+                // appear in a derivative function because we will only call the backward diff function without a intermediate-type
+                // via an interface.
+                SLANG_RELEASE_ASSERT(diffTypes.ContainsKey(t));
+            }
+        }
+
+        // Register the differential types into the conformance dictionaries of the functions that uses them.
+        for (auto t : diffTypes)
+        {
+            HashSet<IRFunc*> registeredFuncs;
+            for (auto use = t.Key->firstUse; use; use = use->nextUse)
+            {
+                auto parentFunc = getParentFunc(use->getUser());
+                if (!parentFunc)
+                    continue;
+                if (!registeredFuncs.Add(parentFunc))
+                    continue;
+                if (auto dictDecor = parentFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
+                {
+                    registerDiffContextType(builder, dictDecor, diffTypes, t.Key);
+                }
+            }
+        }
+    }
+    
+    IntermediateContextTypeDifferentialInfo fillDifferentialTypeImplementationForStruct(
+        OrderedDictionary<IRInst*, IntermediateContextTypeDifferentialInfo>& diffTypes,
+        IRStructType* originalType,
+        IRStructType* diffType)
+    {
+        IntermediateContextTypeDifferentialInfo result;
+        result.diffType = diffType;
+
+        IRBuilder builder(diffType);
+        builder.setInsertInto(diffType);
+
+        // Generate the fields for all differentiable members of the original struct type.
+        for (auto field : originalType->getFields())
+        {
+            IRInst* diffFieldType = nullptr;
+            if (auto diffDecor = field->findDecoration<IRIntermediateContextFieldDifferentialTypeDecoration>())
+            {
+                diffFieldType = diffDecor->getDifferentialType();
+            }
+            else
+            {
+                IntermediateContextTypeDifferentialInfo diffFieldTypeInfo;
+                diffTypes.TryGetValue(field->getDataType(), diffFieldTypeInfo);
+                diffFieldType = diffFieldTypeInfo.diffType;
+            }
+            if (diffFieldType)
+            {
+                IRBuilder keyBuilder = builder;
+                keyBuilder.setInsertBefore(maybeFindOuterGeneric(originalType));
+                auto diffKey = keyBuilder.createStructKey();
+                builder.createStructField(diffType, diffKey, (IRType*)diffFieldType);
+                builder.addDecoration(field->getKey(), kIROp_DerivativeMemberDecoration, diffKey);
+                builder.addDecoration(diffKey, kIROp_DerivativeMemberDecoration, diffKey);
+            }
+        }
+        
+        builder.setInsertAfter(diffType);
+
+        // For now, we are going to structurally derive dadd and dzero methods for intermediate context types,
+        // because it is tricky for us to obtain the original witness tables for the fields at this point.
+        // This is inconsistent with how we are dealing with dadd and dzero methods via witness table lookup,
+        // and can lead to problems if the user defines any non-trivial dadd/dzero methods.
+        //
+        // TODO: we should consider rewrite this logic to be witness table lookup based, or simplify the entire
+        // type system and IR passes to always use structurally derived methods instead of user-provided
+        // methods.
+        IRInst* zeroMethod = nullptr;
+        {
+            auto zeroMethodType = builder.getFuncType(List<IRType*>(), diffType);
+            zeroMethod = builder.createFunc();
+            zeroMethod->setFullType(zeroMethodType);
+            result.zeroMethod = zeroMethod;
+            builder.setInsertInto(zeroMethod);
+            builder.emitBlock();
+            builder.emitReturn(builder.emitDefaultConstruct(diffType));
+        }
+
+        builder.setInsertAfter(zeroMethod);
+        IRInst* addMethod = nullptr;
+        {
+            List<IRType*> paramTypes;
+            paramTypes.add(diffType);
+            paramTypes.add(diffType);
+            auto addMethodType = builder.getFuncType(List<IRType*>(), diffType);
+            addMethod = builder.createFunc();
+            result.addMethod = addMethod;
+            addMethod->setFullType(addMethodType);
+            builder.setInsertInto(addMethod);
+            builder.emitBlock();
+            auto param1 = builder.emitParam(diffType);
+            auto param2 = builder.emitParam(diffType);
+            builder.emitReturn(builder.emitStructuralAdd(param1, param2));
+        }
+
+        builder.setInsertAfter(addMethod);
+        auto diffTypeIsDiffWitness = builder.createWitnessTable(autodiffContext->differentiableInterfaceType, diffType);
+        auto origTypeIsDiffWitness = builder.createWitnessTable(autodiffContext->differentiableInterfaceType, originalType);
+        result.diffWitness = origTypeIsDiffWitness;
+
+        builder.createWitnessTableEntry(origTypeIsDiffWitness, autodiffContext->differentialAssocTypeStructKey, diffType);
+        builder.createWitnessTableEntry(origTypeIsDiffWitness, autodiffContext->differentialAssocTypeWitnessStructKey, diffTypeIsDiffWitness);
+        builder.createWitnessTableEntry(origTypeIsDiffWitness, autodiffContext->zeroMethodStructKey, zeroMethod);
+        builder.createWitnessTableEntry(origTypeIsDiffWitness, autodiffContext->addMethodStructKey, addMethod);
+
+        builder.createWitnessTableEntry(diffTypeIsDiffWitness, autodiffContext->differentialAssocTypeStructKey, diffType);
+        builder.createWitnessTableEntry(diffTypeIsDiffWitness, autodiffContext->differentialAssocTypeWitnessStructKey, diffTypeIsDiffWitness);
+        builder.createWitnessTableEntry(diffTypeIsDiffWitness, autodiffContext->zeroMethodStructKey, zeroMethod);
+        builder.createWitnessTableEntry(diffTypeIsDiffWitness, autodiffContext->addMethodStructKey, addMethod);
+        return result;
+    }
+
+    IntermediateContextTypeDifferentialInfo fillDifferentialTypeImplementation(
+        OrderedDictionary<IRInst*, IntermediateContextTypeDifferentialInfo>& diffTypes,
+        IRInst* originalType)
+    {
+        if (originalType->getOp() == kIROp_StructType)
+        {
+            IRBuilder builder(originalType);
+            builder.setInsertBefore(originalType);
+            auto diffType = builder.createStructType();
+            return fillDifferentialTypeImplementationForStruct(
+                diffTypes,
+                as<IRStructType>(originalType),
+                as<IRStructType>(diffType));
+        }
+        else if (auto genType = as<IRGeneric>(originalType))
+        {
+            // For generics, we process the inner struct type as normal,
+            // and then hoist the additional insts we created from the generic.
+
+            auto structType = as<IRStructType>(findGenericReturnVal(genType));
+            SLANG_RELEASE_ASSERT(structType);
+
+            auto innerResult = fillDifferentialTypeImplementation(diffTypes, structType);
+            IRBuilder builder(originalType);
+            builder.setInsertBefore(originalType);
+
+            // Now we hoist the new values from the generic to form their independent generics.
+            IRInst* specInst = nullptr;
+            IntermediateContextTypeDifferentialInfo result;
+            if (innerResult.diffType)
+                result.diffType = hoistValueFromGeneric(builder, innerResult.diffType, specInst, true);
+            if (innerResult.zeroMethod)
+            {
+                hoistValueFromGeneric(builder, innerResult.zeroMethod->getFullType(), specInst, true);
+                result.zeroMethod = hoistValueFromGeneric(builder, innerResult.zeroMethod, specInst, true);
+            }
+            if (innerResult.addMethod)
+            {
+                hoistValueFromGeneric(builder, innerResult.addMethod->getFullType(), specInst, true);
+                result.addMethod = hoistValueFromGeneric(builder, innerResult.addMethod, specInst, true);
+            }
+            if (innerResult.diffDiffWitness)
+                result.diffDiffWitness = hoistValueFromGeneric(builder, innerResult.diffDiffWitness, specInst, true);
+            if (innerResult.diffWitness)
+            {
+                builder.setInsertBefore(innerResult.diffWitness);
+                List<IRInst*> args;
+                for (auto param : genType->getParams())
+                    args.add(param);
+                as<IRWitnessTable>(innerResult.diffWitness)->setConcreteType((IRType*)builder.emitSpecializeInst(
+                    builder.getTypeKind(), originalType, (UInt)args.getCount(), args.getBuffer()));
+                result.diffWitness = hoistValueFromGeneric(builder, innerResult.diffWitness, specInst, true);
+            }
+            return result;
+        }
+        return IntermediateContextTypeDifferentialInfo();
+    }
+
+    HashSet<IRInst*> fullyDifferentiatedInsts;
+
+    // Returns true if `type` is fully differentiated, i.e. does not have
+    // any unmaterialized intermediate context types.
+    bool isTypeFullyDifferentiated(IRInst* type)
+    {
+        if (fullyDifferentiatedInsts.Contains(type))
+            return true;
+        if (type->getOp() == kIROp_BackwardDiffIntermediateContextType)
+            return false;
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto f : structType->getFields())
+                if (!isTypeFullyDifferentiated(f->getFieldType()))
+                    return false;
+        }
+        else if (auto genType = as<IRGeneric>(type))
+        {
+            bool result = isTypeFullyDifferentiated(findGenericReturnVal(genType));
+            if (result)
+                fullyDifferentiatedInsts.Add(genType);
+            return result;
+        }
+        switch (type->getOp())
+        {
+        case kIROp_ArrayType:
+        case kIROp_UnsizedArrayType:
+        case kIROp_InOutType:
+        case kIROp_OutType:
+        case kIROp_PtrType:
+        case kIROp_DifferentialPairType:
+        case kIROp_DifferentialPairUserCodeType:
+        case kIROp_AttributedType:
+            for (UInt i = 0; i < type->getOperandCount(); i++)
+                if (!isTypeFullyDifferentiated(type->getOperand(i)))
+                    return false;
+        default:
+            fullyDifferentiatedInsts.Add(type);
+            return true;
+        }
+    }
+
+    // Returns true if `func` is fully differentiated, i.e. does not have
+    // any differentiate insts.
+    bool isFullyDifferentiated(IRFunc* func)
+    {
+        if (fullyDifferentiatedInsts.Contains(func))
+            return true;
+
+        for (auto block : func->getBlocks())
+        {
+            for (auto ii : block->getChildren())
+            {
+                switch (ii->getOp())
+                {
+                case kIROp_ForwardDifferentiate:
+                case kIROp_BackwardDifferentiate:
+                case kIROp_BackwardDifferentiatePrimal:
+                case kIROp_BackwardDifferentiatePropagate:
+                case kIROp_BackwardDiffIntermediateContextType:
+                    return false;
+                }
+                if (ii->getDataType() && !isTypeFullyDifferentiated(ii->getDataType()))
+                    return false;
+            }
+        }
+        fullyDifferentiatedInsts.Add(func);
+        return true;
     }
 
     // Process all differentiate calls, and recursively generate code for forward and backward
@@ -703,6 +1101,7 @@ struct AutoDiffPass : public InstPassBase
     //
     bool processReferencedFunctions(IRBuilder* builder)
     {
+        fullyDifferentiatedInsts.Clear();
         bool hasChanges = false;
         for (;;)
         {
@@ -725,6 +1124,12 @@ struct AutoDiffPass : public InstPassBase
                         case kIROp_Func:
                         case kIROp_Specialize:
                         case kIROp_LookupWitness:
+                            if (auto innerFunc = as<IRFunc>(getResolvedInstForDecorations(inst->getOperand(0))))
+                            {
+                                // Skip functions whose body still has a differentiate inst (higher order func).
+                                if (!isFullyDifferentiated(innerFunc))
+                                    return;
+                            }
                             autoDiffWorkList.add(inst);
                             break;
                         default:
@@ -845,6 +1250,11 @@ struct AutoDiffPass : public InstPassBase
             if (!changed)
                 break;
 
+            if (lowerIntermediateContextType(builder))
+            {
+                hasChanges = true;
+            }
+
             // We have done transcribing the functions, now it is time to demote all DifferentialPair types
             // and their operations down to DifferentialPairUserCodeType and *UserCode operations so they
             // can be treated just like normal types with no special semantics in future processing, and won't
@@ -854,10 +1264,6 @@ struct AutoDiffPass : public InstPassBase
             hasChanges |= changed;
         }
 
-        if (lowerIntermediateContextType(builder))
-        {
-            hasChanges = true;
-        }
 
         return hasChanges;
     }

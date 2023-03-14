@@ -150,10 +150,13 @@ struct AddressInstEliminationContext
 
             for (auto use = addrInst->firstUse; use; )
             {
-                if (as<IRDecoration>(use->getUser()))
-                    continue;
-
                 auto nextUse = use->nextUse;
+
+                if (as<IRDecoration>(use->getUser()))
+                {
+                    use = nextUse;
+                    continue;
+                }
 
                 switch (use->getUser()->getOp())
                 {

@@ -613,7 +613,7 @@ However, the `no_diff` keyword is not required in a call if a non-differentiable
 
 ## Higher Order Differentiation
 
-Slang supports generating higher order forward derivative functions. It is allowed to use `__fwd_diff` operator inside a forward differentiable function, or to nest `__fwd_diff` operators. For example, `__fwd_diff(__fwd_diff(sin))` will have the following signature:
+Slang supports generating higher order forward and backward derivative propagation functions. It is allowed to use `__fwd_diff` and `__bwd_diff` operators inside a forward or backward differentiable function, or to nest `__fwd_diff` and `__bwd_diff` operators. For example, `__fwd_diff(__fwd_diff(sin))` will have the following signature:
 
 ```csharp
 DifferentialPair<DifferentialPair<float>> sin_diff2(DifferentialPair<DifferentialPair<float>> x);
@@ -621,9 +621,7 @@ DifferentialPair<DifferentialPair<float>> sin_diff2(DifferentialPair<Differentia
 
 The input parameter `x` contains four fields: `x.p.p`, `x.p.d,`, `x.d.p`, `x.d.d`, where `x.p.p` specifies the orgiginal input value, both `x.p.d` and `x.d.p` store the first order derivative if `x`, and `x.d.d` stores the second order derivative of `x`. Calling `__fwd_diff(__fwd_diff(sin))` with `diffPair(diffPair(pi/2, 1.0), DiffPair(1.0, 0.0))` will result `{ { 1.0, 0.0 }, { 0.0, -1.0 } }`.
 
-Currently, Slang only supports nesting of the `__fwd_diff` operator. The `__bwd_diff` operator cannot be nested. Using `__bwd_diff` operator in a forward derivative or backward propagation function is now allowed and will result in compile-time error.
-
-User defined higher-order derivative functions can be specified by using `[ForwardDerivative]` attribute on the derivative function, or by using `[ForwardDerivativeOf]` attribute on the higher-order derivative function.
+User defined higher-order derivative functions can be specified by using `[ForwardDerivative]` or `[BackwardDerivative]` attribute on the derivative function, or by using `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the higher-order derivative function.
 
 ## Interactions with Generics and Interfaces
 

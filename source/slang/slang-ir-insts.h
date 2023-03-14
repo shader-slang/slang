@@ -783,6 +783,20 @@ struct IRPrimalElementTypeDecoration : IRDecoration
     IRInst* getPrimalElementType() { return getOperand(0); }
 };
 
+struct IRIntermediateContextFieldDifferentialTypeDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_IntermediateContextFieldDifferentialTypeDecoration
+    };
+
+    IR_LEAF_ISA(IntermediateContextFieldDifferentialTypeDecoration)
+
+    IRInst* getDifferentialType() { return getOperand(0); }
+    IRInst* getDifferentialWitness() { return getOperand(1); }
+
+};
+
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -2205,6 +2219,11 @@ struct IRWitnessTable : IRInst
         return (IRType*) getOperand(0);
     }
 
+    void setConcreteType(IRType* t)
+    {
+        return setOperand(0, t);
+    }
+
     IR_LEAF_ISA(WitnessTable)
 };
 
@@ -2867,6 +2886,7 @@ public:
 
     IRInst* addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key);
     IRInst* addPrimalElementTypeDecoration(IRInst* target, IRInst* type);
+    IRInst* addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* type);
 
     // Add a differentiable type entry to the appropriate dictionary.
     IRInst* addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness);
@@ -2948,6 +2968,15 @@ public:
         /// Emits a raw `DefaultConstruct` opcode without attempting to fold/materialize
         /// the inst.
     IRInst* emitDefaultConstructRaw(IRType* type);
+
+    /// Emits appropriate inst for structurally adding two values of `type`.
+    /// If `fallback` is true, will emit `StructuralAdd` inst on unknown types.
+    /// Otherwise, returns nullptr if we can't materialize the inst.
+    IRInst* emitStructuralAdd(IRInst* val0, IRInst* val1, bool fallback = true);
+
+    /// Emits a raw `StructuralAdd` opcode without attempting to fold/materialize
+    /// the inst.
+    IRInst* emitStructuralAddRaw(IRInst* val0, IRInst* val1);
 
     IRInst* emitCast(
         IRType* type,
