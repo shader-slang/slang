@@ -633,6 +633,19 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_StructuralAdd:
+        {
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+            // See if we can replace the generic add inst with concrete values.
+            if (auto newCtor = builder.emitStructuralAdd(inst->getOperand(0), inst->getOperand(1), false))
+            {
+                inst->replaceUsesWith(newCtor);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+        }
+        break;
         case kIROp_Add:
         case kIROp_Mul:
         case kIROp_Sub:

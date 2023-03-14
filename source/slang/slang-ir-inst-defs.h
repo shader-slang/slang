@@ -320,6 +320,9 @@ INST(MakeOptionalValue, makeOptionalValue, 1, 0)
 INST(MakeOptionalNone, makeOptionalNone, 1, 0)
 INST(Call, call, 1, 0)
 
+// Structural addition of two values of the same type.
+INST(StructuralAdd, structuralAdd, 2, 0)
+
 INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
 
@@ -813,6 +816,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Used by the auto-diff pass to mark the primal element type of an
         /// forward-differentiated updateElement inst.
     INST(PrimalElementTypeDecoration, primalElementType, 1, 0)
+
+        /// Used by the auto-diff pass to mark the differential type of an intermediate context field.
+    INST(IntermediateContextFieldDifferentialTypeDecoration, IntermediateContextFieldDifferentialTypeDecoration, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.

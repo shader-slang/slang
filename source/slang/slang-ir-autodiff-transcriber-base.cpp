@@ -258,10 +258,6 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
         auto diffType = (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, origType);
         return (IRType*)findOrTranscribePrimalInst(builder, diffType);
     }
-    else if (origType->getOp() == kIROp_LookupWitness)
-    {
-        return (IRType*)findOrTranscribePrimalInst(builder, (IRInst*)primalType);
-    }
     return (IRType*)transcribe(builder, origType);
 }
 
@@ -282,9 +278,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     {
     case kIROp_Param:
         if (as<IRTypeType>(primalType->getDataType()))
-            return (IRType*)(differentiableTypeConformanceContext.getDifferentialForType(
-                builder,
-                (IRType*)primalType));
+            return differentiateType(builder, origType);
         else if (as<IRWitnessTableType>(primalType->getDataType()))
             return (IRType*)primalType;
 
