@@ -399,9 +399,7 @@ IRInst* DifferentiableTypeConformanceContext::lookUpConformanceForType(IRInst* t
 IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key)
 {
     if (auto conformance = lookUpConformanceForType(origType))
-    {
         return _lookupWitness(builder, conformance, key);
-    }
     return nullptr;
 }
 
@@ -889,40 +887,44 @@ struct AutoDiffPass : public InstPassBase
         builder.setInsertInto(diffType);
 
         // Generate the fields for all differentiable members of the original struct type.
+        struct FieldInfo
+        {
+            IRStructField* field;
+            IRInst* witness;
+        };
+        List<FieldInfo> diffFields;
+
         for (auto field : originalType->getFields())
         {
-            IRInst* diffFieldType = nullptr;
+            IRInst* diffFieldWitness = nullptr;
             if (auto diffDecor = field->findDecoration<IRIntermediateContextFieldDifferentialTypeDecoration>())
             {
-                diffFieldType = diffDecor->getDifferentialType();
+                diffFieldWitness = diffDecor->getDifferentialWitness();
             }
             else
             {
                 IntermediateContextTypeDifferentialInfo diffFieldTypeInfo;
                 diffTypes.TryGetValue(field->getDataType(), diffFieldTypeInfo);
-                diffFieldType = diffFieldTypeInfo.diffType;
+                diffFieldWitness = diffFieldTypeInfo.diffWitness;
             }
-            if (diffFieldType)
+            if (diffFieldWitness)
             {
+                FieldInfo info;
                 IRBuilder keyBuilder = builder;
                 keyBuilder.setInsertBefore(maybeFindOuterGeneric(originalType));
                 auto diffKey = keyBuilder.createStructKey();
-                builder.createStructField(diffType, diffKey, (IRType*)diffFieldType);
+                auto diffFieldType = _lookupWitness(&keyBuilder, diffFieldWitness, autodiffContext->differentialAssocTypeStructKey);
+                info.field = builder.createStructField(diffType, diffKey, (IRType*)diffFieldType);
+                info.witness = diffFieldWitness;
                 builder.addDecoration(field->getKey(), kIROp_DerivativeMemberDecoration, diffKey);
                 builder.addDecoration(diffKey, kIROp_DerivativeMemberDecoration, diffKey);
+                diffFields.add(info);
             }
         }
         
         builder.setInsertAfter(diffType);
 
-        // For now, we are going to structurally derive dadd and dzero methods for intermediate context types,
-        // because it is tricky for us to obtain the original witness tables for the fields at this point.
-        // This is inconsistent with how we are dealing with dadd and dzero methods via witness table lookup,
-        // and can lead to problems if the user defines any non-trivial dadd/dzero methods.
-        //
-        // TODO: we should consider rewrite this logic to be witness table lookup based, or simplify the entire
-        // type system and IR passes to always use structurally derived methods instead of user-provided
-        // methods.
+        // Implement `dadd` and `dzero` methods.
         IRInst* zeroMethod = nullptr;
         {
             auto zeroMethodType = builder.getFuncType(List<IRType*>(), diffType);
@@ -931,7 +933,14 @@ struct AutoDiffPass : public InstPassBase
             result.zeroMethod = zeroMethod;
             builder.setInsertInto(zeroMethod);
             builder.emitBlock();
-            builder.emitReturn(builder.emitDefaultConstruct(diffType));
+            List<IRInst*> fieldVals;
+            for (auto info : diffFields)
+            {
+                auto innerZeroMethod = _lookupWitness(&builder, info.witness, autodiffContext->zeroMethodStructKey);
+                IRInst* val = builder.emitCallInst(info.field->getFieldType(), innerZeroMethod, 0, nullptr);
+                fieldVals.add(val);
+            }
+            builder.emitReturn(builder.emitMakeStruct(diffType, fieldVals));
         }
 
         builder.setInsertAfter(zeroMethod);
@@ -948,7 +957,18 @@ struct AutoDiffPass : public InstPassBase
             builder.emitBlock();
             auto param1 = builder.emitParam(diffType);
             auto param2 = builder.emitParam(diffType);
-            builder.emitReturn(builder.emitStructuralAdd(param1, param2));
+            List<IRInst*> fieldVals;
+            for (auto info : diffFields)
+            {
+                auto innerAddMethod = _lookupWitness(&builder, info.witness, autodiffContext->addMethodStructKey);
+                IRInst* args[2] = {
+                    builder.emitFieldExtract(info.field->getFieldType(), param1, info.field->getKey()),
+                    builder.emitFieldExtract(info.field->getFieldType(), param2, info.field->getKey()),
+                };
+                IRInst* val = builder.emitCallInst(info.field->getFieldType(), innerAddMethod, 2, args);
+                fieldVals.add(val);
+            }
+            builder.emitReturn(builder.emitMakeStruct(diffType, fieldVals));
         }
 
         builder.setInsertAfter(addMethod);
