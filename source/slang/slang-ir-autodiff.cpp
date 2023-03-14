@@ -1026,10 +1026,14 @@ struct AutoDiffPass : public InstPassBase
         return IntermediateContextTypeDifferentialInfo();
     }
 
+    HashSet<IRInst*> fullyDifferentiatedInsts;
+
     // Returns true if `type` is fully differentiated, i.e. does not have
     // any unmaterialized intermediate context types.
     bool isTypeFullyDifferentiated(IRInst* type)
     {
+        if (fullyDifferentiatedInsts.Contains(type))
+            return true;
         if (type->getOp() == kIROp_BackwardDiffIntermediateContextType)
             return false;
         if (auto structType = as<IRStructType>(type))
@@ -1040,19 +1044,37 @@ struct AutoDiffPass : public InstPassBase
         }
         else if (auto genType = as<IRGeneric>(type))
         {
-            return isTypeFullyDifferentiated(findGenericReturnVal(genType));
+            bool result = isTypeFullyDifferentiated(findGenericReturnVal(genType));
+            if (result)
+                fullyDifferentiatedInsts.Add(genType);
+            return result;
         }
-
-        for (UInt i = 0; i < type->getOperandCount(); i++)
-            if (!isTypeFullyDifferentiated(type->getOperand(i)))
-                return false;
-        return true;
+        switch (type->getOp())
+        {
+        case kIROp_ArrayType:
+        case kIROp_UnsizedArrayType:
+        case kIROp_InOutType:
+        case kIROp_OutType:
+        case kIROp_PtrType:
+        case kIROp_DifferentialPairType:
+        case kIROp_DifferentialPairUserCodeType:
+        case kIROp_AttributedType:
+            for (UInt i = 0; i < type->getOperandCount(); i++)
+                if (!isTypeFullyDifferentiated(type->getOperand(i)))
+                    return false;
+        default:
+            fullyDifferentiatedInsts.Add(type);
+            return true;
+        }
     }
 
     // Returns true if `func` is fully differentiated, i.e. does not have
     // any differentiate insts.
     bool isFullyDifferentiated(IRFunc* func)
     {
+        if (fullyDifferentiatedInsts.Contains(func))
+            return true;
+
         for (auto block : func->getBlocks())
         {
             for (auto ii : block->getChildren())
@@ -1070,6 +1092,7 @@ struct AutoDiffPass : public InstPassBase
                     return false;
             }
         }
+        fullyDifferentiatedInsts.Add(func);
         return true;
     }
 
@@ -1078,6 +1101,7 @@ struct AutoDiffPass : public InstPassBase
     //
     bool processReferencedFunctions(IRBuilder* builder)
     {
+        fullyDifferentiatedInsts.Clear();
         bool hasChanges = false;
         for (;;)
         {
