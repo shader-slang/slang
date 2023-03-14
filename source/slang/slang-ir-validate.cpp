@@ -208,6 +208,12 @@ namespace Slang
         if (allInGlobalScope)
             return;
 
+        // Allow exceptions.
+        switch (inst->getOp())
+        {
+        case kIROp_DifferentiableTypeDictionaryItem:
+            return;
+        }
         //
         // We failed to find `operandParent` while walking the ancestors of `inst`,
         // so something had gone wrong.

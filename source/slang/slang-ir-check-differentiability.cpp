@@ -73,16 +73,13 @@ public:
 
     bool isDifferentiableFunc(IRInst* func, DifferentiableLevel level)
     {
-        if (level == DifferentiableLevel::Forward)
+        switch (func->getOp())
         {
-            switch (func->getOp())
-            {
-            case kIROp_ForwardDifferentiate:
-            case kIROp_BackwardDifferentiate:
-                return true;
-            default:
-                break;
-            }
+        case kIROp_ForwardDifferentiate:
+        case kIROp_BackwardDifferentiate:
+            return isDifferentiableFunc(func->getOperand(0), level);
+        default:
+            break;
         }
 
         func = getResolvedInstForDecorations(func);

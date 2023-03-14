@@ -7285,10 +7285,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(inst, op, operands.getBuffer(), operands.getCount());
     }
 
-    void lowerDerivativeMemberModifier(IRInst* inst, DerivativeMemberAttribute* derivativeMember)
+    void lowerDerivativeMemberModifier(IRInst* inst, Decl* memberDecl, DerivativeMemberAttribute* derivativeMember)
     {
-        ensureDecl(context, derivativeMember->memberDeclRef->declRef.getDecl()->parentDecl);
-        auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
+        IRInst* key = nullptr;
+        if (derivativeMember->memberDeclRef->declRef.getDecl() == memberDecl)
+        {
+            key = inst;
+        }
+        else
+        {
+            ensureDecl(context, derivativeMember->memberDeclRef->declRef.getDecl()->parentDecl);
+            key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
+        }
         SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
         auto builder = getBuilder();
         builder->addDecoration(inst, kIROp_DerivativeMemberDecoration, key);
@@ -7358,7 +7366,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         if (auto derivativeMemberModifier = fieldDecl->findModifier<DerivativeMemberAttribute>())
         {
-            lowerDerivativeMemberModifier(irFieldKey, derivativeMemberModifier);
+            lowerDerivativeMemberModifier(irFieldKey, fieldDecl, derivativeMemberModifier);
         }
 
         // We allow a field to be marked as a target intrinsic,

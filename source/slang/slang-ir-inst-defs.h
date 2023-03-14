@@ -62,6 +62,9 @@ INST(Nop, nop, 0, 0)
     INST(OptionalType, Optional, 1, HOISTABLE)
 
     INST(DifferentialPairType, DiffPair, 1, HOISTABLE)
+    INST(DifferentialPairUserCodeType, DiffPairUserCode, 1, HOISTABLE)
+    INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPairUserCodeType)
+
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 
     /* BindExistentialsTypeBase */
@@ -278,8 +281,16 @@ INST(undefined, undefined, 0, 0)
 INST(DefaultConstruct, defaultConstruct, 0, 0)
 
 INST(MakeDifferentialPair, MakeDiffPair, 2, 0)
+INST(MakeDifferentialPairUserCode, MakeDiffPairUserCode, 2, 0)
+INST_RANGE(MakeDifferentialPairBase, MakeDifferentialPair, MakeDifferentialPairUserCode)
+
 INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
+INST(DifferentialPairGetDifferentialUserCode, GetDifferentialUserCode, 1, 0)
+INST_RANGE(DifferentialPairGetDifferentialBase, DifferentialPairGetDifferential, DifferentialPairGetDifferentialUserCode)
+
 INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
+INST(DifferentialPairGetPrimalUserCode, GetPrimalUserCode, 1, 0)
+INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, DifferentialPairGetPrimalUserCode)
 
 INST(Specialize, specialize, 2, HOISTABLE)
 INST(LookupWitness, lookupWitness, 2, HOISTABLE)
@@ -308,6 +319,9 @@ INST(OptionalHasValue, optionalHasValue, 1, 0)
 INST(MakeOptionalValue, makeOptionalValue, 1, 0)
 INST(MakeOptionalNone, makeOptionalNone, 1, 0)
 INST(Call, call, 1, 0)
+
+// Structural addition of two values of the same type.
+INST(StructuralAdd, structuralAdd, 2, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
@@ -802,6 +816,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Used by the auto-diff pass to mark the primal element type of an
         /// forward-differentiated updateElement inst.
     INST(PrimalElementTypeDecoration, primalElementType, 1, 0)
+
+        /// Used by the auto-diff pass to mark the differential type of an intermediate context field.
+    INST(IntermediateContextFieldDifferentialTypeDecoration, IntermediateContextFieldDifferentialTypeDecoration, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.

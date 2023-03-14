@@ -258,10 +258,6 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
         auto diffType = (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, origType);
         return (IRType*)findOrTranscribePrimalInst(builder, diffType);
     }
-    else if (origType->getOp() == kIROp_LookupWitness)
-    {
-        return (IRType*)findOrTranscribePrimalInst(builder, (IRInst*)primalType);
-    }
     return (IRType*)transcribe(builder, origType);
 }
 
@@ -282,9 +278,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     {
     case kIROp_Param:
         if (as<IRTypeType>(primalType->getDataType()))
-            return (IRType*)(differentiableTypeConformanceContext.getDifferentialForType(
-                builder,
-                (IRType*)primalType));
+            return differentiateType(builder, origType);
         else if (as<IRWitnessTableType>(primalType->getDataType()))
             return (IRType*)primalType;
 
@@ -304,8 +298,16 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
         auto primalPairType = as<IRDifferentialPairType>(primalType);
         return getOrCreateDiffPairType(
             builder,
-            pairBuilder->getDiffTypeFromPairType(builder, primalPairType),
-            pairBuilder->getDiffTypeWitnessFromPairType(builder, primalPairType));
+            differentiableTypeConformanceContext.getDiffTypeFromPairType(builder, primalPairType),
+            differentiableTypeConformanceContext.getDiffTypeWitnessFromPairType(builder, primalPairType));
+    }
+
+    case kIROp_DifferentialPairUserCodeType:
+    {
+        auto primalPairType = as<IRDifferentialPairUserCodeType>(primalType);
+        return builder->getDifferentialPairUserCodeType(
+            (IRType*)differentiableTypeConformanceContext.getDiffTypeFromPairType(builder, primalPairType),
+            differentiableTypeConformanceContext.getDiffTypeWitnessFromPairType(builder, primalPairType));
     }
 
     case kIROp_FuncType:
@@ -634,6 +636,15 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
                 builder->markInstAsDifferential(makeDiffPair, as<IRDifferentialPairType>(diffType)->getValueType());
                 return makeDiffPair;
             }
+        case kIROp_DifferentialPairUserCodeType:
+        {
+            auto makeDiffPair = builder->emitMakeDifferentialPairUserCode(
+                diffType,
+                getDifferentialZeroOfType(builder, as<IRDifferentialPairUserCodeType>(diffType)->getValueType()),
+                getDifferentialZeroOfType(builder, as<IRDifferentialPairUserCodeType>(diffType)->getValueType()));
+            builder->markInstAsDifferential(makeDiffPair, as<IRDifferentialPairUserCodeType>(diffType)->getValueType());
+            return makeDiffPair;
+        }
         }
 
         if (auto arrayType = as<IRArrayType>(primalType))

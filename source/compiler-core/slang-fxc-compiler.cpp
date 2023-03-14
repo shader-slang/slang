@@ -180,8 +180,16 @@ static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const Unowned
     return SLANG_OK;
 }
 
-SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
+SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
+    if (!isVersionCompatible(inOptions))
+    {
+        // Not possible to compile with this version of the interface.
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    CompileOptions options = getCompatibleVersion(&inOptions);
+
     // This compiler can only deal with a single source artifact
     if (options.sourceArtifacts.count != 1)
     {

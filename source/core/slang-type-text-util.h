@@ -18,6 +18,12 @@ struct TypeTextUtil
         // Converts text to scalar type. Returns 'none' if not determined
     static slang::TypeReflection::ScalarType findScalarType(const Slang::UnownedStringSlice& text);
 
+        /// Given a slice finds the associated debug info format
+    static SlangResult findDebugInfoFormat(const Slang::UnownedStringSlice& text, SlangDebugInfoFormat& out);
+
+        /// Get the text name for a format
+    static UnownedStringSlice getDebugInfoFormatName(SlangDebugInfoFormat format);
+
         /// As human readable text
     static UnownedStringSlice getPassThroughAsHumanText(SlangPassThrough type);
         /// Gets pass through from human text (as from getPassThroughAsHumanText)

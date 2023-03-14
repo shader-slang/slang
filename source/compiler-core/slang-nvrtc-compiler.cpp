@@ -699,8 +699,16 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompil
     return SLANG_OK;
 }
 
-SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& options, IArtifact** outArtifact)
+SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& inOptions, IArtifact** outArtifact)
 {
+    if (!isVersionCompatible(inOptions))
+    {
+        // Not possible to compile with this version of the interface.
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    CompileOptions options = getCompatibleVersion(&inOptions);
+
     // This compiler can only deal with a single artifact
     if (options.sourceArtifacts.count != 1)
     {

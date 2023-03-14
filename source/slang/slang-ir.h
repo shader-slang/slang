@@ -1448,12 +1448,22 @@ SIMPLE_IR_TYPE(TypeKind, Kind);
 //
 SIMPLE_IR_TYPE(GenericKind, Kind)
 
-struct IRDifferentialPairType : IRType
+struct IRDifferentialPairTypeBase : IRType
 {
     IRType* getValueType() { return (IRType*)getOperand(0); }
     IRInst* getWitness() { return (IRInst*)getOperand(1); }
 
+    IR_PARENT_ISA(DifferentialPairTypeBase)
+};
+
+struct IRDifferentialPairType : IRDifferentialPairTypeBase
+{
     IR_LEAF_ISA(DifferentialPairType)
+};
+
+struct IRDifferentialPairUserCodeType : IRDifferentialPairTypeBase
+{
+    IR_LEAF_ISA(DifferentialPairUserCodeType)
 };
 
 struct IRBackwardDiffIntermediateContextType : IRType
