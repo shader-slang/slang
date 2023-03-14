@@ -483,7 +483,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
 {
     // NOTE! The following only works because List<T> has capacity initialized members, and
     // setting the count if it is <= capacity just sets the count (ie things aren't released(!)).
-    
+
     List<Byte>& dstList = *(List<Byte>*)dst;
     const Index oldCount = dstList.getCount();
     if (oldCount == count)
@@ -502,6 +502,28 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     if (!typeFuncs.isValid())
     {
         return SLANG_FAIL;
+    }
+
+    return setListCount(elementType, typeFuncs, dst, count);
+}
+
+/* static */SlangResult RttiUtil::setListCount(const RttiInfo* elementType, const RttiTypeFuncs& typeFuncs, void* dst, Index count)
+{
+    SLANG_ASSERT(typeFuncs.isValid());
+
+    // NOTE! The following only works because List<T> has capacity initialized members, and
+    // setting the count if it is <= capacity just sets the count (ie things aren't released(!)).
+    
+    List<Byte>& dstList = *(List<Byte>*)dst;
+    const Index oldCount = dstList.getCount();
+    if (oldCount == count)
+    {
+        return SLANG_OK;
+    }
+    if (count < oldCount)
+    {
+        dstList.unsafeShrinkToCount(count);
+        return SLANG_OK;
     }
 
     const Index dstCapacity = dstList.getCapacity();

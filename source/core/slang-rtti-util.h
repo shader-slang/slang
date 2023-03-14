@@ -21,6 +21,8 @@ struct RttiUtil
 
         /// Set a list count
     static SlangResult setListCount(const RttiInfo* elementType, void* dst, Index count);
+        /// Set a list count specifing the funcs
+    static SlangResult setListCount(const RttiInfo* elementType, const RttiTypeFuncs& typeFuncs, void* dst, Index count);
 
         /// Returns if the type can be zero initialized
     static bool canZeroInit(const RttiInfo* type);
