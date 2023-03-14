@@ -87,7 +87,7 @@ var x = diffPair(3.0); // constructs DifferentialPair{3.0, 0.0}
 
 __bwd_diff(myFunc)(a, x, 1.0);
 
-// a.d is now 1.0
+// a.d is now 9.0
 // x.d is now 12.0
 ```
 
