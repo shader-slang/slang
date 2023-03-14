@@ -58,7 +58,7 @@ struct DiffUnzipPass
         return diffMap[inst];
     }
 
-    void unzipDiffInsts(IRFunc* func)
+    RefPtr<HoistedPrimalsInfo> unzipDiffInsts(IRFunc* func)
     {
         diffTypeContext.setFunc(func);
         
@@ -157,11 +157,12 @@ struct DiffUnzipPass
         // Emit counter variables and other supporting
         // instructions for all regions.
         // 
-        // TODO: Create and pass along a HoistedPrimalsInfo* to this too.
         // TODO: Need to have maxIndex in _both_ IndexTrackingInfo & IndexedRegionInfo.
         // That way, we can do the various passes _before_ lowerIndexedRegions()
+        // TODO: Remove the call to lowerIndexedRegions() once checkpointing works properly.
         // 
-        lowerIndexedRegions();
+        RefPtr<HoistedPrimalsInfo> primalsInfo = new HoistedPrimalsInfo();
+        lowerIndexedRegions(primalsInfo);
 
         // Copy regions from fwd-block to their split blocks
         // to make it easier to do lookups.
@@ -196,6 +197,18 @@ struct DiffUnzipPass
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
 
+        RefPtr<BlockSplitInfo> splitInfo = new BlockSplitInfo();
+        for (auto block : mixedBlocks)
+            if (primalMap.ContainsKey(block))
+                splitInfo->diffBlockMap[as<IRBlock>(primalMap[block])] = as<IRBlock>(diffMap[block]);
+        
+        Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlocksInfo;
+        for (auto block : mixedBlocks)
+        {
+            indexedBlocksInfo[as<IRBlock>(diffMap[block])] = getIndexInfoList(as<IRBlock>(diffMap[block]));
+            indexedBlocksInfo[as<IRBlock>(primalMap[block])] = getIndexInfoList(as<IRBlock>(primalMap[block]));
+        }
+
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
 
@@ -203,8 +216,16 @@ struct DiffUnzipPass
         // to the right spots.
         // 
         {
+            RefPtr<AutodiffCheckpointPolicyBase> chkPolicy = new DefaultCheckpointPolicy(unzippedFunc->getModule());
+            chkPolicy->preparePolicy(func);
 
+            auto chkPrimalsInfo = chkPolicy->processFunc(func, splitInfo);
+            primalsInfo->merge(chkPrimalsInfo);
+            
+            primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlocksInfo);
         }
+
+        return primalsInfo;
     }
 
     void tryInferMaxIndex(IndexedRegion* region, IndexTrackingInfo* info)
@@ -227,42 +248,6 @@ struct DiffUnzipPass
         }
     }
 
-    UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
-    {
-        SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(block->getTerminator()));
-        
-        auto branchInst = as<IRUnconditionalBranch>(block->getTerminator());
-        List<IRInst*> phiArgs;
-        
-        for (UIndex ii = 0; ii < branchInst->getArgCount(); ii++)
-            phiArgs.add(branchInst->getArg(ii));
-        
-        phiArgs.add(arg);
-
-        builder->setInsertInto(block);
-        switch (branchInst->getOp())
-        {
-            case kIROp_unconditionalBranch:
-                builder->emitBranch(branchInst->getTargetBlock(), phiArgs.getCount(), phiArgs.getBuffer());
-                break;
-            
-            case kIROp_loop:
-                builder->emitLoop(
-                    as<IRLoop>(branchInst)->getTargetBlock(),
-                    as<IRLoop>(branchInst)->getBreakBlock(),
-                    as<IRLoop>(branchInst)->getContinueBlock(),
-                    phiArgs.getCount(),
-                    phiArgs.getBuffer());
-                break;
-            
-            default:
-                break;
-        }
-
-        branchInst->removeAndDeallocate();
-        return phiArgs.getCount() - 1;
-    }
-
     IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type)
     {
         builder->setInsertInto(block);
@@ -280,7 +265,7 @@ struct DiffUnzipPass
         return addPhiInputParam(builder, block, type);
     }
 
-    void lowerIndexedRegions()
+    void lowerIndexedRegions(HoistedPrimalsInfo* primalsInfo)
     {
         IRBuilder builder(autodiffContext->moduleInst->getModule());
 
@@ -296,6 +281,7 @@ struct DiffUnzipPass
             // Make variable in the top-most block (so it's visible to diff blocks)
             info->primalCountLastVar = builder.emitVar(builder.getIntType());
             builder.addNameHintDecoration(info->primalCountLastVar, UnownedStringSlice("_pc_last_var"));
+            primalsInfo->storeSet.Add(info->primalCountLastVar);
             
             {   
                 auto primalCondBlock = as<IRUnconditionalBranch>(
@@ -378,6 +364,23 @@ struct DiffUnzipPass
                 builder.addPrimalValueAccessDecoration(primalCounterLastVal);
 
                 builder.addLoopExitPrimalValueDecoration(loopInst, info->diffCountParam, primalCounterLastVal);
+
+                // We'll be manually creating the inversion entries for the counters
+                // TODO: This logic can be moved to the checkpointing alg.
+                // 
+                primalsInfo->invertSet.Add(info->diffCountParam);
+                primalsInfo->instsToInvert.Add(incCounterVal);
+                primalsInfo->invertInfoMap[incCounterVal] = InversionInfo(
+                    incCounterVal, 
+                    List<IRInst*>(incCounterVal), 
+                    List<IRInst*>(info->diffCountParam)); 
+                
+                primalsInfo->invertSet.Add(incCounterVal);
+                primalsInfo->instsToInvert.Add(diffUpdateBlock->getTerminator());
+                primalsInfo->invertInfoMap[diffUpdateBlock->getTerminator()] = InversionInfo(
+                    diffUpdateBlock->getTerminator(), 
+                    List<IRInst*>(diffUpdateBlock->getTerminator()), 
+                    List<IRInst*>(incCounterVal)); 
             }
 
             // Try to infer maximum possible number of iterations.
@@ -588,7 +591,6 @@ struct DiffUnzipPass
                 }
             }
 
- 
             // 5. Replace uses in differential blocks with loads from the array.
             List<IRInst*> instsToTag;
             {
@@ -684,6 +686,7 @@ struct DiffUnzipPass
     IRFunc* extractPrimalFunc(
         IRFunc* func,
         IRFunc* originalFunc,
+        HoistedPrimalsInfo* primalsInfo,
         ParameterBlockTransposeInfo& paramInfo,
         IRInst*& intermediateType);
     

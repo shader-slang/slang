@@ -313,7 +313,12 @@ struct ExtractPrimalFuncContext
             inst);
     }
 
-    IRFunc* turnUnzippedFuncIntoPrimalFunc(IRFunc* unzippedFunc, IRFunc* originalFunc, HashSet<IRInst*>& primalParams, IRInst*& outIntermediateType)
+    IRFunc* turnUnzippedFuncIntoPrimalFunc(
+        IRFunc* unzippedFunc,
+        IRFunc* originalFunc,
+        HoistedPrimalsInfo* primalsInfo,
+        HashSet<IRInst*>& primalParams,
+        IRInst*& outIntermediateType)
     {
         IRBuilder builder(module);
 
@@ -356,7 +361,7 @@ struct ExtractPrimalFuncContext
             // output intermediary struct.
             for (auto inst : block->getChildren())
             {
-                if (shouldStoreInst(inst))
+                if (primalsInfo->storeSet.Contains(inst))
                 {
                     if (as<IRParam>(inst))
                         builder.setInsertBefore(block->getFirstOrdinaryInst());
@@ -366,7 +371,7 @@ struct ExtractPrimalFuncContext
                 }
                 else if (inst->getOp() == kIROp_Var)
                 {
-                    if (shouldStoreVar(as<IRVar>(inst)))
+                    if (primalsInfo->storeSet.Contains(as<IRVar>(inst)))
                     {
                         auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
                         builder.setInsertBefore(inst);
@@ -440,6 +445,7 @@ static void copyPrimalValueStructKeyDecorations(IRInst* inst, IRCloneEnv& cloneE
 IRFunc* DiffUnzipPass::extractPrimalFunc(
     IRFunc* func,
     IRFunc* originalFunc,
+    HoistedPrimalsInfo* primalsInfo,
     ParameterBlockTransposeInfo& paramInfo,
     IRInst*& intermediateType)
 {
@@ -475,7 +481,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     context.init(autodiffContext->moduleInst->getModule(), autodiffContext->transcriberSet.primalTranscriber);
 
     intermediateType = nullptr;
-    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, newPrimalParams, intermediateType);
+    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, primalsInfo, newPrimalParams, intermediateType);
 
     if (auto nameHint = primalFunc->findDecoration<IRNameHintDecoration>())
     {

@@ -7,7 +7,7 @@ namespace Slang
 bool containsOperand(IRInst* inst, IRInst* operand)
 {
     for (UIndex ii = 0; ii < inst->getOperandCount(); ii++)
-        if (inst->getOperand(ii) == inst)
+        if (inst->getOperand(ii) == operand)
             return true;
     
     return false;
@@ -38,43 +38,8 @@ bool containsOperand(IRInst* inst, IRInst* operand)
 // and load from inverse-buffer for 'PrimalInvert' insts.
 // 
 
-IRUse* findUniqueStoredVal(IRVar* var)
-{
-    if (as<IRBackwardDerivativeIntermediateTypeDecoration>(var->getDataType()))
-    {
-        IRUse* primalCallUse = nullptr;
-        for (auto use = var->firstUse; use; use = use->nextUse)
-        {
-            if (auto callInst = as<IRCall>(use->getUser()))
-            {
-                // Should not see more than one IRCall. If we do
-                // we'll need to pick the primal call.
-                // 
-                SLANG_RELEASE_ASSERT(!primalCallUse);
-                primalCallUse = use;
-            }
-        }
-        return primalCallUse;
-    }
-    else
-    {
-        IRUse* storeUse = nullptr;
-        for (auto use = var->firstUse; use; use = use->nextUse)
-        {
-            if (auto storeInst = as<IRStore>(use->getUser()))
-            {
-                // Should not see more than one IRStore
-                SLANG_RELEASE_ASSERT(!storeUse);
-                storeUse = use;
-            }
-        }
-        return storeUse;
-    }
-}
 
-
-
-RefPtr<CheckpointSetInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* splitInfo)
+RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* splitInfo)
 {
     RefPtr<CheckpointSetInfo> checkpointInfo = new CheckpointSetInfo();
 
@@ -82,13 +47,19 @@ RefPtr<CheckpointSetInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValu
 
     List<IRUse*> workList;
     HashSet<IRUse*> processedUses;
+
+    HashSet<IRUse*> usesToReplace;
     
     auto addPrimalOperandsToWorkList = [&](IRInst* inst)
     {
         UIndex opIndex = 0;
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
         {   
-            if (!operand->get()->findDecoration<IRDifferentialInstDecoration>())
+            if (!operand->get()->findDecoration<IRDifferentialInstDecoration>() &&
+                !as<IRFunc>(operand->get()) &&
+                !as<IRBlock>(operand->get()) &&
+                !as<IRConstant>(operand->get()) &&
+                !as<IRType>(operand->get()))
                 workList.add(operand);
         }
     };
@@ -109,6 +80,15 @@ RefPtr<CheckpointSetInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValu
         {
             if (!child->findDecoration<IRDifferentialInstDecoration>())
                 continue;
+            
+            // Ignore the primals used to construct a pair
+            if (as<IRMakeDifferentialPair>(child))
+            {
+                // quick consistency check..
+                SLANG_RELEASE_ASSERT(as<IRReturn>(child->firstUse->getUser()));
+                continue;
+            }
+
             addPrimalOperandsToWorkList(child);
         }
     }
@@ -124,7 +104,6 @@ RefPtr<CheckpointSetInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValu
         processedUses.Add(use);
 
         HoistResult result = this->classify(use);
-        checkpointInfo->hoistModeMap[use] = result;
 
         if (result.mode == HoistResult::Mode::Store)
         {
@@ -135,6 +114,8 @@ RefPtr<CheckpointSetInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValu
         {
             SLANG_ASSERT(!checkpointInfo->storeSet.Contains(result.instToRecompute));
             checkpointInfo->recomputeSet.Add(result.instToRecompute);
+
+            usesToReplace.Add(use);
 
             if (auto param = as<IRParam>(result.instToRecompute))
             {
@@ -177,21 +158,108 @@ RefPtr<CheckpointSetInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValu
         }
         else if (result.mode == HoistResult::Mode::Invert)
         {
-            SLANG_ASSERT(containsOperand(result.inversionInfo.instToInvert, use->getUser()));
-            checkpointInfo->invertSet.Add(result.inversionInfo.instToInvert);
+            auto instToInvert = result.inversionInfo.instToInvert;
+
+            SLANG_RELEASE_ASSERT(containsOperand(instToInvert, use->getUser()));
+            SLANG_RELEASE_ASSERT(result.inversionInfo.targetInsts.contains(use->getUser()));
+
+            usesToReplace.Add(use);
+
+            checkpointInfo->invertSet.Add(instToInvert);
+
+            if (checkpointInfo->invInfoMap.ContainsKey(instToInvert))
+            {
+                List<IRInst*> currOperands = checkpointInfo->invInfoMap[instToInvert].GetValue().requiredOperands;
+                for (Index ii = 0; ii < result.inversionInfo.requiredOperands.getCount(); ii++)
+                {
+                    SLANG_RELEASE_ASSERT(result.inversionInfo.requiredOperands[ii] == currOperands[ii]);
+                }
+            }
+            else
+                checkpointInfo->invInfoMap[instToInvert] = result.inversionInfo;
         }
     }
 
+    return applyCheckpointSet(checkpointInfo, func, splitInfo, usesToReplace);
+}
+
+void applyToInst(
+    IRBuilder* builder,
+    CheckpointSetInfo* checkpointInfo,
+    HoistedPrimalsInfo* hoistInfo,
+    IROutOfOrderCloneContext* cloneCtx,
+    IRInst* inst)
+{
+    // Early-out..
+    if (checkpointInfo->storeSet.Contains(inst))
+    {
+        hoistInfo->storeSet.Add(inst);
+        return;
+    }
+
+    bool isParamRecomputed = checkpointInfo->recomputeSet.Contains(inst);
+    if (isParamRecomputed)
+    {
+        // TODO: We would need to clone in the control-flow for each region (without nested loops)
+        // prior to this, and then hoist this parameter into the within-region block, otherwise
+        // this parameter will not be visible to transposed insts.
+        // This will also include adding an extra case to 'ensurePrimalAvailability': if both insts
+        // are withing the _same_ indexed region, skip the indexed store/load and use a simple var.
+        // 
+        SLANG_UNIMPLEMENTED_X("Parameter recompute is not currently supported");
+        //hoistInfo->recomputeSet.Add(cloneCtx->cloneInstOutOfOrder(builder, inst));
+    }
+
+    bool isParamInverted = checkpointInfo->invertSet.Contains(inst);
+    if (isParamInverted)
+    {
+        InversionInfo info = checkpointInfo->invInfoMap[inst];
+        auto clonedInstToInvert = cloneCtx->cloneInstOutOfOrder(builder, info.instToInvert);
+
+        // Process operand set for the inverse inst.
+        List<IRInst*> newOperands;
+        for (auto operand : info.requiredOperands)
+        {
+            if (cloneCtx->cloneEnv.mapOldValToNew.ContainsKey(operand))
+                newOperands.add(cloneCtx->cloneEnv.mapOldValToNew[operand]);
+            else
+                newOperands.add(operand);
+        }
+
+        info.requiredOperands = newOperands;
+
+        hoistInfo->invertInfoMap[clonedInstToInvert] = info;
+        hoistInfo->instsToInvert.Add(clonedInstToInvert);
+        hoistInfo->invertSet.Add(cloneCtx->cloneInstOutOfOrder(builder, inst));
+    }
 }
 
 RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
     CheckpointSetInfo* checkpointInfo,
     IRGlobalValueWithCode* func,
-    BlockSplitInfo* splitInfo)
+    BlockSplitInfo* splitInfo,
+    HashSet<IRUse*> pendingUses)
 {
     RefPtr<HoistedPrimalsInfo> hoistInfo = new HoistedPrimalsInfo();
 
     RefPtr<IROutOfOrderCloneContext> cloneCtx = new IROutOfOrderCloneContext();
+
+    for (auto use : pendingUses)
+        cloneCtx->pendingUses.Add(use);
+    
+    // Populate the clone context with all the primal uses that we may need to replace with
+    // cloned versions. That way any insts we clone into the diff block will automatically replace
+    // their uses.
+    //
+    auto addPrimalUsesToCloneContext = [&](IRInst* inst)
+    {
+        UIndex opIndex = 0;
+        for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
+        {   
+            if (!operand->get()->findDecoration<IRDifferentialInstDecoration>())
+                cloneCtx->pendingUses.Add(operand);
+        }
+    };
 
     // Go back over the insts and move/clone them accoridngly.
     for (auto block : func->getBlocks())
@@ -200,38 +268,53 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
         if (block == func->getFirstBlock())
             continue;
 
-        if (!block->findDecoration<IRDifferentialInstDecoration>())
+        if (block->findDecoration<IRDifferentialInstDecoration>())
             continue;
-        
-        auto firstDiffInst = as<IRBlock>(splitInfo->diffBlockMap[block])->getFirstOrdinaryInst();
 
-        auto firstParam = block->getFirstParam();
+        auto diffBlock = as<IRBlock>(splitInfo->diffBlockMap[block]);
+
+        auto firstDiffInst = as<IRBlock>(splitInfo->diffBlockMap[block])->getFirstOrdinaryInst();
 
         IRBuilder builder(func->getModule());
 
+        UIndex ii = 0;
+        for (auto param : block->getParams())
+        {
+            builder.setInsertBefore(diffBlock->getFirstOrdinaryInst());
+
+            // Apply checkpoint rule to the parameter itself.
+            applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, param);
+
+            // Copy primal branch-arg for predecessor blocks.
+            HashSet<IRBlock*> predecessorSet;
+            for (auto predecessor : block->getPredecessors())
+            {
+                if (predecessorSet.Contains(predecessor))
+                    continue;
+
+                predecessorSet.Add(predecessor);
+
+                auto diffPredecessor = as<IRBlock>(splitInfo->diffBlockMap[block]);
+ 
+                if (checkpointInfo->recomputeSet.Contains(param))
+                    addPhiOutputArg(&builder,
+                        diffPredecessor,
+                        as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii));
+                
+                if (checkpointInfo->invertSet.Contains(param))
+                    addPhiOutputArg(&builder,
+                        diffPredecessor,
+                        as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii));
+            }
+
+            ii++;
+        }
+
         for (auto child : block->getChildren())
         {
-            if (checkpointInfo->recomputeSet.Contains(child))
-            {
-                if (!as<IRParam>(child))
-                {
-                    builder.setInsertBefore(firstDiffInst);
-                    hoistInfo->recomputeSet.Add(cloneCtx->cloneInstOutOfOrder(&builder, child));
-                }
-                else
-                {
-                    builder.setInsertBefore(firstParam);
-                    hoistInfo->recomputeSet.Add(cloneCtx->cloneInstOutOfOrder(&builder, child));
-                }
-            }
-            else if (checkpointInfo->storeSet.Contains(child))
-            {
-                hoistInfo->storeSet.Add(cloneCtx->cloneInstOutOfOrder(&builder, child));
-            }
-            else if (checkpointInfo->invertSet.Contains(child))
-            {
-                SLANG_UNIMPLEMENTED_X("Inverted insts not currently handled");
-            }
+            builder.setInsertBefore(firstDiffInst);
+            
+            applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, child);
         }
     }
 
@@ -273,7 +356,7 @@ IRVar* emitLocalVarForValue(
     IRType* varType = getTypeForLocalStorage(&varBuilder, instToStore, defBlockIndices);
 
     auto var = varBuilder.emitVar(varType);
-    varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(instToStore->getDataType()));
+    varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
 
     return var;
 }
@@ -387,6 +470,11 @@ bool areIndicesEqual(
     return true;
 }
 
+bool isDifferentialBlock(IRBlock* block)
+{
+    return block->findDecoration<IRDifferentialInstDecoration>();
+}
+
 RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     HoistedPrimalsInfo* hoistInfo,
     IRGlobalValueWithCode* func,
@@ -399,6 +487,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
     HashSet<IRInst*> processedStoreSet;
 
+    // TODO: Also ensure availability of everything in the recompute set.
     for (auto instToStore : hoistInfo->storeSet)
     {
         IRBlock* defBlock = nullptr;
@@ -419,11 +508,25 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
         {
             auto nextUse = use->nextUse;
             
+            // Only consider uses in differential blocks. 
+            // This method is not responsible for other blocks.
+            //
             IRBlock* userBlock = getBlock(use->getUser());
-            if (!domTree->dominates(defBlock, userBlock) ||
-                !areIndicesEqual(indexedBlockInfo[defBlock], indexedBlockInfo[userBlock]))
+            if (userBlock->findDecoration<IRDifferentialInstDecoration>())
             {
-                outOfScopeUses.add(use);
+                if (!domTree->dominates(defBlock, userBlock))
+                {
+                    outOfScopeUses.add(use);
+                }
+                else if (!areIndicesEqual(indexedBlockInfo[defBlock], indexedBlockInfo[userBlock]))
+                {
+                    outOfScopeUses.add(use);
+                }
+                else if (indexedBlockInfo[defBlock].GetValue().getCount() > 0 && 
+                         !isDifferentialBlock(defBlock))
+                {
+                    outOfScopeUses.add(use);
+                }
             }
 
             use = nextUse;
@@ -514,6 +617,7 @@ HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
     return HoistResult::store(use->get());
 }
 
+/*
 void maybeCheckpointPrimalInst(
     PrimalHoistContext* context,
     IRBuilder* primalBuilder,
@@ -542,5 +646,5 @@ void maybeCheckpointPrimalInst(
     //
     // Finally, if we store the inst, call hoistPrimalInst(inst)
 }
-
+*/
 };

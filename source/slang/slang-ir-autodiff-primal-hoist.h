@@ -4,7 +4,9 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-autodiff-region.h"
 #include "slang-ir-dominators.h"
+
 
 namespace Slang
 {
@@ -39,6 +41,8 @@ namespace Slang
                 
                 use = nextUse;
             }
+
+            return clonedInst;
         }
     };
 
@@ -46,7 +50,19 @@ namespace Slang
     {
         IRInst* instToInvert;
         List<IRInst*> requiredOperands;
-        IRUse* targetUse;
+        List<IRInst*> targetInsts;
+
+        InversionInfo(
+            IRInst* instToInvert,
+            List<IRInst*> requiredOperands,
+            List<IRInst*> targetInsts) :
+            instToInvert(instToInvert),
+            requiredOperands(requiredOperands),
+            targetInsts(targetInsts)
+        { }
+
+        InversionInfo() : instToInvert(nullptr)
+        { }
     };
 
     struct HoistedPrimalsInfo : public RefObject
@@ -55,7 +71,42 @@ namespace Slang
         HashSet<IRInst*> recomputeSet;
         HashSet<IRInst*> invertSet;
 
+        HashSet<IRInst*> instsToInvert;
+
         Dictionary<IRInst*, InversionInfo> invertInfoMap;
+
+        void merge(HoistedPrimalsInfo* info)
+        {
+            for (auto inst : info->storeSet)
+            {
+                SLANG_ASSERT(!storeSet.Contains(inst));
+                storeSet.Add(inst);
+            }
+
+            for (auto inst : info->recomputeSet)
+            {
+                SLANG_ASSERT(!recomputeSet.Contains(inst));
+                recomputeSet.Add(inst);
+            }
+
+            for (auto inst : info->invertSet)
+            {
+                SLANG_ASSERT(!invertSet.Contains(inst));
+                invertSet.Add(inst);
+            }
+
+            for (auto inst : info->instsToInvert)
+            {
+                SLANG_ASSERT(!instsToInvert.Contains(inst));
+                instsToInvert.Add(inst);
+            }
+
+            for (auto kvpair : info->invertInfoMap)
+            {
+                SLANG_ASSERT(!invertInfoMap.ContainsKey(kvpair.Key));
+                invertInfoMap[kvpair.Key] = kvpair.Value;
+            }
+        }
     };
 
     struct HoistResult
@@ -70,25 +121,28 @@ namespace Slang
         };
 
         Mode mode;
-
-        // This inst that will produce the value
-        union 
-        {
-            IRInst* instToStore;
-            IRInst* instToRecompute;
-            InversionInfo inversionInfo;
-        };
+        
+        IRInst* instToStore = nullptr;
+        IRInst* instToRecompute = nullptr;
+        InversionInfo inversionInfo;
 
         HoistResult(Mode mode, IRInst* target) :
             mode(mode)
         { 
-            if (mode == Mode::Store)
-                instToStore = target;
-            else if (mode == Mode::Recompute)
-                instToRecompute = target;
-            else if (mode == Mode::Invert)
+            switch (mode)
             {
-                SLANG_ASSERT("Wrong constructor for HoistResult::Mode::Invert");
+            case Mode::Store:
+                instToStore = target;
+                break;
+            case Mode::Recompute:
+                instToRecompute = target;
+                break;
+            case Mode::Invert:
+                SLANG_UNEXPECTED("Wrong constructor for HoistResult::Mode::Invert");
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled hoist mode");
+                break;
             }
         }
 
@@ -124,18 +178,23 @@ namespace Slang
         HashSet<IRInst*> recomputeSet;
         HashSet<IRInst*> invertSet;
 
-        Dictionary<IRUse*, HoistResult> hoistModeMap;
+        Dictionary<IRInst*, InversionInfo> invInfoMap;
     };
 
-    class AutodiffCheckpointPolicyBase
+    struct BlockSplitInfo : public RefObject
+    {
+        // Maps primal to differential blocks from the unzip step.
+        Dictionary<IRBlock*, IRBlock*> diffBlockMap;
+    };
+
+    class AutodiffCheckpointPolicyBase : public RefObject
     {
         public:
 
-        AutodiffCheckpointPolicyBase(IRGlobalValueWithCode* func)
-            : func(func), module(func->getModule())
+        AutodiffCheckpointPolicyBase(IRModule* module) : module(module)
         { }
 
-        RefPtr<CheckpointSetInfo> processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* info);
+        RefPtr<HoistedPrimalsInfo> processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* info);
 
         // Do pre-processing on the function (mainly for 
         // 'global' checkpointing methods that consider the entire
@@ -143,24 +202,23 @@ namespace Slang
         // 
         virtual void preparePolicy(IRGlobalValueWithCode* func) = 0;
 
-        virtual HoistResult classify(IRUse* diffBlockUse);
+        virtual HoistResult classify(IRUse* diffBlockUse) = 0;
 
         protected:
 
-        IRGlobalValueWithCode*  func;
         IRModule*               module;
     };
 
     class DefaultCheckpointPolicy : public AutodiffCheckpointPolicyBase
     {
-        DefaultCheckpointPolicy(IRGlobalValueWithCode* func)
-            : AutodiffCheckpointPolicyBase(func)
+        public:
+
+        DefaultCheckpointPolicy(IRModule* module)
+            : AutodiffCheckpointPolicyBase(module)
         { }
 
         virtual void preparePolicy(IRGlobalValueWithCode* func);
-
-        virtual bool shouldStoreInst(IRInst* inst);
-        virtual bool shouldStoreCallContext(IRCall* callInst);
+        virtual HoistResult classify(IRUse* use);
     };
 
     struct PrimalHoistContext
@@ -181,14 +239,8 @@ namespace Slang
         { 
             // TODO: Populate set of primal insts to consider as 
             // being used in a differential inst.
-            //
+            // 
         }
-    };
-
-    struct BlockSplitInfo
-    {
-        // Maps primal to differential blocks from the unzip step.
-        Dictionary<IRBlock*, IRBlock*> diffBlockMap;
     };
 
     void maybeHoistPrimalInst(
@@ -206,7 +258,8 @@ namespace Slang
     RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
         CheckpointSetInfo* checkpointInfo,
         IRGlobalValueWithCode* func,
-        BlockSplitInfo* splitInfo);
+        BlockSplitInfo* splitInfo,
+        HashSet<IRUse*> pendingUses);
 
     RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
         HoistedPrimalsInfo* hoistInfo,

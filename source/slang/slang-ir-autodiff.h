@@ -315,25 +315,12 @@ inline bool isRelevantDifferentialPair(IRType* type)
     return false;
 }
 
-IRBlock* getBlock(IRInst* inst)
-{
-    SLANG_RELEASE_ASSERT(inst);
+IRBlock* getBlock(IRInst* inst);
 
-    if (auto block = as<IRBlock>(inst))
-        return block;
+IRInst* getInstInBlock(IRInst* inst);
 
-    return getBlock(inst->getParent());
-}
+UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg);
 
-IRInst* getInstInBlock(IRInst* inst)
-{
-    SLANG_RELEASE_ASSERT(inst);
-
-    if (auto block = as<IRBlock>(inst->getParent()))
-        return inst;
-
-    return getInstInBlock(inst->getParent());
-}
-
+IRUse* findUniqueStoredVal(IRVar* var);
 
 };

@@ -679,8 +679,10 @@ namespace Slang
         return fwdDiffFunc;
     }
 
-    void BackwardDiffTranscriberBase::insertVariableForRecomputedPrimalInsts(IRFunc* diffPropFunc)
+    void BackwardDiffTranscriberBase::insertVariableForRecomputedPrimalInsts(IRFunc* )
     {
+        return;
+        /*
         RefPtr<IRDominatorTree> domTree = computeDominatorTree(diffPropFunc);
         auto firstBlock = diffPropFunc->getFirstBlock();
         if (!firstBlock)
@@ -776,7 +778,7 @@ namespace Slang
                 if (operandReplacement)
                     builder.replaceOperand(inst->getOperands() + j, operandReplacement);
             }
-        }
+        }*/
     }
 
     InstPair BackwardDiffTranscriberBase::transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
@@ -847,7 +849,7 @@ namespace Slang
         // Copy primal insts to the first block of the unzipped function, copy diff insts to the
         // second block of the unzipped function.
         // 
-        diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
+        RefPtr<HoistedPrimalsInfo> primalsInfo = diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
         IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
 
         // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
@@ -874,8 +876,8 @@ namespace Slang
 
         // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter) representing the
         // derivative of the return value.
-        DiffTransposePass::FuncTranspositionInfo info = { paramTransposeInfo.dOutParam };
-        diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, info);
+        DiffTransposePass::FuncTranspositionInfo transposeInfo = { paramTransposeInfo.dOutParam, primalsInfo };
+        diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, transposeInfo);
 
         eliminateDeadCode(diffPropagateFunc);
 
@@ -883,7 +885,7 @@ namespace Slang
         // with the intermediate results computed from the extracted func.
         IRInst* intermediateType = nullptr;
         auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
-            diffPropagateFunc, primalFunc, paramTransposeInfo, intermediateType);
+            diffPropagateFunc, primalFunc, primalsInfo, paramTransposeInfo, intermediateType);
 
         // At this point the unzipped func is just an empty shell
         // and we can simply remove it.
@@ -943,7 +945,7 @@ namespace Slang
 
         initializeLocalVariables(builder->getModule(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
         initializeLocalVariables(builder->getModule(), diffPropagateFunc);
-        insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
+        // insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
         stripTempDecorations(diffPropagateFunc);
     }
 
