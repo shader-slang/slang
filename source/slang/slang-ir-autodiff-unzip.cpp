@@ -308,9 +308,10 @@ struct ExtractPrimalFuncContext
             fieldType = cloneInst(&cloneEnv, &genTypeBuilder, fieldType);
         }
         auto structField = genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
-        if (auto diffFieldType = backwardPrimalTranscriber->differentiateType(&genTypeBuilder, (IRType*)fieldType))
+      
+        if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(&genTypeBuilder, (IRType*)fieldType))
         {
-            genTypeBuilder.addIntermediateContextFieldDifferentialTypeDecoration(structField, diffFieldType);
+            genTypeBuilder.addIntermediateContextFieldDifferentialTypeDecoration(structField, witness);
         }
         return structField;
     }

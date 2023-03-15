@@ -792,8 +792,7 @@ struct IRIntermediateContextFieldDifferentialTypeDecoration : IRDecoration
 
     IR_LEAF_ISA(IntermediateContextFieldDifferentialTypeDecoration)
 
-    IRInst* getDifferentialType() { return getOperand(0); }
-    IRInst* getDifferentialWitness() { return getOperand(1); }
+    IRInst* getDifferentialWitness() { return getOperand(0); }
 
 };
 
@@ -2886,7 +2885,7 @@ public:
 
     IRInst* addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key);
     IRInst* addPrimalElementTypeDecoration(IRInst* target, IRInst* type);
-    IRInst* addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* type);
+    IRInst* addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* witness);
 
     // Add a differentiable type entry to the appropriate dictionary.
     IRInst* addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness);
@@ -2968,15 +2967,6 @@ public:
         /// Emits a raw `DefaultConstruct` opcode without attempting to fold/materialize
         /// the inst.
     IRInst* emitDefaultConstructRaw(IRType* type);
-
-    /// Emits appropriate inst for structurally adding two values of `type`.
-    /// If `fallback` is true, will emit `StructuralAdd` inst on unknown types.
-    /// Otherwise, returns nullptr if we can't materialize the inst.
-    IRInst* emitStructuralAdd(IRInst* val0, IRInst* val1, bool fallback = true);
-
-    /// Emits a raw `StructuralAdd` opcode without attempting to fold/materialize
-    /// the inst.
-    IRInst* emitStructuralAddRaw(IRInst* val0, IRInst* val1);
 
     IRInst* emitCast(
         IRType* type,

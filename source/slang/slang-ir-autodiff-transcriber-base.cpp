@@ -172,21 +172,145 @@ IRInst* AutoDiffTranscriberBase::maybeCloneForPrimalInst(IRBuilder* builder, IRI
     return primal;
 }
 
+IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey);
+
 // Get or construct `:IDifferentiable` conformance for a DifferentiablePair.
 IRWitnessTable* AutoDiffTranscriberBase::getDifferentialPairWitness(IRBuilder* builder, IRInst* inOriginalDiffPairType, IRInst* inPrimalDiffPairType)
 {
     // Differentiate the pair type to get it's differential (which is itself a pair)
-    auto diffDiffPairType = differentiateType(builder, (IRType*)inOriginalDiffPairType);
-    
+    auto diffDiffPairType = (IRType*)differentiateType(builder, (IRType*)inOriginalDiffPairType);
+
+    auto addMethod = builder->createFunc();
+    auto zeroMethod = builder->createFunc();
+
     auto table = builder->createWitnessTable(autoDiffSharedContext->differentiableInterfaceType, (IRType*)inPrimalDiffPairType);
 
     // And place it in the synthesized witness table.
     builder->createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, diffDiffPairType);
+    builder->createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeWitnessStructKey, table);
+    builder->createWitnessTableEntry(table, autoDiffSharedContext->addMethodStructKey, addMethod);
+    builder->createWitnessTableEntry(table, autoDiffSharedContext->zeroMethodStructKey, zeroMethod);
 
-    // Omit the method synthesis here, since we can just intercept those directly at `getXXMethodForType`.
+    bool isUserCodeType = as<IRDifferentialPairUserCodeType>(inOriginalDiffPairType) ? true : false;
 
+    // Fill in differential method implementations.
+    auto elementType = as<IRDifferentialPairTypeBase>(inPrimalDiffPairType)->getValueType();
+    auto innerWitness = as<IRDifferentialPairTypeBase>(inPrimalDiffPairType)->getWitness();
+
+    {
+        // Add method.
+        IRBuilder b = *builder;
+        b.setInsertInto(addMethod);
+        IRType* paramTypes[2] = { diffDiffPairType, diffDiffPairType };
+        addMethod->setFullType(b.getFuncType(2, paramTypes, diffDiffPairType));
+        b.emitBlock();
+        auto p0 = b.emitParam(diffDiffPairType);
+        auto p1 = b.emitParam(diffDiffPairType);
+
+        // Since we are already dealing with a DiffPair<T>.Differnetial type, we know that value type == diff type.
+        auto innerAdd = _lookupWitness(&b, innerWitness, autoDiffSharedContext->addMethodStructKey);
+        IRInst* argsPrimal[2] = {
+            isUserCodeType ? b.emitDifferentialPairGetPrimalUserCode(p0) : b.emitDifferentialPairGetPrimal(p0),
+            isUserCodeType ? b.emitDifferentialPairGetPrimalUserCode(p1) : b.emitDifferentialPairGetPrimal(p1) };
+        auto primalPart = b.emitCallInst(elementType, innerAdd, 2, argsPrimal);
+        IRInst* argsDiff[2] = {
+            isUserCodeType ? b.emitDifferentialPairGetDifferentialUserCode(elementType, p0) : b.emitDifferentialPairGetDifferential(elementType, p0),
+            isUserCodeType ? b.emitDifferentialPairGetDifferentialUserCode(elementType, p1) : b.emitDifferentialPairGetDifferential(elementType, p1)};
+        auto diffPart = b.emitCallInst(elementType, innerAdd, 2, argsDiff);
+        auto retVal =
+            isUserCodeType
+                ? b.emitMakeDifferentialPairUserCode(diffDiffPairType, primalPart, diffPart)
+                : b.emitMakeDifferentialPair(diffDiffPairType, primalPart, diffPart);
+        b.emitReturn(retVal);
+    }
+    {
+        // Zero method.
+        IRBuilder b = *builder;
+        b.setInsertInto(zeroMethod);
+        zeroMethod->setFullType(b.getFuncType(0, nullptr, diffDiffPairType));
+        b.emitBlock();
+        auto innerZero = _lookupWitness(&b, innerWitness, autoDiffSharedContext->zeroMethodStructKey);
+        auto zeroVal = b.emitCallInst(elementType, innerZero, 0, nullptr);
+        auto retVal =
+            isUserCodeType
+            ? b.emitMakeDifferentialPairUserCode(diffDiffPairType, zeroVal, zeroVal)
+            : b.emitMakeDifferentialPair(diffDiffPairType, zeroVal, zeroVal);
+        b.emitReturn(retVal);
+    }
+    
     // Record this in the context for future lookups
     differentiableTypeConformanceContext.differentiableWitnessDictionary[(IRType*)inOriginalDiffPairType] = table;
+
+    return table;
+}
+
+// Get or construct `:IDifferentiable` conformance for an Array.
+IRWitnessTable* AutoDiffTranscriberBase::getArrayWitness(IRBuilder* builder, IRInst* inOriginalArrayType, IRInst* inPrimalArrayType)
+{
+    // Differentiate the pair type to get it's differential (which is itself a pair)
+    auto diffArrayType = (IRType*)differentiateType(builder, (IRType*)inOriginalArrayType);
+
+    if (!diffArrayType)
+        return nullptr;
+
+    auto innerWitness = tryGetDifferentiableWitness(builder, as<IRArrayTypeBase>(inOriginalArrayType)->getElementType());
+
+    auto addMethod = builder->createFunc();
+    auto zeroMethod = builder->createFunc();
+
+    auto table = builder->createWitnessTable(autoDiffSharedContext->differentiableInterfaceType, (IRType*)inPrimalArrayType);
+
+    // And place it in the synthesized witness table.
+    builder->createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, diffArrayType);
+    builder->createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeWitnessStructKey, table);
+    builder->createWitnessTableEntry(table, autoDiffSharedContext->addMethodStructKey, addMethod);
+    builder->createWitnessTableEntry(table, autoDiffSharedContext->zeroMethodStructKey, zeroMethod);
+
+    auto elementType = as<IRArrayTypeBase>(diffArrayType)->getElementType();
+
+    // Fill in differential method implementations.
+    {
+        // Add method.
+        IRBuilder b = *builder;
+        b.setInsertInto(addMethod);
+        IRType* paramTypes[2] = { diffArrayType, diffArrayType };
+        addMethod->setFullType(b.getFuncType(2, paramTypes, diffArrayType));
+        b.emitBlock();
+        auto p0 = b.emitParam(diffArrayType);
+        auto p1 = b.emitParam(diffArrayType);
+
+        // Since we are already dealing with a DiffPair<T>.Differnetial type, we know that value type == diff type.
+        auto innerAdd = _lookupWitness(&b, innerWitness, autoDiffSharedContext->addMethodStructKey);
+        auto resultVar = b.emitVar(diffArrayType);
+        IRBlock* loopBodyBlock = nullptr;
+        IRBlock* loopBreakBlock = nullptr;
+        auto loopCounter = emitLoopBlocks(&b, b.getIntValue(b.getIntType(), 0), as<IRArrayTypeBase>(diffArrayType)->getElementCount(), loopBodyBlock, loopBreakBlock);
+        b.setInsertBefore(loopBodyBlock->getTerminator());
+
+        IRInst* args[2] = {
+            b.emitElementExtract(p0, loopCounter),
+            b.emitElementExtract(p1, loopCounter) };
+        auto elementResult = b.emitCallInst(elementType, innerAdd, 2, args);
+        auto addr = b.emitElementAddress(resultVar, loopCounter);
+        b.emitStore(addr, elementResult);
+        b.setInsertInto(loopBreakBlock);
+        b.emitReturn(b.emitLoad(resultVar));
+    }
+    {
+        // Zero method.
+        IRBuilder b = *builder;
+        b.setInsertInto(zeroMethod);
+        zeroMethod->setFullType(b.getFuncType(0, nullptr, diffArrayType));
+        b.emitBlock();
+
+        auto innerZero = _lookupWitness(&b, innerWitness, autoDiffSharedContext->zeroMethodStructKey);
+        auto zeroVal = b.emitCallInst(elementType, innerZero, 0, nullptr);
+        auto retVal = b.emitMakeArrayFromElement(diffArrayType, zeroVal);
+        b.emitReturn(retVal);
+    }
+
+    // Record this in the context for future lookups
+    differentiableTypeConformanceContext.differentiableWitnessDictionary[(IRType*)inOriginalArrayType] = table;
 
     return table;
 }
@@ -204,9 +328,13 @@ IRInst* AutoDiffTranscriberBase::tryGetDifferentiableWitness(IRBuilder* builder,
     {
         auto primalType = lookupPrimalInst(builder, originalType, nullptr);
         SLANG_RELEASE_ASSERT(primalType);
-        if (auto primalPairType = as<IRDifferentialPairType>(primalType))
+        if (auto primalPairType = as<IRDifferentialPairTypeBase>(primalType))
         {
             witness = getDifferentialPairWitness(builder, originalType, primalPairType);
+        }
+        else if (auto arrayType = as<IRArrayType>(primalType))
+        {
+            witness = getArrayWitness(builder, originalType, arrayType);
         }
         else if (auto extractExistential = as<IRExtractExistentialType>(originalType))
         {
