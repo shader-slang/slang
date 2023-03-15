@@ -19,8 +19,9 @@ struct JSONToNativeConverter
     SlangResult convertArrayToStruct(const JSONValue& value, T* in) { return convertArrayToStruct(value, GetRttiInfo<T>::get(), (void*)in); }
     SlangResult convertArrayToStruct(const JSONValue& value, const RttiInfo* rttiInfo, void* out);
 
-    JSONToNativeConverter(JSONContainer* container, DiagnosticSink* sink):
+    JSONToNativeConverter(JSONContainer* container, const RttiTypeFuncsMap* typeMap, DiagnosticSink* sink):
         m_container(container),
+        m_typeMap(typeMap),
         m_sink(sink)
     {}
 
@@ -31,6 +32,7 @@ protected:
     SlangResult _structToNative(const ConstArrayView<JSONKeyValue>& pairs, const StructRttiInfo* structRttiInfo, void* out, Index& outFieldCount);
 
     DiagnosticSink* m_sink;
+    const RttiTypeFuncsMap* m_typeMap;
     JSONContainer* m_container;
 };
 
@@ -45,9 +47,9 @@ struct NativeToJSONConverter
     template <typename T>
     SlangResult convertStructToArray(T* in, JSONValue& out) { return convertStructToArray(GetRttiInfo<T>::get(), (const void*)in, out); }
 
-
-    NativeToJSONConverter(JSONContainer* container, DiagnosticSink* sink) :
+    NativeToJSONConverter(JSONContainer* container, const RttiTypeFuncsMap* typeMap, DiagnosticSink* sink) :
         m_container(container),
+        m_typeMap(typeMap),
         m_sink(sink)
     {}
 
@@ -55,9 +57,14 @@ protected:
     SlangResult _structToJSON(const StructRttiInfo* structRttiInfo, const void* src, List<JSONKeyValue>& outPairs);
 
     DiagnosticSink* m_sink;
+    const RttiTypeFuncsMap* m_typeMap;
     JSONContainer* m_container;
 };
 
+struct JSONNativeUtil
+{
+    static RttiTypeFuncsMap getTypeFuncsMap();
+};
 
 } // namespace Slang
 

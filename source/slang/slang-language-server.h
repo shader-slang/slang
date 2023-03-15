@@ -100,7 +100,8 @@ public:
     Slang::InlayHintOptions m_inlayHintOptions;
     bool m_quit = false;
     List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
-
+    RttiTypeFuncsMap m_typeMap;
+    
     SlangResult init(const LanguageServerProtocol::InitializeParams& args);
     SlangResult execute();
     void update();

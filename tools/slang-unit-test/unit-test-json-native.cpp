@@ -107,11 +107,13 @@ static SlangResult _check()
 
     DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
 
+    const auto typeMap = JSONNativeUtil::getTypeFuncsMap(); 
+
     RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
 
     String json;
     {
-        NativeToJSONConverter converter(container, &sink);
+        NativeToJSONConverter converter(container, &typeMap, &sink);
 
         JSONValue value;
         SLANG_RETURN_ON_FAIL(converter.convert(GetRttiInfo<SomeStruct>::get(), &s, value));
@@ -143,7 +145,7 @@ static SlangResult _check()
 
     // Convert back to native
     {
-        JSONToNativeConverter converter(container, &sink);
+        JSONToNativeConverter converter(container, &typeMap, &sink);
 
         {
             SomeStruct readS;

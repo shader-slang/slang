@@ -45,6 +45,9 @@ ArrayView<const char*> getCommitChars()
 SlangResult LanguageServer::init(const InitializeParams& args)
 {
     SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams(JSONRPCConnection::CallStyle::Object));
+    
+    m_typeMap = JSONNativeUtil::getTypeFuncsMap();
+
     m_workspaceFolders = args.workspaceFolders;
     m_workspace = new Workspace();
     List<URI> rootUris;
@@ -1436,7 +1439,7 @@ void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
     if (macros.isValid())
     {
         auto container = m_connection->getContainer();
-        JSONToNativeConverter converter(container, m_connection->getSink());
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         List<String> predefinedMacros;
         if (SLANG_SUCCEEDED(converter.convert(macros, &predefinedMacros)))
         {
@@ -1453,7 +1456,7 @@ void LanguageServer::updateSearchPaths(const JSONValue& value)
     if (value.isValid())
     {
         auto container = m_connection->getContainer();
-        JSONToNativeConverter converter(container, m_connection->getSink());
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         List<String> searchPaths;
         if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
         {
@@ -1470,7 +1473,7 @@ void LanguageServer::updateSearchInWorkspace(const JSONValue& value)
     if (value.isValid())
     {
         auto container = m_connection->getContainer();
-        JSONToNativeConverter converter(container, m_connection->getSink());
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         bool searchPaths;
         if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
         {
@@ -1487,7 +1490,7 @@ void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
     if (jsonValue.isValid())
     {
         auto container = m_connection->getContainer();
-        JSONToNativeConverter converter(container, m_connection->getSink());
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         String value;
         if (SLANG_SUCCEEDED(converter.convert(jsonValue, &value)))
         {
@@ -1510,7 +1513,7 @@ void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
 void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle, const JSONValue& clangFormatFallbackStyle, const JSONValue& allowLineBreakOnType, const JSONValue& allowLineBreakInRange)
 {
     auto container = m_connection->getContainer();
-    JSONToNativeConverter converter(container, m_connection->getSink());
+    JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
     converter.convert(clangFormatLoc, &m_formatOptions.clangFormatLocation);
     converter.convert(clangFormatStyle, &m_formatOptions.style);
     converter.convert(clangFormatFallbackStyle, &m_formatOptions.fallbackStyle);
@@ -1523,7 +1526,7 @@ void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, co
 void LanguageServer::updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames)
 {
     auto container = m_connection->getContainer();
-    JSONToNativeConverter converter(container, m_connection->getSink());
+    JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
     bool showDeducedType = false;
     bool showParameterNames = false;
     converter.convert(deducedTypes, &showDeducedType);
@@ -1542,7 +1545,7 @@ void LanguageServer::updateTraceOptions(const JSONValue& value)
     if (value.isValid())
     {
         auto container = m_connection->getContainer();
-        JSONToNativeConverter converter(container, m_connection->getSink());
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         String str;
         if (SLANG_SUCCEEDED(converter.convert(value, &str)))
         {

@@ -34,6 +34,8 @@ static SlangResult _check()
 
     RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
 
+    const RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
+
     JSONValue readValue;
     {
         // Now need to parse as JSON
@@ -52,14 +54,29 @@ static SlangResult _check()
         readValue = builder.getRootValue();
     }
 
-    // Convert back to native
+    // Convert to native
+    JSONSourceMap readS;
     {
-        JSONToNativeConverter converter(container, &sink);
+        JSONToNativeConverter converter(container, &typeMap, &sink);
 
         // Read it back
-        
-        JSONSourceMap readS;
         SLANG_RETURN_ON_FAIL(converter.convert(readValue, GetRttiInfo<JSONSourceMap>::get(), &readS));
+    }
+
+    // Write it out
+    {
+        String json;
+        
+        NativeToJSONConverter converter(container, &typeMap, &sink);
+
+        JSONValue value;
+        SLANG_RETURN_ON_FAIL(converter.convert(GetRttiInfo<JSONSourceMap>::get(), &readS, value));
+
+        // Convert into a string
+        JSONWriter writer(JSONWriter::IndentationStyle::Allman);
+        container->traverseRecursively(value, &writer);
+
+        json = writer.getBuilder();
     }
 
     return SLANG_OK;

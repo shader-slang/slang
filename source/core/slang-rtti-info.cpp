@@ -2,6 +2,8 @@
 
 #include "../../slang-com-helper.h"
 
+#include "slang-rtti-util.h"
+
 #include <mutex>
 
 namespace Slang {
@@ -189,6 +191,23 @@ StructRttiInfo StructRttiBuilder::make()
     }
 
     return m_rttiInfo;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncsMap !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo) const
+{
+    if (auto funcsPtr = m_map.TryGetValue(rttiInfo))
+    {
+        return *funcsPtr;
+    }
+
+    return RttiUtil::getDefaultTypeFuncs(rttiInfo);
+}
+
+void RttiTypeFuncsMap::add(const RttiInfo* rttiInfo, const RttiTypeFuncs& funcs)
+{
+    m_map.Add(rttiInfo, funcs);
 }
 
 } // namespace Slang

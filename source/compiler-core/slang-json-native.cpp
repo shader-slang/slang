@@ -8,35 +8,12 @@
 
 namespace Slang {
 
-template <typename T>
-struct GetRttiTypeFuncsForPodType
+/* static */RttiTypeFuncsMap JSONNativeUtil::getTypeFuncsMap()
 {
-    static void ctorArray(const RttiInfo* rttiInfo, void* dst, Index count) 
-    { 
-        SLANG_UNUSED(rttiInfo); 
-        ::memset(dst, 0, sizeof(T) * count);
-    }
-    static void dtorArray(const RttiInfo* rttiInfo, void* dst, Index count)
-    { 
-        SLANG_UNUSED(rttiInfo);
-        SLANG_UNUSED(dst);
-        SLANG_UNUSED(count);
-    }
-    static void copyArray(const RttiInfo* rttiInfo, void* dst, const void* src, Index count) 
-    { 
-        SLANG_UNUSED(rttiInfo); 
-        ::memcpy(dst, src, sizeof(T) * count); 
-    }
-
-    static RttiTypeFuncs getFuncs()
-    {
-        RttiTypeFuncs funcs;
-        funcs.copyArray = &copyArray;
-        funcs.dtorArray = &dtorArray;
-        funcs.ctorArray = &ctorArray;
-        return funcs;
-    }
-};
+    RttiTypeFuncsMap typeMap;
+    typeMap.add(GetRttiInfo<JSONValue>::get(), GetRttiTypeFuncsForZeroPod<JSONValue>::getFuncs());
+    return typeMap;
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! JSONToNativeConverter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -223,16 +200,7 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
             const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
             auto elementType = listRttiInfo->m_elementType;
 
-            if (elementType == GetRttiInfo<JSONValue>::get())
-            {
-                const auto typeFuncs = GetRttiTypeFuncsForPodType<JSONValue>::getFuncs();
-
-                SLANG_RETURN_ON_FAIL(RttiUtil::setListCount(elementType, typeFuncs, out, arr.getCount()));
-            }
-            else
-            {
-                SLANG_RETURN_ON_FAIL(RttiUtil::setListCount(elementType, out, arr.getCount()));
-            }
+            SLANG_RETURN_ON_FAIL(RttiUtil::setListCount(m_typeMap, elementType, out, arr.getCount()));
 
             // Okay, we need to copy over one by one
             Byte* dstEles = list.getBuffer();
