@@ -122,34 +122,19 @@ namespace Slang
         void merge(HoistedPrimalsInfo* info)
         {
             for (auto inst : info->storeSet)
-            {
-                SLANG_ASSERT(!storeSet.Contains(inst));
                 storeSet.Add(inst);
-            }
 
             for (auto inst : info->recomputeSet)
-            {
-                SLANG_ASSERT(!recomputeSet.Contains(inst));
                 recomputeSet.Add(inst);
-            }
 
             for (auto inst : info->invertSet)
-            {
-                SLANG_ASSERT(!invertSet.Contains(inst));
                 invertSet.Add(inst);
-            }
 
             for (auto inst : info->instsToInvert)
-            {
-                SLANG_ASSERT(!instsToInvert.Contains(inst));
                 instsToInvert.Add(inst);
-            }
 
             for (auto kvpair : info->invertInfoMap)
-            {
-                SLANG_ASSERT(!invertInfoMap.ContainsKey(kvpair.Key));
                 invertInfoMap[kvpair.Key] = kvpair.Value;
-            }
         }
     };
 

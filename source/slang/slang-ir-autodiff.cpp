@@ -567,7 +567,7 @@ bool canInstBeStored(IRInst* inst)
 {
     if (!inst->getDataType())
         return false;
-        
+
     if (as<IRBasicType>(inst->getDataType()))
         return true;
 
@@ -584,6 +584,7 @@ bool canInstBeStored(IRInst* inst)
     case kIROp_FloatType:
     case kIROp_VectorType:
     case kIROp_MatrixType:
+    case kIROp_AttributedType:
         return true;
     default:
         return false;

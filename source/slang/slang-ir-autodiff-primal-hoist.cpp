@@ -58,7 +58,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             if (!operand->get()->findDecoration<IRDifferentialInstDecoration>() &&
                 !as<IRFunc>(operand->get()) &&
                 !as<IRBlock>(operand->get()) &&
-                !(as<IRModuleInst>(operand->get()->getParent())))
+                !(as<IRModuleInst>(operand->get()->getParent())) &&
+                !getBlock(operand->get())->findDecoration<IRDifferentialInstDecoration>())
                 workList.add(operand);
         }
 
@@ -68,7 +69,10 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
         // since they _have_ to be classified as 'recompute' 
         //
         if (inst->getDataType() && (getParentFunc(inst->getDataType()) == func))
-            workList.add(&inst->typeUse);
+        {
+            if (!getBlock(inst->getDataType())->findDecoration<IRDifferentialInstDecoration>())
+                workList.add(&inst->typeUse);
+        }
     };
 
     // Populate recompute/store/invert sets with insts, by applying the policy
@@ -84,10 +88,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             continue;
 
         for (auto child : block->getChildren())
-        {
-            if (!child->findDecoration<IRDifferentialInstDecoration>())
-                continue;
-            
+        {   
             // Special case: Ignore the primals used to construct the return pair.
             if (as<IRMakeDifferentialPair>(child) &&
                 as<IRReturn>(child->firstUse->getUser()))
@@ -666,15 +667,23 @@ void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode*)
     return;
 }
 
+
 HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
 {
     // Store all. By default, classify will only be called on relevant differential
     // uses (or on uses in a 'recompute' inst)
     // 
-    if (canInstBeStored(use->get()))
+    if (auto var = as<IRVar>(use->get()))
+    {
         return HoistResult::store(use->get());
+    }
     else
-        return HoistResult::recompute(use->get());
+    {
+        if (canInstBeStored(use->get()))
+            return HoistResult::store(use->get());
+        else
+            return HoistResult::recompute(use->get());
+    }
 }
 
 /*

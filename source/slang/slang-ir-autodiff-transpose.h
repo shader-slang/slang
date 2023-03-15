@@ -1458,6 +1458,8 @@ struct DiffTransposePass
         RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
 
         Dictionary<IRInst*, List<IRInst*>> invOperandMap = buildInvOperandMap();
+
+        auto varBlock = func->getFirstBlock()->getNextBlock();
         
         // Load up pending insts into workList.
         for (auto use : primalUsesToHoist)
@@ -1634,39 +1636,14 @@ struct DiffTransposePass
             IRBlock* defBlock = nullptr;
             if (auto varToHoist = as<IRVar>(inst))
             {
+                varToHoist->insertBefore(varBlock->getFirstOrdinaryInst());
                 inst = findUniqueStoredVal(varToHoist)->getUser();
                 SLANG_ASSERT(inst);
 
-                /*for (auto varUse = varToHoist->firstUse; varUse; varUse = varUse->nextUse)
-                {
-                    IRBlock* useBlock = getBlock(varUse->getUser());
-
-                    // Ignore if the varUse is not already in a reverse-mode
-                    // block..
-                    //
-                    if (useBlock->getParent() == nullptr)
-                        continue;
-                    
-                    if (as<IRLoad>(varUse->getUser()))
-                        relevantUses.add(varUse);
-                }*/
                 defBlock = getBlock(inst);
             }
             else
             {
-                /*for (auto instUse = inst->firstUse; instUse; instUse = instUse->nextUse)
-                {
-                    IRBlock* useBlock = getBlock(instUse->getUser());
-
-                    // Ignore if the instUse is not already in a reverse-mode
-                    // block..
-                    //
-                    if (useBlock->getParent() == nullptr)
-                        continue;
-
-                    relevantUses.add(instUse);
-                }*/
-
                 defBlock = getBlock(inst);
             }
 
