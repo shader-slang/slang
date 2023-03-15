@@ -28,7 +28,7 @@ static SlangResult _check()
         "sources" : ["foo.js", "bar.js"],
         "sourcesContent" : [null, null],
         "names" : ["src", "maps", "are", "fun"],
-        "mappings" : "A,AAAB;;ABCDE;"
+        "mappings" : "A,AAAB;;ABCEG;"
 }
 )";
 
