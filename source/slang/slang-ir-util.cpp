@@ -554,6 +554,26 @@ IROp getSwapSideComparisonOp(IROp op)
     }
 }
 
+IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IRBlock*& loopBodyBlock, IRBlock*& loopBreakBlock)
+{
+    IRBuilder loopBuilder = *builder;
+    auto loopHeadBlock = loopBuilder.emitBlock();
+    loopBodyBlock = loopBuilder.emitBlock();
+    loopBreakBlock = loopBuilder.emitBlock();
+    auto loopContinueBlock = loopBuilder.emitBlock();
+    builder->emitLoop(loopHeadBlock, loopBreakBlock, loopHeadBlock, 1, &initVal);
+    loopBuilder.setInsertInto(loopHeadBlock);
+    auto loopParam = loopBuilder.emitParam(initVal->getFullType());
+    auto cmpResult = loopBuilder.emitLess(loopParam, finalVal);
+    loopBuilder.emitIfElse(cmpResult, loopBodyBlock, loopBreakBlock, loopBreakBlock);
+    loopBuilder.setInsertInto(loopBodyBlock);
+    loopBuilder.emitBranch(loopContinueBlock);
+    loopBuilder.setInsertInto(loopContinueBlock);
+    auto newParam = loopBuilder.emitAdd(loopParam->getFullType(), loopParam, loopBuilder.getIntValue(loopBuilder.getIntType(), 1));
+    loopBuilder.emitBranch(loopHeadBlock, 1, &newParam);
+    return loopParam;
+}
+
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
 {
     if (as<IRParam>(inst))

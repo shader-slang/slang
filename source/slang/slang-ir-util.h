@@ -182,6 +182,10 @@ void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst);
 // Set IRBuilder to insert after `inst`. If `inst` is a param, it will insert after the last param.
 void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst);
 
+// Emit a loop structure with a simple incrementing counter.
+// Returns the loop counter `IRParam`.
+IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IRBlock*& loopBodyBlock, IRBlock*& loopBreakBlock);
+
 }
 
 #endif

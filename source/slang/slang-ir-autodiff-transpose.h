@@ -2888,6 +2888,7 @@ struct DiffTransposePass
             auto diffElementType = (IRType*)diffTypeContext.getDifferentialForType(builder, arrayType->getElementType());
             SLANG_RELEASE_ASSERT(diffElementType);
             auto arraySize = arrayType->getElementCount();
+
             if (auto constArraySize = as<IRIntLit>(arraySize))
             {
                 List<IRInst*> args;
