@@ -471,8 +471,6 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
 /* static */SlangResult RttiUtil::setListCount(RttiTypeFuncsMap* typeMap, const RttiInfo* elementType, void* dst, Index count)
 {
-    SLANG_ASSERT(typeFuncs.isValid());
-
     // NOTE! The following only works because List<T> has capacity initialized members, and
     // setting the count if it is <= capacity just sets the count (ie things aren't released(!)).
     

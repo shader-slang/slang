@@ -79,6 +79,12 @@ static SlangResult _check()
         json = writer.getBuilder();
     }
 
+    {
+        SourceMap sourceMap;
+
+        SLANG_RETURN_ON_FAIL(sourceMap.decode(container, readS));
+    }
+
     return SLANG_OK;
 }
 
