@@ -377,12 +377,13 @@ struct DiffTransposePass
                     {
                         IRBlock* revPreCondEndBlock = revBlockMap[falseBlock];
                         builder.setInsertInto(revPreCondEndBlock);
-                        builder.emitLoop(
+                        auto revLoop = builder.emitLoop(
                             revCondBlock,
                             revBreakBlock,
                             revLoopEndBlock,
                             getPhiGrads(falseBlock).getCount(),
                             getPhiGrads(falseBlock).getBuffer());
+                        loop->transferDecorationsTo(revLoop);
                         
                         auto revLoopStartBlock = revBlockMap[breakBlock];
                         builder.setInsertInto(revLoopStartBlock);
@@ -396,12 +397,13 @@ struct DiffTransposePass
                         // Emit loop into rev-version of the break block.
                         auto revLoopBlock = revBlockMap[breakBlock];
                         builder.setInsertInto(revLoopBlock);
-                        builder.emitLoop(
+                        auto revLoop = builder.emitLoop(
                             revPreCondBlock,
                             revBreakBlock,
                             revLoopEndBlock,
                             getPhiGrads(breakBlock).getCount(),
                             getPhiGrads(breakBlock).getBuffer());
+                        loop->transferDecorationsTo(revLoop);
                     }
 
                     currentBlock = breakBlock;
@@ -645,7 +647,6 @@ struct DiffTransposePass
         {
             if (auto loopInst = as<IRLoop>(block->getTerminator()))
             {
-                lowerLoopExitValues(&builder, loopInst);
                 invertLoopCondition(&builder, loopInst);
             }
         }
@@ -694,10 +695,28 @@ struct DiffTransposePass
             IRBlock* revBlock = revBlockMap[block];
 
             for (auto child = revBlock->getFirstChild(); child; child = child->getNextInst())
+            {
                 hoistPrimalOperands(&builder, child);
+
+                for (auto decoration = child->getFirstDecoration(); decoration; decoration = decoration->getNextDecoration())
+                {
+                    if (auto contextDecoration = as<IRBackwardDerivativePrimalContextDecoration>(decoration))
+                        hoistPrimalUse(&builder, &contextDecoration->primalContextVar);
+                    
+                    if (auto loopExitDecoration = as<IRLoopExitPrimalValueDecoration>(decoration))
+                        hoistPrimalUse(&builder, &loopExitDecoration->exitVal);
+                }
+            }
         }
 
         finishHoistingPrimals(revDiffFunc);
+
+        for (auto block : workList)
+        {
+            auto revBlock = as<IRBlock>(revBlockMap[block]);
+            if (auto revLoop = as<IRLoop>(revBlock->getTerminator()))
+                lowerLoopExitValues(&builder, revLoop);
+        }
 
         // At this point, the only block left without terminator insts
         // should be the last one. Add a void return to complete it.
@@ -765,6 +784,11 @@ struct DiffTransposePass
         revAccumulatorVarMap[fwdInst] = tempRevVar;
 
         return tempRevVar;
+    }
+
+    IRVar* lookupInverseVar(IRInst* inst)
+    {
+        return inverseVarMap[inst];
     }
 
     IRVar* getOrCreateInverseVar(IRInst* primalInst, IRGlobalValueWithCode* func)
@@ -842,7 +866,7 @@ struct DiffTransposePass
 
         // Create an inverse builder to insert insts into the inv-block.
         IRBuilder invBuilder(autodiffContext->moduleInst);
-        invBuilder.setInsertInto(tempInvBlock);
+        
 
         // Check if this block has any 'outputs' (in the form of phi args
         // sent to the successor block)
@@ -882,7 +906,8 @@ struct DiffTransposePass
                         auto primalType = arg->getDataType();
                         auto primalInvParam = builder.emitParam(primalType);
 
-                        setInverse(&builder, arg, primalInvParam);
+                        invBuilder.setInsertBefore(branchInst);
+                        setInverse(&invBuilder, fwdBlock, builder.getFunc(), arg, primalInvParam);
                     }
                 }
                 else
@@ -892,7 +917,8 @@ struct DiffTransposePass
                         auto primalType = arg->getDataType();
                         auto primalInvParam = builder.emitParam(primalType);
 
-                        setInverse(&builder, arg, primalInvParam);
+                        invBuilder.setInsertBefore(branchInst);
+                        setInverse(&invBuilder, fwdBlock, builder.getFunc(), arg, primalInvParam);
                     }
                     else
                     {
@@ -1120,24 +1146,38 @@ struct DiffTransposePass
         }
     }
 
-    void lowerLoopExitValues(IRBuilder* builder, IRLoop* fwdLoop)
+    // NOTE: This is a workaround for the fact that we expect inverses to use 
+    // single-use variables. The loop exit value will add a 
+    // second store to most inv-variables and mess with the primal hoisting mechanism.
+    // Instead of emitting into the orphaned inverse block, we'll directly emit into
+    // the reverse-mode block since we'll be running this _after_ the primal hoisting
+    // pass.
+    // 
+    // This workaround is fine for inverting loop counters, but when we want to
+    // expand to supporting general-purpose adjoints, we would want to use per-region 
+    // inverse vars based on 'invInfo' (enforcing single-use vars)
+    // 
+    void lowerLoopExitValues(IRBuilder* builder, IRLoop* revLoop)
     {
-        for (auto decoration : fwdLoop->getDecorations())
+        List<IRDecoration*> processedDecorations;
+        for (auto decoration : revLoop->getDecorations())
         {
             if (auto loopExitValueDecoration = as<IRLoopExitPrimalValueDecoration>(decoration))
             {
-                IRBlock* revLoopInitBlock = revBlockMap[fwdLoop->getBreakBlock()];
+                builder->setInsertBefore(revLoop);
+                setInverse(
+                    builder,
+                    nullptr,
+                    builder->getFunc(),
+                    loopExitValueDecoration->getTargetInst(),
+                    loopExitValueDecoration->getLoopExitValInst());
 
-                if (auto revLoopInst = revLoopInitBlock->getTerminator())
-                    builder->setInsertBefore(revLoopInst);
-                else
-                    builder->setInsertInto(revLoopInitBlock);
-
-                // hoistPrimalInst(builder, loopExitValueDecoration->getLoopExitValInst());
-
-                setInverse(builder, loopExitValueDecoration->getTargetInst(), loopExitValueDecoration->getLoopExitValInst());
+                processedDecorations.add(loopExitValueDecoration);
             }
         }
+
+        for (auto decoration : processedDecorations)
+            decoration->removeAndDeallocate();
     }
 
     void lowerLoopExitValues(IRBuilder* builder, IRBlock* block)
@@ -1240,14 +1280,19 @@ struct DiffTransposePass
         return invInst;
     }
 
-    void setInverse(IRBuilder* builder, IRInst* inst, IRInst* invInst)
+    void setInverse(IRBuilder* builder, IRBlock* defBlock, IRGlobalValueWithCode* func, IRInst* inst, IRInst* invInst)
     {
         auto instBlock = as<IRBlock>(inst->getParent());
         if (!instBlock)
             return;
 
-        if (auto invVar = getOrCreateInverseVar(inst, as<IRGlobalValueWithCode>(instBlock->getParent())))
-            builder->emitStore(invVar, invInst);
+        disableIRValidationAtInsert();
+        if (auto invVar = getOrCreateInverseVar(inst, func))
+        {
+            auto invStore = builder->emitStore(invVar, invInst);
+            mapStoreToDefBlock[as<IRStore>(invStore)] = defBlock;
+        }
+        enableIRValidationAtInsert();
     }
 
     bool shouldInstBeInverted(IRInst* inst)
@@ -1300,53 +1345,128 @@ struct DiffTransposePass
 
     bool doesInstRequireHoisting(IRInst* inst)
     {
+        if (as<IRModuleInst>(inst->getParent()))
+            return false;
+
         if (as<IRBlock>(inst) ||
             as<IRGlobalValueWithCode>(inst) ||
             as<IRType>(inst) ||
             as<IRConstant>(inst))
             return false;
+        
+        if (as<IRTerminatorInst>(inst))
+            return false;
+        
+        if (as<IRDecoration>(inst))
+            return doesInstRequireHoisting(getInstInBlock(inst));
 
         // We're looking for primal insts in differential blocks
         // that have not yet been moved to the 'active' blocks
         // (i.e in diff blocks that do not have parents)
         // 
         return (!isDifferentialInst(inst) && 
-                isDifferentialInst(getBlock(inst)) &&
+                (isDifferentialInst(getBlock(inst)) || getBlock(inst) == tempInvBlock) &&
                 getBlock(inst)->getParent() == nullptr);
+    }
+
+    // Builds a map from inst to a list of uses by primal _inverted_ insts.
+    Dictionary<IRInst*, List<IRInst*>> buildInvOperandMap()
+    {
+        Dictionary<IRInst*, List<IRInst*>> invOperandMap;
+        for (auto kvpair : this->hoistedPrimalsInfo->invertInfoMap)
+        {
+            InversionInfo invInfo = kvpair.Value;
+
+            for (auto operand : invInfo.requiredOperands)
+            {
+                if (!invOperandMap.ContainsKey(operand))
+                    invOperandMap[operand] = List<IRInst*>();
+
+                for (auto target : invInfo.targetInsts)
+                    invOperandMap[operand].GetValue().add(target);
+            }
+        }
+
+        return invOperandMap;
+    }
+
+    IRBlock* walkToEndOfRegion(IRBlock* block)
+    {
+        IRBlock* currBlock = block;
+
+        bool keepGoing = true;
+        while (keepGoing)
+        {
+            auto terminator = currBlock->getTerminator();
+            switch (terminator->getOp())
+            {
+                case kIROp_Return: 
+                    keepGoing = false;
+                    break;
+
+                case kIROp_unconditionalBranch:
+                {
+                    auto nextBlock = as<IRUnconditionalBranch>(terminator)->getTargetBlock();
+
+                    HashSet<IRBlock*> predecessorSet;
+                    for (auto predecessor : nextBlock->getPredecessors())
+                        predecessorSet.Add(predecessor);
+
+                    if (predecessorSet.Count() > 1)
+                    {
+                        keepGoing = false;
+                        break;
+                    }
+                    
+                    currBlock = nextBlock;
+                    break;
+                }
+                
+                case kIROp_ifElse:
+                {
+                    for (auto predecessor : currBlock->getPredecessors())
+                    {
+                        if (as<IRLoop>(predecessor->getTerminator()))
+                        {
+                            keepGoing = false;
+                            break;
+                        }
+                    }
+                        
+                    currBlock = as<IRIfElse>(terminator)->getAfterBlock();
+                    break;
+                }
+                
+                case kIROp_Switch:
+                    currBlock = as<IRSwitch>(terminator)->getBreakLabel();
+                    break;
+                
+                case kIROp_loop:
+                    currBlock = as<IRLoop>(terminator)->getBreakBlock();
+                    break;
+            }
+        }
+
+        return currBlock;
     }
 
     void finishHoistingPrimals(IRGlobalValueWithCode* func)
     {
-        List<IRUse*> workList;
+        List<IRInst*> workList;
         
         Dictionary<IRInst*, IRInst*> hoistedInstMap;
 
         RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
+
+        Dictionary<IRInst*, List<IRInst*>> invOperandMap = buildInvOperandMap();
         
         // Load up pending insts into workList.
         for (auto use : primalUsesToHoist)
-            workList.add(use);
+            workList.add(use->get());
         
         primalUsesToHoist.clear();
-
-        /*auto maybeReplacePrimalOperands = [&](IRBuilder* builder, IRInst* inst)
-        {
-            UIndex opIndex = 0;
-            for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
-            {   
-                if (this->hoistedPrimalsInfo->invertSet.Contains(operand->get()))
-                {
-                    // Replace with inverse.
-                    operand->set(loadInverse(builder, operand->get()));
-                }
-                else if (hoistedInstMap.ContainsKey(operand->get()) && 
-                    hoistedInstMap[operand->get()] != operand->get())
-                {
-                    operand->set(hoistedInstMap[operand->get()]);
-                }
-            }
-        };*/
         
+
         auto maybeAddPrimalOperandsToWorkList = [&](IRInst* inst)
         {
             UIndex opIndex = 0;
@@ -1355,7 +1475,7 @@ struct DiffTransposePass
                 if (doesInstRequireHoisting(operand->get()) &&
                     !hoistedInstMap.ContainsKey(operand->get()))
                 {
-                    workList.add(operand);
+                    workList.add(operand->get());
                 }
             }
         };
@@ -1366,11 +1486,14 @@ struct DiffTransposePass
             {   
                 if (doesInstRequireHoisting(use->getUser()))
                 {
+                    if (as<IRVar>(inst) && as<IRStore>(use->getUser()))
+                        continue;
+
                     // Uses that haven't already been hoisted into reverse-mode 
                     // blocks, and are not in the invert-set are pending uses.
                     // 
-                    if (!hoistedInstMap.ContainsKey(use->getUser()))
-                        workList.add(use);
+                    if (!hoistedInstMap.ContainsKey(use->getUser()) && !hasInverse(use->getUser()))
+                        workList.add(use->getUser());
                 }
             }
         };
@@ -1381,10 +1504,13 @@ struct DiffTransposePass
             {   
                 if (doesInstRequireHoisting(use->getUser()))
                 {
+                    if (as<IRVar>(inst) && as<IRStore>(use->getUser()))
+                        continue;
+
                     // Users that haven't already been hoisted into reverse-mode 
                     // blocks are pending users.
                     // 
-                    if (!hoistedInstMap.ContainsKey(use->getUser()))
+                    if (!hoistedInstMap.ContainsKey(use->getUser()) && !hasInverse(use->getUser()))
                         return true;
                 }
             }
@@ -1392,77 +1518,120 @@ struct DiffTransposePass
             return false;
         };
 
+        auto isInstHoisted = [&](IRInst* inst)
+        {
+            return getBlock(inst)->getParent() != nullptr && isDifferentialInst(getBlock(inst));
+        };
+
         while (workList.getCount() > 0)
         {
             // Pop work item
-            auto use = workList.getLast();
+            auto inst = workList.getLast();
             workList.removeLast();
 
             // Already hoisted to reverse-mode block.
             // replace with mapped inst (in case it's different)
             // and continue on.. (this should actually never be hit)
             //
-            if (hoistedInstMap.ContainsKey(use->get()))
+            if (hoistedInstMap.ContainsKey(inst))
+                continue;
+
+            if (invOperandMap.ContainsKey(inst))
             {
-                use->set(hoistedInstMap[use->get()]);
-                SLANG_UNEXPECTED("Should not see a use for an inst that has already been hoisted");
+                List<IRInst*> pendingInvDependencies;
+                for (auto dependency : invOperandMap[inst].GetValue())
+                {
+                    if (doesInstRequireHoisting(dependency) &&
+                        !hoistedInstMap.ContainsKey(dependency))
+                        pendingInvDependencies.add(dependency);
+                }
+                
+                if (pendingInvDependencies.getCount() > 0)
+                {
+                    workList.add(inst);
+                    for (auto dependency : pendingInvDependencies)
+                        workList.add(dependency);
+                    
+                    // Skip until all the dependencies have been handled.
+                    continue;
+                }
+            }
+
+            // Are the uses of this primal inst already hoisted into the reverse-mode
+            // blocks? We cannot hoist this inst unless the uses are hoisted.
+            // 
+            if (doesInstHavePendingUsers(inst)) 
+            {
+                // Add inst back to work list.
+                workList.add(inst);
+
+                // Then, add all the pending use to the top of 
+                // list, ensuring they are processed before we see 
+                // inst again.
+                // 
+                maybeAddUsersToWorkList(inst);
+
                 continue;
             }
 
             // The used inst is marked for inversion, lookup and load
             // an inverse.
             // 
-            if (this->hoistedPrimalsInfo->invertSet.Contains(use->get()))
+            if (this->hoistedPrimalsInfo->invertSet.Contains(inst))
             {
                 // Replace with inverse.
                 IRBuilder builder(func->getModule());
-                builder.setInsertBefore(use->getUser());
 
-                use->set(loadInverse(&builder, use->get()));
+                for (auto use = inst->firstUse; use;)
+                {
+                    auto nextUse = use->nextUse;
+
+                    if (!isInstHoisted(use->getUser()))
+                    {
+                        use = nextUse;
+                        continue;
+                    }
+
+                    // TODO: Hacky workaround to prevent the 'key' being overwritten, 
+                    // avoid this by adding the decoration on the param instead of the loop
+                    // 
+                    if (auto exitValDecoration = as<IRLoopExitPrimalValueDecoration>(use->getUser()))
+                    {
+                        if (&exitValDecoration->target == use)
+                        {
+                            use = nextUse;
+                            continue;
+                        }
+                    }
+
+
+                    builder.setInsertBefore(getInstInBlock(use->getUser()));
+                    use->set(loadInverse(&builder, inst));
+
+                    use = nextUse;
+                }
+
+                // If all uses of the invertible inst have been hoisted, 
+                // add the inv-var to the worklist.
+                // 
+                workList.add(lookupInverseVar(inst));
+                hoistedInstMap[inst] = nullptr;
+
                 continue;
             }
 
-            // If none of the previous cases were hit, we need to hoist this inst.
-            // 
-            
-            auto instToHoist = use->get();
-
-            // Are the uses of this primal inst already hoisted into the reverse-mode
-            // blocks? We cannot hoist this inst unless the uses are hoisted.
-            // 
-            if (doesInstHavePendingUsers(instToHoist))
-            {
-                // Add inst back to work list.
-                workList.add(use);
-
-                // Then, add all the pending use to the top of 
-                // list, ensuring they are processed before we see 
-                // inst again.
-                // 
-                maybeAddUsersToWorkList(instToHoist);
-
-                continue;
-            }
-
-            // If we're trying to hoist an inst that has an inverse, replace with the var instead.
-            // 
-            if (this->hoistedPrimalsInfo->invertSet.Contains(instToHoist))
-            {
-                // This key _must_ exist since we should have seen it's use
-                // turn into a load at some point earlier in this loop.
-                // 
-                IRVar* invVar = inverseVarMap[instToHoist];
-                instToHoist = invVar;
-            }
+            // Should not see an inst marked for inversion here.
+            SLANG_RELEASE_ASSERT(!this->hoistedPrimalsInfo->invertSet.Contains(inst));
 
             List<IRUse*> relevantUses;
 
-            if (auto varToHoist = as<IRVar>(instToHoist))
+            IRBlock* defBlock = nullptr;
+            if (auto varToHoist = as<IRVar>(inst))
             {
-                instToHoist = findUniqueStoredVal(varToHoist)->getUser();
-                SLANG_ASSERT(instToHoist);
+                inst = findUniqueStoredVal(varToHoist)->getUser();
+                SLANG_ASSERT(inst);
 
-                for (auto varUse = varToHoist->firstUse; varUse; varUse = varUse->nextUse)
+                /*for (auto varUse = varToHoist->firstUse; varUse; varUse = varUse->nextUse)
                 {
                     IRBlock* useBlock = getBlock(varUse->getUser());
 
@@ -1474,11 +1643,12 @@ struct DiffTransposePass
                     
                     if (as<IRLoad>(varUse->getUser()))
                         relevantUses.add(varUse);
-                }
+                }*/
+                defBlock = getBlock(inst);
             }
             else
             {
-                for (auto instUse = instToHoist->firstUse; instUse; instUse = instUse->nextUse)
+                /*for (auto instUse = inst->firstUse; instUse; instUse = instUse->nextUse)
                 {
                     IRBlock* useBlock = getBlock(instUse->getUser());
 
@@ -1489,17 +1659,19 @@ struct DiffTransposePass
                         continue;
 
                     relevantUses.add(instUse);
-                }
+                }*/
+
+                defBlock = getBlock(inst);
             }
 
-            if (!doesInstRequireHoisting(instToHoist))
+            if (!doesInstRequireHoisting(inst))
                 continue;
 
             // Move this inst to after it's diff uses.
             // 
             {
-                IRBlock* block = as<IRBlock>(instToHoist->getParent());
-                IRBlock* currTopBlock = revBlockMap[block];
+                //IRBlock* block = as<IRBlock>(inst->getParent());
+                /*IRBlock* currTopBlock = revBlockMap.ContainsKey(block) ? (IRBlock*)revBlockMap[block] : nullptr;
 
                 for (auto relevantUse : relevantUses)
                 {
@@ -1515,20 +1687,22 @@ struct DiffTransposePass
                     // we're good,
                     // Otherwise, make the use-block the top-block, and keep going.
                     // 
-                    if (!domTree->dominates(currTopBlock, useBlock))
+                    if (!currTopBlock || !domTree->dominates(currTopBlock, useBlock))
                     {
                         currTopBlock = useBlock;
                     }
-                }
+                }*/
+
+                IRBlock* currTopBlock = revBlockMap[walkToEndOfRegion(defBlock)];
 
                 SLANG_RELEASE_ASSERT(currTopBlock);
                 
                 // Consistency check: currTopBlock should dominate all relevant use sites.
-                for (auto relevantUse : relevantUses)
+                /*for (auto relevantUse : relevantUses)
                 {
                     IRBlock* useBlock = getBlock(relevantUse->getUser());
                     SLANG_RELEASE_ASSERT(domTree->dominates(currTopBlock, useBlock));
-                }
+                }*/
 
                 // More consistency checks
                 SLANG_RELEASE_ASSERT(currTopBlock->getFirstOrdinaryInst() != nullptr);
@@ -1539,13 +1713,13 @@ struct DiffTransposePass
                 // this inst might not be hoisted to the right place yet)
                 // 
                 disableIRValidationAtInsert();
-                instToHoist->insertBefore(currTopBlock->getFirstOrdinaryInst());
+                inst->insertBefore(currTopBlock->getFirstOrdinaryInst());
                 enableIRValidationAtInsert();
             }
 
             // Finish up..
-            hoistedInstMap[instToHoist] = instToHoist;
-            maybeAddPrimalOperandsToWorkList(instToHoist);
+            hoistedInstMap[inst] = inst;
+            maybeAddPrimalOperandsToWorkList(inst);
         }
     }
 
@@ -1578,14 +1752,20 @@ struct DiffTransposePass
             if (as<IRTerminatorInst>(primalInst))
                 return;
 
-            //auto invOutput = loadInverse(builder, primalInst);
-            //auto invOutput = lookupInstInPrimalBlock(primalInst);
             auto invInfo = this->hoistedPrimalsInfo->invertInfoMap[primalInst];
 
-            auto invEntries = invertInst(builder, primalInst, invInfo);
+            IRBuilder invBuilder(builder->getModule());
+            invBuilder.setInsertAfter(primalInst);
 
+            auto invEntries = invertInst(&invBuilder, primalInst, invInfo);
+            
             for (auto entry : invEntries)
-                setInverse(builder, entry.inst, entry.invInst);
+                setInverse(
+                    &invBuilder,
+                    getBlock(primalInst),
+                    as<IRGlobalValueWithCode>(entry.inst->getParent()->getParent()),
+                    entry.inst, 
+                    entry.invInst);
         }
         else
         {
@@ -2100,6 +2280,7 @@ struct DiffTransposePass
                 return transposeUpdateElement(builder, fwdInst, revValue);
 
             case kIROp_LoadReverseGradient:
+            case kIROp_ReverseGradientDiffPairRef:
             case kIROp_DefaultConstruct:
             case kIROp_Specialize:
             case kIROp_unconditionalBranch:
@@ -3251,6 +3432,8 @@ struct DiffTransposePass
     Dictionary<IRInst*, IRInst*>                         inverseValueMap;
 
     List<IRUse*>                                         primalUsesToHoist;
+
+    Dictionary<IRStore*, IRBlock*>                       mapStoreToDefBlock;
 };
 
 

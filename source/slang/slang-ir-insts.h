@@ -639,6 +639,7 @@ struct IRBackwardDerivativePrimalContextDecoration : IRDecoration
     };
     IR_LEAF_ISA(BackwardDerivativePrimalContextDecoration)
 
+    IRUse primalContextVar;
     IRInst* getBackwardDerivativePrimalContextVar() { return getOperand(0); }
 };
 
@@ -692,6 +693,8 @@ struct IRLoopExitPrimalValueDecoration : IRDecoration
     };
     IR_LEAF_ISA(LoopExitPrimalValueDecoration)
 
+    IRUse target;
+    IRUse exitVal;
     IRInst* getTargetInst() { return getOperand(0); }
     IRInst* getLoopExitValInst() { return getOperand(1); }
 };

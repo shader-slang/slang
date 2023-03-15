@@ -81,16 +81,19 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             if (!child->findDecoration<IRDifferentialInstDecoration>())
                 continue;
             
-            // Ignore the primals used to construct a pair
-            if (as<IRMakeDifferentialPair>(child))
+            // Special case: Ignore the primals used to construct the return pair.
+            if (as<IRMakeDifferentialPair>(child) &&
+                as<IRReturn>(child->firstUse->getUser()))
             {
-                // quick consistency check..
-                SLANG_RELEASE_ASSERT(as<IRReturn>(child->firstUse->getUser()));
+                // quick check
+                SLANG_RELEASE_ASSERT(child->firstUse->nextUse == nullptr);
                 continue;
             }
 
             addPrimalOperandsToWorkList(child);
         }
+
+        addPrimalOperandsToWorkList(block->getTerminator());
     }
     
     while (workList.getCount() > 0)
@@ -323,11 +326,9 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
 
 IRType* getTypeForLocalStorage(
     IRBuilder* builder,
-    IRInst* inst,
+    IRType* storageType,
     List<IndexTrackingInfo*> defBlockIndices)
 {
-    IRType* storageType = inst->getDataType();
-
     for (auto index : defBlockIndices)
     {
         SLANG_ASSERT(index->status == IndexTrackingInfo::CountStatus::Static);
@@ -343,17 +344,17 @@ IRType* getTypeForLocalStorage(
     return storageType;
 }
 
-IRVar* emitLocalVarForValue(
+IRVar* emitIndexedLocalVar(
     IRBlock* varBlock,
-    IRInst* instToStore,
+    IRType* baseType,
     List<IndexTrackingInfo*> defBlockIndices)
 {
-    SLANG_RELEASE_ASSERT(!as<IRPtrTypeBase>(instToStore->getDataType()));
+    SLANG_RELEASE_ASSERT(!as<IRPtrTypeBase>(baseType));
 
     IRBuilder varBuilder(varBlock->getModule());
     varBuilder.setInsertBefore(varBlock->getFirstOrdinaryInst());
 
-    IRType* varType = getTypeForLocalStorage(&varBuilder, instToStore, defBlockIndices);
+    IRType* varType = getTypeForLocalStorage(&varBuilder, baseType, defBlockIndices);
 
     auto var = varBuilder.emitVar(varType);
     varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
@@ -434,7 +435,7 @@ IRVar* storeIndexedValue(
     IRInst* instToStore,
     List<IndexTrackingInfo*> defBlockIndices)
 {
-    IRVar* localVar = emitLocalVarForValue(defaultVarBlock, instToStore, defBlockIndices);
+    IRVar* localVar = emitIndexedLocalVar(defaultVarBlock, instToStore->getDataType(), defBlockIndices);
 
     IRInst* addr = emitIndexedStoreAddressForVar(builder, localVar, defBlockIndices);
 
@@ -469,6 +470,23 @@ bool areIndicesEqual(
 
     return true;
 }
+
+bool areIndicesSubsetOf(
+    List<IndexTrackingInfo*> indicesA, 
+    List<IndexTrackingInfo*> indicesB)
+{
+    if (indicesA.getCount() > indicesB.getCount())
+        return false;
+    
+    for (Index ii = 0; ii < indicesA.getCount(); ii++)
+    {
+        if (indicesA[ii] != indicesB[ii])
+            return false;
+    }
+
+    return true;
+}
+
 
 bool isDifferentialBlock(IRBlock* block)
 {
@@ -518,11 +536,16 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 {
                     outOfScopeUses.add(use);
                 }
-                else if (!areIndicesEqual(indexedBlockInfo[defBlock], indexedBlockInfo[userBlock]))
+                else if (!areIndicesSubsetOf(indexedBlockInfo[defBlock], indexedBlockInfo[userBlock]))
                 {
                     outOfScopeUses.add(use);
                 }
                 else if (indexedBlockInfo[defBlock].GetValue().getCount() > 0 && 
+                         !isDifferentialBlock(defBlock))
+                {
+                    outOfScopeUses.add(use);
+                }
+                else if (as<IRPtrTypeBase>(instToStore->getDataType()) &&
                          !isDifferentialBlock(defBlock))
                 {
                     outOfScopeUses.add(use);
@@ -550,21 +573,24 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
             bool isIndexedStore = (storeUse && defBlockIndices.getCount() > 0);
 
-            if (!isIndexedStore)
+            // TODO: There's a slight hackiness here. (Ideally we might just want to emit
+            // additional vars when splitting a call)
+            //
+            if (!isIndexedStore && 
+                as<IRBackwardDiffIntermediateContextType>(varToStore->getDataType()))
             {
                 varToStore->insertBefore(defaultVarBlock->getFirstOrdinaryInst());
                 processedStoreSet.Add(varToStore);
                 continue;
             }
 
-            IRStore* storeInst = as<IRStore>(storeUse->getUser());
+            setInsertAfterOrdinaryInst(&builder, getInstInBlock(storeUse->getUser()));
 
-            setInsertAfterOrdinaryInst(&builder, storeInst);
-
-            IRVar* localVar = emitLocalVarForValue(defaultVarBlock, storeInst, defBlockIndices);
-            IRInst* storeAddr = emitIndexedStoreAddressForVar(&builder, localVar, defBlockIndices);
-
-            builder.replaceOperand(&storeInst->ptr, storeAddr);
+            IRVar* localVar = storeIndexedValue(
+                &builder, 
+                defaultVarBlock, 
+                builder.emitLoad(varToStore),
+                defBlockIndices);
 
             for (auto use : outOfScopeUses)
             {
