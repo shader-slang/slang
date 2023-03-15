@@ -63,6 +63,23 @@ namespace Slang
 
         InversionInfo() : instToInvert(nullptr)
         { }
+
+        InversionInfo applyMap(IRCloneEnv* env)
+        {
+            InversionInfo newInfo;
+            if (env->mapOldValToNew.ContainsKey(instToInvert))
+                newInfo.instToInvert = env->mapOldValToNew[instToInvert];
+            
+            for (auto inst : requiredOperands)
+                if (env->mapOldValToNew.ContainsKey(inst))
+                    newInfo.requiredOperands.add(env->mapOldValToNew[inst]);
+                
+            for (auto inst : targetInsts)
+                if (env->mapOldValToNew.ContainsKey(inst))
+                    newInfo.targetInsts.add(env->mapOldValToNew[inst]);
+            
+            return newInfo;
+        }
     };
 
     struct HoistedPrimalsInfo : public RefObject
@@ -74,6 +91,33 @@ namespace Slang
         HashSet<IRInst*> instsToInvert;
 
         Dictionary<IRInst*, InversionInfo> invertInfoMap;
+
+        RefPtr<HoistedPrimalsInfo> applyMap(IRCloneEnv* env)
+        {
+            RefPtr<HoistedPrimalsInfo> newPrimalsInfo = new HoistedPrimalsInfo();
+            
+            for (auto inst : this->storeSet)
+                if (env->mapOldValToNew.ContainsKey(inst))
+                    newPrimalsInfo->storeSet.Add(env->mapOldValToNew[inst]);
+            
+            for (auto inst : this->recomputeSet)
+                if (env->mapOldValToNew.ContainsKey(inst))
+                    newPrimalsInfo->recomputeSet.Add(env->mapOldValToNew[inst]);
+                
+            for (auto inst : this->invertSet)
+                if (env->mapOldValToNew.ContainsKey(inst))
+                    newPrimalsInfo->invertSet.Add(env->mapOldValToNew[inst]);
+            
+            for (auto inst : this->instsToInvert)
+                if (env->mapOldValToNew.ContainsKey(inst))
+                    newPrimalsInfo->instsToInvert.Add(env->mapOldValToNew[inst]);
+
+            for (auto kvpair : this->invertInfoMap)
+                if (env->mapOldValToNew.ContainsKey(kvpair.Key))
+                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.Key]] = kvpair.Value.applyMap(env);
+            
+            return newPrimalsInfo;
+        }
 
         void merge(HoistedPrimalsInfo* info)
         {

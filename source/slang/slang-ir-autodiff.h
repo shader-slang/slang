@@ -323,4 +323,7 @@ UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg);
 
 IRUse* findUniqueStoredVal(IRVar* var);
 
+bool isDerivativeContextVar(IRVar* var);
+
+
 };

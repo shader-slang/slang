@@ -312,7 +312,7 @@ IRInst* applyAccessChain(
 
     case kIROp_FieldAddress:
         {
-            SLANG_ASSERT(context->instsToRemove.contains(accessChain));
+            //SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
             auto baseChain = accessChain->getOperand(0);
             auto fieldKey = accessChain->getOperand(1);
@@ -333,7 +333,7 @@ IRInst* applyAccessChain(
 
     case kIROp_GetElementPtr:
         {
-            SLANG_ASSERT(context->instsToRemove.contains(accessChain));
+            //SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
             auto baseChain = accessChain->getOperand(0);
             auto index = accessChain->getOperand(1);

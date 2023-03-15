@@ -565,6 +565,9 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
 
 bool canInstBeStored(IRInst* inst)
 {
+    if (!inst->getDataType())
+        return false;
+        
     if (as<IRBasicType>(inst->getDataType()))
         return true;
 
@@ -1036,7 +1039,7 @@ UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
 
 IRUse* findUniqueStoredVal(IRVar* var)
 {
-    if (as<IRBackwardDerivativeIntermediateTypeDecoration>(var->getDataType()))
+    if (isDerivativeContextVar(var))
     {
         IRUse* primalCallUse = nullptr;
         for (auto use = var->firstUse; use; use = use->nextUse)
@@ -1066,6 +1069,11 @@ IRUse* findUniqueStoredVal(IRVar* var)
         }
         return storeUse;
     }
+}
+
+bool isDerivativeContextVar(IRVar* var)
+{
+    return var->findDecoration<IRBackwardDerivativePrimalContextDecoration>();
 }
 
 }

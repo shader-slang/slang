@@ -363,15 +363,7 @@ struct ExtractPrimalFuncContext
             {
                 if (primalsInfo->storeSet.Contains(inst))
                 {
-                    if (as<IRParam>(inst))
-                        builder.setInsertBefore(block->getFirstOrdinaryInst());
-                    else
-                        builder.setInsertAfter(inst);
-                    storeInst(builder, inst, outIntermediary);
-                }
-                else if (inst->getOp() == kIROp_Var)
-                {
-                    if (primalsInfo->storeSet.Contains(as<IRVar>(inst)))
+                    if (as<IRVar>(inst))
                     {
                         auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
                         builder.setInsertBefore(inst);
@@ -380,7 +372,14 @@ struct ExtractPrimalFuncContext
                         inst->replaceUsesWith(fieldAddr);
                         builder.addPrimalValueStructKeyDecoration(inst, field->getKey());
                     }
-                    
+                    else
+                    {
+                        if (as<IRParam>(inst))
+                            builder.setInsertBefore(block->getFirstOrdinaryInst());
+                        else
+                            builder.setInsertAfter(inst);
+                        storeInst(builder, inst, outIntermediary);
+                    }
                 }
             }
         }
@@ -457,6 +456,8 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     subEnv.parent = &cloneEnv;
     auto clonedFunc = as<IRFunc>(cloneInst(&subEnv, &builder, func));
 
+    auto clonedPrimalsInfo = primalsInfo->applyMap(&subEnv);
+
     // Remove [KeepAlive] decorations in clonedFunc.
     for (auto block : clonedFunc->getBlocks())
         for (auto inst : block->getChildren())
@@ -481,7 +482,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     context.init(autodiffContext->moduleInst->getModule(), autodiffContext->transcriberSet.primalTranscriber);
 
     intermediateType = nullptr;
-    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, primalsInfo, newPrimalParams, intermediateType);
+    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, clonedPrimalsInfo, newPrimalParams, intermediateType);
 
     if (auto nameHint = primalFunc->findDecoration<IRNameHintDecoration>())
     {

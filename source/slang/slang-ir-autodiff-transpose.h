@@ -1350,7 +1350,6 @@ struct DiffTransposePass
 
         if (as<IRBlock>(inst) ||
             as<IRGlobalValueWithCode>(inst) ||
-            as<IRType>(inst) ||
             as<IRConstant>(inst))
             return false;
         
@@ -1477,6 +1476,13 @@ struct DiffTransposePass
                 {
                     workList.add(operand->get());
                 }
+            }
+
+            if (auto instType = inst->getDataType())
+            {
+                if (doesInstRequireHoisting(instType) &&
+                    !hoistedInstMap.ContainsKey(instType))
+                    workList.add(instType);
             }
         };
 

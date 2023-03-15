@@ -58,10 +58,17 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             if (!operand->get()->findDecoration<IRDifferentialInstDecoration>() &&
                 !as<IRFunc>(operand->get()) &&
                 !as<IRBlock>(operand->get()) &&
-                !as<IRConstant>(operand->get()) &&
-                !as<IRType>(operand->get()))
+                !(as<IRModuleInst>(operand->get()->getParent())))
                 workList.add(operand);
         }
+
+        // Is the type itself computed within our function? 
+        // If so, we'll need to consider that too (this is for existential types, specialize insts, etc)
+        // TODO: We might not really need to query the checkpointing algorithm for these
+        // since they _have_ to be classified as 'recompute' 
+        //
+        if (inst->getDataType() && (getParentFunc(inst->getDataType()) == func))
+            workList.add(&inst->typeUse);
     };
 
     // Populate recompute/store/invert sets with insts, by applying the policy
@@ -91,6 +98,17 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             }
 
             addPrimalOperandsToWorkList(child);
+
+            // We'll be conservative with the decorations we consider as differential uses
+            // of a primal inst, in order to avoid weird behaviour with some decorations 
+            // 
+            for (auto decoration : child->getDecorations())
+            {
+                if (auto primalCtxDecoration = as<IRBackwardDerivativePrimalContextDecoration>(decoration))
+                    workList.add(&primalCtxDecoration->primalContextVar);
+                else if (auto loopExitDecoration = as<IRLoopExitPrimalValueDecoration>(decoration))
+                    workList.add(&loopExitDecoration->exitVal);
+            }
         }
 
         addPrimalOperandsToWorkList(block->getTerminator());
@@ -118,7 +136,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             SLANG_ASSERT(!checkpointInfo->storeSet.Contains(result.instToRecompute));
             checkpointInfo->recomputeSet.Add(result.instToRecompute);
 
-            usesToReplace.Add(use);
+            if (use->getUser()->findDecoration<IRDifferentialInstDecoration>())
+                usesToReplace.Add(use);
 
             if (auto param = as<IRParam>(result.instToRecompute))
             {
@@ -166,7 +185,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             SLANG_RELEASE_ASSERT(containsOperand(instToInvert, use->getUser()));
             SLANG_RELEASE_ASSERT(result.inversionInfo.targetInsts.contains(use->getUser()));
 
-            usesToReplace.Add(use);
+            if (use->getUser()->findDecoration<IRDifferentialInstDecoration>())
+                usesToReplace.Add(use);
 
             checkpointInfo->invertSet.Add(instToInvert);
 
@@ -200,21 +220,31 @@ void applyToInst(
         return;
     }
 
-    bool isParamRecomputed = checkpointInfo->recomputeSet.Contains(inst);
-    if (isParamRecomputed)
+    bool isInstRecomputed = checkpointInfo->recomputeSet.Contains(inst);
+    if (isInstRecomputed)
     {
-        // TODO: We would need to clone in the control-flow for each region (without nested loops)
-        // prior to this, and then hoist this parameter into the within-region block, otherwise
-        // this parameter will not be visible to transposed insts.
-        // This will also include adding an extra case to 'ensurePrimalAvailability': if both insts
-        // are withing the _same_ indexed region, skip the indexed store/load and use a simple var.
-        // 
-        SLANG_UNIMPLEMENTED_X("Parameter recompute is not currently supported");
-        //hoistInfo->recomputeSet.Add(cloneCtx->cloneInstOutOfOrder(builder, inst));
+        if (as<IRParam>(inst))
+        {
+            // Can completely ignore first block parameters
+            if (getBlock(inst) != getBlock(inst)->getParent()->getFirstBlock())
+            {    
+                // TODO: We would need to clone in the control-flow for each region (without nested loops)
+                // prior to this, and then hoist this parameter into the within-region block, otherwise
+                // this parameter will not be visible to transposed insts.
+                // This will also include adding an extra case to 'ensurePrimalAvailability': if both insts
+                // are withing the _same_ indexed region, skip the indexed store/load and use a simple var.
+                // 
+                SLANG_UNIMPLEMENTED_X("Parameter recompute is not currently supported");
+            }
+        }
+        else
+        {
+            hoistInfo->recomputeSet.Add(cloneCtx->cloneInstOutOfOrder(builder, inst));
+        }
     }
 
-    bool isParamInverted = checkpointInfo->invertSet.Contains(inst);
-    if (isParamInverted)
+    bool isInstInverted = checkpointInfo->invertSet.Contains(inst);
+    if (isInstInverted)
     {
         InversionInfo info = checkpointInfo->invInfoMap[inst];
         auto clonedInstToInvert = cloneCtx->cloneInstOutOfOrder(builder, info.instToInvert);
@@ -501,11 +531,13 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
 
     IRBuilder builder(func->getModule());
-    IRBlock* defaultVarBlock = func->getFirstBlock();
+    IRBlock* defaultVarBlock = func->getFirstBlock()->getNextBlock();
+
+    SLANG_ASSERT(!isDifferentialBlock(defaultVarBlock));
 
     HashSet<IRInst*> processedStoreSet;
 
-    // TODO: Also ensure availability of everything in the recompute set.
+    // TODO: Also ensure availability of everything in the recompute set (for proper recompute support)
     for (auto instToStore : hoistInfo->storeSet)
     {
         IRBlock* defBlock = nullptr;
@@ -576,8 +608,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
             // TODO: There's a slight hackiness here. (Ideally we might just want to emit
             // additional vars when splitting a call)
             //
-            if (!isIndexedStore && 
-                as<IRBackwardDiffIntermediateContextType>(varToStore->getDataType()))
+            if (!isIndexedStore && isDerivativeContextVar(varToStore))
             {
                 varToStore->insertBefore(defaultVarBlock->getFirstOrdinaryInst());
                 processedStoreSet.Add(varToStore);
@@ -640,7 +671,10 @@ HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
     // Store all. By default, classify will only be called on relevant differential
     // uses (or on uses in a 'recompute' inst)
     // 
-    return HoistResult::store(use->get());
+    if (canInstBeStored(use->get()))
+        return HoistResult::store(use->get());
+    else
+        return HoistResult::recompute(use->get());
 }
 
 /*
