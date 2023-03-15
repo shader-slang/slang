@@ -250,40 +250,6 @@ namespace Slang
         virtual HoistResult classify(IRUse* use);
     };
 
-    struct PrimalHoistContext
-    {
-        IRGlobalValueWithCode* func;
-        IRModule* module;
-        RefPtr<IRDominatorTree> domTree;
-        RefPtr<AutodiffCheckpointPolicyBase> checkpointPolicy;
-
-        List<IRInst*> storedInsts;
-        List<IRInst*> recomputedInsts;
-        List<IRInst*> invertedInsts;
-
-        PrimalHoistContext(IRGlobalValueWithCode* func) : 
-            func(func),
-            module(func->getModule()),
-            domTree(computeDominatorTree(func))
-        { 
-            // TODO: Populate set of primal insts to consider as 
-            // being used in a differential inst.
-            // 
-        }
-    };
-
-    void maybeHoistPrimalInst(
-        PrimalHoistContext* context,
-        BlockSplitInfo* splitInfo,
-        IRBuilder* primalBuilder,
-        IRBuilder* diffBuilder,
-        IRInst* primalInst);
-
-    // Determines if the inst is invertible. 
-    // (Does not actually materialize the inverse)
-    //
-    bool isInstInvertible(IRInst* primalInst);
-
     RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
         CheckpointSetInfo* checkpointInfo,
         IRGlobalValueWithCode* func,
