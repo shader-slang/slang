@@ -203,12 +203,8 @@ RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo)
     }
 
     // Try to get the default impl
+    // NOTE! funcs could be invalid if there is no default impl.
     const auto funcs = RttiUtil::getDefaultTypeFuncs(rttiInfo);
-    if (!funcs.isValid())
-    {
-        // If there isn't a default impl, then we are done
-        return funcs;
-    }
 
     // Add to the map
     m_map.Add(rttiInfo, funcs);
@@ -217,7 +213,15 @@ RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo)
 
 void RttiTypeFuncsMap::add(const RttiInfo* rttiInfo, const RttiTypeFuncs& funcs)
 {
-    m_map.Add(rttiInfo, funcs);
+    if (auto funcsPtr = m_map.TryGetValueOrAdd(rttiInfo, funcs))
+    {
+        // If there are funcs set, they aren't valid otherwise this would be 
+        // replacing, so assert on that scenario.
+        SLANG_ASSERT(!funcsPtr->isValid());
+
+        // Replace the funcs
+        *funcsPtr = funcs;
+    }
 }
 
 } // namespace Slang
