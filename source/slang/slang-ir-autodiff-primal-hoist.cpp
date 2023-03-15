@@ -13,32 +13,6 @@ bool containsOperand(IRInst* inst, IRInst* operand)
     return false;
 }
 
-// TODO: STOPPED HERE
-// Current plan: 
-// Call moveToDiffBlock() by re-traversing the blocks, checking if insts
-// are in the recomputeSet
-// _after_ calling apply() on _all_ *uses*. Use BlockSplitInfo
-// to simply move the insts to top-of-differential-block
-// 
-// Then we traverse through the primal blocks _again_ looking for 
-// insts in the invertSet, find the inverted-use-site (the specific use of 
-// the specific operand for which we're inverting this inst), clone that
-// inst and place it into the differential block _after_ the inverted-use-site
-// For now, we'll assert out if there are multiple inverted-use-sites
-//
-// Then call ensurePrimalInstAvailability(inst) on all the insts in 
-// storeSet. This will use a dominator tree to check if the inst can
-// be accessed. If not, create a var based on the level of indexing.
-// Any Load/GetElementPtr inst lowered into the diff blocks will be
-// tagged as 'PrimalRecompute'
-//  
-// During transposition: insts marked 'PrimalInvert' will be inverted as we go,
-// hoistPrimalOperands() will be called on each differential inst which will
-// recursively pull any 'PrimalRecompute' operands into the reverse-mode blocks as needed,
-// and load from inverse-buffer for 'PrimalInvert' insts.
-// 
-
-
 RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* splitInfo)
 {
     RefPtr<CheckpointSetInfo> checkpointInfo = new CheckpointSetInfo();
@@ -686,34 +660,4 @@ HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
     }
 }
 
-/*
-void maybeCheckpointPrimalInst(
-    PrimalHoistContext* context,
-    IRBuilder* primalBuilder,
-    IRBuilder* diffBuilder,
-    IRInst* primalInst)
-{
-    // Cases to consider on the primalInst
-    // 1. primalInst is a global value: ignore entirely
-    // 2. primalInst is never used in a differential block.
-    //    -> In this case we move this inst to primal block and
-    //       forget it
-    // 3. primalInst is (transitively) used in a differential inst.
-    //    3.a. primalInst is a value type.
-    //         -> call checkpointPolicy->shouldStoreInst(inst).
-    //            if true, move to primalBlock, and add IRPrimalValueStoreDecoration
-    //                     push to context->storedInsts
-    //            if false, move to diffBlock, and keep IRPrimalInstDecoration
-    //                     push to context->recomputedInsts
-    //    3.b. primalInst is a var type.
-    //         3.b.i primalInst is an intermediate context var
-    //               -> call checkpointPolicy->shouldStoreContext(call_inst)
-    //                  same as 3.a (instead of shouldStoreInst)
-    //         3.b.ii primalInst is regular var (likely used for out/inout parameter of calls)
-    //               -> call checkpointPolicy->shouldStoreInst(store_inst)
-    //                  same as 3.a (instead of shouldStoreInst)
-    //
-    // Finally, if we store the inst, call hoistPrimalInst(inst)
-}
-*/
 };

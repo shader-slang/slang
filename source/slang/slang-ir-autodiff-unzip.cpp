@@ -160,61 +160,6 @@ struct ExtractPrimalFuncContext
         return hasDiffUser;
     }
 
-    bool doesInstHaveStore(IRInst* inst)
-    {
-        SLANG_RELEASE_ASSERT(as<IRPtrTypeBase>(inst->getDataType()));
-
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            if (as<IRStore>(use->getUser()))
-                return true;
-            
-            if (as<IRPtrTypeBase>(use->getUser()->getDataType()))
-            {
-                if (doesInstHaveStore(use->getUser()))
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    bool isIntermediateContextType(IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_BackwardDiffIntermediateContextType:
-            return true;
-        case kIROp_PtrType:
-            return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());
-        case kIROp_ArrayType:
-            return isIntermediateContextType(as<IRArrayType>(type)->getElementType()); 
-        }
-
-        return false;
-    }
-
-    bool shouldStoreVar(IRVar* var)
-    {
-        // Always store intermediate context var.
-        if (var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
-        {
-            return true;
-        }
-
-        if (isIntermediateContextType(var->getDataType()))
-        {
-            return true;
-        }
-
-        // For now the store policy is simple, we use two conditions:
-        // 1. Is the var used in a differential block and,
-        // 2. Does the var have a store
-        // 
-        
-        return (doesInstHaveDiffUse(var) && doesInstHaveStore(var));
-    }
-
     bool shouldStoreInst(IRInst* inst)
     {
         if (!inst->getDataType())

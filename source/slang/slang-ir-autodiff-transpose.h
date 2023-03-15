@@ -1251,12 +1251,6 @@ struct DiffTransposePass
     bool hasInverse(IRInst* primalInst)
     {
         return this->hoistedPrimalsInfo->invertSet.Contains(primalInst);
-
-        /*if (getOrCreateInverseVar(primalInst))
-            return true;
-        else
-            return false;
-            */
     }
 
     IRInst* loadInverse(IRBuilder* builder, IRInst* primalInst)
@@ -1302,40 +1296,7 @@ struct DiffTransposePass
             return true;
         
         return false;
-
-        /*if (isPrimalInst(inst) && 
-            as<IRBlock>(inst->getParent()) && 
-            isDifferentialInst(as<IRBlock>(inst->getParent())))
-        {
-            if (!inst->findDecoration<IRPrimalValueAccessDecoration>())
-            {
-                return true; 
-            }
-        }
-
-        return false;*/
     }
-
-    /*
-    IRInst* hoistPrimalInst(IRBuilder* revBuilder, IRInst* inst)
-    {
-        if (as<IRBlock>(inst->getParent()) && 
-            isDifferentialInst(as<IRBlock>(inst->getParent())))
-        {
-            SLANG_RELEASE_ASSERT(isPrimalInst(inst));
-        }
-        
-        if (shouldInstBeInverted(inst))
-        {
-            return loadInverse(revBuilder, inst);
-        }
-        else
-        {
-            primalUsesToHoist.add(inst);
-        }
-
-        return inst;
-    }*/
 
     IRInst* hoistPrimalUse(IRBuilder*, IRUse* use)
     {   
@@ -1653,39 +1614,10 @@ struct DiffTransposePass
             // Move this inst to after it's diff uses.
             // 
             {
-                //IRBlock* block = as<IRBlock>(inst->getParent());
-                /*IRBlock* currTopBlock = revBlockMap.ContainsKey(block) ? (IRBlock*)revBlockMap[block] : nullptr;
-
-                for (auto relevantUse : relevantUses)
-                {
-                    IRBlock* useBlock = getBlock(relevantUse->getUser());
-
-                    // Ignore if the use is not already in a reverse-mode
-                    // block..
-                    //
-                    if (useBlock->getParent() == nullptr)
-                        continue;
-
-                    // If the current 'top' block dominates the use-block, then
-                    // we're good,
-                    // Otherwise, make the use-block the top-block, and keep going.
-                    // 
-                    if (!currTopBlock || !domTree->dominates(currTopBlock, useBlock))
-                    {
-                        currTopBlock = useBlock;
-                    }
-                }*/
 
                 IRBlock* currTopBlock = revBlockMap[walkToEndOfRegion(defBlock)];
 
                 SLANG_RELEASE_ASSERT(currTopBlock);
-                
-                // Consistency check: currTopBlock should dominate all relevant use sites.
-                /*for (auto relevantUse : relevantUses)
-                {
-                    IRBlock* useBlock = getBlock(relevantUse->getUser());
-                    SLANG_RELEASE_ASSERT(domTree->dominates(currTopBlock, useBlock));
-                }*/
 
                 // More consistency checks
                 SLANG_RELEASE_ASSERT(currTopBlock->getFirstOrdinaryInst() != nullptr);
