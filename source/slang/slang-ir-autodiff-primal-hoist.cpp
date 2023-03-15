@@ -637,14 +637,13 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
 void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode*)
 {
-    // Do nothing.. This is an always-store policy.
+    // Do nothing.. This is an (almost) always-store policy.
     return;
 }
 
-
 HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
 {
-    // Store all. By default, classify will only be called on relevant differential
+    // Store all that we can.. by default, classify will only be called on relevant differential
     // uses (or on uses in a 'recompute' inst)
     // 
     if (auto var = as<IRVar>(use->get()))
