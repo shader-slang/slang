@@ -204,7 +204,7 @@ struct MyRayDifferential
     float3 d_dir;
 }
 
-struct MyRay : IDifferential
+struct MyRay : IDifferentiable
 {
     // Specify that `MyRay.Differential` is `MyRayDifferential`.
     typealias Differential = MyRayDifferential;
