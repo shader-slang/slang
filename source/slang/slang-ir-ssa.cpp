@@ -312,7 +312,7 @@ IRInst* applyAccessChain(
 
     case kIROp_FieldAddress:
         {
-            //SLANG_ASSERT(context->instsToRemove.contains(accessChain));
+            SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
             auto baseChain = accessChain->getOperand(0);
             auto fieldKey = accessChain->getOperand(1);
@@ -333,7 +333,7 @@ IRInst* applyAccessChain(
 
     case kIROp_GetElementPtr:
         {
-            //SLANG_ASSERT(context->instsToRemove.contains(accessChain));
+            SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
             auto baseChain = accessChain->getOperand(0);
             auto index = accessChain->getOperand(1);
@@ -802,6 +802,34 @@ IRInst* readVar(
     return readVarRec(context, blockInfo, var);
 }
 
+void collectInstsToRemove(
+    ConstructSSAContext*    context,
+    IRBlock*                block)
+{
+    IRInst* next = nullptr;
+    for (auto ii = block->getFirstInst(); ii; ii = next)
+    {
+        next = ii->getNextInst();
+        
+        switch (ii->getOp())
+        {
+        default:
+            // Ordinary instruction -> leave as-is
+            break;
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+            {
+                auto  ptrArg = ii->getOperand(0);
+                if (auto var = asPromotableVarAccessChain(context, ptrArg))
+                {
+                    context->instsToRemove.add(ii);
+                }
+            }
+            break;
+        }
+    }
+}
+
 void processBlock(
     ConstructSSAContext*    context,
     IRBlock*                block,
@@ -877,19 +905,6 @@ void processBlock(
                 }
             }
             break;
-
-        case kIROp_GetElementPtr:
-        case kIROp_FieldAddress:
-            {
-                auto  ptrArg = ii->getOperand(0);
-                if (auto var = asPromotableVarAccessChain(context, ptrArg))
-                {
-                    context->instsToRemove.add(ii);
-                }
-            }
-            break;
-
-
         }
     }
 
@@ -1078,6 +1093,10 @@ bool constructSSA(ConstructSSAContext* context)
 
         context->blockInfos.Add(bb, blockInfo);
     }
+
+    for(auto bb : globalVal->getBlocks())
+        collectInstsToRemove(context, bb);
+
     for(auto bb : globalVal->getBlocks())
     {
         auto blockInfo = * context->blockInfos.TryGetValue(bb);
