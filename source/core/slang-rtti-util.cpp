@@ -6,7 +6,7 @@ namespace Slang {
 
 struct ListFuncs
 {
-    static void ctorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
@@ -23,7 +23,7 @@ struct ListFuncs
             new (dst + i) Type;
         }
     }
-    static void copyArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
@@ -76,7 +76,7 @@ struct ListFuncs
         }
     }
 
-    static void dtorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
@@ -117,7 +117,7 @@ struct ListFuncs
 
 struct StructFuncs
 {
-    static void ctorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
@@ -134,7 +134,7 @@ struct StructFuncs
             new (dst + i) Type;
         }
     }
-    static void copyArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
@@ -187,7 +187,7 @@ struct StructFuncs
         }
     }
 
-    static void dtorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
@@ -228,17 +228,17 @@ struct StructFuncs
 
 struct StructArrayFuncs
 {
-    static void ctorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
     {
         return RttiUtil::ctorArray(typeMap, rttiInfo, inDst, rttiInfo->m_size, count);
     }
 
-    static void copyArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
     {
         return RttiUtil::copyArray(typeMap, rttiInfo, inDst, inSrc, rttiInfo->m_size, count);
     }
 
-    static void dtorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
     {
         return RttiUtil::dtorArray(typeMap, rttiInfo, inDst, rttiInfo->m_size, count);
     }
@@ -469,7 +469,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     }
 }
 
-/* static */SlangResult RttiUtil::setListCount(const RttiTypeFuncsMap* typeMap, const RttiInfo* elementType, void* dst, Index count)
+/* static */SlangResult RttiUtil::setListCount(RttiTypeFuncsMap* typeMap, const RttiInfo* elementType, void* dst, Index count)
 {
     SLANG_ASSERT(typeFuncs.isValid());
 
@@ -694,7 +694,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     }
 }
 
-/* static */void RttiUtil::ctorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
+/* static */void RttiUtil::ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
 {
     if (count <= 0)
     {
@@ -788,7 +788,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     SLANG_ASSERT(!"Unexpected");
 }
 
-/* static */void RttiUtil::copyArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, ptrdiff_t stride, Index count)
+/* static */void RttiUtil::copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, ptrdiff_t stride, Index count)
 {
     if (count <= 0)
     {
@@ -887,7 +887,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     SLANG_ASSERT(!"Unexpected");
 }
 
-/* static */void RttiUtil::dtorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
+/* static */void RttiUtil::dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
 {
     if (count <= 0 || !hasDtor(rttiInfo))
     {

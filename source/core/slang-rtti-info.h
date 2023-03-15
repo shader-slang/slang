@@ -14,9 +14,9 @@ struct RttiTypeFuncsMap;
 
 struct RttiTypeFuncs
 {
-    typedef void (*CtorArray)(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count);
-    typedef void (*DtorArray)(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count);
-    typedef void (*CopyArray)(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, const void* src, Index count);
+    typedef void (*CtorArray)(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count);
+    typedef void (*DtorArray)(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count);
+    typedef void (*CopyArray)(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, const void* src, Index count);
 
     bool isValid() const { return ctorArray && dtorArray && copyArray;  }
 
@@ -32,7 +32,8 @@ struct RttiTypeFuncsMap
 {
         /// For a given type returns the funcs.
         /// If not found returns funcs that return 'isValid' as false. 
-    RttiTypeFuncs getFuncsForType(const RttiInfo* rttiInfo) const;
+    RttiTypeFuncs getFuncsForType(const RttiInfo* rttiInfo);
+
         /// Add funcs for a type
     void add(const RttiInfo* rttiInfo, const RttiTypeFuncs& funcs);
 
@@ -44,7 +45,7 @@ protected:
 template <typename T>
 struct GetRttiTypeFuncs
 {
-    static void ctorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* in, Index count)
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* in, Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
@@ -54,7 +55,7 @@ struct GetRttiTypeFuncs
             new (dst + i) T;
         }
     }
-    static void dtorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* in, Index count)
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* in, Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
@@ -64,7 +65,7 @@ struct GetRttiTypeFuncs
             (dst + i)->~T();
         }
     }
-    static void copyArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
     {
         SLANG_UNUSED(rttiInfo);
         SLANG_UNUSED(typeMap);
@@ -92,20 +93,20 @@ such as structs that only contain "ZeroPod" types */
 template <typename T>
 struct GetRttiTypeFuncsForZeroPod
 {
-    static void ctorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count)
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
         ::memset(dst, 0, sizeof(T) * count);
     }
-    static void dtorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count)
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
         SLANG_UNUSED(dst);
         SLANG_UNUSED(count);
     }
-    static void copyArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, const void* src, Index count)
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, const void* src, Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);

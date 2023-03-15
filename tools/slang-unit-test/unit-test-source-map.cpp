@@ -34,7 +34,7 @@ static SlangResult _check()
 
     RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
 
-    const RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
+    RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
 
     JSONValue readValue;
     {

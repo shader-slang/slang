@@ -195,14 +195,24 @@ StructRttiInfo StructRttiBuilder::make()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncsMap !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo) const
+RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo)
 {
     if (auto funcsPtr = m_map.TryGetValue(rttiInfo))
     {
         return *funcsPtr;
     }
 
-    return RttiUtil::getDefaultTypeFuncs(rttiInfo);
+    // Try to get the default impl
+    const auto funcs = RttiUtil::getDefaultTypeFuncs(rttiInfo);
+    if (!funcs.isValid())
+    {
+        // If there isn't a default impl, then we are done
+        return funcs;
+    }
+
+    // Add to the map
+    m_map.Add(rttiInfo, funcs);
+    return funcs;
 }
 
 void RttiTypeFuncsMap::add(const RttiInfo* rttiInfo, const RttiTypeFuncs& funcs)

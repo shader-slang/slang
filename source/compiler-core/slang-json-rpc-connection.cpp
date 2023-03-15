@@ -105,7 +105,7 @@ void JSONRPCConnection::disconnect()
 
 SlangResult JSONRPCConnection::sendRPC(const RttiInfo* rttiInfo, const void* data)
 {
-    const auto typeMap = JSONNativeUtil::getTypeFuncsMap();
+    auto typeMap = JSONNativeUtil::getTypeFuncsMap();
 
     // Convert to JSON
     NativeToJSONConverter converter(&m_container, &typeMap, &m_diagnosticSink);

@@ -107,7 +107,7 @@ static SlangResult _check()
 
     DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
 
-    const auto typeMap = JSONNativeUtil::getTypeFuncsMap(); 
+    auto typeMap = JSONNativeUtil::getTypeFuncsMap(); 
 
     RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
 

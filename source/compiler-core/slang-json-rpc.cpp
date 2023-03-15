@@ -126,7 +126,7 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
 
 /* static */SlangResult JSONRPCUtil::convertToNative(JSONContainer* container, const JSONValue& value, DiagnosticSink* sink, const RttiInfo* rttiInfo, void* out)
 {
-    const auto typeMap = JSONNativeUtil::getTypeFuncsMap();
+    auto typeMap = JSONNativeUtil::getTypeFuncsMap();
 
     JSONToNativeConverter converter(container, &typeMap, sink);
     SLANG_RETURN_ON_FAIL(converter.convert(value, rttiInfo, out));
@@ -138,7 +138,7 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
     SourceManager* sourceManager = sink->getSourceManager();
     JSONContainer container(sourceManager);
 
-    const auto typeMap = JSONNativeUtil::getTypeFuncsMap();
+    auto typeMap = JSONNativeUtil::getTypeFuncsMap();
 
     NativeToJSONConverter converter(&container, &typeMap, sink);
 

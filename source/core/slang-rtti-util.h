@@ -23,7 +23,7 @@ struct RttiUtil
     static RttiTypeFuncs getDefaultTypeFuncs(const RttiInfo* rttiInfo);
 
         /// Set a list count
-    static SlangResult setListCount(const RttiTypeFuncsMap* typeMap, const RttiInfo* elementType, void* dst, Index count);
+    static SlangResult setListCount(RttiTypeFuncsMap* typeMap, const RttiInfo* elementType, void* dst, Index count);
 
         /// Returns if the type can be zero initialized
     static bool canZeroInit(const RttiInfo* type);
@@ -32,9 +32,9 @@ struct RttiUtil
         /// Returns true if we can memcpy to copy 
     static bool canMemCpy(const RttiInfo* type);
 
-    static void ctorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count);
-    static void copyArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, ptrdiff_t stride, Index count);
-    static void dtorArray(const RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count);
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count);
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, ptrdiff_t stride, Index count);
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count);
 };
 
 } // namespace Slang
