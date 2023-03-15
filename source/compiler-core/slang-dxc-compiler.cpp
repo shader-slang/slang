@@ -356,8 +356,16 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
     return SLANG_OK;
 }
 
-SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
+SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
+    if (!isVersionCompatible(inOptions)) 
+    {
+        // Not possible to compile with this version of the interface.
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    CompileOptions options = getCompatibleVersion(&inOptions);
+
     // This compiler can only deal with a single artifact
     if (options.sourceArtifacts.count != 1)
     {
@@ -442,6 +450,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
             args.add(L"-Gis"); // "force IEEE strictness"
             break;
     }
+
+
 
     switch (options.optimizationLevel)
     {
@@ -541,7 +551,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
 
     DxcIncludeHandler includeHandler(&searchDirectories, options.fileSystemExt, options.sourceManager);
 
-    ComPtr<IDxcOperationResult> dxcResult;
+    ComPtr<IDxcOperationResult> dxcOperationResult;
     SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
         wideSourcePath.begin(),
         wideEntryPointName.begin(),
@@ -551,13 +561,13 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         nullptr,            // `#define`s
         0,                  // `#define` count
         &includeHandler,    // `#include` handler
-        dxcResult.writeRef()));
+        dxcOperationResult.writeRef()));
 
     auto diagnostics = ArtifactDiagnostics::create();
     
     ComPtr<IDxcBlob> dxcResultBlob;
 
-    SLANG_RETURN_ON_FAIL(_handleOperationResult(dxcResult, diagnostics, dxcResultBlob));
+    SLANG_RETURN_ON_FAIL(_handleOperationResult(dxcOperationResult, diagnostics, dxcResultBlob));
 
     // If we have libraries then we need to link...
     if (libraries.getCount())
@@ -621,6 +631,11 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         ComPtr<IDxcBlob> linkedBlob;
         SLANG_RETURN_ON_FAIL(_handleOperationResult(linkDxcResult, diagnostics, linkedBlob));
 
+        // When we've linked we make that the overall operation result
+        // As presumably it can contain pdb and perhaps other information
+        dxcOperationResult = linkDxcResult;
+
+        // Set the result blob
         dxcResultBlob = linkedBlob;
     }
 
@@ -629,6 +644,42 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     if (dxcResultBlob)
     {
         artifact->addRepresentationUnknown((ISlangBlob*)dxcResultBlob.get());
+    }
+
+    // If asking for PDB extract it.
+    if (options.m_debugInfoFormat == SLANG_DEBUG_INFO_FORMAT_PDB)
+    {
+        ComPtr<IDxcResult> dxcResult;
+        if (SLANG_SUCCEEDED(dxcOperationResult->QueryInterface(dxcResult.writeRef())))
+        {
+            if (dxcResult->HasOutput(DXC_OUT_PDB))
+            {
+                ComPtr<IDxcBlob> pdbBlob;
+                ComPtr<IDxcBlobWide> nameBlob;
+
+                if (SLANG_SUCCEEDED(dxcResult->GetOutput(DXC_OUT_PDB, __uuidof(pdbBlob), (void**)pdbBlob.writeRef(), nameBlob.writeRef())))
+                {
+                    auto pdbArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactDesc::Kind::BinaryFormat, ArtifactDesc::Payload::PdbDebugInfo));
+
+                    if (nameBlob)
+                    {
+                        const auto wideName = (const WCHAR*)nameBlob->GetBufferPointer();
+
+                        const auto name = String::fromWString(wideName);
+                        if (name.getLength())
+                        {
+                            // Set the name on the artifact. This is the name that must be used for the PDB to be loadable as a file by other tooling.
+                            pdbArtifact->setName(name.getBuffer());
+                        }
+                    }
+
+                    pdbArtifact->addRepresentationUnknown((ISlangBlob*)pdbBlob.get());
+
+                    // Associate it
+                    artifact->addAssociated(pdbArtifact);
+                }
+            }
+        }
     }
 
     *outArtifact = artifact.detach();

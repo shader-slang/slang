@@ -160,6 +160,71 @@ struct ExtractPrimalFuncContext
         return hasDiffUser;
     }
 
+    bool doesInstHaveStore(IRInst* inst)
+    {
+        SLANG_RELEASE_ASSERT(as<IRPtrTypeBase>(inst->getDataType()));
+
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRStore>(use->getUser()))
+                return true;
+            
+            if (as<IRPtrTypeBase>(use->getUser()->getDataType()))
+            {
+                if (doesInstHaveStore(use->getUser()))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool isIntermediateContextType(IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_BackwardDiffIntermediateContextType:
+            return true;
+        case kIROp_PtrType:
+            return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());
+        case kIROp_ArrayType:
+            return isIntermediateContextType(as<IRArrayType>(type)->getElementType()); 
+        }
+
+        return false;
+    }
+
+    bool shouldStoreVar(IRVar* var)
+    {
+        // Always store intermediate context var.
+        if (auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+        {
+            // If we are specializing a callee's intermediate context with types that can't be stored,
+            // we can't store the entire context.
+            if (auto spec = as<IRSpecialize>(as<IRPtrTypeBase>(var->getDataType())->getValueType()))
+            {
+                for (UInt i = 0; i < spec->getArgCount(); i++)
+                {
+                    if (!canTypeBeStored(spec->getArg(i)->getDataType()))
+                        return false;
+                }
+            }
+            return true;
+        }
+
+        if (isIntermediateContextType(var->getDataType()))
+        {
+            return true;
+        }
+
+        // For now the store policy is simple, we use two conditions:
+        // 1. Is the var used in a differential block and,
+        // 2. Does the var have a store
+        // 
+        
+        return (doesInstHaveDiffUse(var) && doesInstHaveStore(var) && canTypeBeStored(as<IRPtrTypeBase>(var->getDataType())->getValueType()));
+    }
+
     bool shouldStoreInst(IRInst* inst)
     {
         if (!inst->getDataType())
@@ -167,7 +232,7 @@ struct ExtractPrimalFuncContext
             return false;
         }
 
-        if (!canInstBeStored(inst))
+        if (!canTypeBeStored(inst->getDataType()))
             return false;
 
         // Never store certain opcodes.
@@ -191,6 +256,9 @@ struct ExtractPrimalFuncContext
         case kIROp_MakeOptionalValue:
         case kIROp_DifferentialPairGetDifferential:
         case kIROp_DifferentialPairGetPrimal:
+        case kIROp_ExtractExistentialValue:
+        case kIROp_ExtractExistentialType:
+        case kIROp_ExtractExistentialWitnessTable:
             return false;
         case kIROp_GetElement:
         case kIROp_FieldExtract:
@@ -239,7 +307,13 @@ struct ExtractPrimalFuncContext
             IRCloneEnv cloneEnv;
             fieldType = cloneInst(&cloneEnv, &genTypeBuilder, fieldType);
         }
-        return genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
+        auto structField = genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
+      
+        if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(&genTypeBuilder, (IRType*)fieldType))
+        {
+            genTypeBuilder.addIntermediateContextFieldDifferentialTypeDecoration(structField, witness);
+        }
+        return structField;
     }
 
     void storeInst(
@@ -512,7 +586,13 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                 if (inst->getOp() == kIROp_Call)
                 {
                     // The primal calls should be marked as no side effect so they can be DCE'd if possible.
-                    // builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
+                    // We can only do so if the intermediate context of the callee is stored.
+                    //
+                    if (primalCtx->getBackwardDerivativePrimalContextVar()
+                            ->findDecoration<IRPrimalValueStructKeyDecoration>())
+                    {
+                        builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
+                    }
                 }
             }
         }

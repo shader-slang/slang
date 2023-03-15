@@ -1971,31 +1971,26 @@ namespace Slang
 
                 if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
                 {
-                    if (auto funcDeclExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(higherOrderInvoke)))
+                    FunctionDifferentiableLevel requiredLevel;
+                    if (auto funcDeclExpr = as<DeclRefExpr>(
+                            getInnerMostExprFromHigherOrderExpr(higherOrderInvoke, requiredLevel)))
                     {
                         auto funcDecl = as<FunctionDeclBase>(funcDeclExpr->declRef.getDecl());
                         if (funcDecl)
                         {
-                            DifferentiateExpr* forwardDiff = nullptr;
-                            DifferentiateExpr* backwardDiff = nullptr;
-                            for (auto node = as<DifferentiateExpr>(invoke->functionExpr); node; node = as<DifferentiateExpr>(node->baseFunction))
+                            if (requiredLevel == FunctionDifferentiableLevel::Forward &&
+                                !getShared()->isDifferentiableFunc(funcDecl))
                             {
-                                if (auto fwd = as<ForwardDifferentiateExpr>(node))
-                                    forwardDiff = fwd;
-                                if (auto bwd = as<BackwardDifferentiateExpr>(node))
-                                    backwardDiff = bwd;
+                                getSink()->diagnose(funcDeclExpr, Diagnostics::functionNotMarkedAsDifferentiable, funcDecl, "forward");
                             }
-                            if (forwardDiff && !getShared()->isDifferentiableFunc(funcDecl))
+                            if (requiredLevel == FunctionDifferentiableLevel::Backward &&
+                                !getShared()->isBackwardDifferentiableFunc(funcDecl))
                             {
-                                getSink()->diagnose(forwardDiff, Diagnostics::functionNotMarkedAsDifferentiable, funcDecl, "forward");
-                            }
-                            if (backwardDiff && !getShared()->isBackwardDifferentiableFunc(funcDecl))
-                            {
-                                getSink()->diagnose(forwardDiff, Diagnostics::functionNotMarkedAsDifferentiable, funcDecl, "backward");
+                                getSink()->diagnose(funcDeclExpr, Diagnostics::functionNotMarkedAsDifferentiable, funcDecl, "backward");
                             }
                             if (!isEffectivelyStatic(funcDecl) && !isGlobalDecl(funcDecl))
                             {
-                                getSink()->diagnose(forwardDiff, Diagnostics::nonStaticMemberFunctionNotAllowedAsDiffOperand, funcDecl);
+                                getSink()->diagnose(invoke->functionExpr, Diagnostics::nonStaticMemberFunctionNotAllowedAsDiffOperand, funcDecl);
                             }
                         }
                     }
@@ -2232,10 +2227,10 @@ namespace Slang
         return type;
     }
 
-    struct DifferentiateExprCheckingActions
+    struct HigherOrderInvokeExprCheckingActions
     {
-        virtual DifferentiateExpr* createDifferentiateExpr(SemanticsVisitor* semantics) = 0;
-        virtual void fillDifferentiateExpr(DifferentiateExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) = 0;
+        virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) = 0;
+        virtual void fillHigherOrderInvokeExpr(HigherOrderInvokeExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) = 0;
         FuncType* getBaseFunctionType(SemanticsVisitor* semantics, Expr* funcExpr)
         {
             if (auto funcType = as<FuncType>(funcExpr->type.type))
@@ -2260,13 +2255,13 @@ namespace Slang
         }
     };
 
-    struct ForwardDifferentiateExprCheckingActions : DifferentiateExprCheckingActions
+    struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingActions
     {
-        virtual DifferentiateExpr* createDifferentiateExpr(SemanticsVisitor* semantics) override
+        virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
         {
             return semantics->getASTBuilder()->create<ForwardDifferentiateExpr>();
         }
-        void fillDifferentiateExpr(DifferentiateExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) override
+        void fillHigherOrderInvokeExpr(HigherOrderInvokeExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) override
         {
             resultDiffExpr->baseFunction = funcExpr;
             auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
@@ -2295,13 +2290,13 @@ namespace Slang
         }
     };
 
-    struct BackwardDifferentiateExprCheckingActions : DifferentiateExprCheckingActions
+    struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingActions
     {
-        virtual DifferentiateExpr* createDifferentiateExpr(SemanticsVisitor* semantics) override
+        virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
         {
             return semantics->getASTBuilder()->create<BackwardDifferentiateExpr>();
         }
-        void fillDifferentiateExpr(DifferentiateExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) override
+        void fillHigherOrderInvokeExpr(HigherOrderInvokeExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) override
         {
             resultDiffExpr->baseFunction = funcExpr;
             auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
@@ -2338,10 +2333,45 @@ namespace Slang
         }
     };
 
-    static Expr* _checkDifferentiateExpr(
+    struct PrimalSubstituteExprCheckingActions : HigherOrderInvokeExprCheckingActions
+    {
+        virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
+        {
+            return semantics->getASTBuilder()->create<PrimalSubstituteExpr>();
+        }
+        void fillHigherOrderInvokeExpr(HigherOrderInvokeExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) override
+        {
+            resultDiffExpr->baseFunction = funcExpr;
+            auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
+            if (!baseFuncType)
+            {
+                resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+                semantics->getSink()->diagnose(funcExpr, Diagnostics::expectedFunction, funcExpr->type.type);
+                return;
+            }
+            resultDiffExpr->type = baseFuncType;
+            if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+            {
+                auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
+                if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
+                {
+                    funcDecl = as<CallableDecl>(genDecl->inner);
+                }
+                if (funcDecl)
+                {
+                    for (auto param : funcDecl->getParameters())
+                    {
+                        resultDiffExpr->newParameterNames.add(param->getName());
+                    }
+                }
+            }
+        }
+    };
+
+    static Expr* _checkHigherOrderInvokeExpr(
         SemanticsVisitor* semantics,
-        DifferentiateExpr* expr,
-        DifferentiateExprCheckingActions* actions)
+        HigherOrderInvokeExpr* expr,
+        HigherOrderInvokeExprCheckingActions* actions)
     {
         // Check/Resolve inner function declaration.
         expr->baseFunction = semantics->CheckTerm(expr->baseFunction);
@@ -2359,8 +2389,8 @@ namespace Slang
                     nullptr,
                     overloadedExpr->loc,
                     nullptr);
-                auto candidateExpr = actions->createDifferentiateExpr(semantics);
-                actions->fillDifferentiateExpr(candidateExpr, semantics, lookupResultExpr);
+                auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
+                actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, lookupResultExpr);
                 candidateExpr->loc = expr->loc;
                 result->candidiateExprs.add(candidateExpr);
             }
@@ -2373,8 +2403,8 @@ namespace Slang
             OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
             for (auto item : overloadedExpr2->candidiateExprs)
             {
-                auto candidateExpr = actions->createDifferentiateExpr(semantics);
-                actions->fillDifferentiateExpr(candidateExpr, semantics, item);
+                auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
+                actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, item);
                 candidateExpr->loc = expr->loc;
                 result->candidiateExprs.add(candidateExpr);
             }
@@ -2383,20 +2413,26 @@ namespace Slang
             return result;
         }
 
-        actions->fillDifferentiateExpr(expr, semantics, expr->baseFunction);
+        actions->fillHigherOrderInvokeExpr(expr, semantics, expr->baseFunction);
         return expr;
     }
 
     Expr* SemanticsExprVisitor::visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
     {
         ForwardDifferentiateExprCheckingActions actions;
-        return _checkDifferentiateExpr(this, expr, &actions);
+        return _checkHigherOrderInvokeExpr(this, expr, &actions);
     }
 
     Expr* SemanticsExprVisitor::visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
     {
         BackwardDifferentiateExprCheckingActions actions;
-        return _checkDifferentiateExpr(this, expr, &actions);
+        return _checkHigherOrderInvokeExpr(this, expr, &actions);
+    }
+
+    Expr* SemanticsExprVisitor::visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
+    {
+        PrimalSubstituteExprCheckingActions actions;
+        return _checkHigherOrderInvokeExpr(this, expr, &actions);
     }
 
     Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)

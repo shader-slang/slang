@@ -87,7 +87,7 @@ var x = diffPair(3.0); // constructs DifferentialPair{3.0, 0.0}
 
 __bwd_diff(myFunc)(a, x, 1.0);
 
-// a.d is now 1.0
+// a.d is now 9.0
 // x.d is now 12.0
 ```
 
@@ -204,7 +204,7 @@ struct MyRayDifferential
     float3 d_dir;
 }
 
-struct MyRay : IDifferential
+struct MyRay : IDifferentiable
 {
     // Specify that `MyRay.Differential` is `MyRayDifferential`.
     typealias Differential = MyRayDifferential;
@@ -483,10 +483,76 @@ The following builtin functions are backward differentiable and both their forwa
 - Hyperbolic functions: `sinh`, `cosh`, `tanh`
 - Exponential and logarithmic functions: `exp`, `exp2`, `pow`, `log`, `log2`, `log10`
 - Vector functions: `dot`, `cross`, `length`, `distance`, `normalize`, `reflect`, `refract`
-- Matrix transform: `mul(matrix, vector)`, `mul(vector, matrix)`, `mul(matrix, matrix)`, `transpose`
+- Matrix transforms: `mul(matrix, vector)`, `mul(vector, matrix)`, `mul(matrix, matrix)`
+- Matrix operations: `transpose`, `determinant`
+- Legacy blending and lighting intrinsics: `dst`, `lit`
 
-Derivatives for the following legacy HLSL intrinsic functions are not implemented:
-- `dst`, `lit`, 
+## Primal Substitute Functions
+
+Sometimes it is desirable to replace a function with another when generating forward or backward derivative propagation code. For example, the following code shows a function that computes the integral of some term by sampling and we want to use a different sampling stragegy when computing the derivatives.
+```csharp
+float myTerm(float x)
+{
+     return someComplexComputation(x);
+}
+
+float getSample(float a, float b) { ... }
+
+[BackwardDifferentiable]
+float computeIntegralOverMyTerm(float x, float a, float b)
+{
+     float sum = 0.0;
+     for (int i = 0; i < SAMPLE_COUNT; i++)
+     {
+          let s = no_diff getSample(a, b);
+          let y = myTerm(s);
+          sum += y * ((b-a)/SAMPLE_COUNT);
+     }
+     return sum;
+}
+```
+
+In this code, the `getSample` function returns a random sample in the range of `[a,b]`. Assume we have another sampling function `getSampleForDerivativeComputation(a,b)` that we wish to use instead in derivative computation, we can do so by marking it as a primal-substitute of `getSample`, as in the following code:
+```csharp
+[PrimalSubstituteOf(getSample)]
+float getSampleForDerivativeComputation(float a, float b)
+{
+     ...
+}
+```
+
+Here, the `[PrimalSubstituteOf(getSample)]` attributes marks the `getSampleForDerivativeComputation` function as the substitute for `getSample` in derivative propagation functions. When a function has a primal subsittute, the compiler will treat all calls to that function as if it is a call to the substiute function when generating derivative code. Note that this only applies to compiler generated derivative function and does not affect user provided derivative functions. If a user provided derivative function calls `getSample`, it will not be replaced by `getSampleForDerivativeComputation` by the compiler.
+
+Similar to `[ForwardDerivative]` and `[ForwardDerivativeOf]` attributes, The `[PrimalSubsitute(substFunc)]` attribute works the other way around: it specifies the primal substitute function of the function being marked.
+
+Primal subsitute can be used as another way to make a function differentiable. A function is considered differentiable if it has a primal subsitute that is differentiable. The following code illustrates this mechanism.
+```csharp
+float myFunc(float x) {...}
+
+[PrimalSubstituteOf(myFunc)]
+[BackwardDifferentiable]
+float myFuncSubst(float x) {...}
+
+// myFunc is now considered backward differentiable.
+```
+
+The following example shows in more detail on how primal subsitute affects derivative computation.
+```csharp
+float myFunc(float x) { return x*x; }
+
+[PrimalSubstituteOf(myFunc)]
+[ForwardDifferentiable]
+float myFuncSubst(float x) { return x*x*x; }
+
+[ForwardDifferentiable]
+float caller(float x) { return myFunc(x); }
+
+let a = caller(4.0); // a == 16.0 (calling myFunc)
+let b = __fwd_diff(caller)(diffPair(4.0, 1.0)).p; // b == 64.0 (calling myFuncSubst)
+let c = __fwd_diff(caller)(diffPair(4.0, 1.0)).d; // c == 48.0 (calling derivative of myFuncSubst)
+```
+
+In case that a function has both custom defined derivatives and a differentiable primal substitute, the primal substitute overrides the custom defined derivative on the original function. All calls to the original function will be translated into calls to the primal substitute first, and differentiation step follows after. This means that the derivatives of the primal subsitute function will be used instead of the derivatives defined on the original function.
 
 ## Excluding Parameters From Differentiation
 
@@ -547,7 +613,7 @@ However, the `no_diff` keyword is not required in a call if a non-differentiable
 
 ## Higher Order Differentiation
 
-Slang supports generating higher order forward derivative functions. It is allowed to use `__fwd_diff` operator inside a forward differentiable function, or to nest `__fwd_diff` operators. For example, `__fwd_diff(__fwd_diff(sin))` will have the following signature:
+Slang supports generating higher order forward and backward derivative propagation functions. It is allowed to use `__fwd_diff` and `__bwd_diff` operators inside a forward or backward differentiable function, or to nest `__fwd_diff` and `__bwd_diff` operators. For example, `__fwd_diff(__fwd_diff(sin))` will have the following signature:
 
 ```csharp
 DifferentialPair<DifferentialPair<float>> sin_diff2(DifferentialPair<DifferentialPair<float>> x);
@@ -555,9 +621,7 @@ DifferentialPair<DifferentialPair<float>> sin_diff2(DifferentialPair<Differentia
 
 The input parameter `x` contains four fields: `x.p.p`, `x.p.d,`, `x.d.p`, `x.d.d`, where `x.p.p` specifies the orgiginal input value, both `x.p.d` and `x.d.p` store the first order derivative if `x`, and `x.d.d` stores the second order derivative of `x`. Calling `__fwd_diff(__fwd_diff(sin))` with `diffPair(diffPair(pi/2, 1.0), DiffPair(1.0, 0.0))` will result `{ { 1.0, 0.0 }, { 0.0, -1.0 } }`.
 
-Currently, Slang only supports nesting of the `__fwd_diff` operator. The `__bwd_diff` operator cannot be nested. Using `__bwd_diff` operator in a forward derivative or backward propagation function is now allowed and will result in compile-time error.
-
-User defined higher-order derivative functions can be specified by using `[ForwardDerivative]` attribute on the derivative function, or by using `[ForwardDerivativeOf]` attribute on the higher-order derivative function.
+User defined higher-order derivative functions can be specified by using `[ForwardDerivative]` or `[BackwardDerivative]` attribute on the derivative function, or by using `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the higher-order derivative function.
 
 ## Interactions with Generics and Interfaces
 
@@ -569,9 +633,8 @@ An interface method requirement can be marked as `[ForwardDifferentiable]` or `[
 
 The compiler can generate forward derivative and backward propagation implementations for most uses of array and struct types, including arbitrary read and write access at dynamic array indices, and supports uses of all types of control flows, mutable parameters, generics and interfaces. This covers the set of operations that is sufficient for a lot of functions. However, the user needs to be aware of the following restrictions when using automatic differentiation:
 
-- No access to global variables or shader parameters within a differentiable function.
-- All operations to global resources, including texture reads or atomic writes, are treating as a non-differentiable operation.
+- All operations to global resources, global variables and shader parameters, including texture reads or atomic writes, are treating as a non-differentiable operation.
 - If a differentiable function contains calls that cause side-effects such as updates to global memory, there will not be a guarantee on how many times the side-effect will occur during the resulting derivative function or back-propagation function.
-- Loops: In a backward differentiable function, loops currently cannot have `continue` statements although `break` statements are supported. Loops must use the attribute `[MaxIters(<count>)]` to specify a maximum number of iterations. This will be used by compiler to allocate space to store intermediate data. If the actual number of iterations exceeds the provided maximum, the behavior is undefined. You can always mark a loop with the `[ForceUnroll]` attribute to instruct the Slang compiler to unroll the loop before generating derivative propagation functions. Unrolled loops will be treated the same way as ordinary code and are not subject to any additional restrictions.
+- Loops: Loops must use the attribute `[MaxIters(<count>)]` to specify a maximum number of iterations. This will be used by compiler to allocate space to store intermediate data. If the actual number of iterations exceeds the provided maximum, the behavior is undefined. You can always mark a loop with the `[ForceUnroll]` attribute to instruct the Slang compiler to unroll the loop before generating derivative propagation functions. Unrolled loops will be treated the same way as ordinary code and are not subject to any additional restrictions.
 
 The above restrictions do not apply if a user-defined derivative or backward propagation function is provided.

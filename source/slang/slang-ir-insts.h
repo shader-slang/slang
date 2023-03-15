@@ -608,6 +608,17 @@ struct IRForwardDerivativeDecoration : IRDecoration
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRPrimalSubstituteDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_PrimalSubstituteDecoration
+    };
+    IR_LEAF_ISA(PrimalSubstituteDecoration)
+
+    IRInst* getPrimalSubstituteFunc() { return getOperand(0); }
+};
+
 struct IRBackwardDerivativeIntermediateTypeDecoration : IRDecoration
 {
     enum
@@ -775,6 +786,19 @@ struct IRPrimalElementTypeDecoration : IRDecoration
     IRInst* getPrimalElementType() { return getOperand(0); }
 };
 
+struct IRIntermediateContextFieldDifferentialTypeDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_IntermediateContextFieldDifferentialTypeDecoration
+    };
+
+    IR_LEAF_ISA(IntermediateContextFieldDifferentialTypeDecoration)
+
+    IRInst* getDifferentialWitness() { return getOperand(0); }
+
+};
+
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -880,6 +904,20 @@ struct IRBackwardDifferentiate : IRInst
     IRInst* getBaseFn() { return getOperand(0); }
 
     IR_LEAF_ISA(BackwardDifferentiate)
+};
+
+// Retrieves the primal substitution function for the given function.
+struct IRPrimalSubstitute : IRInst
+{
+    enum
+    {
+        kOp = kIROp_PrimalSubstitute
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(PrimalSubstitute)
 };
 
 // Dictionary item mapping a type with a corresponding 
@@ -2183,6 +2221,11 @@ struct IRWitnessTable : IRInst
         return (IRType*) getOperand(0);
     }
 
+    void setConcreteType(IRType* t)
+    {
+        return setOperand(0, t);
+    }
+
     IR_LEAF_ISA(WitnessTable)
 };
 
@@ -2237,23 +2280,48 @@ struct IRGetTupleElement : IRInst
 
 // An Instruction that creates a differential pair value from a
 // primal and differential.
-struct IRMakeDifferentialPair : IRInst
+
+struct IRMakeDifferentialPairBase : IRInst
 {
-    IR_LEAF_ISA(MakeDifferentialPair)
+    IR_PARENT_ISA(MakeDifferentialPairBase)
     IRInst* getPrimalValue() { return getOperand(0); }
     IRInst* getDifferentialValue() { return getOperand(1); }
 };
-
-struct IRDifferentialPairGetDifferential : IRInst
+struct IRMakeDifferentialPair : IRMakeDifferentialPairBase
 {
-    IR_LEAF_ISA(DifferentialPairGetDifferential)
-    IRInst* getBase() { return getOperand(0); }
+    IR_LEAF_ISA(MakeDifferentialPair)
+};
+struct IRMakeDifferentialPairUserCode : IRMakeDifferentialPairBase
+{
+    IR_LEAF_ISA(MakeDifferentialPairUserCode)
 };
 
-struct IRDifferentialPairGetPrimal : IRInst
+struct IRDifferentialPairGetDifferentialBase : IRInst
+{
+    IR_PARENT_ISA(DifferentialPairGetDifferentialBase)
+    IRInst* getBase() { return getOperand(0); }
+};
+struct IRDifferentialPairGetDifferential : IRDifferentialPairGetDifferentialBase
+{
+    IR_LEAF_ISA(DifferentialPairGetDifferential)
+};
+struct IRDifferentialPairGetDifferentialUserCode : IRDifferentialPairGetDifferentialBase
+{
+    IR_LEAF_ISA(DifferentialPairGetDifferentialUserCode)
+};
+
+struct IRDifferentialPairGetPrimalBase : IRInst
+{
+    IR_PARENT_ISA(DifferentialPairGetPrimalBase)
+    IRInst* getBase() { return getOperand(0); }
+};
+struct IRDifferentialPairGetPrimal : IRDifferentialPairGetPrimalBase
 {
     IR_LEAF_ISA(DifferentialPairGetPrimal)
-    IRInst* getBase() { return getOperand(0); }
+};
+struct IRDifferentialPairGetPrimalUserCode : IRDifferentialPairGetPrimalBase
+{
+    IR_LEAF_ISA(DifferentialPairGetPrimalUserCode)
 };
 
 struct IRDetachDerivative : IRInst
@@ -2695,6 +2763,10 @@ public:
         IRType* valueType,
         IRInst* witnessTable);
 
+    IRDifferentialPairUserCodeType* getDifferentialPairUserCodeType(
+        IRType* valueType,
+        IRInst* witnessTable);
+
     IRBackwardDiffIntermediateContextType* getBackwardDiffIntermediateContextType(IRInst* func);
 
     IRFuncType* getFuncType(
@@ -2807,13 +2879,16 @@ public:
     IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
+    IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
 
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
 
     IRInst* addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key);
     IRInst* addPrimalElementTypeDecoration(IRInst* target, IRInst* type);
+    IRInst* addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* witness);
 
     // Add a differentiable type entry to the appropriate dictionary.
     IRInst* addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness);
@@ -2943,6 +3018,8 @@ public:
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
+    IRInst* emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialPairGetPrimalUserCode(IRInst* diffPair);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,
@@ -3624,6 +3701,11 @@ public:
     void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalContextDecoration, ctx);
+    }
+
+    void addPrimalSubstituteDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_PrimalSubstituteDecoration, jvpFn);
     }
 
     void addLoopCounterDecoration(IRInst* value)

@@ -77,7 +77,7 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeSwitch(IRBuilder* builder, IRSwitch* origSwitch);
 
-    InstPair transcribeMakeDifferentialPair(IRBuilder* builder, IRMakeDifferentialPair* origInst);
+    InstPair transcribeMakeDifferentialPair(IRBuilder* builder, IRMakeDifferentialPairUserCode* origInst);
 
     InstPair transcribeDifferentialPairGetElement(IRBuilder* builder, IRInst* origInst);
 
@@ -99,6 +99,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     List<IRInst*> transcribePhiArgs(IRBuilder* builder, List<IRInst*> origPhiArgs);
 
     void checkAutodiffInstDecorations(IRFunc* fwdFunc);
+
+    SlangResult prepareFuncForForwardDiff(IRFunc* func);
 
     // Create an empty func to represent the transcribed func of `origFunc`.
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;

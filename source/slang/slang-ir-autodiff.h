@@ -159,7 +159,11 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key);
     
-    IRInst* getDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairType* diffPairType);
+    IRInst* getDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairTypeBase* diffPairType);
+
+    IRInst* getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
+
+    IRInst* getDiffTypeWitnessFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
 
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable interface.
@@ -180,6 +184,13 @@ struct DifferentiableTypeConformanceContext
                 diffElementType,
                 as<IRArrayType>(origType)->getElementCount());
         }
+        case kIROp_DifferentialPairUserCodeType:
+        {
+            auto diffPairType = as<IRDifferentialPairTypeBase>(origType);
+            auto diffType = getDiffTypeFromPairType(builder, diffPairType);
+            auto diffWitness = getDiffTypeWitnessFromPairType(builder, diffPairType);
+            return builder->getDifferentialPairUserCodeType((IRType*)diffType, diffWitness);
+        }
         default:
             return lookUpInterfaceMethod(builder, origType, sharedContext->differentialAssocTypeStructKey);
         }
@@ -194,6 +205,8 @@ struct DifferentiableTypeConformanceContext
             case kIROp_FloatType:
             case kIROp_HalfType:
             case kIROp_DoubleType:
+            case kIROp_DifferentialPairType:
+            case kIROp_DifferentialPairUserCodeType:
                 return true;
             case kIROp_VectorType:
             case kIROp_ArrayType:
@@ -244,10 +257,6 @@ struct DifferentialPairTypeBuilder
 
     IRInst* _createDiffPairType(IRType* origBaseType, IRType* diffType);
 
-    IRInst* getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairType* type);
-
-    IRInst* getDiffTypeWitnessFromPairType(IRBuilder* builder, IRDifferentialPairType* type);
-
     IRInst* lowerDiffPairType(IRBuilder* builder, IRType* originalPairType);
 
     struct PairStructKey
@@ -297,7 +306,7 @@ bool isBackwardDifferentiableFunc(IRInst* func);
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
 
-bool canInstBeStored(IRInst* inst);
+bool canTypeBeStored(IRInst* type);
 
 inline bool isRelevantDifferentialPair(IRType* type)
 {

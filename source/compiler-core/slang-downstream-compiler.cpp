@@ -68,10 +68,16 @@ void* DownstreamCompilerBase::getObject(const Guid& guid)
 
 SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
+    if (!isVersionCompatible(inOptions))
+    {
+        // Not possible to compile with this version of the interface.
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    CompileOptions options = getCompatibleVersion(&inOptions);
+
     // Copy the command line options
     CommandLine cmdLine(m_cmdLine);
-
-    CompileOptions options(inOptions);
 
     // Work out the ArtifactDesc 
     const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);

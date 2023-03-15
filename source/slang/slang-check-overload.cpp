@@ -1549,7 +1549,7 @@ namespace Slang
                 // Base is a normal or fully specialized generic function.
                 OverloadCandidate candidate;
                 candidate.flavor = OverloadCandidate::Flavor::Expr;
-                if (auto diffExpr = as<DifferentiateExpr>(expr))
+                if (auto diffExpr = as<HigherOrderInvokeExpr>(expr))
                 {
                     candidate.funcType = as<FuncType>(diffExpr->type.type);
                 }
@@ -1622,10 +1622,10 @@ namespace Slang
             else
             {
                 // Unhandled case for the inner expr.
-                funcExpr->type = this->getASTBuilder()->getErrorType();
                 getSink()->diagnose(funcExpr->loc,
                     Diagnostics::expectedFunction,
                     funcExpr->type);
+                funcExpr->type = this->getASTBuilder()->getErrorType();
             }
            
         }

@@ -385,6 +385,14 @@ SLANG_API void spSetDebugInfoLevel(
     request->setDebugInfoLevel(level);
 }
 
+SLANG_API void spSetDebugInfoFormat(
+    slang::ICompileRequest* request,
+    SlangDebugInfoFormat format)
+{
+    SLANG_ASSERT(request);
+    request->setDebugInfoFormat(format);
+}
+
 SLANG_API void spSetOptimizationLevel(
     slang::ICompileRequest*    request,
     SlangOptimizationLevel  level)

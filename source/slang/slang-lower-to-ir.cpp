@@ -3165,6 +3165,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 baseVal.val));
     }
 
+    LoweredValInfo visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->baseFunction);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitPrimalSubstituteInst(
+                lowerType(context, expr->type),
+                baseVal.val));
+    }
+
     LoweredValInfo visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
@@ -7274,10 +7285,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(inst, op, operands.getBuffer(), operands.getCount());
     }
 
-    void lowerDerivativeMemberModifier(IRInst* inst, DerivativeMemberAttribute* derivativeMember)
+    void lowerDerivativeMemberModifier(IRInst* inst, Decl* memberDecl, DerivativeMemberAttribute* derivativeMember)
     {
-        ensureDecl(context, derivativeMember->memberDeclRef->declRef.getDecl()->parentDecl);
-        auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
+        IRInst* key = nullptr;
+        if (derivativeMember->memberDeclRef->declRef.getDecl() == memberDecl)
+        {
+            key = inst;
+        }
+        else
+        {
+            ensureDecl(context, derivativeMember->memberDeclRef->declRef.getDecl()->parentDecl);
+            key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
+        }
         SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
         auto builder = getBuilder();
         builder->addDecoration(inst, kIROp_DerivativeMemberDecoration, key);
@@ -7347,7 +7366,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         if (auto derivativeMemberModifier = fieldDecl->findModifier<DerivativeMemberAttribute>())
         {
-            lowerDerivativeMemberModifier(irFieldKey, derivativeMemberModifier);
+            lowerDerivativeMemberModifier(irFieldKey, fieldDecl, derivativeMemberModifier);
         }
 
         // We allow a field to be marked as a target intrinsic,
@@ -7970,14 +7989,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
 
-        if (decl->findModifier<ForwardDifferentiableAttribute>())
-        {
-            getBuilder()->addForwardDifferentiableDecoration(irFunc);
-        }
-        if (decl->findModifier<BackwardDifferentiableAttribute>())
-        {
-            getBuilder()->addBackwardDifferentiableDecoration(irFunc);
-        }
         if (auto differentialAttr = decl->findModifier<DifferentiableAttribute>())
         {
             lowerDifferentiableAttribute(subContext, irFunc, differentialAttr);
@@ -8291,156 +8302,156 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
         }
 
-        if (decl->findModifier<RequiresNVAPIAttribute>())
-        {
-            getBuilder()->addSimpleDecoration<IRRequiresNVAPIDecoration>(irFunc);
-        }
-
-        if (decl->findModifier<AlwaysFoldIntoUseSiteAttribute>())
-        {
-            getBuilder()->addSimpleDecoration<IRAlwaysFoldIntoUseSiteDecoration>(irFunc);
-        }
-
-        if (decl->findModifier<NoInlineAttribute>())
-        {
-            getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
-        }
-
-        if (auto attr = decl->findModifier<InstanceAttribute>())
-        {
-            IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
-            getBuilder()->addDecoration(irFunc, kIROp_InstanceDecoration, intLit);
-        }
-
-        if (auto attr = decl->findModifier<MaxVertexCountAttribute>())
-        {
-            IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
-            getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
-        }
-
-        if (auto attr = decl->findModifier<NumThreadsAttribute>())
-        {
-            auto builder = getBuilder();
-            IRType* intType = builder->getIntType();
-
-            IRInst* operands[3] = {
-                builder->getIntValue(intType, attr->x),
-                builder->getIntValue(intType, attr->y),
-                builder->getIntValue(intType, attr->z)
-            };
-
-            builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
-        }
-
-        if (decl->findModifier<ReadNoneAttribute>())
-        {
-            getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
-        }
-
-        if (decl->findModifier<EarlyDepthStencilAttribute>())
-        {
-            getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
-        }
-
-        if (auto attr = decl->findModifier<DomainAttribute>())
-        {
-            IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
-            getBuilder()->addDecoration(irFunc, kIROp_DomainDecoration, stringLit);
-        }
-
-        if (auto attr = decl->findModifier<PartitioningAttribute>())
-        {
-            IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
-            getBuilder()->addDecoration(irFunc, kIROp_PartitioningDecoration, stringLit);
-        }
-
-        if (auto attr = decl->findModifier<OutputTopologyAttribute>())
-        {
-            IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
-            getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
-        }
-
-        if (auto attr = decl->findModifier<OutputControlPointsAttribute>())
-        {
-            IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
-            getBuilder()->addDecoration(irFunc, kIROp_OutputControlPointsDecoration, intLit);
-        }
-
-        if (auto attr = decl->findModifier<SPIRVInstructionOpAttribute>())
-        {
-            auto builder = getBuilder();
-            IRIntLit* intLit = _getIntLitFromAttribute(builder, attr, 0);
-
-            IRStringLit* setStringLit = nullptr;
-            if (attr->args.getCount() > 1)
-            {
-                IRStringLit* checkSetStringLit = _getStringLitFromAttribute(builder, attr, 1);
-                if (checkSetStringLit && checkSetStringLit->getStringSlice().getLength() > 0)
-                {
-                    setStringLit = checkSetStringLit;
-                }
-            }
-
-            // If it has a `set` defined, set it on the decoration
-            if (setStringLit)
-            {
-                builder->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit, setStringLit);
-            }
-            else
-            {
-                builder->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit);
-            }
-        }
-
-        if (decl->findModifier<UnsafeForceInlineEarlyAttribute>())
-        {
-            getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
-        }
-
-        if (decl->findModifier<ForceInlineAttribute>())
-        {
-            getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
-        }
-
-        if (decl->findModifier<TreatAsDifferentiableAttribute>())
-        {
-            getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
-        }
-
-        if (auto intrinsicOp = decl->findModifier<IntrinsicOpModifier>())
-        {
-            auto op = getBuilder()->getIntValue(getBuilder()->getIntType(), intrinsicOp->op);
-            getBuilder()->addDecoration(irFunc, kIROp_IntrinsicOpDecoration, op);
-        }
-
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         setGlobalValue(context, decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
-        if (auto attr = decl->findModifier<UserDefinedDerivativeAttribute>())
+        for (auto modifier : decl->modifiers)
         {
-            // We need to lower the decl ref to the custom derivative function to IR.
-            // The IR insts correspond to the decl ref is not part of the function we
-            // are processing. If we emit it directly to within the function, it could
-            // mess up the assumption on the form of the IR (e.g. having non decoration insts
-            // appearing in the middle of decoration insts). so we emit the decl ref to the
-            // function's parent for now.
+            if (as<RequiresNVAPIAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRRequiresNVAPIDecoration>(irFunc);
+            }
+            else if (as<AlwaysFoldIntoUseSiteAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRAlwaysFoldIntoUseSiteDecoration>(irFunc);
+            }
+            else if (as<NoInlineAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
+            }
+            else if (auto instanceAttr = as<InstanceAttribute>(modifier))
+            {
+                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), instanceAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_InstanceDecoration, intLit);
+            }
+            else if (auto maxVertCountAttr = as<MaxVertexCountAttribute>(modifier))
+            {
+                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), maxVertCountAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
+            }
+            else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
+            {
+                auto builder = getBuilder();
+                IRType* intType = builder->getIntType();
 
-            subContext->irBuilder->setInsertInto(irFunc->getParent());
+                IRInst* operands[3] = {
+                    builder->getIntValue(intType, numThreadsAttr->x),
+                    builder->getIntValue(intType, numThreadsAttr->y),
+                    builder->getIntValue(intType, numThreadsAttr->z)
+                };
 
-            auto loweredVal = lowerRValueExpr(subContext, attr->funcExpr);
+                builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
+            }
+            else if (as<ReadNoneAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
+            }
+            else if (as<EarlyDepthStencilAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
+            }
+            else if (auto domainAttr = as<DomainAttribute>(modifier))
+            {
+                IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), domainAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_DomainDecoration, stringLit);
+            }
+            else if (auto partitionAttr = as<PartitioningAttribute>(modifier))
+            {
+                IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), partitionAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_PartitioningDecoration, stringLit);
+            }
+            else if (auto outputTopAttr = as<OutputTopologyAttribute>(modifier))
+            {
+                IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), outputTopAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
+            }
+            else if (auto outputCtrlPtAttr = as<OutputControlPointsAttribute>(modifier))
+            {
+                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), outputCtrlPtAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_OutputControlPointsDecoration, intLit);
+            }
+            else if (auto spvInstOpAttr = as<SPIRVInstructionOpAttribute>(modifier))
+            {
+                auto builder = getBuilder();
+                IRIntLit* intLit = _getIntLitFromAttribute(builder, spvInstOpAttr, 0);
 
-            SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-            IRInst* derivativeFunc = loweredVal.val;
+                IRStringLit* setStringLit = nullptr;
+                if (spvInstOpAttr->args.getCount() > 1)
+                {
+                    IRStringLit* checkSetStringLit = _getStringLitFromAttribute(builder, spvInstOpAttr, 1);
+                    if (checkSetStringLit && checkSetStringLit->getStringSlice().getLength() > 0)
+                    {
+                        setStringLit = checkSetStringLit;
+                    }
+                }
 
-            if (as<ForwardDerivativeAttribute>(attr))
-                getBuilder()->addForwardDerivativeDecoration(irFunc, derivativeFunc);
-            else
-                getBuilder()->addUserDefinedBackwardDerivativeDecoration(irFunc, derivativeFunc);
+                // If it has a `set` defined, set it on the decoration
+                if (setStringLit)
+                {
+                    builder->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit, setStringLit);
+                }
+                else
+                {
+                    builder->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit);
+                }
+            }
+            else if (as<UnsafeForceInlineEarlyAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
+            }
+            else if (as<ForceInlineAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
+            }
+            else if (as<TreatAsDifferentiableAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
+            }
+            else if (auto intrinsicOp = as<IntrinsicOpModifier>(modifier))
+            {
+                auto op = getBuilder()->getIntValue(getBuilder()->getIntType(), intrinsicOp->op);
+                getBuilder()->addDecoration(irFunc, kIROp_IntrinsicOpDecoration, op);
+            }
+            else if (as<UserDefinedDerivativeAttribute>(modifier) || as<PrimalSubstituteAttribute>(modifier))
+            {
+                // We need to lower the decl ref to the custom derivative function to IR.
+                // The IR insts correspond to the decl ref is not part of the function we
+                // are processing. If we emit it directly to within the function, it could
+                // mess up the assumption on the form of the IR (e.g. having non decoration insts
+                // appearing in the middle of decoration insts). so we emit the decl ref to the
+                // function's parent for now.
 
-            // Reset cursor.
-            subContext->irBuilder->setInsertInto(irFunc);
+                subContext->irBuilder->setInsertInto(irFunc->getParent());
+                Expr* funcExpr = nullptr;
+                if (auto udAttr = as<UserDefinedDerivativeAttribute>(modifier))
+                    funcExpr = udAttr->funcExpr;
+                else if (auto primalAttr = as<PrimalSubstituteAttribute>(modifier))
+                    funcExpr = primalAttr->funcExpr;
+
+                auto loweredVal = lowerRValueExpr(subContext, funcExpr);
+
+                SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
+                IRInst* derivativeFunc = loweredVal.val;
+
+                if (as<ForwardDerivativeAttribute>(modifier))
+                    getBuilder()->addForwardDerivativeDecoration(irFunc, derivativeFunc);
+                else if (as<BackwardDerivativeAttribute>(modifier))
+                    getBuilder()->addUserDefinedBackwardDerivativeDecoration(irFunc, derivativeFunc);
+                else
+                    getBuilder()->addPrimalSubstituteDecoration(irFunc, derivativeFunc);
+
+                // Reset cursor.
+                subContext->irBuilder->setInsertInto(irFunc);
+            }
+            else if (as<ForwardDifferentiableAttribute>(modifier))
+            {
+                getBuilder()->addForwardDifferentiableDecoration(irFunc);
+            }
+            else if (as<BackwardDifferentiableAttribute>(modifier))
+            {
+                getBuilder()->addBackwardDifferentiableDecoration(irFunc);
+            }
         }
-
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
@@ -8451,39 +8462,59 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the interface's type definition.
         auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
 
-        if (auto attr = decl->findModifier<DerivativeOfAttribute>())
+        for (auto modifier : decl->modifiers)
         {
-            if (auto originalDeclRefExpr = as<DeclRefExpr>(attr->funcExpr))
+            if (as<DerivativeOfAttribute>(modifier) || as<PrimalSubstituteOfAttribute>(modifier))
             {
-                NestedContext originalContextFunc(this);
-                auto originalSubBuilder = originalContextFunc.getBuilder();
-                auto originalSubContext = originalContextFunc.getContext();
-                if (auto outterGeneric = getOuterGeneric(irFunc))
-                    originalSubBuilder->setInsertBefore(outterGeneric);
-                else
-                    originalSubBuilder->setInsertBefore(irFunc);
-                auto originalFuncDecl = as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
-                SLANG_RELEASE_ASSERT(originalFuncDecl);
+                Expr* funcExpr = nullptr;
+                Expr* backDeclRef = nullptr;
+                if (auto attr = as<DerivativeOfAttribute>(modifier))
+                {
+                    funcExpr = attr->funcExpr;
+                    backDeclRef = attr->backDeclRef;
+                }
+                else if (auto primalAttr = as<PrimalSubstituteOfAttribute>(modifier))
+                {
+                    funcExpr = primalAttr->funcExpr;
+                    backDeclRef = primalAttr->backDeclRef;
+                }
 
-                auto originalFuncVal = lowerFuncDeclInContext(originalSubContext, originalSubBuilder, originalFuncDecl).val;
-                if (auto originalFuncGeneric = as<IRGeneric>(originalFuncVal))
+                if (auto originalDeclRefExpr = as<DeclRefExpr>(funcExpr))
                 {
-                    originalFuncVal = findGenericReturnVal(originalFuncGeneric);
+                    NestedContext originalContextFunc(this);
+                    auto originalSubBuilder = originalContextFunc.getBuilder();
+                    auto originalSubContext = originalContextFunc.getContext();
+                    if (auto outterGeneric = getOuterGeneric(irFunc))
+                        originalSubBuilder->setInsertBefore(outterGeneric);
+                    else
+                        originalSubBuilder->setInsertBefore(irFunc);
+                    auto originalFuncDecl = as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
+                    SLANG_RELEASE_ASSERT(originalFuncDecl);
+
+                    auto originalFuncVal = lowerFuncDeclInContext(originalSubContext, originalSubBuilder, originalFuncDecl).val;
+                    if (auto originalFuncGeneric = as<IRGeneric>(originalFuncVal))
+                    {
+                        originalFuncVal = findGenericReturnVal(originalFuncGeneric);
+                    }
+                    originalSubBuilder->setInsertBefore(originalFuncVal);
+                    auto derivativeFuncVal = lowerRValueExpr(originalSubContext, backDeclRef);
+                    if (as<ForwardDerivativeOfAttribute>(modifier))
+                    {
+                        originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                        getBuilder()->addForwardDifferentiableDecoration(irFunc);
+                    }
+                    else if (as<BackwardDerivativeOfAttribute>(modifier))
+                    {
+                        originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                    }
+                    else
+                    {
+                        originalSubBuilder->addPrimalSubstituteDecoration(originalFuncVal, derivativeFuncVal.val);
+                    }
                 }
-                originalSubBuilder->setInsertBefore(originalFuncVal);
-                auto derivativeFuncVal = lowerRValueExpr(originalSubContext, attr->backDeclRef);
-                if (as<ForwardDerivativeOfAttribute>(attr))
-                {
-                    originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
-                    getBuilder()->addForwardDifferentiableDecoration(irFunc);
-                }
-                else
-                {
-                    originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
-                }
+                subContext->irBuilder->setInsertInto(irFunc);
+                finalVal->moveToEnd();
             }
-            subContext->irBuilder->setInsertInto(irFunc);
-            finalVal->moveToEnd();
         }
         return LoweredValInfo::simple(finalVal);
     }

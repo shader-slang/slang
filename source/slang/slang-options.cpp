@@ -1497,25 +1497,69 @@ struct OptionsParser
                  
                     compileRequest->setOptimizationLevel(level);
                 }
-
                 // Note: unlike with `-O` above, we have to consider that other
                 // options might have names that start with `-g` and so cannot
                 // just detect it as a prefix.
-                else if( argValue == "-g" || argValue == "-g2" )
+                else if (argValue.startsWith("-g"))
                 {
-                    compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
-                }
-                else if( argValue == "-g0" )
-                {
-                    compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_NONE);
-                }
-                else if( argValue == "-g1" )
-                {
-                    compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MINIMAL);
-                }
-                else if( argValue == "-g3" )
-                {
-                    compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
+                    if (argValue == toSlice("-g"))
+                    {
+                        // The default is standard
+                        compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
+                    }
+                    else if (argValue.getLength() == 3 && argValue[2] >= '0' && argValue[2] <= '3')
+                    {
+                        // Extract the digit into an index
+                        const Index levelIndex = argValue[2] - '0';
+                        SLANG_ASSERT(levelIndex >= 0 && levelIndex <= 3);
+
+                        // Map indices to enum values
+                        const SlangDebugInfoLevel levels[] = 
+                        {
+                            SLANG_DEBUG_INFO_LEVEL_NONE,
+                            SLANG_DEBUG_INFO_LEVEL_MINIMAL,
+                            SLANG_DEBUG_INFO_LEVEL_STANDARD,
+                            SLANG_DEBUG_INFO_LEVEL_MAXIMAL
+                        };
+
+                        const auto level = levels[levelIndex];
+                        compileRequest->setDebugInfoLevel(level);
+                    }
+                    else
+                    {
+                        // Perhaps it's trying to specify a format
+                        auto formatName = argValue.getUnownedSlice().tail(2);
+
+                        SlangDebugInfoFormat format;
+                        if (SLANG_FAILED(TypeTextUtil::findDebugInfoFormat(formatName, format)))
+                        {
+                            List<String> debugOptions;
+
+                            debugOptions.add(toSlice("-g"));
+
+                            for (Int i = 0; i <= 3; ++i)
+                            {
+                                StringBuilder buf;
+                                buf << toSlice("-g") << i;
+                                debugOptions.add(buf);
+                            }
+
+                            for (Index i = 0; i < SLANG_DEBUG_INFO_FORMAT_COUNT_OF; ++i)
+                            {
+                                StringBuilder buf;
+                                buf << toSlice("-g") << TypeTextUtil::getDebugInfoFormatName(SlangDebugInfoFormat(i));
+                                debugOptions.add(buf);
+                            }
+
+                            StringBuilder buf;
+                            StringUtil::join(debugOptions, toSlice(", "), buf);
+
+                            sink->diagnose(arg.loc, Diagnostics::unknownDebugOption, buf);
+                            return SLANG_FAIL;
+                        }
+                       
+                        compileRequest->setDebugInfoFormat(format);
+                    }
                 }
                 else if( argValue == "-default-image-format-unknown" )
                 {

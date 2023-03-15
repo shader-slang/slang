@@ -391,6 +391,10 @@ namespace Slang
             /// maybe synthesized and made available only after conformance checking.
         TypesFullyResolved,
 
+            /// All attributes are fully checked. This is the final step before
+            /// checking the function body.
+        AttributesChecked,
+
             /// The declaration is fully checked.
             ///
             /// This step includes any validation of the declaration that is
@@ -1500,12 +1504,12 @@ namespace Slang
 
     enum class DeclAssociationKind
     {
-        ForwardDerivativeFunc, BackwardDerivativeFunc,
+        ForwardDerivativeFunc, BackwardDerivativeFunc, PrimalSubstituteFunc
     };
 
-    struct DeclAssociation
+    struct DeclAssociation : SerialRefObject
     {
-        SLANG_VALUE_CLASS(DeclAssociation)
+        SLANG_OBJ_CLASS(DeclAssociation)
         DeclAssociationKind kind;
         Decl* decl;
     };
@@ -1516,7 +1520,7 @@ namespace Slang
     {
         SLANG_OBJ_CLASS(DeclAssociationList)
 
-        List<DeclAssociation> associations;
+        List<RefPtr<DeclAssociation>> associations;
     };
 
         /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
@@ -1537,9 +1541,22 @@ namespace Slang
         DMulFunc, ///< The `IDifferentiable.dmul` function requirement 
     };
 
+    enum class FunctionDifferentiableLevel
+    {
+        None,
+        Forward,
+        Backward
+    };
+
     /// Get the inner most expr from an higher order expr chain, e.g. `__fwd_diff(__fwd_diff(f))`'s
     /// inner most expr is `f`.
-    Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr);
+    Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLevel& outDiffLevel);
+    inline Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr)
+    {
+        FunctionDifferentiableLevel level;
+        return getInnerMostExprFromHigherOrderExpr(expr, level);
+    }
+
 
     /// Get the operator name from the higher order invoke expr.
     UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr);

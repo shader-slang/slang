@@ -130,6 +130,19 @@ namespace Slang
         Maximal     = SLANG_DEBUG_INFO_LEVEL_MAXIMAL,
     };
 
+    enum class DebugInfoFormat : SlangDebugInfoFormatIntegral
+    {
+        Default     = SLANG_DEBUG_INFO_FORMAT_DEFAULT,
+        C7          = SLANG_DEBUG_INFO_FORMAT_C7,
+        Pdb         = SLANG_DEBUG_INFO_FORMAT_PDB,
+
+        Stabs       = SLANG_DEBUG_INFO_FORMAT_STABS,
+        Coff        = SLANG_DEBUG_INFO_FORMAT_COFF,
+        Dwarf       = SLANG_DEBUG_INFO_FORMAT_DWARF,
+
+        CountOf     = SLANG_DEBUG_INFO_FORMAT_COUNT_OF,
+    };
+
     enum class OptimizationLevel : SlangOptimizationLevelIntegral
     {
         None    = SLANG_OPTIMIZATION_LEVEL_NONE,
@@ -1884,6 +1897,7 @@ namespace Slang
         MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
 
         DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
+        DebugInfoFormat debugInfoFormat = DebugInfoFormat::Default;
 
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
 
@@ -2595,6 +2609,7 @@ namespace Slang
             SlangSeverity overrideSeverity) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangDiagnosticFlags SLANG_MCALL getDiagnosticFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
 
         EndToEndCompileRequest(
             Session* session);

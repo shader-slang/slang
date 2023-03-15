@@ -178,6 +178,8 @@ enum class ArtifactPayload : uint8_t
     Log,            ///< Log file
     Lock,           ///< Typically some kind of 'lock' file. Contents is typically not important.
 
+    PdbDebugInfo,   ///< PDB debug info
+
     CountOf,
 };
 

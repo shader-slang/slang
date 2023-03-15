@@ -34,6 +34,26 @@ namespace Slang
         }
     };
 
+    struct SemanticsDeclAttributesVisitor
+        : public SemanticsDeclVisitorBase
+        , public DeclVisitor<SemanticsDeclAttributesVisitor>
+    {
+        SemanticsDeclAttributesVisitor(SemanticsContext const& outer)
+            : SemanticsDeclVisitorBase(outer)
+        {}
+
+        void visitDecl(Decl*) {}
+        void visitDeclGroup(DeclGroup*) {}
+
+        void visitFunctionDeclBase(FunctionDeclBase* decl);
+
+        void checkForwardDerivativeOfAttribute(FunctionDeclBase* funcDecl, ForwardDerivativeOfAttribute* attr);
+
+        void checkBackwardDerivativeOfAttribute(FunctionDeclBase* funcDecl, BackwardDerivativeOfAttribute* attr);
+
+        void checkPrimalSubstituteOfAttribute(FunctionDeclBase* funcDecl, PrimalSubstituteOfAttribute* attr);
+    };
+
     struct SemanticsDeclHeaderVisitor
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclHeaderVisitor>
@@ -258,10 +278,6 @@ namespace Slang
         void visitFunctionDeclBase(FunctionDeclBase* funcDecl);
 
         void visitParamDecl(ParamDecl* paramDecl);
-
-        void checkForwardDerivativeOfAttribute(FunctionDeclBase* funcDecl);
-
-        void checkBackwardDerivativeOfAttribute(FunctionDeclBase* funcDecl);
     };
 
         /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
@@ -1490,19 +1506,37 @@ namespace Slang
             aggTypeDecl->members.add(diffField);
             aggTypeDecl->invalidateMemberDictionary();
 
+            // Inject a `DerivativeMember` modifier on the differential field to point to itself.
+            {
+                auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+                auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+                fieldLookupExpr->type.type = diffMemberType;
+                auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = differentialType;
+                auto baseTypeType = m_astBuilder->create<TypeType>();
+                baseTypeType->type = differentialType;
+                baseTypeExpr->type.type = baseTypeType;
+                fieldLookupExpr->baseExpression = baseTypeExpr;
+                fieldLookupExpr->declRef = makeDeclRef(diffField);
+                derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+                addModifier(diffField, derivativeMemberModifier);
+            }
+
             // Inject a `DerivativeMember` modifier on the original decl.
-            auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
-            auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
-            fieldLookupExpr->type.type = diffMemberType;
-            auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
-            baseTypeExpr->base.type = differentialType;
-            auto baseTypeType = m_astBuilder->create<TypeType>();
-            baseTypeType->type = differentialType;
-            baseTypeExpr->type.type = baseTypeType;
-            fieldLookupExpr->baseExpression = baseTypeExpr;
-            fieldLookupExpr->declRef = makeDeclRef(diffField);
-            derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
-            addModifier(member, derivativeMemberModifier);
+            {
+                auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+                auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+                fieldLookupExpr->type.type = diffMemberType;
+                auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = differentialType;
+                auto baseTypeType = m_astBuilder->create<TypeType>();
+                baseTypeType->type = differentialType;
+                baseTypeExpr->type.type = baseTypeType;
+                fieldLookupExpr->baseExpression = baseTypeExpr;
+                fieldLookupExpr->declRef = makeDeclRef(diffField);
+                derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+                addModifier(member, derivativeMemberModifier);
+            }
         };
 
         // Make the Differential type itself conform to `IDifferential` interface.
@@ -4657,353 +4691,9 @@ namespace Slang
             getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
     }
 
-    template<typename TDerivativeAttr>
-    void checkDerivativeAttributeImpl(
-        SemanticsVisitor* visitor,
-        TDerivativeAttr* attr,
-        const List<Expr*>& imaginaryArguments)
-    {
-        auto invokeExpr = visitor->constructUncheckedInvokeExpr(attr->funcExpr, imaginaryArguments);
-        auto resolved = visitor->ResolveInvoke(invokeExpr);
-        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
-        {
-            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
-            {
-                attr->funcExpr = calleeDeclRef;
-                return;
-            }
-        }
-        visitor->getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
-    }
-
-    template<typename TDerivativeAttr>
-    const char* getDerivativeAttrName() { SLANG_UNREACHABLE(""); }
-
-    template<>
-    const char* getDerivativeAttrName<ForwardDerivativeAttribute>()
-    {
-        return "ForwardDerivative";
-    }
-    template<>
-    const char* getDerivativeAttrName<BackwardDerivativeAttribute>()
-    {
-        return "BackwardDerivative";
-    }
-
-    List<Expr*> getImaginaryArgsToForwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
-    {
-        List<Expr*> imaginaryArguments;
-        for (auto param : originalFuncDecl->getParameters())
-        {
-            auto arg = visitor->getASTBuilder()->create<VarExpr>();
-            arg->declRef.decl = param;
-            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
-            arg->type.type = param->getType();
-            arg->loc = loc;
-            if (auto pairType = visitor->getDifferentialPairType(param->getType()))
-            {
-                arg->type.type = pairType;
-            }
-            imaginaryArguments.add(arg);
-        }
-        return imaginaryArguments;
-    }
-
-    List<Expr*> getImaginaryArgsToOriginalFuncFromForwardDerivativeFunc(ASTBuilder* astBuilder, FunctionDeclBase* fwdDiffFunc, SourceLoc loc)
-    {
-        List<Expr*> imaginaryArguments;
-        for (auto param : fwdDiffFunc->getParameters())
-        {
-            auto arg = astBuilder->create<VarExpr>();
-            arg->declRef.decl = param;
-            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
-            arg->type.type = param->getType();
-            arg->loc = loc;
-            if (auto pairType = as<DifferentialPairType>(param->getType()))
-            {
-                arg->type.type = pairType->getPrimalType();
-            }
-            imaginaryArguments.add(arg);
-        }
-        return imaginaryArguments;
-    }
-
-    List<Expr*> getImaginaryArgsToBackwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
-    {
-        List<Expr*> imaginaryArguments;
-        for (auto param : originalFuncDecl->getParameters())
-        {
-            auto arg = visitor->getASTBuilder()->create<VarExpr>();
-            arg->declRef.decl = param;
-            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
-            arg->type.type = param->getType();
-            arg->loc = loc;
-            if (auto pairType = visitor->getDifferentialPairType(param->getType()))
-            {
-                arg->type.type = pairType;
-                if (auto diffPairType = as<DifferentialPairType>(pairType))
-                {
-                    if (param->findModifier<OutModifier>() != nullptr && param->findModifier<InModifier>() == nullptr)
-                    {
-                        arg->type.isLeftValue = false;
-                        arg->type.type = diffPairType->getPrimalType();
-                    }
-                }
-            }
-            imaginaryArguments.add(arg);
-        }
-        if (auto diffReturnType = visitor->tryGetDifferentialType(visitor->getASTBuilder(), originalFuncDecl->returnType.type))
-        {
-            auto arg = visitor->getASTBuilder()->create<InitializerListExpr>();
-            arg->type.isLeftValue = false;
-            arg->type.type = diffReturnType;
-            arg->loc = loc;
-            imaginaryArguments.add(arg);
-        }
-        return imaginaryArguments;
-    }
-
-    List<Expr*> getImaginaryArgsToOriginalFuncFromBackwardDerivativeFunc(ASTBuilder* astBuilder, FunctionDeclBase* bwdDiffFunc, SourceLoc loc)
-    {
-        // Note: it isn't always possible to construct original arguments from
-        // backward propagation arguments because backward propagation function
-        // may drop certain parameters.
-        List<Expr*> imaginaryArguments;
-        for (auto param : bwdDiffFunc->getParameters())
-        {
-            auto arg = astBuilder->create<VarExpr>();
-            arg->declRef.decl = param;
-            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
-            arg->type.type = param->getType();
-            arg->loc = loc;
-            if (auto pairType = as<DifferentialPairType>(param->getType()))
-            {
-                if (param->findModifier<OutModifier>() != nullptr && param->findModifier<InModifier>() == nullptr)
-                {
-                    arg->type.isLeftValue = false;
-                }
-                arg->type.type = pairType->getPrimalType();
-            }
-            imaginaryArguments.add(arg);
-        }
-        // Assume the last parameter is `dOut`.
-        // This is not true if the function returns a non-differentiable value.
-        // However in that uncommon case we just fail the overload resolution
-        // and require the user to provide disambiguate themselves.
-        if (imaginaryArguments.getCount())
-            imaginaryArguments.fastRemoveAt(imaginaryArguments.getCount() - 1);
-        return imaginaryArguments;
-    }
-
-    // This helper function is needed to workaround a gcc bug.
-    // Remove when we upgrade to a newer version of gcc.
-    template <typename T>
-    static T* _findModifier(Decl* decl)
-    {
-        return decl->findModifier<T>();
-    }
-
-    template <typename TDerivativeAttr, typename TDerivativeOfAttr>
-    void checkDerivativeOfAttributeImpl(
-        SemanticsVisitor* visitor,
-        FunctionDeclBase* funcDecl,
-        TDerivativeOfAttr* derivativeOfAttr,
-        DeclAssociationKind assocKind,
-        const List<Expr*>& imaginaryArgsToOriginal)
-    {
-        DeclRef<Decl> calleeDeclRef;
-        auto calleeDeclRefExpr = as<DeclRefExpr>(derivativeOfAttr->funcExpr);
-        if (!calleeDeclRefExpr)
-        {
-            auto invokeExpr = visitor->constructUncheckedInvokeExpr(derivativeOfAttr->funcExpr, imaginaryArgsToOriginal);
-            auto resolved = visitor->ResolveInvoke(invokeExpr);
-            if (auto resolvedInvoke = as<InvokeExpr>(resolved))
-            {
-                calleeDeclRefExpr = as<DeclRefExpr>(resolvedInvoke->functionExpr);
-            }
-        }
-        if (!calleeDeclRefExpr)
-        {
-            visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
-            return;
-        }
-        calleeDeclRef = calleeDeclRefExpr->declRef;
-        if (auto calleeGenDecl = as<GenericDecl>(calleeDeclRef.getDecl()))
-        {
-            auto parentGenericDecl = as<GenericDecl>(funcDecl->parentDecl);
-            if (!parentGenericDecl)
-            {
-                visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
-                return;
-            }
-            FunctionDeclBase* funcReturnVal = nullptr;
-            List<Val*> args;
-            for (auto mm : parentGenericDecl->members)
-            {
-                if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm))
-                {
-                    args.add(DeclRefType::create(visitor->getASTBuilder(), DeclRef<Decl>(genericTypeParamDecl, nullptr)));
-                }
-                else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
-                {
-                    args.add(visitor->getASTBuilder()->getOrCreate<GenericParamIntVal>(
-                        genericValueParamDecl->getType(),
-                        genericValueParamDecl, nullptr));
-                }
-            }
-            auto funcs = calleeGenDecl->getMembersOfType<FunctionDeclBase>();
-            if (funcs.isEmpty())
-            {
-                visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
-                return;
-            }
-            funcReturnVal = funcs.getFirst();
-            if (funcReturnVal)
-            {
-                auto subst = visitor->getASTBuilder()->getOrCreateGenericSubstitution(calleeGenDecl, args, nullptr);
-                calleeDeclRef.decl = funcReturnVal;
-                calleeDeclRef.substitutions = subst;
-                calleeDeclRefExpr = as<DeclRefExpr>(visitor->ConstructDeclRefExpr(
-                    calleeDeclRef, nullptr, derivativeOfAttr->loc, nullptr));
-            }
-            else
-            {
-                calleeDeclRef = DeclRef<Decl>();
-                calleeDeclRefExpr = nullptr;
-            }
-        }
-
-        auto calleeFunc = as<FunctionDeclBase>(calleeDeclRef.getDecl());
-        if (!calleeFunc)
-        {
-            visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
-            return;
-        }
-
-        if (auto existingModifier = _findModifier<TDerivativeAttr>(calleeFunc))
-        {
-            // The primal function already has a `[*Derivative]` attribute, this is invalid.
-            visitor->getSink()->diagnose(
-                derivativeOfAttr,
-                Diagnostics::declAlreadyHasAttribute,
-                calleeDeclRef,
-                getDerivativeAttrName<TDerivativeAttr>());
-            visitor->getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef.getDecl());
-        }
-        derivativeOfAttr->funcExpr = calleeDeclRefExpr;
-        auto derivativeAttr = visitor->getASTBuilder()->create<TDerivativeAttr>();
-        derivativeAttr->loc = derivativeOfAttr->loc;
-        auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
-        auto declRef =
-            DeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
-        auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, derivativeOfAttr->loc, nullptr);
-        declRefExpr->type.type = nullptr;
-        derivativeAttr->args.add(declRefExpr);
-        derivativeAttr->funcExpr = declRefExpr;
-        checkDerivativeAttribute(visitor, calleeFunc, derivativeAttr);
-        derivativeOfAttr->backDeclRef = derivativeAttr->funcExpr;
-        derivativeAttr->funcExpr = nullptr;
-        visitor->getShared()->registerAssociatedDecl(calleeDeclRef.getDecl(), assocKind, funcDecl);
-    }
-
-    static void checkDerivativeAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, ForwardDerivativeAttribute* attr)
-    {
-        if (!attr->funcExpr)
-            return;
-        if (attr->funcExpr->type.type)
-            return;
-
-        List<Expr*> imaginaryArguments = getImaginaryArgsToForwardDerivative(visitor, funcDecl, attr->loc);
-        checkDerivativeAttributeImpl(visitor, attr, imaginaryArguments);
-    }
-
-    static void checkDerivativeAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, BackwardDerivativeAttribute* attr)
-    {
-        if (!attr->funcExpr)
-            return;
-        if (attr->funcExpr->type.type)
-            return;
-
-        List<Expr*> imaginaryArguments = getImaginaryArgsToBackwardDerivative(visitor, funcDecl, attr->loc);
-        checkDerivativeAttributeImpl(visitor, attr, imaginaryArguments);
-    }
-
-    template<typename TDerivativeAttr, typename TDerivativeOfAttr>
-    bool tryCheckDerivativeOfAttributeImpl(
-        SemanticsVisitor* visitor,
-        FunctionDeclBase* funcDecl,
-        TDerivativeOfAttr* derivativeOfAttr,
-        DeclAssociationKind assocKind,
-        const List<Expr*>& imaginaryArgsToOriginal)
-    {
-        DiagnosticSink tempSink(visitor->getSourceManager(), nullptr);
-        SemanticsVisitor subVisitor(visitor->withSink(&tempSink));
-        checkDerivativeOfAttributeImpl<TDerivativeAttr>(
-            &subVisitor,
-            funcDecl,
-            derivativeOfAttr,
-            assocKind,
-            imaginaryArgsToOriginal);
-        return tempSink.getErrorCount() == 0;
-    }
-
-    void SemanticsDeclBodyVisitor::checkForwardDerivativeOfAttribute(FunctionDeclBase* funcDecl)
-    {
-        auto attr = funcDecl->findModifier<ForwardDerivativeOfAttribute>();
-        if (!attr)
-            return;
-
-        List<Expr*> imaginaryArgsToOriginal = getImaginaryArgsToOriginalFuncFromForwardDerivativeFunc(m_astBuilder, funcDecl, attr->loc);
-        checkDerivativeOfAttributeImpl<ForwardDerivativeAttribute>(
-            this, funcDecl, attr, DeclAssociationKind::ForwardDerivativeFunc, imaginaryArgsToOriginal);
-    }
-
-    void SemanticsDeclBodyVisitor::checkBackwardDerivativeOfAttribute(FunctionDeclBase* funcDecl)
-    {
-        auto attr = funcDecl->findModifier<BackwardDerivativeOfAttribute>();
-        if (!attr)
-            return;
-
-        List<Expr*> imaginaryArguments = getImaginaryArgsToOriginalFuncFromBackwardDerivativeFunc(m_astBuilder, funcDecl, attr->loc);
-
-        // The tricky part here is that we can't easily derive the arguments to original func just
-        // from the definition of a backward derivative function, because we don't know if the last
-        // parameter is just a normal parameter of the original func, or if it is the additional
-        // derivative of the return value. The solution here is to try to resolve the original
-        // function with or without the last argument. However if the type of the last argument
-        // isn't differentiable, we know that it can't possibly be the result derivative.
-
-        if (imaginaryArguments.getCount() == 0 ||
-            !tryGetDifferentialType(m_astBuilder, imaginaryArguments.getLast()->type.type))
-        {
-            checkDerivativeOfAttributeImpl<BackwardDerivativeAttribute>(
-                this, funcDecl, attr, DeclAssociationKind::BackwardDerivativeFunc, imaginaryArguments);
-            return;
-        }
-
-        // Otherwise, try resolve with all the arguments, if failed, resolve without the last
-        // argument.
-        if (tryCheckDerivativeOfAttributeImpl<BackwardDerivativeAttribute>(this, funcDecl, attr, DeclAssociationKind::BackwardDerivativeFunc, imaginaryArguments))
-        {
-            return;
-        }
-
-        imaginaryArguments.removeLast();
-        checkDerivativeOfAttributeImpl<BackwardDerivativeAttribute>(
-            this, funcDecl, attr, DeclAssociationKind::BackwardDerivativeFunc, imaginaryArguments);
-    }
-
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         auto newContext = withParentFunc(decl);
-
-        // Run checking on attributes that can't be fully checked in header checking stage.
-        checkForwardDerivativeOfAttribute(decl);
-        if (auto derivativeAttr = decl->findModifier<ForwardDerivativeAttribute>())
-            checkDerivativeAttribute(this, decl, derivativeAttr);
-        checkBackwardDerivativeOfAttribute(decl);
-        if (auto derivativeAttr = decl->findModifier<BackwardDerivativeAttribute>())
-            checkDerivativeAttribute(this, decl, derivativeAttr);
 
         if (newContext.getParentDifferentiableAttribute())
         {
@@ -6846,7 +6536,7 @@ namespace Slang
     /// Note: this function creates an empty list of candidates for the given type if
     /// a matching entry doesn't exist already.
     ///
-    static List<DeclAssociation>& _getDeclAssociationList(
+    static List<RefPtr<DeclAssociation>>& _getDeclAssociationList(
         Decl* decl,
         OrderedDictionary<Decl*, RefPtr<DeclAssociationList>>& mapDeclToDeclarations)
     {
@@ -6871,14 +6561,16 @@ namespace Slang
     void SharedSemanticsContext::registerAssociatedDecl(Decl* original, DeclAssociationKind kind, Decl* associated)
     {
         auto moduleDecl = getModuleDecl(associated);
-        DeclAssociation assoc = {kind, associated};
+        RefPtr<DeclAssociation> assoc = new DeclAssociation();
+        assoc->kind = kind;
+        assoc->decl = associated;
         _getDeclAssociationList(original, moduleDecl->mapDeclToAssociatedDecls).add(assoc);
 
         m_associatedDeclListsBuilt = false;
         m_mapDeclToAssociatedDecls.Clear();
     }
 
-    List<DeclAssociation> const& SharedSemanticsContext::getAssociatedDeclsForDecl(Decl* decl)
+    List<RefPtr<DeclAssociation>> const& SharedSemanticsContext::getAssociatedDeclsForDecl(Decl* decl)
     {
         // This duplicates the exact same logic from `getCandidateExtensionsForTypeDecl`.
         // Consider refactoring them into the same framework.
@@ -6922,6 +6614,23 @@ namespace Slang
 
     FunctionDifferentiableLevel SharedSemanticsContext::getFuncDifferentiableLevel(FunctionDeclBase* func)
     {
+        return _getFuncDifferentiableLevelImpl(func, 1);
+    }
+
+    FunctionDifferentiableLevel SharedSemanticsContext::_getFuncDifferentiableLevelImpl(FunctionDeclBase* func, int recurseLimit)
+    {
+        if (recurseLimit > 0)
+        {
+            if (auto primalSubst = func->findModifier<PrimalSubstituteAttribute>())
+            {
+                if (auto declRefExpr = as<DeclRefExpr>(primalSubst->funcExpr))
+                {
+                    if (auto primalSubstFunc = declRefExpr->declRef.as<FunctionDeclBase>())
+                        return _getFuncDifferentiableLevelImpl(primalSubstFunc, recurseLimit - 1);
+                }
+            }
+        }
+
         if (func->findModifier<BackwardDifferentiableAttribute>())
             return FunctionDifferentiableLevel::Backward;
         if (func->findModifier<BackwardDerivativeAttribute>())
@@ -6933,12 +6642,18 @@ namespace Slang
 
         for (auto assocDecl : getAssociatedDeclsForDecl(func))
         {
-            switch (assocDecl.kind)
+            switch (assocDecl->kind)
             {
             case DeclAssociationKind::BackwardDerivativeFunc:
                 return FunctionDifferentiableLevel::Backward;
             case DeclAssociationKind::ForwardDerivativeFunc:
                 diffLevel = FunctionDifferentiableLevel::Forward;
+                break;
+            case DeclAssociationKind::PrimalSubstituteFunc:
+                if (auto assocFunc = as<FunctionDeclBase>(assocDecl->decl))
+                {
+                    return _getFuncDifferentiableLevelImpl(assocFunc, recurseLimit - 1);
+                }
                 break;
             default:
                 break;
@@ -7055,6 +6770,10 @@ namespace Slang
             SemanticsDeclDifferentialConformanceVisitor(shared).dispatch(decl);
             break;
 
+        case DeclCheckState::AttributesChecked:
+            SemanticsDeclAttributesVisitor(shared).dispatch(decl);
+            break;
+
         case DeclCheckState::Checked:
             SemanticsDeclBodyVisitor(shared).dispatch(decl);
             break;
@@ -7142,4 +6861,297 @@ namespace Slang
         return val;
     }
 
+
+    template<typename TDerivativeAttr>
+    void checkDerivativeAttributeImpl(
+        SemanticsVisitor* visitor,
+        TDerivativeAttr* attr,
+        const List<Expr*>& imaginaryArguments)
+    {
+        SemanticsContext::ExprLocalScope scope;
+        auto ctx = visitor->withExprLocalScope(&scope);
+        auto subVisitor = SemanticsVisitor(ctx);
+        auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
+        auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
+        auto resolved = subVisitor.ResolveInvoke(invokeExpr);
+        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+        {
+            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+            {
+                attr->funcExpr = calleeDeclRef;
+                return;
+            }
+        }
+        visitor->getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
+    }
+
+    template<typename TDerivativeAttr>
+    const char* getDerivativeAttrName() { SLANG_UNREACHABLE(""); }
+
+    template<>
+    const char* getDerivativeAttrName<ForwardDerivativeAttribute>()
+    {
+        return "ForwardDerivative";
+    }
+    template<>
+    const char* getDerivativeAttrName<BackwardDerivativeAttribute>()
+    {
+        return "BackwardDerivative";
+    }
+    template<>
+    const char* getDerivativeAttrName<PrimalSubstituteAttribute>()
+    {
+        return "PrimalSubstitute";
+    }
+
+    List<Expr*> getImaginaryArgsToFunc(ASTBuilder* astBuilder, FunctionDeclBase* func, SourceLoc loc)
+    {
+        List<Expr*> imaginaryArguments;
+        for (auto param : func->getParameters())
+        {
+            auto arg = astBuilder->create<VarExpr>();
+            arg->declRef.decl = param;
+            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
+            arg->type.type = param->getType();
+            arg->loc = loc;
+            imaginaryArguments.add(arg);
+        }
+        return imaginaryArguments;
+    }
+
+    List<Expr*> getImaginaryArgsToForwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
+    {
+        List<Expr*> imaginaryArguments;
+        for (auto param : originalFuncDecl->getParameters())
+        {
+            auto arg = visitor->getASTBuilder()->create<VarExpr>();
+            arg->declRef.decl = param;
+            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
+            arg->type.type = param->getType();
+            arg->loc = loc;
+            if (auto pairType = visitor->getDifferentialPairType(param->getType()))
+            {
+                arg->type.type = pairType;
+            }
+            imaginaryArguments.add(arg);
+        }
+        return imaginaryArguments;
+    }
+
+    List<Expr*> getImaginaryArgsToBackwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
+    {
+        List<Expr*> imaginaryArguments;
+        auto isOutParam = [&](ParamDecl* param)
+        {
+            return param->findModifier<OutModifier>() != nullptr && param->findModifier<InModifier>() == nullptr;
+        };
+
+        for (auto param : originalFuncDecl->getParameters())
+        {
+            auto arg = visitor->getASTBuilder()->create<VarExpr>();
+            arg->declRef.decl = param;
+            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
+            arg->type.type = param->getType();
+            arg->loc = loc;
+            if (auto pairType = as<DifferentialPairType>(visitor->getDifferentialPairType(param->getType())))
+            {
+                arg->type.type = pairType;
+                if (isOutParam(param))
+                {
+                    // out T -> in T.Differential
+                    arg->type.isLeftValue = false;
+                    arg->type.type = visitor->tryGetDifferentialType(
+                        visitor->getASTBuilder(), pairType->getPrimalType());
+                }
+            }
+            else
+            {
+                if (isOutParam(param))
+                {
+                    // Skip non-differentiable out params.
+                    continue;
+                }
+            }
+            imaginaryArguments.add(arg);
+        }
+        if (auto diffReturnType = visitor->tryGetDifferentialType(visitor->getASTBuilder(), originalFuncDecl->returnType.type))
+        {
+            auto arg = visitor->getASTBuilder()->create<InitializerListExpr>();
+            arg->type.isLeftValue = false;
+            arg->type.type = diffReturnType;
+            arg->loc = loc;
+            imaginaryArguments.add(arg);
+        }
+        return imaginaryArguments;
+    }
+
+    // This helper function is needed to workaround a gcc bug.
+    // Remove when we upgrade to a newer version of gcc.
+    template <typename T>
+    static T* _findModifier(Decl* decl)
+    {
+        return decl->findModifier<T>();
+    }
+
+    template <typename TDerivativeAttr, typename TDifferentiateExpr, typename TDerivativeOfAttr>
+    void checkDerivativeOfAttributeImpl(
+        SemanticsVisitor* visitor,
+        FunctionDeclBase* funcDecl,
+        TDerivativeOfAttr* derivativeOfAttr,
+        DeclAssociationKind assocKind)
+    {
+        DeclRef<Decl> calleeDeclRef;
+        DeclRefExpr* calleeDeclRefExpr = nullptr;
+        HigherOrderInvokeExpr* higherOrderFuncExpr = visitor->getASTBuilder()->create<TDifferentiateExpr>();
+        higherOrderFuncExpr->baseFunction = derivativeOfAttr->funcExpr;
+        higherOrderFuncExpr->loc = derivativeOfAttr->loc;
+        Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(higherOrderFuncExpr, *visitor);
+        if (!checkedHigherOrderFuncExpr)
+        {
+            visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
+            return;
+        }
+        List<Expr*> imaginaryArgs = getImaginaryArgsToFunc(visitor->getASTBuilder(), funcDecl, derivativeOfAttr->loc);
+        auto invokeExpr = visitor->constructUncheckedInvokeExpr(checkedHigherOrderFuncExpr, imaginaryArgs);
+        SemanticsContext::ExprLocalScope scope;
+        auto ctx = visitor->withExprLocalScope(&scope);
+        auto subVisitor = SemanticsVisitor(ctx);
+        auto resolved = subVisitor.ResolveInvoke(invokeExpr);
+        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+        {
+            auto resolvedFuncExpr = as<HigherOrderInvokeExpr>(resolvedInvoke->functionExpr);
+            if (resolvedFuncExpr)
+                calleeDeclRefExpr = as<DeclRefExpr>(resolvedFuncExpr->baseFunction);
+        }
+
+        if (!calleeDeclRefExpr)
+        {
+            visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
+            return;
+        }
+        calleeDeclRef = calleeDeclRefExpr->declRef;
+
+        auto calleeFunc = as<FunctionDeclBase>(calleeDeclRef.getDecl());
+        if (!calleeFunc)
+        {
+            visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
+            return;
+        }
+
+        if (auto existingModifier = _findModifier<TDerivativeAttr>(calleeFunc))
+        {
+            // The primal function already has a `[*Derivative]` attribute, this is invalid.
+            visitor->getSink()->diagnose(
+                derivativeOfAttr,
+                Diagnostics::declAlreadyHasAttribute,
+                calleeDeclRef,
+                getDerivativeAttrName<TDerivativeAttr>());
+            visitor->getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef.getDecl());
+        }
+
+        derivativeOfAttr->funcExpr = calleeDeclRefExpr;
+        auto derivativeAttr = visitor->getASTBuilder()->create<TDerivativeAttr>();
+        derivativeAttr->loc = derivativeOfAttr->loc;
+        auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
+        auto declRef =
+            DeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
+        auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, derivativeOfAttr->loc, nullptr);
+        declRefExpr->type.type = nullptr;
+        derivativeAttr->args.add(declRefExpr);
+        derivativeAttr->funcExpr = declRefExpr;
+        checkDerivativeAttribute(visitor, calleeFunc, derivativeAttr);
+        derivativeOfAttr->backDeclRef = derivativeAttr->funcExpr;
+        derivativeAttr->funcExpr = nullptr;
+        visitor->getShared()->registerAssociatedDecl(calleeDeclRef.getDecl(), assocKind, funcDecl);
+    }
+
+    static void checkDerivativeAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, ForwardDerivativeAttribute* attr)
+    {
+        if (!attr->funcExpr)
+            return;
+        if (attr->funcExpr->type.type)
+            return;
+
+        List<Expr*> imaginaryArguments = getImaginaryArgsToForwardDerivative(visitor, funcDecl, attr->loc);
+        checkDerivativeAttributeImpl(visitor, attr, imaginaryArguments);
+    }
+
+    static void checkDerivativeAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, BackwardDerivativeAttribute* attr)
+    {
+        if (!attr->funcExpr)
+            return;
+        if (attr->funcExpr->type.type)
+            return;
+
+        List<Expr*> imaginaryArguments = getImaginaryArgsToBackwardDerivative(visitor, funcDecl, attr->loc);
+        checkDerivativeAttributeImpl(visitor, attr, imaginaryArguments);
+    }
+
+    static void checkDerivativeAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, PrimalSubstituteAttribute* attr)
+    {
+        if (!attr->funcExpr)
+            return;
+        if (attr->funcExpr->type.type)
+            return;
+
+        List<Expr*> imaginaryArguments = getImaginaryArgsToFunc(visitor->getASTBuilder(), funcDecl, attr->loc);
+        checkDerivativeAttributeImpl(visitor, attr, imaginaryArguments);
+    }
+
+    template<typename TDerivativeAttr, typename TDerivativeOfAttr>
+    bool tryCheckDerivativeOfAttributeImpl(
+        SemanticsVisitor* visitor,
+        FunctionDeclBase* funcDecl,
+        TDerivativeOfAttr* derivativeOfAttr,
+        DeclAssociationKind assocKind,
+        const List<Expr*>& imaginaryArgsToOriginal)
+    {
+        DiagnosticSink tempSink(visitor->getSourceManager(), nullptr);
+        SemanticsVisitor subVisitor(visitor->withSink(&tempSink));
+        checkDerivativeOfAttributeImpl<TDerivativeAttr>(
+            &subVisitor,
+            funcDecl,
+            derivativeOfAttr,
+            assocKind,
+            imaginaryArgsToOriginal);
+        return tempSink.getErrorCount() == 0;
+    }
+
+    void SemanticsDeclAttributesVisitor::checkForwardDerivativeOfAttribute(FunctionDeclBase* funcDecl, ForwardDerivativeOfAttribute* attr)
+    {
+        checkDerivativeOfAttributeImpl<ForwardDerivativeAttribute, ForwardDifferentiateExpr>(
+            this, funcDecl, attr, DeclAssociationKind::ForwardDerivativeFunc);
+    }
+
+    void SemanticsDeclAttributesVisitor::checkBackwardDerivativeOfAttribute(FunctionDeclBase* funcDecl, BackwardDerivativeOfAttribute* attr)
+    {
+        checkDerivativeOfAttributeImpl<BackwardDerivativeAttribute, BackwardDifferentiateExpr>(
+            this, funcDecl, attr, DeclAssociationKind::BackwardDerivativeFunc);
+    }
+
+    void SemanticsDeclAttributesVisitor::checkPrimalSubstituteOfAttribute(FunctionDeclBase* funcDecl, PrimalSubstituteOfAttribute* attr)
+    {
+        checkDerivativeOfAttributeImpl<PrimalSubstituteAttribute, PrimalSubstituteExpr>(
+            this, funcDecl, attr, DeclAssociationKind::PrimalSubstituteFunc);
+    }
+
+    void SemanticsDeclAttributesVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
+    {
+        // Run checking on attributes that can't be fully checked in header checking stage.
+        for (auto attr : decl->modifiers)
+        {
+            if (auto fwdDerivativeOfAttr = as<ForwardDerivativeOfAttribute>(attr))
+                checkForwardDerivativeOfAttribute(decl, fwdDerivativeOfAttr);
+            else if (auto bwdDerivativeOfAttr = as<BackwardDerivativeOfAttribute>(attr))
+                checkBackwardDerivativeOfAttribute(decl, bwdDerivativeOfAttr);
+            else if (auto primalOfAttr = as<PrimalSubstituteOfAttribute>(attr))
+                checkPrimalSubstituteOfAttribute(decl, primalOfAttr);
+            else if (auto fwdDerivativeAttr = as<ForwardDerivativeAttribute>(attr))
+                checkDerivativeAttribute(this, decl, fwdDerivativeAttr);
+            else if (auto bwdDerivativeAttr = as<BackwardDerivativeAttribute>(attr))
+                checkDerivativeAttribute(this, decl, bwdDerivativeAttr);
+            else if (auto primalAttr = as<PrimalSubstituteAttribute>(attr))
+                checkDerivativeAttribute(this, decl, primalAttr);
+        }
+    }
 }

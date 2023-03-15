@@ -39,12 +39,17 @@ public:
         return false;
     }
 
-
     bool _isDifferentiableFuncImpl(IRInst* func, DifferentiableLevel level)
     {
         func = getResolvedInstForDecorations(func);
         if (!func)
             return false;
+        if (auto substDecor = func->findDecoration<IRPrimalSubstituteDecoration>())
+        {
+            func = getResolvedInstForDecorations(substDecor->getPrimalSubstituteFunc());
+            if (!func)
+                return false;
+        }
 
         for (auto decorations : func->getDecorations())
         {
@@ -68,23 +73,26 @@ public:
 
     bool isDifferentiableFunc(IRInst* func, DifferentiableLevel level)
     {
-        if (level == DifferentiableLevel::Forward)
+        switch (func->getOp())
         {
-            switch (func->getOp())
-            {
-            case kIROp_ForwardDifferentiate:
-            case kIROp_BackwardDifferentiate:
-                return true;
-            default:
-                break;
-            }
+        case kIROp_ForwardDifferentiate:
+        case kIROp_BackwardDifferentiate:
+            return isDifferentiableFunc(func->getOperand(0), level);
+        default:
+            break;
         }
 
         func = getResolvedInstForDecorations(func);
         if (!func)
             return false;
 
-        
+        if (auto substDecor = func->findDecoration<IRPrimalSubstituteDecoration>())
+        {
+            func = getResolvedInstForDecorations(substDecor->getPrimalSubstituteFunc());
+            if (!func)
+                return false;
+        }
+
         if (auto existingLevel = differentiableFunctions.TryGetValue(func))
             return *existingLevel >= level;
 

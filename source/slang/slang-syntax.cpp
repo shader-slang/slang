@@ -1232,6 +1232,25 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     }
                     break;
                     }
+
+                    // Hard code implementation of T.Differential.Differential == T.Differential rule.
+                    if (auto builtinReq = substDeclRef.getDecl()->findModifier<BuiltinRequirementModifier>())
+                    {
+                        if (builtinReq->kind == BuiltinRequirementKind::DifferentialType)
+                        {
+                            // Is the concrete type a Differential associated type?
+                            if (auto innerDeclRefType = as<DeclRefType>(thisSubst->witness->sub))
+                            {
+                                if (auto innerBuiltinReq = innerDeclRefType->declRef.decl->findModifier<BuiltinRequirementModifier>())
+                                {
+                                    if (innerBuiltinReq->kind == BuiltinRequirementKind::DifferentialType)
+                                    {
+                                        return innerDeclRefType;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
