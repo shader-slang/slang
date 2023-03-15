@@ -574,19 +574,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                 }
                 instsToRemove.add(inst);
             }
-            else if (auto primalCtx = inst->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
-            {
-                if (inst->getOp() == kIROp_Call)
-                {
-                    // The primal calls should be marked as no side effect so they can be DCE'd if possible.
-                    // We can only do so if the intermediate context of the callee is stored.
-                    if (primalCtx->getBackwardDerivativePrimalContextVar()
-                            ->findDecoration<IRPrimalValueStructKeyDecoration>())
-                    {
-                        builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
-                    }
-                }
-            }
         }
     }
 
