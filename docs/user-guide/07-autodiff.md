@@ -156,8 +156,8 @@ In addition, a differentiable type must define the `zero` value of its derivativ
 
 ### Builtin Differentiable Types
 The following builtin types are differentiable: 
-- Scalars: `float`, `half`.
-- Vector/Matrix: `vector` and `matrix` of `float` and `half` types.
+- Scalars: `float`, `double` and `half`.
+- Vector/Matrix: `vector` and `matrix` of `float`, `double` and `half` types.
 - Arrays: `T[n]` is differentiable if `T` is differentiable.
 
 ### User Defined Differentiable Types
