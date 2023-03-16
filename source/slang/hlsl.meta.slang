@@ -2274,10 +2274,9 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
 __generic<T : __BuiltinType>
 [__readNone]
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl, "$0[$1]")
+__target_intrinsic(GL_NV_fragment_shader_barycentric, "$0[$1]")
+__target_intrinsic(GL_EXT_fragment_shader_barycentric, "$0[$1]")
 __glsl_version(450)
-__glsl_extension(GL_NV_fragment_shader_barycentric)
-__glsl_extension(GL_EXT_fragment_shader_barycentric)
 T GetAttributeAtVertex(T attribute, uint vertexIndex);
 
 /// Get the value of a vertex attribute at a specific vertex.
@@ -2297,10 +2296,9 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex);
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl, "$0[$1]")
+__target_intrinsic(GL_NV_fragment_shader_barycentric, "$0[$1]")
+__target_intrinsic(GL_EXT_fragment_shader_barycentric, "$0[$1]")
 __glsl_version(450)
-__glsl_extension(GL_NV_fragment_shader_barycentric)
-__glsl_extension(GL_EXT_fragment_shader_barycentric)
 vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex);
 
 /// Get the value of a vertex attribute at a specific vertex.
@@ -2320,10 +2318,9 @@ vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex);
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl, "$0[$1]")
+__target_intrinsic(GL_NV_fragment_shader_barycentric, "$0[$1]")
+__target_intrinsic(GL_EXT_fragment_shader_barycentric, "$0[$1]")
 __glsl_version(450)
-__glsl_extension(GL_NV_fragment_shader_barycentric)
-__glsl_extension(GL_EXT_fragment_shader_barycentric)
 matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex);
 
 
