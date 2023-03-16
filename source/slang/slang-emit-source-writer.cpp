@@ -363,7 +363,7 @@ void SourceWriter::_updateSourceMap(const HumaneSourceLoc& sourceLocation)
     _calcLocation(generatedLineIndex, generatedColumnIndex);
 
     // Advance to the current output line
-    m_sourceMap->advanceToLine(generatedColumnIndex);
+    m_sourceMap->advanceToLine(generatedLineIndex);
 
     // Add the entry into the map, mapping back to the original source
     SourceMap::Entry entry;
@@ -567,6 +567,10 @@ void SourceWriter::_calcLocation(Index& outLineIndex, Index& outColumnIndex)
 
     // Set the current offset is the end
     m_currentOutputOffset = m_builder.getLength();
+
+    // Output the values
+    outLineIndex = m_currentLineIndex;
+    outColumnIndex = m_currentColumnIndex;
 }
 
 } // namespace Slang

@@ -201,26 +201,26 @@ void SourceMap::clear()
 
 void SourceMap::advanceToLine(Index nextLineIndex)
 {
-    const Count lineIndex = getGeneratedLineCount();
+    const Count currentLineIndex = getGeneratedLineCount();
 
-    SLANG_ASSERT(nextLineIndex >= lineIndex);
+    SLANG_ASSERT(nextLineIndex >= currentLineIndex);
     
-    if (lineIndex <= nextLineIndex)
+    if (nextLineIndex <= currentLineIndex)
     {
         return;
     }
 
-    const auto lastEntry = m_lineEntries.getCount();
+    const auto lastEntryIndex = m_lineEntries.getCount();
 
     // For all the new entries they will need to point to the end 
     m_lineStarts.setCount(nextLineIndex + 1);
 
-    Index* starts = m_lineStarts.getBuffer() + lineIndex;
-    const Count startsCount = nextLineIndex + 1 - lineIndex;
+    Index* starts = m_lineStarts.getBuffer() + currentLineIndex;
+    const Count startsCount = nextLineIndex + 1 - currentLineIndex;
 
     for (Index i = 0; i < startsCount; ++i)
     {
-        starts[i] = lastEntry;
+        starts[i] = lastEntryIndex;
     }
 }
 

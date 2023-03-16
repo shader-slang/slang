@@ -938,7 +938,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     RefPtr<SourceMap> sourceMap;
 
     // If SourceMap is enabled, we create one and associate it with the sourceWriter
-    if (targetRequest->getTargetFlags() & SLANG_TARGET_FLAG_EMIT_SOURCE_MAP)
+    if (targetRequest->getLinkage()->m_generateSourceMap)
     {
         sourceMap = new SourceMap;
     }
@@ -1102,6 +1102,34 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     if (metadata)
     {
         artifact->addAssociated(metadata);
+    }
+
+    if (sourceMap)
+    {
+        SourceManager sourceMapSourceManager;
+        sourceMapSourceManager.initialize(nullptr, nullptr);
+
+        // Create a sink
+        DiagnosticSink sourceMapSink(&sourceMapSourceManager, nullptr);
+
+        // Turn into JSON
+        RefPtr<JSONContainer> jsonContainer(new JSONContainer(&sourceMapSourceManager));
+
+        JSONValue jsonValue;
+        SLANG_RETURN_ON_FAIL(sourceMap->encode(jsonContainer, &sourceMapSink, jsonValue));
+
+        // Okay now convert this into a text file and then a blob
+
+        // Convert into a string
+        JSONWriter writer(JSONWriter::IndentationStyle::KNR);
+        jsonContainer->traverseRecursively(jsonValue, &writer);
+
+        auto sourceMapBlob = StringBlob::moveCreate(writer.getBuilder());
+
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Text, ArtifactPayload::SourceMap, ArtifactStyle::None));
+        sourceMapArtifact->addRepresentationUnknown(sourceMapBlob);
+
+        artifact->addAssociated(sourceMapArtifact);
     }
 
     outArtifact.swap(artifact);

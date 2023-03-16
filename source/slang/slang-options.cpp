@@ -1179,7 +1179,7 @@ struct OptionsParser
                 }
                 else if(argValue == "-source-map")
                 {
-                    getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_EMIT_SOURCE_MAP;
+                    requestImpl->getLinkage()->m_generateSourceMap = true;
                 }
                 else if (argValue == "-ir-compression")
                 {

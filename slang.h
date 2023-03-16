@@ -664,9 +664,6 @@ extern "C"
 
         /* When set, will generate SPIRV directly instead of going through glslang. */
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
-
-        /* If set will generate a source map for an emit */
-        SLANG_TARGET_FLAG_EMIT_SOURCE_MAP = 1 << 11,
     };
 
     /*!
