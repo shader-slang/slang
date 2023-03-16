@@ -448,6 +448,7 @@ GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
 
 GLSLSystemValueInfo* getGLSLSystemValueInfo(
     GLSLLegalizationContext*    context,
+    CodeGenContext*             codeGenContext,
     IRVarLayout*                varLayout,
     LayoutResourceKind          kind,
     Stage                       stage,
@@ -843,9 +844,16 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "sv_barycentrics")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
-
-        name = "gl_BaryCoordNV";
+        if (codeGenContext->getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric))
+        {
+            context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
+            name = "gl_BaryCoordNV";
+        }
+        else
+        {
+            context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
+            name = "gl_BaryCoordEXT";
+        }
 
         // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
         // we ought to use if the `noperspective` modifier has been
@@ -874,6 +882,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
 ScalarizedVal createSimpleGLSLGlobalVarying(
     GLSLLegalizationContext*    context,
+    CodeGenContext*             codeGenContext,
     IRBuilder*                  builder,
     IRType*                     inType,
     IRVarLayout*                inVarLayout,
@@ -889,6 +898,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     GLSLSystemValueInfo systemValueInfoStorage;
     auto systemValueInfo = getGLSLSystemValueInfo(
         context,
+        codeGenContext,
         inVarLayout,
         kind,
         stage,
@@ -1040,6 +1050,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
 ScalarizedVal createGLSLGlobalVaryingsImpl(
     GLSLLegalizationContext*    context,
+    CodeGenContext*             codeGenContext,
     IRBuilder*                  builder,
     IRType*                     type,
     IRVarLayout*                varLayout,
@@ -1059,12 +1070,14 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     {
         return createSimpleGLSLGlobalVarying(
             context,
+            codeGenContext,
             builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
     }
     else if( as<IRVectorType>(type) )
     {
         return createSimpleGLSLGlobalVarying(
             context,
+            codeGenContext,
             builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
     }
     else if( as<IRMatrixType>(type) )
@@ -1072,6 +1085,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         // TODO: a matrix-type varying should probably be handled like an array of rows
         return createSimpleGLSLGlobalVarying(
             context,
+            codeGenContext,
             builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
     }
     else if( auto arrayType = as<IRArrayType>(type) )
@@ -1091,6 +1105,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
         return createGLSLGlobalVaryingsImpl(
             context,
+            codeGenContext,
             builder,
             elementType,
             varLayout,
@@ -1133,6 +1148,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
         return createGLSLGlobalVaryingsImpl(
             context,
+            codeGenContext,
             builder,
             elementType,
             varLayout,
@@ -1153,6 +1169,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
         return createGLSLGlobalVaryingsImpl(
             context,
+            codeGenContext,
             builder,
             elementType,
             varLayout,
@@ -1214,6 +1231,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
             auto fieldVal = createGLSLGlobalVaryingsImpl(
                 context,
+                codeGenContext,
                 builder,
                 field->getFieldType(),
                 fieldLayout,
@@ -1240,11 +1258,13 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     // Default case is to fall back on the simple behavior
     return createSimpleGLSLGlobalVarying(
         context,
+        codeGenContext,
         builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
 }
 
 ScalarizedVal createGLSLGlobalVaryings(
     GLSLLegalizationContext*    context,
+    CodeGenContext*             codeGenContext,
     IRBuilder*                  builder,
     IRType*                     type,
     IRVarLayout*                layout,
@@ -1261,6 +1281,7 @@ ScalarizedVal createGLSLGlobalVaryings(
     }
     return createGLSLGlobalVaryingsImpl(
         context,
+        codeGenContext,
         builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr, leafVar);
 }
 
@@ -1722,6 +1743,7 @@ void legalizeMeshOutputParam(
 
     auto globalOutputVal = createGLSLGlobalVaryings(
         context,
+        codeGenContext,
         builder,
         meshOutputType,
         paramLayout,
@@ -2140,6 +2162,7 @@ void legalizeEntryPointParameterForGLSL(
 
             auto globalOutputVal = createGLSLGlobalVaryings(
                 context,
+                codeGenContext,
                 builder,
                 valueType,
                 paramLayout,
@@ -2305,6 +2328,7 @@ void legalizeEntryPointParameterForGLSL(
             // side and one for the `out` side.
             auto globalInputVal = createGLSLGlobalVaryings(
                 context,
+                codeGenContext,
                 builder, valueType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
 
             assign(builder, localVal, globalInputVal);
@@ -2320,6 +2344,7 @@ void legalizeEntryPointParameterForGLSL(
         // when the function is done. We create them here.
         auto globalOutputVal = createGLSLGlobalVaryings(
                 context,
+                codeGenContext,
                 builder, valueType, paramLayout, LayoutResourceKind::VaryingOutput, stage, pp);
 
         // Now we need to iterate over all the blocks in the function looking
@@ -2361,6 +2386,7 @@ void legalizeEntryPointParameterForGLSL(
 
         auto globalValue = createGLSLGlobalVaryings(
             context,
+            codeGenContext,
             builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
 
         // Next we need to replace uses of the parameter with
@@ -2455,6 +2481,7 @@ void legalizeEntryPointForGLSL(
 
         auto resultGlobal = createGLSLGlobalVaryings(
             &context,
+            codeGenContext,
             &builder,
             resultType,
             entryPointLayout->getResultLayout(),
