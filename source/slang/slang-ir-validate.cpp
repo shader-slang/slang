@@ -331,6 +331,16 @@ namespace Slang
         }
     }
 
+    void validateIRInst(IRInst* inst)
+    {
+        IRValidateContext contextStorage;
+        IRValidateContext* context = &contextStorage;
+        DiagnosticSink sink;
+        context->module = inst->getModule();
+        context->sink = &sink;
+        validateIRInst(context, inst);
+    }
+
     void validateIRModule(IRModule* module, DiagnosticSink* sink)
     {
         IRValidateContext contextStorage;

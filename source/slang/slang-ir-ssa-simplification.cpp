@@ -11,6 +11,8 @@
 #include "slang-ir-remove-unused-generic-param.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-propagate-func-properties.h"
+#include "slang-ir-validate.h"
+#include "slang-ir-clone.h"
 
 namespace Slang
 {

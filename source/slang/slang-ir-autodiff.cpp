@@ -559,6 +559,9 @@ void stripNoDiffTypeAttribute(IRModule* module)
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst)
 {
+    if (!typeInst)
+        return false;
+
     if (context.isDifferentiableType((IRType*)typeInst))
         return true;
     // Look for equivalent types.

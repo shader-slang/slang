@@ -1,6 +1,7 @@
 #include "slang-ir-peephole.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-dominators.h"
 
 namespace Slang
 {
@@ -289,6 +290,9 @@ struct PeepholeContext : InstPassBase
         }
         return false;
     }
+
+    RefPtr<IRDominatorTree> domTree;
+    IRGlobalValueWithCode* domTreeFunc = nullptr;
 
     void processInst(IRInst* inst)
     {
@@ -679,9 +683,23 @@ struct PeepholeContext : InstPassBase
                 {
                     if (inst->hasUses())
                     {
-                        inst->replaceUsesWith(argValue);
-                        // Never remove param inst.
-                        changed = true;
+                        // We can replace only if argVal dominates inst.
+                        auto parentFunc = getParentFunc(inst);
+                        if (!parentFunc)
+                            break;
+                        if (domTreeFunc != parentFunc)
+                        {
+                            domTree = computeDominatorTree(parentFunc);
+                            domTreeFunc = parentFunc;
+                        }
+                        if (!domTree)
+                            break;
+                        if (domTree->dominates(argValue, inst))
+                        {
+                            inst->replaceUsesWith(argValue);
+                            // Never remove param inst.
+                            changed = true;
+                        }
                     }
                 }
             }
@@ -694,7 +712,6 @@ struct PeepholeContext : InstPassBase
     bool processFunc(IRInst* func)
     {
         bool result = false;
-
         for (;;)
         {
             changed = false;

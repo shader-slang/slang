@@ -467,6 +467,8 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     ParameterBlockTransposeInfo& paramInfo,
     IRInst*& intermediateType)
 {
+    validateIRInst(func);
+
     IRBuilder builder(autodiffContext->moduleInst);
     builder.setInsertBefore(func);
 
@@ -474,6 +476,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     subEnv.squashChildrenMapping = true;
     subEnv.parent = &cloneEnv;
     auto clonedFunc = as<IRFunc>(cloneInst(&subEnv, &builder, func));
+    validateIRInst(clonedFunc);
 
     auto clonedPrimalsInfo = primalsInfo->applyMap(&subEnv);
 
