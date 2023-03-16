@@ -67,6 +67,8 @@ protected:
 
     void _maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringSlice name);
 
+    bool _maybeEmitInterpolationModifierText(IRInterpolationMode mode, Stage stage, bool isInput);
+
     void _requireGLSLExtension(const UnownedStringSlice& name);
 
     void _requireGLSLVersion(ProfileVersion version);
@@ -107,6 +109,8 @@ protected:
     bool _tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& boolOp, const EmitOpInfo& inOuterPrec);
 
     void _requireRayTracing();
+
+    void _requireFragmentShaderBarycentric();
 
     void _emitSpecialFloatImpl(IRType* type, const char* valueExpr);
 
