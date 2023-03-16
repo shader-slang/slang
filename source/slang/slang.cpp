@@ -2277,7 +2277,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
         if (shouldDumpAST)
         {
             StringBuilder buf;
-            SourceWriter writer(linkage->getSourceManager(), LineDirectiveMode::None);
+            SourceWriter writer(linkage->getSourceManager(), LineDirectiveMode::None, nullptr);
 
             ASTDumpUtil::dump(translationUnit->getModuleDecl(), ASTDumpUtil::Style::Flat, 0, &writer);
 

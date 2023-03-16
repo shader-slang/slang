@@ -935,7 +935,15 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         lineDirectiveMode = LineDirectiveMode::GLSL;
     }
 
-    SourceWriter sourceWriter(sourceManager, lineDirectiveMode );
+    RefPtr<SourceMap> sourceMap;
+
+    // If SourceMap is enabled, we create one and associate it with the sourceWriter
+    if (targetRequest->getTargetFlags() & SLANG_TARGET_FLAG_EMIT_SOURCE_MAP)
+    {
+        sourceMap = new SourceMap;
+    }
+
+    SourceWriter sourceWriter(sourceManager, lineDirectiveMode, sourceMap );
 
     CLikeSourceEmitter::Desc desc;
 

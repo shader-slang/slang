@@ -15,10 +15,19 @@
 
 namespace Slang {
 
-struct SourceMap
+struct SourceMap : public RefObject
 {
     struct Entry
     {
+        void init()
+        {
+            generatedColumn = 0;
+            sourceFileIndex = 0;
+            sourceLine = 0;
+            sourceColumn = 0;
+            nameIndex = 0;
+        }
+
         // Note! All column/line are zero indexed
         Index generatedColumn;          ///< The generated column
         Index sourceFileIndex;          ///< The index into the source name/contents
@@ -38,6 +47,20 @@ struct SourceMap
         /// Get the entries on the line
     SLANG_FORCE_INLINE ConstArrayView<Entry> getEntriesForLine(Index generatedLine) const;
     
+        /// Advance to the specified line index. 
+        /// It is an error to specify a line *before* the current line. It should either be the current 
+        /// output line or a later output line. Interveining lines will be set as empty
+    void advanceToLine(Index lineIndex);
+
+        /// Add an entry to the current line
+    void addEntry(const Entry& entry);
+
+        /// Given the slice returns the index
+    Index getSourceFileIndex(const UnownedStringSlice& slice);
+
+        /// Get the name index
+    Index getNameIndex(const UnownedStringSlice& slice);
+
         /// Clear the contents of the source map
     void clear();
 

@@ -199,6 +199,86 @@ void SourceMap::clear()
     m_slicePool.clear();
 }
 
+void SourceMap::advanceToLine(Index nextLineIndex)
+{
+    const Count lineIndex = getGeneratedLineCount();
+
+    SLANG_ASSERT(nextLineIndex >= lineIndex);
+    
+    if (lineIndex <= nextLineIndex)
+    {
+        return;
+    }
+
+    const auto lastEntry = m_lineEntries.getCount();
+
+    // For all the new entries they will need to point to the end 
+    m_lineStarts.setCount(nextLineIndex + 1);
+
+    Index* starts = m_lineStarts.getBuffer() + lineIndex;
+    const Count startsCount = nextLineIndex + 1 - lineIndex;
+
+    for (Index i = 0; i < startsCount; ++i)
+    {
+        starts[i] = lastEntry;
+    }
+}
+
+void SourceMap::addEntry(const Entry& entry)
+{
+    m_lineEntries.add(entry);
+    ++m_lineStarts.getLast();
+
+    // Check things seem normal...
+    SLANG_ASSERT(m_lineStarts.getLast() == m_lineEntries.getCount());
+}
+
+Index SourceMap::getNameIndex(const UnownedStringSlice& slice)
+{
+    StringSlicePool::Handle handle;
+
+    if (!m_slicePool.findOrAdd(slice, handle))
+    {
+        // We know it can't possibly be used, so must be new (!)
+
+        m_names.add(handle);
+        return m_names.getCount() - 1;
+    }
+
+    // Okay, could already be in the list
+    const auto index = m_names.indexOf(handle);
+    if (index >= 0)
+    {
+        return index;
+    }
+
+    m_names.add(handle);
+    return m_names.getCount() - 1;
+}
+
+Index SourceMap::getSourceFileIndex(const UnownedStringSlice& slice)
+{
+    StringSlicePool::Handle handle;
+
+    if (!m_slicePool.findOrAdd(slice, handle))
+    {
+        // We know it can't possibly be used, so must be new (!)
+
+        m_sources.add(handle);
+        return m_sources.getCount() - 1;
+    }
+
+    // Okay, could already be in the list
+    const auto index = m_sources.indexOf(handle);
+    if (index >= 0)
+    {
+        return index;
+    }
+
+    m_sources.add(handle);
+    return m_sources.getCount() - 1;
+}
+
 SlangResult SourceMap::decode(JSONContainer* container, JSONValue root, DiagnosticSink* sink)
 {
     clear();
