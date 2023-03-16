@@ -308,6 +308,7 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
     // differentiated, don't differentiate the inst
     // 
     auto primalConstructType = (IRType*)findOrTranscribePrimalInst(builder, origConstruct->getDataType());
+    // TODO: Need to update this to generate derivatives on a per-key basis
     if (auto diffConstructType = differentiateType(builder, primalConstructType))
     {
         UCount operandCount = origConstruct->getOperandCount();
