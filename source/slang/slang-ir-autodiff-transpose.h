@@ -690,6 +690,9 @@ struct DiffTransposePass
 
         // Mark all primal operands for hoisting.
         // TODO: Can we just merge this with finishHoistingPrimalInsts?
+        // TODO: Some of this logic is replicated in finishHoistingPrimalInsts. Merge it with the
+        // maybeAddOperandsToWorkList logic there.
+        // 
         for (auto block : workList)
         {
             IRBlock* revBlock = revBlockMap[block];
@@ -706,6 +709,10 @@ struct DiffTransposePass
                     if (auto loopExitDecoration = as<IRLoopExitPrimalValueDecoration>(decoration))
                         hoistPrimalUse(&builder, &loopExitDecoration->exitVal);
                 }
+
+                if (auto instType = child->getDataType())
+                    if (!as<IRModuleInst>(instType->getParent()))
+                        hoistPrimalUse(&builder, &child->typeUse);
             }
         }
 
@@ -1610,7 +1617,7 @@ struct DiffTransposePass
 
             if (!doesInstRequireHoisting(inst))
                 continue;
-
+                
             // Move this inst to after it's diff uses.
             // 
             {

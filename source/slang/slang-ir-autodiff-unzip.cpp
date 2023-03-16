@@ -591,7 +591,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                     if (primalCtx->getBackwardDerivativePrimalContextVar()
                             ->findDecoration<IRPrimalValueStructKeyDecoration>())
                     {
-                        builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
+                        //builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
                     }
                 }
             }

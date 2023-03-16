@@ -905,7 +905,7 @@ struct AutoDiffPass : public InstPassBase
             else
             {
                 IntermediateContextTypeDifferentialInfo diffFieldTypeInfo;
-                diffTypes.TryGetValue(field->getDataType(), diffFieldTypeInfo);
+                diffTypes.TryGetValue(field->getFieldType(), diffFieldTypeInfo);
                 diffFieldWitness = diffFieldTypeInfo.diffWitness;
             }
             if (diffFieldWitness)

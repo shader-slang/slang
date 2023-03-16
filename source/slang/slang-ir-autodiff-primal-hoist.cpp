@@ -648,11 +648,23 @@ HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
     // 
     if (auto var = as<IRVar>(use->get()))
     {
-        return HoistResult::store(use->get());
+        if (auto spec = as<IRSpecialize>(as<IRPtrTypeBase>(var->getDataType())->getValueType()))
+        {
+            for (UInt i = 0; i < spec->getArgCount(); i++)
+            {
+                if (!canTypeBeStored(spec->getArg(i)->getDataType()))
+                    return HoistResult::recompute(use->get());
+            }
+            return HoistResult::store(use->get());    
+        }
+        else // if (canTypeBeStored(as<IRPtrTypeBase>(var->getDataType())->getValueType()));
+        {
+            return HoistResult::store(use->get());
+        }
     }
     else
     {
-        if (canInstBeStored(use->get()))
+        if (canTypeBeStored(use->get()->getDataType()))
             return HoistResult::store(use->get());
         else
             return HoistResult::recompute(use->get());
