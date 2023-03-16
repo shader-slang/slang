@@ -9,6 +9,8 @@
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-propagate.h"
 #include "slang-ir-autodiff-transcriber-base.h"
+#include "slang-ir-autodiff-region.h"
+#include "slang-ir-autodiff-primal-hoist.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-ssa.h"
 
@@ -36,170 +38,9 @@ struct DiffUnzipPass
     // might run into an issue here?
     IRBlock*                                firstDiffBlock;
 
-    struct IndexedRegion : public RefObject
-    {
-        IRLoop* loop;
-        IndexedRegion* parent;
-
-        IndexedRegion(IRLoop* loop, IndexedRegion* parent) : loop(loop), parent(parent)
-        { }
-
-        IRBlock* getInitializerBlock() { return as<IRBlock>(loop->getParent()); }
-        IRBlock* getConditionBlock() 
-        {
-            auto condBlock = as<IRBlock>(loop->getTargetBlock());
-            SLANG_RELEASE_ASSERT(as<IRIfElse>(condBlock->getTerminator()));
-            return condBlock;
-        }
-
-        IRBlock* getBreakBlock() { return loop->getBreakBlock(); }
-
-        IRBlock* getUpdateBlock() 
-        { 
-            auto initBlock = getInitializerBlock();
-
-            auto condBlock = getConditionBlock();
-
-            IRBlock* lastLoopBlock = nullptr;
-
-            for (auto predecessor : condBlock->getPredecessors())
-            {
-                if (predecessor != initBlock)
-                    lastLoopBlock = predecessor;
-            }
-
-            // Should find atleast one predecessor that is _not_ the 
-            // init block (that contains the loop info). This 
-            // predecessor would be the last block in the loop
-            // before looping back to the condition.
-            // 
-            SLANG_RELEASE_ASSERT(lastLoopBlock);
-
-            return lastLoopBlock;
-        }
-    };
-
-    
-    struct IndexedRegionMap : public RefObject
-    {
-        Dictionary<IRBlock*, IndexedRegion*> map;
-        List<RefPtr<IndexedRegion>> regions;
-
-        IndexedRegion* newRegion(IRLoop* loop, IndexedRegion* parent)
-        {
-            auto region = new IndexedRegion(loop, parent);
-            regions.add(region);
-
-            return region;
-        }
-
-        void mapBlock(IRBlock* block, IndexedRegion* region)
-        {
-            map.Add(block, region);
-        }
-
-        bool hasMapping(IRBlock* block)
-        {
-            return map.ContainsKey(block);
-        }
-
-        IndexedRegion* getRegion(IRBlock* block)
-        {
-            return map[block];
-        }
-
-        List<IndexedRegion*> getAllAncestorRegions(IRBlock* block)
-        {
-            List<IndexedRegion*> regionList;
-
-            IndexedRegion* region = getRegion(block);
-            for (; region; region = region->parent)
-                regionList.add(region);
-
-            return regionList;
-        }
-    };
-
-    RefPtr<IndexedRegionMap> buildIndexedRegionMap(IRGlobalValueWithCode* func)
-    {
-        RefPtr<IndexedRegionMap> regionMap = new IndexedRegionMap;
-
-        List<IRBlock*> workList;
-        
-        regionMap->mapBlock(func->getFirstBlock(), nullptr);
-        workList.add(func->getFirstBlock());
-
-        while (workList.getCount() > 0)
-        {
-            auto currentBlock = workList.getLast();
-            workList.removeLast();
-
-            auto terminator = currentBlock->getTerminator();
-            auto currentRegion = regionMap->getRegion(currentBlock);
-
-            switch (terminator->getOp())
-            {
-                case kIROp_loop:
-                {
-                    auto loopRegion = regionMap->newRegion(as<IRLoop>(terminator), currentRegion);
-                    auto condBlock = as<IRLoop>(terminator)->getTargetBlock();
-
-                    regionMap->mapBlock(condBlock, loopRegion);
-                    workList.add(condBlock);
-                                    
-                    auto ifElse = as<IRIfElse>(condBlock->getTerminator());
-                    SLANG_RELEASE_ASSERT(ifElse);
-
-                    // TODO: this is one of the places we'll need to change if we support loops that
-                    // loop on either the true or false side. For now, we assume the loop is on the
-                    // true side only.
-                    //
-                    regionMap->mapBlock(ifElse->getFalseBlock(), currentRegion);
-                    workList.add(ifElse->getFalseBlock());
-                }
-            }
-
-            for (auto successor : currentBlock->getSuccessors())
-            {   
-                // If already mapped, skip.
-                if (regionMap->hasMapping(successor))
-                    continue;
-                regionMap->mapBlock(successor, currentRegion);
-                workList.add(successor);
-            }
-        }
-        
-        return regionMap;
-    }
-
-
     RefPtr<IndexedRegionMap>                      indexRegionMap;
 
-    struct IndexTrackingInfo : public RefObject
-    {
-        // After lowering, store references to the count
-        // variables associated with this region
-        //
-        IRInst*         primalCountParam   = nullptr;
-        IRInst*         diffCountParam     = nullptr;
-
-        IRVar*          primalCountLastVar   = nullptr;
-
-        enum CountStatus
-        {
-            Unresolved,
-            Dynamic,
-            Static
-        };
-
-        CountStatus    status           = CountStatus::Unresolved;
-
-        // Inferred maximum number of iterations.
-        Count          maxIters         = -1;
-    };
-
     Dictionary<IndexedRegion*, RefPtr<IndexTrackingInfo>> indexInfoMap;
-
 
     DiffUnzipPass(
         AutoDiffSharedContext* autodiffContext)
@@ -217,7 +58,7 @@ struct DiffUnzipPass
         return diffMap[inst];
     }
 
-    void unzipDiffInsts(IRFunc* func)
+    RefPtr<HoistedPrimalsInfo> unzipDiffInsts(IRFunc* func)
     {
         diffTypeContext.setFunc(func);
         
@@ -316,7 +157,12 @@ struct DiffUnzipPass
         // Emit counter variables and other supporting
         // instructions for all regions.
         // 
-        lowerIndexedRegions();
+        // TODO: Need to have maxIndex in _both_ IndexTrackingInfo & IndexedRegionInfo.
+        // That way, we can do the various passes _before_ lowerIndexedRegions()
+        // TODO: Remove the call to lowerIndexedRegions() once checkpointing works properly.
+        // 
+        RefPtr<HoistedPrimalsInfo> primalsInfo = new HoistedPrimalsInfo();
+        lowerIndexedRegions(primalsInfo);
 
         // Copy regions from fwd-block to their split blocks
         // to make it easier to do lookups.
@@ -338,21 +184,39 @@ struct DiffUnzipPass
                     indexRegionMap->map[as<IRBlock>(diffMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
             }
         }
-
-        // Process intermediate insts in indexed blocks
-        // into array loads/stores.
-        // 
-        for (auto block : mixedBlocks)
-        {
-            if (indexRegionMap->getRegion(block) != nullptr)
-                processIndexedFwdBlock(block);
-        }
         
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
 
+        RefPtr<BlockSplitInfo> splitInfo = new BlockSplitInfo();
+        for (auto block : mixedBlocks)
+            if (primalMap.ContainsKey(block))
+                splitInfo->diffBlockMap[as<IRBlock>(primalMap[block])] = as<IRBlock>(diffMap[block]);
+        
+        Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlocksInfo;
+        for (auto block : mixedBlocks)
+        {
+            indexedBlocksInfo[as<IRBlock>(diffMap[block])] = getIndexInfoList(as<IRBlock>(diffMap[block]));
+            indexedBlocksInfo[as<IRBlock>(primalMap[block])] = getIndexInfoList(as<IRBlock>(primalMap[block]));
+        }
+
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
+
+        // Run the three checkpointing passes to hoist/clone primal insts
+        // to the right spots.
+        // 
+        {
+            RefPtr<AutodiffCheckpointPolicyBase> chkPolicy = new DefaultCheckpointPolicy(unzippedFunc->getModule());
+            chkPolicy->preparePolicy(func);
+
+            auto chkPrimalsInfo = chkPolicy->processFunc(func, splitInfo);
+            primalsInfo->merge(chkPrimalsInfo);
+            
+            primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlocksInfo);
+        }
+
+        return primalsInfo;
     }
 
     void tryInferMaxIndex(IndexedRegion* region, IndexTrackingInfo* info)
@@ -375,42 +239,6 @@ struct DiffUnzipPass
         }
     }
 
-    UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
-    {
-        SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(block->getTerminator()));
-        
-        auto branchInst = as<IRUnconditionalBranch>(block->getTerminator());
-        List<IRInst*> phiArgs;
-        
-        for (UIndex ii = 0; ii < branchInst->getArgCount(); ii++)
-            phiArgs.add(branchInst->getArg(ii));
-        
-        phiArgs.add(arg);
-
-        builder->setInsertInto(block);
-        switch (branchInst->getOp())
-        {
-            case kIROp_unconditionalBranch:
-                builder->emitBranch(branchInst->getTargetBlock(), phiArgs.getCount(), phiArgs.getBuffer());
-                break;
-            
-            case kIROp_loop:
-                builder->emitLoop(
-                    as<IRLoop>(branchInst)->getTargetBlock(),
-                    as<IRLoop>(branchInst)->getBreakBlock(),
-                    as<IRLoop>(branchInst)->getContinueBlock(),
-                    phiArgs.getCount(),
-                    phiArgs.getBuffer());
-                break;
-            
-            default:
-                break;
-        }
-
-        branchInst->removeAndDeallocate();
-        return phiArgs.getCount() - 1;
-    }
-
     IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type)
     {
         builder->setInsertInto(block);
@@ -428,27 +256,7 @@ struct DiffUnzipPass
         return addPhiInputParam(builder, block, type);
     }
 
-    IRBlock* getBlock(IRInst* inst)
-    {
-        SLANG_RELEASE_ASSERT(inst);
-
-        if (auto block = as<IRBlock>(inst))
-            return block;
-
-        return getBlock(inst->getParent());
-    }
-
-    IRInst* getInstInBlock(IRInst* inst)
-    {
-        SLANG_RELEASE_ASSERT(inst);
-
-        if (auto block = as<IRBlock>(inst->getParent()))
-            return inst;
-
-        return getInstInBlock(inst->getParent());
-    }
-
-    void lowerIndexedRegions()
+    void lowerIndexedRegions(HoistedPrimalsInfo* primalsInfo)
     {
         IRBuilder builder(autodiffContext->moduleInst->getModule());
 
@@ -464,6 +272,7 @@ struct DiffUnzipPass
             // Make variable in the top-most block (so it's visible to diff blocks)
             info->primalCountLastVar = builder.emitVar(builder.getIntType());
             builder.addNameHintDecoration(info->primalCountLastVar, UnownedStringSlice("_pc_last_var"));
+            primalsInfo->storeSet.Add(info->primalCountLastVar);
             
             {   
                 auto primalCondBlock = as<IRUnconditionalBranch>(
@@ -546,6 +355,23 @@ struct DiffUnzipPass
                 builder.addPrimalValueAccessDecoration(primalCounterLastVal);
 
                 builder.addLoopExitPrimalValueDecoration(loopInst, info->diffCountParam, primalCounterLastVal);
+
+                // We'll be manually creating the inversion entries for the counters
+                // TODO: This logic can be moved to the checkpointing alg.
+                // 
+                primalsInfo->invertSet.Add(info->diffCountParam);
+                primalsInfo->instsToInvert.Add(incCounterVal);
+                primalsInfo->invertInfoMap[incCounterVal] = InversionInfo(
+                    incCounterVal, 
+                    List<IRInst*>(incCounterVal), 
+                    List<IRInst*>(info->diffCountParam)); 
+                
+                primalsInfo->invertSet.Add(incCounterVal);
+                primalsInfo->instsToInvert.Add(diffUpdateBlock->getTerminator());
+                primalsInfo->invertInfoMap[diffUpdateBlock->getTerminator()] = InversionInfo(
+                    diffUpdateBlock->getTerminator(), 
+                    List<IRInst*>(diffUpdateBlock->getTerminator()), 
+                    List<IRInst*>(incCounterVal)); 
             }
 
             // Try to infer maximum possible number of iterations.
@@ -576,282 +402,10 @@ struct DiffUnzipPass
         return indices;
     }
 
-    void processIndexedFwdBlock(IRBlock* fwdBlock)
-    {   
-        // Grab first primal block.
-        IRBlock* firstPrimalBlock = as<IRBlock>(primalMap[fwdBlock->getParent()->getFirstBlock()->getNextBlock()]);
-        
-        // Scan through instructions and identify those that are used
-        // outside the local block.
-        //
-        IRBlock* primalBlock = as<IRBlock>(primalMap[fwdBlock]);
-
-        List<IRInst*> primalInsts;
-        for (auto child = primalBlock->getFirstChild(); child; child = child->getNextInst())
-        {
-            // TODO: This might be a decent place to enforce that each load has a single 
-            // corresponding store (i.e. that everything is SSAd properly)?
-
-            // We're only interested in insts that generate values.
-            if (child->getDataType() == nullptr || 
-                as<IRVoidType>(child->getDataType()) ||
-                as<IRFuncType>(child->getDataType()) ||
-                as<IRTypeKind>(child->getDataType()))
-                continue;
-
-            primalInsts.add(child);
-        }
-
-        IRBuilder builder(autodiffContext->moduleInst->getModule());
-        
-        for (auto inst : primalInsts)
-        {
-            // 1. Check if we need to store inst (is it used in a differential block?)
-
-            bool shouldStore = false;
-            for (auto use = inst->firstUse; use; use = use->nextUse)
-            {
-                IRBlock* useBlock = getBlock(use->getUser());
-
-                if (isDifferentialInst(useBlock))
-                {
-                    shouldStore = true;
-                    break;
-                }
-            }
-
-            if (!shouldStore) continue;
-
-            // 2. If we're dealing with a var, we need to locate the value that
-            // we actually need to store. We assume everything is SSA form
-            // so there must be a single IRStore on this var.
-            //
-            IRInst* valueToStore = nullptr;
-            IRBlock* valueBlock = nullptr;
-            IRType* valueType = nullptr;
-
-            bool isPtrType = false;
-            bool isIntermediateContext = false;
-
-            if (auto ptrValueType = as<IRPtrTypeBase>(inst->getDataType()))
-            {
-                isPtrType = true;
-
-                // Find value to store
-                for (auto use = inst->firstUse; use; use = use->nextUse)
-                {
-                    if (auto storeInst = as<IRStore>(use->getUser()))
-                    {
-                        // Should not see more than one IRStore
-                        SLANG_RELEASE_ASSERT(!valueToStore);
-                        valueToStore = storeInst->getVal();
-
-                        // Is this the right block to use to determine if the
-                        // store can have multiple values based on the index?
-                        // 
-                        valueBlock = as<IRBlock>(storeInst->getParent());
-                    }
-                }
-
-                if (as<IRBackwardDiffIntermediateContextType>(ptrValueType->getValueType()))
-                {
-                    isIntermediateContext = true;
-
-                    // TODO: This should be the parent block of the `call` associated
-                    // with this context type. The var itself _could_ be in a different place.
-                    // 
-                    valueBlock = as<IRBlock>(inst->getParent());
-                }
-
-                valueType = ptrValueType->getValueType();
-            }
-            else
-            {
-                isPtrType = false;
-                valueToStore = inst;
-                valueBlock = as<IRBlock>(inst->getParent());
-                valueType = inst->getDataType();
-            }
-
-            // What do we do for primal vars that are used in the diff block
-            // but do not have an IRStore on them? This can happen for 'out'
-            // primal variables.
-            // 
-            if (!valueToStore && !isIntermediateContext)
-            {
-                // For now, we can ignore them since they are used as inputs
-                // to 'out' parameters. If their value is every actually used, 
-                // we will see an IRLoad which will be hoisted accordingly.
-                //
-                continue;
-            }
-
-            // Build list of indices that the value's block is affected by.
-            List<IndexTrackingInfo*> indices = getIndexInfoList(valueBlock);
-
-            // 3. Emit an array to top-level to allocate space.
-            
-            builder.setInsertBefore(firstPrimalBlock->getTerminator());
-
-            IRType* storageType = valueType;
-
-            for (auto index : indices)
-            {
-                SLANG_ASSERT(index->status == IndexTrackingInfo::CountStatus::Static);
-                SLANG_ASSERT(index->maxIters >= 0);
-
-                storageType = builder.getArrayType(
-                    storageType,
-                    builder.getIntValue(
-                        builder.getUIntType(),
-                        index->maxIters + 1));
-            }
-
-            // Reverse the list since the indices need to be 
-            // emitted in reverse order.
-            // 
-            indices.reverse();
-            
-            auto storageVar = builder.emitVar(storageType);
-            if (isIntermediateContext)
-                builder.addBackwardDerivativePrimalContextDecoration(
-                    storageVar, 
-                    storageVar);
-
-            // 4. Store current value into the array and replace uses with a load.
-            //    If an index is missing, use the 'last' value of the primal index.
-            
-            {
-                if (!isIntermediateContext)
-                    setInsertAfterOrdinaryInst(&builder, valueToStore);
-                else
-                    setInsertAfterOrdinaryInst(&builder, inst);
-                
-                IRInst* storeAddr = storageVar;
-                IRType* currType = as<IRPtrTypeBase>(storageVar->getDataType())->getValueType();
-
-                for (auto index : indices)
-                {
-                    currType = as<IRArrayType>(currType)->getElementType();
-
-                    storeAddr = builder.emitElementAddress(
-                        builder.getPtrType(currType),
-                        storeAddr, 
-                        index->primalCountParam);
-                }
-                
-                if (!isIntermediateContext)
-                    builder.emitStore(storeAddr, valueToStore);
-                else
-                {
-                    List<IRUse*> primalUses;
-                    for (auto use = inst->firstUse; use; use = use->nextUse)
-                    {
-                        if (!isDifferentialInst(getBlock(use->getUser())))
-                            primalUses.add(use);
-                    }
-                    
-                    for (auto use : primalUses)
-                        use->set(storeAddr);
-                }
-            }
-
- 
-            // 5. Replace uses in differential blocks with loads from the array.
-            List<IRInst*> instsToTag;
-            {
-                List<IRUse*> diffUses;
-                for (auto use = inst->firstUse; use; use = use->nextUse)
-                {   
-                    if (as<IRDecoration>(use->getUser()))
-                    {
-                        if (!as<IRLoopExitPrimalValueDecoration>(use->getUser()) &&
-                            !as<IRBackwardDerivativePrimalContextDecoration>(use->getUser()))
-                            continue;
-                    }
-
-                    IRBlock* useBlock = getBlock(use->getUser());
-                    if (useBlock && isDifferentialInst(useBlock))
-                        diffUses.add(use);
-                }
-
-                for (auto use : diffUses)
-                {
-                    IRBlock* useBlock = getBlock(use->getUser());
-                    setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
-
-                    IRInst* loadAddr = storageVar;
-                    IRType* currType = as<IRPtrTypeBase>(storageVar->getDataType())->getValueType();
-
-                    // Enumerate use block regions.
-                    // TODO: Probably a good idea to do this ahead of time for
-                    // all blocks.
-                    //
-                    List<IndexTrackingInfo*> useBlockIndices = getIndexInfoList(useBlock);
-
-                    for (auto index : indices)
-                    {
-                        currType = as<IRArrayType>(currType)->getElementType();
-                        if (useBlockIndices.contains(index))
-                        {
-                            // If the use-block is under the same region, use the 
-                            // differential counter variable
-                            //
-                            auto diffCounterCurrValue = index->diffCountParam;
-
-                            loadAddr = builder.emitElementAddress(
-                                builder.getPtrType(currType),
-                                loadAddr, 
-                                diffCounterCurrValue);
-                        }
-                        else
-                        {
-                            // If the use-block is outside this region, use the
-                            // last available value (by indexing with primal counter minus 1)
-                            // 
-                            auto primalCounterCurrValue = builder.emitLoad(index->primalCountLastVar);
-                            auto primalCounterLastValue = builder.emitSub(
-                                primalCounterCurrValue->getDataType(),
-                                primalCounterCurrValue,
-                                builder.getIntValue(builder.getIntType(), 1));
-
-                            instsToTag.add(primalCounterCurrValue);
-                            instsToTag.add(primalCounterLastValue);
-
-                            loadAddr = builder.emitElementAddress(
-                                builder.getPtrType(currType),
-                                loadAddr, 
-                                primalCounterLastValue);
-                        }
-
-                        instsToTag.add(loadAddr);
-                    }
-
-                    if (!isPtrType)
-                    {
-                        auto loadedValue = builder.emitLoad(loadAddr);
-                        instsToTag.add(loadedValue);
-
-                        use->set(loadedValue);
-                    }
-                    else
-                    {
-                        use->set(loadAddr);
-                    }
-                }
-            }
-
-            for (auto instToTag : instsToTag)
-            {
-                builder.addPrimalValueAccessDecoration(instToTag);
-                builder.markInstAsPrimal(instToTag);
-            }
-        }
-    }
-
     IRFunc* extractPrimalFunc(
         IRFunc* func,
         IRFunc* originalFunc,
+        HoistedPrimalsInfo* primalsInfo,
         ParameterBlockTransposeInfo& paramInfo,
         IRInst*& intermediateType);
     
@@ -972,6 +526,13 @@ struct DiffUnzipPass
             {
                 auto primalArg = lookupPrimalInst(arg);
                 auto diffArg = lookupDiffInst(arg);
+
+                if (auto primalVar = as<IRVar>(primalArg))
+                {
+                    primalArg = diffBuilder->emitVar(as<IRPtrTypeBase>(primalVar->getDataType())->getValueType());
+                    if (auto storeUse = findUniqueStoredVal(primalVar))   
+                        diffBuilder->emitStore(primalArg, as<IRStore>(storeUse->getUser())->getVal());
+                }
 
                 // If arg is a mixed differential (pair), it should have already been split.
                 SLANG_ASSERT(primalArg);
