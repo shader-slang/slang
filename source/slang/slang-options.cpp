@@ -712,9 +712,11 @@ struct OptionsParser
             "  code accordingly.\n"
             "  Currently defined capabilities are:\n"
             "\n"
-            "    spriv_1_{0,1,2,3,4,5}   - minimum supported SPIR-V version\n"
+            "    spirv_1_{0,1,2,3,4,5}   - minimum supported SPIR-V version\n"
             "    GL_NV_ray_tracing       - enables the GL_NV_ray_tracing extension\n"
             "    GL_EXT_ray_tracing      - enables the GL_EXT_ray_tracing extension\n"
+            "    GL_NV_fragment_shader_barycentric  - enables the GL_NV_fragment_shader_barycentric extension\n"
+            "    GL_EXT_fragment_shader_barycentric - enables the GL_EXT_fragment_shader_barycentric extension\n"
             "\n";
 
 #undef EXECUTABLE_EXTENSION

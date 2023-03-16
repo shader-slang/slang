@@ -80,6 +80,27 @@ void GLSLSourceEmitter::_requireRayTracing()
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
 }
 
+void GLSLSourceEmitter::_requireFragmentShaderBarycentric()
+{
+    // There is more than one extension that provides barycentric coords in fragment shaders,
+    // and we need to pick which one to enable.
+    //
+    // By default, we will use the `GL_EXT_fragment_shader_barycentric` extension, but if
+    // the user has explicitly opted in to the `GL_NV_fragment_shader_barycentric` extension 
+    // we will use that one instead.
+    
+    if( getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric) )
+    {
+        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
+    }
+    else
+    {
+        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
+    }
+    m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
+}
+
+
 void GLSLSourceEmitter::_requireGLSLExtension(const UnownedStringSlice& name)
 {
     m_glslExtensionTracker->requireExtension(name);
@@ -2250,27 +2271,40 @@ void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     }
 }
 
-static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode, Stage stage, bool isInput)
+bool GLSLSourceEmitter::_maybeEmitInterpolationModifierText(IRInterpolationMode mode, Stage stage, bool isInput)
 {
     switch (mode)
     {
-        case IRInterpolationMode::NoInterpolation:      return UnownedStringSlice::fromLiteral("flat");
-        case IRInterpolationMode::NoPerspective:        return UnownedStringSlice::fromLiteral("noperspective");
-        case IRInterpolationMode::Linear:               return UnownedStringSlice::fromLiteral("smooth");
-        case IRInterpolationMode::Sample:               return UnownedStringSlice::fromLiteral("sample");
-        case IRInterpolationMode::Centroid:             return UnownedStringSlice::fromLiteral("centroid");
-
+        case IRInterpolationMode::NoInterpolation:      
+            m_writer->emit("flat "); return true;
+        case IRInterpolationMode::NoPerspective:        
+            m_writer->emit("noperspective "); return true;
+        case IRInterpolationMode::Linear:               
+            m_writer->emit("smooth "); return true;
+        case IRInterpolationMode::Sample:              
+            m_writer->emit("sample "); return true;
+        case IRInterpolationMode::Centroid:             
+            m_writer->emit("centroid "); return true;
         case IRInterpolationMode::PerVertex:
-            if( stage == Stage::Fragment )
+            if( stage == Stage::Fragment && isInput)
             {
-                if( isInput )
+                _requireFragmentShaderBarycentric();
+                if (getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric))
                 {
-                    return UnownedStringSlice::fromLiteral("pervertexNV");
+                    m_writer->emit("pervertexNV ");    
+                }
+                else 
+                {
+                    m_writer->emit("pervertexEXT ");
                 }
             }
-            return UnownedStringSlice::fromLiteral("flat");
-
-        default:                                        return UnownedStringSlice();
+            else 
+            {
+                m_writer->emit("flat ");
+            }
+            return true;
+        default:
+            return false;
     }
 }
 
@@ -2293,14 +2327,8 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
             continue;
 
         auto decoration = (IRInterpolationModeDecoration*)dd;
-        const UnownedStringSlice slice = _getInterpolationModifierText(decoration->getMode(), stage, isInput);
 
-        if (slice.getLength())
-        {
-            m_writer->emit(slice);
-            m_writer->emitChar(' ');
-            anyModifiers = true;
-        }
+        anyModifiers |= _maybeEmitInterpolationModifierText(decoration->getMode(), stage, isInput);
 
         switch( decoration->getMode() )
         {
@@ -2312,8 +2340,7 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
             {
                 if( isInput )
                 {
-                    _requireGLSLVersion(ProfileVersion::GLSL_450);
-                    _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
+                    _requireFragmentShaderBarycentric();
                 }
             }
             break;

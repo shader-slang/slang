@@ -595,6 +595,7 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_FloatType:
     case kIROp_VectorType:
     case kIROp_MatrixType:
+    case kIROp_AttributedType:
         return true;
     default:
         return false;
@@ -904,7 +905,7 @@ struct AutoDiffPass : public InstPassBase
             else
             {
                 IntermediateContextTypeDifferentialInfo diffFieldTypeInfo;
-                diffTypes.TryGetValue(field->getDataType(), diffFieldTypeInfo);
+                diffTypes.TryGetValue(field->getFieldType(), diffFieldTypeInfo);
                 diffFieldWitness = diffFieldTypeInfo.diffWitness;
             }
             if (diffFieldWitness)
@@ -1427,6 +1428,101 @@ bool finalizeAutoDiffPass(IRModule* module)
     stripAutoDiffDecorations(module);
 
     return false;
+}
+
+IRBlock* getBlock(IRInst* inst)
+{
+    SLANG_RELEASE_ASSERT(inst);
+
+    if (auto block = as<IRBlock>(inst))
+        return block;
+
+    return getBlock(inst->getParent());
+}
+
+IRInst* getInstInBlock(IRInst* inst)
+{
+    SLANG_RELEASE_ASSERT(inst);
+
+    if (auto block = as<IRBlock>(inst->getParent()))
+        return inst;
+
+    return getInstInBlock(inst->getParent());
+}
+
+UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
+{
+    SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(block->getTerminator()));
+    
+    auto branchInst = as<IRUnconditionalBranch>(block->getTerminator());
+    List<IRInst*> phiArgs;
+    
+    for (UIndex ii = 0; ii < branchInst->getArgCount(); ii++)
+        phiArgs.add(branchInst->getArg(ii));
+    
+    phiArgs.add(arg);
+
+    builder->setInsertInto(block);
+    switch (branchInst->getOp())
+    {
+        case kIROp_unconditionalBranch:
+            builder->emitBranch(branchInst->getTargetBlock(), phiArgs.getCount(), phiArgs.getBuffer());
+            break;
+        
+        case kIROp_loop:
+            builder->emitLoop(
+                as<IRLoop>(branchInst)->getTargetBlock(),
+                as<IRLoop>(branchInst)->getBreakBlock(),
+                as<IRLoop>(branchInst)->getContinueBlock(),
+                phiArgs.getCount(),
+                phiArgs.getBuffer());
+            break;
+        
+        default:
+            SLANG_UNEXPECTED("Unexpected branch-type for phi replacement");
+    }
+
+    branchInst->removeAndDeallocate();
+    return phiArgs.getCount() - 1;
+}
+
+IRUse* findUniqueStoredVal(IRVar* var)
+{
+    if (isDerivativeContextVar(var))
+    {
+        IRUse* primalCallUse = nullptr;
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            if (auto callInst = as<IRCall>(use->getUser()))
+            {
+                // Should not see more than one IRCall. If we do
+                // we'll need to pick the primal call.
+                // 
+                SLANG_RELEASE_ASSERT(!primalCallUse);
+                primalCallUse = use;
+            }
+        }
+        return primalCallUse;
+    }
+    else
+    {
+        IRUse* storeUse = nullptr;
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            if (auto storeInst = as<IRStore>(use->getUser()))
+            {
+                // Should not see more than one IRStore
+                SLANG_RELEASE_ASSERT(!storeUse);
+                storeUse = use;
+            }
+        }
+        return storeUse;
+    }
+}
+
+bool isDerivativeContextVar(IRVar* var)
+{
+    return var->findDecoration<IRBackwardDerivativePrimalContextDecoration>();
 }
 
 }
