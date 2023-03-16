@@ -40,7 +40,7 @@ struct VlqDecodeTable
         }
     }
         /// Returns a *negative* value if invalid
-    int8_t operator[](char c) const { return (c & 0x80) | map[c & 0x7f]; }
+    int8_t operator[](char c) const { return (c & ~char(0x7f)) ? -1 : map[c]; }
 
     int8_t map[128];
 };
@@ -50,7 +50,7 @@ static const VlqDecodeTable g_vlqDecodeTable;
 /* 
 https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit?hl=en_US&pli=1&pli=1#
 The VLQ is a Base64 value, where the most significant bit (the 6th bit) is used as the continuation 
-bit, and the ìdigitsî are encoded into the string least significant first, and where the least significant 
+bit, and the ‚Äúdigits‚Äù are encoded into the string least significant first, and where the least significant 
 bit of the first digit is used as the sign bit. */
 
 static SlangResult _decode(UnownedStringSlice& ioEncoded, Index& out)
@@ -90,14 +90,12 @@ static SlangResult _decode(UnownedStringSlice& ioEncoded, Index& out)
     // Save out the remaining part
     ioEncoded = UnownedStringSlice(cur, end);
 
-    const Index sign = -(v & 1);
-    // Remove the least significant bit
-    v = v >> 1;
+    // Double to make setting lower bit simpler
+    v += v;
 
-    // sign will be -1 if need to make negative, 0 if not.
-    // This is just equvalent to -v if sign == -1, else just v.
-    out = (v ^ sign) - sign;
-
+    // If it's negative we make positive and set the bottom bit
+    // otherwise we just return with the LSB not set.
+    out = (v < 0) ? (1 - v) : v;
     return SLANG_OK;
 }
 
@@ -189,7 +187,7 @@ SlangResult SourceMap::decode(JSONContainer* container, const JSONSourceMap& src
             // It can be 4 or 5 parts
             if (segment.getLength())
             {
-                /* If present, an zero-based index into the ìsourcesî list. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented.
+                /* If present, an zero-based index into the ‚Äúsources‚Äù list. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented.
                     If present, the zero-based starting line in the original source represented. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented. Always present if there is a source field.
                     If present, the zero-based starting column of the line in the source represented. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented. Always present if there is a source field.
                      */
@@ -213,7 +211,7 @@ SlangResult SourceMap::decode(JSONContainer* container, const JSONSourceMap& src
                 // 5 parts
                 if (segment.getLength() > 0)
                 {
-                    /* If present, the zero - based index into the ìnamesî list associated with this segment.This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented.
+                    /* If present, the zero - based index into the ‚Äúnames‚Äù list associated with this segment.This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented.
                     */
 
                     Index nameDelta;
