@@ -346,6 +346,64 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
     }
 }
 
+InstPair ForwardDiffTranscriber::transcribeMakeStruct(IRBuilder* builder, IRInst* origMakeStruct)
+{
+    IRInst* primalMakeStruct = maybeCloneForPrimalInst(builder, origMakeStruct);
+
+    // Check if the output type can be differentiated. If it cannot be 
+    // differentiated, don't differentiate the inst
+    // 
+    auto primalStructType = (IRType*)findOrTranscribePrimalInst(builder, origMakeStruct->getDataType());
+    if (auto diffStructType = differentiateType(builder, primalStructType))
+    {
+        auto primalStruct = as<IRStructType>(getResolvedInstForDecorations(primalStructType));
+        SLANG_RELEASE_ASSERT(primalStruct);
+
+        List<IRInst*> diffOperands;
+        UIndex ii = 0;
+        for (auto field : primalStruct->getFields())
+        {
+            SLANG_RELEASE_ASSERT(ii < origMakeStruct->getOperandCount());
+
+            // If this field is not differentiable, skip the operand.
+            if (!field->getKey()->findDecoration<IRDerivativeMemberDecoration>())
+            {
+                ii++;
+                continue;
+            }
+
+            // If the operand has a differential version, replace the original with
+            // the differential. Otherwise, use a zero.
+            // 
+            if (auto diffInst = lookupDiffInst(origMakeStruct->getOperand(ii), nullptr))
+            {
+                diffOperands.add(diffInst);
+            }
+            else
+            {
+                auto operandDataType = origMakeStruct->getOperand(ii)->getDataType();
+                auto diffOperandType = differentiateType(builder, operandDataType);
+                SLANG_RELEASE_ASSERT(diffOperandType);
+                operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
+                diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+            }
+            ii++;
+        }
+
+        return InstPair(
+            primalMakeStruct,
+            builder->emitIntrinsicInst(
+                diffStructType,
+                kIROp_MakeStruct,
+                diffOperands.getCount(),
+                diffOperands.getBuffer()));
+    }
+    else
+    {
+        return InstPair(primalMakeStruct, nullptr);
+    }
+}
+
 static bool _isDifferentiableFunc(IRInst* func)
 {
     func = getResolvedInstForDecorations(func);
@@ -1551,10 +1609,11 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_IntCast:
     case kIROp_FloatCast:
     case kIROp_MakeVectorFromScalar:
-    case kIROp_MakeStruct:
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
         return transcribeConstruct(builder, origInst);
+    case kIROp_MakeStruct:
+        return transcribeMakeStruct(builder, origInst);
 
     case kIROp_LookupWitness:
         return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));

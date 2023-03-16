@@ -46,6 +46,7 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     // and then return nullptr. Literals do not need to be differentiated.
     //
     InstPair transcribeConstruct(IRBuilder* builder, IRInst* origConstruct);
+    InstPair transcribeMakeStruct(IRBuilder* builder, IRInst* origMakeStruct);
 
     // Differentiating a call instruction here is primarily about generating
     // an appropriate call list based on whichever parameters have differentials 
