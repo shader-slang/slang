@@ -2186,13 +2186,16 @@ struct OptionsParser
         // If we don't have any raw outputs but do have a raw target,
         // and output type is callable, add an empty' rawOutput.
         if (rawOutputs.getCount() == 0 && 
-            rawTargets.getCount() == 1 && 
-            ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
+            rawTargets.getCount() == 1)
         {
-            RawOutput rawOutput;
-            rawOutput.impliedFormat = rawTargets[0].format;
-            rawOutput.targetIndex = 0;
-            rawOutputs.add(rawOutput);
+            auto artifactKind = ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind;
+            if (artifactKind == ArtifactKind::HostCallable || artifactKind == ArtifactKind::Source)
+            {
+                RawOutput rawOutput;
+                rawOutput.impliedFormat = rawTargets[0].format;
+                rawOutput.targetIndex = 0;
+                rawOutputs.add(rawOutput);
+            }
         }
 
         // Consider the output files specified via `-o` and try to figure
