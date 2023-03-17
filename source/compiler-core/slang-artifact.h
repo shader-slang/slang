@@ -180,6 +180,8 @@ enum class ArtifactPayload : uint8_t
 
     PdbDebugInfo,   ///< PDB debug info
 
+    SourceMap,      ///< SourceMap
+
     CountOf,
 };
 

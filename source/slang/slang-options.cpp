@@ -669,6 +669,7 @@ struct OptionsParser
             "  -save-stdlib-bin-source <filename>: Same as -save-stdlib but output\n"
             "      the data as a C array.\n"
             "  -track-liveness: Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.\n"
+            "  -source-map: Enables outputting of a source map. Note this is *distinct* from line-directive-mode.\n"
             "\n"
             "Deprecated options (allowed but ignored; may be removed in future):\n"
             "\n"
@@ -1175,6 +1176,10 @@ struct OptionsParser
                 else if(argValue == "-parameter-blocks-use-register-spaces" )
                 {
                     getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
+                }
+                else if(argValue == "-source-map")
+                {
+                    requestImpl->getLinkage()->m_generateSourceMap = true;
                 }
                 else if (argValue == "-ir-compression")
                 {

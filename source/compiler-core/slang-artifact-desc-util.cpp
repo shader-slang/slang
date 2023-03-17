@@ -223,7 +223,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(Diagnostics, Metadata) \
         x(Miscellaneous, Base) \
             x(Log, Miscellaneous) \
-            x(Lock, Miscellaneous)
+            x(Lock, Miscellaneous) \
+        x(SourceMap, Base)
 
 #define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 
@@ -550,6 +551,13 @@ static const KindExtension g_cpuKindExts[] =
         return ArtifactDesc::make(ArtifactKind::Assembly, ArtifactPayload::HostCPU);
     }
 
+    // TODO(JS): Unfortunately map extension is also used from output for linkage from 
+    // Visual Studio. It's used here for source map.
+    if (slice == toSlice("map"))
+    {
+        return ArtifactDesc::make(ArtifactKind::Text, ArtifactPayload::SourceMap);
+    }
+
     if (slice == toSlice("pdb"))
     {
         // Program database
@@ -621,6 +629,7 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
         case Payload::MetalAIR:     return toSlice("air");
 
         case Payload::PdbDebugInfo: return toSlice("pdb");
+        case Payload::SourceMap:    return toSlice("map");
 
         default: break;
     }
