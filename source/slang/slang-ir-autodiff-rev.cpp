@@ -556,6 +556,7 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
+
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
@@ -702,7 +703,7 @@ namespace Slang
         // derivative of the return value.
         DiffTransposePass::FuncTranspositionInfo transposeInfo = { paramTransposeInfo.dOutParam, primalsInfo };
         diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, transposeInfo);
-        
+
         eliminateDeadCode(diffPropagateFunc);
 
         // Extracts the primal computations into its own func, and replace the primal insts

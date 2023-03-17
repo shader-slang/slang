@@ -1501,23 +1501,8 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
     // Create a clone for original func and run additional transformations on the clone.
     IRCloneEnv env;
     auto primalFuncClone = as<IRFunc>(cloneInst(&env, &builder, primalFunc));
-    {
-        IRCloneEnv scloneEnv;
-        IRBuilder sbuilder = *inBuilder;
-        sbuilder.setInsertBefore(primalFuncClone);
-        auto newF = cloneInst(&scloneEnv, &sbuilder, primalFuncClone);
-        validateIRInst(newF);
-        newF->removeAndDeallocate();
-    }
     prepareFuncForForwardDiff(primalFuncClone);
-    {
-        IRCloneEnv scloneEnv;
-        IRBuilder sbuilder = *inBuilder;
-        sbuilder.setInsertBefore(primalFuncClone);
-        auto newF = cloneInst(&scloneEnv, &sbuilder, primalFuncClone);
-        validateIRInst(newF);
-        newF->removeAndDeallocate();
-    }
+
     builder.setInsertInto(diffFunc);
 
     differentiableTypeConformanceContext.setFunc(primalFuncClone);
