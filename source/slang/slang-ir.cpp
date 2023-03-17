@@ -3159,6 +3159,20 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitDispatchKernelInst(IRType* type, IRInst* baseFn, IRInst* threadGroupSize, IRInst* dispatchSize, Int argCount, IRInst* const* inArgs)
+    {
+        List<IRInst*> args = {baseFn, threadGroupSize, dispatchSize};
+        args.addRange(inArgs, (Index)argCount);
+        auto inst = createInst<IRDispatchKernel>(
+            this,
+            kIROp_DispatchKernel,
+            type,
+            (Int)args.getCount(),
+            args.getBuffer());
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn)
     {
         auto inst = createInst<IRBackwardDifferentiatePrimal>(

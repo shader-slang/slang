@@ -2189,10 +2189,12 @@ struct OptionsParser
         }
 
         // If we don't have any raw outputs but do have a raw target,
-        // and output type is callable, add an empty' rawOutput.
+        // add an empty' rawOutput for certain targets where the expected behavior is obvious.
         if (rawOutputs.getCount() == 0 &&
             rawTargets.getCount() == 1 &&
-            ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
+            (rawTargets[0].format == CodeGenTarget::HostCPPSource ||
+            rawTargets[0].format == CodeGenTarget::CUDASource ||
+            ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable))
         {
             RawOutput rawOutput;
             rawOutput.impliedFormat = rawTargets[0].format;

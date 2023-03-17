@@ -3078,6 +3078,12 @@ attribute_syntax [DllExport] : DllExportAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [CudaDeviceExport] : CudaDeviceExportAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [CudaHost] : CudaHostAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [CudaKernel] : CudaKernelAttribute;
+
 __attributeTarget(InterfaceDecl)
 attribute_syntax [COM(guid: String)] : ComInterfaceAttribute;
 

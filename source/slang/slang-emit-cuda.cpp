@@ -223,9 +223,15 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
 
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
-    if(inst && inst->findDecoration<IREntryPointDecoration>())
+    if (!inst)
+        return;
+    if (inst->findDecoration<IREntryPointDecoration>() || inst->findDecoration<IRCudaKernelDecoration>())
     {
-        m_writer->emit("extern \"C\" __global__ ");
+        m_writer->emit("__global__ ");
+    }
+    else if (inst->findDecoration<IRCudaHostDecoration>())
+    {
+        m_writer->emit("__host__ ");
     }
     else
     {
@@ -606,6 +612,24 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("((");
             emitType(inst->getDataType());
             m_writer->emit(")optixGetSbtDataPointer())");
+            return true;
+        }
+        case kIROp_DispatchKernel:
+        {
+            auto dispatchInst = as<IRDispatchKernel>(inst);
+            emitOperand(dispatchInst->getBaseFn(), getInfo(EmitOp::Atomic));
+            m_writer->emit("<<<");
+            emitOperand(dispatchInst->getThreadGroupSize(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(dispatchInst->getDispatchSize(), getInfo(EmitOp::General));
+            m_writer->emit(">>>(");
+            for (UInt i = 0; i < dispatchInst->getArgCount(); i++)
+            {
+                if (i > 0)
+                    m_writer->emit(", ");
+                emitOperand(dispatchInst->getArg(i), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
             return true;
         }
         default: break;

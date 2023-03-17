@@ -2158,6 +2158,27 @@ namespace Slang
         return parseBackwardDifferentiate(parser);
     }
 
+    static Expr* parseDispatchKernel(Parser* parser)
+    {
+        DispatchKernelExpr* dispatchExpr = parser->astBuilder->create<DispatchKernelExpr>();
+
+        parser->ReadToken(TokenType::LParent);
+
+        dispatchExpr->baseFunction = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        dispatchExpr->threadGroupSize = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        dispatchExpr->dispatchSize = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::RParent);
+
+        return dispatchExpr;
+    }
+
+    static NodeBase* parseDispatchKernel(Parser* parser, void* /* unused */)
+    {
+        return parseDispatchKernel(parser);
+    }
+
         /// Parse a `This` type expression
     static Expr* parseThisTypeExpr(Parser* parser)
     {
@@ -6721,7 +6742,8 @@ namespace Slang
         _makeParseExpr("no_diff", parseTreatAsDifferentiableExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
         _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
-        _makeParseExpr("__bwd_diff", parseBackwardDifferentiate)
+        _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
+        _makeParseExpr("__dispatch_kernel", parseDispatchKernel)
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()
