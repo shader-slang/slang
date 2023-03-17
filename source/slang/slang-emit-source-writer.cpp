@@ -1,6 +1,8 @@
 // slang-emit-source-writer.cpp
 #include "slang-emit-source-writer.h"
 
+#include "../core/slang-char-encode.h"
+
 // Disable warnings about sprintf
 #ifdef _WIN32
 #   pragma warning(disable:4996)
@@ -516,61 +518,60 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
 
 void SourceWriter::_calcLocation(Index& outLineIndex, Index& outColumnIndex)
 {
-    // If we are at the end, then we are done.
-    if (m_currentOutputOffset == m_builder.getLength())
+    // If there are move chars we need to update 
+    if (m_currentOutputOffset < m_builder.getLength())
     {
-        outLineIndex = m_currentLineIndex;
-        outColumnIndex = m_currentColumnIndex;
-        return;
-    }
+        const char* cur = m_builder.getBuffer() + m_currentOutputOffset;
+        const char* end = m_builder.end();
 
-    const char* cur = m_builder.getBuffer() + m_currentOutputOffset;
-    const char* end = m_builder.end();
+        const char* start = cur;
 
-    const char* start = cur;
-
-    while (cur < end)
-    {
-        // Reset start
-        start = cur;
-
-        // Look for the end of the line
-        while (*cur != '\n' && *cur != '\r' && cur < end)
+        while (cur < end)
         {
-            cur++;
-        }
+            // Reset start
+            start = cur;
 
-        // If we are not at the total end then we must have hit a \n or \r
-        if (cur < end)
-        {
-            const auto c = *cur++;
+            // Look for the end of the line
+            while (*cur != '\n' && *cur != '\r' && cur < end)
+            {
+                cur++;
+            }
 
-            ++m_currentLineIndex;
-            // Reset the column 
-            m_currentColumnIndex = 0;
-
-            // Check the next char to see if it's part of a CR/LF combination
+            // If we are not at the total end then we must have hit a \n or \r
             if (cur < end)
             {
-                const auto d = *cur;
-                // If it is combination skip the next byte
-                cur += ((c ^ d) == ('\r' ^ '\n'));
+                const auto c = *cur++;
+
+                // Next line
+                ++m_currentLineIndex;
+                
+                // Check the next char to see if it's part of a CR/LF combination
+                if (cur < end)
+                {
+                    const auto d = *cur;
+                    // If it is combination skip the next byte
+                    cur += ((c ^ d) == ('\r' ^ '\n'));
+                }
+
+                // Calculate the offset to the start of this line
+                m_currentColumnIndex = 0;
+                start = cur;
             }
         }
+
+        // Set the current offset to the end
+        m_currentOutputOffset = m_builder.getLength();
+
+        // Get the bytes remaining on this line (which may not be complete)
+        const UnownedStringSlice lineRemaining(start, m_builder.end());
+
+        // Offset the column index in codepoints 
+        m_currentColumnIndex += UTF8Util::calcCodePointCount(lineRemaining);
     }
 
-    // Fix up the current index.
-    // TODO(JS):
-    // NOTE! This isn't strictly correct because it assumes one byte is a *column* which isn't actually the case with utf8 
-    // encoding... 
-    m_currentColumnIndex += Index(cur - start);
-
-    // Set the current offset is the end
-    m_currentOutputOffset = m_builder.getLength();
-
-    // Output the values
-    outLineIndex = m_currentLineIndex;
+    // Output the position
     outColumnIndex = m_currentColumnIndex;
+    outLineIndex = m_currentLineIndex;
 }
 
 } // namespace Slang
