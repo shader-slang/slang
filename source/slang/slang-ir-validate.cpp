@@ -3,6 +3,7 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-dominators.h"
 
 namespace Slang
 {
@@ -10,6 +11,8 @@ namespace Slang
     {
         // The IR module we are validating.
         IRModule*           module;
+
+        RefPtr<IRDominatorTree> domTree;
 
         // A diagnostic sink to send errors to if anything is invalid.
         DiagnosticSink*     sink;
@@ -165,9 +168,14 @@ namespace Slang
                     // the same function (or another value with code). We need
                     // to validate that `operandParentBlock` dominates `instParentBlock`.
                     //
-                    // TODO: implement this validation once we compute dominator trees.
-                    //
-                    // validate(context, operandParentBlock->dominates(instParentBlock),    inst, "def must dominate use");
+                    if (context && context->domTree)
+                    {
+                        validate(
+                            context,
+                            context->domTree->dominates(operandParentBlock, instParentBlock),
+                            inst,
+                            "def must dominate use");
+                    }
                     return;
                 }
             }
@@ -327,7 +335,9 @@ namespace Slang
 
         if (auto code = as<IRGlobalValueWithCode>(inst))
         {
+            context->domTree = computeDominatorTree(code);
             validateCodeBody(context, code);
+            context->domTree = nullptr;
         }
     }
 
@@ -338,6 +348,8 @@ namespace Slang
         DiagnosticSink sink;
         context->module = inst->getModule();
         context->sink = &sink;
+        if (auto func = as<IRFunc>(inst))
+            context->domTree = computeDominatorTree(func);
         validateIRInst(context, inst);
     }
 

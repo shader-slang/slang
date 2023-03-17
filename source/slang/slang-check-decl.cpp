@@ -3324,6 +3324,7 @@ namespace Slang
         {
             VarDecl* indexVar = nullptr;
             auto forStmt = synth.emitFor(synth.emitIntConst(0), synth.emitGetArrayLengthExpr(leftValue), indexVar);
+            addModifier(forStmt, synth.getBuilder()->create<ForceUnrollAttribute>());
             auto innerLeft = synth.emitIndexExpr(leftValue, synth.emitVarExpr(indexVar));
             for (auto& arg : args)
             {
