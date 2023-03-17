@@ -301,6 +301,10 @@ namespace Slang
             emitVal(context, lookupIntVal->witness);
             emitName(context, lookupIntVal->key->getName());
         }
+        else if (auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
+        {
+            emitRaw(context, "KX");
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");

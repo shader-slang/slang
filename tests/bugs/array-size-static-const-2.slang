@@ -14,7 +14,7 @@ struct B : IA
 }
 struct GenType<T : __BuiltinIntegerType, A: IA, let N : int>
 {
-    static const int HalfN = N / A.M;
+    static const int HalfN = N > 1? N / A.M : 1;
     T sum(T arr[HalfN])
     {
         T rs = T(0);
