@@ -474,7 +474,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     subEnv.squashChildrenMapping = true;
     subEnv.parent = &cloneEnv;
     auto clonedFunc = as<IRFunc>(cloneInst(&subEnv, &builder, func));
-
     auto clonedPrimalsInfo = primalsInfo->applyMap(&subEnv);
 
     // Remove [KeepAlive] decorations in clonedFunc.

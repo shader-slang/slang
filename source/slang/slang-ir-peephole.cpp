@@ -706,7 +706,7 @@ struct PeepholeContext : InstPassBase
                             if (!domTree)
                                 break;
 
-                            if (domTree->dominates(argValue, inst))
+                            //if (domTree->dominates(argValue, inst))
                             {
                                 inst->replaceUsesWith(argValue);
                                 // Never remove param inst.

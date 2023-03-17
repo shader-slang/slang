@@ -110,6 +110,14 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
+/// Modifer to mark a function for forward-mode differentiation.
+/// i.e. the compiler will automatically generate a new function
+/// that computes the jacobian-vector product of the original.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
 
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as
@@ -135,6 +143,77 @@ interface IDifferentiable
 
     __builtin_requirement($( (int)BuiltinRequirementKind::DMulFunc) )
     static Differential dmul(This, Differential);
+};
+
+
+/// Pair type that serves to wrap the primal and
+/// differential types of an arbitrary type T.
+
+__generic<T : IDifferentiable>
+__magic_type(DifferentialPairType)
+__intrinsic_type($(kIROp_DifferentialPairUserCodeType))
+struct DifferentialPair : IDifferentiable
+{
+    typedef DifferentialPair<T.Differential> Differential;
+    typedef T.Differential DifferentialElementType;
+
+    __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
+    __init(T _primal, T.Differential _differential);
+
+    property p : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        get;
+    }
+
+    property v : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        get;
+    }
+
+    property d : T.Differential
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetDifferentialUserCode))
+        get;
+    }
+
+    [__unsafeForceInlineEarly]
+    T.Differential getDifferential()
+    {
+        return d;
+    }
+
+    [__unsafeForceInlineEarly]
+    T getPrimal()
+    {
+        return p;
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dzero()
+    {
+        return Differential(T.dzero(), T.Differential.dzero());
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return Differential(
+            T.dadd(
+                a.p,
+                b.p
+            ),
+            T.Differential.dadd(a.d, b.d));
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dmul(This a, Differential b)
+    {
+        return Differential(
+            T.dmul(a.p, b.p),
+            T.Differential.dmul(a.d, b.d));
+    }
 };
 
 /// A type that can represent non-integers
@@ -371,18 +450,21 @@ ${{{{
         typedef $(kBaseTypes[tt].name) Differential;
     
         [__unsafeForceInlineEarly]
+        [BackwardDifferentiable]
         static Differential dzero()
         {
             return Differential(0);
         }
 
         [__unsafeForceInlineEarly]
+        [BackwardDifferentiable]
         static Differential dadd(Differential a, Differential b)
         {
             return a + b;
         }
 
         [__unsafeForceInlineEarly]
+        [BackwardDifferentiable]
         static Differential dmul(Differential a, Differential b)
         {
             return a * b;
@@ -1072,18 +1154,21 @@ extension vector<T, N> : IDifferentiable
     typedef vector<T, N> Differential;
 
     [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
     static Differential dzero()
     {
         return Differential(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return a + b;
     }
 
     [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
     static Differential dmul(This a, Differential b)
     {
         return a * b;
@@ -1096,18 +1181,21 @@ extension matrix<T, R, C> : IDifferentiable
     typedef matrix<T, R, C> Differential;
 
     [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
     static Differential dzero()
     {
         return matrix<T, R, C>(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return a + b;
     }
 
     [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
     static Differential dmul(This a, Differential b)
     {
         return a * b;

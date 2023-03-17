@@ -772,6 +772,9 @@ namespace Slang
         initializeLocalVariables(builder->getModule(), diffPropagateFunc);
         // insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
         stripTempDecorations(diffPropagateFunc);
+
+        sortBlocksInFunc(diffPropagateFunc);
+        sortBlocksInFunc(primalFunc);
     }
 
     ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(

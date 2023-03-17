@@ -201,6 +201,7 @@ IRWitnessTable* AutoDiffTranscriberBase::getDifferentialPairWitness(IRBuilder* b
         // Add method.
         IRBuilder b = *builder;
         b.setInsertInto(addMethod);
+        b.addBackwardDifferentiableDecoration(addMethod);
         IRType* paramTypes[2] = { diffDiffPairType, diffDiffPairType };
         addMethod->setFullType(b.getFuncType(2, paramTypes, diffDiffPairType));
         b.emitBlock();
@@ -273,6 +274,7 @@ IRWitnessTable* AutoDiffTranscriberBase::getArrayWitness(IRBuilder* builder, IRI
         // Add method.
         IRBuilder b = *builder;
         b.setInsertInto(addMethod);
+        b.addBackwardDifferentiableDecoration(addMethod);
         IRType* paramTypes[2] = { diffArrayType, diffArrayType };
         addMethod->setFullType(b.getFuncType(2, paramTypes, diffArrayType));
         b.emitBlock();
