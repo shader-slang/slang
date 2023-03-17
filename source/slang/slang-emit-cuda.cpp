@@ -225,7 +225,13 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
         return;
-    if (inst->findDecoration<IREntryPointDecoration>() || inst->findDecoration<IRCudaKernelDecoration>())
+    if (inst->findDecoration<IREntryPointDecoration>())
+    {
+        m_writer->emit("extern \"C\" __global__ ");
+        return;
+    }
+
+    if (inst->findDecoration<IRCudaKernelDecoration>())
     {
         m_writer->emit("__global__ ");
     }
