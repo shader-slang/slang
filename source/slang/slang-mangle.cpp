@@ -295,6 +295,12 @@ namespace Slang
             for (Index i = 0; i < funcCallIntVal->args.getCount(); i++)
                 emitVal(context, funcCallIntVal->args[i]);
         }
+        else if (auto lookupIntVal = dynamicCast<WitnessLookupIntVal>(val))
+        {
+            emitRaw(context, "KL");
+            emitVal(context, lookupIntVal->witness);
+            emitName(context, lookupIntVal->key->getName());
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");
