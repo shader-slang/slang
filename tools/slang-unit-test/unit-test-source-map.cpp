@@ -20,7 +20,7 @@ static SlangResult _check()
     sourceManager.initialize(nullptr, nullptr);
     DiagnosticSink sink(&sourceManager, nullptr);
 
-    const char json[] = R"(
+    const char jsonSource[] = R"(
 {
         "version" : 3,
         "file" : "out.js",
@@ -28,18 +28,16 @@ static SlangResult _check()
         "sources" : ["foo.js", "bar.js"],
         "sourcesContent" : [null, null],
         "names" : ["src", "maps", "are", "fun"],
-        "mappings" : "A,AAAB;;ABCEG;"
+        "mappings" : "A,AAAB;;ABCEG;" 
 }
 )";
 
     RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
 
-    RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
-
-    JSONValue readValue;
+    JSONValue rootValue;
     {
         // Now need to parse as JSON
-        String contents(json);
+        String contents(jsonSource);
         SourceFile* sourceFile = sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
         SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
 
@@ -51,38 +49,25 @@ static SlangResult _check()
         JSONParser parser;
         SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
 
-        readValue = builder.getRootValue();
+        rootValue = builder.getRootValue();
     }
 
-    // Convert to native
-    JSONSourceMap readS;
-    {
-        JSONToNativeConverter converter(container, &typeMap, &sink);
-
-        // Read it back
-        SLANG_RETURN_ON_FAIL(converter.convert(readValue, GetRttiInfo<JSONSourceMap>::get(), &readS));
-    }
-
-    // Write it out
-    {
-        String json;
+    SourceMap sourceMap;
         
-        NativeToJSONConverter converter(container, &typeMap, &sink);
+    SLANG_RETURN_ON_FAIL(sourceMap.decode(container, rootValue, &sink));
+    
+    // Write it out
+    String json;
+    {
+        JSONValue jsonValue;
 
-        JSONValue value;
-        SLANG_RETURN_ON_FAIL(converter.convert(GetRttiInfo<JSONSourceMap>::get(), &readS, value));
-
+        SLANG_RETURN_ON_FAIL(sourceMap.encode(container, &sink, jsonValue));
+        
         // Convert into a string
         JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-        container->traverseRecursively(value, &writer);
+        container->traverseRecursively(jsonValue, &writer);
 
         json = writer.getBuilder();
-    }
-
-    {
-        SourceMap sourceMap;
-
-        SLANG_RETURN_ON_FAIL(sourceMap.decode(container, readS));
     }
 
     return SLANG_OK;

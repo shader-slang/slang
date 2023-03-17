@@ -2988,6 +2988,9 @@ attribute_syntax [DllImport(modulePath: String)] : DllImportAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [DllExport] : DllExportAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [CudaDeviceExport] : CudaDeviceExportAttribute;
+
 __attributeTarget(InterfaceDecl)
 attribute_syntax [COM(guid: String)] : ComInterfaceAttribute;
 
