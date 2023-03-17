@@ -8,6 +8,54 @@
 
 namespace Slang {
 
+/*
+Support for source maps. Source maps provide a standardized mechanism to associate a location in one output file
+with another.
+
+* [Source Map Proposal](https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit?hl=en_US&pli=1&pli=1)
+* [Chrome Source Map post](https://developer.chrome.com/blog/sourcemaps/)
+* [Base64 VLQs in Source Maps](https://www.lucidchart.com/techblog/2019/08/22/decode-encoding-base64-vlqs-source-maps/)
+
+Example...
+
+{
+"version" : 3,
+"file": "out.js",
+"sourceRoot": "",
+"sources": ["foo.js", "bar.js"],
+"sourcesContent": [null, null],
+"names": ["src", "maps", "are", "fun"],
+"mappings": "A,AAAB;;ABCDE;"
+}
+*/
+
+namespace { // anonymous
+
+struct JSONSourceMap
+{
+    /// File version (always the first entry in the object) and must be a positive integer.
+    int32_t version = 3;
+    /// An optional name of the generated code that this source map is associated with.
+    String file;
+    /// An optional source root, useful for relocating source files on a server or removing repeated values in 
+    /// the “sources” entry.  This value is prepended to the individual entries in the “source” field.
+    String sourceRoot;
+    /// A list of original sources used by the “mappings” entry.
+    List<UnownedStringSlice> sources;
+    /// An optional list of source content, useful when the “source” can’t be hosted. The contents are listed in the same order as the sources in line 5. 
+    /// “null” may be used if some original sources should be retrieved by name.
+    /// Because could be a string or nullptr, we use JSONValue to hold value.
+    List<JSONValue> sourcesContent;
+    /// A list of symbol names used by the “mappings” entry.
+    List<UnownedStringSlice> names;
+    /// A string with the encoded mapping data.
+    UnownedStringSlice mappings;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+} // anonymous
+
 static const StructRttiInfo _makeJSONSourceMap_Rtti()
 {
     JSONSourceMap obj;
@@ -16,10 +64,10 @@ static const StructRttiInfo _makeJSONSourceMap_Rtti()
 
     builder.addField("version", &obj.version);
     builder.addField("file", &obj.file);
-    builder.addField("sourceRoot", &obj.sourceRoot);
+    builder.addField("sourceRoot", &obj.sourceRoot, StructRttiInfo::Flag::Optional);
     builder.addField("sources", &obj.sources);
-    builder.addField("sourcesContent", &obj.sourcesContent);
-    builder.addField("names", &obj.names);
+    builder.addField("sourcesContent", &obj.sourcesContent, StructRttiInfo::Flag::Optional);
+    builder.addField("names", &obj.names, StructRttiInfo::Flag::Optional);
     builder.addField("mappings", &obj.mappings);
 
     return builder.make();
@@ -40,7 +88,7 @@ struct VlqDecodeTable
         }
     }
         /// Returns a *negative* value if invalid
-    int8_t operator[](char c) const { return (c & ~char(0x7f)) ? -1 : map[c]; }
+    SLANG_FORCE_INLINE int8_t operator[](char c) const { return (c & ~char(0x7f)) ? -1 : map[c]; }
 
     int8_t map[128];
 };
@@ -90,24 +138,88 @@ static SlangResult _decode(UnownedStringSlice& ioEncoded, Index& out)
     // Save out the remaining part
     ioEncoded = UnownedStringSlice(cur, end);
 
-    // Double to make setting lower bit simpler
-    v += v;
-
-    // If it's negative we make positive and set the bottom bit
-    // otherwise we just return with the LSB not set.
-    out = (v < 0) ? (1 - v) : v;
+    // Handle negating
+    out = (v & 1) ? -(v >> 1) : (v >> 1);
     return SLANG_OK;
 }
 
-SlangResult SourceMap::decode(JSONContainer* container, const JSONSourceMap& src)
+void _encode(Index v, StringBuilder& out)
 {
+    // Double to free up low bit to hold the sign
+    v += v;
+
+    // We want to make v always positive to encode
+    // we use the last bit to indicate negativity
+    v = (v < 0) ? (1 - v) : v; 
+    
+    // We'll use a simple buffer, so as to not have to constantly update he StringBuffer
+    char dst[8];
+    char* cur = dst;
+
+    do 
+    {
+        // Encode it
+        const auto nextV  = v >> 5;
+
+        // Encode 5 bits
+        char c = g_vlqEncodeTable[(v & 0x1f)];
+
+        // See what bits are remaining
+        v = (v >> 5);
+
+        // Set the continuation bit's if there is more to encode
+        c |= v ? 0x20 : 0;
+
+        // Save the char
+        *cur++ = c;
+    }
+    while (v);
+
+    out.append(dst, cur);
+}
+
+void SourceMap::clear()
+{
+    String empty;
+
+    m_file = empty;
+    m_sourceRoot = empty;
+
+    m_sources.clear();
+
+    m_names.clear();
+
+    m_sourcesContent.clear();
+
+    m_lineStarts.setCount(1);
+    m_lineStarts[0] = 0;
+
+    m_lineEntries.clear();
+
+    m_slicePool.clear();
+}
+
+SlangResult SourceMap::decode(JSONContainer* container, JSONValue root, DiagnosticSink* sink)
+{
+    clear();
+
+    // Let's try and decode the JSON into native types to make this easier...
+
+    RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
+
+    // Convert to native
+    JSONSourceMap src;
+    {
+        JSONToNativeConverter converter(container, &typeMap, sink);
+
+        // Convert to the native type
+        SLANG_RETURN_ON_FAIL(converter.convert(root, GetRttiInfo<JSONSourceMap>::get(), &src));
+    }
+
     m_slicePool.clear();
 
     m_file = src.file;
     m_sourceRoot = src.sourceRoot;
-
-    m_lineStarts.clear();
-    m_lineEntries.clear();
 
     const Count sourcesCount = src.sources.getCount();
     
@@ -141,7 +253,6 @@ SlangResult SourceMap::decode(JSONContainer* container, const JSONSourceMap& src
         }
     }
 
-    
     List<UnownedStringSlice> lines;
     StringUtil::split(src.mappings, ';', lines);
     
@@ -227,6 +338,7 @@ SlangResult SourceMap::decode(JSONContainer* container, const JSONSourceMap& src
             entry.sourceColumn = sourceColumn;
             entry.sourceLine = sourceLine;
             entry.sourceFileIndex = sourceFileIndex;
+            entry.nameIndex = nameIndex;
 
             m_lineEntries.add(entry);
         }
@@ -238,5 +350,135 @@ SlangResult SourceMap::decode(JSONContainer* container, const JSONSourceMap& src
     return SLANG_OK;
 }
 
+SlangResult SourceMap::encode(JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue)
+{
+    // Convert to native
+    JSONSourceMap native;
+
+    native.file = m_file;
+    native.sourceRoot = m_sourceRoot;
+
+    // Copy over the sources
+    {
+        const auto count = m_sources.getCount();
+        native.sources.setCount(count);
+        for (Index i = 0; i < count; ++i)
+        {
+            native.sources[i] = m_slicePool.getSlice(m_sources[i]);
+        }
+    }
+
+    // Copy out the sourcesContent, care is needed around handling null
+    {
+        const auto count = m_sourcesContent.getCount();
+        native.sourcesContent.setCount(count);
+        for (Index i = 0; i < count; ++i)
+        {
+            const auto srcValue = m_sourcesContent[i];
+            
+            const JSONValue dstValue = (srcValue == StringSlicePool::kNullHandle) ?
+                native.sourcesContent[i] = JSONValue::makeNull() :
+                container->createString(m_slicePool.getSlice(srcValue));
+
+            native.sourcesContent[i] = dstValue;
+        }
+    }
+
+    // Copy out the names
+    {
+        const auto count = m_names.getCount();
+        native.names.setCount(count);
+        for (Index i = 0; i < count; ++i)
+        {
+            native.names[i] = m_slicePool.getSlice(m_names[i]);
+        }
+    }
+
+    StringBuilder mappings;
+
+    // Do the encoding!
+    {
+        const Count linesCount = getGeneratedLineCount();
+
+        Index sourceFileIndex = 0;
+
+        Index sourceLine = 0;
+        Index sourceColumn = 0;
+        Index nameIndex = 0;
+
+        for (Index i = 0; i < linesCount; ++i)
+        {
+            // Add the semicolon to start the line
+            if (i > 0)
+            {
+                mappings.appendChar(';');
+            }
+
+            const auto entries = getEntriesForLine(i);
+            const auto entriesCount = entries.getCount();
+
+            if (entriesCount == 0)
+            {
+                continue;
+            }
+
+            // We reset the generated column index at the start of each new generated line
+            Index generatedColumn = 0;
+            
+            for (Index j = 0; j < entriesCount; ++j)
+            {
+                auto entry = entries[j];
+
+                if (j > 0)
+                {
+                    mappings.appendChar(',');
+                }
+
+                Index generatedDelta = entry.generatedColumn - generatedColumn;
+                generatedColumn = entry.generatedColumn;
+
+                _encode(generatedDelta, mappings);
+
+                // See if there any other deltas we need to handle
+                const Index sourceFileDelta = entry.sourceFileIndex - sourceFileIndex;
+                const Index sourceLineDelta = entry.sourceLine - sourceLine;
+                const Index sourceColumnDelta = entry.sourceColumn - sourceColumn;
+                const Index nameIndexDelta = entry.nameIndex - nameIndex;
+
+                if (sourceFileDelta || sourceLineDelta || sourceColumnDelta || nameIndex)
+                {
+                    // Okay we have to encode all these deltae
+                    _encode(sourceFileDelta, mappings);
+                    _encode(sourceLineDelta, mappings);
+                    _encode(sourceColumnDelta, mappings);
+
+                    // Update these values
+                    sourceFileIndex = entry.sourceFileIndex;
+                    sourceLine = entry.sourceLine;
+                    sourceColumn = entry.sourceColumn;
+
+                    if (nameIndexDelta)
+                    {
+                        _encode(nameIndexDelta, mappings);
+                        nameIndex = entry.nameIndex;
+                    }
+                }
+            }
+        }
+    }
+
+    // Set the mappings
+    native.mappings = mappings.getUnownedSlice();
+
+    // Write it out
+    {
+        RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
+
+        NativeToJSONConverter converter(container, &typeMap, sink);
+        SLANG_RETURN_ON_FAIL(converter.convert(GetRttiInfo<JSONSourceMap>::get(), &native, outValue));
+    }
+
+    return SLANG_OK;
+}
 
 } // namespace Slang
