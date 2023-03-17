@@ -667,6 +667,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// An `[entryPoint]` decoration marks a function that represents a shader entry point
     INST(EntryPointDecoration,              entryPoint,             2, 0)
 
+    INST(CudaKernelDecoration,              CudaKernel,             0, 0)
+    INST(CudaHostDecoration,                CudaHost,               0, 0)
+
         /// Used to mark parameters that are moved from entry point parameters to global params as coming from the entry point.
     INST(EntryPointParamDecoration,         entryPointParam,        0, 0)
 
@@ -903,6 +906,8 @@ INST(BackwardDifferentiatePropagate,         BackwardDifferentiatePropagate,  1,
 INST(BackwardDifferentiate, BackwardDifferentiate, 1, 0)
 
 INST(PrimalSubstitute, PrimalSubstitute, 1, 0)
+
+INST(DispatchKernel, DispatchKernel, 3, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)

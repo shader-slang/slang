@@ -1,4 +1,4 @@
-//DISABLED_TEST:SIMPLE: -target cuda -line-directive-mode none
+//DISABLE_TEST:SIMPLE: -target cuda -line-directive-mode none
 
 // Verify that we can output a cuda device function with [CudaDeviceExport].
 // Disabled until we have FileCheck.
@@ -26,4 +26,16 @@ float f(MixedType m)
 void diffF(inout DifferentialPair<MixedType> m, float dout)
 {
     __bwd_diff(f)(m, dout);
+}
+
+[CudaKernel]
+void myKernel(float* inValues, float* outValues)
+{
+    outValues[0] = sin(inValues[0]);
+}
+
+[CudaHost]
+public __extern_cpp void runCompute(float *inValues, float *outValues, uint3 dispathcSize)
+{
+    __dispatch_kernel(myKernel, uint3(128, 1, 1), dispathcSize)(inValues, outValues);
 }

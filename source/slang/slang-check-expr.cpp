@@ -2333,11 +2333,12 @@ namespace Slang
         }
     };
 
-    struct PrimalSubstituteExprCheckingActions : HigherOrderInvokeExprCheckingActions
+    template<typename ExprASTType>
+    struct PassthroughHighOrderExprCheckingActionsBase : HigherOrderInvokeExprCheckingActions
     {
         virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
         {
-            return semantics->getASTBuilder()->create<PrimalSubstituteExpr>();
+            return semantics->getASTBuilder()->create<ExprASTType>();
         }
         void fillHigherOrderInvokeExpr(HigherOrderInvokeExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) override
         {
@@ -2431,7 +2432,43 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
     {
-        PrimalSubstituteExprCheckingActions actions;
+        PassthroughHighOrderExprCheckingActionsBase<PrimalSubstituteExpr> actions;
+        return _checkHigherOrderInvokeExpr(this, expr, &actions);
+    }
+
+    Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
+    {
+        auto isInt3Type = [this](Type* type)
+        {
+            auto vectorType = as<VectorExpressionType>(type);
+            if (!vectorType)
+                return false;
+            if (!isIntegerBaseType(getVectorBaseType(vectorType)))
+                return false;
+            auto constElementCount = as<ConstantIntVal>(vectorType->elementCount);
+            if (!constElementCount)
+                return false;
+            return constElementCount->value == 3;
+        };
+        expr->threadGroupSize = dispatchExpr(expr->threadGroupSize, *this);
+        if (!isInt3Type(expr->threadGroupSize->type.type))
+        {
+            getSink()->diagnose(
+                expr->threadGroupSize,
+                Diagnostics::typeMismatch,
+                "uint3",
+                expr->threadGroupSize->type);
+        }
+        expr->dispatchSize = dispatchExpr(expr->dispatchSize, *this);
+        if (!isInt3Type(expr->dispatchSize->type.type))
+        {
+            getSink()->diagnose(
+                expr->dispatchSize,
+                Diagnostics::typeMismatch,
+                "uint3",
+                expr->dispatchSize->type);
+        }
+        PassthroughHighOrderExprCheckingActionsBase<DispatchKernelExpr> actions;
         return _checkHigherOrderInvokeExpr(this, expr, &actions);
     }
 
