@@ -2,6 +2,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -683,22 +684,34 @@ struct PeepholeContext : InstPassBase
                 {
                     if (inst->hasUses())
                     {
-                        // We can replace only if argVal dominates inst.
-                        auto parentFunc = getParentFunc(inst);
-                        if (!parentFunc)
-                            break;
-                        if (domTreeFunc != parentFunc)
-                        {
-                            domTree = computeDominatorTree(parentFunc);
-                            domTreeFunc = parentFunc;
-                        }
-                        if (!domTree)
-                            break;
-                        if (domTree->dominates(argValue, inst))
+                        // Is argValue a global constant?
+                        if (isChildInstOf(inst, argValue->getParent()))
                         {
                             inst->replaceUsesWith(argValue);
                             // Never remove param inst.
                             changed = true;
+                        }
+                        else
+                        {
+                            // If argValue is defined locally,
+                            // we can replace only if argVal dominates inst.
+                            auto parentFunc = getParentFunc(inst);
+                            if (!parentFunc)
+                                break;
+                            if (domTreeFunc != parentFunc)
+                            {
+                                domTree = computeDominatorTree(parentFunc);
+                                domTreeFunc = parentFunc;
+                            }
+                            if (!domTree)
+                                break;
+
+                            if (domTree->dominates(argValue, inst))
+                            {
+                                inst->replaceUsesWith(argValue);
+                                // Never remove param inst.
+                                changed = true;
+                            }
                         }
                     }
                 }
