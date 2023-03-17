@@ -2185,8 +2185,8 @@ struct OptionsParser
 
         // If we don't have any raw outputs but do have a raw target,
         // and output type is callable, add an empty' rawOutput.
-        if (rawOutputs.getCount() == 0 && 
-            rawTargets.getCount() == 1 && 
+        if (rawOutputs.getCount() == 0 &&
+            rawTargets.getCount() == 1 &&
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
         {
             RawOutput rawOutput;

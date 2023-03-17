@@ -3768,6 +3768,11 @@ public:
         addDecoration(value, kIROp_DllExportDecoration, getStringValue(functionName));
     }
 
+    void addCudaDeviceExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
+    {
+        addDecoration(value, kIROp_CudaDeviceExportDecoration, getStringValue(functionName));
+    }
+
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)
     {
         IRInst* operands[] = { getIntValue(getIntType(), profile.raw), getStringValue(name), getStringValue(moduleName) };

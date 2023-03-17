@@ -83,6 +83,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_SHADER_SHARED_LIBRARY, "dll,so",                                    "sharedlib,sharedlibrary,dll" },
     { SLANG_CUDA_SOURCE,    "cu",                                               "cuda,cu"  },
     { SLANG_PTX,            "ptx",                                              "ptx" },
+    { SLANG_CUDA_OBJECT_CODE, "obj,o",                                          "cuobj,cubin" },
     { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable" },
     { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code" },
     { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable" },
