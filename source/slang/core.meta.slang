@@ -83,7 +83,6 @@ interface __BuiltinType {}
 /// A type that can be used for arithmetic operations
 [sealed]
 [builtin]
-[TreatAsDifferentiable]
 interface __BuiltinArithmeticType : __BuiltinType
 {
         /// Initialize from a 32-bit signed integer value.
