@@ -1155,6 +1155,11 @@ static void addLinkageDecoration(
         builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
         builder->addPublicDecoration(inst);
     }
+    if (decl->findModifier<CudaDeviceExportAttribute>())
+    {
+        builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
+        builder->addPublicDecoration(inst);
+    }
 }
 
 static void addLinkageDecoration(

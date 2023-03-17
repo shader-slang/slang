@@ -1069,14 +1069,13 @@ InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* orig
     // will branch into the loop body)
     auto diffTargetBlock = findOrTranscribeDiffInst(builder, origLoop->getTargetBlock());
 
-    // Transcribe the break block (this is the block after the exiting the loop)
-    auto diffBreakBlock = findOrTranscribeDiffInst(builder, origLoop->getBreakBlock());
-
     // Transcribe the continue block (this is the 'update' part of the loop, which will
     // branch into the condition block)
     auto diffContinueBlock = findOrTranscribeDiffInst(builder, origLoop->getContinueBlock());
 
-    
+    // Transcribe the break block (this is the block after the exiting the loop)
+    auto diffBreakBlock = findOrTranscribeDiffInst(builder, origLoop->getBreakBlock());
+        
     List<IRInst*> diffLoopOperands;
     diffLoopOperands.add(diffTargetBlock);
     diffLoopOperands.add(diffBreakBlock);
@@ -1510,14 +1509,17 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
     
     mapInOutParamToWriteBackValue.Clear();
 
-    // Transcribe children from origFunc into diffFunc
+    // Create and map blocks in diff func.
     for (auto block = primalFuncClone->getFirstBlock(); block; block = block->getNextBlock())
-        this->transcribe(&builder, block);
+    {
+        auto diffBlock = builder.emitBlock();
+        mapPrimalInst(block, diffBlock);
+        mapDifferentialInst(block, diffBlock);
+    }
 
-    // Some of the transcribed blocks can appear 'out-of-order'. Although this 
-    // shouldn't be an issue, for consistency, we put them back in order.
+    // Now actually transcribe the content of each block.
     for (auto block = primalFuncClone->getFirstBlock(); block; block = block->getNextBlock())
-        as<IRBlock>(lookupDiffInst(block))->insertAtEnd(diffFunc);
+        this->transcribeBlock(&builder, block);
 
     for (auto block : diffFunc->getBlocks())
     {

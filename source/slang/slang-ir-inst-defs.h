@@ -712,6 +712,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(DllImportDecoration, dllImport, 2, 0)
         /// An dllExport decoration marks a function as an export symbol. Slang will generate a native wrapper function that is exported to DLL.
     INST(DllExportDecoration, dllExport, 1, 0)
+        /// An cudaDeviceExport decoration marks a function to be exported as a cuda __device__ function.
+    INST(CudaDeviceExportDecoration, cudaDeviceExport, 1, 0)
 
         /// Marks an interface as a COM interface declaration.
     INST(ComInterfaceDecoration, COMInterface, 0, 0)
