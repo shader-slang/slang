@@ -186,6 +186,7 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst);
 // Returns the loop counter `IRParam`.
 IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IRBlock*& loopBodyBlock, IRBlock*& loopBreakBlock);
 
+void sortBlocksInFunc(IRGlobalValueWithCode* func);
 }
 
 #endif

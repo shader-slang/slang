@@ -3324,6 +3324,7 @@ namespace Slang
         {
             VarDecl* indexVar = nullptr;
             auto forStmt = synth.emitFor(synth.emitIntConst(0), synth.emitGetArrayLengthExpr(leftValue), indexVar);
+            addModifier(forStmt, synth.getBuilder()->create<ForceUnrollAttribute>());
             auto innerLeft = synth.emitIndexExpr(leftValue, synth.emitVarExpr(indexVar));
             for (auto& arg : args)
             {
@@ -3358,6 +3359,7 @@ namespace Slang
         // We synthesize a memberwise dispatch to compute each field of `TResult`,
         // resulting an implementation of the form:
         // ```
+        // [BackwardDifferentiable]
         // static TResult requiredMethod(TParam1 p0, TParam2 p1, ...)
         // {
         //     TResult result;
@@ -3389,6 +3391,9 @@ namespace Slang
         ThisExpr* synThis = nullptr;
         auto synFunc = synthesizeMethodSignatureForRequirementWitness(
             context, requirementDeclRef.as<FuncDecl>(), synArgs, synThis);
+        
+        addModifier(synFunc, m_astBuilder->create<BackwardDifferentiableAttribute>());
+
         synFunc->parentDecl = context->parentDecl;
         synth.pushContainerScope(synFunc);
         auto blockStmt = m_astBuilder->create<BlockStmt>();

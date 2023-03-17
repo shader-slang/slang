@@ -2,6 +2,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-dominators.h"
 
 namespace Slang
 {
@@ -572,6 +573,13 @@ IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IR
     auto newParam = loopBuilder.emitAdd(loopParam->getFullType(), loopParam, loopBuilder.getIntValue(loopBuilder.getIntType(), 1));
     loopBuilder.emitBranch(loopHeadBlock, 1, &newParam);
     return loopParam;
+}
+
+void sortBlocksInFunc(IRGlobalValueWithCode* func)
+{
+    auto order = getReversePostorder(func);
+    for (auto block : order)
+        block->insertAtEnd(func);
 }
 
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
