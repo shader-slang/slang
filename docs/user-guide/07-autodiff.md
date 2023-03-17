@@ -578,7 +578,7 @@ In addition, the `no_diff` modifier can also be used on the return type to indic
 ```csharp
 no_diff float myFunc(no_diff float a, float x, out float y);
 ```
-Will the the following forward derivative and backward propagation function signatures:
+Will have the following forward derivative and backward propagation function signatures:
 
 ```csharp
 float fwd_derivative(float a, DifferentialPair<float> x);
@@ -610,14 +610,14 @@ For example, the following code excludes `member1` from differentiation:
 struct MyType : IDifferentiable
 {
     no_diff float member1;  // excluded from differentiation
-    flaot2 member2;
+    float2 member2;
 }
 ```
 The generated `Differential` in this case will be:
 ```csharp
 struct MyType.Differential : IDifferentiable
 {
-    flaot2 member2;
+    float2 member2;
 }
 ```
 
