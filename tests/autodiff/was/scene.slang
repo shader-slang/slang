@@ -65,3 +65,8 @@ Intersection intersect(float x)
 
     return Intersection(LineSegment(0, 0, 0), x, false);
 }
+
+float shadeIntersection(Intersection isect)
+{
+    return isect.ls.color;
+}

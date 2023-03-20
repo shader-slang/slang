@@ -65,9 +65,13 @@ float warp(Intersection isect, PRNG prng)
 Intersection warpedIntersect(float x, PRNG prng)
 {   
     Intersection isect = intersect(x);
+    Intersection.Differential d_isect = Intersection.Differential.dzero();
+    d_isect.x = 1.0;
 
-    isect.x = detach(isect.x) + infinitesimal(warp(x, prng));
-    isect.color = isect.color * (1 + infinitesimal(__fwd_diff(warp)(diffPair(x, 1.0))));
+    var dpwarp = infinitesimal(
+        __fwd_diff(warp)(diffPair(isect, d_isect), prng));
 
-    return isect;
+    isect.x = detach(isect.x) + dpwarp.p();
+
+    return shadeIntersection(isect) * (1 + dpwarp.d());;
 }
