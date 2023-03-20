@@ -68,13 +68,12 @@ void myMiss_0(inout MyRayPayload_0 payload_4)
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
-    MyProceduralHitAttrs_0 committedProceduralAttrs_0;
-
     rayQueryEXT query_0;
 
     MyRayPayload_0 payload_5;
     payload_5.value_1 = -1;
     rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0._data.rayFlags_0 | 512), (C_0._data.instanceMask_0), (C_0._data.origin_0), (C_0._data.tMin_0), (C_0._data.direction_0), (C_0._data.tMax_0));
+    MyProceduralHitAttrs_0 committedProceduralAttrs_0;
     for(;;)
     {
         bool _S2 = rayQueryProceedEXT(query_0);
@@ -83,6 +82,7 @@ void main()
             break;
         }
         uint _S3 = (rayQueryGetIntersectionTypeEXT((query_0), false));
+        MyProceduralHitAttrs_0 committedProceduralAttrs_1;
         switch(_S3)
         {
         case 1U:
@@ -102,16 +102,16 @@ void main()
                         {
                             rayQueryTerminateEXT(query_0);
                         }
-                        committedProceduralAttrs_0 = _S6;
+                        committedProceduralAttrs_1 = _S6;
                     }
                     else
                     {
-                        committedProceduralAttrs_0 = committedProceduralAttrs_0;
+                        committedProceduralAttrs_1 = committedProceduralAttrs_0;
                     }
                 }
                 else
                 {
-                    committedProceduralAttrs_0 = committedProceduralAttrs_0;
+                    committedProceduralAttrs_1 = committedProceduralAttrs_0;
                 }
                 break;
             }
@@ -126,13 +126,16 @@ void main()
                         rayQueryTerminateEXT(query_0);
                     }
                 }
+                committedProceduralAttrs_1 = committedProceduralAttrs_0;
                 break;
             }
         default:
             {
+                committedProceduralAttrs_1 = committedProceduralAttrs_0;
                 break;
             }
         }
+        committedProceduralAttrs_0 = committedProceduralAttrs_1;
     }
     uint _S8 = (rayQueryGetIntersectionTypeEXT((query_0), true));
     switch(_S8)

@@ -201,6 +201,7 @@ IRWitnessTable* AutoDiffTranscriberBase::getDifferentialPairWitness(IRBuilder* b
         // Add method.
         IRBuilder b = *builder;
         b.setInsertInto(addMethod);
+        b.addBackwardDifferentiableDecoration(addMethod);
         IRType* paramTypes[2] = { diffDiffPairType, diffDiffPairType };
         addMethod->setFullType(b.getFuncType(2, paramTypes, diffDiffPairType));
         b.emitBlock();
@@ -273,6 +274,7 @@ IRWitnessTable* AutoDiffTranscriberBase::getArrayWitness(IRBuilder* builder, IRI
         // Add method.
         IRBuilder b = *builder;
         b.setInsertInto(addMethod);
+        b.addBackwardDifferentiableDecoration(addMethod);
         IRType* paramTypes[2] = { diffArrayType, diffArrayType };
         addMethod->setFullType(b.getFuncType(2, paramTypes, diffArrayType));
         b.emitBlock();
@@ -831,15 +833,9 @@ InstPair AutoDiffTranscriberBase::transcribeBlockImpl(IRBuilder* builder, IRBloc
     IRBuilder subBuilder = *builder;
     subBuilder.setInsertLoc(builder->getInsertLoc());
     
-    IRInst* diffBlock = subBuilder.emitBlock();
+    IRInst* diffBlock = lookupDiffInst(origBlock);
+    SLANG_RELEASE_ASSERT(diffBlock);
     subBuilder.markInstAsMixedDifferential(diffBlock);
-
-    // Note: for blocks, we setup the mapping _before_
-    // processing the children since we could encounter
-    // a lookup while processing the children.
-    // 
-    mapPrimalInst(origBlock, diffBlock);
-    mapDifferentialInst(origBlock, diffBlock);
 
     subBuilder.setInsertInto(diffBlock);
 
@@ -1017,9 +1013,10 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
 
     // Transcribe children from origFunc into diffFunc.
     builder.setInsertInto(diffGeneric);
+    auto bodyBlock = builder.emitBlock();
+    mapPrimalInst(origGeneric->getFirstBlock(), bodyBlock);
+    mapDifferentialInst(origGeneric->getFirstBlock(), bodyBlock);
     auto transcribedBlock = transcribeBlockImpl(&builder, origGeneric->getFirstBlock(), instsToSkip);
-    mapPrimalInst(origGeneric->getFirstBlock(), transcribedBlock.primal);
-    mapDifferentialInst(origGeneric->getFirstBlock(), transcribedBlock.differential);
 
     return InstPair(primalGeneric, diffGeneric);
 }

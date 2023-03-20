@@ -571,6 +571,7 @@ extern "C"
         SLANG_SHADER_HOST_CALLABLE,      ///< A CPU target that makes the compiled shader code available to be run immediately
         SLANG_CUDA_SOURCE,          ///< Cuda source
         SLANG_PTX,                  ///< PTX
+        SLANG_CUDA_OBJECT_CODE,     ///< Object code that contains CUDA functions.
         SLANG_OBJECT_CODE,          ///< Object code that can be used for later linking
         SLANG_HOST_CPP_SOURCE,      ///< C++ code for host library or executable.
         SLANG_HOST_HOST_CALLABLE,   ///< 

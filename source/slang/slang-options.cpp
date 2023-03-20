@@ -669,6 +669,7 @@ struct OptionsParser
             "  -save-stdlib-bin-source <filename>: Same as -save-stdlib but output\n"
             "      the data as a C array.\n"
             "  -track-liveness: Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.\n"
+            "  -source-map: Enables outputting of a source map. Note this is *distinct* from line-directive-mode.\n"
             "\n"
             "Deprecated options (allowed but ignored; may be removed in future):\n"
             "\n"
@@ -712,9 +713,11 @@ struct OptionsParser
             "  code accordingly.\n"
             "  Currently defined capabilities are:\n"
             "\n"
-            "    spriv_1_{0,1,2,3,4,5}   - minimum supported SPIR-V version\n"
+            "    spirv_1_{0,1,2,3,4,5}   - minimum supported SPIR-V version\n"
             "    GL_NV_ray_tracing       - enables the GL_NV_ray_tracing extension\n"
             "    GL_EXT_ray_tracing      - enables the GL_EXT_ray_tracing extension\n"
+            "    GL_NV_fragment_shader_barycentric  - enables the GL_NV_fragment_shader_barycentric extension\n"
+            "    GL_EXT_fragment_shader_barycentric - enables the GL_EXT_fragment_shader_barycentric extension\n"
             "\n";
 
 #undef EXECUTABLE_EXTENSION
@@ -1173,6 +1176,10 @@ struct OptionsParser
                 else if(argValue == "-parameter-blocks-use-register-spaces" )
                 {
                     getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
+                }
+                else if(argValue == "-source-map")
+                {
+                    requestImpl->getLinkage()->m_generateSourceMap = true;
                 }
                 else if (argValue == "-ir-compression")
                 {
@@ -2182,10 +2189,12 @@ struct OptionsParser
         }
 
         // If we don't have any raw outputs but do have a raw target,
-        // and output type is callable, add an empty' rawOutput.
-        if (rawOutputs.getCount() == 0 && 
-            rawTargets.getCount() == 1 && 
-            ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
+        // add an empty' rawOutput for certain targets where the expected behavior is obvious.
+        if (rawOutputs.getCount() == 0 &&
+            rawTargets.getCount() == 1 &&
+            (rawTargets[0].format == CodeGenTarget::HostCPPSource ||
+            rawTargets[0].format == CodeGenTarget::CUDASource ||
+            ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable))
         {
             RawOutput rawOutput;
             rawOutput.impliedFormat = rawTargets[0].format;

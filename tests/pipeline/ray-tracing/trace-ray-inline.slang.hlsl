@@ -67,14 +67,13 @@ void myMiss_0(inout MyRayPayload_0 payload_4)
 [shader("compute")][numthreads(1, 1, 1)]
 void main(uint3 tid_0 : SV_DISPATCHTHREADID)
 {
-    MyProceduralHitAttrs_0 committedProceduralAttrs_0;
-
     RayQuery<int(512) > query_0;
 
     MyRayPayload_0 payload_5;
     payload_5.value_1 = int(-1);
     RayDesc ray_0 = { C_0.origin_0, C_0.tMin_0, C_0.direction_0, C_0.tMax_0 };
     query_0.TraceRayInline(myAccelerationStructure_0, C_0.rayFlags_0, C_0.instanceMask_0, ray_0);
+    MyProceduralHitAttrs_0 committedProceduralAttrs_0;
     for(;;)
     {
         bool _S1 = query_0.Proceed();
@@ -83,6 +82,7 @@ void main(uint3 tid_0 : SV_DISPATCHTHREADID)
             break;
         }
         uint _S2 = query_0.CandidateType();
+        MyProceduralHitAttrs_0 committedProceduralAttrs_1;
         switch(_S2)
         {
         case 1U:
@@ -102,16 +102,16 @@ void main(uint3 tid_0 : SV_DISPATCHTHREADID)
                         {
                             query_0.Abort();
                         }
-                        committedProceduralAttrs_0 = _S5;
+                        committedProceduralAttrs_1 = _S5;
                     }
                     else
                     {
-                        committedProceduralAttrs_0 = committedProceduralAttrs_0;
+                        committedProceduralAttrs_1 = committedProceduralAttrs_0;
                     }
                 }
                 else
                 {
-                    committedProceduralAttrs_0 = committedProceduralAttrs_0;
+                    committedProceduralAttrs_1 = committedProceduralAttrs_0;
                 }
                 break;
             }
@@ -126,13 +126,16 @@ void main(uint3 tid_0 : SV_DISPATCHTHREADID)
                         query_0.Abort();
                     }
                 }
+                committedProceduralAttrs_1 = committedProceduralAttrs_0;
                 break;
             }
         default:
             {
+                committedProceduralAttrs_1 = committedProceduralAttrs_0;
                 break;
             }
         }
+        committedProceduralAttrs_0 = committedProceduralAttrs_1;
     }
     uint _S7 = query_0.CommittedStatus();
     switch(_S7)

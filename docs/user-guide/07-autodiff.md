@@ -156,8 +156,8 @@ In addition, a differentiable type must define the `zero` value of its derivativ
 
 ### Builtin Differentiable Types
 The following builtin types are differentiable: 
-- Scalars: `float`, `half`.
-- Vector/Matrix: `vector` and `matrix` of `float` and `half` types.
+- Scalars: `float`, `double` and `half`.
+- Vector/Matrix: `vector` and `matrix` of `float`, `double` and `half` types.
 - Arrays: `T[n]` is differentiable if `T` is differentiable.
 
 ### User Defined Differentiable Types
@@ -554,7 +554,12 @@ let c = __fwd_diff(caller)(diffPair(4.0, 1.0)).d; // c == 48.0 (calling derivati
 
 In case that a function has both custom defined derivatives and a differentiable primal substitute, the primal substitute overrides the custom defined derivative on the original function. All calls to the original function will be translated into calls to the primal substitute first, and differentiation step follows after. This means that the derivatives of the primal subsitute function will be used instead of the derivatives defined on the original function.
 
-## Excluding Parameters From Differentiation
+## Working with Mixed Differentiable and Non-Differentiable Code
+
+Introducing differentiability to an existing system often involves dealing with code that mixes differentiable and non-differentiable logic.
+Slang provides type checking and code analysis features to allow users to clarify the intention and guard against unexpected behaviors involving when to propagate derivatives through operations.
+
+### Excluding Parameters from Differentiation
 
 Sometimes we do not wish a parameter to be considered differentiable despite it has a differentiable type. We can use the `no_diff` modifier on the parameter to inform the compiler to treat the parameter as non-differentiable and skip generating differentiation code for the parameter. The syntax is:
 
@@ -573,14 +578,85 @@ In addition, the `no_diff` modifier can also be used on the return type to indic
 ```csharp
 no_diff float myFunc(no_diff float a, float x, out float y);
 ```
-Will the the following forward derivative and backward propagation function signatures:
+Will have the following forward derivative and backward propagation function signatures:
 
 ```csharp
 float fwd_derivative(float a, DifferentialPair<float> x);
 void back_prop(float a, inout DifferentialPair<float> x, float d_y);
 ```
 
-## Calling Non-Differentiable Functions from a Differentiable Function
+### Excluding Struct Members from Differentiation
+
+When using automatic `IDifferentiable` conformance synthesis for a `struct` type, Slang will by-default treat all struct members that have a differentiable type as differentiable, and thus include a correspondant field in the generated `Differential` type for the struct.
+For example, given the following definition
+```csharp
+struct MyType : IDifferentiable
+{
+    float member1;
+    float2 member2;
+}
+```
+Slang will genereate:
+```csharp
+struct MyType.Differential : IDifferentiable
+{
+    float member1;  // derivative for MyType.member1
+    float2 member2; // derivative for MyType.member2
+}
+```
+If the user does not want a certain member to be treated as differentiable despite it has a differentiable type, a `no_diff` modifier can be used on the struct member to exclude it from differentiation.
+For example, the following code excludes `member1` from differentiation:
+```csharp
+struct MyType : IDifferentiable
+{
+    no_diff float member1;  // excluded from differentiation
+    float2 member2;
+}
+```
+The generated `Differential` in this case will be:
+```csharp
+struct MyType.Differential : IDifferentiable
+{
+    float2 member2;
+}
+```
+
+### Assigning Differentiable Values into a Non-Differentiable Location
+
+When a value with derivatives is being assigned to a location that is not differentiable, such as a struct member that is marked as `no_diff`, the derivative info is discarded and any derivative propagation is stopped at the assignment site.
+This may lead to unexpected results. For example:
+```csharp
+struct MyType : IDifferentiable
+{
+    no_diff float member;
+    float someOtherMemther;
+}
+[ForwardDifferentiable]
+float f(float x)
+{
+    MyType t;
+    t.member = x * x; // Error: assigning value with derivative into a non-differentiable location.
+    return t.member;
+}
+...
+let result = __fwd_diff(f)(diffPair(3.0, 1.0)).d; // result == 0.0
+```
+In this case, we are assigning the value `x*x`, which carries a derivative, into a non-differentiable location `MyType.member`, thus throwing away any derivative info. When `f` returns `t.member`, there will be no derivative associated with it so
+the function will not propagate the derivative through. This code is most likely not intending to discard the derivative through the assignment. To help avoid this kind of unintentional behavior, Slang will treat any assignments of a value with
+derivative info into a non-differentiable location as a compile-time error. To eliminate this error, the user should either make `t.member` differentiable, or to force the assignment by clarifying the intention to discard any derivatives using the builtin `detach` method.
+The following code will compile and the derivatives will be discarded:
+```csharp
+[ForwardDifferentiable]
+float f(float x)
+{
+    MyType t;
+    // OK: the code has expressed clearly the intention to discard the derivative and perform the assignment.
+    t.member = detach(x * x);
+    return t.member;
+}
+```
+
+### Calling Non-Differentiable Functions from a Differentiable Function
 Calling non-differentiable function from a differentiable function is allowed. However, derivatives will not be propagated through the call. The user is required to clarify the intention by prefixing the call with the `no_diff` keyword. An unclarified 
 call to non-differnetiable function will result in a compile-time error.
 
@@ -610,6 +686,7 @@ float f(float x)
 ```
 
 However, the `no_diff` keyword is not required in a call if a non-differentiable function does not take any differentiable parameters, or if the result of the differentiable function is not dependant on the derivative being propagated through the call.
+
 
 ## Higher Order Differentiation
 

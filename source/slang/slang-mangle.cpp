@@ -287,6 +287,24 @@ namespace Slang
             emitRaw(context, "k");
             emit(context, (UInt) constantIntVal->value);
         }
+        else if (auto funcCallIntVal = dynamicCast<FuncCallIntVal>(val))
+        {
+            emitRaw(context, "KC");
+            emit(context, funcCallIntVal->args.getCount());
+            emitName(context, funcCallIntVal->funcDeclRef.getName());
+            for (Index i = 0; i < funcCallIntVal->args.getCount(); i++)
+                emitVal(context, funcCallIntVal->args[i]);
+        }
+        else if (auto lookupIntVal = dynamicCast<WitnessLookupIntVal>(val))
+        {
+            emitRaw(context, "KL");
+            emitVal(context, lookupIntVal->witness);
+            emitName(context, lookupIntVal->key->getName());
+        }
+        else if (auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
+        {
+            emitRaw(context, "KX");
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");

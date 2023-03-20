@@ -556,7 +556,7 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
- 
+
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
@@ -772,6 +772,9 @@ namespace Slang
         initializeLocalVariables(builder->getModule(), diffPropagateFunc);
         // insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
         stripTempDecorations(diffPropagateFunc);
+
+        sortBlocksInFunc(diffPropagateFunc);
+        sortBlocksInFunc(primalFunc);
     }
 
     ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(

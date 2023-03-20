@@ -2,6 +2,8 @@
 
 #include "../../slang-com-helper.h"
 
+#include "slang-rtti-util.h"
+
 #include <mutex>
 
 namespace Slang {
@@ -189,6 +191,37 @@ StructRttiInfo StructRttiBuilder::make()
     }
 
     return m_rttiInfo;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncsMap !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo)
+{
+    if (auto funcsPtr = m_map.TryGetValue(rttiInfo))
+    {
+        return *funcsPtr;
+    }
+
+    // Try to get the default impl
+    // NOTE! funcs could be invalid if there is no default impl.
+    const auto funcs = RttiUtil::getDefaultTypeFuncs(rttiInfo);
+
+    // Add to the map
+    m_map.Add(rttiInfo, funcs);
+    return funcs;
+}
+
+void RttiTypeFuncsMap::add(const RttiInfo* rttiInfo, const RttiTypeFuncs& funcs)
+{
+    if (auto funcsPtr = m_map.TryGetValueOrAdd(rttiInfo, funcs))
+    {
+        // If there are funcs set, they aren't valid otherwise this would be 
+        // replacing, so assert on that scenario.
+        SLANG_ASSERT(!funcsPtr->isValid());
+
+        // Replace the funcs
+        *funcsPtr = funcs;
+    }
 }
 
 } // namespace Slang

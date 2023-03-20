@@ -1063,6 +1063,21 @@ class DllExportAttribute : public Attribute
     SLANG_AST_CLASS(DllExportAttribute)
 };
 
+class CudaDeviceExportAttribute : public Attribute
+{
+    SLANG_AST_CLASS(CudaDeviceExportAttribute)
+};
+
+class CudaKernelAttribute : public Attribute
+{
+    SLANG_AST_CLASS(CudaKernelAttribute)
+};
+
+class CudaHostAttribute : public Attribute
+{
+    SLANG_AST_CLASS(CudaHostAttribute)
+};
+
 class DerivativeMemberAttribute : public Attribute
 {
     SLANG_AST_CLASS(DerivativeMemberAttribute)

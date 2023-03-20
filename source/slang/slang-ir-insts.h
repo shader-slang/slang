@@ -421,6 +421,9 @@ struct IREntryPointDecoration : IRDecoration
     IRStringLit* getModuleName() { return cast<IRStringLit>(getOperand(2)); }
 };
 
+IR_SIMPLE_DECORATION(CudaHostDecoration)
+IR_SIMPLE_DECORATION(CudaKernelDecoration)
+
 struct IRGeometryInputPrimitiveTypeDecoration: IRDecoration
 {
     IR_PARENT_ISA(GeometryInputPrimitiveTypeDecoration)
@@ -913,11 +916,24 @@ struct IRPrimalSubstitute : IRInst
     {
         kOp = kIROp_PrimalSubstitute
     };
-    // The base function for the call.
-    IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
 
     IR_LEAF_ISA(PrimalSubstitute)
+};
+
+struct IRDispatchKernel : IRInst
+{
+    enum
+    {
+        kOp = kIROp_DispatchKernel
+    };
+    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getThreadGroupSize() { return getOperand(1); }
+    IRInst* getDispatchSize() { return getOperand(2); }
+    UInt getArgCount() { return getOperandCount() - 3; }
+    IRInst* getArg(UInt i) { return getOperand(3 + i); }
+
+    IR_LEAF_ISA(DispatchKernel)
 };
 
 // Dictionary item mapping a type with a corresponding 
@@ -2880,6 +2896,7 @@ public:
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
+    IRInst* emitDispatchKernelInst(IRType* type, IRInst* baseFn, IRInst* threadGroupSize, IRInst* dispatchSize, Int argCount, IRInst* const* inArgs);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
@@ -3766,6 +3783,21 @@ public:
     void addDllExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
     {
         addDecoration(value, kIROp_DllExportDecoration, getStringValue(functionName));
+    }
+
+    void addCudaDeviceExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
+    {
+        addDecoration(value, kIROp_CudaDeviceExportDecoration, getStringValue(functionName));
+    }
+
+    void addCudaHostDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_CudaHostDecoration);
+    }
+
+    void addCudaKernelDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_CudaKernelDecoration);
     }
 
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)

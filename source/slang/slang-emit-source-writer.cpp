@@ -16,10 +16,11 @@
 
 namespace Slang {
 
-SourceWriter::SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode)
+SourceWriter::SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, SourceMap* sourceMap)
 {
+    m_sourceMap = sourceMap;
     m_lineDirectiveMode = lineDirectiveMode;
-    this->m_sourceManager = sourceManager;
+    m_sourceManager = sourceManager;
 }
 
 String SourceWriter::getContentAndClear()
@@ -274,7 +275,10 @@ void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocatio
 
 void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
 {
-    if (getLineDirectiveMode() == LineDirectiveMode::None)
+    // If we don't have any line directives *and* we don't want to output 
+    // source map, we can just ignore
+    if (getLineDirectiveMode() == LineDirectiveMode::None &&
+        m_sourceMap == nullptr)
     {
         // Ignore if we aren't outputting directives 
         return;
@@ -328,7 +332,14 @@ void SourceWriter::_flushSourceLocationChange()
     // advances the location, and outputting text is what
     // triggers this flush operation.
     m_needToUpdateSourceLocation = false;
+    
     _emitLineDirectiveIfNeeded(m_nextHumaneSourceLocation);
+
+    // If we have a source map update state
+    if (m_sourceMap)
+    {
+        _updateSourceMap(m_nextHumaneSourceLocation);
+    }
 }
 
 void SourceWriter::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceLoc& sourceLocation)
@@ -339,6 +350,31 @@ void SourceWriter::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceL
     newLoc.column = 1;
 
     m_loc = newLoc;
+}
+
+void SourceWriter::_updateSourceMap(const HumaneSourceLoc& sourceLocation)
+{
+    // Ignore invalid source locations
+    if (sourceLocation.line <= 0)
+        return;
+
+    // We need to work out the current column in the generated (ie being written) output
+    Index generatedLineIndex, generatedColumnIndex;
+    _calcLocation(generatedLineIndex, generatedColumnIndex);
+
+    // Advance to the current output line
+    m_sourceMap->advanceToLine(generatedLineIndex);
+
+    // Add the entry into the map, mapping back to the original source
+    SourceMap::Entry entry;
+    entry.init();
+
+    entry.sourceFileIndex = m_sourceMap->getSourceFileIndex(sourceLocation.pathInfo.getName().getUnownedSlice());
+    entry.sourceLine = sourceLocation.line - 1;
+    entry.sourceColumn = sourceLocation.column - 1;
+    entry.generatedColumn = generatedColumnIndex;
+    
+    m_sourceMap->addEntry(entry);
 }
 
 void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocation)
@@ -476,6 +512,65 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
     }
 
     emitRawText("\n");
+}
+
+void SourceWriter::_calcLocation(Index& outLineIndex, Index& outColumnIndex)
+{
+    // If we are at the end, then we are done.
+    if (m_currentOutputOffset == m_builder.getLength())
+    {
+        outLineIndex = m_currentLineIndex;
+        outColumnIndex = m_currentColumnIndex;
+        return;
+    }
+
+    const char* cur = m_builder.getBuffer() + m_currentOutputOffset;
+    const char* end = m_builder.end();
+
+    const char* start = cur;
+
+    while (cur < end)
+    {
+        // Reset start
+        start = cur;
+
+        // Look for the end of the line
+        while (*cur != '\n' && *cur != '\r' && cur < end)
+        {
+            cur++;
+        }
+
+        // If we are not at the total end then we must have hit a \n or \r
+        if (cur < end)
+        {
+            const auto c = *cur++;
+
+            ++m_currentLineIndex;
+            // Reset the column 
+            m_currentColumnIndex = 0;
+
+            // Check the next char to see if it's part of a CR/LF combination
+            if (cur < end)
+            {
+                const auto d = *cur;
+                // If it is combination skip the next byte
+                cur += ((c ^ d) == ('\r' ^ '\n'));
+            }
+        }
+    }
+
+    // Fix up the current index.
+    // TODO(JS):
+    // NOTE! This isn't strictly correct because it assumes one byte is a *column* which isn't actually the case with utf8 
+    // encoding... 
+    m_currentColumnIndex += Index(cur - start);
+
+    // Set the current offset is the end
+    m_currentOutputOffset = m_builder.getLength();
+
+    // Output the values
+    outLineIndex = m_currentLineIndex;
+    outColumnIndex = m_currentColumnIndex;
 }
 
 } // namespace Slang

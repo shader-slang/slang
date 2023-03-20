@@ -25,6 +25,8 @@ public:
     {
     }
 
+    ASTBuilder* getBuilder() { return m_builder; }
+
     Scope* getScope(ContainerDecl* decl)
     {
         for (auto container = decl; container; container = container->parentDecl)
