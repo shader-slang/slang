@@ -6934,9 +6934,12 @@ namespace Slang
             arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
             arg->type.type = param->getType();
             arg->loc = loc;
-            if (auto pairType = visitor->getDifferentialPairType(param->getType()))
+            if (!param->findModifier<NoDiffModifier>())
             {
-                arg->type.type = pairType;
+                if (auto pairType = visitor->getDifferentialPairType(param->getType()))
+                {
+                    arg->type.type = pairType;
+                }
             }
             imaginaryArguments.add(arg);
         }
@@ -6958,18 +6961,26 @@ namespace Slang
             arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
             arg->type.type = param->getType();
             arg->loc = loc;
-            if (auto pairType = as<DifferentialPairType>(visitor->getDifferentialPairType(param->getType())))
+            bool isDiffParam = (!param->findModifier<NoDiffModifier>());
+            if (isDiffParam)
             {
-                arg->type.type = pairType;
-                if (isOutParam(param))
+                if (auto pairType = as<DifferentialPairType>(visitor->getDifferentialPairType(param->getType())))
                 {
-                    // out T -> in T.Differential
-                    arg->type.isLeftValue = false;
-                    arg->type.type = visitor->tryGetDifferentialType(
-                        visitor->getASTBuilder(), pairType->getPrimalType());
+                    arg->type.type = pairType;
+                    if (isOutParam(param))
+                    {
+                        // out T -> in T.Differential
+                        arg->type.isLeftValue = false;
+                        arg->type.type = visitor->tryGetDifferentialType(
+                            visitor->getASTBuilder(), pairType->getPrimalType());
+                    }
+                }
+                else
+                {
+                    isDiffParam = false;
                 }
             }
-            else
+            if (!isDiffParam)
             {
                 if (isOutParam(param))
                 {

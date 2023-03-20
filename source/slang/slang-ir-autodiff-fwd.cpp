@@ -525,7 +525,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         return InstPair(primalCall, nullptr);
     }
 
-    auto calleeType = _getCalleeActualFuncType(diffCallee);
+    auto calleeType = _getCalleeActualFuncType(primalCallee);
     SLANG_ASSERT(calleeType);
     SLANG_RELEASE_ASSERT(calleeType->getParamCount() == origCall->getArgCount());
 
