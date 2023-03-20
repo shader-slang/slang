@@ -2810,6 +2810,10 @@ public:
         IRType* elementType,
         IRInst* elementCount);
 
+    IRVectorType* getVectorType(
+        IRType* elementType,
+        UInt    elementCount);
+
     IRMatrixType* getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
@@ -3324,6 +3328,10 @@ public:
 
     IRInst* emitElementExtract(
         IRInst* base,
+        UInt    index);
+
+    IRInst* emitElementExtract(
+        IRInst* base,
         const ArrayView<IRInst*>& accessChain);
 
     IRInst* emitElementAddress(
@@ -3337,9 +3345,14 @@ public:
 
     IRInst* emitElementAddress(
         IRInst* basePtr,
+        UInt    index);
+
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
         const ArrayView<IRInst*>& accessChain);
 
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
+    IRInst* emitUpdateElement(IRInst* base, UInt index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement);
 
     IRInst* emitGetAddress(
@@ -3355,6 +3368,12 @@ public:
     IRInst* emitSwizzle(
         IRType*         type,
         IRInst*        base,
+        UInt            elementCount,
+        UInt const*     elementIndices);
+
+    IRInst* emitMatrixSwizzle(
+        IRType*         type,
+        IRInst*         base,
         UInt            elementCount,
         UInt const*     elementIndices);
 
