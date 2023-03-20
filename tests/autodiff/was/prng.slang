@@ -1,3 +1,4 @@
+//TEST_IGNORE_FILE:
 struct PRNG
 {
     /** Initializes a Xorshift32 pseudorandom generator.

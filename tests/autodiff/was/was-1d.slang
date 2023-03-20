@@ -1,3 +1,4 @@
+//TEST_IGNORE_FILE:
 __exported import scene;
 __exported import prng;
 
@@ -5,7 +6,7 @@ float sample1DNormal(float x, PRNG prng)
 {
     float u = prng.nextFloat1D();
     float v = prng.nextFloat1D();
-    return sqrt(-2 * log(u))*cos(2*M_PI*v);
+    return sqrt(-2 * log(u))*cos(2*3.1415*v);
 }
 
 float boundaryTerm(Intersection isect)
@@ -29,13 +30,12 @@ float harmonicWeight(Intersection isect, no_diff Intersection aux_isect)
 }
 
 [BackwardDifferentiable]
-Intersection attachToGeometry(Intersection isect)
+float attachToGeometry(Intersection isect)
 {
     float leftWt = detach(isect.ls.x1 - isect.x);
     float rightWt = detach(isect.x - isect.x0);
 
-    isect.x = (leftWt * isect.ls.x0 + rightWt * isect.ls.x1);
-    return isect;
+    return (leftWt * isect.ls.x0 + rightWt * isect.ls.x1);;
 }
 
 [BackwardDifferentiable]
@@ -64,7 +64,12 @@ float warp(Intersection isect, PRNG prng)
 [BackwardDifferentiable]
 Intersection warpedIntersect(float x, PRNG prng)
 {   
+    // TODO: For now the jacobian here is 1.0, 
+    // but we will need to adjust the warp by the jacobian for
+    // more complex intersection models.
+    //
     Intersection isect = intersect(x);
+
     Intersection.Differential d_isect = Intersection.Differential.dzero();
     d_isect.x = 1.0;
 
@@ -72,6 +77,7 @@ Intersection warpedIntersect(float x, PRNG prng)
         __fwd_diff(warp)(diffPair(isect, d_isect), prng));
 
     isect.x = detach(isect.x) + dpwarp.p();
+    isect.wt = isect.wt * (1 + dpwarp.d());
 
-    return shadeIntersection(isect) * (1 + dpwarp.d());;
+    return isect;
 }
