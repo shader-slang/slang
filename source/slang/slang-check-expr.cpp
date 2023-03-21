@@ -487,12 +487,25 @@ namespace Slang
         switch (builtinAssocTypeAttr->kind)
         {
         case BuiltinRequirementKind::DifferentialType:
-            synthesizedDecl = m_astBuilder->create<StructDecl>();
+            {
+                auto structDecl = m_astBuilder->create<StructDecl>();
+                auto conformanceDecl = m_astBuilder->create<InheritanceDecl>();
+                conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
+                conformanceDecl->parentDecl = structDecl;
+                structDecl->members.add(conformanceDecl);
+
+                synthesizedDecl = structDecl;
+                auto typeDef = m_astBuilder->create<TypeAliasDecl>();
+                typeDef->nameAndLoc.name = getName("Differential");
+                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, DeclRef<Decl>(structDecl, nullptr));
+                typeDef->type.type = m_astBuilder->getOrCreateDeclRefType(declRef.decl, declRef.substitutions);
+                typeDef->parentDecl = structDecl;
+                structDecl->members.add(typeDef);
+            }
             break;
         default:
-            break;
+            return nullptr;
         }
-        synthesizedDecl = m_astBuilder->create<StructDecl>();
         synthesizedDecl->parentDecl = parent;
         synthesizedDecl->nameAndLoc.name = item.declRef.getName();
         synthesizedDecl->loc = parent->loc;

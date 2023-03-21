@@ -1245,6 +1245,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                                 {
                                     if (innerBuiltinReq->kind == BuiltinRequirementKind::DifferentialType)
                                     {
+                                        if (!innerDeclRefType->declRef.equals(declRef))
+                                            return _tryLookupConcreteAssociatedTypeFromThisTypeSubst(builder, innerDeclRefType->declRef);
                                         return innerDeclRefType;
                                     }
                                 }
