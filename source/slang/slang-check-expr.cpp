@@ -658,6 +658,15 @@ namespace Slang
             default:
                 SLANG_UNREACHABLE("all cases handle");
             }
+            if (getShared()->isInLanguageServer())
+            {
+                // Don't make breadcrumb nodes carry any source loc info,
+                // as they may confuse language server functionalities.
+                if (bb)
+                {
+                    bb->loc = SourceLoc();
+                }
+            }
         }
 
         return ConstructDeclRefExpr(item.declRef, bb, loc, originalExpr);
