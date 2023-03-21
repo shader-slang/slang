@@ -457,6 +457,12 @@ struct AutoDiffTexture : public WindowedAppBase
 
     virtual void renderFrame(int frameBufferIndex) override
     {
+        static uint32_t frameCount = 0;
+        frameCount++;
+        int32_t layerLimit = (int)mipMapOffset.getCount() - 2 - (frameCount / 50);
+        if (layerLimit < 0)
+            layerLimit = 0;
+
         {
             ComPtr<ICommandBuffer> commandBuffer =
                 gTransientHeaps[frameBufferIndex]->createCommandBuffer();
@@ -474,7 +480,7 @@ struct AutoDiffTexture : public WindowedAppBase
         renderImage(
             frameBufferIndex,
             gFramebuffers[frameBufferIndex],
-            [this](IRenderCommandEncoder* encoder)
+            [&](IRenderCommandEncoder* encoder)
             {
                 auto rootObject = encoder->bindPipeline(gIterPipelineState);
                 ShaderCursor rootCursor(rootObject);
@@ -486,6 +492,8 @@ struct AutoDiffTexture : public WindowedAppBase
                 rootCursor["Uniforms"]["mipOffset"].setData(mipMapOffset.getBuffer(), sizeof(uint32_t) * mipMapOffset.getCount());
                 rootCursor["Uniforms"]["texRef"].setResource(gRefImageSRV);
                 rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setResource(gAccumulateBufferView);
+                rootCursor["Uniforms"]["bwdTexture"]["minLOD"].setData((float)layerLimit);
+
             });
 
         {
@@ -547,14 +555,14 @@ struct AutoDiffTexture : public WindowedAppBase
                 encoder->dispatchCompute(
                     ((textureWidth >> i) + 15) / 16, ((textureHeight >> i) + 15) / 16, 1);
             }
+            encoder->textureBarrier(gLearningTexture, ResourceState::UnorderedAccess, ResourceState::ShaderResource);
+
             encoder->endEncoding();
             commandBuffer->close();
             gQueue->executeCommandBuffer(commandBuffer);
         }
         gSwapchain->present();
 
-        static uint32_t frameCount = 0;
-        frameCount++;
         if (frameCount % 50 == 0)
         {
             ComPtr<ISlangBlob> blob;

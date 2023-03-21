@@ -4,7 +4,7 @@ struct BwdTextureContext
 {
     RWStructuredBuffer<int> accumulateBuffer;
     Texture2D texture;
-    
+    float minLOD;
     void writeDiffToTexel(uint offset, uint layerW, uint layerH, float x, float y, float3 val)
     {
         int4 uval = int4(int3(val * 65536), 1);
@@ -54,7 +54,7 @@ struct BwdTextureContext
         float lengthY = length(dY);
         float LOD = log2(max(lengthX, lengthY));
         float maxLOD = levels - 1;
-        float clampedLOD = max(0.0, (min(maxLOD, LOD)));
+        float clampedLOD = max(minLOD, (min(maxLOD, LOD)));
 
         float lodFrac = clampedLOD - floor(clampedLOD);
         uint lod0 = (uint)floor(clampedLOD);
@@ -104,7 +104,7 @@ struct BwdTextureContext
         float lengthY = length(dY);
         float LOD = log2(max(lengthX, lengthY));
         float maxLOD = levels - 1;
-        float clampedLOD = max(0.0, (min(maxLOD, LOD)));
+        float clampedLOD = max(minLOD, (min(maxLOD, LOD)));
 
         float lodFrac = clampedLOD - floor(clampedLOD);
         uint lod0 = (uint)floor(clampedLOD);
