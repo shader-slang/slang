@@ -7021,7 +7021,7 @@ namespace Slang
         HigherOrderInvokeExpr* higherOrderFuncExpr = visitor->getASTBuilder()->create<TDifferentiateExpr>();
         higherOrderFuncExpr->baseFunction = derivativeOfAttr->funcExpr;
         higherOrderFuncExpr->loc = derivativeOfAttr->loc;
-        Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(higherOrderFuncExpr, *visitor);
+        Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(higherOrderFuncExpr, visitor->allowStaticReferenceToNonStaticMember());
         if (!checkedHigherOrderFuncExpr)
         {
             visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);

@@ -276,9 +276,10 @@
   <ItemGroup>
     <None Include="..\..\..\examples\autodiff-texture\buildmip.slang" />
     <None Include="..\..\..\examples\autodiff-texture\convert.slang" />
+    <None Include="..\..\..\examples\autodiff-texture\draw-quad.slang" />
     <None Include="..\..\..\examples\autodiff-texture\learnmip.slang" />
     <None Include="..\..\..\examples\autodiff-texture\reconstruct.slang" />
-    <None Include="..\..\..\examples\autodiff-texture\shaders.slang" />
+    <None Include="..\..\..\examples\autodiff-texture\train.slang" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\example-base\example-base.vcxproj">

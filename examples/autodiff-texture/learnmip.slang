@@ -1,3 +1,5 @@
+// A compute shader to add gradients to a mip-map texture.
+
 cbuffer Uniforms
 {
     uint dstWidth;

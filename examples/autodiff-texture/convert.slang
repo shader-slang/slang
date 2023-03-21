@@ -1,3 +1,4 @@
+// A compute shader to convert from a buffer into a mip-map texture.
 cbuffer Uniforms
 {
     uint4 mipOffset[16];

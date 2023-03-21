@@ -17,13 +17,16 @@
     <None Include="..\..\..\examples\autodiff-texture\convert.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\examples\autodiff-texture\draw-quad.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\examples\autodiff-texture\learnmip.slang">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\examples\autodiff-texture\reconstruct.slang">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="..\..\..\examples\autodiff-texture\shaders.slang">
+    <None Include="..\..\..\examples\autodiff-texture\train.slang">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>

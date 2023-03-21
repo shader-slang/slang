@@ -1,3 +1,5 @@
+// A compute shader to build a mip-map layer using box filtering.
+
 cbuffer Uniforms
 {
     uint dstWidth;

@@ -1,6 +1,6 @@
 // shaders.slang
 
-struct BwdTextureContext
+struct BwdTexture
 {
     RWStructuredBuffer<int> accumulateBuffer;
     Texture2D texture;
@@ -116,6 +116,29 @@ struct BwdTextureContext
         let v1 = sampleTexture_linear(lod1, uv, w, h) * weightLod1;
         return v0 + v1;
     }
+
+    static float4 sample(BwdTexture t, SamplerState s, no_diff float2 uv)
+    {
+        return t.texture.Sample(s, uv);
+    }
+
+    [ForwardDerivativeOf(BwdTexture.sample)]
+    static float4 fwd_sample(BwdTexture t, SamplerState s, no_diff float2 uv)
+    {
+        return float4(0.0);
+    }
+
+    [BackwardDerivativeOf(BwdTexture.sample)]
+    static void bwd_sample(BwdTexture t, SamplerState s, no_diff float2 uv, float4 dOut)
+    {
+        float2 dX = ddx_coarse(uv);
+        float2 dY = ddy_coarse(uv);
+        uint w;
+        uint h;
+        uint levels;
+        t.texture.GetDimensions(0, w, h, levels);
+        t.sampleTexture_trilinear_bwd(w, h, levels, uv, dX, dY, dOut);
+    }
 }
 
 cbuffer Uniforms
@@ -125,7 +148,7 @@ cbuffer Uniforms
 
     Texture2D texRef;
     SamplerState sampler;
-    BwdTextureContext bwdTexture;
+    BwdTexture bwdTexture;
 }
 
 struct AssembledVertex
@@ -144,33 +167,10 @@ struct VertexStageOutput
     float4          sv_position     : SV_Position;
 };
 
-float4 sampleAlbedo(no_diff float2 uv)
-{
-    return bwdTexture.texture.Sample(sampler, uv);
-}
-
-[ForwardDerivativeOf(sampleAlbedo)]
-DifferentialPair<float4> sampleAlbedo_fwd(float2 uv)
-{
-    return DifferentialPair<float4>(no_diff bwdTexture.texture.Sample(sampler, uv), 0.0);
-}
-
-[BackwardDerivativeOf(sampleAlbedo)]
-void sampleAlbedo_bwd(float2 uv, float4 dOut)
-{
-    float2 dX = ddx_coarse(uv);
-    float2 dY = ddy_coarse(uv);
-    uint w;
-    uint h;
-    uint levels;
-    bwdTexture.texture.GetDimensions(0, w, h, levels);
-    bwdTexture.sampleTexture_trilinear_bwd(w, h, levels, uv, dX, dY, dOut);
-}
-
 [BackwardDifferentiable]
 float4 shadeFragment(no_diff float2 uv)
 {
-    float3 color = sampleAlbedo(uv * 2).xyz;
+    float3 color = BwdTexture.sample(bwdTexture, sampler, uv * 2).xyz;
     return float4(color, 1.0);
 }
 

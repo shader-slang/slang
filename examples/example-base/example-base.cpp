@@ -91,7 +91,7 @@ Slang::Result WindowedAppBase::initializeBase(
     renderTargetAccess.finalState = ResourceState::Present;
     depthStencilAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
     depthStencilAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-    depthStencilAccess.initialState = ResourceState::Undefined;
+    depthStencilAccess.initialState = ResourceState::DepthWrite;
     depthStencilAccess.finalState = ResourceState::DepthWrite;
     renderPassDesc.renderTargetAccess = &renderTargetAccess;
     renderPassDesc.depthStencilAccess = &depthStencilAccess;

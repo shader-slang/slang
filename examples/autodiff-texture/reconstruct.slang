@@ -1,3 +1,5 @@
+// A compute shader to propagate gradients from high level mip(low-res) to lower level mip (high-res).
+
 cbuffer Uniforms
 {
     uint4 mipOffset[16];
