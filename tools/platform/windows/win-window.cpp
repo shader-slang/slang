@@ -342,7 +342,6 @@ public:
             NULL, // menu
             instance,
             NULL);
-
         if (handle)
             Win32AppContext::windows[handle] = this;
     }

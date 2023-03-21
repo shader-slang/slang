@@ -766,6 +766,8 @@ example "triangle"
 example "ray-tracing"
 example "ray-tracing-pipeline"
 
+example "autodiff-texture"
+
 example "gpu-printing"
     kind "ConsoleApp"
 
@@ -781,17 +783,7 @@ example "cpu-com-example"
 
 example "cpu-hello-world"
     kind "ConsoleApp"
-if enableExperimental then
-    project "heterogeneous-hello-world"
-        kind "ConsoleApp"
-        links "slangc"
-        location("build/" .. slangUtil.getBuildLocationName(targetInfo) .. "/heterogeneous-hello-world")
-        prebuildcommands {
-            "\"%{cfg.targetdir}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/main.slang\" -o \"%{cfg.targetdir}/heterogeneous-hello-world.exe\""
-        }
-        files {"examples/heterogeneous-hello-world/*.slang"}
 
-end
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
 --
