@@ -525,9 +525,13 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         return InstPair(primalCall, nullptr);
     }
 
-    auto calleeType = _getCalleeActualFuncType(diffCallee);
+    auto calleeType = _getCalleeActualFuncType(primalCallee);
     SLANG_ASSERT(calleeType);
     SLANG_RELEASE_ASSERT(calleeType->getParamCount() == origCall->getArgCount());
+
+    auto diffCalleeType = _getCalleeActualFuncType(diffCallee);
+    SLANG_ASSERT(diffCalleeType);
+    SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
 
     auto placeholderCall = builder->emitCallInst(nullptr, builder->emitUndefined(builder->getTypeKind()), 0, nullptr);
     builder->setInsertBefore(placeholderCall);
@@ -545,8 +549,9 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
         auto origType = origCall->getArg(ii)->getDataType();
         auto primalType = primalArg->getDataType();
-        auto paramType = calleeType->getParamType(ii);
-        if (!isNoDiffType(paramType))
+        auto originalParamType = calleeType->getParamType(ii);
+        auto diffParamType = diffCalleeType->getParamType(ii);
+        if (!isNoDiffType(originalParamType))
         {
             if (isNoDiffType(primalType))
             {
@@ -561,7 +566,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 auto pairValType = as<IRDifferentialPairType>(
                     pairPtrType ? pairPtrType->getValueType() : pairType);
                 auto diffType = differentiableTypeConformanceContext.getDifferentialTypeFromDiffPairType(&argBuilder, pairValType);
-                if (auto ptrParamType = as<IRPtrTypeBase>(paramType))
+                if (auto ptrParamType = as<IRPtrTypeBase>(diffParamType))
                 {
                     // Create temp var to pass in/out arguments.
                     auto srcVar = argBuilder.emitVar(ptrParamType->getValueType());

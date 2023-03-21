@@ -6,6 +6,9 @@
 #include <Windows.h>
 #endif
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "external/stb/stb_image.h"
+
 using namespace Slang;
 using namespace gfx;
 
@@ -88,7 +91,7 @@ Slang::Result WindowedAppBase::initializeBase(
     renderTargetAccess.finalState = ResourceState::Present;
     depthStencilAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
     depthStencilAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-    depthStencilAccess.initialState = ResourceState::Undefined;
+    depthStencilAccess.initialState = ResourceState::DepthWrite;
     depthStencilAccess.finalState = ResourceState::DepthWrite;
     renderPassDesc.renderTargetAccess = &renderTargetAccess;
     renderPassDesc.depthStencilAccess = &depthStencilAccess;
@@ -121,7 +124,8 @@ void WindowedAppBase::createSwapchainFramebuffers()
         depthBufferDesc.format = gfx::Format::D32_FLOAT;
         depthBufferDesc.defaultState = ResourceState::DepthWrite;
         depthBufferDesc.allowedStates = ResourceStateSet(ResourceState::DepthWrite);
-        
+        ClearValue depthClearValue = {};
+        depthBufferDesc.optimalClearValue = &depthClearValue;
         ComPtr<gfx::ITextureResource> depthBufferResource =
             gDevice->createTextureResource(depthBufferDesc, nullptr);
         ComPtr<gfx::ITextureResource> colorBuffer;
@@ -151,6 +155,72 @@ void WindowedAppBase::createSwapchainFramebuffers()
         ComPtr<gfx::IFramebuffer> frameBuffer = gDevice->createFramebuffer(framebufferDesc);
         gFramebuffers.add(frameBuffer);
     }
+}
+
+ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(String fileName, int& textureWidth, int& textureHeight)
+{
+    int channelsInFile = 0;
+    auto textureContent = stbi_load(fileName.getBuffer(), &textureWidth, &textureHeight, &channelsInFile, 4);
+    gfx::ITextureResource::Desc textureDesc = {};
+    textureDesc.allowedStates.add(ResourceState::ShaderResource);
+    textureDesc.format = gfx::Format::R8G8B8A8_UNORM;
+    textureDesc.numMipLevels = Math::Log2Ceil(Math::Min(textureWidth, textureHeight)) + 1;
+    textureDesc.type = gfx::IResource::Type::Texture2D;
+    textureDesc.size.width = textureWidth;
+    textureDesc.size.height = textureHeight;
+    textureDesc.size.depth = 1;
+    List<gfx::ITextureResource::SubresourceData> subresData;
+    List<List<uint32_t>> mipMapData;
+    mipMapData.setCount(textureDesc.numMipLevels);
+    subresData.setCount(textureDesc.numMipLevels);
+    mipMapData[0].setCount(textureWidth * textureHeight);
+    memcpy(mipMapData[0].getBuffer(), textureContent, textureWidth * textureHeight * 4);
+    stbi_image_free(textureContent);
+    subresData[0].data = mipMapData[0].getBuffer();
+    subresData[0].strideY = textureWidth * 4;
+    subresData[0].strideZ = textureWidth * textureHeight * 4;
+
+    // Build mipmaps.
+    struct RGBA { uint8_t v[4]; };
+    auto castToRGBA = [](uint32_t v) { RGBA result; memcpy(&result, &v, 4); return result; };
+    auto castToUint = [](RGBA v) { uint32_t result; memcpy(&result, &v, 4); return result; };
+
+    int lastMipWidth = textureWidth;
+    int lastMipHeight = textureHeight;
+    for (int m = 1; m < textureDesc.numMipLevels; m++)
+    {
+        auto lastMipmapData = mipMapData[m - 1].getBuffer();
+        int w = lastMipWidth / 2;
+        int h = lastMipHeight / 2;
+        mipMapData[m].setCount(w * h);
+        subresData[m].data = mipMapData[m].getBuffer();
+        subresData[m].strideY = w * 4;
+        subresData[m].strideZ = h * w * 4;
+        for (int x = 0; x < w; x++)
+        {
+            for (int y = 0; y < h; y++)
+            {
+                auto pix1 = castToRGBA(lastMipmapData[(y * 2) * lastMipWidth + (x * 2)]);
+                auto pix2 = castToRGBA(lastMipmapData[(y * 2) * lastMipWidth + (x * 2 + 1)]);
+                auto pix3 = castToRGBA(lastMipmapData[(y * 2 + 1) * lastMipWidth + (x * 2)]);
+                auto pix4 = castToRGBA(lastMipmapData[(y * 2 + 1) * lastMipWidth + (x * 2 + 1)]);
+                RGBA pix;
+                for (int c = 0; c < 4; c++)
+                {
+                    pix.v[c] = (uint8_t)(((uint32_t)pix1.v[c] + pix2.v[c] + pix3.v[c] + pix4.v[c]) / 4);
+                }
+                mipMapData[m][y * w + x] = castToUint(pix);
+            }
+        }
+        lastMipWidth = w;
+        lastMipHeight = h;
+    }
+
+    auto texture = gDevice->createTextureResource(textureDesc, subresData.getBuffer());
+
+    gfx::IResourceView::Desc viewDesc = {};
+    viewDesc.type = gfx::IResourceView::Type::ShaderResource;
+    return gDevice->createTextureView(texture.get(), viewDesc);
 }
 
 void WindowedAppBase::windowSizeChanged()

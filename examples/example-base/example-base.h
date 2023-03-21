@@ -33,7 +33,7 @@ protected:
         gfx::DeviceType deviceType = gfx::DeviceType::Default);
     void createSwapchainFramebuffers();
     void mainLoop();
-
+    Slang::ComPtr<gfx::IResourceView> createTextureFromFile(Slang::String fileName, int& textureWidth, int& textureHeight);
     virtual void windowSizeChanged();
 
 protected:
