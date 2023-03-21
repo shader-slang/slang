@@ -9188,8 +9188,8 @@ struct LocObfuscator
 
                 for (Index i = 0; i < SLANG_COUNT_OF(data); ++i)
                 {
-                    buf.appendChar(CharUtil::getHexChar(data[i] & 0xf));
-                    buf.appendChar(CharUtil::getHexChar(data[i] >> 4));
+                    dst[i * 2 + 0] = CharUtil::getHexChar(data[i] & 0xf);
+                    dst[i * 2 + 1] = CharUtil::getHexChar(data[i] >> 4);
                 }
                 buf.appendInPlace(dst, charsCount);
                 obfusctatedPathInfo = PathInfo::makePath(buf);
@@ -9259,13 +9259,10 @@ struct LocObfuscator
         sourceMap->m_file = obfusctatedPathInfo.getName();
 
         // Make sure we have line 0.
+        // We only end up with one line in the obfuscated map.
         sourceMap->advanceToLine(0);
 
-        List<SourceMap::Entry> sourceMapEntries;
-                
-        {
-            sourceMapEntries.setCount(uniqueLocCount);
-        
+        {        
             // Current view, with cached "View" based sourceFileIndex
             SourceView* curView = nullptr;
             Index curViewSourceFileIndex = -1;
@@ -9278,18 +9275,21 @@ struct LocObfuscator
             {
                 const auto& pair = locPairs[i];
 
-                auto& entry = sourceMapEntries[i];
-                entry.init();
 
                 // First find the view
                 if (curView == nullptr || 
                     !curView->getRange().contains(pair.originalLoc))
                 {
-                    curView = sourceManager->findSourceView(pair.originalLoc);
+                    curView = sourceManager->findSourceViewRecursively(pair.originalLoc);
                     SLANG_ASSERT(curView);
 
                     // Reset the current view path index, to being unset
                     curViewSourceFileIndex = -1;
+
+                    // We have to reset, because the path index is for the source manager
+                    // that holds the view. If the view changes we need to re determine the 
+                    // path string, and index.
+                    curPathSourceFileIndex = -1;
                 }
                
                 // Now get the location
@@ -9308,16 +9308,25 @@ struct LocObfuscator
                 }
                 else
                 {
-                    if (handleLoc.pathHandle != curPathHandle)
+                    if (curPathSourceFileIndex < 0 || 
+                        handleLoc.pathHandle != curPathHandle)
                     {
+                        auto viewSourceManager = curView->getSourceManager();
+                        const auto filePathSlice = viewSourceManager->getStringSlicePool().getSlice(curPathHandle);
+
+                        // Set the handle
                         curPathHandle = handleLoc.pathHandle;
 
-                        const auto filePathSlice = sourceManager->getStringSlicePool().getSlice(curPathHandle);
+                        // Get the source file index.
                         curPathSourceFileIndex = sourceMap->getSourceFileIndex(filePathSlice);
                     }
 
                     sourceFileIndex = curPathSourceFileIndex;
                 }
+
+                // Create the entry
+                SourceMap::Entry entry;
+                entry.init();
 
                 entry.sourceFileIndex = sourceFileIndex;
   
@@ -9326,12 +9335,10 @@ struct LocObfuscator
 
                 entry.sourceColumn = handleLoc.column - 1;
                 entry.sourceLine = handleLoc.line - 1;
-            }
-        }
 
-        for (const auto& sourceMapEntry : sourceMapEntries)
-        {
-            sourceMap->addEntry(sourceMapEntry);
+                // Add it to the source map
+                sourceMap->addEntry(entry);
+            }
         }
 
         return SLANG_OK;
@@ -9536,7 +9543,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         {
             LocObfuscator locObfuscator;
 
-            locObfuscator.obfuscate(module, compileRequest->getSink()->getSourceManager());
+            locObfuscator.obfuscate(module, compileRequest->getSourceManager());
         }
     }
 
