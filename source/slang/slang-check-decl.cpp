@@ -642,6 +642,9 @@ namespace Slang
             }
             else if( auto genericValueParamDecl = as<GenericValueParamDecl>(mm) )
             {
+                if (semantics)
+                    ensureDecl(semantics, genericValueParamDecl, DeclCheckState::ReadyForLookup);
+
                 args.add(astBuilder->getOrCreate<GenericParamIntVal>(
                     genericValueParamDecl->getType(),
                     genericValueParamDecl, outerSubst));
