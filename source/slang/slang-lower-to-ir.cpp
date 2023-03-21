@@ -3,6 +3,10 @@
 
 #include "../../slang.h"
 
+#include "../core/slang-random-generator.h"
+#include "../core/slang-hash.h"
+#include "../core/slang-char-util.h"
+
 #include "slang-check.h"
 #include "slang-ir.h"
 #include "slang-ir-constexpr.h"
@@ -9080,6 +9084,262 @@ static void ensureAllDeclsRec(
     }
 }
 
+struct LocObfuscator
+{
+    struct InstWithLoc
+    {
+        typedef InstWithLoc ThisType;
+
+        SLANG_FORCE_INLINE bool operator<(const ThisType& rhs) const { return loc.getRaw() < rhs.loc.getRaw(); }
+
+        IRInst* inst;
+        SourceLoc loc;
+    };
+
+    struct LocPair
+    {
+        SourceLoc originalLoc;
+        SourceLoc obfuscatedLoc;
+    };
+
+    void _findInstsRec(IRInst* inst)
+    {
+        if (inst->sourceLoc.isValid())
+        {
+            InstWithLoc instWithLoc;
+            instWithLoc.inst = inst;
+            instWithLoc.loc = inst->sourceLoc;
+            m_instWithLocs.add(instWithLoc);
+        }
+
+        for (IRInst* child : inst->getModifiableChildren())
+        {
+            _findInstsRec(child);
+        }
+    }
+
+    SlangResult obfuscate(IRModule* module, SourceManager* sourceManager)
+    {
+        // There shouldn't be an obfuscated source map set
+        SLANG_ASSERT(module->getObfuscatedSourceMap() == nullptr);
+
+        // Find all of the instructions with source locs
+        _findInstsRec(module->getModuleInst());
+
+        // Sort them
+        m_instWithLocs.sort();
+        
+        // Lets produce a hash, so we can use as a key for random number generation.
+        // We could base it on time, or some other thing as there is no requirement for 
+        // stability or consistency.
+        // We use a hash because it avoids issues around clocks, and availability of a clock
+        // as a good source of entropy.
+        //
+        // An argument *could* be made to generate the name via some mechanism that uniquely identified the 
+        // combination of flags, options, files, names that identified the compilation, but that is 
+        // not easily achieved.
+        HashCode hash = 0;
+
+        List<LocPair> locPairs;
+
+        {
+            SourceLoc curLoc;
+            for (const auto& instWithLoc : m_instWithLocs)
+            {
+                hash = combineHash(hash, getHashCode(instWithLoc.inst));
+                hash = combineHash(hash, getHashCode(instWithLoc.loc.getRaw()));
+
+                if (instWithLoc.loc != curLoc)
+                {
+                    LocPair locPair;
+                    locPair.originalLoc = instWithLoc.loc;
+                    locPairs.add(locPair);
+
+                    // This is the current loc
+                    curLoc = instWithLoc.loc;
+                }
+            }
+        }
+
+        const Count uniqueLocCount = locPairs.getCount();
+
+        // We need a seed to make this random on each run
+        const uint32_t randomSeed = uint32_t(hash);
+        RefPtr<RandomGenerator> rand = RandomGenerator::create(randomSeed);
+
+        // We want a random unique name because we could have multiple obfuscated modules
+        // and we need to identify each
+
+        PathInfo obfusctatedPathInfo;
+
+        {
+            // We need a pathInfo to *identify* this modules obfuscated locs.
+            // We are going to use a random number, seeded from the hash to do this.
+            // Turning the number as hex as the name.
+            {
+                StringBuilder buf;
+
+                uint8_t data[4];
+                rand->nextData(data, sizeof(data));
+
+                const Count charsCount = SLANG_COUNT_OF(data) * 2;
+
+                char* dst = buf.prepareForAppend(charsCount);
+
+                for (Index i = 0; i < SLANG_COUNT_OF(data); ++i)
+                {
+                    buf.appendChar(CharUtil::getHexChar(data[i] & 0xf));
+                    buf.appendChar(CharUtil::getHexChar(data[i] >> 4));
+                }
+                buf.appendInPlace(dst, charsCount);
+                obfusctatedPathInfo = PathInfo::makePath(buf);
+            }
+        }
+
+        SourceFile* obfuscatedFile = sourceManager->createSourceFileWithSize(obfusctatedPathInfo, uniqueLocCount);
+
+        // Create the view we are going to use from the obfusctated "file".
+        SourceView* obfuscatedView = sourceManager->createSourceView(obfuscatedFile, nullptr, SourceLoc());
+
+        // Okay now we want to produce a map from these locs to a new source location
+        {
+            // Create a "bag" and put all of the indices in it.
+            List<SourceLoc> bag;
+
+            bag.setCount(uniqueLocCount);
+
+            const SourceLoc baseLoc = obfuscatedView->getRange().begin;
+
+            {
+                SourceLoc* dst = bag.getBuffer();
+                for (Index i = 0; i < uniqueLocCount; ++i)
+                {
+                    dst[i] = baseLoc + i;
+                }
+            }
+
+            // Pull the indices randomly out of the bag to create the map
+            for (auto& pair : locPairs)
+            {
+                // Find an index in the bag
+                const Index bagIndex = rand->nextInt32InRange(0, int32_t(bag.getCount()));
+                // Set in the map
+                pair.obfuscatedLoc = bag[bagIndex];
+                // Remove from the bag
+                bag.fastRemoveAt(bagIndex);
+            }
+        }
+
+        // We can now just set all the new locs in the instructions
+        {
+            const LocPair* curPair = locPairs.getBuffer();
+            LocPair pair = *curPair;
+
+            for (const auto& instWithLoc : m_instWithLocs)
+            {
+                auto inst = instWithLoc.inst;
+
+                if (instWithLoc.loc != pair.originalLoc)
+                {
+                    SLANG_ASSERT(curPair < locPairs.end());
+                    curPair++;
+                    pair = *curPair;
+                }
+                SLANG_ASSERT(pair.originalLoc == instWithLoc.loc);
+
+                // Set the loc
+                inst->sourceLoc = pair.obfuscatedLoc;
+            }
+        }
+
+        // We can now create a map. The locs are in order in entries, so that should make lookup easier.
+        // This doesn't "leak" anything as the obfuscated loc map is not distributed.
+
+        RefPtr<SourceMap> sourceMap = new SourceMap;
+        sourceMap->m_file = obfusctatedPathInfo.getName();
+
+        // Make sure we have line 0.
+        sourceMap->advanceToLine(0);
+
+        List<SourceMap::Entry> sourceMapEntries;
+                
+        {
+            sourceMapEntries.setCount(uniqueLocCount);
+        
+            // Current view, with cached "View" based sourceFileIndex
+            SourceView* curView = nullptr;
+            Index curViewSourceFileIndex = -1;
+
+            // Current handle, and store cached index in curPathSourceFileIndex
+            StringSlicePool::Handle curPathHandle = StringSlicePool::Handle(0);
+            Index curPathSourceFileIndex = -1;
+
+            for (Index i = 0; i < uniqueLocCount; ++i)
+            {
+                const auto& pair = locPairs[i];
+
+                auto& entry = sourceMapEntries[i];
+                entry.init();
+
+                // First find the view
+                if (curView == nullptr || 
+                    !curView->getRange().contains(pair.originalLoc))
+                {
+                    curView = sourceManager->findSourceView(pair.originalLoc);
+                    SLANG_ASSERT(curView);
+
+                    // Reset the current view path index, to being unset
+                    curViewSourceFileIndex = -1;
+                }
+               
+                // Now get the location
+                const auto handleLoc = curView->getHandleLoc(pair.originalLoc);
+
+                Index sourceFileIndex = -1;
+
+                if (handleLoc.pathHandle == StringSlicePool::Handle(0))
+                {
+                    if (curViewSourceFileIndex < 0)
+                    {
+                        const auto pathInfo = curView->getViewPathInfo();
+                        curViewSourceFileIndex = sourceMap->getSourceFileIndex(pathInfo.getName().getUnownedSlice());
+                    }
+                    sourceFileIndex = curViewSourceFileIndex;
+                }
+                else
+                {
+                    if (handleLoc.pathHandle != curPathHandle)
+                    {
+                        curPathHandle = handleLoc.pathHandle;
+
+                        const auto filePathSlice = sourceManager->getStringSlicePool().getSlice(curPathHandle);
+                        curPathSourceFileIndex = sourceMap->getSourceFileIndex(filePathSlice);
+                    }
+
+                    sourceFileIndex = curPathSourceFileIndex;
+                }
+
+                entry.sourceFileIndex = sourceFileIndex;
+  
+                // i is the generated column
+                entry.generatedColumn = i;
+
+                entry.sourceColumn = handleLoc.column - 1;
+                entry.sourceLine = handleLoc.line - 1;
+            }
+        }
+
+        for (const auto& sourceMapEntry : sourceMapEntries)
+        {
+            sourceMap->addEntry(sourceMapEntry);
+        }
+
+        return SLANG_OK;
+    }
+
+    List<InstWithLoc> m_instWithLocs;
+};
+
 RefPtr<IRModule> generateIRForTranslationUnit(
     ASTBuilder* astBuilder,
     TranslationUnitRequest* translationUnit)
@@ -9249,10 +9509,17 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         Linkage* linkage = compileRequest->getLinkage();
 
         stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
-        stripOptions.stripSourceLocs = linkage->m_obfuscateCode;
 
+        // If we are generating an obfuscated source map, we don't want to strip locs, 
+        // we want to generate *new* locs that can be mapped (via source map)
+        // back to *actual* source.
+        // 
+        // We don't do the obfuscation remapping here, because DCE and other passes may 
+        // change what locs are actually needed, we need to be sure 
+        // that if we have obfuscation enabled we don't forget to obfuscate.
+        stripOptions.stripSourceLocs = linkage->m_obfuscateCode && !linkage->m_generateSourceMap;
         stripFrontEndOnlyInstructions(module, stripOptions);
-
+    
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
         // undesirable (e.g., the string literals referenced by name-hint
@@ -9264,6 +9531,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         IRDeadCodeEliminationOptions options;
         options.keepExportsAlive = true;
         eliminateDeadCode(module, options);
+
+        if (linkage->m_obfuscateCode && linkage->m_generateSourceMap)
+        {
+            LocObfuscator locObfuscator;
+
+            locObfuscator.obfuscate(module, compileRequest->getSink()->getSourceManager());
+        }
     }
 
     // TODO: consider doing some more aggressive optimizations

@@ -1126,7 +1126,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
         auto sourceMapBlob = StringBlob::moveCreate(writer.getBuilder());
 
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Text, ArtifactPayload::SourceMap, ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::None));
         sourceMapArtifact->addRepresentationUnknown(sourceMapBlob);
 
         artifact->addAssociated(sourceMapArtifact);
