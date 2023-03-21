@@ -11,6 +11,18 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\examples\autodiff-texture\buildmip.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\examples\autodiff-texture\convert.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\examples\autodiff-texture\learnmip.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\examples\autodiff-texture\reconstruct.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\examples\autodiff-texture\shaders.slang">
       <Filter>Source Files</Filter>
     </None>

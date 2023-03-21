@@ -274,6 +274,10 @@
     <ClCompile Include="..\..\..\examples\autodiff-texture\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\examples\autodiff-texture\buildmip.slang" />
+    <None Include="..\..\..\examples\autodiff-texture\convert.slang" />
+    <None Include="..\..\..\examples\autodiff-texture\learnmip.slang" />
+    <None Include="..\..\..\examples\autodiff-texture\reconstruct.slang" />
     <None Include="..\..\..\examples\autodiff-texture\shaders.slang" />
   </ItemGroup>
   <ItemGroup>
