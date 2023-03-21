@@ -1234,25 +1234,32 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     }
 
                     // Hard code implementation of T.Differential.Differential == T.Differential rule.
-                    if (auto builtinReq = substDeclRef.getDecl()->findModifier<BuiltinRequirementModifier>())
+                    auto foldResult = [&]() -> Val*
                     {
-                        if (builtinReq->kind == BuiltinRequirementKind::DifferentialType)
+                        auto builtinReq = substDeclRef.getDecl()->findModifier<BuiltinRequirementModifier>();
+                        if (!builtinReq)
+                            return nullptr;
+                        if (builtinReq->kind != BuiltinRequirementKind::DifferentialType)
+                            return nullptr;
+                        // Is the concrete type a Differential associated type?
+                        auto innerDeclRefType = as<DeclRefType>(thisSubst->witness->sub);
+                        if (!innerDeclRefType)
+                            return nullptr;
+                        auto innerBuiltinReq = innerDeclRefType->declRef.decl->findModifier<BuiltinRequirementModifier>();
+                        if (!innerBuiltinReq)
+                            return nullptr;
+                        if (innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialType)
+                            return nullptr;
+                        if (!innerDeclRefType->declRef.equals(declRef))
                         {
-                            // Is the concrete type a Differential associated type?
-                            if (auto innerDeclRefType = as<DeclRefType>(thisSubst->witness->sub))
-                            {
-                                if (auto innerBuiltinReq = innerDeclRefType->declRef.decl->findModifier<BuiltinRequirementModifier>())
-                                {
-                                    if (innerBuiltinReq->kind == BuiltinRequirementKind::DifferentialType)
-                                    {
-                                        if (!innerDeclRefType->declRef.equals(declRef))
-                                            return _tryLookupConcreteAssociatedTypeFromThisTypeSubst(builder, innerDeclRefType->declRef);
-                                        return innerDeclRefType;
-                                    }
-                                }
-                            }
+                            auto result = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(builder, innerDeclRefType->declRef);
+                            if (result)
+                                return result;
                         }
-                    }
+                        return innerDeclRefType;
+                    }();
+                    if (foldResult)
+                        return foldResult;
                 }
             }
         }
