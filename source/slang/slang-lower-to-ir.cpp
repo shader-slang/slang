@@ -647,8 +647,29 @@ LoweredValInfo emitCallToVal(
         switch (tryEnv.clauseType)
         {
         case TryClauseType::None:
-            return LoweredValInfo::simple(
-                builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
+        {
+            auto callee = getSimpleVal(context, funcVal);
+            if (auto dispatchKernel = as<IRDispatchKernel>(callee))
+            {
+                // If callee is a dispatch kernel expr, don't emit call(dispatchKernel, ...), instead
+                // emit a dispatchKernel(high_order_args, actual_args).
+                auto result = LoweredValInfo::simple(builder->emitDispatchKernelInst(
+                    type,
+                    dispatchKernel->getBaseFn(),
+                    dispatchKernel->getThreadGroupSize(),
+                    dispatchKernel->getDispatchSize(),
+                    argCount,
+                    args));
+                SLANG_ASSERT(!dispatchKernel->hasUses());
+                dispatchKernel->removeAndDeallocate();
+                return result;
+            }
+            else
+            {
+                return LoweredValInfo::simple(
+                    builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
+            }
+        }
 
         case TryClauseType::Standard:
             {
@@ -1163,6 +1184,14 @@ static void addLinkageDecoration(
     {
         builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
         builder->addPublicDecoration(inst);
+    }
+    if (decl->findModifier<CudaHostAttribute>())
+    {
+        builder->addCudaHostDecoration(inst);
+    }
+    if (decl->findModifier<CudaKernelAttribute>())
+    {
+        builder->addCudaKernelDecoration(inst);
     }
 }
 
@@ -3206,6 +3235,23 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitBackwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
+    }
+
+    LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->baseFunction);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+        auto threadSize = lowerRValueExpr(context, expr->threadGroupSize);
+        auto groupSize = lowerRValueExpr(context, expr->dispatchSize);
+        // Actual arguments to be filled in when we lower the actual call expr.
+        // This is handled in `emitCallToVal`.
+        return LoweredValInfo::simple(getBuilder()->emitDispatchKernelInst(
+            lowerType(context, expr->type),
+            baseVal.val,
+            getSimpleVal(context, threadSize),
+            getSimpleVal(context, groupSize),
+            0,
+            nullptr));
     }
 
     LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)

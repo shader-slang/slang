@@ -83,7 +83,6 @@ interface __BuiltinType {}
 /// A type that can be used for arithmetic operations
 [sealed]
 [builtin]
-[TreatAsDifferentiable]
 interface __BuiltinArithmeticType : __BuiltinType
 {
         /// Initialize from a 32-bit signed integer value.
@@ -3078,6 +3077,12 @@ attribute_syntax [DllExport] : DllExportAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [CudaDeviceExport] : CudaDeviceExportAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [CudaHost] : CudaHostAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [CudaKernel] : CudaKernelAttribute;
 
 __attributeTarget(InterfaceDecl)
 attribute_syntax [COM(guid: String)] : ComInterfaceAttribute;
