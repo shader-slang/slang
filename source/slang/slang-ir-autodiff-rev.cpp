@@ -295,7 +295,8 @@ namespace Slang
     // Create an empty func to represent the transcribed func of `origFunc`.
     InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc)
     {
-        if (!isBackwardDifferentiableFunc(origFunc))
+        if (!isBackwardDifferentiableFunc(origFunc) &&
+            !origFunc->findDecoration<IRTreatAsDifferentiableDecoration>())
             return InstPair(nullptr, nullptr);
 
         IRBuilder builder = *inBuilder;
