@@ -107,6 +107,8 @@ enum class ArtifactKind : uint8_t
 
     Instance,                   ///< Primary representation is an interface/class instance 
     
+    Json,                       ///< It's JSON
+
     CountOf,
 };
 
@@ -180,7 +182,7 @@ enum class ArtifactPayload : uint8_t
 
     PdbDebugInfo,   ///< PDB debug info
 
-    SourceMap,      ///< SourceMap
+    SourceMap,      ///< A source map
 
     CountOf,
 };
@@ -206,6 +208,8 @@ enum class ArtifactStyle : uint8_t
 
     Kernel,             ///< Compiled as `GPU kernel` style.        
     Host,               ///< Compiled in `host` style
+
+    Obfuscated,         ///< Holds something specific to obfuscation, such as an obfuscated source map
 
     CountOf,
 };

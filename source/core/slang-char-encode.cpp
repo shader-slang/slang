@@ -178,4 +178,38 @@ CharEncoding* CharEncoding::UTF16 = &_utf16Encoding;
 CharEncoding* CharEncoding::UTF16Reversed = &_utf16EncodingReversed;
 CharEncoding* CharEncoding::UTF32 = &_utf32Encoding;
 	
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UTF8Util !!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */Index UTF8Util::calcCodePointCount(const UnownedStringSlice& in)
+{
+    Index count = 0;
+
+    // Analyse with bytes...
+    const int8_t* cur = (const int8_t*)in.begin();
+    const int8_t*const end = (const int8_t*)in.end();
+
+    while (cur < end)
+    {
+        const auto c = *cur++;
+        
+        count++;
+
+        // If c < 0 it means the top bit is set... which means we have multiple bytes
+        if (c < 0)
+        {
+            // https://en.wikipedia.org/wiki/UTF-8
+            // All continuation bytes contain exactly six bits from the code point.So the next six bits of the code point 
+            /// are stored in the low order six bits of the next byte, and 10 is stored in the high order two bits to 
+            // mark it as a continuation byte(so 10000010).
+
+            while (cur < end && (*cur & 0xc0) == 0x80)
+            {
+                cur++;
+            }
+        }
+    }
+
+    return count;
+}
+
 } // namespace Slang

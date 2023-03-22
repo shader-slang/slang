@@ -189,7 +189,7 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
     m_entries.add(entry);
 }
 
-HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
+HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
 {
     const int offset = m_range.getOffset(loc);
 
@@ -206,9 +206,9 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
     //   that an IDE expects us to use when reporting locations?)    
     const int columnIndex = m_sourceFile->calcColumnIndex(lineIndex, offset);
 
-    HumaneSourceLoc humaneLoc;
-    humaneLoc.column = columnIndex + 1;
-    humaneLoc.line = lineIndex + 1;
+    HandleSourceLoc handleLoc;
+    handleLoc.column = columnIndex + 1;
+    handleLoc.line = lineIndex + 1;
 
     // Make up a default entry
     StringSlicePool::Handle pathHandle = StringSlicePool::Handle(0);
@@ -219,16 +219,27 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
     {
         const Entry& entry = m_entries[entryIndex];
         // Adjust the line
-        humaneLoc.line += entry.m_lineAdjust;
+        handleLoc.line += entry.m_lineAdjust;
         // Get the pathHandle..
         pathHandle = entry.m_pathHandle;
     }
 
-    humaneLoc.pathInfo = _getPathInfoFromHandle(pathHandle);
+    handleLoc.pathHandle = pathHandle;
+    return handleLoc;
+}
+
+HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
+{
+    HandleSourceLoc handleLoc = getHandleLoc(loc, type);
+
+    HumaneSourceLoc humaneLoc;
+    humaneLoc.column = handleLoc.column;
+    humaneLoc.line = handleLoc.line;
+    humaneLoc.pathInfo = _getPathInfoFromHandle(handleLoc.pathHandle);
     return humaneLoc;
 }
 
-PathInfo SourceView::_getPathInfo() const
+PathInfo SourceView::getViewPathInfo() const
 {
     if (m_viewPath.getLength())
     {
@@ -247,7 +258,7 @@ PathInfo SourceView::_getPathInfoFromHandle(StringSlicePool::Handle pathHandle) 
     // If there is no override path, then just the source files path
     if (pathHandle == StringSlicePool::Handle(0))
     {
-        return _getPathInfo();
+        return getViewPathInfo();
     }
     else
     {
@@ -259,7 +270,7 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
 {
     if (type == SourceLocType::Actual)
     {
-        return _getPathInfo();
+        return getViewPathInfo();
     }
 
     const int entryIndex = findEntryIndex(loc);

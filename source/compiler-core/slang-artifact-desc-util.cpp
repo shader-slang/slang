@@ -175,6 +175,7 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
             x(HumanText, Text) \
             x(Source, Text) \
             x(Assembly, Text) \
+            x(Json, Text) \
         x(Instance, Base)
 
 #define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
@@ -239,12 +240,12 @@ SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_
         x(Unknown, Base) \
         x(CodeLike, Base) \
             x(Kernel, CodeLike) \
-            x(Host, CodeLike) 
+            x(Host, CodeLike) \
+        x(Obfuscated, Base) 
 
 #define SLANG_ARTIFACT_STYLE_ENTRY(TYPE, PARENT) { Index(ArtifactStyle::TYPE), Index(ArtifactStyle::PARENT), #TYPE },
 
 SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYLE_ENTRY)
-
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDescUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -555,7 +556,7 @@ static const KindExtension g_cpuKindExts[] =
     // Visual Studio. It's used here for source map.
     if (slice == toSlice("map"))
     {
-        return ArtifactDesc::make(ArtifactKind::Text, ArtifactPayload::SourceMap);
+        return ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap);
     }
 
     if (slice == toSlice("pdb"))

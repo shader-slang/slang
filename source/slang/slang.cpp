@@ -2377,6 +2377,9 @@ void FrontEndCompileRequest::generateIR()
 
         if (useSerialIRBottleneck)
         {
+            // Keep the obfuscated source map (if there is one)
+            RefPtr<SourceMap> obfuscatedSourceMap = irModule->getObfuscatedSourceMap();
+
             IRSerialData serialData;
             {
                 // Write IR out to serialData - copying over SourceLoc information directly
@@ -2395,6 +2398,7 @@ void FrontEndCompileRequest::generateIR()
 
             // Set irModule to the read module
             irModule = irReadModule;
+            irModule->setObfuscatedSourceMap(obfuscatedSourceMap);
         }
 
         // Set the module on the translation unit
