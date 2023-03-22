@@ -1143,9 +1143,8 @@ struct AutoDiffPass : public InstPassBase
         {
             bool changed = false;
             List<IRInst*> autoDiffWorkList;
-            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the module.
-            autoDiffWorkList.clear();
-            processAllInsts([&](IRInst* inst)
+            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the call graph.
+            processAllReachableInsts([&](IRInst* inst)
                 {
                     switch (inst->getOp())
                     {
@@ -1176,10 +1175,12 @@ struct AutoDiffPass : public InstPassBase
                         // Explicit primal subst operator is not yet supported.
                         SLANG_UNIMPLEMENTED_X("explicit primal_subst operator.");
                     default:
+                        for (UInt i = 0; i < inst->getOperandCount(); i++)
+                            addToWorkList(inst->getOperand(i));
                         break;
                     }
                 });
-
+        
             // Process collected differentiate insts and replace them with placeholders for
             // differentiated functions.
 
@@ -1199,7 +1200,7 @@ struct AutoDiffPass : public InstPassBase
                     }
                     break;
                 case kIROp_BackwardDifferentiatePrimal:
-                     {
+                        {
                         auto baseFunc = differentiateInst->getOperand(0);
                         diffFunc = backwardPrimalTranscriber.transcribe(&subBuilder, baseFunc);
                     }
@@ -1279,9 +1280,9 @@ struct AutoDiffPass : public InstPassBase
 
             autodiffCleanupList.clear();
 
-#if _DEBUG
+    #if _DEBUG
             validateIRModule(module, sink);
-#endif
+    #endif
 
             if (!changed)
                 break;
@@ -1299,7 +1300,6 @@ struct AutoDiffPass : public InstPassBase
 
             hasChanges |= changed;
         }
-
 
         return hasChanges;
     }

@@ -464,6 +464,7 @@ struct TupleTypeBuilder
             // collide.
             //
             // (Also, the original type wasn't legal - that was the whole point...)
+            originalStructType->removeFromParent();
             context->replacedInstructions.add(originalStructType);
 
             for(auto ee : ordinaryElements)

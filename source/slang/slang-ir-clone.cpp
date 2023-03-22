@@ -142,12 +142,9 @@ static void _cloneInstDecorationsAndChildren(
     // If `newInst` already has non-decoration children, we want to
     // insert the new children between the existing decoration and non-decoration children
     // so that we maintain the invariant that all decorations are defined before non-decorations.
-    if (auto lastDecor = newInst->getLastDecoration())
+    if (auto firstChild = newInst->getFirstChild())
     {
-        if (auto nextInstBeforeLastDecor = lastDecor->getNextInst())
-        {
-            builder->setInsertBefore(nextInstBeforeLastDecor);
-        }
+        builder->setInsertBefore(firstChild);
     }
 
     // When applying the first phase of cloning to

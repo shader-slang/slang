@@ -620,7 +620,7 @@ struct IRTypeLegalizationContext
 
     // store instructions that have been replaced here, so we can free them
     // when legalization has done
-    List<IRInst*> replacedInstructions;
+    OrderedHashSet<IRInst*> replacedInstructions;
 
     Dictionary<IRType*, LegalType> mapTypeToLegalType;
 

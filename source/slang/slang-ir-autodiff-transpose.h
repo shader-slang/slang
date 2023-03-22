@@ -1708,7 +1708,9 @@ struct DiffTransposePass
         // Look for gradient entries for this inst.
         List<RevGradient> gradients;
         if (hasRevGradients(inst))
+        {
             gradients = popRevGradients(inst);
+        }
 
         IRType* primalType = tryGetPrimalTypeFromDiffInst(inst);
 
@@ -2746,7 +2748,8 @@ struct DiffTransposePass
         }
         
         default:
-            SLANG_ASSERT_FAILURE("Unhandled target type for promotion");
+            // Default is not to promote.
+            return inst;
         }
     }
 

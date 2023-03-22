@@ -23,14 +23,15 @@ namespace Slang
             workListSet.Add(inst);
         }
 
-        IRInst* pop()
+        IRInst* pop(bool removeFromSet = true)
         {
             if (workList.getCount() == 0)
                 return nullptr;
 
             IRInst* inst = workList.getLast();
             workList.removeLast();
-            workListSet.Remove(inst);
+            if (removeFromSet)
+                workListSet.Remove(inst);
             return inst;
         }
 
@@ -113,6 +114,26 @@ namespace Slang
             processChildInsts(module->getModuleInst(), f);
         }
 
+        template <typename Func>
+        void processAllReachableInsts(const Func& f)
+        {
+            workList.clear();
+            workListSet.Clear();
+
+            addToWorkList(module->getModuleInst());
+            while (workList.getCount() != 0)
+            {
+                IRInst* inst = pop(false);
+                f(inst);
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                {
+                    if (as<IRDecoration>(child))
+                        break;
+                    if (shouldInstBeLiveIfParentIsLive(child, IRDeadCodeEliminationOptions()))
+                        addToWorkList(child);
+                }
+            }
+        }
     };
 
 }

@@ -62,7 +62,7 @@ struct SpecializationContext
     // if it is in our set.
     //
     bool isInstFullySpecialized(
-        IRInst*                     inst)
+        IRInst* inst)
     {
         // A small wrinkle is that a null instruction pointer
         // sometimes appears a a type, and so should be treated
@@ -70,7 +70,7 @@ struct SpecializationContext
         //
         // TODO: It would be nice to remove this wrinkle.
         //
-        if(!inst) return true;
+        if (!inst) return true;
 
         // An interface requirement entry should always be considered
         // to be fully specialized, even if it hasn't been visited.
@@ -79,7 +79,7 @@ struct SpecializationContext
         // can't mark an interface as used until its requirements are
         // used, etc.
         //
-        if(inst->getOp() == kIROp_InterfaceRequirementEntry)
+        if (inst->getOp() == kIROp_InterfaceRequirementEntry)
             return true;
 
         // A generic parameter is never specialized.
@@ -93,6 +93,20 @@ struct SpecializationContext
                 inst->getParent()->getParent()->getOp() == kIROp_Generic)
                 return false;
         }
+
+        // A global value is always specialized.
+        if (inst->getParent() == module->getModuleInst())
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_LookupWitness:
+            case kIROp_Specialize:
+                return false;
+            default:
+                return true;
+            }
+        }
+
         return fullySpecializedInsts.Contains(inst);
     }
 
@@ -101,13 +115,14 @@ struct SpecializationContext
     // a query to check for the "all operands fully specialized" case.
     //
     bool areAllOperandsFullySpecialized(
-        IRInst*                     inst)
+        IRInst*                     inst,
+        UInt startingOperandIndex = 0)
     {
         if(!isInstFullySpecialized(inst->getFullType()))
             return false;
 
         UInt operandCount = inst->getOperandCount();
-        for(UInt ii = 0; ii < operandCount; ++ii)
+        for(UInt ii = startingOperandIndex; ii < operandCount; ++ii)
         {
             IRInst* operand = inst->getOperand(ii);
             if(!isInstFullySpecialized(operand))
@@ -351,7 +366,7 @@ struct SpecializationContext
         // operands to the `speicalize(...)` instruction are
         // themselves fully specialized.
         //
-        if(!areAllOperandsFullySpecialized(specInst))
+        if(!areAllOperandsFullySpecialized(specInst, 1))
             return false;
 
         // The invariant that the arguments are fully specialized
@@ -504,12 +519,9 @@ struct SpecializationContext
             // be considered as fully specialized as soon
             // as all of its operands are.
             //
-            // TODO: We realistically need a more refined
-            // check here that uses an allow-list of instructions
-            // that can represent values suitable for use
-            // as generic arguments.
-            //
-            if(areAllOperandsFullySpecialized(inst))
+            // Anything defined in global scope can be viewed as fully specialized.
+            if (inst->getParent() == module->getModuleInst() ||
+                areAllOperandsFullySpecialized(inst))
             {
                 markInstAsFullySpecialized(inst);
             }
@@ -553,7 +565,7 @@ struct SpecializationContext
                             // any ordinary instruciton.
                             //
 
-                            if( areAllOperandsFullySpecialized(inst) )
+                            if( areAllOperandsFullySpecialized(inst, 1) )
                             {
                                 markInstAsFullySpecialized(inst);
                             }
