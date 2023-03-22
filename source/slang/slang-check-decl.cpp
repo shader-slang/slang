@@ -1543,18 +1543,48 @@ namespace Slang
         };
 
         // Make the Differential type itself conform to `IDifferential` interface.
-        auto inheritanceIDiffernetiable = m_astBuilder->create<InheritanceDecl>();
-        inheritanceIDiffernetiable->base.type = m_astBuilder->getDiffInterfaceType();
-        inheritanceIDiffernetiable->parentDecl = aggTypeDecl;
-        aggTypeDecl->members.add(inheritanceIDiffernetiable);
+        bool hasDifferentialConformance = false;
+        for (auto inheritanceDecl : aggTypeDecl->getMembersOfType<InheritanceDecl>())
+        {
+            if (auto declRefType = as<DeclRefType>(inheritanceDecl->base.type))
+            {
+                if (declRefType->declRef == m_astBuilder->getDifferentiableInterface())
+                {
+                    hasDifferentialConformance = true;
+                    break;
+                }
+            }
+        }
+        if (!hasDifferentialConformance)
+        {
+            auto inheritanceIDiffernetiable = m_astBuilder->create<InheritanceDecl>();
+            inheritanceIDiffernetiable->base.type = m_astBuilder->getDiffInterfaceType();
+            inheritanceIDiffernetiable->parentDecl = aggTypeDecl;
+            aggTypeDecl->members.add(inheritanceIDiffernetiable);
+        }
 
         // The `Differential` type of a `Differential` type is always itself.
-        auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
-        assocTypeDef->nameAndLoc.name = getName("Differential");
-        assocTypeDef->type.type = satisfyingType;
-        assocTypeDef->parentDecl = aggTypeDecl;
-        assocTypeDef->setCheckState(DeclCheckState::Checked);
-        aggTypeDecl->members.add(assocTypeDef);
+        bool hasDifferentialTypeDef = false;
+        for (auto member : aggTypeDecl->members)
+        {
+            if (auto name = member->getName())
+            {
+                if (name->text == "Differential")
+                {
+                    hasDifferentialTypeDef = true;
+                    break;
+                }
+            }
+        }
+        if (!hasDifferentialTypeDef)
+        {
+            auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
+            assocTypeDef->nameAndLoc.name = getName("Differential");
+            assocTypeDef->type.type = satisfyingType;
+            assocTypeDef->parentDecl = aggTypeDecl;
+            assocTypeDef->setCheckState(DeclCheckState::Checked);
+            aggTypeDecl->members.add(assocTypeDef);
+        }
 
         // Go through all members and collect their differential types.
         // Go through super types.

@@ -208,8 +208,19 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
     if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(declRef.getDecl()))
     {
         if (auto result = maybeSubstituteGenericParam(this, genericTypeParamDecl, subst, ioDiff))
+        {
+            if (auto substDeclRefType = as<DeclRefType>(result))
+            {
+                // After generic substitution, we may be able to further simplify
+                // by looking up the actual type of an associated type.
+                if (auto satisfyingVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(
+                        astBuilder, substDeclRefType->declRef))
+                    return satisfyingVal;
+            }
             return result;
+        }
     }
+
     int diff = 0;
     DeclRef<Decl> substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
 
