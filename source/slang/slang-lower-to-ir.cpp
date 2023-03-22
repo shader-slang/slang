@@ -8508,6 +8508,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addBackwardDifferentiableDecoration(irFunc);
             }
+            else if (as<TreatAsDifferentiableAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
+            }
         }
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
