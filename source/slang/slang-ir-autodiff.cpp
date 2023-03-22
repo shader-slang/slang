@@ -1180,7 +1180,7 @@ struct AutoDiffPass : public InstPassBase
                         break;
                     }
                 });
-        
+
             // Process collected differentiate insts and replace them with placeholders for
             // differentiated functions.
 
@@ -1200,7 +1200,7 @@ struct AutoDiffPass : public InstPassBase
                     }
                     break;
                 case kIROp_BackwardDifferentiatePrimal:
-                        {
+                    {
                         auto baseFunc = differentiateInst->getOperand(0);
                         diffFunc = backwardPrimalTranscriber.transcribe(&subBuilder, baseFunc);
                     }
@@ -1280,9 +1280,9 @@ struct AutoDiffPass : public InstPassBase
 
             autodiffCleanupList.clear();
 
-    #if _DEBUG
+#if _DEBUG
             validateIRModule(module, sink);
-    #endif
+#endif
 
             if (!changed)
                 break;

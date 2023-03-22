@@ -3,6 +3,7 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-dce.h"
 
 namespace Slang
 {

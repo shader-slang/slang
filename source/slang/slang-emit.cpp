@@ -394,7 +394,6 @@ Result linkAndOptimizeIR(
         disableIRValidationAtInsert();
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
-
         if (!changed)
             break;
     }
