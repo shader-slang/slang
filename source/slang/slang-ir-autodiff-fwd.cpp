@@ -44,6 +44,74 @@ IRFuncType* ForwardDiffTranscriber::differentiateFunctionType(IRBuilder* builder
     return builder->getFuncType(newParameterTypes, diffReturnType);
 }
 
+void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFunc* diffFunc)
+{
+    IRBuilder builder(diffFunc);
+    builder.setInsertInto(diffFunc);
+    auto block = builder.emitBlock();
+    builder.markInstAsMixedDifferential(block);
+
+    for (auto param : primalFunc->getParams())
+    {
+        transcribeFuncParam(&builder, param, param->getFullType()).differential;
+    }
+    List<IRParam*> diffParams;
+    for (auto param : diffFunc->getParams())
+    {
+        diffParams.add(param);
+    }
+    auto emitDiffPairVal = [&](IRDifferentialPairTypeBase* pairType)
+    {
+        auto primal = builder.emitDefaultConstruct(pairType->getValueType());
+        builder.markInstAsPrimal(primal);
+        auto diff = getDifferentialZeroOfType(&builder, pairType->getValueType());
+        builder.markInstAsDifferential(primal);
+
+        auto val = builder.emitMakeDifferentialPair(pairType, primal, diff);
+        builder.markInstAsMixedDifferential(val);
+
+        return val;
+        
+    };
+    for (auto param : diffParams)
+    {
+        if (auto outType = as<IROutTypeBase>(param->getFullType()))
+        {
+            if (isRelevantDifferentialPair(outType))
+            {
+                auto pairType = as<IRDifferentialPairTypeBase>(outType->getValueType());
+                auto val = emitDiffPairVal(pairType);
+                auto store = builder.emitStore(param, val);
+                builder.markInstAsMixedDifferential(store);
+            }
+            else
+            {
+                auto val = builder.emitDefaultConstruct(outType->getValueType());
+                builder.markInstAsPrimal(val);
+
+                auto store = builder.emitStore(param, val);
+                builder.markInstAsPrimal(store);
+
+            }
+        }
+    }
+    if (isRelevantDifferentialPair(diffFunc->getResultType()))
+    {
+        auto pairType = as<IRDifferentialPairTypeBase>(diffFunc->getResultType());
+        auto val = emitDiffPairVal(pairType);
+        auto returnInst = builder.emitReturn(val);
+        builder.markInstAsMixedDifferential(val);
+        builder.markInstAsMixedDifferential(returnInst);
+    }
+    else
+    {
+        auto retVal = builder.emitDefaultConstruct(diffFunc->getResultType());
+        auto returnInst = builder.emitReturn(retVal);
+        builder.markInstAsPrimal(retVal);
+        builder.markInstAsPrimal(returnInst);
+    }
+}
+
 // Returns "d<var-name>" to use as a name hint for variables and parameters.
 // If no primal name is available, returns a blank string.
 // 
@@ -1500,6 +1568,13 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
 // Transcribe a function definition.
 InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
 {
+    if (primalFunc->findDecoration<IRTreatAsDifferentiableDecoration>())
+    {
+        // Generate a trivial implementation for [TreatAsDifferentiable] functions.
+        generateTrivialFwdDiffFunc(primalFunc, diffFunc);
+        return InstPair(primalFunc, diffFunc);
+    }
+
     IRBuilder builder = *inBuilder;
     builder.setInsertBefore(primalFunc);
 
