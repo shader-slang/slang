@@ -3,22 +3,24 @@
 __exported import IMaterialInstance;
 __exported import IBSDF;
 
-struct DiffuseBSDF : IBSDF
+struct GlossyBSDF : IBSDF
 {
     float3 albedo;
 
-    [BackwardDifferentiable]
+    [TreatAsDifferentiable]
+    //[BackwardDifferentiable]
     float3 eval(const float3 wiLocal, const float3 woLocal)
     {
-        return albedo;
+        return albedo * albedo;
     }
 };
 
-struct DiffuseMaterialInstance : IMaterialInstance
+struct GlossyMaterialInstance : IMaterialInstance
 {
-    DiffuseBSDF bsdf;
+    GlossyBSDF bsdf;
 
-    [BackwardDifferentiable]
+    [TreatAsDifferentiable]
+    //[BackwardDifferentiable]
     float3 eval(const float3 wi, const float3 wo)
     {
         return bsdf.eval(wi, wo);
