@@ -105,7 +105,7 @@ protected:
 
         /// Maybe emits 'export' (such that visible outside binary/dll) and `extern "C"` naming
     void _getExportStyle(IRInst* inst, bool& outIsExport, bool& outIsExternC);
-    void _maybeEmitExportLike(IRInst* inst);
+    virtual void _maybeEmitExportLike(IRInst* inst);
 
     static bool _isVariable(IROp op);
 

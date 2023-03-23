@@ -1,8 +1,3 @@
-/// Modifer to mark a function for forward-mode differentiation.
-/// i.e. the compiler will automatically generate a new function
-/// that computes the jacobian-vector product of the original.
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 
 // Custom Forward Derivative Function reference
 __attributeTarget(FunctionDeclBase)
@@ -14,8 +9,6 @@ attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PrimalSubstitute(function)] : PrimalSubstituteAttribute;
 
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivativeOf(function)] : ForwardDerivativeOfAttribute;
@@ -32,77 +25,6 @@ attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 // Exclude "this" parameter from differentiation.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
-
-
-/// Pair type that serves to wrap the primal and
-/// differential types of an arbitrary type T.
-
-__generic<T : IDifferentiable>
-__magic_type(DifferentialPairType)
-__intrinsic_type($(kIROp_DifferentialPairUserCodeType))
-struct DifferentialPair : IDifferentiable
-{
-    typedef DifferentialPair<T.Differential> Differential;
-    typedef T.Differential DifferentialElementType;
-
-    __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
-    __init(T _primal, T.Differential _differential);
-
-    property p : T
-    {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
-        get;
-    }
-
-    property v : T
-    {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
-        get;
-    }
-
-    property d : T.Differential
-    {
-        __intrinsic_op($(kIROp_DifferentialPairGetDifferentialUserCode))
-        get;
-    }
-
-    [__unsafeForceInlineEarly]
-    T.Differential getDifferential()
-    {
-        return d;
-    }
-
-    [__unsafeForceInlineEarly]
-    T getPrimal()
-    {
-        return p;
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dzero()
-    {
-        return Differential(T.dzero(), T.Differential.dzero());
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dadd(Differential a, Differential b)
-    {
-        return Differential(
-            T.dadd(
-                a.p,
-                b.p
-            ),
-            T.Differential.dadd(a.d, b.d));
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dmul(This a, Differential b)
-    {
-        return Differential(
-            T.dmul(a.p, b.p),
-            T.Differential.dmul(a.d, b.d));
-    }
-};
 
 __generic<T: IDifferentiable>
 __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
@@ -1100,31 +1022,35 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 T __determinant_impl(matrix<T,N,N> m)
 {
-    if (N == 1)
-        return m[0][0];
-    else if (N == 2)
-        return m[0][0] * m[1][1] - m[0][1] * m[1][0];
-    else if (N == 3)
+    T result = T(0);
+    switch (N)
     {
-        return  m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2])
+    case 1:
+        result = m[0][0];
+        break;
+    case 2:
+        result = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+        break;
+    case 3:
+        result =  m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2])
 		      - m[1][0] * (m[0][1] * m[2][2] - m[2][1] * m[0][2])
 			  + m[2][0] * (m[0][1] * m[1][2] - m[1][1] * m[0][2]);
-    }
-    else if (N == 4)
-    {
-    	T s00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
+        break;
+    case 4:
+        T s00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
 		T s01 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
 		T s02 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
 		T s03 = m[2][0] * m[3][3] - m[3][0] * m[2][3];
 		T s04 = m[2][0] * m[3][2] - m[3][0] * m[2][2];
 		T s05 = m[2][0] * m[3][1] - m[3][0] * m[2][1];
 
-		return m[0][0] * (m[1][1] * s00 - m[1][2] * s01 + m[1][3] * s02)
+		result = m[0][0] * (m[1][1] * s00 - m[1][2] * s01 + m[1][3] * s02)
 			 - m[0][1] * (m[1][0] * s00 - m[1][2] * s03 + m[1][3] * s04)
 			 + m[0][2] * (m[1][0] * s01 - m[1][1] * s03 + m[1][3] * s05)
 			 - m[0][3] * (m[1][0] * s02 - m[1][1] * s04 + m[1][2] * s05);
+        break;
     }
-    return T(0.0);
+    return result;
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [ForwardDerivativeOf(determinant)]

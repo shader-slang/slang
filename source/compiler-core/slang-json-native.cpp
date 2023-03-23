@@ -8,6 +8,13 @@
 
 namespace Slang {
 
+/* static */RttiTypeFuncsMap JSONNativeUtil::getTypeFuncsMap()
+{
+    RttiTypeFuncsMap typeMap;
+    typeMap.add(GetRttiInfo<JSONValue>::get(), GetRttiTypeFuncsForZeroPod<JSONValue>::getFuncs());
+    return typeMap;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! JSONToNativeConverter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */Index JSONToNativeConverter::_getFieldCount(const StructRttiInfo* structRttiInfo)
@@ -193,10 +200,9 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
             const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
             auto elementType = listRttiInfo->m_elementType;
 
-            SLANG_RETURN_ON_FAIL(RttiUtil::setListCount(elementType, out, arr.getCount()));
+            SLANG_RETURN_ON_FAIL(RttiUtil::setListCount(m_typeMap, elementType, out, arr.getCount()));
 
             // Okay, we need to copy over one by one
-
             Byte* dstEles = list.getBuffer();
             for (Index i = 0; i < count; ++i, dstEles += elementType->m_size)
             {

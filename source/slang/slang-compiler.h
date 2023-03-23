@@ -81,6 +81,7 @@ namespace Slang
         ShaderHostCallable  = SLANG_SHADER_HOST_CALLABLE,
         CUDASource          = SLANG_CUDA_SOURCE,
         PTX                 = SLANG_PTX,
+        CUDAObjectCode      = SLANG_CUDA_OBJECT_CODE,
         ObjectCode          = SLANG_OBJECT_CODE,
         HostHostCallable    = SLANG_HOST_HOST_CALLABLE,
         CountOf             = SLANG_TARGET_COUNT_OF,
@@ -1766,6 +1767,7 @@ namespace Slang
         SourceManager* m_sourceManager = nullptr;
 
         bool m_obfuscateCode = false;
+        bool m_generateSourceMap = false;
 
         /// Holds any args that are destined for downstream compilers/tools etc
         DownstreamArgs m_downstreamArgs;

@@ -5,6 +5,8 @@
 #include "../core/slang-basic.h"
 
 #include "slang-compiler.h"
+#include "../compiler-core/slang-source-map.h"
+
 
 namespace Slang
 {
@@ -72,8 +74,11 @@ public:
         /// Get the source manager user
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
+        /// Get the associated source map. If source map tracking is not required, can return nullptr.
+    SourceMap* getSourceMap() const { return m_sourceMap; }
+
         /// Ctor
-    SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode);
+    SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, SourceMap* sourceMap);
 
 protected:
     void _emitTextSpan(char const* textBegin, char const* textEnd);
@@ -86,9 +91,14 @@ protected:
 
     void _emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocation);
 
+    void _updateSourceMap(const HumaneSourceLoc& sourceLocation);
+
         // Emit a `#line` directive to the output.
         // Doesn't update state of source-location tracking.
     void _emitLineDirective(const HumaneSourceLoc& sourceLocation);
+
+        /// Calculate the current location in the ouput
+    void _calcLocation(Index& outLineIndex, Index& outColumnIndex);
 
     // The string of code we've built so far.
     // TODO(JS): We could store the text in chunks, and then only sew together into one buffer
@@ -103,6 +113,13 @@ protected:
     SourceLoc m_nextSourceLoc;
     HumaneSourceLoc m_nextHumaneSourceLocation;
     
+    // Used to determine the current location in the output for outputting the source map
+    // This is separate from m_loc, because m_loc doesn't appear to track the line/column directly 
+    // in the output stream - for example when #line emits a "raw" emit takes place.
+    Count m_currentOutputOffset = 0;
+    Index m_currentLineIndex = 0;
+    Index m_currentColumnIndex = 0;
+
     bool m_needToUpdateSourceLocation = false;
 
     bool m_supressLineDirective = false;
@@ -122,6 +139,8 @@ protected:
     // instead.
     Dictionary<String, int> m_mapGLSLSourcePathToID;
     int m_glslSourceIDCount = 0;
+
+    RefPtr<SourceMap> m_sourceMap;
 
     LineDirectiveMode m_lineDirectiveMode;
 };

@@ -67,6 +67,10 @@ enum class CapabilityAtomConflictMask : uint32_t
     // Capability atoms that represent GLSL ray tracing extensions conflict with
     // one another (we only want to use one such extension at a time).
     RayTracingExtension = 1 << 1,
+
+    // Capability atoms that represent GLSL fragment shader barycentric extensions conflict with
+    // one another (we only want to use one such extension at a time).
+    FragmentShaderBarycentricExtension = 1 << 2,
 };
 
 // For simplicity in building up our data structure representing

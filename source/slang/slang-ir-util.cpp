@@ -2,6 +2,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-dominators.h"
 
 namespace Slang
 {
@@ -554,6 +555,33 @@ IROp getSwapSideComparisonOp(IROp op)
     }
 }
 
+IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IRBlock*& loopBodyBlock, IRBlock*& loopBreakBlock)
+{
+    IRBuilder loopBuilder = *builder;
+    auto loopHeadBlock = loopBuilder.emitBlock();
+    loopBodyBlock = loopBuilder.emitBlock();
+    loopBreakBlock = loopBuilder.emitBlock();
+    auto loopContinueBlock = loopBuilder.emitBlock();
+    builder->emitLoop(loopHeadBlock, loopBreakBlock, loopHeadBlock, 1, &initVal);
+    loopBuilder.setInsertInto(loopHeadBlock);
+    auto loopParam = loopBuilder.emitParam(initVal->getFullType());
+    auto cmpResult = loopBuilder.emitLess(loopParam, finalVal);
+    loopBuilder.emitIfElse(cmpResult, loopBodyBlock, loopBreakBlock, loopBreakBlock);
+    loopBuilder.setInsertInto(loopBodyBlock);
+    loopBuilder.emitBranch(loopContinueBlock);
+    loopBuilder.setInsertInto(loopContinueBlock);
+    auto newParam = loopBuilder.emitAdd(loopParam->getFullType(), loopParam, loopBuilder.getIntValue(loopBuilder.getIntType(), 1));
+    loopBuilder.emitBranch(loopHeadBlock, 1, &newParam);
+    return loopParam;
+}
+
+void sortBlocksInFunc(IRGlobalValueWithCode* func)
+{
+    auto order = getReversePostorder(func);
+    for (auto block : order)
+        block->insertAtEnd(func);
+}
+
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
 {
     if (as<IRParam>(inst))
@@ -589,17 +617,57 @@ bool isPureFunctionalCall(IRCall* call)
     {
         // If the function has no side effect and is not writing to any outputs,
         // we can safely treat the call as a normal inst.
-        bool hasOutArg = false;
+        IRFunc* parentFunc = nullptr;
         for (UInt i = 0; i < call->getArgCount(); i++)
         {
-            if (isValueType(call->getArg(i)->getDataType()))
+            auto arg = call->getArg(i);
+            if (isValueType(arg->getDataType()))
                 continue;
+
             // If the argument type is not a known value type,
             // assume it is a pointer or handle through which side effect can take place.
-            hasOutArg = true;
-            break;
+            if (!parentFunc)
+            {
+                parentFunc = getParentFunc(call);
+                if (!parentFunc)
+                    return false;
+            }
+
+            if (arg->getOp() == kIROp_Var && getParentFunc(arg) == parentFunc)
+            {
+                // If the pointer argument is a local variable (thus can't alias with other addresses)
+                // and it is never read from in the function, we can safely treat the call as having
+                // no side-effect.
+                // This is a conservative test, but is sufficient to detect the most common case where
+                // a temporary variable is used as the inout argument and the result stored in the temp
+                // variable isn't being used elsewhere in the parent func.
+                // 
+                // A more aggresive test can check all other address uses reachable from the call site
+                // and see if any of them are aliasing with the argument.
+                for (auto use = arg->firstUse; use; use = use->nextUse)
+                {
+                    if (as<IRDecoration>(use->getUser()))
+                        continue;
+                    switch (use->getUser()->getOp())
+                    {
+                    case kIROp_Store:
+                        // We are fine with stores into the variable, since store operations
+                        // are not dependent on whatever we do in the call here.
+                        continue;
+                    default:
+                        // We have some other unknown use of the variable address, they can
+                        // be loads, or calls using addresses derived from the variable,
+                        // we will treat the call as having side effect to be safe.
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                return false;
+            }
         }
-        return !hasOutArg;
+        return true;
     }
     return false;
 }

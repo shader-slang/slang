@@ -279,6 +279,13 @@ struct HumaneSourceLoc
     Int     column = 0;
 };
 
+// Same as HumaneSourceLoc but stores the path only as a handle.
+struct HandleSourceLoc
+{
+    StringSlicePool::Handle pathHandle = StringSlicePool::Handle(0);
+    Int line = 0;
+    Int column = 0;
+};
 
 /* A SourceView maps to a single span of SourceLoc range and is equivalent to a single include or more precisely use of a source file. 
 It is distinct from a SourceFile - because a SourceFile may be included multiple times, with different interpretations (depending 
@@ -336,6 +343,10 @@ class SourceView
         /// Type determines if the location wanted is the original, or the 'normal' (which modifys behavior based on #line directives)
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
+        /// Get the humane location, but store the path as a handle
+    HandleSourceLoc getHandleLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
+
+
         /// Get the path associated with a location
     PathInfo getPathInfo(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
@@ -345,6 +356,10 @@ class SourceView
         /// will be the location of the #include in the source.
         /// For the original source file (ie not an include) - the view will have an initiating source loc of SourceLoc(0)
     SourceLoc getInitiatingSourceLoc() const { return m_initiatingSourceLoc; }
+
+        /// Gets the pathInfo for this view. It may be different from the m_sourceFile's if the path has been
+        /// overridden by m_viewPath
+    PathInfo getViewPathInfo() const;
 
         /// Ctor
     SourceView(SourceFile* sourceFile, SourceRange range, const String* viewPath, SourceLoc initiatingSourceLoc):
@@ -361,10 +376,7 @@ class SourceView
     protected:
         /// Get the pathInfo from a string handle. If it's 0, it will return the _getPathInfo
     PathInfo _getPathInfoFromHandle(StringSlicePool::Handle pathHandle) const;
-        /// Gets the pathInfo for this view. It may be different from the m_sourceFile's if the path has been
-        /// overridden by m_viewPath
-    PathInfo _getPathInfo() const;
-
+    
     String m_viewPath;                  ///< Path to this view. If empty the path is the path to the SourceView
 
     SourceLoc m_initiatingSourceLoc;    ///< An optional source loc that defines where this view was initiated from. SourceLoc(0) if not defined.

@@ -14,14 +14,20 @@ struct A : IDifferentiable
 [BackwardDifferentiable]
 float f(A x)
 {
-    return x.x * x.x;
+    A rs;
+    rs.x = 1.0;
+    for (int i = 0; i < 2; i++)
+        rs.x = rs.x * x.x;
+    return rs.x;
 }
 
 [BackwardDifferentiable]
 float outerF(A x)
 {
     A nx;
-    nx.x = x.x * x.x;
+    nx.x = 1.0;
+    for (int i = 0; i < 2; i++)
+        nx.x = nx.x * x.x;
     nx.nx = 2;//x.nx;
     return f(nx);
 }

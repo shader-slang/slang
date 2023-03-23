@@ -477,6 +477,16 @@ class BackwardDifferentiateExpr: public DifferentiateExpr
     SLANG_AST_CLASS(BackwardDifferentiateExpr)
 };
 
+    /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
+    /// dispatch a compute kernel from host.
+    ///
+class DispatchKernelExpr : public HigherOrderInvokeExpr
+{
+    SLANG_AST_CLASS(DispatchKernelExpr)
+    Expr* threadGroupSize;
+    Expr* dispatchSize;
+};
+
     /// An express to mark its inner expression as an intended non-differential call.
 class TreatAsDifferentiableExpr : public Expr
 {

@@ -384,6 +384,18 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             else
             {
                 differentiableWitnessDictionary.Add((IRType*)item->getConcreteType(), item->getWitness());
+                if (auto diffPairType = as<IRDifferentialPairTypeBase>(item->getConcreteType()))
+                {
+                    // For differential pair types, register the differential type as well.
+                    IRBuilder builder(diffPairType);
+                    builder.setInsertAfter(diffPairType->getWitness());
+                    auto diffType = _lookupWitness(&builder, diffPairType->getWitness(), sharedContext->differentialAssocTypeStructKey);
+                    auto diffWitness = _lookupWitness(&builder, diffPairType->getWitness(), sharedContext->differentialAssocTypeWitnessStructKey);
+                    if (diffType && diffWitness)
+                    {
+                        differentiableWitnessDictionary.AddIfNotExists((IRType*)diffType, diffWitness);
+                    }
+                }
             }
         }
     }
@@ -399,9 +411,7 @@ IRInst* DifferentiableTypeConformanceContext::lookUpConformanceForType(IRInst* t
 IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key)
 {
     if (auto conformance = lookUpConformanceForType(origType))
-    {
         return _lookupWitness(builder, conformance, key);
-    }
     return nullptr;
 }
 
@@ -561,6 +571,9 @@ void stripNoDiffTypeAttribute(IRModule* module)
 
 bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst)
 {
+    if (!typeInst)
+        return false;
+
     if (context.isDifferentiableType((IRType*)typeInst))
         return true;
     // Look for equivalent types.
@@ -597,6 +610,7 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_FloatType:
     case kIROp_VectorType:
     case kIROp_MatrixType:
+    case kIROp_AttributedType:
         return true;
     default:
         return false;
@@ -889,40 +903,44 @@ struct AutoDiffPass : public InstPassBase
         builder.setInsertInto(diffType);
 
         // Generate the fields for all differentiable members of the original struct type.
+        struct FieldInfo
+        {
+            IRStructField* field;
+            IRInst* witness;
+        };
+        List<FieldInfo> diffFields;
+
         for (auto field : originalType->getFields())
         {
-            IRInst* diffFieldType = nullptr;
+            IRInst* diffFieldWitness = nullptr;
             if (auto diffDecor = field->findDecoration<IRIntermediateContextFieldDifferentialTypeDecoration>())
             {
-                diffFieldType = diffDecor->getDifferentialType();
+                diffFieldWitness = diffDecor->getDifferentialWitness();
             }
             else
             {
                 IntermediateContextTypeDifferentialInfo diffFieldTypeInfo;
-                diffTypes.TryGetValue(field->getDataType(), diffFieldTypeInfo);
-                diffFieldType = diffFieldTypeInfo.diffType;
+                diffTypes.TryGetValue(field->getFieldType(), diffFieldTypeInfo);
+                diffFieldWitness = diffFieldTypeInfo.diffWitness;
             }
-            if (diffFieldType)
+            if (diffFieldWitness)
             {
+                FieldInfo info;
                 IRBuilder keyBuilder = builder;
                 keyBuilder.setInsertBefore(maybeFindOuterGeneric(originalType));
                 auto diffKey = keyBuilder.createStructKey();
-                builder.createStructField(diffType, diffKey, (IRType*)diffFieldType);
+                auto diffFieldType = _lookupWitness(&keyBuilder, diffFieldWitness, autodiffContext->differentialAssocTypeStructKey);
+                info.field = builder.createStructField(diffType, diffKey, (IRType*)diffFieldType);
+                info.witness = diffFieldWitness;
                 builder.addDecoration(field->getKey(), kIROp_DerivativeMemberDecoration, diffKey);
                 builder.addDecoration(diffKey, kIROp_DerivativeMemberDecoration, diffKey);
+                diffFields.add(info);
             }
         }
         
         builder.setInsertAfter(diffType);
 
-        // For now, we are going to structurally derive dadd and dzero methods for intermediate context types,
-        // because it is tricky for us to obtain the original witness tables for the fields at this point.
-        // This is inconsistent with how we are dealing with dadd and dzero methods via witness table lookup,
-        // and can lead to problems if the user defines any non-trivial dadd/dzero methods.
-        //
-        // TODO: we should consider rewrite this logic to be witness table lookup based, or simplify the entire
-        // type system and IR passes to always use structurally derived methods instead of user-provided
-        // methods.
+        // Implement `dadd` and `dzero` methods.
         IRInst* zeroMethod = nullptr;
         {
             auto zeroMethodType = builder.getFuncType(List<IRType*>(), diffType);
@@ -931,7 +949,14 @@ struct AutoDiffPass : public InstPassBase
             result.zeroMethod = zeroMethod;
             builder.setInsertInto(zeroMethod);
             builder.emitBlock();
-            builder.emitReturn(builder.emitDefaultConstruct(diffType));
+            List<IRInst*> fieldVals;
+            for (auto info : diffFields)
+            {
+                auto innerZeroMethod = _lookupWitness(&builder, info.witness, autodiffContext->zeroMethodStructKey);
+                IRInst* val = builder.emitCallInst(info.field->getFieldType(), innerZeroMethod, 0, nullptr);
+                fieldVals.add(val);
+            }
+            builder.emitReturn(builder.emitMakeStruct(diffType, fieldVals));
         }
 
         builder.setInsertAfter(zeroMethod);
@@ -948,7 +973,18 @@ struct AutoDiffPass : public InstPassBase
             builder.emitBlock();
             auto param1 = builder.emitParam(diffType);
             auto param2 = builder.emitParam(diffType);
-            builder.emitReturn(builder.emitStructuralAdd(param1, param2));
+            List<IRInst*> fieldVals;
+            for (auto info : diffFields)
+            {
+                auto innerAddMethod = _lookupWitness(&builder, info.witness, autodiffContext->addMethodStructKey);
+                IRInst* args[2] = {
+                    builder.emitFieldExtract(info.field->getFieldType(), param1, info.field->getKey()),
+                    builder.emitFieldExtract(info.field->getFieldType(), param2, info.field->getKey()),
+                };
+                IRInst* val = builder.emitCallInst(info.field->getFieldType(), innerAddMethod, 2, args);
+                fieldVals.add(val);
+            }
+            builder.emitReturn(builder.emitMakeStruct(diffType, fieldVals));
         }
 
         builder.setInsertAfter(addMethod);
@@ -1107,9 +1143,8 @@ struct AutoDiffPass : public InstPassBase
         {
             bool changed = false;
             List<IRInst*> autoDiffWorkList;
-            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the module.
-            autoDiffWorkList.clear();
-            processAllInsts([&](IRInst* inst)
+            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the call graph.
+            processAllReachableInsts([&](IRInst* inst)
                 {
                     switch (inst->getOp())
                     {
@@ -1128,11 +1163,15 @@ struct AutoDiffPass : public InstPassBase
                             {
                                 // Skip functions whose body still has a differentiate inst (higher order func).
                                 if (!isFullyDifferentiated(innerFunc))
+                                {
+                                    addToWorkList(inst->getOperand(0));
                                     return;
+                                }
                             }
                             autoDiffWorkList.add(inst);
                             break;
                         default:
+                            autoDiffWorkList.add(inst->getOperand(0));
                             break;
                         }
                         break;
@@ -1140,6 +1179,11 @@ struct AutoDiffPass : public InstPassBase
                         // Explicit primal subst operator is not yet supported.
                         SLANG_UNIMPLEMENTED_X("explicit primal_subst operator.");
                     default:
+                        for (UInt i = 0; i < inst->getOperandCount(); i++)
+                        {
+                            auto operand = inst->getOperand(i);
+                            addToWorkList(operand);
+                        }
                         break;
                     }
                 });
@@ -1163,7 +1207,7 @@ struct AutoDiffPass : public InstPassBase
                     }
                     break;
                 case kIROp_BackwardDifferentiatePrimal:
-                     {
+                    {
                         auto baseFunc = differentiateInst->getOperand(0);
                         diffFunc = backwardPrimalTranscriber.transcribe(&subBuilder, baseFunc);
                     }
@@ -1263,7 +1307,6 @@ struct AutoDiffPass : public InstPassBase
 
             hasChanges |= changed;
         }
-
 
         return hasChanges;
     }
@@ -1407,6 +1450,101 @@ bool finalizeAutoDiffPass(IRModule* module)
     stripAutoDiffDecorations(module);
 
     return false;
+}
+
+IRBlock* getBlock(IRInst* inst)
+{
+    SLANG_RELEASE_ASSERT(inst);
+
+    if (auto block = as<IRBlock>(inst))
+        return block;
+
+    return getBlock(inst->getParent());
+}
+
+IRInst* getInstInBlock(IRInst* inst)
+{
+    SLANG_RELEASE_ASSERT(inst);
+
+    if (auto block = as<IRBlock>(inst->getParent()))
+        return inst;
+
+    return getInstInBlock(inst->getParent());
+}
+
+UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
+{
+    SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(block->getTerminator()));
+    
+    auto branchInst = as<IRUnconditionalBranch>(block->getTerminator());
+    List<IRInst*> phiArgs;
+    
+    for (UIndex ii = 0; ii < branchInst->getArgCount(); ii++)
+        phiArgs.add(branchInst->getArg(ii));
+    
+    phiArgs.add(arg);
+
+    builder->setInsertInto(block);
+    switch (branchInst->getOp())
+    {
+        case kIROp_unconditionalBranch:
+            builder->emitBranch(branchInst->getTargetBlock(), phiArgs.getCount(), phiArgs.getBuffer());
+            break;
+        
+        case kIROp_loop:
+            builder->emitLoop(
+                as<IRLoop>(branchInst)->getTargetBlock(),
+                as<IRLoop>(branchInst)->getBreakBlock(),
+                as<IRLoop>(branchInst)->getContinueBlock(),
+                phiArgs.getCount(),
+                phiArgs.getBuffer());
+            break;
+        
+        default:
+            SLANG_UNEXPECTED("Unexpected branch-type for phi replacement");
+    }
+
+    branchInst->removeAndDeallocate();
+    return phiArgs.getCount() - 1;
+}
+
+IRUse* findUniqueStoredVal(IRVar* var)
+{
+    if (isDerivativeContextVar(var))
+    {
+        IRUse* primalCallUse = nullptr;
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            if (auto callInst = as<IRCall>(use->getUser()))
+            {
+                // Should not see more than one IRCall. If we do
+                // we'll need to pick the primal call.
+                // 
+                SLANG_RELEASE_ASSERT(!primalCallUse);
+                primalCallUse = use;
+            }
+        }
+        return primalCallUse;
+    }
+    else
+    {
+        IRUse* storeUse = nullptr;
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            if (auto storeInst = as<IRStore>(use->getUser()))
+            {
+                // Should not see more than one IRStore
+                SLANG_RELEASE_ASSERT(!storeUse);
+                storeUse = use;
+            }
+        }
+        return storeUse;
+    }
+}
+
+bool isDerivativeContextVar(IRVar* var)
+{
+    return var->findDecoration<IRBackwardDerivativePrimalContextDecoration>();
 }
 
 }

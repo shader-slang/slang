@@ -10,6 +10,13 @@
 
 namespace Slang {
 
+/// Ctor
+JSONRPCConnection::JSONRPCConnection():
+    m_container(nullptr),
+    m_typeMap(JSONNativeUtil::getTypeFuncsMap())
+{
+}
+
 SlangResult JSONRPCConnection::init(HTTPPacketConnection* connection, CallStyle defaultCallStyle, Process* process)
 {
     m_connection = connection;
@@ -98,8 +105,10 @@ void JSONRPCConnection::disconnect()
 
 SlangResult JSONRPCConnection::sendRPC(const RttiInfo* rttiInfo, const void* data)
 {
+    auto typeMap = JSONNativeUtil::getTypeFuncsMap();
+
     // Convert to JSON
-    NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
+    NativeToJSONConverter converter(&m_container, &typeMap, &m_diagnosticSink);
     JSONValue value;
 
     SLANG_RETURN_ON_FAIL(converter.convert(rttiInfo, data, value));
@@ -132,7 +141,7 @@ SlangResult JSONRPCConnection::toNativeArgsOrSendError(const JSONValue& srcArgs,
     if (dstArgsRttiInfo->m_kind == RttiInfo::Kind::Struct &&
         srcArgs.getKind() == JSONValue::Kind::Array)
     {
-        JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
+        JSONToNativeConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
         if (SLANG_FAILED(converter.convertArrayToStruct(srcArgs, dstArgsRttiInfo, dstArgs)))
         {
             return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
@@ -149,7 +158,7 @@ SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const
 {
     m_diagnosticSink.outputBuffer.Clear();
 
-    JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
+    JSONToNativeConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
     
     if (SLANG_FAILED(converter.convert(value, info, dst)))
     {
@@ -174,7 +183,7 @@ SlangResult JSONRPCConnection::sendResult(const RttiInfo* rttiInfo, const void* 
     JSONResultResponse response;
     response.id = id;
 
-    NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
+    NativeToJSONConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
     SLANG_RETURN_ON_FAIL(converter.convert(rttiInfo, result, response.result));
 
     // Send the RPC
@@ -194,7 +203,7 @@ SlangResult JSONRPCConnection::sendCall(CallStyle callStyle, const UnownedString
     call.method = method;
 
     // Set up the converter to now convert the args.
-    NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
+    NativeToJSONConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
     
     // If we have a struct *and* call style is 'array', do special handling
     if (argsRttiInfo->m_kind == RttiInfo::Kind::Struct &&
@@ -263,7 +272,7 @@ SlangResult JSONRPCConnection::getMessage(const RttiInfo* rttiInfo, void* out)
     }
 
     m_diagnosticSink.outputBuffer.Clear();
-    JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
+    JSONToNativeConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
 
     // Get the RPC response
     JSONResultResponse resultResponse;
@@ -297,7 +306,7 @@ SlangResult JSONRPCConnection::getRPC(const RttiInfo* rttiInfo, void* out)
     }
 
     m_diagnosticSink.outputBuffer.Clear();
-    JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
+    JSONToNativeConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
 
     // Convert the result in the response
     SLANG_RETURN_ON_FAIL(converter.convert(m_jsonRoot, rttiInfo, out));

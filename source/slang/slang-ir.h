@@ -13,6 +13,7 @@
 #include "../core/slang-memory-arena.h"
 
 #include "../compiler-core/slang-source-loc.h"
+#include "../compiler-core/slang-source-map.h"
 
 #include "slang-type-system-shared.h"
 
@@ -2008,6 +2009,9 @@ public:
     SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst;  }
     SLANG_FORCE_INLINE MemoryArena& getMemoryArena() { return m_memoryArena; }
 
+    SLANG_FORCE_INLINE SourceMap* getObfuscatedSourceMap() const { return m_obfuscatedSourceMap; }
+    SLANG_FORCE_INLINE void setObfuscatedSourceMap(SourceMap* sourceMap) { m_obfuscatedSourceMap = sourceMap; }
+
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
@@ -2074,6 +2078,9 @@ private:
 
         /// Shared contexts for constructing and deduplicating the IR.
     mutable IRDeduplicationContext m_deduplicationContext;
+
+        /// Holds the obfuscated source map for this module if applicable
+    RefPtr<SourceMap> m_obfuscatedSourceMap;
 };
 
 struct IRSpecializationDictionaryItem : public IRInst

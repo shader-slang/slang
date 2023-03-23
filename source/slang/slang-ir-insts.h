@@ -421,6 +421,9 @@ struct IREntryPointDecoration : IRDecoration
     IRStringLit* getModuleName() { return cast<IRStringLit>(getOperand(2)); }
 };
 
+IR_SIMPLE_DECORATION(CudaHostDecoration)
+IR_SIMPLE_DECORATION(CudaKernelDecoration)
+
 struct IRGeometryInputPrimitiveTypeDecoration: IRDecoration
 {
     IR_PARENT_ISA(GeometryInputPrimitiveTypeDecoration)
@@ -650,6 +653,7 @@ struct IRBackwardDerivativePrimalContextDecoration : IRDecoration
     };
     IR_LEAF_ISA(BackwardDerivativePrimalContextDecoration)
 
+    IRUse primalContextVar;
     IRInst* getBackwardDerivativePrimalContextVar() { return getOperand(0); }
 };
 
@@ -703,6 +707,8 @@ struct IRLoopExitPrimalValueDecoration : IRDecoration
     };
     IR_LEAF_ISA(LoopExitPrimalValueDecoration)
 
+    IRUse target;
+    IRUse exitVal;
     IRInst* getTargetInst() { return getOperand(0); }
     IRInst* getLoopExitValInst() { return getOperand(1); }
 };
@@ -722,8 +728,8 @@ struct IRDifferentialInstDecoration : IRAutodiffInstDecoration
     IRUse primalType;
     IR_LEAF_ISA(DifferentialInstDecoration)
 
-    IRType* getPrimalType() { return as<IRType>(getOperand(0)); }
-    IRInst* getPrimalInst() { return as<IRInst>(getOperand(1)); }
+    IRType* getPrimalType() { return (IRType*)(getOperand(0)); }
+    IRInst* getPrimalInst() { return getOperand(1); }
 };
 
 struct IRPrimalInstDecoration : IRAutodiffInstDecoration
@@ -792,8 +798,7 @@ struct IRIntermediateContextFieldDifferentialTypeDecoration : IRDecoration
 
     IR_LEAF_ISA(IntermediateContextFieldDifferentialTypeDecoration)
 
-    IRInst* getDifferentialType() { return getOperand(0); }
-    IRInst* getDifferentialWitness() { return getOperand(1); }
+    IRInst* getDifferentialWitness() { return getOperand(0); }
 
 };
 
@@ -911,11 +916,24 @@ struct IRPrimalSubstitute : IRInst
     {
         kOp = kIROp_PrimalSubstitute
     };
-    // The base function for the call.
-    IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
 
     IR_LEAF_ISA(PrimalSubstitute)
+};
+
+struct IRDispatchKernel : IRInst
+{
+    enum
+    {
+        kOp = kIROp_DispatchKernel
+    };
+    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getThreadGroupSize() { return getOperand(1); }
+    IRInst* getDispatchSize() { return getOperand(2); }
+    UInt getArgCount() { return getOperandCount() - 3; }
+    IRInst* getArg(UInt i) { return getOperand(3 + i); }
+
+    IR_LEAF_ISA(DispatchKernel)
 };
 
 // Dictionary item mapping a type with a corresponding 
@@ -2878,6 +2896,7 @@ public:
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
+    IRInst* emitDispatchKernelInst(IRType* type, IRInst* baseFn, IRInst* threadGroupSize, IRInst* dispatchSize, Int argCount, IRInst* const* inArgs);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
@@ -2886,7 +2905,7 @@ public:
 
     IRInst* addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key);
     IRInst* addPrimalElementTypeDecoration(IRInst* target, IRInst* type);
-    IRInst* addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* type);
+    IRInst* addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* witness);
 
     // Add a differentiable type entry to the appropriate dictionary.
     IRInst* addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness);
@@ -2968,15 +2987,6 @@ public:
         /// Emits a raw `DefaultConstruct` opcode without attempting to fold/materialize
         /// the inst.
     IRInst* emitDefaultConstructRaw(IRType* type);
-
-    /// Emits appropriate inst for structurally adding two values of `type`.
-    /// If `fallback` is true, will emit `StructuralAdd` inst on unknown types.
-    /// Otherwise, returns nullptr if we can't materialize the inst.
-    IRInst* emitStructuralAdd(IRInst* val0, IRInst* val1, bool fallback = true);
-
-    /// Emits a raw `StructuralAdd` opcode without attempting to fold/materialize
-    /// the inst.
-    IRInst* emitStructuralAddRaw(IRInst* val0, IRInst* val1);
 
     IRInst* emitCast(
         IRType* type,
@@ -3773,6 +3783,21 @@ public:
     void addDllExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
     {
         addDecoration(value, kIROp_DllExportDecoration, getStringValue(functionName));
+    }
+
+    void addCudaDeviceExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
+    {
+        addDecoration(value, kIROp_CudaDeviceExportDecoration, getStringValue(functionName));
+    }
+
+    void addCudaHostDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_CudaHostDecoration);
+    }
+
+    void addCudaKernelDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_CudaKernelDecoration);
     }
 
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)

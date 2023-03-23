@@ -73,6 +73,7 @@ public:
             /// combining information from the target and entry point.
         Profile effectiveProfile = Profile::RawEnum::Unknown;
 
+            /// The source writer to use
         SourceWriter* sourceWriter = nullptr;
     };
 

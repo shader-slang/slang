@@ -1953,6 +1953,7 @@ namespace Slang
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
         Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
         Expr* visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr);
+        Expr* visitDispatchKernelExpr(DispatchKernelExpr* expr);
 
         Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 

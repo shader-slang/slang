@@ -175,6 +175,7 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
             x(HumanText, Text) \
             x(Source, Text) \
             x(Assembly, Text) \
+            x(Json, Text) \
         x(Instance, Base)
 
 #define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
@@ -223,7 +224,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(Diagnostics, Metadata) \
         x(Miscellaneous, Base) \
             x(Log, Miscellaneous) \
-            x(Lock, Miscellaneous)
+            x(Lock, Miscellaneous) \
+        x(SourceMap, Base)
 
 #define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 
@@ -238,12 +240,12 @@ SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_
         x(Unknown, Base) \
         x(CodeLike, Base) \
             x(Kernel, CodeLike) \
-            x(Host, CodeLike) 
+            x(Host, CodeLike) \
+        x(Obfuscated, Base) 
 
 #define SLANG_ARTIFACT_STYLE_ENTRY(TYPE, PARENT) { Index(ArtifactStyle::TYPE), Index(ArtifactStyle::PARENT), #TYPE },
 
 SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYLE_ENTRY)
-
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDescUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -550,6 +552,13 @@ static const KindExtension g_cpuKindExts[] =
         return ArtifactDesc::make(ArtifactKind::Assembly, ArtifactPayload::HostCPU);
     }
 
+    // TODO(JS): Unfortunately map extension is also used from output for linkage from 
+    // Visual Studio. It's used here for source map.
+    if (slice == toSlice("map"))
+    {
+        return ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap);
+    }
+
     if (slice == toSlice("pdb"))
     {
         // Program database
@@ -621,6 +630,7 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
         case Payload::MetalAIR:     return toSlice("air");
 
         case Payload::PdbDebugInfo: return toSlice("pdb");
+        case Payload::SourceMap:    return toSlice("map");
 
         default: break;
     }

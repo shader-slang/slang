@@ -295,7 +295,8 @@ namespace Slang
     // Create an empty func to represent the transcribed func of `origFunc`.
     InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc)
     {
-        if (!isBackwardDifferentiableFunc(origFunc))
+        if (!isBackwardDifferentiableFunc(origFunc) &&
+            !origFunc->findDecoration<IRTreatAsDifferentiableDecoration>())
             return InstPair(nullptr, nullptr);
 
         IRBuilder builder = *inBuilder;
@@ -390,6 +391,8 @@ namespace Slang
         auto origFuncType = as<IRFuncType>(origFunc->getFullType());
         List<IRInst*> primalArgs, propagateArgs;
         List<IRType*> primalTypes, propagateTypes;
+        IRType* primalResultType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getResultType());
+
         for (UInt i = 0; i < origFuncType->getParamCount(); i++)
         {
             auto primalParamType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getParamType(i));
@@ -464,11 +467,11 @@ namespace Slang
 
         auto primalFuncType = builder.getFuncType(
             primalTypes,
-            origFuncType->getResultType());
+            primalResultType);
         primalArgs.add(intermediateVar);
         primalTypes.add(builder.getOutType(intermediateType));
         auto primalFunc = builder.emitBackwardDifferentiatePrimalInst(primalFuncType, specializedOriginalFunc);
-        builder.emitCallInst(origFuncType->getResultType(), primalFunc, primalArgs);
+        builder.emitCallInst(primalResultType, primalFunc, primalArgs);
 
         propagateTypes.add(intermediateType);
         propagateArgs.add(builder.emitLoad(intermediateVar));
@@ -556,7 +559,7 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
- 
+
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
@@ -604,106 +607,6 @@ namespace Slang
         }
 
         return fwdDiffFunc;
-    }
-
-    void BackwardDiffTranscriberBase::insertVariableForRecomputedPrimalInsts(IRFunc* diffPropFunc)
-    {
-        RefPtr<IRDominatorTree> domTree = computeDominatorTree(diffPropFunc);
-        auto firstBlock = diffPropFunc->getFirstBlock();
-        if (!firstBlock)
-            return;
-        Dictionary<IRInst*, IRVar*> instVars;
-        Dictionary<IRBlock*, IRCloneEnv> cloneEnvs;
-        auto storeInstAsLocalVar = [&](IRInst* inst)
-        {
-            IRVar* var = nullptr;
-            if (instVars.TryGetValue(inst, var))
-                return var;
-            IRBuilder builder(diffPropFunc);
-            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-            var = builder.emitVar(inst->getDataType());
-            builder.emitStore(var, builder.emitDefaultConstruct(inst->getDataType()));
-
-            setInsertAfterOrdinaryInst(&builder, inst);
-            builder.emitStore(var, inst);
-            instVars[inst] = var;
-            return var;
-        };
-
-        IRBuilder builder(diffPropFunc);
-        List<IRInst*> workList;
-        for (auto block : diffPropFunc->getBlocks())
-        {
-            if (!block->findDecoration<IRDifferentialInstDecoration>())
-                continue;
-            cloneEnvs[block] = IRCloneEnv();
-            for (auto inst : block->getChildren())
-            {
-                workList.add(inst);
-            }
-        }
-
-        for (Index i = 0; i < workList.getCount(); i++)
-        {
-            auto inst = workList[i];
-            for (UInt j = 0; j < inst->getOperandCount(); j++)
-            {
-                auto operand = inst->getOperand(j);
-                if (operand->getOp() == kIROp_Block)
-                    continue;
-                auto operandParent = inst->getOperand(j)->getParent();
-                if (!operandParent)
-                    continue;
-                if (operandParent->parent != diffPropFunc)
-                    continue;
-                if (domTree->dominates(operandParent, inst->parent))
-                    continue;
-
-                // The def site of the operand does not dominate the use.
-                // We need to insert a local variable to store this var.
-
-                IRInst* operandReplacement = nullptr;
-                if (canTypeBeStored(operand->getDataType()))
-                {
-                    auto var = storeInstAsLocalVar(operand);
-                    builder.setInsertBefore(inst);
-                    operandReplacement = builder.emitLoad(var);
-                }
-                else if (operand->getOp() == kIROp_Var)
-                {
-                    // Var can just be hoisted to first block.
-                    operand->insertBefore(firstBlock->getFirstOrdinaryInst());
-                }
-                else
-                {
-                    // For all other insts, we need to copy it to right before this inst.
-                    // Before actually copying it, check if we have already copied it to
-                    // any blocks that dominates this block.
-                    auto dom = as<IRBlock>(inst->getParent());
-                    while (dom)
-                    {
-                        auto subCloneEnv = cloneEnvs.TryGetValue(dom);
-                        if (!subCloneEnv) break;
-                        if (subCloneEnv->mapOldValToNew.TryGetValue(operand, operandReplacement))
-                        {
-                            break;
-                        }
-                        dom = domTree->getImmediateDominator(dom);
-                    }
-                    // We have not found an existing clone in dominators, so we need to copy it
-                    // to this block.
-                    if (!operandReplacement)
-                    {
-                        auto subCloneEnv = cloneEnvs.TryGetValue(as<IRBlock>(inst->getParent()));
-                        builder.setInsertBefore(inst);
-                        operandReplacement = cloneInst(subCloneEnv, &builder, operand);
-                        workList.add(operandReplacement);
-                    }
-                }
-                if (operandReplacement)
-                    builder.replaceOperand(inst->getOperands() + j, operandReplacement);
-            }
-        }
     }
 
     InstPair BackwardDiffTranscriberBase::transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
@@ -774,7 +677,7 @@ namespace Slang
         // Copy primal insts to the first block of the unzipped function, copy diff insts to the
         // second block of the unzipped function.
         // 
-        diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
+        RefPtr<HoistedPrimalsInfo> primalsInfo = diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
         IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
 
         // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
@@ -801,8 +704,8 @@ namespace Slang
 
         // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter) representing the
         // derivative of the return value.
-        DiffTransposePass::FuncTranspositionInfo info = { paramTransposeInfo.dOutParam };
-        diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, info);
+        DiffTransposePass::FuncTranspositionInfo transposeInfo = { paramTransposeInfo.dOutParam, primalsInfo };
+        diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, transposeInfo);
 
         eliminateDeadCode(diffPropagateFunc);
 
@@ -810,7 +713,7 @@ namespace Slang
         // with the intermediate results computed from the extracted func.
         IRInst* intermediateType = nullptr;
         auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
-            diffPropagateFunc, primalFunc, paramTransposeInfo, intermediateType);
+            diffPropagateFunc, primalFunc, primalsInfo, paramTransposeInfo, intermediateType);
 
         // At this point the unzipped func is just an empty shell
         // and we can simply remove it.
@@ -870,8 +773,11 @@ namespace Slang
 
         initializeLocalVariables(builder->getModule(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
         initializeLocalVariables(builder->getModule(), diffPropagateFunc);
-        insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
+        // insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
         stripTempDecorations(diffPropagateFunc);
+
+        sortBlocksInFunc(diffPropagateFunc);
+        sortBlocksInFunc(primalFunc);
     }
 
     ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(

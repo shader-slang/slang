@@ -2,6 +2,285 @@
 
 namespace Slang {
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncs Impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+struct ListFuncs
+{
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    {
+        SLANG_UNUSED(typeMap);
+        SLANG_UNUSED(rttiInfo);
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+
+        // We don't care about the element type, as we can just initialize them all as List<Byte>
+        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+        typedef List<Byte> Type;
+
+        Type* dst = (Type*)inDst;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            new (dst + i) Type;
+        }
+    }
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    {
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+        const auto elementType = listRttiInfo->m_elementType;
+
+        // We need to get the type funcs
+        auto typeFuncs = typeMap->getFuncsForType(elementType);
+        SLANG_ASSERT(typeFuncs.isValid());
+
+        // We need a type that we can get information from the list from - List<Byte> gives us the functions we need.
+        typedef List<Byte> Type;
+
+        Type* dst = (Type*)inDst;
+        const Type* src = (const Type*)inSrc;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            auto& dstList = dst[i];
+            auto& srcList = src[i];
+
+            const Index srcCount = srcList.getCount();
+
+            if (srcCount > dstList.getCount())
+            {
+                // Allocate new memory
+                const Index dstCapacity = dstList.getCapacity();
+                void* oldBuffer = dstList.detachBuffer();
+
+                void* newBuffer = ::malloc(count * elementType->m_size);
+                // Initialize it all first
+                typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
+                typeFuncs.copyArray(typeMap, elementType, newBuffer, oldBuffer, count);
+
+                // Attach the new buffer
+                dstList.attachBuffer((Byte*)newBuffer, count, count);
+
+                // Free the old buffer
+                if (oldBuffer)
+                {
+                    typeFuncs.dtorArray(typeMap, elementType, oldBuffer, dstCapacity);
+
+                    ::free(oldBuffer);
+                }
+            }
+            else
+            {
+                typeFuncs.copyArray(typeMap, elementType, dstList.getBuffer(), srcList.getBuffer(), srcCount);
+                dstList.unsafeShrinkToCount(srcCount);
+            }
+        }
+    }
+
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    {
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+
+        const auto elementType = listRttiInfo->m_elementType;
+
+        // We need to get the type funcs
+        auto typeFuncs = typeMap->getFuncsForType(elementType);
+        SLANG_ASSERT(typeFuncs.isValid());
+
+        typedef List<Byte> Type;
+        Type* dst = (Type*)inDst;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            auto& dstList = dst[i];
+
+            const Index capacity = dstList.getCapacity();
+            Byte* buffer = dstList.detachBuffer();
+
+            if (buffer)
+            {
+                typeFuncs.dtorArray(typeMap, elementType, buffer, capacity);
+                ::free(buffer);
+            }
+        }
+    }
+
+    static RttiTypeFuncs getFuncs()
+    {
+        RttiTypeFuncs funcs;
+        funcs.copyArray = &copyArray;
+        funcs.dtorArray = &dtorArray;
+        funcs.ctorArray = &ctorArray;
+        return funcs;
+    }
+};
+
+struct StructFuncs
+{
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    {
+        SLANG_UNUSED(typeMap);
+        SLANG_UNUSED(rttiInfo);
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+
+        // We don't care about the element type, as we can just initialize them all as List<Byte>
+        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+        typedef List<Byte> Type;
+
+        Type* dst = (Type*)inDst;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            new (dst + i) Type;
+        }
+    }
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    {
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+        const auto elementType = listRttiInfo->m_elementType;
+
+        // We need to get the type funcs
+        auto typeFuncs = typeMap->getFuncsForType(elementType);
+        SLANG_ASSERT(typeFuncs.isValid());
+
+        // We need a type that we can get information from the list from - List<Byte> gives us the functions we need.
+        typedef List<Byte> Type;
+
+        Type* dst = (Type*)inDst;
+        const Type* src = (const Type*)inSrc;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            auto& dstList = dst[i];
+            auto& srcList = src[i];
+
+            const Index srcCount = srcList.getCount();
+
+            if (srcCount > dstList.getCount())
+            {
+                // Allocate new memory
+                const Index dstCapacity = dstList.getCapacity();
+                void* oldBuffer = dstList.detachBuffer();
+
+                void* newBuffer = ::malloc(count * elementType->m_size);
+                // Initialize it all first
+                typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
+                typeFuncs.copyArray(typeMap, elementType, newBuffer, oldBuffer, count);
+
+                // Attach the new buffer
+                dstList.attachBuffer((Byte*)newBuffer, count, count);
+
+                // Free the old buffer
+                if (oldBuffer)
+                {
+                    typeFuncs.dtorArray(typeMap, elementType, oldBuffer, dstCapacity);
+
+                    ::free(oldBuffer);
+                }
+            }
+            else
+            {
+                typeFuncs.copyArray(typeMap, elementType, dstList.getBuffer(), srcList.getBuffer(), srcCount);
+                dstList.unsafeShrinkToCount(srcCount);
+            }
+        }
+    }
+
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    {
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+
+        const auto elementType = listRttiInfo->m_elementType;
+
+        // We need to get the type funcs
+        auto typeFuncs = typeMap->getFuncsForType(elementType);
+        SLANG_ASSERT(typeFuncs.isValid());
+
+        typedef List<Byte> Type;
+        Type* dst = (Type*)inDst;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            auto& dstList = dst[i];
+
+            const Index capacity = dstList.getCapacity();
+            Byte* buffer = dstList.detachBuffer();
+
+            if (buffer)
+            {
+                typeFuncs.dtorArray(typeMap, elementType, buffer, capacity);
+                ::free(buffer);
+            }
+        }
+    }
+
+    static RttiTypeFuncs getFuncs()
+    {
+        RttiTypeFuncs funcs;
+        funcs.copyArray = &copyArray;
+        funcs.dtorArray = &dtorArray;
+        funcs.ctorArray = &ctorArray;
+        return funcs;
+    }
+};
+
+struct StructArrayFuncs
+{
+    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    {
+        return RttiUtil::ctorArray(typeMap, rttiInfo, inDst, rttiInfo->m_size, count);
+    }
+
+    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    {
+        return RttiUtil::copyArray(typeMap, rttiInfo, inDst, inSrc, rttiInfo->m_size, count);
+    }
+
+    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    {
+        return RttiUtil::dtorArray(typeMap, rttiInfo, inDst, rttiInfo->m_size, count);
+    }
+
+    static RttiTypeFuncs getFuncs()
+    {
+        RttiTypeFuncs funcs;
+        funcs.copyArray = copyArray;
+        funcs.dtorArray = dtorArray;
+        funcs.ctorArray = ctorArray;
+        return funcs;
+    }
+};
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo) 
+{
+    if (rttiInfo->isBuiltIn())
+    {
+        switch (rttiInfo->m_size)
+        {
+            case 1: return GetRttiTypeFuncsForZeroPod<uint8_t>::getFuncs();
+            case 2: return GetRttiTypeFuncsForZeroPod<uint16_t>::getFuncs();
+            case 4: return GetRttiTypeFuncsForZeroPod<uint32_t>::getFuncs();
+            case 8: return GetRttiTypeFuncsForZeroPod<uint64_t>::getFuncs();
+        }
+        return RttiTypeFuncs::makeEmpty();
+    }
+
+    switch (rttiInfo->m_kind)
+    {
+        case RttiInfo::Kind::String:                return GetRttiTypeFuncs<String>::getFuncs();
+        case RttiInfo::Kind::UnownedStringSlice:    return GetRttiTypeFuncs<UnownedStringSlice>::getFuncs();
+        case RttiInfo::Kind::List:                  return ListFuncs::getFuncs();
+        case RttiInfo::Kind::Struct:                return StructArrayFuncs::getFuncs();
+        default: break;
+    }
+
+    return RttiTypeFuncs::makeEmpty();
+}
+
 /* static */SlangResult RttiUtil::setInt(int64_t value, const RttiInfo* rttiInfo, void* dst)
 {
     SLANG_ASSERT(rttiInfo->isIntegral());
@@ -190,296 +469,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     }
 }
 
-template <typename T>
-struct GetRttiTypeFuncsForBuiltIn
-{
-    static void ctorArray(const RttiInfo* rttiInfo, void* dst, Index count) { SLANG_UNUSED(rttiInfo);  ::memset(dst, 0, sizeof(T) * count); }
-    static void dtorArray(const RttiInfo* rttiInfo, void* dst, Index count) { SLANG_UNUSED(rttiInfo); SLANG_UNUSED(dst); SLANG_UNUSED(count); }
-    static void copyArray(const RttiInfo* rttiInfo, void* dst, const void* src, Index count) { SLANG_UNUSED(rttiInfo); ::memcpy(dst, src, sizeof(T) * count); }
-
-    static RttiTypeFuncs getFuncs()
-    {
-        RttiTypeFuncs funcs;
-        funcs.copyArray = &copyArray;
-        funcs.dtorArray = &dtorArray;
-        funcs.ctorArray = &ctorArray;
-        return funcs;
-    }
-};
-
-struct ListFuncs
-{
-    static void ctorArray(const RttiInfo* rttiInfo, void* inDst, Index count)
-    {
-        SLANG_UNUSED(rttiInfo);
-        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
-
-        // We don't care about the element type, as we can just initialize them all as List<Byte>
-        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
-        typedef List<Byte> Type;
-
-        Type* dst = (Type*)inDst;
-
-        for (Index i = 0; i < count; ++i)
-        {
-            new (dst + i) Type;
-        }
-    }
-    static void copyArray(const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
-    {
-        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
-        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
-        const auto elementType = listRttiInfo->m_elementType;
-
-        // We need to get the type funcs
-        auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
-        SLANG_ASSERT(typeFuncs.isValid());
-
-        // We need a type that we can get information from the list from - List<Byte> gives us the functions we need.
-        typedef List<Byte> Type;
-
-        Type* dst = (Type*)inDst;
-        const Type* src = (const Type*)inSrc;
-
-        for (Index i = 0; i < count; ++i)
-        {
-            auto& dstList = dst[i];
-            auto& srcList = src[i];
-
-            const Index srcCount = srcList.getCount();
-
-            if (srcCount > dstList.getCount())
-            {
-                // Allocate new memory
-                const Index dstCapacity = dstList.getCapacity();
-                void* oldBuffer = dstList.detachBuffer();
-
-                void* newBuffer = ::malloc(count * elementType->m_size);
-                // Initialize it all first
-                typeFuncs.ctorArray(elementType, newBuffer, count);
-                typeFuncs.copyArray(elementType, newBuffer, oldBuffer, count);
-
-                // Attach the new buffer
-                dstList.attachBuffer((Byte*)newBuffer, count, count);
-
-                // Free the old buffer
-                if (oldBuffer)
-                {
-                    typeFuncs.dtorArray(elementType, oldBuffer, dstCapacity);
-
-                    ::free(oldBuffer);
-                }
-            }
-            else
-            {
-                typeFuncs.copyArray(elementType, dstList.getBuffer(), srcList.getBuffer(), srcCount);
-                dstList.unsafeShrinkToCount(srcCount);
-            }
-        }
-    }
-
-    static void dtorArray(const RttiInfo* rttiInfo, void* inDst, Index count)
-    {
-        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
-        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
-
-        const auto elementType = listRttiInfo->m_elementType;
-
-        // We need to get the type funcs
-        auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
-        SLANG_ASSERT(typeFuncs.isValid());
-
-        typedef List<Byte> Type;
-        Type* dst = (Type*)inDst;
-
-        for (Index i = 0; i < count; ++i)
-        {
-            auto& dstList = dst[i];
-
-            const Index capacity = dstList.getCapacity();
-            Byte* buffer = dstList.detachBuffer();
-
-            if (buffer)
-            {
-                typeFuncs.dtorArray(elementType, buffer, capacity);
-                ::free(buffer);
-            }
-        }
-    }
-
-    static RttiTypeFuncs getFuncs()
-    {
-        RttiTypeFuncs funcs;
-        funcs.copyArray = &copyArray;
-        funcs.dtorArray = &dtorArray;
-        funcs.ctorArray = &ctorArray;
-        return funcs;
-    }
-};
-
-struct StructFuncs
-{
-    
-
-    static void ctorArray(const RttiInfo* rttiInfo, void* inDst, Index count)
-    {
-        SLANG_UNUSED(rttiInfo);
-        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
-
-        // We don't care about the element type, as we can just initialize them all as List<Byte>
-        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
-        typedef List<Byte> Type;
-
-        Type* dst = (Type*)inDst;
-
-        for (Index i = 0; i < count; ++i)
-        {
-            new (dst + i) Type;
-        }
-    }
-    static void copyArray(const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
-    {
-        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
-        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
-        const auto elementType = listRttiInfo->m_elementType;
-
-        // We need to get the type funcs
-        auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
-        SLANG_ASSERT(typeFuncs.isValid());
-
-        // We need a type that we can get information from the list from - List<Byte> gives us the functions we need.
-        typedef List<Byte> Type;
-
-        Type* dst = (Type*)inDst;
-        const Type* src = (const Type*)inSrc;
-
-        for (Index i = 0; i < count; ++i)
-        {
-            auto& dstList = dst[i];
-            auto& srcList = src[i];
-
-            const Index srcCount = srcList.getCount();
-
-            if (srcCount > dstList.getCount())
-            {
-                // Allocate new memory
-                const Index dstCapacity = dstList.getCapacity();
-                void* oldBuffer = dstList.detachBuffer();
-
-                void* newBuffer = ::malloc(count * elementType->m_size);
-                // Initialize it all first
-                typeFuncs.ctorArray(elementType, newBuffer, count);
-                typeFuncs.copyArray(elementType, newBuffer, oldBuffer, count);
-
-                // Attach the new buffer
-                dstList.attachBuffer((Byte*)newBuffer, count, count);
-
-                // Free the old buffer
-                if (oldBuffer)
-                {
-                    typeFuncs.dtorArray(elementType, oldBuffer, dstCapacity);
-
-                    ::free(oldBuffer);
-                }
-            }
-            else
-            {
-                typeFuncs.copyArray(elementType, dstList.getBuffer(), srcList.getBuffer(), srcCount);
-                dstList.unsafeShrinkToCount(srcCount);
-            }
-        }
-    }
-
-    static void dtorArray(const RttiInfo* rttiInfo, void* inDst, Index count)
-    {
-        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
-        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
-
-        const auto elementType = listRttiInfo->m_elementType;
-
-        // We need to get the type funcs
-        auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
-        SLANG_ASSERT(typeFuncs.isValid());
-
-        typedef List<Byte> Type;
-        Type* dst = (Type*)inDst;
-
-        for (Index i = 0; i < count; ++i)
-        {
-            auto& dstList = dst[i];
-
-            const Index capacity = dstList.getCapacity();
-            Byte* buffer = dstList.detachBuffer();
-
-            if (buffer)
-            {
-                typeFuncs.dtorArray(elementType, buffer, capacity);
-                ::free(buffer);
-            }
-        }
-    }
-
-    static RttiTypeFuncs getFuncs()
-    {
-        RttiTypeFuncs funcs;
-        funcs.copyArray = &copyArray;
-        funcs.dtorArray = &dtorArray;
-        funcs.ctorArray = &ctorArray;
-        return funcs;
-    }
-};
-
-static void _ctorStructArray(const RttiInfo* rttiInfo, void* inDst, Index count)
-{
-    RttiUtil::ctorArray(rttiInfo, inDst, rttiInfo->m_size, count);
-}
-
-static void _copyStructArray(const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
-{
-    RttiUtil::copyArray(rttiInfo, inDst, inSrc, rttiInfo->m_size, count);
-}
-
-static void _dtorStructArray(const RttiInfo* rttiInfo, void* inDst, Index count)
-{
-    RttiUtil::dtorArray(rttiInfo, inDst, rttiInfo->m_size, count);
-}
-
-static RttiTypeFuncs _getStructTypeFuncs()
-{
-    RttiTypeFuncs funcs;
-    funcs.copyArray = _copyStructArray;
-    funcs.dtorArray = _dtorStructArray;
-    funcs.ctorArray = _ctorStructArray;
-    return funcs;
-}
-
-RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
-{
-    if (rttiInfo->isBuiltIn())
-    {
-        switch (rttiInfo->m_size)
-        {
-            case 1: return GetRttiTypeFuncsForBuiltIn<uint8_t>::getFuncs();
-            case 2: return GetRttiTypeFuncsForBuiltIn<uint16_t>::getFuncs();
-            case 4: return GetRttiTypeFuncsForBuiltIn<uint32_t>::getFuncs();
-            case 8: return GetRttiTypeFuncsForBuiltIn<uint64_t>::getFuncs();
-        }
-        return RttiTypeFuncs::makeEmpty();
-    }
-
-    switch (rttiInfo->m_kind)
-    {
-        case RttiInfo::Kind::String:                return GetRttiTypeFuncs<String>::getFuncs();
-        case RttiInfo::Kind::UnownedStringSlice:    return GetRttiTypeFuncs<UnownedStringSlice>::getFuncs();
-        case RttiInfo::Kind::List:                  return ListFuncs::getFuncs();
-        case RttiInfo::Kind::Struct:                return _getStructTypeFuncs();
-        default: break;
-    }
-
-    return RttiTypeFuncs::makeEmpty();
-}
-
-/* static */SlangResult RttiUtil::setListCount(const RttiInfo* elementType, void* dst, Index count)
+/* static */SlangResult RttiUtil::setListCount(RttiTypeFuncsMap* typeMap, const RttiInfo* elementType, void* dst, Index count)
 {
     // NOTE! The following only works because List<T> has capacity initialized members, and
     // setting the count if it is <= capacity just sets the count (ie things aren't released(!)).
@@ -496,22 +486,17 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
         return SLANG_OK;
     }
 
-    // Get funcs needed
-    const auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
-
-    if (!typeFuncs.isValid())
-    {
-        return SLANG_FAIL;
-    }
+    const auto typeFuncs = typeMap->getFuncsForType(elementType);
+    SLANG_ASSERT(typeFuncs.isValid());
 
     const Index dstCapacity = dstList.getCapacity();
     void* oldBuffer = dstList.detachBuffer();
 
     void* newBuffer = ::malloc(count * elementType->m_size);
     // Initialize it all first
-    typeFuncs.ctorArray(elementType, newBuffer, count);
+    typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
 
-    typeFuncs.copyArray(elementType, newBuffer, oldBuffer, oldCount);
+    typeFuncs.copyArray(typeMap, elementType, newBuffer, oldBuffer, oldCount);
 
     // Attach the new buffer
     dstList.attachBuffer((Byte*)newBuffer, count, count);
@@ -519,7 +504,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     // Free the old buffer
     if (oldBuffer)
     {
-        typeFuncs.dtorArray(elementType, oldBuffer, dstCapacity);
+        typeFuncs.dtorArray(typeMap, elementType, oldBuffer, dstCapacity);
         ::free(oldBuffer);
     }
 
@@ -707,7 +692,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     }
 }
 
-/* static */void RttiUtil::ctorArray(const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
+/* static */void RttiUtil::ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
 {
     if (count <= 0)
     {
@@ -741,14 +726,14 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
             if (fixedArrayRttiInfo->m_size == stride)
             {
                 // It's contiguous do in one go
-                ctorArray(fixedArrayRttiInfo->m_elementType, dst, fixedArrayRttiInfo->m_elementType->m_size, fixedArrayRttiInfo->m_elementCount * count);
+                ctorArray(typeMap, fixedArrayRttiInfo->m_elementType, dst, fixedArrayRttiInfo->m_elementType->m_size, fixedArrayRttiInfo->m_elementCount * count);
             }
             else
             {
                 // Do it in array runs
                 for (Index i = 0; i < count; ++i, dst += stride)
                 {
-                    ctorArray(fixedArrayRttiInfo->m_elementType, dst, fixedArrayRttiInfo->m_elementType->m_size, fixedArrayRttiInfo->m_elementCount);
+                    ctorArray(typeMap, fixedArrayRttiInfo->m_elementType, dst, fixedArrayRttiInfo->m_elementType->m_size, fixedArrayRttiInfo->m_elementCount);
                 }
             }
             return;
@@ -757,19 +742,20 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
         case RttiInfo::Kind::Dictionary:
         case RttiInfo::Kind::Other:
         {
-            auto funcs = getTypeFuncs(rttiInfo);
+            auto funcs = typeMap->getFuncsForType(rttiInfo);
+            SLANG_ASSERT(funcs.isValid());
 
             const OtherRttiInfo* otherRttiInfo = static_cast<const OtherRttiInfo*>(rttiInfo);
             if (otherRttiInfo->m_size == stride)
             {
-                funcs.ctorArray(rttiInfo, dst, count);
+                funcs.ctorArray(typeMap, rttiInfo, dst, count);
             }
             else
             {
                 // Do it in array runs
                 for (Index i = 0; i < count; ++i, dst += stride)
                 {
-                    funcs.ctorArray(rttiInfo, dst, 1);
+                    funcs.ctorArray(typeMap, rttiInfo, dst, 1);
                 }
             }
             return;
@@ -787,7 +773,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
                 for (Index i = 0; i < fieldCount; ++i)
                 {
                     const auto& field = fields[i];
-                    ctorArray(field.m_type, dst + field.m_offset, stride, count);
+                    ctorArray(typeMap, field.m_type, dst + field.m_offset, stride, count);
                 }
                 structRttiInfo = structRttiInfo->m_super;
             }
@@ -800,7 +786,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     SLANG_ASSERT(!"Unexpected");
 }
 
-/* static */void RttiUtil::copyArray(const RttiInfo* rttiInfo, void* inDst, const void* inSrc, ptrdiff_t stride, Index count)
+/* static */void RttiUtil::copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, ptrdiff_t stride, Index count)
 {
     if (count <= 0)
     {
@@ -840,14 +826,14 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
             if (ptrdiff_t(size) == stride)
             {
                 // It's contiguous do in one go
-                copyArray(elementType, dst, src, elementSize, elementCount * count);
+                copyArray(typeMap, elementType, dst, src, elementSize, elementCount * count);
             }
             else
             {
                 // Do it in array runs
                 for (Index i = 0; i < count; ++i, dst += stride, src += stride)
                 {
-                    copyArray(elementType, dst, src, elementSize, elementCount);
+                    copyArray(typeMap, elementType, dst, src, elementSize, elementCount);
                 }
             }
             return;
@@ -856,18 +842,19 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
         case RttiInfo::Kind::Dictionary:
         case RttiInfo::Kind::Other:
         {
-            auto funcs = getTypeFuncs(rttiInfo);
+            auto funcs = typeMap->getFuncsForType(rttiInfo);
+            SLANG_ASSERT(funcs.isValid());
 
             const OtherRttiInfo* otherRttiInfo = static_cast<const OtherRttiInfo*>(rttiInfo);
             if (otherRttiInfo->m_size == stride)
             {
-                funcs.copyArray(rttiInfo, dst, src, count);
+                funcs.copyArray(typeMap, rttiInfo, dst, src, count);
             }
             else
             {
                 for (Index i = 0; i < count; ++i, dst += stride, src += stride)
                 {
-                    funcs.copyArray(rttiInfo, dst, src, 1);
+                    funcs.copyArray(typeMap, rttiInfo, dst, src, 1);
                 }
             }
             return;
@@ -885,7 +872,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
                 for (Index i = 0; i < fieldCount; ++i)
                 {
                     const auto& field = fields[i];
-                    copyArray(field.m_type, dst + field.m_offset, src + field.m_offset, stride, count);
+                    copyArray(typeMap, field.m_type, dst + field.m_offset, src + field.m_offset, stride, count);
                 }
                 structRttiInfo = structRttiInfo->m_super;
             }
@@ -898,7 +885,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     SLANG_ASSERT(!"Unexpected");
 }
 
-/* static */void RttiUtil::dtorArray(const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
+/* static */void RttiUtil::dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
 {
     if (count <= 0 || !hasDtor(rttiInfo))
     {
@@ -920,14 +907,14 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
             if (ptrdiff_t(size) == stride)
             {
                 // It's contiguous do in one go
-                dtorArray(elementType, dst, elementSize, elementCount * count);
+                dtorArray(typeMap, elementType, dst, elementSize, elementCount * count);
             }
             else
             {
                 // Do it in array runs
                 for (Index i = 0; i < count; ++i, dst += stride)
                 {
-                    dtorArray(elementType, dst, elementSize, elementCount);
+                    dtorArray(typeMap, elementType, dst, elementSize, elementCount);
                 }
             }
             return;
@@ -936,18 +923,19 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
         case RttiInfo::Kind::Dictionary:
         case RttiInfo::Kind::Other:
         {
-            auto funcs = getTypeFuncs(rttiInfo);
+            auto funcs = typeMap->getFuncsForType(rttiInfo);
+            SLANG_ASSERT(funcs.isValid());
 
             const OtherRttiInfo* otherRttiInfo = static_cast<const OtherRttiInfo*>(rttiInfo);
             if (otherRttiInfo->m_size == stride)
             {
-                funcs.dtorArray(rttiInfo, dst, count);
+                funcs.dtorArray(typeMap, rttiInfo, dst, count);
             }
             else
             {
                 for (Index i = 0; i < count; ++i, dst += stride)
                 {
-                    funcs.dtorArray(rttiInfo, dst, 1);
+                    funcs.dtorArray(typeMap, rttiInfo, dst, 1);
                 }
             }
             return;
@@ -965,7 +953,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
                 for (Index i = 0; i < fieldCount; ++i)
                 {
                     const auto& field = fields[i];
-                    dtorArray(field.m_type, dst + field.m_offset, stride, count);
+                    dtorArray(typeMap, field.m_type, dst + field.m_offset, stride, count);
                 }
                 structRttiInfo = structRttiInfo->m_super;
             }

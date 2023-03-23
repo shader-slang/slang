@@ -642,6 +642,9 @@ namespace Slang
             }
             else if( auto genericValueParamDecl = as<GenericValueParamDecl>(mm) )
             {
+                if (semantics)
+                    ensureDecl(semantics, genericValueParamDecl, DeclCheckState::ReadyForLookup);
+
                 args.add(astBuilder->getOrCreate<GenericParamIntVal>(
                     genericValueParamDecl->getType(),
                     genericValueParamDecl, outerSubst));
@@ -1540,18 +1543,48 @@ namespace Slang
         };
 
         // Make the Differential type itself conform to `IDifferential` interface.
-        auto inheritanceIDiffernetiable = m_astBuilder->create<InheritanceDecl>();
-        inheritanceIDiffernetiable->base.type = m_astBuilder->getDiffInterfaceType();
-        inheritanceIDiffernetiable->parentDecl = aggTypeDecl;
-        aggTypeDecl->members.add(inheritanceIDiffernetiable);
+        bool hasDifferentialConformance = false;
+        for (auto inheritanceDecl : aggTypeDecl->getMembersOfType<InheritanceDecl>())
+        {
+            if (auto declRefType = as<DeclRefType>(inheritanceDecl->base.type))
+            {
+                if (declRefType->declRef == m_astBuilder->getDifferentiableInterface())
+                {
+                    hasDifferentialConformance = true;
+                    break;
+                }
+            }
+        }
+        if (!hasDifferentialConformance)
+        {
+            auto inheritanceIDiffernetiable = m_astBuilder->create<InheritanceDecl>();
+            inheritanceIDiffernetiable->base.type = m_astBuilder->getDiffInterfaceType();
+            inheritanceIDiffernetiable->parentDecl = aggTypeDecl;
+            aggTypeDecl->members.add(inheritanceIDiffernetiable);
+        }
 
         // The `Differential` type of a `Differential` type is always itself.
-        auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
-        assocTypeDef->nameAndLoc.name = getName("Differential");
-        assocTypeDef->type.type = satisfyingType;
-        assocTypeDef->parentDecl = aggTypeDecl;
-        assocTypeDef->setCheckState(DeclCheckState::Checked);
-        aggTypeDecl->members.add(assocTypeDef);
+        bool hasDifferentialTypeDef = false;
+        for (auto member : aggTypeDecl->members)
+        {
+            if (auto name = member->getName())
+            {
+                if (name->text == "Differential")
+                {
+                    hasDifferentialTypeDef = true;
+                    break;
+                }
+            }
+        }
+        if (!hasDifferentialTypeDef)
+        {
+            auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
+            assocTypeDef->nameAndLoc.name = getName("Differential");
+            assocTypeDef->type.type = satisfyingType;
+            assocTypeDef->parentDecl = aggTypeDecl;
+            assocTypeDef->setCheckState(DeclCheckState::Checked);
+            aggTypeDecl->members.add(assocTypeDef);
+        }
 
         // Go through all members and collect their differential types.
         // Go through super types.
@@ -1922,8 +1955,11 @@ namespace Slang
         bool hasForwardDerivative = false;
         if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
         {
-            if (!satisfyingMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>()
-                && !satisfyingMemberDeclRef.getDecl()->hasModifier<BackwardDerivativeAttribute>())
+            auto funcDecl = as<FunctionDeclBase>(satisfyingMemberDeclRef.getDecl());
+            if (!funcDecl)
+                return false;
+            
+            if (getShared()->getFuncDifferentiableLevel(funcDecl) != FunctionDifferentiableLevel::Backward)
             {
                 // A non-`BackwardDifferentiable` method can't satisfy a `BackwardDifferentiable` requirement and vice versa.
                 return false;
@@ -1933,12 +1969,12 @@ namespace Slang
         }
         else if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
         {
-            if (!satisfyingMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>()
-                && !satisfyingMemberDeclRef.getDecl()->hasModifier<ForwardDerivativeAttribute>()
-                && !satisfyingMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>()
-                && !satisfyingMemberDeclRef.getDecl()->hasModifier<BackwardDerivativeAttribute>())
+            auto funcDecl = as<FunctionDeclBase>(satisfyingMemberDeclRef.getDecl());
+            if (!funcDecl)
+                return false;
+            if (getShared()->getFuncDifferentiableLevel(funcDecl) == FunctionDifferentiableLevel::None)
             {
-                // A non-`ForwardDifferentiable` method can't satisfy a `ForwardDifferentiable` requirement and vice versa.
+                // A non-`BackwardDifferentiable` method can't satisfy a `BackwardDifferentiable` requirement and vice versa.
                 return false;
             }
             hasForwardDerivative = true;
@@ -3324,6 +3360,7 @@ namespace Slang
         {
             VarDecl* indexVar = nullptr;
             auto forStmt = synth.emitFor(synth.emitIntConst(0), synth.emitGetArrayLengthExpr(leftValue), indexVar);
+            addModifier(forStmt, synth.getBuilder()->create<ForceUnrollAttribute>());
             auto innerLeft = synth.emitIndexExpr(leftValue, synth.emitVarExpr(indexVar));
             for (auto& arg : args)
             {
@@ -3358,6 +3395,7 @@ namespace Slang
         // We synthesize a memberwise dispatch to compute each field of `TResult`,
         // resulting an implementation of the form:
         // ```
+        // [BackwardDifferentiable]
         // static TResult requiredMethod(TParam1 p0, TParam2 p1, ...)
         // {
         //     TResult result;
@@ -3389,6 +3427,9 @@ namespace Slang
         ThisExpr* synThis = nullptr;
         auto synFunc = synthesizeMethodSignatureForRequirementWitness(
             context, requirementDeclRef.as<FuncDecl>(), synArgs, synThis);
+        
+        addModifier(synFunc, m_astBuilder->create<BackwardDifferentiableAttribute>());
+
         synFunc->parentDecl = context->parentDecl;
         synth.pushContainerScope(synFunc);
         auto blockStmt = m_astBuilder->create<BlockStmt>();
@@ -6636,6 +6677,9 @@ namespace Slang
         if (func->findModifier<BackwardDerivativeAttribute>())
             return FunctionDifferentiableLevel::Backward;
 
+        if (func->findModifier<TreatAsDifferentiableAttribute>())
+            return FunctionDifferentiableLevel::Backward;
+
         FunctionDifferentiableLevel diffLevel = FunctionDifferentiableLevel::None;
         if (func->findModifier<DifferentiableAttribute>())
             diffLevel = FunctionDifferentiableLevel::Forward;
@@ -6929,9 +6973,12 @@ namespace Slang
             arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
             arg->type.type = param->getType();
             arg->loc = loc;
-            if (auto pairType = visitor->getDifferentialPairType(param->getType()))
+            if (!param->findModifier<NoDiffModifier>())
             {
-                arg->type.type = pairType;
+                if (auto pairType = visitor->getDifferentialPairType(param->getType()))
+                {
+                    arg->type.type = pairType;
+                }
             }
             imaginaryArguments.add(arg);
         }
@@ -6953,18 +7000,26 @@ namespace Slang
             arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
             arg->type.type = param->getType();
             arg->loc = loc;
-            if (auto pairType = as<DifferentialPairType>(visitor->getDifferentialPairType(param->getType())))
+            bool isDiffParam = (!param->findModifier<NoDiffModifier>());
+            if (isDiffParam)
             {
-                arg->type.type = pairType;
-                if (isOutParam(param))
+                if (auto pairType = as<DifferentialPairType>(visitor->getDifferentialPairType(param->getType())))
                 {
-                    // out T -> in T.Differential
-                    arg->type.isLeftValue = false;
-                    arg->type.type = visitor->tryGetDifferentialType(
-                        visitor->getASTBuilder(), pairType->getPrimalType());
+                    arg->type.type = pairType;
+                    if (isOutParam(param))
+                    {
+                        // out T -> in T.Differential
+                        arg->type.isLeftValue = false;
+                        arg->type.type = visitor->tryGetDifferentialType(
+                            visitor->getASTBuilder(), pairType->getPrimalType());
+                    }
+                }
+                else
+                {
+                    isDiffParam = false;
                 }
             }
-            else
+            if (!isDiffParam)
             {
                 if (isOutParam(param))
                 {
@@ -7005,7 +7060,7 @@ namespace Slang
         HigherOrderInvokeExpr* higherOrderFuncExpr = visitor->getASTBuilder()->create<TDifferentiateExpr>();
         higherOrderFuncExpr->baseFunction = derivativeOfAttr->funcExpr;
         higherOrderFuncExpr->loc = derivativeOfAttr->loc;
-        Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(higherOrderFuncExpr, *visitor);
+        Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(higherOrderFuncExpr, visitor->allowStaticReferenceToNonStaticMember());
         if (!checkedHigherOrderFuncExpr)
         {
             visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);

@@ -298,6 +298,8 @@ bool processAutodiffCalls(
 
 bool finalizeAutoDiffPass(IRModule* module);
 
+// Utility methods
+
 void stripDerivativeDecorations(IRInst* inst);
 
 bool isBackwardDifferentiableFunc(IRInst* func);
@@ -321,5 +323,16 @@ inline bool isRelevantDifferentialPair(IRType* type)
     }
     return false;
 }
+
+IRBlock* getBlock(IRInst* inst);
+
+IRInst* getInstInBlock(IRInst* inst);
+
+UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg);
+
+IRUse* findUniqueStoredVal(IRVar* var);
+
+bool isDerivativeContextVar(IRVar* var);
+
 
 };

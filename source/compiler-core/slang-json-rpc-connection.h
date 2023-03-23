@@ -154,7 +154,7 @@ public:
     ~JSONRPCConnection() { disconnect(); }
 
         /// Ctor
-    JSONRPCConnection():m_container(nullptr) {}
+    JSONRPCConnection();
 
 protected:
     CallStyle _getCallStyle(CallStyle callStyle) const { return (callStyle == CallStyle::Default) ? m_defaultCallStyle : callStyle; }
@@ -171,6 +171,8 @@ protected:
 
     CallStyle m_defaultCallStyle = CallStyle::Array;    ///< The default calling style
     
+    RttiTypeFuncsMap m_typeMap;
+
     Int m_terminationTimeOutInMs = 1 * 1000;        ///< Time to wait for termination response. Default is 1 second
 };
 

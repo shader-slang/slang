@@ -3,6 +3,10 @@
 
 #include "../../slang.h"
 
+#include "../core/slang-random-generator.h"
+#include "../core/slang-hash.h"
+#include "../core/slang-char-util.h"
+
 #include "slang-check.h"
 #include "slang-ir.h"
 #include "slang-ir-constexpr.h"
@@ -21,6 +25,8 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-lower-error-handling.h"
+#include "slang-ir-obfuscate-loc.h"
+
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -643,8 +649,29 @@ LoweredValInfo emitCallToVal(
         switch (tryEnv.clauseType)
         {
         case TryClauseType::None:
-            return LoweredValInfo::simple(
-                builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
+        {
+            auto callee = getSimpleVal(context, funcVal);
+            if (auto dispatchKernel = as<IRDispatchKernel>(callee))
+            {
+                // If callee is a dispatch kernel expr, don't emit call(dispatchKernel, ...), instead
+                // emit a dispatchKernel(high_order_args, actual_args).
+                auto result = LoweredValInfo::simple(builder->emitDispatchKernelInst(
+                    type,
+                    dispatchKernel->getBaseFn(),
+                    dispatchKernel->getThreadGroupSize(),
+                    dispatchKernel->getDispatchSize(),
+                    argCount,
+                    args));
+                SLANG_ASSERT(!dispatchKernel->hasUses());
+                dispatchKernel->removeAndDeallocate();
+                return result;
+            }
+            else
+            {
+                return LoweredValInfo::simple(
+                    builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
+            }
+        }
 
         case TryClauseType::Standard:
             {
@@ -1154,6 +1181,19 @@ static void addLinkageDecoration(
     {
         builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
         builder->addPublicDecoration(inst);
+    }
+    if (decl->findModifier<CudaDeviceExportAttribute>())
+    {
+        builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
+        builder->addPublicDecoration(inst);
+    }
+    if (decl->findModifier<CudaHostAttribute>())
+    {
+        builder->addCudaHostDecoration(inst);
+    }
+    if (decl->findModifier<CudaKernelAttribute>())
+    {
+        builder->addCudaKernelDecoration(inst);
     }
 }
 
@@ -3197,6 +3237,23 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitBackwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
+    }
+
+    LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->baseFunction);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+        auto threadSize = lowerRValueExpr(context, expr->threadGroupSize);
+        auto groupSize = lowerRValueExpr(context, expr->dispatchSize);
+        // Actual arguments to be filled in when we lower the actual call expr.
+        // This is handled in `emitCallToVal`.
+        return LoweredValInfo::simple(getBuilder()->emitDispatchKernelInst(
+            lowerType(context, expr->type),
+            baseVal.val,
+            getSimpleVal(context, threadSize),
+            getSimpleVal(context, groupSize),
+            0,
+            nullptr));
     }
 
     LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
@@ -8451,6 +8508,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addBackwardDifferentiableDecoration(irFunc);
             }
+            else if (as<TreatAsDifferentiableAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
+            }
         }
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
@@ -9244,10 +9305,17 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         Linkage* linkage = compileRequest->getLinkage();
 
         stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
-        stripOptions.stripSourceLocs = linkage->m_obfuscateCode;
 
+        // If we are generating an obfuscated source map, we don't want to strip locs, 
+        // we want to generate *new* locs that can be mapped (via source map)
+        // back to *actual* source.
+        // 
+        // We don't do the obfuscation remapping here, because DCE and other passes may 
+        // change what locs are actually needed, we need to be sure 
+        // that if we have obfuscation enabled we don't forget to obfuscate.
+        stripOptions.stripSourceLocs = linkage->m_obfuscateCode && !linkage->m_generateSourceMap;
         stripFrontEndOnlyInstructions(module, stripOptions);
-
+    
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
         // undesirable (e.g., the string literals referenced by name-hint
@@ -9259,6 +9327,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         IRDeadCodeEliminationOptions options;
         options.keepExportsAlive = true;
         eliminateDeadCode(module, options);
+
+        if (linkage->m_obfuscateCode && linkage->m_generateSourceMap)
+        {
+            // The obfuscated source map is stored on the module
+            obfuscateModuleLocs(module, compileRequest->getSourceManager());
+        }
     }
 
     // TODO: consider doing some more aggressive optimizations
