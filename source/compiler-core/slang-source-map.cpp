@@ -201,7 +201,7 @@ void SourceMap::clear()
 
 void SourceMap::advanceToLine(Index nextLineIndex)
 {
-    const Count currentLineIndex = getGeneratedLineCount();
+    const Count currentLineIndex = getGeneratedLineCount() - 1;
 
     SLANG_ASSERT(nextLineIndex >= currentLineIndex);
     
@@ -215,22 +215,11 @@ void SourceMap::advanceToLine(Index nextLineIndex)
     // For all the new entries they will need to point to the end 
     m_lineStarts.setCount(nextLineIndex + 1);
 
-    Index* starts = m_lineStarts.getBuffer() + currentLineIndex;
-    const Count startsCount = nextLineIndex + 1 - currentLineIndex;
-
-    for (Index i = 0; i < startsCount; ++i)
+    Index* starts = m_lineStarts.getBuffer();
+    for (Index i = currentLineIndex + 1; i < nextLineIndex + 1; ++i)
     {
         starts[i] = lastEntryIndex;
     }
-}
-
-void SourceMap::addEntry(const Entry& entry)
-{
-    m_lineEntries.add(entry);
-    ++m_lineStarts.getLast();
-
-    // Check things seem normal...
-    SLANG_ASSERT(m_lineStarts.getLast() == m_lineEntries.getCount());
 }
 
 Index SourceMap::getNameIndex(const UnownedStringSlice& slice)

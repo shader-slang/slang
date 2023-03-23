@@ -2011,10 +2011,10 @@ namespace Slang
 
                     // Try to write it out
                     {
-                        // Get the path
-
+                        // Work out the path to the artifact
                         auto artifactPath = Path::combine(parentPath, artifactFilename);
 
+                        // Write out the map
                         FileStream stream;
                         SLANG_RETURN_ON_FAIL(stream.init(artifactPath, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
                         SLANG_RETURN_ON_FAIL(stream.write(blob->getBufferPointer(), blob->getBufferSize()));
