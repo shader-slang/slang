@@ -710,6 +710,26 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             // Don't know the extension for that 
             return SLANG_E_NOT_FOUND;
         }
+        case ArtifactKind::Json:
+        {
+            auto ext = _getPayloadExtension(desc.payload);
+            if (ext.begin() != nullptr)
+            {
+                // TODO(JS):
+                // Do we need to alter the extension or the name if it's an
+                // obfuscated map?
+                //if (isDerivedFrom(desc.style, ArtifactStyle::Obfuscated))
+                //{  
+                //}
+
+                out << ext;
+                return SLANG_OK;
+            }
+
+            // Not really what kind of json, so just use 'generic' json extension
+            out << "json";
+            return SLANG_OK;
+        }
         default: break;
     }
 

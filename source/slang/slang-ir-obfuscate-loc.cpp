@@ -128,6 +128,12 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
     SourceFile* obfuscatedFile = sourceManager->createSourceFileWithSize(obfusctatedPathInfo, uniqueLocCount);
 
+    // We have only one line for all locs, just set up that way...
+    {
+        const uint32_t offsets[2] = { 0, uint32_t(uniqueLocCount) };
+        obfuscatedFile->setLineBreakOffsets(offsets, SLANG_COUNT_OF(offsets));
+    }
+    
     // Create the view we are going to use from the obfusctated "file".
     SourceView* obfuscatedView = sourceManager->createSourceView(obfuscatedFile, nullptr, SourceLoc());
 

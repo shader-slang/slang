@@ -2647,6 +2647,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
 
         SLANG_RETURN_ON_FAIL(maybeCreateContainer());
+        
         SLANG_RETURN_ON_FAIL(maybeWriteContainer(m_containerOutputPath));
 
         return SLANG_OK;
@@ -5231,10 +5232,14 @@ char const* EndToEndCompileRequest::getEntryPointSource(int entryPointIndex)
 
 void const* EndToEndCompileRequest::getCompileRequestCode(size_t* outSize)
 {
-    if (m_containerBlob)
+    if (m_containerArtifact)
     {
-        *outSize = m_containerBlob->getBufferSize();
-        return m_containerBlob->getBufferPointer();
+        ComPtr<ISlangBlob> containerBlob;
+        if (SLANG_SUCCEEDED(m_containerArtifact->loadBlob(ArtifactKeep::Yes, containerBlob.writeRef())))
+        {
+            *outSize = containerBlob->getBufferSize();
+            return containerBlob->getBufferPointer();
+        }
     }
 
     // Container blob does not have any contents
@@ -5244,14 +5249,15 @@ void const* EndToEndCompileRequest::getCompileRequestCode(size_t* outSize)
 
 SlangResult EndToEndCompileRequest::getContainerCode(ISlangBlob** outBlob)
 {
-    ISlangBlob* containerBlob = m_containerBlob;
-    if (containerBlob)
+    if (m_containerArtifact)
     {
-        containerBlob->addRef();
-        *outBlob = containerBlob;
-        return SLANG_OK;
+        ComPtr<ISlangBlob> containerBlob;
+        if (SLANG_SUCCEEDED(m_containerArtifact->loadBlob(ArtifactKeep::Yes, containerBlob.writeRef())))
+        {
+            *outBlob = containerBlob.detach();
+            return SLANG_OK;
+        }
     }
-
     return SLANG_FAIL;
 }
 
