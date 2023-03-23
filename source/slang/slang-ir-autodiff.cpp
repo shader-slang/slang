@@ -1163,7 +1163,10 @@ struct AutoDiffPass : public InstPassBase
                             {
                                 // Skip functions whose body still has a differentiate inst (higher order func).
                                 if (!isFullyDifferentiated(innerFunc))
+                                {
+                                    addToWorkList(inst->getOperand(0));
                                     return;
+                                }
                             }
                             autoDiffWorkList.add(inst);
                             break;
