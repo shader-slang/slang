@@ -3975,6 +3975,10 @@ inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
 }
 
 
+void addHoistableInst(
+    IRBuilder* builder,
+    IRInst* inst);
+
 }
 
 #endif

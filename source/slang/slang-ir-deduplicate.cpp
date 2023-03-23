@@ -35,10 +35,6 @@ namespace Slang
         }
     }
 
-    void addHoistableInst(
-        IRBuilder* builder,
-        IRInst* inst);
-
     void IRDeduplicationContext::tryHoistInst(IRInst* inst)
     {
         List<IRInst*> workList;
