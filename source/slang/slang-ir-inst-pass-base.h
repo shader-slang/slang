@@ -130,6 +130,15 @@ namespace Slang
                 {
                     if (as<IRDecoration>(child))
                         break;
+                    switch (child->getOp())
+                    {
+                    case kIROp_GenericSpecializationDictionary:
+                    case kIROp_ExistentialFuncSpecializationDictionary:
+                    case kIROp_ExistentialTypeSpecializationDictionary:
+                        continue;
+                    default:
+                        break;
+                    }
                     if (shouldInstBeLiveIfParentIsLive(child, IRDeadCodeEliminationOptions()))
                         addToWorkList(child);
                 }

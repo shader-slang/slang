@@ -1176,7 +1176,10 @@ struct AutoDiffPass : public InstPassBase
                         SLANG_UNIMPLEMENTED_X("explicit primal_subst operator.");
                     default:
                         for (UInt i = 0; i < inst->getOperandCount(); i++)
-                            addToWorkList(inst->getOperand(i));
+                        {
+                            auto operand = inst->getOperand(i);
+                            addToWorkList(operand);
+                        }
                         break;
                     }
                 });
