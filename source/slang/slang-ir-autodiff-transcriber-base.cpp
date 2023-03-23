@@ -1116,9 +1116,12 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
                 }
                 else
                 {
-                    if (!pair.primal->findDecoration<IRAutodiffInstDecoration>()
-                        && !as<IRConstant>(pair.differential))
+                    if (!pair.primal->findDecoration<IRAutodiffInstDecoration>())
                     {
+                        if (as<IRConstant>(pair.differential))
+                            break;
+                        if (as<IRType>(pair.differential))
+                            break;
                         auto mixedType = (IRType*)(pair.primal->getDataType());
                         builder->markInstAsMixedDifferential(pair.primal, mixedType);
                     }
