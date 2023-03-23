@@ -65,7 +65,7 @@ void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFu
         auto primal = builder.emitDefaultConstruct(pairType->getValueType());
         builder.markInstAsPrimal(primal);
         auto diff = getDifferentialZeroOfType(&builder, pairType->getValueType());
-        builder.markInstAsDifferential(primal);
+        builder.markInstAsDifferential(diff, primal->getDataType());
 
         auto val = builder.emitMakeDifferentialPair(pairType, primal, diff);
         builder.markInstAsMixedDifferential(val);
