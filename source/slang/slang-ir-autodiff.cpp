@@ -1171,6 +1171,7 @@ struct AutoDiffPass : public InstPassBase
                             autoDiffWorkList.add(inst);
                             break;
                         default:
+                            autoDiffWorkList.add(inst->getOperand(0));
                             break;
                         }
                         break;

@@ -199,7 +199,7 @@ struct CFGNormalizationPass
         bool currBreakRegion = false;
         bool currBaseRegion = true;
 
-        // Detect the trivial case. The current block is alredy
+        // Detect the trivial case. The current block is already
         // in the next region => this region is empty.
         //
         if (afterBlocks.contains(currentBlock))
