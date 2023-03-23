@@ -90,19 +90,16 @@ void main()
     ivec2 launchID_0 = ivec2(_S2.xy);
     uvec3 _S3 = ((gl_LaunchSizeEXT));
     ivec2 launchSize_0 = ivec2(_S3.xy);
-
-    float _S4 = (float(launchID_0.x) + 0.5) / float(launchSize_0.x);
-    float _S5 = (float(launchID_0.y) + 0.5) / float(launchSize_0.y);
-    vec2 inUV_0 = vec2(_S4, _S5);
-    vec4 _S6 = (texture(sampler2D(samplerPosition_0,sampler_0), (inUV_0)));
-    vec3 P_0 = _S6.xyz;
-    vec4 _S7 = (texture(sampler2D(samplerNormal_0,sampler_0), (inUV_0)));
-    vec3 N_0 = _S7.xyz * 2.0 - 1.0;
+    vec2 inUV_0 = vec2((float(launchID_0.x) + 0.5) / float(launchSize_0.x), (float(launchID_0.y) + 0.5) / float(launchSize_0.y));
+    vec4 _S4 = (texture(sampler2D(samplerPosition_0,sampler_0), (inUV_0)));
+    vec3 P_0 = _S4.xyz;
+    vec4 _S5 = (texture(sampler2D(samplerNormal_0,sampler_0), (inUV_0)));
+    vec3 N_0 = _S5.xyz * 2.0 - 1.0;
 
     vec3 lightDelta_0 = ubo_0._data.light_0.position_0.xyz - P_0;
     float lightDist_0 = length(lightDelta_0);
     vec3 L_0 = normalize(lightDelta_0);
-    float _S8 = 1.0 / (lightDist_0 * lightDist_0);
+    float _S6 = 1.0 / (lightDist_0 * lightDist_0);
     RayDesc_0 ray_0;
     ray_0.Origin_0 = P_0;
     ray_0.TMin_0 = 0.00000099999999747524;
@@ -120,7 +117,7 @@ void main()
     }
     else
     {
-        atten_0 = _S8;
+        atten_0 = _S6;
     }
     vec3 color_2 = ubo_0._data.light_0.color_1.xyz * saturate_0(dot(N_0, L_0)) * atten_0;
 

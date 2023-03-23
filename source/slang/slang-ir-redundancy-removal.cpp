@@ -150,6 +150,7 @@ struct RedundancyRemovalContext
             if (resultInst != instP)
             {
                 instP->replaceUsesWith(resultInst);
+                instP->removeAndDeallocate();
                 result = true;
             }
             else if (isMovableInst(resultInst))
@@ -182,7 +183,6 @@ bool removeRedundancy(IRModule* module)
         if (auto func = as<IRFunc>(inst))
         {
             changed |= removeRedundancyInFunc(func);
-            changed |= eliminateRedundantLoadStore(func);
         }
     }
     return changed;
@@ -197,7 +197,12 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     RedundancyRemovalContext context;
     context.dom = computeDominatorTree(func);
     DeduplicateContext deduplicateCtx;
-    return context.removeRedundancyInBlock(deduplicateCtx, func, root);
+    bool result = context.removeRedundancyInBlock(deduplicateCtx, func, root);
+    if (auto normalFunc = as<IRFunc>(func))
+    {
+        result |= eliminateRedundantLoadStore(normalFunc);
+    }
+    return result;
 }
 
 static IRInst* _getRootVar(IRInst* inst)

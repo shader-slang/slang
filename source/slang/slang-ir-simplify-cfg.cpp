@@ -315,42 +315,6 @@ static bool isTrivialIfElse(IRIfElse* condBranch, bool& isTrueBranchTrivial, boo
     return false;
 }
 
-#if 0
-static bool tryMoveFalseBranchToTrueBranch(IRBuilder& builder, IRIfElse* ifElseInst)
-{
-    auto falseBlock = ifElseInst->getFalseBlock();
-    if (falseBlock == ifElseInst->getAfterBlock())
-        return false;
-    if (auto termInst = as<IRUnconditionalBranch>(falseBlock->getTerminator()))
-    {
-        // We can't fold a branch with arguments into the ifElse.
-        if (termInst->getArgCount() != 0)
-            return false;
-    }
-    ifElseInst->trueBlock.set(falseBlock);
-    ifElseInst->falseBlock.set(ifElseInst->getAfterBlock());
-    builder.setInsertBefore(ifElseInst);
-    auto newCondition = builder.emitNot(builder.getBoolType(), ifElseInst->getCondition());
-    ifElseInst->condition.set(newCondition);
-    return true;
-}
-#endif
-
-static bool tryEliminateFalseBranch(IRIfElse* ifElseInst)
-{
-    auto falseBlock = ifElseInst->getFalseBlock();
-    if (falseBlock == ifElseInst->getAfterBlock())
-        return false;
-    if (auto termInst = as<IRUnconditionalBranch>(falseBlock->getTerminator()))
-    {
-        // We can't fold a branch with arguments into the ifElse.
-        if (termInst->getArgCount() != 0)
-            return false;
-    }
-    ifElseInst->falseBlock.set(ifElseInst->getAfterBlock());
-    return true;
-}
-
 static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
 {
     bool isTrueBranchTrivial = false;
@@ -370,18 +334,6 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
             ifElseInst->removeAndDeallocate();
             return true;
         }
-    }
-    else if (isTrueBranchTrivial)
-    {
-        // If true branch is empty, we move false branch to true branch and invert the condition.
-        // TODO: diabled for now since our auto-diff pass can't handle loops whose body is on the false
-        // side of condition.
-        //return tryMoveFalseBranchToTrueBranch(builder, ifElseInst);
-    }
-    else if (isFalseBranchTrivial)
-    {
-        // If false branch is empty, we set it to afterBlock.
-        return tryEliminateFalseBranch(ifElseInst);
     }
     return false;
 }
