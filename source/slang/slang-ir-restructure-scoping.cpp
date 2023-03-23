@@ -211,7 +211,8 @@ void defaultInitializeVar(
 static void fixValueScopingForInst(
     IRInst*         def,
     SimpleRegion*   defRegion,
-    RegionTree*     regionTree)
+    RegionTree*     regionTree,
+    bool            isInstAlwaysFolded)
 {
     // This algorithm should not consider "phi nodes" for now,
     // because the emit logic will already create variables for them.
@@ -305,8 +306,18 @@ static void fixValueScopingForInst(
         // If we've gotten this far, we know that `u` is a "bad"
         // use of `def`, and needs fixing.
         //
-        // We will use a temporary variable to resolve the bad scoping,
-        // creating it on-demand when we ecounter a first "bad" use, and
+        // For insts that are always fold into use sites, we try to hoist them
+        // to as early as possible, and then leave it there.
+        // 
+        if (isInstAlwaysFolded)
+        {
+            def->removeFromParent();
+            addHoistableInst(&builder, def);
+            continue;
+        }
+
+        // For non-hoistable insts, we will use a temporary variable to resolve
+        // the bad scoping, creating it on-demand when we ecounter a first "bad" use, and
         // then re-using that temporary for any subsequent bad uses.
         //
         if( !tmp )
@@ -433,7 +444,7 @@ static void fixValueScopingForInst(
     }
 }
 
-void fixValueScoping(RegionTree* regionTree)
+void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAlwaysFoldInst)
 {
     // We are going to have to walk through every instruction
     // in the code of the function to detect an bad cases.
@@ -475,8 +486,8 @@ void fixValueScoping(RegionTree* regionTree)
         for (auto inst = block->getFirstOrdinaryInst(); inst; inst = nextInst)
         {
             nextInst = inst->getNextInst();
-
-            fixValueScopingForInst(inst, parentRegion, regionTree);
+            bool isInstAlwaysFolded = shouldAlwaysFoldInst(inst);
+            fixValueScopingForInst(inst, parentRegion, regionTree, isInstAlwaysFolded);
         }
     }
 }
