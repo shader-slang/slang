@@ -26,10 +26,11 @@ namespace Slang
         while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
-
             changed |= deduplicateGenericChildren(module);
             changed |= propagateFuncProperties(module);
             changed |= removeUnusedGenericParam(module);
+            changed |= applySparseConditionalConstantPropagationForGlobalScope(module);
+            changed |= peepholeOptimize(module);
 
             for (auto inst : module->getGlobalInsts())
             {

@@ -16,6 +16,8 @@ namespace Slang
         /// Returns true if IR is changed.
     bool applySparseConditionalConstantPropagation(
         IRModule*       module);
+    bool applySparseConditionalConstantPropagationForGlobalScope(
+        IRModule* module);
 
     bool applySparseConditionalConstantPropagation(IRInst* func);
 
