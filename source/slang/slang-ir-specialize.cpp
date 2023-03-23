@@ -115,14 +115,13 @@ struct SpecializationContext
     // a query to check for the "all operands fully specialized" case.
     //
     bool areAllOperandsFullySpecialized(
-        IRInst*                     inst,
-        UInt startingOperandIndex = 0)
+        IRInst*                     inst)
     {
         if(!isInstFullySpecialized(inst->getFullType()))
             return false;
 
         UInt operandCount = inst->getOperandCount();
-        for(UInt ii = startingOperandIndex; ii < operandCount; ++ii)
+        for(UInt ii = 0; ii < operandCount; ++ii)
         {
             IRInst* operand = inst->getOperand(ii);
             if(!isInstFullySpecialized(operand))
@@ -366,7 +365,7 @@ struct SpecializationContext
         // operands to the `speicalize(...)` instruction are
         // themselves fully specialized.
         //
-        if(!areAllOperandsFullySpecialized(specInst, 1))
+        if(!areAllOperandsFullySpecialized(specInst))
             return false;
 
         // The invariant that the arguments are fully specialized
@@ -565,7 +564,7 @@ struct SpecializationContext
                             // any ordinary instruciton.
                             //
 
-                            if( areAllOperandsFullySpecialized(inst, 1) )
+                            if( areAllOperandsFullySpecialized(inst) )
                             {
                                 markInstAsFullySpecialized(inst);
                             }
