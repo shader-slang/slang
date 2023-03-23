@@ -3,7 +3,7 @@
 __exported import IMaterial;
 __exported import GlossyMaterialInstance;
 
-struct GlossyMaterial : IMaterial, IDifferentiable
+struct GlossyMaterial : IMaterial
 {
     float3 baseColor;
 

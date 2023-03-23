@@ -7,11 +7,23 @@ struct GlossyBSDF : IBSDF
 {
     float3 albedo;
 
-    [TreatAsDifferentiable]
-    //[BackwardDifferentiable]
+    [BackwardDifferentiable]
+    float3 getAlbedo()
+    {
+        return albedo;
+    }
+
+    [ForwardDerivativeOf(getAlbedo)]
+    DifferentialPair<float3> __fwd_d_getAlbedo()
+    {
+        return diffPair(albedo, float3(1.f));
+    }
+
+    [BackwardDifferentiable]
     float3 eval(const float3 wiLocal, const float3 woLocal)
     {
-        return albedo * albedo;
+        float3 a = getAlbedo();
+        return a * a;
     }
 };
 
@@ -19,8 +31,7 @@ struct GlossyMaterialInstance : IMaterialInstance
 {
     GlossyBSDF bsdf;
 
-    [TreatAsDifferentiable]
-    //[BackwardDifferentiable]
+    [BackwardDifferentiable]
     float3 eval(const float3 wi, const float3 wo)
     {
         return bsdf.eval(wi, wo);

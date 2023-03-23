@@ -14,12 +14,12 @@ import GlossyMaterialInstance;
 //TEST_INPUT: type_conformance GlossyMaterial:IMaterial = 1
 
 [BackwardDifferentiable]
-float3 evalBSDF(int type, float3 albedo)
+float3 evalBSDF(int type)
 {
     float3 wi = normalize(float3(0.5, 0.2, 0.8));
     float3 wo = normalize(float3(-0.1, -0.3, 0.9));
 
-    IMaterial material = createMaterialClassConformance(type, albedo);
+    IMaterial material = createMaterialClassConformance(type, float3(0.9f, 0.6f, 0.2f));
     let mi = material.setupMaterialInstance();
     float3 f = mi.eval(wi, wo);
     return f;
@@ -28,11 +28,8 @@ float3 evalBSDF(int type, float3 albedo)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    DifferentialPair<float3> dp_albedo = DifferentialPair<float3>(
-        float3(0.9f, 0.6f, 0.2f), float3(1.f, 1.f, 1.f));
-
     {
-        DifferentialPair<float3> dp_f = __fwd_diff(evalBSDF)(0, dp_albedo);
+        DifferentialPair<float3> dp_f = __fwd_diff(evalBSDF)(0);
 
         outputBuffer[0] = dp_f.d[0];
         outputBuffer[1] = dp_f.d[1];
@@ -40,7 +37,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
 
     {
-        DifferentialPair<float3> dp_f = __fwd_diff(evalBSDF)(1, dp_albedo);
+        DifferentialPair<float3> dp_f = __fwd_diff(evalBSDF)(1);
 
         outputBuffer[3] = dp_f.d[0];
         outputBuffer[4] = dp_f.d[1];
