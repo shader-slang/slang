@@ -3,7 +3,7 @@
 __exported import IMaterial;
 __exported import DiffuseMaterialInstance;
 
-struct DiffuseMaterial : IMaterial
+struct DiffuseMaterial : IMaterial, IDifferentiable
 {
     float3 baseColor;
 
