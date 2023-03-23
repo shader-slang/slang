@@ -188,6 +188,11 @@ Int IRDominatorTree::getBlockIndex(IRBlock* block)
 
 bool IRDominatorTree::isUnreachable(IRBlock* block)
 {
+    if (auto inst = block->getFirstOrdinaryInst())
+    {
+        if (inst->getOp() == kIROp_Unreachable)
+            return true;
+    }
     return !mapBlockToIndex.ContainsKey(block);
 }
 
