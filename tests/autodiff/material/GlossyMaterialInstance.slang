@@ -19,6 +19,13 @@ struct GlossyBSDF : IBSDF
         return diffPair(albedo, float3(1.f));
     }
 
+    [BackwardDerivativeOf(getAlbedo)]
+    void __bwd_d_getAlbedo(float3 dOut)
+    {
+        [unroll]
+        for (int j = 0; j < 3; j++) outputBuffer[j + 3] += dOut[j];
+    }
+
     [BackwardDifferentiable]
     float3 eval(const float3 wiLocal, const float3 woLocal)
     {
