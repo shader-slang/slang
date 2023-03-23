@@ -26,6 +26,7 @@ namespace Slang
         while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
+            changed |= hoistConstants(module);
             changed |= deduplicateGenericChildren(module);
             changed |= propagateFuncProperties(module);
             changed |= removeUnusedGenericParam(module);

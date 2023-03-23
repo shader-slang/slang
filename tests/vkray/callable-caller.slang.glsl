@@ -41,10 +41,9 @@ void main()
     uvec3 _S2 = ((gl_LaunchIDNV));
     vec2 _S3 = vec2(_S2.xy);
     uvec3 _S4 = ((gl_LaunchSizeNV));
-    vec2 _S5 = _S3 / vec2(_S4.xy);
-    payload_1.uv_0 = _S5;
+    payload_1.uv_0 = _S3 / vec2(_S4.xy);
     CallShader_0(C_0._data.shaderIndex_0, payload_1);
-    uvec3 _S6 = ((gl_LaunchIDNV));
-    imageStore((gImage_0), ivec2((_S6.xy)), payload_1.albedo_0);
+    uvec3 _S5 = ((gl_LaunchIDNV));
+    imageStore((gImage_0), ivec2((_S5.xy)), payload_1.albedo_0);
     return;
 }
