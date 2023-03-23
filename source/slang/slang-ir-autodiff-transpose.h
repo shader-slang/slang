@@ -950,15 +950,31 @@ struct DiffTransposePass
             // Slang doesn't support function values. So if we see a func-typed inst
             // it's proabably a reference to a function.
             // 
-            if (as<IRFuncType>(child->getDataType()))
+            switch (child->getOp())
+            {
+            /*
+               TODO: need a better way to move specialize, lookupwitness, extractExistentialType/Value/Witness
+               insts to a proper location that dominates all their use sites. Create copies of these insts
+               when necessary.
+                case kIROp_Specialize:
+                case kIROp_LookupWitness:
+                case kIROp_ExtractExistentialType:
+                case kIROp_ExtractExistentialValue:
+                case kIROp_ExtractExistentialWitnessTable:
+            */
+            case kIROp_ForwardDifferentiate:
+            case kIROp_BackwardDifferentiate:
+            case kIROp_BackwardDifferentiatePrimal:
+            case kIROp_BackwardDifferentiatePropagate:
                 typeInsts.add(child);
+                break;
+            }
         }
 
         for (auto inst : typeInsts)
         {
             inst->insertAtEnd(revBlock);
         }
-
 
         // Then, go backwards through the regular instructions, and transpose them into the new
         // rev block.
@@ -2221,6 +2237,10 @@ struct DiffTransposePass
             case kIROp_ifElse:
             case kIROp_loop:
             case kIROp_Switch:
+            case kIROp_LookupWitness:
+            case kIROp_ExtractExistentialType:
+            case kIROp_ExtractExistentialValue:
+            case kIROp_ExtractExistentialWitnessTable:
             {
                 // Ignore. transposeBlock() should take care of adding the
                 // appropriate branch instruction.
@@ -3474,6 +3494,9 @@ struct DiffTransposePass
     List<IRUse*>                                         primalUsesToHoist;
 
     Dictionary<IRStore*, IRBlock*>                       mapStoreToDefBlock;
+
+    IRCloneEnv typeInstCloneEnv = {};
+
 };
 
 
