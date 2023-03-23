@@ -84,21 +84,9 @@ namespace Slang
                     }
                     break;
 
-                case kIROp_LookupWitness:
-                case kIROp_Specialize:
+                default:
                     {
                         childrenToDemote.add(clonedChild);
-                        // Make sure all uses are from the function body.
-                        for (auto use = genericChild->firstUse; use; use = use->nextUse)
-                        {
-                            if (use->getUser()->getParent() == genericChild->getParent())
-                            {
-                                // This specialize/lookup is used as operand to some other
-                                // global inst in the generic. This is not supported now.
-                                SLANG_UNIMPLEMENTED_X(
-                                    "Unsupported use of specialize/lookupWitness in generic body.");
-                            }
-                        }
                         continue;
                     }
                 }
