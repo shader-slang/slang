@@ -474,7 +474,9 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     }
 
     default:
-        return (IRType*)(differentiableTypeConformanceContext.getDifferentialForType(builder, (IRType*)primalType));
+    return (IRType*)maybeCloneForPrimalInst(
+        builder,
+        differentiableTypeConformanceContext.getDifferentialForType(builder, (IRType*)origType));
     }
 }
 
@@ -674,7 +676,7 @@ InstPair AutoDiffTranscriberBase::transcribeParam(IRBuilder* builder, IRParam* o
     {
         auto primal = cloneInst(&cloneEnv, builder, origParam);
         IRInst* diff = nullptr;
-        if (IRType* diffType = differentiateType(builder, (IRType*)primalDataType))
+        if (IRType* diffType = differentiateType(builder, (IRType*)origParam->getDataType()))
         {
             diff = builder->emitParam(diffType);
         }
@@ -749,11 +751,11 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(IRBuilder* bui
 // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
 // The current implementation requires that types are defined linearly.
 // 
-IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType)
+IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, IRType* originalType)
 {
-    primalType = (IRType*)unwrapAttributedType(primalType);
-
-    if (auto diffType = differentiateType(builder, primalType))
+    originalType = (IRType*)unwrapAttributedType(originalType);
+    auto primalType = (IRType*)lookupPrimalInst(builder, originalType);
+    if (auto diffType = differentiateType(builder, originalType))
     {
         switch (diffType->getOp())
         {
@@ -777,7 +779,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
         }
         }
 
-        if (auto arrayType = as<IRArrayType>(primalType))
+        if (auto arrayType = as<IRArrayType>(originalType))
         {
             auto diffElementType =
                 (IRType*)differentiableTypeConformanceContext.getDifferentialForType(
@@ -803,7 +805,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
         }
         else
         {
-            zeroMethod = differentiableTypeConformanceContext.getZeroMethodForType(builder, primalType);
+            zeroMethod = differentiableTypeConformanceContext.getZeroMethodForType(builder, originalType);
         }
         SLANG_RELEASE_ASSERT(zeroMethod);
 
@@ -1108,7 +1110,7 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
                     if (!pair.differential->findDecoration<IRAutodiffInstDecoration>()
                         && !as<IRConstant>(pair.differential))
                     {
-                        auto primalType = as<IRType>(pair.primal->getDataType());
+                        auto primalType = (IRType*)(pair.primal->getDataType());
                         builder->markInstAsDifferential(pair.differential, primalType);
                     }
                 }
@@ -1117,7 +1119,7 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
                     if (!pair.primal->findDecoration<IRAutodiffInstDecoration>()
                         && !as<IRConstant>(pair.differential))
                     {
-                        auto mixedType = as<IRType>(pair.primal->getDataType());
+                        auto mixedType = (IRType*)(pair.primal->getDataType());
                         builder->markInstAsMixedDifferential(pair.primal, mixedType);
                     }
                 }

@@ -2169,7 +2169,8 @@ static LegalVal legalizeInst(
             context->replacedInstructions.add(inst);
             return LegalVal::simple(newInst);
         }
-        inst->setFullType(legalType.getSimple());
+        if (inst->getFullType() != legalType.getSimple())
+            inst->setFullType(legalType.getSimple());
         return LegalVal::simple(inst);
     }
 
@@ -3473,7 +3474,14 @@ struct IRTypeLegalizationPass
     // instructions have ever been added to the work list.
 
     List<IRInst*> workList;
+    HashSet<IRInst*> hasBeenAddedOrProcessedSet;
     HashSet<IRInst*> addedToWorkListSet;
+
+    bool hasBeenAddedToWorkListOrProcessed(IRInst* inst)
+    {
+        if (hasBeenAddedToWorkList(inst)) return true;
+        return hasBeenAddedOrProcessedSet.Contains(inst);
+    }
 
     // We will add a simple query to check whether an instruciton
     // has been put on the work list before (or if it should be
@@ -3523,9 +3531,9 @@ struct IRTypeLegalizationPass
         //
         if(addedToWorkListSet.Contains(inst))
             return;
-
         workList.add(inst);
         addedToWorkListSet.Add(inst);
+        hasBeenAddedOrProcessedSet.Add(inst);
     }
 
     void processModule(IRModule* module)
@@ -3549,6 +3557,7 @@ struct IRTypeLegalizationPass
             //
             List<IRInst*> workListCopy;
             Swap(workListCopy, workList);
+            addedToWorkListSet.Clear();
 
             // Now we simply process each instruction on the copy of
             // the work list, knowing that `processInst` may add additional
@@ -3567,6 +3576,20 @@ struct IRTypeLegalizationPass
         //
         for (auto& lv : context->replacedInstructions)
         {
+#if _DEBUG
+            for (auto use = lv->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user->getModule() == nullptr)
+                    continue;
+                if (as<IRType>(user))
+                    continue;
+                if (!context->replacedInstructions.Contains(user))
+                    SLANG_UNEXPECTED("replaced inst still has use.");
+                if (lv->getParent())
+                    SLANG_UNEXPECTED("replaced inst still in a parent.");
+            }
+#endif
             lv->removeAndDeallocate();
         }
     }
@@ -3635,19 +3658,19 @@ struct IRTypeLegalizationPass
         // Next, we don't want to add something if its parent
         // hasn't been added already.
         //
-        if(!hasBeenAddedToWorkList(inst->getParent()))
+        if(!hasBeenAddedToWorkListOrProcessed(inst->getParent()))
             return;
 
         // Finally, we don't want to add something if its
         // type and/or operands haven't all been added.
         //
-        if(!hasBeenAddedToWorkList(inst->getFullType()))
+        if(!hasBeenAddedToWorkListOrProcessed(inst->getFullType()))
             return;
         Index operandCount = (Index) inst->getOperandCount();
         for( Index i = 0; i < operandCount; ++i )
         {
             auto operand = inst->getOperand(i);
-            if(!hasBeenAddedToWorkList(operand))
+            if(!hasBeenAddedToWorkListOrProcessed(operand))
                 return;
         }
 

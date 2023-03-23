@@ -1143,9 +1143,8 @@ struct AutoDiffPass : public InstPassBase
         {
             bool changed = false;
             List<IRInst*> autoDiffWorkList;
-            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the module.
-            autoDiffWorkList.clear();
-            processAllInsts([&](IRInst* inst)
+            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the call graph.
+            processAllReachableInsts([&](IRInst* inst)
                 {
                     switch (inst->getOp())
                     {
@@ -1164,11 +1163,15 @@ struct AutoDiffPass : public InstPassBase
                             {
                                 // Skip functions whose body still has a differentiate inst (higher order func).
                                 if (!isFullyDifferentiated(innerFunc))
+                                {
+                                    addToWorkList(inst->getOperand(0));
                                     return;
+                                }
                             }
                             autoDiffWorkList.add(inst);
                             break;
                         default:
+                            autoDiffWorkList.add(inst->getOperand(0));
                             break;
                         }
                         break;
@@ -1176,6 +1179,11 @@ struct AutoDiffPass : public InstPassBase
                         // Explicit primal subst operator is not yet supported.
                         SLANG_UNIMPLEMENTED_X("explicit primal_subst operator.");
                     default:
+                        for (UInt i = 0; i < inst->getOperandCount(); i++)
+                        {
+                            auto operand = inst->getOperand(i);
+                            addToWorkList(operand);
+                        }
                         break;
                     }
                 });
@@ -1199,7 +1207,7 @@ struct AutoDiffPass : public InstPassBase
                     }
                     break;
                 case kIROp_BackwardDifferentiatePrimal:
-                     {
+                    {
                         auto baseFunc = differentiateInst->getOperand(0);
                         diffFunc = backwardPrimalTranscriber.transcribe(&subBuilder, baseFunc);
                     }
@@ -1299,7 +1307,6 @@ struct AutoDiffPass : public InstPassBase
 
             hasChanges |= changed;
         }
-
 
         return hasChanges;
     }

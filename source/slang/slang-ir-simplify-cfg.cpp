@@ -105,7 +105,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
         loopBlocks.Add(b);
     auto addressHasOutOfLoopUses = [&](IRInst* addr)
     {
-        // The entire access chain of `addr` must have no uses out side the loop.
+        // The entire access chain of `addr` must have no uses outside the loop.
         // The root variable must be a local var.
         for (auto chainNode = addr; chainNode;)
         {
@@ -123,6 +123,11 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
                 chainNode = chainNode->getOperand(0);
                 continue;
             case kIROp_Var:
+                if (auto rate = chainNode->getFullType()->getRate())
+                {
+                    if (!as<IRConstExprRate>(rate))
+                        return true;
+                }
                 break;
             default:
                 return true;
@@ -142,10 +147,6 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
                 if (!loopBlocks.Contains(as<IRBlock>(use->getUser()->getParent())))
                     return true;
             }
-
-            // The inst can't possibly have side effect? Skip it.
-            if (!inst->mightHaveSideEffects())
-                continue;
 
             // This inst might have side effect, try to prove that the
             // side effect does not leak beyond the scope of the loop.
@@ -187,6 +188,10 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
             }
             else
             {
+                // The inst can't possibly have side effect? Skip it.
+                if (!inst->mightHaveSideEffects())
+                    continue;
+
                 // For all other insts, we assume it has a global side effect.
                 return true;
             }

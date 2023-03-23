@@ -372,6 +372,8 @@ Result linkAndOptimizeIR(
             changed |= specializeModule(irModule);
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
 
+        eliminateDeadCode(irModule);
+
         validateIRModuleIfEnabled(codeGenContext, irModule);
     
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,

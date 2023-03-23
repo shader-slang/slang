@@ -648,6 +648,14 @@ namespace Slang
 		{
 			return dict.AddIfNotExists(_Move(obj), _DummyClass());
 		}
+        bool add(const T& obj)
+        {
+            return dict.AddIfNotExists(obj, _DummyClass());
+        }
+        bool add(T&& obj)
+        {
+            return dict.AddIfNotExists(_Move(obj), _DummyClass());
+        }
 		void Remove(const T & obj)
 		{
 			dict.Remove(obj);

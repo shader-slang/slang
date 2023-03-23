@@ -391,6 +391,8 @@ namespace Slang
         auto origFuncType = as<IRFuncType>(origFunc->getFullType());
         List<IRInst*> primalArgs, propagateArgs;
         List<IRType*> primalTypes, propagateTypes;
+        IRType* primalResultType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getResultType());
+
         for (UInt i = 0; i < origFuncType->getParamCount(); i++)
         {
             auto primalParamType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getParamType(i));
@@ -465,11 +467,11 @@ namespace Slang
 
         auto primalFuncType = builder.getFuncType(
             primalTypes,
-            origFuncType->getResultType());
+            primalResultType);
         primalArgs.add(intermediateVar);
         primalTypes.add(builder.getOutType(intermediateType));
         auto primalFunc = builder.emitBackwardDifferentiatePrimalInst(primalFuncType, specializedOriginalFunc);
-        builder.emitCallInst(origFuncType->getResultType(), primalFunc, primalArgs);
+        builder.emitCallInst(primalResultType, primalFunc, primalArgs);
 
         propagateTypes.add(intermediateType);
         propagateArgs.add(builder.emitLoad(intermediateVar));

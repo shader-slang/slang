@@ -728,8 +728,8 @@ struct IRDifferentialInstDecoration : IRAutodiffInstDecoration
     IRUse primalType;
     IR_LEAF_ISA(DifferentialInstDecoration)
 
-    IRType* getPrimalType() { return as<IRType>(getOperand(0)); }
-    IRInst* getPrimalInst() { return as<IRInst>(getOperand(1)); }
+    IRType* getPrimalType() { return (IRType*)(getOperand(0)); }
+    IRInst* getPrimalInst() { return getOperand(1); }
 };
 
 struct IRPrimalInstDecoration : IRAutodiffInstDecoration

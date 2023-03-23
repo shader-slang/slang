@@ -30,12 +30,13 @@ namespace Slang
             changed |= peepholeOptimize(module);
             changed |= removeRedundancy(module);
             changed |= simplifyCFG(module);
-            changed |= propagateFuncProperties(module);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
             // DCE will always remove those nearly generated consts and always returns true here.
             eliminateDeadCode(module);
+
+            changed |= propagateFuncProperties(module);
 
             changed |= constructSSA(module);
             changed |= removeUnusedGenericParam(module);

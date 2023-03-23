@@ -65,7 +65,7 @@ void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFu
         auto primal = builder.emitDefaultConstruct(pairType->getValueType());
         builder.markInstAsPrimal(primal);
         auto diff = getDifferentialZeroOfType(&builder, pairType->getValueType());
-        builder.markInstAsDifferential(primal);
+        builder.markInstAsDifferential(diff, primal->getDataType());
 
         auto val = builder.emitMakeDifferentialPair(pairType, primal, diff);
         builder.markInstAsMixedDifferential(val);
@@ -178,7 +178,8 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
         diffRight = diffRight ? diffRight : getDifferentialZeroOfType(builder, primalRight->getDataType());
 
         auto resultType = primalArith->getDataType();
-        auto diffType = (IRType*) differentiableTypeConformanceContext.getDifferentialForType(builder, resultType);
+        auto origResultType = origArith->getDataType();
+        auto diffType = (IRType*)differentiateType(builder, origResultType);
 
         switch(origArith->getOp())
         {
@@ -263,15 +264,13 @@ InstPair ForwardDiffTranscriber::transcribeSelect(IRBuilder* builder, IRInst* or
 
     auto primalSelect = maybeCloneForPrimalInst(builder, origSelect);
 
-    auto resultType = primalCondition->getDataType();
-
     // If both sides have no differential, skip
     if (diffLeft || diffRight)
     {
         diffLeft = diffLeft ? diffLeft : getDifferentialZeroOfType(builder, primalLeft->getDataType());
         diffRight = diffRight ? diffRight : getDifferentialZeroOfType(builder, primalRight->getDataType());
 
-        auto diffType = (IRType*) differentiableTypeConformanceContext.getDifferentialForType(builder, resultType);
+        auto diffType = differentiateType(builder, origSelect->getDataType());
 
         return InstPair(
             primalSelect,
@@ -1831,7 +1830,9 @@ String ForwardDiffTranscriber::makeDiffPairName(IRInst* origVar)
 
 InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
 {
-    if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalType))
+    SLANG_UNUSED(primalType);
+
+    if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)origParam->getFullType()))
     {
         IRInst* diffPairParam = builder->emitParam(diffPairType);
 
