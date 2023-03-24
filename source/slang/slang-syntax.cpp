@@ -1197,8 +1197,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubstInner(ASTBuilder* builder, DeclRef<AssocTypeDecl> substDeclRef)
+    Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef)
     {
+        auto substDeclRef = declRef.as<AssocTypeDecl>();
+        if (!substDeclRef)
+            return nullptr;
+
         auto substAssocTypeDecl = substDeclRef.getDecl();
 
         for (auto s = substDeclRef.substitutions.substitutions; s; s = s->outer)
@@ -1246,7 +1250,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                             return nullptr;
                         if (innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialType)
                             return nullptr;
-                        if (!innerDeclRefType->declRef.equals(substDeclRef))
+                        if (!innerDeclRefType->declRef.equals(declRef))
                         {
                             auto result = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(builder, innerDeclRefType->declRef);
                             if (result)
@@ -1259,40 +1263,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 }
             }
         }
-
         return nullptr;
-    }
-    
-    Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef)
-    {
-        auto currDeclRef = declRef.as<AssocTypeDecl>();
-        if (!currDeclRef)
-            return nullptr;
-
-        Val* lastVal = nullptr;
-        for (;;)
-        {
-            Val* newVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubstInner(builder, currDeclRef);
-
-            if (auto newDeclRefType = as<DeclRefType>(newVal))
-            {
-                if (auto newDeclRefAssocType = newDeclRefType->declRef.as<AssocTypeDecl>())
-                {
-                    currDeclRef = newDeclRefAssocType;
-                    lastVal = newVal;
-                }
-                else
-                    return newVal;
-            }
-            else if (newVal == nullptr)
-            {
-                return lastVal;
-            }
-            else
-            {
-                return newVal;
-            }
-        }
     }
 
     String DeclRefBase::toString() const
