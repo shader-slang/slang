@@ -99,7 +99,7 @@ struct AddressInstEliminationContext
         IRBuilder builder(module);
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
-        auto callee = getResolvedInstForDecorations(call->getCallee());
+        //auto callee = getResolvedInstForDecorations(call->getCallee());
         //auto funcType = as<IRFuncType>(callee->getFullType());
         //SLANG_RELEASE_ASSERT(funcType);
         //UInt paramIndex = (UInt)(use - call->getOperands() - 1);

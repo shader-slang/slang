@@ -8484,17 +8484,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     funcExpr = udAttr->funcExpr;
                 else if (auto primalAttr = as<PrimalSubstituteAttribute>(modifier))
                     funcExpr = primalAttr->funcExpr;
-
-                auto loweredVal = lowerRValueExpr(subContext, funcExpr);
-
-                switch (loweredVal.flavor)
-                {
-                case LoweredValInfo::Flavor::Simple:
-
-                case LoweredValInfo::Flavor::BoundMember:
-
-                    break;
-                }
+                DeclRefExpr* declRefExpr = as<DeclRefExpr>(funcExpr);
+                auto funcType = lowerType(subContext, funcExpr->type);
+                auto loweredVal = emitDeclRef(
+                    subContext,
+                    declRefExpr->declRef,
+                    funcType);
+                
+                SLANG_RELEASE_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
 
                 IRInst* derivativeFunc = loweredVal.val;
 
