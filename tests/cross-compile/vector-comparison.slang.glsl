@@ -1,8 +1,6 @@
-//TEST_IGNORE_FILE
 #version 450
 layout(row_major) uniform;
 layout(row_major) buffer;
-
 struct Param_0
 {
     vec4 a_0;
@@ -19,6 +17,8 @@ out vec4 _S2;
 
 void main()
 {
-    _S2 = mix(vec4(3.0), vec4(2.0), (equal(params_0._data.a_0,params_0._data.b_0))) + mix(vec4(3.0), vec4(2.0), (lessThan(params_0._data.a_0,params_0._data.b_0))) + mix(vec4(3.0), vec4(2.0), (greaterThan(params_0._data.a_0,params_0._data.b_0))) + mix(vec4(3.0), vec4(2.0), (lessThanEqual(params_0._data.a_0,params_0._data.b_0))) + mix(vec4(3.0), vec4(2.0), (greaterThanEqual(params_0._data.a_0,params_0._data.b_0))) + mix(vec4(3.0), vec4(2.0), (notEqual(params_0._data.a_0,params_0._data.b_0)));
+    const vec4 _S3 = vec4(2.0);
+    const vec4 _S4 = vec4(3.0);
+    _S2 = mix(_S4, _S3, (equal(params_0._data.a_0,params_0._data.b_0))) + mix(_S4, _S3, (lessThan(params_0._data.a_0,params_0._data.b_0))) + mix(_S4, _S3, (greaterThan(params_0._data.a_0,params_0._data.b_0))) + mix(_S4, _S3, (lessThanEqual(params_0._data.a_0,params_0._data.b_0))) + mix(_S4, _S3, (greaterThanEqual(params_0._data.a_0,params_0._data.b_0))) + mix(_S4, _S3, (notEqual(params_0._data.a_0,params_0._data.b_0)));
     return;
 }
