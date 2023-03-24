@@ -201,7 +201,7 @@ void SourceMap::clear()
 
 void SourceMap::advanceToLine(Index nextLineIndex)
 {
-    const Count currentLineIndex = getGeneratedLineCount();
+    const Count currentLineIndex = getGeneratedLineCount() - 1;
 
     SLANG_ASSERT(nextLineIndex >= currentLineIndex);
     
@@ -215,22 +215,11 @@ void SourceMap::advanceToLine(Index nextLineIndex)
     // For all the new entries they will need to point to the end 
     m_lineStarts.setCount(nextLineIndex + 1);
 
-    Index* starts = m_lineStarts.getBuffer() + currentLineIndex;
-    const Count startsCount = nextLineIndex + 1 - currentLineIndex;
-
-    for (Index i = 0; i < startsCount; ++i)
+    Index* starts = m_lineStarts.getBuffer();
+    for (Index i = currentLineIndex + 1; i < nextLineIndex + 1; ++i)
     {
         starts[i] = lastEntryIndex;
     }
-}
-
-void SourceMap::addEntry(const Entry& entry)
-{
-    m_lineEntries.add(entry);
-    ++m_lineStarts.getLast();
-
-    // Check things seem normal...
-    SLANG_ASSERT(m_lineStarts.getLast() == m_lineEntries.getCount());
 }
 
 Index SourceMap::getNameIndex(const UnownedStringSlice& slice)
@@ -284,33 +273,30 @@ SlangResult SourceMap::decode(JSONContainer* container, JSONValue root, Diagnost
     clear();
 
     // Let's try and decode the JSON into native types to make this easier...
-
     RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
 
     // Convert to native
-    JSONSourceMap src;
+    JSONSourceMap native;
     {
         JSONToNativeConverter converter(container, &typeMap, sink);
 
         // Convert to the native type
-        SLANG_RETURN_ON_FAIL(converter.convert(root, GetRttiInfo<JSONSourceMap>::get(), &src));
+        SLANG_RETURN_ON_FAIL(converter.convert(root, GetRttiInfo<JSONSourceMap>::get(), &native));
     }
 
-    m_slicePool.clear();
+    m_file = native.file;
+    m_sourceRoot = native.sourceRoot;
 
-    m_file = src.file;
-    m_sourceRoot = src.sourceRoot;
-
-    const Count sourcesCount = src.sources.getCount();
+    const Count sourcesCount = native.sources.getCount();
     
     // These should all be unique, but for simplicity, we build a table
     m_sources.setCount(sourcesCount);
     for (Index i = 0; i < sourcesCount; ++i)
     {
-        m_sources[i] = m_slicePool.add(src.sources[i]);
+        m_sources[i] = m_slicePool.add(native.sources[i]);
     }
 
-    Count sourcesContentCount = src.sourcesContent.getCount();
+    Count sourcesContentCount = native.sourcesContent.getCount();
     sourcesContentCount = std::min(sourcesContentCount, sourcesCount);
 
     m_sourcesContent.setCount(sourcesContentCount);
@@ -321,7 +307,7 @@ SlangResult SourceMap::decode(JSONContainer* container, JSONValue root, Diagnost
 
     for (Index i = 0; i < sourcesContentCount; ++i)
     {
-        auto value = src.sourcesContent[i];
+        auto value = native.sourcesContent[i];
 
         if (value.type != JSONValue::Type::Null)
         {
@@ -334,7 +320,7 @@ SlangResult SourceMap::decode(JSONContainer* container, JSONValue root, Diagnost
     }
 
     List<UnownedStringSlice> lines;
-    StringUtil::split(src.mappings, ';', lines);
+    StringUtil::split(native.mappings, ';', lines);
     
     List<UnownedStringSlice> segments;
 
@@ -378,10 +364,10 @@ SlangResult SourceMap::decode(JSONContainer* container, JSONValue root, Diagnost
             // It can be 4 or 5 parts
             if (segment.getLength())
             {
-                /* If present, an zero-based index into the “sources” list. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented.
-                    If present, the zero-based starting line in the original source represented. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented. Always present if there is a source field.
-                    If present, the zero-based starting column of the line in the source represented. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented. Always present if there is a source field.
-                     */
+                /* If present, an zero-based index into the "sources" list. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented.
+                   If present, the zero-based starting line in the original source represented. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented. Always present if there is a source field.
+                   If present, the zero-based starting column of the line in the source represented. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented. Always present if there is a source field.
+                */
 
                 Index sourceFileDelta;
                 Index sourceLineDelta;
@@ -402,7 +388,9 @@ SlangResult SourceMap::decode(JSONContainer* container, JSONValue root, Diagnost
                 // 5 parts
                 if (segment.getLength() > 0)
                 {
-                    /* If present, the zero - based index into the “names” list associated with this segment.This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented.
+                    /* If present, the zero - based index into the "names" list associated with this segment.
+                    This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence 
+                    of this field, in which case the whole value is represented.
                     */
 
                     Index nameDelta;

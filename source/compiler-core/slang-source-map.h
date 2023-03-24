@@ -43,7 +43,7 @@ struct SourceMap : public RefObject
     SlangResult encode(JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue);
 
         /// Get the total number of generated lines
-    Count getGeneratedLineCount() const { return m_lineStarts.getCount() - 1; }
+    Count getGeneratedLineCount() const { return m_lineStarts.getCount(); }
         /// Get the entries on the line
     SLANG_FORCE_INLINE ConstArrayView<Entry> getEntriesForLine(Index generatedLine) const;
     
@@ -53,7 +53,7 @@ struct SourceMap : public RefObject
     void advanceToLine(Index lineIndex);
 
         /// Add an entry to the current line
-    void addEntry(const Entry& entry);
+    void addEntry(const Entry& entry) { m_lineEntries.add(entry); }
 
         /// Given the slice returns the index
     Index getSourceFileIndex(const UnownedStringSlice& slice);
@@ -91,17 +91,19 @@ struct SourceMap : public RefObject
 // -------------------------------------------------------------
 SLANG_FORCE_INLINE ConstArrayView<SourceMap::Entry> SourceMap::getEntriesForLine(Index generatedLine) const
 {
+    SLANG_ASSERT(generatedLine >= 0 && generatedLine < m_lineStarts.getCount());
+
     const Index start = m_lineStarts[generatedLine];
-    const Index end = m_lineStarts[generatedLine + 1];
-    
+
+    const Index end = (generatedLine + 1 >= m_lineStarts.getCount()) ? m_lineEntries.getCount() : m_lineStarts[generatedLine + 1];
+
     const auto entries = m_lineEntries.begin();
 
-    SLANG_ASSERT(start >= 0 && start < m_lineEntries.getCount());
+    SLANG_ASSERT(start >= 0 && start <= m_lineEntries.getCount());
     SLANG_ASSERT(end >= start && end >= 0 && end <= m_lineEntries.getCount());
 
     return ConstArrayView<SourceMap::Entry>(entries + start, end - start);
 }
-
 
 } // namespace Slang
 
