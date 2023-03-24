@@ -510,7 +510,7 @@ IRInst* tryFindPrimalSubstitute(IRBuilder* builder, IRInst* callee)
     {
         auto innerGen = as<IRGeneric>(specialize->getBase());
         if (!innerGen)
-            return nullptr;
+            return callee;
         auto innerFunc = findGenericReturnVal(innerGen);
         if (auto decor = innerFunc->findDecoration<IRPrimalSubstituteDecoration>())
         {
@@ -553,7 +553,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         return InstPair(nullptr, nullptr);
     }
 
-    auto primalCallee = lookupPrimalInst(builder, origCallee, origCallee);
+    auto primalCallee = findOrTranscribePrimalInst(builder, origCallee);
     auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
 
     IRInst* diffCallee = nullptr;
@@ -563,7 +563,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
     else
     {
-        instMapD.TryGetValue(substPrimalCallee, diffCallee);
+        diffCallee = findOrTranscribeDiffInst(builder, origCallee);
         primalCallee = substPrimalCallee;
     }
 
@@ -904,17 +904,32 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
     IRInst* diffBase = nullptr;
     if (instMapD.TryGetValue(origSpecialize->getBase(), diffBase))
     {
-        List<IRInst*> args;
-        for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+        if (diffBase)
         {
-            args.add(primalSpecialize->getArg(i));
+            List<IRInst*> args;
+            for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+            {
+                args.add(primalSpecialize->getArg(i));
+            }
+            auto diffSpecialize = builder->emitSpecializeInst(
+                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+            return InstPair(primalSpecialize, diffSpecialize);
         }
-        auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
-        return InstPair(primalSpecialize, diffSpecialize);
+        else
+        {
+            return InstPair(primalSpecialize, nullptr);
+        }
     }
 
     auto genericInnerVal = findInnerMostGenericReturnVal(as<IRGeneric>(origSpecialize->getBase()));
+
+    // Right now we don't support transcribing a differentiable callee that is a specialize of a interface lookup
+    // (calling differentiable generic interface method). To support it, we need to recursively transcribe the
+    // specialization base here.
+
+    if (!genericInnerVal)
+        return InstPair(primalSpecialize, nullptr);
+
     // Look for an IRForwardDerivativeDecoration on the specialize inst.
     // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
     // can be specialized, so we put a decoration on the IRSpecialize)
@@ -963,10 +978,7 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
             builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
         return InstPair(primalSpecialize, diffSpecialize);
     }
-    else
-    {
-        return InstPair(primalSpecialize, nullptr);
-    }
+    return InstPair(primalSpecialize, nullptr);
 }
 
 InstPair ForwardDiffTranscriber::transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst)
@@ -1432,6 +1444,8 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
     IRBuilder builder = *inBuilder;
 
     IRFunc* primalFunc = origFunc;
+
+    maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
 
     differentiableTypeConformanceContext.setFunc(origFunc);
 

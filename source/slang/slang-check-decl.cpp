@@ -5638,6 +5638,10 @@ namespace Slang
             bool isDiffFunc = false;
             if (decl->hasModifier<ForwardDifferentiableAttribute>() || decl->hasModifier<BackwardDifferentiableAttribute>())
             {
+                if (GetOuterGeneric(decl))
+                {
+                    getSink()->diagnose(decl, Diagnostics::differentiableGenericInterfaceMethodNotSupported);
+                }
                 auto reqDecl = m_astBuilder->create<ForwardDerivativeRequirementDecl>();
                 cloneModifiers(reqDecl, decl);
                 auto declRef = DeclRef<CallableDecl>(decl, createDefaultSubstitutions(m_astBuilder, this, decl));

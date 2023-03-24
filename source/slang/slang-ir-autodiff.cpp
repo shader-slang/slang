@@ -368,6 +368,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 {
     parentFunc = func;
 
+
     auto decor = func->findDecoration<IRDifferentiableTypeDictionaryDecoration>();
     SLANG_RELEASE_ASSERT(decor);
 
