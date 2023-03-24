@@ -292,6 +292,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
 
 #define VECTOR_MATRIX_BINARY_DIFF_IMPL(NAME)                                                 \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<vector<T, N>> __d_##NAME##_vector(                                      \
         DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)              \
@@ -309,6 +310,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         return DifferentialPair<vector<T, N>>(result, d_result);                             \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<matrix<T, M, N>> __d_##NAME##_matrix(                                   \
         DifferentialPair<matrix<T, M, N>> dpx, DifferentialPair<matrix<T, M, N>> dpy)        \
@@ -327,6 +329,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME##_vector(                                                                \
             inout DifferentialPair<vector<T, N>> dpx,                                        \
@@ -346,6 +349,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         dpy = diffPair(dpy.p, right_d_result);                                               \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME##_matrix(                                                                \
             inout DifferentialPair<matrix<T, M, N>> dpx,                                     \
@@ -368,6 +372,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
 
 #define VECTOR_MATRIX_TERNARY_DIFF_IMPL(NAME)                                                \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<vector<T, N>> __d_##NAME##_vector(                                      \
         DifferentialPair<vector<T, N>> dpx,                                                  \
@@ -388,8 +393,9 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         return DifferentialPair<vector<T, N>>(result, d_result);                             \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
-    DifferentialPair<matrix<T, M, N>> __d_##NAME##_matrix(                                  \
+    DifferentialPair<matrix<T, M, N>> __d_##NAME##_matrix(                                   \
         DifferentialPair<matrix<T, M, N>> dpx,                                               \
         DifferentialPair<matrix<T, M, N>> dpy,                                               \
         DifferentialPair<matrix<T, M, N>> dpz)                                               \
@@ -409,6 +415,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME##_vector(                                                                \
             inout DifferentialPair<vector<T, N>> dpx,                                        \
@@ -433,6 +440,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         dpz = diffPair(dpz.p, right_d_result);                                               \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME##_matrix(                                                                \
             inout DifferentialPair<matrix<T, M, N>> dpx,                                     \
@@ -460,7 +468,6 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
 
 #define UNARY_DERIVATIVE_IMPL(NAME, FWD_DIFF_FUNC, BWD_DIFF_FUNC)                            \
     __generic<T : __BuiltinFloatingPointType>                                                \
-    [ForwardDifferentiable]                                                                  \
     [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<T> __d_##NAME(DifferentialPair<T> dpx)                                  \
@@ -468,7 +475,6 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         return DifferentialPair<T>(NAME(dpx.p), FWD_DIFF_FUNC);                              \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
-    [ForwardDifferentiable]                                                                  \
     [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<vector<T, N>> __d_##NAME##_vector(DifferentialPair<vector<T, N>> dpx)   \
@@ -485,7 +491,6 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         return DifferentialPair<vector<T, N>>(result, d_result);                             \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
-    [ForwardDifferentiable]                                                                  \
     [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<matrix<T, M, N>> __d_##NAME##_m(DifferentialPair<matrix<T, M, N>> dpx)  \
@@ -504,7 +509,6 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType>                                                \
-    [ForwardDifferentiable]                                                                  \
     [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME(inout DifferentialPair<T> dpx, T.Differential dOut)                      \
@@ -512,7 +516,6 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
-    [ForwardDifferentiable]                                                                  \
     [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME##_vector(                                                                \
@@ -528,7 +531,6 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         dpx = diffPair(dpx.p, d_result);                                                     \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
-    [ForwardDifferentiable]                                                                  \
     [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME##_matrix(                                                                \
@@ -593,6 +595,7 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(atan, T(1.0) / (T(1.0) + dpx.p * dpx.p))
 
 // Atan2
 __generic<T : __BuiltinFloatingPointType>
+[BackwardDifferentiable]
 [ForwardDerivativeOf(atan2)]
 DifferentialPair<T> __d_atan2(DifferentialPair<T> dpy, DifferentialPair<T> dpx)
 {
@@ -604,6 +607,7 @@ DifferentialPair<T> __d_atan2(DifferentialPair<T> dpy, DifferentialPair<T> dpx)
 }
 
 __generic<T : __BuiltinFloatingPointType>
+[BackwardDifferentiable]
 [BackwardDerivativeOf(atan2)]
 void __d_atan2(inout DifferentialPair<T> dpy, inout DifferentialPair<T> dpx, T.Differential dOut)
 {
@@ -615,12 +619,14 @@ VECTOR_MATRIX_BINARY_DIFF_IMPL(atan2)
 
 // fmod
 __generic<T : __BuiltinFloatingPointType>
+[BackwardDifferentiable]
 [ForwardDerivativeOf(fmod)]
 DifferentialPair<T> __d_fmod(DifferentialPair<T> x, DifferentialPair<T> y)
 {
     return DifferentialPair<T>(fmod(x.p, y.p), x.d);
 }
 __generic<T : __BuiltinFloatingPointType>
+[BackwardDifferentiable]
 [BackwardDerivativeOf(fmod)]
 void __d_fmod(inout DifferentialPair<T> x, inout DifferentialPair<T> y, T.Differential dOut)
 {
@@ -632,7 +638,6 @@ VECTOR_MATRIX_BINARY_DIFF_IMPL(fmod)
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(pow)]
 DifferentialPair<T> __d_pow(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {
@@ -653,7 +658,6 @@ DifferentialPair<T> __d_pow(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(pow)]
 void __d_pow(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
 {
@@ -680,7 +684,6 @@ VECTOR_MATRIX_BINARY_DIFF_IMPL(pow)
 // Maximum
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(max)]
 DifferentialPair<T> __d_max(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {
@@ -692,7 +695,6 @@ DifferentialPair<T> __d_max(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(max)]
 void __d_max(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
 {
@@ -705,7 +707,6 @@ VECTOR_MATRIX_BINARY_DIFF_IMPL(max)
 // Minimum
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(min)]
 DifferentialPair<T> __d_min(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {
@@ -717,7 +718,6 @@ DifferentialPair<T> __d_min(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(min)]
 void __d_min(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
 {
@@ -730,7 +730,6 @@ VECTOR_MATRIX_BINARY_DIFF_IMPL(min)
 // Lerp
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(lerp)]
 DifferentialPair<T> __d_lerp(DifferentialPair<T> dpx, DifferentialPair<T> dpy, DifferentialPair<T> dps)
 {
@@ -741,7 +740,6 @@ DifferentialPair<T> __d_lerp(DifferentialPair<T> dpx, DifferentialPair<T> dpy, D
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(lerp)]
 void __d_lerp(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, inout DifferentialPair<T> dps, T.Differential dOut)
 {
@@ -754,7 +752,6 @@ VECTOR_MATRIX_TERNARY_DIFF_IMPL(lerp)
 //  Clamp
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(clamp)]
 DifferentialPair<T> __d_clamp(DifferentialPair<T> dpx, DifferentialPair<T> dpMin, DifferentialPair<T> dpMax)
 {
@@ -764,7 +761,6 @@ DifferentialPair<T> __d_clamp(DifferentialPair<T> dpx, DifferentialPair<T> dpMin
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(clamp)]
 void __d_clamp(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpMin, inout DifferentialPair<T> dpMax, T.Differential dOut)
 {
@@ -776,7 +772,6 @@ VECTOR_MATRIX_TERNARY_DIFF_IMPL(clamp)
 
 // fma
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(fma)]
 DifferentialPair<double> __d_fma(DifferentialPair<double> dpx, DifferentialPair<double> dpy, DifferentialPair<double> dpz)
 {
@@ -785,7 +780,6 @@ DifferentialPair<double> __d_fma(DifferentialPair<double> dpx, DifferentialPair<
         dpy.p * dpx.d + dpx.p * dpy.d + dpz.d);
 }
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(fma)]
 void __d_fma(inout DifferentialPair<double> dpx, inout DifferentialPair<double> dpy, inout DifferentialPair<double> dpz, double dOut)
 {
@@ -795,7 +789,6 @@ void __d_fma(inout DifferentialPair<double> dpx, inout DifferentialPair<double> 
 }
 __generic<let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(fma)]
 DifferentialPair<vector<double, N>> __d_fma_vector(
     DifferentialPair<vector<double, N>> dpx,
@@ -817,7 +810,6 @@ DifferentialPair<vector<double, N>> __d_fma_vector(
 }
 __generic<let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(fma)]
 void __d_fma_vector(
         inout DifferentialPair<vector<double, N>> dpx,
@@ -844,7 +836,6 @@ void __d_fma_vector(
 // mad
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(mad)]
 DifferentialPair<T> __d_mad(DifferentialPair<T> dpx, DifferentialPair<T> dpy, DifferentialPair<T> dpz)
 {
@@ -854,7 +845,6 @@ DifferentialPair<T> __d_mad(DifferentialPair<T> dpx, DifferentialPair<T> dpy, Di
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(mad)]
 void __d_mad(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, inout DifferentialPair<T> dpz, T.Differential dOut)
 {
@@ -874,7 +864,6 @@ T __smoothstep_impl(T minVal, T maxVal, T x)
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(smoothstep)]
 DifferentialPair<T> __d_smoothstep(DifferentialPair<T> minVal, DifferentialPair<T> maxVal, DifferentialPair<T> x)
 {
@@ -882,7 +871,6 @@ DifferentialPair<T> __d_smoothstep(DifferentialPair<T> minVal, DifferentialPair<
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(smoothstep)]
 void __d_smoothstep(inout DifferentialPair<T> minVal, inout DifferentialPair<T> maxVal, inout DifferentialPair<T> x, T.Differential dOut)
 {
@@ -905,7 +893,6 @@ T __length_impl(vector<T, N> x)
 
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(length)]
 [ForceInline]
 DifferentialPair<T> __d_length(DifferentialPair<vector<T, N>> x)
@@ -915,7 +902,6 @@ DifferentialPair<T> __d_length(DifferentialPair<vector<T, N>> x)
 
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(length)]
 [ForceInline]
 void __d_length(inout DifferentialPair<vector<T, N>> x, T.Differential dOut)
@@ -932,7 +918,6 @@ T __distance_impl(vector<T, N> x, vector<T, N> y)
 }
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(distance)]
 [ForceInline]
 DifferentialPair<T> __d_distance(DifferentialPair<vector<T, N>> x, DifferentialPair<vector<T, N>> y)
@@ -942,7 +927,6 @@ DifferentialPair<T> __d_distance(DifferentialPair<vector<T, N>> x, DifferentialP
 
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(distance)]
 [ForceInline]
 void __d_distance(inout DifferentialPair<vector<T, N>> x, inout DifferentialPair<vector<T, N>> y, T.Differential dOut)
@@ -960,7 +944,6 @@ vector<T, N> __normalize_impl(vector<T, N> x)
 }
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(normalize)]
 [ForceInline]
 DifferentialPair<vector<T, N>> __d_normalize(DifferentialPair<vector<T, N>> x)
@@ -969,7 +952,6 @@ DifferentialPair<vector<T, N>> __d_normalize(DifferentialPair<vector<T, N>> x)
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(normalize)]
 [ForceInline]
 void __d_distance(inout DifferentialPair<vector<T, N>> x, vector<T, N>.Differential dOut)
@@ -986,7 +968,6 @@ vector<T, N> __reflect_impl(vector<T, N> i, vector<T, N> n)
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(reflect)]
 [ForceInline]
 DifferentialPair<vector<T, N>> __d_reflect(DifferentialPair<vector<T, N>> i, DifferentialPair<vector<T, N>> n)
@@ -995,7 +976,6 @@ DifferentialPair<vector<T, N>> __d_reflect(DifferentialPair<vector<T, N>> i, Dif
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(reflect)]
 [ForceInline]
 void __d_reflect(inout DifferentialPair<vector<T, N>> i, inout DifferentialPair<vector<T, N>> n, vector<T, N>.Differential dOut)
@@ -1013,7 +993,6 @@ vector<T, N> __refract_impl(vector<T, N> i, vector<T, N> n, T eta)
 }
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [ForwardDerivativeOf(refract)]
 [ForceInline]
 DifferentialPair<vector<T, N>> __d_refract(DifferentialPair<vector<T, N>> i, DifferentialPair<vector<T, N>> n, DifferentialPair<T> eta)
@@ -1022,7 +1001,6 @@ DifferentialPair<vector<T, N>> __d_refract(DifferentialPair<vector<T, N>> i, Dif
 }
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
-[ForwardDifferentiable]
 [BackwardDerivativeOf(refract)]
 [ForceInline]
 void __d_refract(inout DifferentialPair<vector<T, N>> i, inout DifferentialPair<vector<T, N>> n, inout DifferentialPair<T> eta, vector<T, N>.Differential dOut)
