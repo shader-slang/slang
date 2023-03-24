@@ -8487,7 +8487,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 auto loweredVal = lowerRValueExpr(subContext, funcExpr);
 
-                SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
+                switch (loweredVal.flavor)
+                {
+                case LoweredValInfo::Flavor::Simple:
+
+                case LoweredValInfo::Flavor::BoundMember:
+
+                    break;
+                }
+
                 IRInst* derivativeFunc = loweredVal.val;
 
                 if (as<ForwardDerivativeAttribute>(modifier))

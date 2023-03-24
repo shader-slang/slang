@@ -100,21 +100,21 @@ struct AddressInstEliminationContext
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
         auto callee = getResolvedInstForDecorations(call->getCallee());
-        auto funcType = as<IRFuncType>(callee->getFullType());
-        SLANG_RELEASE_ASSERT(funcType);
-        UInt paramIndex = (UInt)(use - call->getOperands() - 1);
-        SLANG_RELEASE_ASSERT(call->getArg(paramIndex) == addr);
-        if (!as<IROutType>(funcType->getParamType(paramIndex)))
+        //auto funcType = as<IRFuncType>(callee->getFullType());
+        //SLANG_RELEASE_ASSERT(funcType);
+        //UInt paramIndex = (UInt)(use - call->getOperands() - 1);
+        //SLANG_RELEASE_ASSERT(call->getArg(paramIndex) == addr);
+        //if (!as<IROutType>(funcType->getParamType(paramIndex)))
         {
             builder.emitStore(tempVar, getValue(builder, addr));
         }
-        else
+        /*else
         {
             builder.emitStore(
                 tempVar,
                 builder.emitDefaultConstruct(
                     as<IRPtrTypeBase>(tempVar->getDataType())->getValueType()));
-        }
+        }*/
         builder.setInsertAfter(call);
         storeValue(builder, addr, builder.emitLoad(tempVar));
         use->set(tempVar);

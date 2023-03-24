@@ -352,6 +352,8 @@ DIAGNOSTIC(31145, Error, invalidCustomDerivative, "invalid custom derivative att
 DIAGNOSTIC(31146, Error, declAlreadyHasAttribute, "'$0' already has attribute '[$1]'.")
 DIAGNOSTIC(31147, Error, cannotResolveOriginalFunctionForDerivative, "cannot resolve the original function for the the custom derivative.")
 
+DIAGNOSTIC(31148, Error, differentiableGenericInterfaceMethodNotSupported, "`[ForwardDifferentiable] and [BackwardDifferentiable] are not supported on generic interface requirements.")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType,        "invalid tag type for 'enum': '$0'")
