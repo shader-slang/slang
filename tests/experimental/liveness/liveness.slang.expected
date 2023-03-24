@@ -92,9 +92,9 @@ layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
-    const int  _S10[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int _S11 = index_0 & 7;
-    SomeStruct_0 _S12 = makeSomeStruct_0();
+    SomeStruct_0 _S10 = makeSomeStruct_0();
+    const int  _S11[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int _S12 = index_0 & 7;
     int v_1 = someSlowFunc_0(index_0);
     bool _S13 = (v_1 & 256) != 0;
     int _S14 = v_1 & 3;
@@ -118,7 +118,7 @@ void main()
         livenessStart_2(s_3, 0);
         SomeStruct_0 t_0;
         livenessStart_2(t_0, 0);
-        t_0 = _S12;
+        t_0 = _S10;
         SomeStruct_0 u_0;
         if(_S13)
         {
@@ -127,7 +127,7 @@ void main()
             livenessStart_2(u_0, 0);
             u_0.a_1 = 0;
             u_0.x_0 = 0;
-            u_0.c_0 = _S10;
+            u_0.c_0 = _S11;
         }
         else
         {
@@ -135,14 +135,14 @@ void main()
             livenessStart_2(x_1, 0);
             x_1.a_1 = 0;
             x_1.x_0 = 0;
-            x_1.c_0 = _S10;
+            x_1.c_0 = _S11;
             x_1.x_0 = ((anotherBuffer_0)._data[(uint(_S14))]) + 1;
             SomeStruct_0 _S15 = x_1;
             livenessEnd_2(x_1, 0);
             livenessStart_2(u_0, 0);
             u_0 = _S15;
         }
-        s_3.c_0[_S11] = s_3.c_0[_S11] + 1;
+        s_3.c_0[_S12] = s_3.c_0[_S12] + 1;
         int _S16 = s_3.x_0 + t_0.x_0;
         SomeStruct_0 _S17 = u_0;
         livenessEnd_2(u_0, 0);

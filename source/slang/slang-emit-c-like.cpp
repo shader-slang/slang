@@ -2835,7 +2835,7 @@ void CLikeSourceEmitter::emitFunctionBody(IRGlobalValueWithCode* code)
     // storage for derived structures like the region tree (and logic
     // for invalidating them when a transformation would break them).
     //
-    fixValueScoping(regionTree);
+    fixValueScoping(regionTree, [this](IRInst* inst) {return shouldFoldInstIntoUseSites(inst); });
 
     // Now emit high-level code from that structured region tree.
     //

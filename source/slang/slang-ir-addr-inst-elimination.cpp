@@ -99,22 +99,11 @@ struct AddressInstEliminationContext
         IRBuilder builder(module);
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
-        auto callee = getResolvedInstForDecorations(call->getCallee());
-        auto funcType = as<IRFuncType>(callee->getFullType());
-        SLANG_RELEASE_ASSERT(funcType);
-        UInt paramIndex = (UInt)(use - call->getOperands() - 1);
-        SLANG_RELEASE_ASSERT(call->getArg(paramIndex) == addr);
-        if (!as<IROutType>(funcType->getParamType(paramIndex)))
-        {
-            builder.emitStore(tempVar, getValue(builder, addr));
-        }
-        else
-        {
-            builder.emitStore(
-                tempVar,
-                builder.emitDefaultConstruct(
-                    as<IRPtrTypeBase>(tempVar->getDataType())->getValueType()));
-        }
+
+        // Store the initial value of the mutable argument into temp var.
+        // If this is an `out` var, the initial value will be undefined,
+        // which will get cleaned up later into a `defaultConstruct`.
+        builder.emitStore(tempVar, getValue(builder, addr));
         builder.setInsertAfter(call);
         storeValue(builder, addr, builder.emitLoad(tempVar));
         use->set(tempVar);

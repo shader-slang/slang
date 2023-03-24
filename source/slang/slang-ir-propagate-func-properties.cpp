@@ -117,7 +117,8 @@ bool propagateFuncProperties(IRModule* module)
                         default:
                             // We have a inst that has side effect and is not understood by this method.
                             // e.g. bufferStore, discard, etc.
-                            return true;
+                            hasSideEffectCall = true;
+                            break;
                         }
                     }
 

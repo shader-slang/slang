@@ -195,6 +195,16 @@ protected:
     static CharEncoding*const g_encoding[Index(CharEncodeType::CountOf)];
 };
 
+struct UTF8Util
+{
+        /// Given a slice calculate the number of code points (unicode chars)
+        ///
+        /// NOTE! This doesn't check the *validity* of code points/encoding. 
+        /// Non valid utf8 input or ending starting in partial characters, will produce 
+        /// undefined results without error.
+    static Index calcCodePointCount(const UnownedStringSlice& in);
+};
+
 }
 
 #endif

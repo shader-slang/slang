@@ -129,14 +129,14 @@ struct ASTFieldAccess
 
         String readDump;
         {
-            SourceWriter sourceWriter(sourceManager, LineDirectiveMode::None);
+            SourceWriter sourceWriter(sourceManager, LineDirectiveMode::None, nullptr);
             ASTDumpUtil::dump(reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>(), ASTDumpUtil::Style::Hierachical, dumpFlags, &sourceWriter);
             readDump = sourceWriter.getContentAndClear();
 
         }
         String origDump;
         {
-            SourceWriter sourceWriter(sourceManager, LineDirectiveMode::None);
+            SourceWriter sourceWriter(sourceManager, LineDirectiveMode::None, nullptr);
             ASTDumpUtil::dump(node, ASTDumpUtil::Style::Hierachical, dumpFlags, &sourceWriter);
             origDump = sourceWriter.getContentAndClear();
         }

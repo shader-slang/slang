@@ -487,12 +487,25 @@ namespace Slang
         switch (builtinAssocTypeAttr->kind)
         {
         case BuiltinRequirementKind::DifferentialType:
-            synthesizedDecl = m_astBuilder->create<StructDecl>();
+            {
+                auto structDecl = m_astBuilder->create<StructDecl>();
+                auto conformanceDecl = m_astBuilder->create<InheritanceDecl>();
+                conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
+                conformanceDecl->parentDecl = structDecl;
+                structDecl->members.add(conformanceDecl);
+
+                synthesizedDecl = structDecl;
+                auto typeDef = m_astBuilder->create<TypeAliasDecl>();
+                typeDef->nameAndLoc.name = getName("Differential");
+                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, DeclRef<Decl>(structDecl, nullptr));
+                typeDef->type.type = m_astBuilder->getOrCreateDeclRefType(declRef.decl, declRef.substitutions);
+                typeDef->parentDecl = structDecl;
+                structDecl->members.add(typeDef);
+            }
             break;
         default:
-            break;
+            return nullptr;
         }
-        synthesizedDecl = m_astBuilder->create<StructDecl>();
         synthesizedDecl->parentDecl = parent;
         synthesizedDecl->nameAndLoc.name = item.declRef.getName();
         synthesizedDecl->loc = parent->loc;
@@ -644,6 +657,15 @@ namespace Slang
 
             default:
                 SLANG_UNREACHABLE("all cases handle");
+            }
+            if (getShared()->isInLanguageServer())
+            {
+                // Don't make breadcrumb nodes carry any source loc info,
+                // as they may confuse language server functionalities.
+                if (bb)
+                {
+                    bb->loc = SourceLoc();
+                }
             }
         }
 
@@ -2333,11 +2355,12 @@ namespace Slang
         }
     };
 
-    struct PrimalSubstituteExprCheckingActions : HigherOrderInvokeExprCheckingActions
+    template<typename ExprASTType>
+    struct PassthroughHighOrderExprCheckingActionsBase : HigherOrderInvokeExprCheckingActions
     {
         virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
         {
-            return semantics->getASTBuilder()->create<PrimalSubstituteExpr>();
+            return semantics->getASTBuilder()->create<ExprASTType>();
         }
         void fillHigherOrderInvokeExpr(HigherOrderInvokeExpr* resultDiffExpr, SemanticsVisitor* semantics, Expr* funcExpr) override
         {
@@ -2431,7 +2454,43 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
     {
-        PrimalSubstituteExprCheckingActions actions;
+        PassthroughHighOrderExprCheckingActionsBase<PrimalSubstituteExpr> actions;
+        return _checkHigherOrderInvokeExpr(this, expr, &actions);
+    }
+
+    Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
+    {
+        auto isInt3Type = [this](Type* type)
+        {
+            auto vectorType = as<VectorExpressionType>(type);
+            if (!vectorType)
+                return false;
+            if (!isIntegerBaseType(getVectorBaseType(vectorType)))
+                return false;
+            auto constElementCount = as<ConstantIntVal>(vectorType->elementCount);
+            if (!constElementCount)
+                return false;
+            return constElementCount->value == 3;
+        };
+        expr->threadGroupSize = dispatchExpr(expr->threadGroupSize, *this);
+        if (!isInt3Type(expr->threadGroupSize->type.type))
+        {
+            getSink()->diagnose(
+                expr->threadGroupSize,
+                Diagnostics::typeMismatch,
+                "uint3",
+                expr->threadGroupSize->type);
+        }
+        expr->dispatchSize = dispatchExpr(expr->dispatchSize, *this);
+        if (!isInt3Type(expr->dispatchSize->type.type))
+        {
+            getSink()->diagnose(
+                expr->dispatchSize,
+                Diagnostics::typeMismatch,
+                "uint3",
+                expr->dispatchSize->type);
+        }
+        PassthroughHighOrderExprCheckingActionsBase<DispatchKernelExpr> actions;
         return _checkHigherOrderInvokeExpr(this, expr, &actions);
     }
 

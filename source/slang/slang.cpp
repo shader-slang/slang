@@ -2277,7 +2277,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
         if (shouldDumpAST)
         {
             StringBuilder buf;
-            SourceWriter writer(linkage->getSourceManager(), LineDirectiveMode::None);
+            SourceWriter writer(linkage->getSourceManager(), LineDirectiveMode::None, nullptr);
 
             ASTDumpUtil::dump(translationUnit->getModuleDecl(), ASTDumpUtil::Style::Flat, 0, &writer);
 
@@ -2377,6 +2377,9 @@ void FrontEndCompileRequest::generateIR()
 
         if (useSerialIRBottleneck)
         {
+            // Keep the obfuscated source map (if there is one)
+            RefPtr<SourceMap> obfuscatedSourceMap = irModule->getObfuscatedSourceMap();
+
             IRSerialData serialData;
             {
                 // Write IR out to serialData - copying over SourceLoc information directly
@@ -2395,6 +2398,7 @@ void FrontEndCompileRequest::generateIR()
 
             // Set irModule to the read module
             irModule = irReadModule;
+            irModule->setObfuscatedSourceMap(obfuscatedSourceMap);
         }
 
         // Set the module on the translation unit
@@ -2643,6 +2647,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
 
         SLANG_RETURN_ON_FAIL(maybeCreateContainer());
+        
         SLANG_RETURN_ON_FAIL(maybeWriteContainer(m_containerOutputPath));
 
         return SLANG_OK;
@@ -5227,10 +5232,14 @@ char const* EndToEndCompileRequest::getEntryPointSource(int entryPointIndex)
 
 void const* EndToEndCompileRequest::getCompileRequestCode(size_t* outSize)
 {
-    if (m_containerBlob)
+    if (m_containerArtifact)
     {
-        *outSize = m_containerBlob->getBufferSize();
-        return m_containerBlob->getBufferPointer();
+        ComPtr<ISlangBlob> containerBlob;
+        if (SLANG_SUCCEEDED(m_containerArtifact->loadBlob(ArtifactKeep::Yes, containerBlob.writeRef())))
+        {
+            *outSize = containerBlob->getBufferSize();
+            return containerBlob->getBufferPointer();
+        }
     }
 
     // Container blob does not have any contents
@@ -5240,14 +5249,15 @@ void const* EndToEndCompileRequest::getCompileRequestCode(size_t* outSize)
 
 SlangResult EndToEndCompileRequest::getContainerCode(ISlangBlob** outBlob)
 {
-    ISlangBlob* containerBlob = m_containerBlob;
-    if (containerBlob)
+    if (m_containerArtifact)
     {
-        containerBlob->addRef();
-        *outBlob = containerBlob;
-        return SLANG_OK;
+        ComPtr<ISlangBlob> containerBlob;
+        if (SLANG_SUCCEEDED(m_containerArtifact->loadBlob(ArtifactKeep::Yes, containerBlob.writeRef())))
+        {
+            *outBlob = containerBlob.detach();
+            return SLANG_OK;
+        }
     }
-
     return SLANG_FAIL;
 }
 

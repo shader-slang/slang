@@ -20,25 +20,45 @@ namespace Slang
     {
         bool changed = true;
         const int kMaxIterations = 8;
+        const int kMaxFuncIterations = 16;
         int iterationCounter = 0;
+
         while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
             changed |= hoistConstants(module);
             changed |= deduplicateGenericChildren(module);
-            changed |= applySparseConditionalConstantPropagation(module);
-            changed |= peepholeOptimize(module);
-            changed |= removeRedundancy(module);
-            changed |= simplifyCFG(module);
             changed |= propagateFuncProperties(module);
+            changed |= removeUnusedGenericParam(module);
+            changed |= applySparseConditionalConstantPropagationForGlobalScope(module);
+            changed |= peepholeOptimize(module);
+
+            for (auto inst : module->getGlobalInsts())
+            {
+                auto func = as<IRGlobalValueWithCode>(inst);
+                if (!func)
+                    continue;
+                bool funcChanged = true;
+                int funcIterationCount = 0;
+                while (funcChanged && funcIterationCount < kMaxFuncIterations)
+                {
+                    funcChanged = false;
+                    funcChanged |= applySparseConditionalConstantPropagation(func);
+                    funcChanged |= peepholeOptimize(func);
+                    funcChanged |= removeRedundancyInFunc(func);
+                    funcChanged |= simplifyCFG(func);
+                    eliminateDeadCode(func);
+                    funcChanged |= constructSSA(func);
+                    changed |= funcChanged;
+                    funcIterationCount++;
+                }
+            }
 
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
             // DCE will always remove those nearly generated consts and always returns true here.
             eliminateDeadCode(module);
 
-            changed |= constructSSA(module);
-            changed |= removeUnusedGenericParam(module);
             iterationCounter++;
         }
     }

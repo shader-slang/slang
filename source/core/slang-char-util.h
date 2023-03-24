@@ -47,6 +47,9 @@ struct CharUtil
         /// Given a character return the upper case equivalent
     SLANG_FORCE_INLINE static char toUpper(char c) { return (c >= 'a' && c <= 'z') ? (c -'a' + 'A') : c; }
 
+        /// Given a value between 0-15 inclusive returns the hex digit. Uses lower case hex.
+    SLANG_FORCE_INLINE static char getHexChar(Index i) { SLANG_ASSERT((i & ~Index(0xf)) == 0); return char(i >= 10 ? (i - 10 + 'a') : (i + '0')); }
+
         /// Returns the value if c interpretted as a hex digit
         /// If c is not a valid hex returns -1
     inline static int getHexDigitValue(char c);

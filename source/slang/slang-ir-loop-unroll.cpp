@@ -67,8 +67,14 @@ List<IRBlock*> _collectBlocksInLoop(IRDominatorTree* dom, IRLoop* loopInst)
         {
             if (succ == breakBlock)
                 continue;
-            if (dom->dominates(firstBlock, succ) && !dom->dominates(breakBlock, succ))
-                addBlock(succ);
+            if (!dom->dominates(firstBlock, succ))
+                continue;
+            if (!as<IRUnreachable>(breakBlock->getTerminator()))
+            {
+                if (dom->dominates(breakBlock, succ))
+                    continue;
+            }
+            addBlock(succ);
         }
     }
     return loopBlocks;

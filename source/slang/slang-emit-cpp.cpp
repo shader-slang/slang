@@ -338,7 +338,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                     // TODO(JS): This is a bit of a hack. We don't want to emit the result here,
                     // so we replace the writer, write out the type, grab the contents, and restore the writer
 
-                    SourceWriter writer(sourceManager, LineDirectiveMode::None);
+                    SourceWriter writer(sourceManager, LineDirectiveMode::None, nullptr);
                     m_writer = &writer;
 
                     m_writer->emit(prefix);

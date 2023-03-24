@@ -1,6 +1,8 @@
 #include "slang-ir-peephole.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-dominators.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -289,6 +291,9 @@ struct PeepholeContext : InstPassBase
         }
         return false;
     }
+
+    RefPtr<IRDominatorTree> domTree;
+    IRGlobalValueWithCode* domTreeFunc = nullptr;
 
     void processInst(IRInst* inst)
     {
@@ -633,19 +638,6 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_StructuralAdd:
-        {
-            IRBuilder builder(module);
-            builder.setInsertBefore(inst);
-            // See if we can replace the generic add inst with concrete values.
-            if (auto newCtor = builder.emitStructuralAdd(inst->getOperand(0), inst->getOperand(1), false))
-            {
-                inst->replaceUsesWith(newCtor);
-                maybeRemoveOldInst(inst);
-                changed = true;
-            }
-        }
-        break;
         case kIROp_Add:
         case kIROp_Mul:
         case kIROp_Sub:
@@ -692,9 +684,35 @@ struct PeepholeContext : InstPassBase
                 {
                     if (inst->hasUses())
                     {
-                        inst->replaceUsesWith(argValue);
-                        // Never remove param inst.
-                        changed = true;
+                        // Is argValue a global constant?
+                        if (isChildInstOf(inst, argValue->getParent()))
+                        {
+                            inst->replaceUsesWith(argValue);
+                            // Never remove param inst.
+                            changed = true;
+                        }
+                        else
+                        {
+                            // If argValue is defined locally,
+                            // we can replace only if argVal dominates inst.
+                            auto parentFunc = getParentFunc(inst);
+                            if (!parentFunc)
+                                break;
+                            if (domTreeFunc != parentFunc)
+                            {
+                                domTree = computeDominatorTree(parentFunc);
+                                domTreeFunc = parentFunc;
+                            }
+                            if (!domTree)
+                                break;
+
+                            if (domTree->dominates(argValue, inst))
+                            {
+                                inst->replaceUsesWith(argValue);
+                                // Never remove param inst.
+                                changed = true;
+                            }
+                        }
                     }
                 }
             }
@@ -707,7 +725,6 @@ struct PeepholeContext : InstPassBase
     bool processFunc(IRInst* func)
     {
         bool result = false;
-
         for (;;)
         {
             changed = false;

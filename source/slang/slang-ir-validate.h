@@ -7,7 +7,7 @@ namespace Slang
     class CompileRequestBase;
     class DiagnosticSink;
     struct IRModule;
-
+    struct IRInst;
 
     // Validate that an IR module obeys the invariants we need to enforce.
     // For example:
@@ -27,6 +27,7 @@ namespace Slang
     //
     // * Confirm that all the parameters of a block come before any "ordinary" instructions.
     void validateIRModule(IRModule* module, DiagnosticSink* sink);
+    void validateIRInst(IRInst* inst);
 
     // A wrapper that calls `validateIRModule` only when IR validation is enabled
     // for the given compile request.

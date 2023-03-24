@@ -616,6 +616,9 @@ struct DominatorTreeComputationContext
 
     RefPtr<IRDominatorTree> createDominatorTree(IRGlobalValueWithCode* code)
     {
+        if (code->getFirstBlock() == nullptr)
+            return nullptr;
+
         // We first run the Cooper et al. algorithm to compute the `doms` array
         // which encodes immediate dominators.
         //

@@ -1,6 +1,8 @@
 // slang-emit-source-writer.cpp
 #include "slang-emit-source-writer.h"
 
+#include "../core/slang-char-encode.h"
+
 // Disable warnings about sprintf
 #ifdef _WIN32
 #   pragma warning(disable:4996)
@@ -16,10 +18,11 @@
 
 namespace Slang {
 
-SourceWriter::SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode)
+SourceWriter::SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, SourceMap* sourceMap)
 {
+    m_sourceMap = sourceMap;
     m_lineDirectiveMode = lineDirectiveMode;
-    this->m_sourceManager = sourceManager;
+    m_sourceManager = sourceManager;
 }
 
 String SourceWriter::getContentAndClear()
@@ -274,7 +277,10 @@ void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocatio
 
 void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
 {
-    if (getLineDirectiveMode() == LineDirectiveMode::None)
+    // If we don't have any line directives *and* we don't want to output 
+    // source map, we can just ignore
+    if (getLineDirectiveMode() == LineDirectiveMode::None &&
+        m_sourceMap == nullptr)
     {
         // Ignore if we aren't outputting directives 
         return;
@@ -328,7 +334,14 @@ void SourceWriter::_flushSourceLocationChange()
     // advances the location, and outputting text is what
     // triggers this flush operation.
     m_needToUpdateSourceLocation = false;
+    
     _emitLineDirectiveIfNeeded(m_nextHumaneSourceLocation);
+
+    // If we have a source map update state
+    if (m_sourceMap)
+    {
+        _updateSourceMap(m_nextHumaneSourceLocation);
+    }
 }
 
 void SourceWriter::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceLoc& sourceLocation)
@@ -339,6 +352,31 @@ void SourceWriter::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceL
     newLoc.column = 1;
 
     m_loc = newLoc;
+}
+
+void SourceWriter::_updateSourceMap(const HumaneSourceLoc& sourceLocation)
+{
+    // Ignore invalid source locations
+    if (sourceLocation.line <= 0)
+        return;
+
+    // We need to work out the current column in the generated (ie being written) output
+    Index generatedLineIndex, generatedColumnIndex;
+    _calcLocation(generatedLineIndex, generatedColumnIndex);
+
+    // Advance to the current output line
+    m_sourceMap->advanceToLine(generatedLineIndex);
+
+    // Add the entry into the map, mapping back to the original source
+    SourceMap::Entry entry;
+    entry.init();
+
+    entry.sourceFileIndex = m_sourceMap->getSourceFileIndex(sourceLocation.pathInfo.getName().getUnownedSlice());
+    entry.sourceLine = sourceLocation.line - 1;
+    entry.sourceColumn = sourceLocation.column - 1;
+    entry.generatedColumn = generatedColumnIndex;
+    
+    m_sourceMap->addEntry(entry);
 }
 
 void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocation)
@@ -476,6 +514,64 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
     }
 
     emitRawText("\n");
+}
+
+void SourceWriter::_calcLocation(Index& outLineIndex, Index& outColumnIndex)
+{
+    // If there are move chars we need to update 
+    if (m_currentOutputOffset < m_builder.getLength())
+    {
+        const char* cur = m_builder.getBuffer() + m_currentOutputOffset;
+        const char* end = m_builder.end();
+
+        const char* start = cur;
+
+        while (cur < end)
+        {
+            // Reset start
+            start = cur;
+
+            // Look for the end of the line
+            while (*cur != '\n' && *cur != '\r' && cur < end)
+            {
+                cur++;
+            }
+
+            // If we are not at the total end then we must have hit a \n or \r
+            if (cur < end)
+            {
+                const auto c = *cur++;
+
+                // Next line
+                ++m_currentLineIndex;
+                
+                // Check the next char to see if it's part of a CR/LF combination
+                if (cur < end)
+                {
+                    const auto d = *cur;
+                    // If it is combination skip the next byte
+                    cur += ((c ^ d) == ('\r' ^ '\n'));
+                }
+
+                // Calculate the offset to the start of this line
+                m_currentColumnIndex = 0;
+                start = cur;
+            }
+        }
+
+        // Set the current offset to the end
+        m_currentOutputOffset = m_builder.getLength();
+
+        // Get the bytes remaining on this line (which may not be complete)
+        const UnownedStringSlice lineRemaining(start, m_builder.end());
+
+        // Offset the column index in codepoints 
+        m_currentColumnIndex += UTF8Util::calcCodePointCount(lineRemaining);
+    }
+
+    // Output the position
+    outColumnIndex = m_currentColumnIndex;
+    outLineIndex = m_currentLineIndex;
 }
 
 } // namespace Slang

@@ -1675,6 +1675,17 @@ bool applySparseConditionalConstantPropagation(
     return changed;
 }
 
+bool applySparseConditionalConstantPropagationForGlobalScope(
+    IRModule* module)
+{
+    SharedSCCPContext shared;
+    shared.module = module;
+    SCCPContext globalContext;
+    globalContext.shared = &shared;
+    globalContext.code = nullptr;
+    bool changed = globalContext.applyOnGlobalScope(module);
+    return changed;
+}
 
 bool applySparseConditionalConstantPropagation(IRInst* func)
 {

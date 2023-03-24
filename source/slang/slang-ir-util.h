@@ -49,9 +49,13 @@ struct DeduplicateContext
             return *newValue;
         for (UInt i = 0; i < value->getOperandCount(); i++)
         {
-            value->unsafeSetOperand(i, deduplicate(value->getOperand(i), shouldDeduplicate));
+            auto deduplicatedOperand = deduplicate(value->getOperand(i), shouldDeduplicate);
+            if (deduplicatedOperand != value->getOperand(i))
+                value->unsafeSetOperand(i, deduplicatedOperand);
         }
-        value->setFullType((IRType*)deduplicate(value->getFullType(), shouldDeduplicate));
+        auto deduplicatedType = (IRType*)deduplicate(value->getFullType(), shouldDeduplicate);
+        if (deduplicatedType != value->getFullType())
+            value->setFullType(deduplicatedType);
         if (auto newValue = deduplicateMap.TryGetValue(key))
             return *newValue;
         deduplicateMap[key] = value;
@@ -182,6 +186,11 @@ void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst);
 // Set IRBuilder to insert after `inst`. If `inst` is a param, it will insert after the last param.
 void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst);
 
+// Emit a loop structure with a simple incrementing counter.
+// Returns the loop counter `IRParam`.
+IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IRBlock*& loopBodyBlock, IRBlock*& loopBreakBlock);
+
+void sortBlocksInFunc(IRGlobalValueWithCode* func);
 }
 
 #endif

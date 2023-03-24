@@ -308,9 +308,10 @@ struct ExtractPrimalFuncContext
             fieldType = cloneInst(&cloneEnv, &genTypeBuilder, fieldType);
         }
         auto structField = genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
-        if (auto diffFieldType = backwardPrimalTranscriber->differentiateType(&genTypeBuilder, (IRType*)fieldType))
+      
+        if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(&genTypeBuilder, (IRType*)fieldType))
         {
-            genTypeBuilder.addIntermediateContextFieldDifferentialTypeDecoration(structField, diffFieldType);
+            genTypeBuilder.addIntermediateContextFieldDifferentialTypeDecoration(structField, witness);
         }
         return structField;
     }
@@ -331,7 +332,12 @@ struct ExtractPrimalFuncContext
             inst);
     }
 
-    IRFunc* turnUnzippedFuncIntoPrimalFunc(IRFunc* unzippedFunc, IRFunc* originalFunc, HashSet<IRInst*>& primalParams, IRInst*& outIntermediateType)
+    IRFunc* turnUnzippedFuncIntoPrimalFunc(
+        IRFunc* unzippedFunc,
+        IRFunc* originalFunc,
+        HoistedPrimalsInfo* primalsInfo,
+        HashSet<IRInst*>& primalParams,
+        IRInst*& outIntermediateType)
     {
         IRBuilder builder(module);
 
@@ -374,17 +380,9 @@ struct ExtractPrimalFuncContext
             // output intermediary struct.
             for (auto inst : block->getChildren())
             {
-                if (shouldStoreInst(inst))
+                if (primalsInfo->storeSet.Contains(inst))
                 {
-                    if (as<IRParam>(inst))
-                        builder.setInsertBefore(block->getFirstOrdinaryInst());
-                    else
-                        builder.setInsertAfter(inst);
-                    storeInst(builder, inst, outIntermediary);
-                }
-                else if (inst->getOp() == kIROp_Var)
-                {
-                    if (shouldStoreVar(as<IRVar>(inst)))
+                    if (as<IRVar>(inst))
                     {
                         auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
                         builder.setInsertBefore(inst);
@@ -393,7 +391,14 @@ struct ExtractPrimalFuncContext
                         inst->replaceUsesWith(fieldAddr);
                         builder.addPrimalValueStructKeyDecoration(inst, field->getKey());
                     }
-                    
+                    else
+                    {
+                        if (as<IRParam>(inst))
+                            builder.setInsertBefore(block->getFirstOrdinaryInst());
+                        else
+                            builder.setInsertAfter(inst);
+                        storeInst(builder, inst, outIntermediary);
+                    }
                 }
             }
         }
@@ -458,6 +463,7 @@ static void copyPrimalValueStructKeyDecorations(IRInst* inst, IRCloneEnv& cloneE
 IRFunc* DiffUnzipPass::extractPrimalFunc(
     IRFunc* func,
     IRFunc* originalFunc,
+    HoistedPrimalsInfo* primalsInfo,
     ParameterBlockTransposeInfo& paramInfo,
     IRInst*& intermediateType)
 {
@@ -468,6 +474,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     subEnv.squashChildrenMapping = true;
     subEnv.parent = &cloneEnv;
     auto clonedFunc = as<IRFunc>(cloneInst(&subEnv, &builder, func));
+    auto clonedPrimalsInfo = primalsInfo->applyMap(&subEnv);
 
     // Remove [KeepAlive] decorations in clonedFunc.
     for (auto block : clonedFunc->getBlocks())
@@ -493,7 +500,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     context.init(autodiffContext->moduleInst->getModule(), autodiffContext->transcriberSet.primalTranscriber);
 
     intermediateType = nullptr;
-    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, newPrimalParams, intermediateType);
+    auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(clonedFunc, originalFunc, clonedPrimalsInfo, newPrimalParams, intermediateType);
 
     if (auto nameHint = primalFunc->findDecoration<IRNameHintDecoration>())
     {
@@ -572,19 +579,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                     }
                 }
                 instsToRemove.add(inst);
-            }
-            else if (auto primalCtx = inst->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
-            {
-                if (inst->getOp() == kIROp_Call)
-                {
-                    // The primal calls should be marked as no side effect so they can be DCE'd if possible.
-                    // We can only do so if the intermediate context of the callee is stored.
-                    if (primalCtx->getBackwardDerivativePrimalContextVar()
-                            ->findDecoration<IRPrimalValueStructKeyDecoration>())
-                    {
-                        builder.addSimpleDecoration<IRNoSideEffectDecoration>(inst);
-                    }
-                }
             }
         }
     }

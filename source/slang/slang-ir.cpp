@@ -3159,6 +3159,20 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitDispatchKernelInst(IRType* type, IRInst* baseFn, IRInst* threadGroupSize, IRInst* dispatchSize, Int argCount, IRInst* const* inArgs)
+    {
+        List<IRInst*> args = {baseFn, threadGroupSize, dispatchSize};
+        args.addRange(inArgs, (Index)argCount);
+        auto inst = createInst<IRDispatchKernel>(
+            this,
+            kIROp_DispatchKernel,
+            type,
+            (Int)args.getCount(),
+            args.getBuffer());
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn)
     {
         auto inst = createInst<IRBackwardDifferentiatePrimal>(
@@ -3505,104 +3519,6 @@ namespace Slang
         if (fallback)
         {
             return emitIntrinsicInst(type, kIROp_DefaultConstruct, 0, nullptr);
-        }
-        return nullptr;
-    }
-
-    IRInst* IRBuilder::emitStructuralAddRaw(IRInst* val0, IRInst* val1)
-    {
-        IRInst* args[2] = { val0, val1 };
-        return emitIntrinsicInst(val0->getFullType(), kIROp_StructuralAdd, 2, args);
-    }
-
-    IRInst* IRBuilder::emitStructuralAdd(IRInst* val0, IRInst* val1, bool fallback)
-    {
-        auto type = val0->getFullType();
-        SLANG_RELEASE_ASSERT(val0->getFullType() == val1->getFullType());
-        IRType* actualType = val0->getFullType();
-        for (;;)
-        {
-            if (auto attr = as<IRAttributedType>(actualType))
-                actualType = attr->getBaseType();
-            else if (auto rateQualified = as<IRRateQualifiedType>(actualType))
-                actualType = rateQualified->getValueType();
-            else
-                break;
-        }
-        if (as<IRBasicType>(actualType))
-            return emitAdd(type, val0, val1);
-
-        switch (actualType->getOp())
-        {
-        case kIROp_PtrType:
-        case kIROp_VectorType:
-        case kIROp_MatrixType:
-            return emitAdd(type, val0, val1);
-        case kIROp_TupleType:
-        {
-            List<IRInst*> elements;
-            auto tupleType = as<IRTupleType>(actualType);
-            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
-            {
-                auto operand = tupleType->getOperand(i);
-                if (as<IRAttr>(operand))
-                    break;
-                auto inner = emitStructuralAdd(
-                    emitGetTupleElement((IRType*)operand, val0, i),
-                    emitGetTupleElement((IRType*)operand, val1, i),
-                    fallback);
-                if (!inner)
-                    return nullptr;
-                elements.add(inner);
-            }
-            return emitMakeTuple(tupleType, elements);
-        }
-        case kIROp_StructType:
-        {
-            List<IRInst*> elements;
-            auto structType = as<IRStructType>(actualType);
-            for (auto field : structType->getFields())
-            {
-                auto fieldType = field->getFieldType();
-                auto inner = emitStructuralAdd(
-                    emitFieldExtract(fieldType, val0, field->getKey()),
-                    emitFieldExtract(fieldType, val1, field->getKey()),
-                    fallback);
-                if (!inner)
-                    return nullptr;
-                elements.add(inner);
-            }
-            return emitMakeStruct(type, elements);
-        }
-        case kIROp_ArrayType:
-        {
-            auto arrayType = as<IRArrayType>(actualType);
-            if (auto count = as<IRIntLit>(arrayType->getElementCount()))
-            {
-                auto elementType = arrayType->getElementType();
-                List<IRInst*> elements;
-                constexpr int maxCount = 4096;
-                if (count->getValue() > maxCount)
-                    break;
-                for (IRIntegerValue i = 0; i < count->getValue(); i++)
-                {
-                    auto index = getIntValue(getIntType(), i);
-                    auto element = emitStructuralAdd(
-                        emitElementExtract(elementType, val0, index),
-                        emitElementExtract(elementType, val1, index),
-                        fallback);
-                    elements.add(element);
-                }
-                return emitMakeArray(type, elements.getCount(), elements.getBuffer());
-            }
-            break;
-        }
-        default:
-            break;
-        }
-        if (fallback)
-        {
-            return emitStructuralAddRaw(val0, val1);
         }
         return nullptr;
     }
@@ -4026,9 +3942,9 @@ namespace Slang
         return addDecoration(target, kIROp_PrimalElementTypeDecoration, type);
     }
 
-    IRInst* IRBuilder::addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* type)
+    IRInst* IRBuilder::addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* witness)
     {
-        return addDecoration(target, kIROp_IntermediateContextFieldDifferentialTypeDecoration, type);
+        return addDecoration(target, kIROp_IntermediateContextFieldDifferentialTypeDecoration, witness);
     }
 
     RefPtr<IRModule> IRModule::create(Session* session)
@@ -7131,7 +7047,6 @@ namespace Slang
         case kIROp_Nop:
         case kIROp_undefined:
         case kIROp_DefaultConstruct:
-        case kIROp_StructuralAdd:
         case kIROp_Specialize:
         case kIROp_LookupWitness:
         case kIROp_GetSequentialID:
@@ -7178,8 +7093,6 @@ namespace Slang
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
-        //case kIROp_Div:   // TODO: We could split out integer vs. floating-point div/mod and assume the floating-point cases have no side effects
-        //case kIROp_Rem:
         case kIROp_Lsh:
         case kIROp_Rsh:
         case kIROp_Eql:
@@ -7222,6 +7135,22 @@ namespace Slang
         case kIROp_BackwardDifferentiatePrimal:
         case kIROp_BackwardDifferentiatePropagate:
         case kIROp_DetachDerivative:
+            return false;
+
+        case kIROp_Div:
+        case kIROp_IRem:
+            if (isIntegralScalarOrCompositeType(getFullType()))
+            {
+                if (auto intLit = as<IRIntLit>(getOperand(1)))
+                {
+                    if (intLit->getValue() != 0)
+                        return false;
+                }
+                return true;
+            }
+            return false;
+
+        case kIROp_FRem:
             return false;
         }
         return true;

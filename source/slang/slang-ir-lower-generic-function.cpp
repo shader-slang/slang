@@ -57,8 +57,9 @@ namespace Slang
             SLANG_ASSERT(loweredGenericType);
             loweredFunc->setFullType(loweredGenericType);
 
-            List<IRInst*> childrenToDemote;
+            OrderedHashSet<IRInst*> childrenToDemote;
             List<IRInst*> clonedParams;
+            auto moduleInst = genericParent->getModule()->getModuleInst();
             for (auto genericChild : genericParent->getFirstBlock()->getChildren())
             {
                 switch (genericChild->getOp())
@@ -83,21 +84,26 @@ namespace Slang
                         clonedParams.add(clonedChild);
                     }
                     break;
-
-                case kIROp_LookupWitness:
                 case kIROp_Specialize:
+                case kIROp_LookupWitness:
+                    childrenToDemote.add(clonedChild);
+                    break;
+                default:
                     {
-                        childrenToDemote.add(clonedChild);
-                        // Make sure all uses are from the function body.
-                        for (auto use = genericChild->firstUse; use; use = use->nextUse)
+                        bool shouldDemote = false;
+                        if (childrenToDemote.Contains(clonedChild->getFullType()))
+                            shouldDemote = true;
+                        for (UInt i = 0; i < clonedChild->getOperandCount(); i++)
                         {
-                            if (use->getUser()->getParent() == genericChild->getParent())
+                            if (childrenToDemote.Contains(clonedChild->getOperand(i)))
                             {
-                                // This specialize/lookup is used as operand to some other
-                                // global inst in the generic. This is not supported now.
-                                SLANG_UNIMPLEMENTED_X(
-                                    "Unsupported use of specialize/lookupWitness in generic body.");
+                                shouldDemote = true;
+                                break;
                             }
+                        }
+                        if (shouldDemote && clonedChild->getParent() == moduleInst)
+                        {
+                            childrenToDemote.add(clonedChild);
                         }
                         continue;
                     }
@@ -114,9 +120,12 @@ namespace Slang
 
             // Demote specialize and lookupWitness insts and their dependents down to function body.
             auto insertPoint = block->getFirstOrdinaryInst();
-            for (Index i = childrenToDemote.getCount() - 1; i >= 0; i--)
+            List<IRInst*> childrenToDemoteList;
+            for (auto child : childrenToDemote)
+                childrenToDemoteList.add(child);
+            for (Index i = childrenToDemoteList.getCount() - 1; i >= 0; i--)
             {
-                auto child = childrenToDemote[i];
+                auto child = childrenToDemoteList[i];
                 child->insertBefore(insertPoint);
             }
 

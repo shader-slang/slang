@@ -998,14 +998,6 @@ class ForceInlineAttribute : public Attribute
 };
 
 
-// A `[TreatAsDifferentiableAttribute]` attribute indicates that a function or an interface
-// should be treated as differentiable in IR validation step.
-//
-class TreatAsDifferentiableAttribute : public Attribute
-{
-    SLANG_AST_CLASS(TreatAsDifferentiableAttribute)
-};
-
     /// An attribute that marks a type declaration as either allowing or
     /// disallowing the type to be inherited from in other modules.
 class InheritanceControlAttribute : public Attribute { SLANG_AST_CLASS(InheritanceControlAttribute) };
@@ -1063,6 +1055,21 @@ class DllExportAttribute : public Attribute
     SLANG_AST_CLASS(DllExportAttribute)
 };
 
+class CudaDeviceExportAttribute : public Attribute
+{
+    SLANG_AST_CLASS(CudaDeviceExportAttribute)
+};
+
+class CudaKernelAttribute : public Attribute
+{
+    SLANG_AST_CLASS(CudaKernelAttribute)
+};
+
+class CudaHostAttribute : public Attribute
+{
+    SLANG_AST_CLASS(CudaHostAttribute)
+};
+
 class DerivativeMemberAttribute : public Attribute
 {
     SLANG_AST_CLASS(DerivativeMemberAttribute)
@@ -1091,6 +1098,14 @@ class RequiresNVAPIAttribute : public Attribute
 class AlwaysFoldIntoUseSiteAttribute :public Attribute
 {
     SLANG_AST_CLASS(AlwaysFoldIntoUseSiteAttribute)
+};
+
+// A `[TreatAsDifferentiableAttribute]` attribute indicates that a function or an interface
+// should be treated as differentiable in IR validation step.
+//
+class TreatAsDifferentiableAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(TreatAsDifferentiableAttribute)
 };
 
     /// The `[ForwardDifferentiable]` attribute indicates that a function can be forward-differentiated.
