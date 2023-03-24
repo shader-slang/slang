@@ -901,20 +901,32 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
     auto primalSpecialize = (IRSpecialize*)builder->emitSpecializeInst(
         (IRType*)primalType, primalBase, primalArgs.getCount(), primalArgs.getBuffer());
 
-    IRInst* diffBase = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
-    if (diffBase)
+    IRInst* diffBase = nullptr;
+    if (instMapD.TryGetValue(origSpecialize->getBase(), diffBase))
     {
-        List<IRInst*> args;
-        for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+        if (diffBase)
         {
-            args.add(primalSpecialize->getArg(i));
+            List<IRInst*> args;
+            for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+            {
+                args.add(primalSpecialize->getArg(i));
+            }
+            auto diffSpecialize = builder->emitSpecializeInst(
+                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+            return InstPair(primalSpecialize, diffSpecialize);
         }
-        auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
-        return InstPair(primalSpecialize, diffSpecialize);
+        else
+        {
+            return InstPair(primalSpecialize, nullptr);
+        }
     }
 
     auto genericInnerVal = findInnerMostGenericReturnVal(as<IRGeneric>(origSpecialize->getBase()));
+
+    // Right now we don't support transcribing a differentiable callee that is a specialize of a interface lookup
+    // (calling differentiable generic interface method). To support it, we need to recursively transcribe the
+    // specialization base here.
+
     if (!genericInnerVal)
         return InstPair(primalSpecialize, nullptr);
 
