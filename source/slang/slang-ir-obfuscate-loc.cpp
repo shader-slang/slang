@@ -293,6 +293,10 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
         }
     }
 
+    // Associate the sourceMap with the obfuscated file
+    obfuscatedFile->setObfuscatedSourceMap(sourceMap);
+
+    // Set the obfuscated map onto the module
     module->setObfuscatedSourceMap(sourceMap);
 
     return SLANG_OK;

@@ -2,21 +2,17 @@
 #define SLANG_COMPILER_CORE_SOURCE_MAP_H
 
 #include "../../slang.h"
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
 
 #include "../core/slang-string.h"
 #include "../core/slang-list.h"
-#include "../core/slang-rtti-info.h"
 
 #include "../core/slang-string-slice-pool.h"
 
-#include "slang-json-value.h"
-
 namespace Slang {
 
-struct SourceMap : public RefObject
+class SourceMap : public RefObject
 {
+public:
     struct Entry
     {
         void init()
@@ -36,12 +32,6 @@ struct SourceMap : public RefObject
         Index nameIndex;                ///< Name index
     };
 
-        /// Decode from root into the source map
-    SlangResult decode(JSONContainer* container, JSONValue root, DiagnosticSink* sink);
-
-        /// Converts the source map contents into JSON
-    SlangResult encode(JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue);
-
         /// Get the total number of generated lines
     Count getGeneratedLineCount() const { return m_lineStarts.getCount(); }
         /// Get the entries on the line
@@ -60,6 +50,16 @@ struct SourceMap : public RefObject
 
         /// Get the name index
     Index getNameIndex(const UnownedStringSlice& slice);
+
+        /// Given a row and col index, find the closest entry
+        /// NOTE! Zero indexed line and column.
+    Index findEntry(Index lineIndex, Index colIndex) const;
+
+        /// Given an entry index return the entry
+    const Entry& getEntryByIndex(Index i) const {return m_lineEntries[i]; }
+
+        /// Given the sourceFileIndex return the name
+    UnownedStringSlice getSourceFileName(Index sourceFileIndex) const;
 
         /// Clear the contents of the source map
     void clear();

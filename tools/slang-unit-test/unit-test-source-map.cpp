@@ -7,6 +7,7 @@
 #include "../../source/compiler-core/slang-json-native.h"
 
 #include "../../source/compiler-core/slang-source-map.h"
+#include "../../source/compiler-core/slang-json-source-map-util.h"
 
 #include "../../source/core/slang-rtti-info.h"
 
@@ -52,16 +53,16 @@ static SlangResult _check()
         rootValue = builder.getRootValue();
     }
 
-    SourceMap sourceMap;
+    RefPtr<SourceMap> sourceMap;
         
-    SLANG_RETURN_ON_FAIL(sourceMap.decode(container, rootValue, &sink));
+    SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::decode(container, rootValue, &sink, sourceMap));
     
     // Write it out
     String json;
     {
         JSONValue jsonValue;
 
-        SLANG_RETURN_ON_FAIL(sourceMap.encode(container, &sink, jsonValue));
+        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, container, &sink, jsonValue));
         
         // Convert into a string
         JSONWriter writer(JSONWriter::IndentationStyle::Allman);

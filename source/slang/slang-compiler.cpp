@@ -14,6 +14,8 @@
 
 #include "../compiler-core/slang-lexer.h"
 
+#include "../compiler-core/slang-json-source-map-util.h"
+
 // Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-representation-impl.h"
@@ -1905,7 +1907,7 @@ namespace Slang
 
                     JSONValue jsonValue;
 
-                    SLANG_RETURN_ON_FAIL(sourceMap->encode(jsonContainer, sink, jsonValue));
+                    SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, sink, jsonValue));
 
                     // Convert into a string
                     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
