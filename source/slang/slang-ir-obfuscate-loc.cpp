@@ -72,13 +72,14 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
     List<LocPair> locPairs;
 
+    // We want the hash to be stable. One problem is the source locs depend on their order of inclusion.
+    // To work around this we are going 
     {
+        SourceView* sourceView = nullptr;
+
         SourceLoc curLoc;
         for (const auto& instWithLoc : instWithLocs)
         {
-            hash = combineHash(hash, getHashCode(instWithLoc.inst));
-            hash = combineHash(hash, getHashCode(instWithLoc.loc.getRaw()));
-
             if (instWithLoc.loc != curLoc)
             {
                 LocPair locPair;
@@ -87,6 +88,21 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
                 // This is the current loc
                 curLoc = instWithLoc.loc;
+            
+                // If the loc isn't in the view, lookup the view it is in
+                if (sourceView == nullptr || 
+                    !sourceView->getRange().contains(curLoc))
+                {
+                    sourceView = sourceManager->findSourceViewRecursively(curLoc);
+                    SLANG_ASSERT(sourceView);
+
+                    // Combine the name
+                    hash = combineHash(hash, getHashCode(sourceView->getViewPathInfo().getName().getUnownedSlice()));
+                }
+                SLANG_ASSERT(sourceView);
+
+                // We combine the *offset* which is stable
+                hash = combineHash(hash, getHashCode(sourceView->getRange().getOffset(curLoc)));
             }
         }
     }
@@ -128,6 +144,12 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
     SourceFile* obfuscatedFile = sourceManager->createSourceFileWithSize(obfusctatedPathInfo, uniqueLocCount);
 
+    // We have only one line for all locs, just set up that way...
+    {
+        const uint32_t offsets[2] = { 0, uint32_t(uniqueLocCount) };
+        obfuscatedFile->setLineBreakOffsets(offsets, SLANG_COUNT_OF(offsets));
+    }
+    
     // Create the view we are going to use from the obfusctated "file".
     SourceView* obfuscatedView = sourceManager->createSourceView(obfuscatedFile, nullptr, SourceLoc());
 

@@ -2625,9 +2625,9 @@ namespace Slang
             // If it's set to a format, the container blob will be calculated during compile
         ContainerFormat m_containerFormat = ContainerFormat::None;
 
-            /// Where the container blob is stored. This is calculated as part of compile if m_containerFormat is set to
+            /// Where the container is stored. This is calculated as part of compile if m_containerFormat is set to
             /// a supported format. 
-        ComPtr<ISlangBlob> m_containerBlob;
+        ComPtr<IArtifact> m_containerArtifact;
 
             // Path to output container to
         String m_containerOutputPath;
@@ -2774,6 +2774,9 @@ namespace Slang
         void generateOutput(TargetProgram* targetProgram);
 
         void init();
+
+        SlangResult _createContainer();
+        SlangResult _completeContainer();
 
         Session*                        m_session = nullptr;
         RefPtr<Linkage>                 m_linkage;
