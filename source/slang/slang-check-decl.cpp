@@ -238,6 +238,9 @@ namespace Slang
 
         void visitCallableDecl(CallableDecl* decl)
         {
+            for (auto paramDecl : decl->getMembersOfType<ParamDecl>())
+                visitTypeExp(paramDecl->type);
+
             visitTypeExp(decl->returnType);
             visitTypeExp(decl->errorType);
         }
@@ -6916,6 +6919,7 @@ namespace Slang
         auto ctx = visitor->withExprLocalScope(&scope);
         auto subVisitor = SemanticsVisitor(ctx);
         auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
+        visitor->ensureDecl(as<DeclRefExpr>(checkedFuncExpr)->declRef, DeclCheckState::TypesFullyResolved);
         auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
         auto resolved = subVisitor.ResolveInvoke(invokeExpr);
         if (auto resolvedInvoke = as<InvokeExpr>(resolved))
