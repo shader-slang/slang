@@ -7093,8 +7093,6 @@ namespace Slang
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
-        //case kIROp_Div:   // TODO: We could split out integer vs. floating-point div/mod and assume the floating-point cases have no side effects
-        //case kIROp_Rem:
         case kIROp_Lsh:
         case kIROp_Rsh:
         case kIROp_Eql:
@@ -7137,6 +7135,22 @@ namespace Slang
         case kIROp_BackwardDifferentiatePrimal:
         case kIROp_BackwardDifferentiatePropagate:
         case kIROp_DetachDerivative:
+            return false;
+
+        case kIROp_Div:
+        case kIROp_IRem:
+            if (isIntegralScalarOrCompositeType(getFullType()))
+            {
+                if (auto intLit = as<IRIntLit>(getOperand(1)))
+                {
+                    if (intLit->getValue() != 0)
+                        return false;
+                }
+                return true;
+            }
+            return false;
+
+        case kIROp_FRem:
             return false;
         }
         return true;

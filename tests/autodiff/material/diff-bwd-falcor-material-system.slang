@@ -28,19 +28,6 @@ float3 evalBSDF(int type)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    {
-        DifferentialPair<float3> dp_f = __fwd_diff(evalBSDF)(0);
-
-        outputBuffer[0] = dp_f.d[0];
-        outputBuffer[1] = dp_f.d[1];
-        outputBuffer[2] = dp_f.d[2];
-    }
-
-    {
-        DifferentialPair<float3> dp_f = __fwd_diff(evalBSDF)(1);
-
-        outputBuffer[3] = dp_f.d[0];
-        outputBuffer[4] = dp_f.d[1];
-        outputBuffer[5] = dp_f.d[2];
-    }
+    __bwd_diff(evalBSDF)(0, float3(1.f));
+    __bwd_diff(evalBSDF)(1, float3(1.f));
 }

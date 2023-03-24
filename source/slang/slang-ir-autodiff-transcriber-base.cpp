@@ -594,7 +594,11 @@ void AutoDiffTranscriberBase::maybeMigrateDifferentiableDictionaryFromDerivative
     }
     else
     {
-        cloneDecoration(udfDecor, origFunc);
+        auto udfDictDecor = derivative->findDecoration< IRDifferentiableTypeDictionaryDecoration>();
+        if (udfDictDecor)
+        {
+            cloneDecoration(udfDictDecor, origFunc);
+        }
     }
 }
 
@@ -977,6 +981,8 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     if (auto innerFunc = as<IRFunc>(innerVal))
     {
         maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, innerFunc);
+        if (!innerFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
+            return InstPair(origGeneric, nullptr);
         differentiableTypeConformanceContext.setFunc(innerFunc);
     }
     else if (auto funcType = as<IRFuncType>(innerVal))
@@ -1116,9 +1122,12 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
                 }
                 else
                 {
-                    if (!pair.primal->findDecoration<IRAutodiffInstDecoration>()
-                        && !as<IRConstant>(pair.differential))
+                    if (!pair.primal->findDecoration<IRAutodiffInstDecoration>())
                     {
+                        if (as<IRConstant>(pair.differential))
+                            break;
+                        if (as<IRType>(pair.differential))
+                            break;
                         auto mixedType = (IRType*)(pair.primal->getDataType());
                         builder->markInstAsMixedDifferential(pair.primal, mixedType);
                     }

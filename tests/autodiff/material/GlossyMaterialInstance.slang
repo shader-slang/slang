@@ -7,16 +7,24 @@ struct GlossyBSDF : IBSDF
 {
     float3 albedo;
 
-    [BackwardDifferentiable]
     float3 getAlbedo()
     {
         return albedo;
     }
 
     [ForwardDerivativeOf(getAlbedo)]
+    [TreatAsDifferentiable]
     DifferentialPair<float3> __fwd_d_getAlbedo()
     {
         return diffPair(albedo, float3(1.f));
+    }
+
+    [BackwardDerivativeOf(getAlbedo)]
+    [TreatAsDifferentiable]
+    void __bwd_d_getAlbedo(float3 dOut)
+    {
+        [unroll]
+        for (int j = 0; j < 3; j++) outputBuffer[j + 3] += dOut[j];
     }
 
     [BackwardDifferentiable]

@@ -1,10 +1,12 @@
 // slang-ir-restructure-scoping.h
 #pragma once
+#include "../core/slang-func-ptr.h"
 
 namespace Slang
 {
 
 class RegionTree;
+struct IRInst;
 
 /// Fix cases where a value might be used in a non-nested region.
 ///
@@ -19,6 +21,6 @@ class RegionTree;
 /// to survive across blocks are communicated through variables
 /// declared at a sufficiently broad scope.
 ///
-void fixValueScoping(RegionTree* regionTree);
+void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAlwaysFoldInst);
 
 }
