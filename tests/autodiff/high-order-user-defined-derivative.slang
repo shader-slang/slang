@@ -4,7 +4,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=endpointBuffer
+//TEST_INPUT:ubuffer(data=[0.0 1.0 2.0 3.0], stride=4):name=endpointBuffer
 RWStructuredBuffer<float> endpointBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=endpointDifferentialBuffer
@@ -38,14 +38,14 @@ DifferentialPair<LineSegment> fwd_loadLineSegment(uint id)
 
 void d_loadLineSegment(uint id, LineSegment.Differential d_ls)
 {
-    __atomicAdd(endpointDifferentialBuffer[id * 2], d_ls.x0);
-    __atomicAdd(endpointDifferentialBuffer[id * 2 + 1], d_ls.x1);
+    endpointDifferentialBuffer[id * 2] += d_ls.x0;
+    endpointDifferentialBuffer[id * 2 + 1] += d_ls.x1;
 }
 
 void d_fwd_loadLineSegment(uint id, DifferentialPair<LineSegment>.Differential dp_ls)
 {
-    __atomicAdd(endpointDifferentialBuffer[id * 2], dp_ls.p.x0);
-    __atomicAdd(endpointDifferentialBuffer[id * 2 + 1], dp_ls.p.x1);
+    endpointDifferentialBuffer[id * 2] += dp_ls.p.x0;
+    endpointDifferentialBuffer[id * 2 + 1] += dp_ls.p.x1;
 }
 
 [BackwardDifferentiable]
