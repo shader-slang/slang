@@ -594,7 +594,11 @@ void AutoDiffTranscriberBase::maybeMigrateDifferentiableDictionaryFromDerivative
     }
     else
     {
-        cloneDecoration(udfDecor, origFunc);
+        auto udfDictDecor = derivative->findDecoration< IRDifferentiableTypeDictionaryDecoration>();
+        if (udfDictDecor)
+        {
+            cloneDecoration(udfDictDecor, origFunc);
+        }
     }
 }
 

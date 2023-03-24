@@ -1433,6 +1433,8 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
 
     IRFunc* primalFunc = origFunc;
 
+    maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
+
     differentiableTypeConformanceContext.setFunc(origFunc);
 
     primalFunc = origFunc;
