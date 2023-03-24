@@ -1844,46 +1844,185 @@ namespace Slang
         return SLANG_OK;
     }
 
-    SlangResult EndToEndCompileRequest::maybeCreateContainer()
+    SlangResult EndToEndCompileRequest::_createContainer()
     {
         switch (m_containerFormat)
         {
-            case ContainerFormat::SlangModule:
+        case ContainerFormat::SlangModule:
+        {
+
+            OwnedMemoryStream stream(FileAccess::Write);
+            SlangResult res = writeContainerToStream(&stream);
+            if (SLANG_FAILED(res))
             {
-                m_containerBlob.setNull();
-
-                OwnedMemoryStream stream(FileAccess::Write);
-                SlangResult res = writeContainerToStream(&stream);
-                if (SLANG_FAILED(res))
-                {
-                    getSink()->diagnose(SourceLoc(), Diagnostics::unableToCreateModuleContainer);
-                    return res;
-                }
-
-                // Need to turn into a blob
-                List<uint8_t> blobData;
-                stream.swapContents(blobData);
-
-                m_containerBlob = ListBlob::moveCreate(blobData);
-
+                getSink()->diagnose(SourceLoc(), Diagnostics::unableToCreateModuleContainer);
                 return res;
             }
-            default: break;
+
+            // Need to turn into a blob
+            List<uint8_t> blobData;
+            stream.swapContents(blobData);
+
+            auto containerBlob = ListBlob::moveCreate(blobData);
+
+            m_containerArtifact = Artifact::create(ArtifactDesc::make(Artifact::Kind::CompileBinary, ArtifactPayload::SlangIR, ArtifactStyle::Unknown));
+
+            m_containerArtifact->addRepresentationUnknown(containerBlob);
+
+            return res;
         }
+        default: break;
+        }
+        return SLANG_OK;
+    }
+
+    SlangResult EndToEndCompileRequest::_completeContainer()
+    {
+        SLANG_ASSERT(m_containerArtifact);
+        if (!m_containerArtifact)
+        {
+            return SLANG_FAIL;
+        }
+
+        auto frontEndReq = getFrontEndReq();
+
+        auto sourceManager = frontEndReq->getSourceManager();
+        auto sink = getSink();
+
+        for (auto translationUnit : frontEndReq->translationUnits)
+        {
+            // Hmmm do I have to therefore add a map for all translation units(!)
+            // I guess this is okay in so far as an association can always be looked up by name
+
+            auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap();
+
+            if (sourceMap)
+            {
+                // Write it out
+                String json;
+                {
+                    RefPtr<JSONContainer> jsonContainer(new JSONContainer(sourceManager));
+
+                    JSONValue jsonValue;
+
+                    SLANG_RETURN_ON_FAIL(sourceMap->encode(jsonContainer, sink, jsonValue));
+
+                    // Convert into a string
+                    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
+                    jsonContainer->traverseRecursively(jsonValue, &writer);
+
+                    json = writer.getBuilder();
+                }
+
+                auto jsonSourceMapBlob = StringBlob::moveCreate(json);
+
+                auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
+
+                // Create the source map artifact
+                auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->m_file.getUnownedSlice());
+                sourceMapArtifact->addRepresentationUnknown(jsonSourceMapBlob);
+
+                // Associate with the container
+                m_containerArtifact->addAssociated(sourceMapArtifact);
+            }
+        }
+
+        return SLANG_OK;
+    }
+
+    SlangResult EndToEndCompileRequest::maybeCreateContainer()
+    {
+        m_containerArtifact.setNull();
+
+        if (m_containerFormat == ContainerFormat::None)
+        {
+            return SLANG_OK;
+        }
+
+        // Create the container
+        SLANG_RETURN_ON_FAIL(_createContainer());
+
+        // Associate any other stuff with the container artifact
+        SLANG_RETURN_ON_FAIL(_completeContainer());
+        
         return SLANG_OK;
     }
 
     SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
     {
         // If there is no container, or filename, don't write anything 
-        if (fileName.getLength() == 0 || !m_containerBlob)
+        if (fileName.getLength() == 0 || !m_containerArtifact)
         {
             return SLANG_OK;
         }
 
-        FileStream stream;
-        SLANG_RETURN_ON_FAIL(stream.init(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
-        SLANG_RETURN_ON_FAIL(stream.write(m_containerBlob->getBufferPointer(), m_containerBlob->getBufferSize()));
+        ComPtr<ISlangBlob> containerBlob;
+        SLANG_RETURN_ON_FAIL(m_containerArtifact->loadBlob(ArtifactKeep::Yes, containerBlob.writeRef()));
+
+        {
+            FileStream stream;
+            SLANG_RETURN_ON_FAIL(stream.init(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
+            SLANG_RETURN_ON_FAIL(stream.write(containerBlob->getBufferPointer(), containerBlob->getBufferSize()));
+        }
+
+        auto parentPath = Path::getParentDirectory(fileName);
+
+        // Lets look to see if we have any maps
+        {
+            Index nameCount = 0;
+
+            auto associated = m_containerArtifact->getAssociated();
+            const Count count = associated->getCount();
+            for (Index i = 0; i < count; ++i)
+            {
+                IArtifact* artifact = as<IArtifact>(associated->getAt(i));
+                auto desc = artifact->getDesc();
+
+                if (isDerivedFrom(desc.payload, ArtifactPayload::SourceMap))
+                {
+                    StringBuilder artifactFilename;
+
+                    // Dump out
+                    const char* artifactName = artifact->getName();
+                    if (artifactName && artifactName[0] != 0)
+                    {
+                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(artifact, UnownedStringSlice(artifactName), artifactFilename));
+                    }
+                    else
+                    {
+                        // Perhaps we can generate the name from the output basename
+                        StringBuilder baseName;
+
+                        baseName << Path::getFileNameWithoutExt(m_containerOutputPath);
+
+                        if (nameCount != 0)
+                        {
+                            baseName.appendChar('-');
+                            baseName.append(nameCount);
+                        }
+
+                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(artifact, baseName.getUnownedSlice(), artifactFilename));
+
+                        nameCount ++;
+                    }
+
+                    ComPtr<ISlangBlob> blob;
+                    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+
+                    // Try to write it out
+                    {
+                        // Work out the path to the artifact
+                        auto artifactPath = Path::combine(parentPath, artifactFilename);
+
+                        // Write out the map
+                        FileStream stream;
+                        SLANG_RETURN_ON_FAIL(stream.init(artifactPath, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
+                        SLANG_RETURN_ON_FAIL(stream.write(blob->getBufferPointer(), blob->getBufferSize()));
+                    }
+                }
+            }
+        }
+
         return SLANG_OK;
     }
 
