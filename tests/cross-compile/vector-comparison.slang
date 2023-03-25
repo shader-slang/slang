@@ -1,6 +1,6 @@
 // vector-comparison.slang
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
+//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment -Wno-use-of-non-short-circuiting-operator
 
 // This test ensures that we cross-compile vector comparison operators
 // correctly to GLSL

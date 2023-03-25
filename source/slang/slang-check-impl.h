@@ -1896,6 +1896,8 @@ namespace Slang
 
         Expr* visitInvokeExpr(InvokeExpr *expr);
 
+        Expr* visitSelectExpr(SelectExpr* expr);
+
         Expr* visitVarExpr(VarExpr *expr);
 
         Expr* visitTypeCastExpr(TypeCastExpr * expr);

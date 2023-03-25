@@ -4003,6 +4003,43 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return e;
     }
 
+    LoweredValInfo visitSelectExpr(SelectExpr* expr)
+    {
+        // A vector typed `select` expr will turn into a normal `select` op.
+        if (!as<BasicExpressionType>(expr->arguments[0]->type.type))
+        {
+            return visitInvokeExpr(expr);
+        }
+
+        // In global scope? This is a constant, and we should emit as `select` inst.
+        if (!getParentFunc(context->irBuilder->getInsertLoc().getInst()))
+        {
+            return visitInvokeExpr(expr);
+        }
+
+        // A scalar typed `select` expr will turn into an if-else to implement short circuiting
+        // semantics.
+        auto builder = context->irBuilder;
+        auto thenBlock = builder->createBlock();
+        auto elseBlock = builder->createBlock();
+        auto afterBlock = builder->createBlock();
+        auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
+        builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+        builder->insertBlock(thenBlock);
+        builder->setInsertInto(thenBlock);
+        auto trueVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
+        builder->emitBranch(afterBlock, 1, &trueVal);
+        builder->insertBlock(elseBlock);
+        builder->setInsertInto(elseBlock);
+        auto falseVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[2]));
+        builder->emitBranch(afterBlock, 1, &falseVal);
+        builder->insertBlock(afterBlock);
+        builder->setInsertInto(afterBlock);
+        auto paramType = lowerType(context, expr->type.type);
+        auto result = builder->emitParam(paramType);
+        return LoweredValInfo::simple(result);
+    }
+
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
         return visitInvokeExprImpl(expr, TryClauseEnvironment());
