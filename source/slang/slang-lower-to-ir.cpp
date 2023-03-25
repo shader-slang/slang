@@ -4011,6 +4011,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return visitInvokeExpr(expr);
         }
 
+        // In global scope? This is a constant, and we should emit as `select` inst.
+        if (!getParentFunc(context->irBuilder->getInsertLoc().getInst()))
+        {
+            return visitInvokeExpr(expr);
+        }
+
         // A scalar typed `select` expr will turn into an if-else to implement short circuiting
         // semantics.
         auto builder = context->irBuilder;

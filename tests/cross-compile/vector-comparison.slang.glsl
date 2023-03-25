@@ -1,4 +1,4 @@
-#version 450#line .*\n
+#version 450
 layout(row_major) uniform;
 layout(row_major) buffer;
 struct Param_0
