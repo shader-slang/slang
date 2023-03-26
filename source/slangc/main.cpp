@@ -85,9 +85,9 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobal
         // Just create the global session in the regular way if there isn't one set
         SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()));
     }
-#if 0
+
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
-#endif
+
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
     compileRequest->addSearchPath(Path::getParentDirectory(Path::getExecutablePath()).getBuffer());
     SlangResult res = _compile(compileRequest, argc, argv);
