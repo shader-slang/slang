@@ -530,6 +530,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 matType->declRef = declRef;
                 return matType;
             }
+            else if (magicMod->magicName == "TensorViewType")
+            {
+                SLANG_ASSERT(subst && subst->getArgs().getCount() == 1);
+                auto vecType = astBuilder->getOrCreate<TensorViewType>(ExtractGenericArgType(subst->getArgs()[0]));
+                vecType->declRef = declRef;
+                return vecType;
+            }
             else if (magicMod->magicName == "Texture")
             {
                 SLANG_ASSERT(subst && subst->getArgs().getCount() >= 1);

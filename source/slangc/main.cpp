@@ -79,15 +79,15 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobal
     if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
     {
         SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
-        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
     }
     else if (!session)
     {
         // Just create the global session in the regular way if there isn't one set
         SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()));
-        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
     }
-
+#if 0
+    TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
+#endif
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
     compileRequest->addSearchPath(Path::getParentDirectory(Path::getExecutablePath()).getBuffer());
     SlangResult res = _compile(compileRequest, argc, argv);

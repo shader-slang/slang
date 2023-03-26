@@ -1490,6 +1490,25 @@ struct IRMatrixType : IRType
     IR_LEAF_ISA(MatrixType)
 };
 
+struct IRArrayListType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+
+    IR_LEAF_ISA(ArrayListType)
+};
+
+struct IRTensorViewType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+
+    IR_LEAF_ISA(TensorViewType)
+};
+
+struct IRTorchTensorType : IRType
+{
+    IR_LEAF_ISA(TorchTensorType)
+};
+
 struct IRSPIRVLiteralType : IRType
 {
     IR_LEAF_ISA(SPIRVLiteralType)
@@ -1697,6 +1716,12 @@ struct IRAttributedType : IRType
 struct IRTupleType : IRType
 {
     IR_LEAF_ISA(TupleType)
+};
+
+/// Represents a tuple in target language. TargetTupleType will not be lowered to structs.
+struct IRTargetTupleType : IRType
+{
+    IR_LEAF_ISA(TargetTupleType)
 };
 
 /// Represents an `Result<T,E>`, used by functions that throws error codes.

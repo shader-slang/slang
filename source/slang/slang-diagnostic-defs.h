@@ -664,6 +664,8 @@ DIAGNOSTIC(54002, Error, meshOutputMustBeArray, "HLSL style mesh shader outputs 
 DIAGNOSTIC(54003, Error, meshOutputArrayMustHaveSize, "HLSL style mesh shader output arrays must have a length specified")
 DIAGNOSTIC(54004, Warning, unnecessaryHLSLMeshOutputModifier, "Unnecessary HLSL style mesh shader output modifier")
 
+DIAGNOSTIC(55101, Error, invalidTorchKernelReturnType, "'$0' is not a valid return type for a pytorch kernel function.")
+DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid parameter type for a pytorch kernel function.")
 
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.

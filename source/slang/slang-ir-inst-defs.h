@@ -67,6 +67,11 @@ INST(Nop, nop, 0, 0)
 
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 
+    INST(TensorViewType, TensorView, 1, HOISTABLE)
+    INST(TorchTensorType, TorchTensor, 0, HOISTABLE)
+    INST(TorchKernelMemoryAllocatorType, TorchMemAllocatorType, 0, HOISTABLE)
+    INST(ArrayListType, ArrayListVector, 1, HOISTABLE)
+    
     /* BindExistentialsTypeBase */
 
         // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
@@ -220,6 +225,7 @@ INST(ThisType, this_type, 0, HOISTABLE)
 INST(RTTIType, rtti_type, 0, HOISTABLE)
 INST(RTTIHandleType, rtti_handle_type, 0, HOISTABLE)
 INST(TupleType, tuple_type, 0, HOISTABLE)
+INST(TargetTupleType, TargetTuple, 0, HOISTABLE)
 
 // A type that identifies it's contained type as being emittable as `spirv_literal.
 INST(SPIRVLiteralType, spirvLiteralType, 1, HOISTABLE)
@@ -308,6 +314,7 @@ INST(MakeArray, makeArray, 0, 0)
 INST(MakeArrayFromElement, makeArrayFromElement, 1, 0)
 INST(MakeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
+INST(MakeTargetTuple, makeTuple, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
 INST(MakeResultValue, makeResultValue, 1, 0)
 INST(MakeResultError, makeResultError, 1, 0)
@@ -509,24 +516,24 @@ INST(SwizzledStore, swizzledStore, 2, 0)
     /* IRConditionalbranch */
 
         // conditionalBranch <condition> <trueBlock> <falseBlock>
-        INST(conditionalBranch, conditionalBranch, 3, 0)
+INST(conditionalBranch, conditionalBranch, 3, 0)
 
-        // ifElse <condition> <trueBlock> <falseBlock> <mergeBlock>
-        INST(ifElse, ifElse, 4, 0)
-    INST_RANGE(ConditionalBranch, conditionalBranch, ifElse)
+// ifElse <condition> <trueBlock> <falseBlock> <mergeBlock>
+INST(ifElse, ifElse, 4, 0)
+INST_RANGE(ConditionalBranch, conditionalBranch, ifElse)
 
-    INST(Throw, throw, 1, 0)
-    // tryCall <successBlock> <failBlock> <callee> <args>...
-    INST(TryCall, tryCall, 3, 0)
-    // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
-    INST(Switch, switch, 3, 0)
+INST(Throw, throw, 1, 0)
+// tryCall <successBlock> <failBlock> <callee> <args>...
+INST(TryCall, tryCall, 3, 0)
+// switch <val> <break> <default> <caseVal1> <caseBlock1> ...
+INST(Switch, switch, 3, 0)
 
-    INST(discard, discard, 0, 0)
+INST(discard, discard, 0, 0)
 
-    /* IRUnreachable */
-        INST(MissingReturn, missingReturn, 0, 0)
-        INST(Unreachable, unreachable, 0, 0)
-    INST_RANGE(Unreachable, MissingReturn, Unreachable)
+/* IRUnreachable */
+INST(MissingReturn, missingReturn, 0, 0)
+INST(Unreachable, unreachable, 0, 0)
+INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
 INST_RANGE(TerminatorInst, Return, Unreachable)
 
@@ -575,10 +582,10 @@ INST(GetStringHash, getStringHash, 1, 0)
 
 INST(WaveGetActiveMask, waveGetActiveMask, 0, 0)
 
-    /// trueMask = waveMaskBallot(mask, condition)
+/// trueMask = waveMaskBallot(mask, condition)
 INST(WaveMaskBallot, waveMaskBallot, 2, 0)
 
-    /// matchMask = waveMaskBallot(mask, value)
+/// matchMask = waveMaskBallot(mask, value)
 INST(WaveMaskMatch, waveMaskMatch, 2, 0)
 
 // Texture sampling operation of the form `t.Sample(s,u)`
@@ -603,6 +610,12 @@ INST(GetOptiXHitAttribute, getOptiXHitAttribute, 2, 0)
 // Wrapper for OptiX intrinsics used to load shader binding table record data
 // using a pointer. 
 INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
+
+INST(MakeArrayList, makeArrayList, 0, 0)
+INST(MakeTensorView, makeTensorView, 0, 0)
+INST(AllocateTorchTensor, allocTorchTensor , 0, 0)
+INST(TorchGetCudaStream, TorchGetCudaStream, 0, 0)
+INST(TorchTensorGetView, TorchTensorGetView, 0, 0)
 
 /* Decoration */
 
@@ -669,7 +682,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(CudaKernelDecoration,              CudaKernel,             0, 0)
     INST(CudaHostDecoration,                CudaHost,               0, 0)
-
+    INST(TorchEntryPointDecoration,         TorchEntryPoint,        0, 0)
+    
         /// Used to mark parameters that are moved from entry point parameters to global params as coming from the entry point.
     INST(EntryPointParamDecoration,         entryPointParam,        0, 0)
 
@@ -908,6 +922,7 @@ INST(BackwardDifferentiate, BackwardDifferentiate, 1, 0)
 INST(PrimalSubstitute, PrimalSubstitute, 1, 0)
 
 INST(DispatchKernel, DispatchKernel, 3, 0)
+INST(CudaKernelLaunch, CudaKernelLaunch, 6, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)

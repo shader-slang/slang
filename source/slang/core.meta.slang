@@ -3081,6 +3081,9 @@ __attributeTarget(FuncDecl)
 attribute_syntax [DllExport] : DllExportAttribute;
 
 __attributeTarget(FuncDecl)
+attribute_syntax [TorchEntryPoint] : TorchEntryPointAttribute;
+
+__attributeTarget(FuncDecl)
 attribute_syntax [CudaDeviceExport] : CudaDeviceExportAttribute;
 
 __attributeTarget(FuncDecl)

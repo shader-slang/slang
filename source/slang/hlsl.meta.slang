@@ -6834,3 +6834,13 @@ void debugBreak();
 __specialized_for_target(glsl)
 [[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
 void debugBreak();
+
+
+__target_intrinsic(cuda, "(threadIdx)")
+uint3 cudaThreadIdx();
+
+__target_intrinsic(cuda, "(blockIdx)")
+uint3 cudaBlockIdx();
+
+__target_intrinsic(cuda, "(blockDim)")
+uint3 cudaBlockDim();

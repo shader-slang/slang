@@ -75,6 +75,7 @@ namespace Slang
         DXILAssembly        = SLANG_DXIL_ASM,
         CSource             = SLANG_C_SOURCE,
         CPPSource           = SLANG_CPP_SOURCE,
+        PyTorchCppBinding   = SLANG_CPP_PYTORCH_BINDING,
         HostCPPSource       = SLANG_HOST_CPP_SOURCE,
         HostExecutable      = SLANG_HOST_EXECUTABLE,
         ShaderSharedLibrary = SLANG_SHADER_SHARED_LIBRARY,
