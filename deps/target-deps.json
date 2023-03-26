@@ -4,7 +4,7 @@
         "dependencies" : [
             {
                 "name" : "slang-llvm",
-                "baseUrl" : "https://github.com/shader-slang/slang-llvm/releases/download/v13.x-34/",
+                "baseUrl" : "https://github.com/shader-slang/slang-llvm/releases/download/v13.x-35/",
                 "optional" : true,
                 "packages" : 
                 {
