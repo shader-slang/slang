@@ -6,8 +6,6 @@
 #define SLANG_CUDA_RTC 0
 #endif
 
-#include <stdio.h>
-
 // Define SLANG_CUDA_ENABLE_HALF to use the cuda_fp16 include to add half support. 
 // For this to work NVRTC needs to have the path to the CUDA SDK.
 //
