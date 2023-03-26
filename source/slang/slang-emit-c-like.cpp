@@ -129,6 +129,7 @@ Index LocationTracker::getValue(Kind kind, IRInst* inst, IRDecoration* decoratio
         }
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::HostCPPSource:
+        case CodeGenTarget::PyTorchCppBinding:
         {
             return SourceLanguage::CPP;
         }

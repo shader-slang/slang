@@ -1350,7 +1350,8 @@ if enableEmbedStdLib then
             "prelude/slang-cuda-prelude.h.cpp",
             "prelude/slang-hlsl-prelude.h.cpp",
             "prelude/slang-cpp-prelude.h.cpp",
-            "prelude/slang-cpp-host-prelude.h.cpp"
+            "prelude/slang-cpp-host-prelude.h.cpp",
+            "prelude/slang-torch-prelude.h.cpp"
         }
 end
 
@@ -1460,7 +1461,8 @@ standardProject("slang", "source/slang")
         "prelude/slang-cuda-prelude.h.cpp",
         "prelude/slang-hlsl-prelude.h.cpp",
         "prelude/slang-cpp-prelude.h.cpp",
-        "prelude/slang-cpp-host-prelude.h.cpp"
+        "prelude/slang-cpp-host-prelude.h.cpp",
+        "prelude/slang-torch-prelude.h.cpp"
     }
 
     -- Similarly for any generated lookup tables
@@ -1553,7 +1555,8 @@ if enableProfile then
             "prelude/slang-cuda-prelude.h.cpp",
             "prelude/slang-hlsl-prelude.h.cpp",
             "prelude/slang-cpp-prelude.h.cpp",
-            "prelude/slang-cpp-host-prelude.h.cpp"
+            "prelude/slang-cpp-host-prelude.h.cpp",
+            "prelude/slang-torch-prelude.h.cpp"
         }
 
         -- Add the slang source

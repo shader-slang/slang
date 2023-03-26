@@ -1150,50 +1150,66 @@ static void addLinkageDecoration(
     {
         builder->addExportDecoration(inst, mangledName);
     }
-    if (decl->findModifier<PublicModifier>())
+    for (auto modifier : decl->modifiers)
     {
-        builder->addPublicDecoration(inst);
-        builder->addKeepAliveDecoration(inst);
-    }
-    if (decl->findModifier<HLSLExportModifier>())
-    {
-        builder->addHLSLExportDecoration(inst);
-        builder->addKeepAliveDecoration(inst);
-    }
-    if (decl->findModifier<ExternCppModifier>())
-    {
-        builder->addExternCppDecoration(inst, mangledName);
+        if (as<PublicModifier>(modifier))
+        {
+            builder->addPublicDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
+        }
+        else if (as<HLSLExportModifier>(modifier))
+        {
+            builder->addHLSLExportDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
+        }
+        else if (as<ExternCppModifier>(modifier))
+        {
+            builder->addExternCppDecoration(inst, mangledName);
+        }
+        else if (auto dllImportModifier = as<DllImportAttribute>(modifier))
+        {
+            auto libraryName = dllImportModifier->modulePath;
+            auto functionName = dllImportModifier->functionName.getLength()
+                ? dllImportModifier->functionName.getUnownedSlice()
+                : decl->getName()->text.getUnownedSlice();
+            builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), functionName);
+        }
+        else if (as<DllExportAttribute>(modifier))
+        {
+            builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addPublicDecoration(inst);
+        }
+        else if (as<CudaDeviceExportAttribute>(modifier))
+        {
+            builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addPublicDecoration(inst);
+            builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+        }
+        else if (as<CudaHostAttribute>(modifier))
+        {
+            builder->addCudaHostDecoration(inst);
+            builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+        }
+        else if (as<CudaKernelAttribute>(modifier))
+        {
+            builder->addCudaKernelDecoration(inst);
+            builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addPublicDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
+        }
+        else if (as<TorchEntryPointAttribute>(modifier))
+        {
+            builder->addTorchEntryPointDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addCudaHostDecoration(inst);
+            builder->addPublicDecoration(inst);
+            builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+        }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
-        decl->parentDecl->hasModifier<ComInterfaceAttribute>())
+        decl->parentDecl->hasModifier<ComInterfaceAttribute>() &&
+        !inst->findDecoration<IRExternCppDecoration>())
     {
         builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
-    }
-    if (auto dllImportModifier = decl->findModifier<DllImportAttribute>())
-    {
-        auto libraryName = dllImportModifier->modulePath;
-        auto functionName = dllImportModifier->functionName.getLength()
-            ? dllImportModifier->functionName.getUnownedSlice()
-            : decl->getName()->text.getUnownedSlice();
-        builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), functionName);
-    }
-    if (decl->findModifier<DllExportAttribute>())
-    {
-        builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-        builder->addPublicDecoration(inst);
-    }
-    if (decl->findModifier<CudaDeviceExportAttribute>())
-    {
-        builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-        builder->addPublicDecoration(inst);
-    }
-    if (decl->findModifier<CudaHostAttribute>())
-    {
-        builder->addCudaHostDecoration(inst);
-    }
-    if (decl->findModifier<CudaKernelAttribute>())
-    {
-        builder->addCudaKernelDecoration(inst);
     }
 }
 

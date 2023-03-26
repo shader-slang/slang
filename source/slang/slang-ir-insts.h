@@ -518,6 +518,18 @@ struct IRDllExportDecoration : IRDecoration
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
+struct IRTorchEntryPointDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_TorchEntryPointDecoration
+    };
+    IR_LEAF_ISA(TorchEntryPointDecoration)
+
+    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
+};
+
 struct IRFormatDecoration : IRDecoration
 {
     enum { kOp = kIROp_FormatDecoration };
@@ -934,6 +946,15 @@ struct IRDispatchKernel : IRInst
     IRInst* getArg(UInt i) { return getOperand(3 + i); }
 
     IR_LEAF_ISA(DispatchKernel)
+};
+
+struct IRTorchTensorGetView : IRInst
+{
+    enum
+    {
+        kOp = kIROp_TorchTensorGetView
+    };
+    IR_LEAF_ISA(TorchTensorGetView)
 };
 
 // Dictionary item mapping a type with a corresponding 
@@ -2720,6 +2741,8 @@ public:
     IRAnyValueType* getAnyValueType(IRInst* size);
     IRDynamicType* getDynamicType();
 
+    IRTargetTupleType* getTargetTupleType(UInt count, IRType* const* types);
+
     IRTupleType* getTupleType(UInt count, IRType* const* types);
     IRTupleType* getTupleType(List<IRType*> const& types)
     {
@@ -2774,6 +2797,10 @@ public:
         IRType* elementType,
         IRInst* rowCount,
         IRInst* columnCount);
+
+    IRArrayListType* getArrayListType(IRType* elementType);
+    IRTensorViewType* getTensorViewType(IRType* elementType);
+    IRTorchTensorType* getTorchTensorType();
 
     IRDifferentialPairType* getDifferentialPairType(
         IRType* valueType,
@@ -2896,7 +2923,10 @@ public:
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
+
     IRInst* emitDispatchKernelInst(IRType* type, IRInst* baseFn, IRInst* threadGroupSize, IRInst* dispatchSize, Int argCount, IRInst* const* inArgs);
+    IRInst* emitCudaKernelLaunch(IRInst* baseFn, IRInst* gridDim, IRInst* blockDim, IRInst* argsArray, IRInst* cudaStream);
+    IRInst* emitGetTorchCudaStream();
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
@@ -2999,6 +3029,8 @@ public:
     // Creates an RTTI object. Result is of `IRRTTIType`.
     IRInst* emitMakeRTTIObject(IRInst* typeInst);
 
+    IRInst* emitMakeTargetTuple(IRType* type, UInt count, IRInst* const* args);
+
     IRInst* emitMakeTuple(IRType* type, UInt count, IRInst* const* args);
     IRInst* emitMakeTuple(UInt count, IRInst* const* args);
 
@@ -3067,6 +3099,11 @@ public:
         UInt            argCount,
         IRInst* const* args);
 
+    IRInst* emitMakeArrayList(
+        IRType* type,
+        UInt            argCount,
+        IRInst* const* args);
+
     IRInst* emitMakeArrayFromElement(
         IRType* type,
         IRInst* element);
@@ -3082,6 +3119,8 @@ public:
     {
         return emitMakeStruct(type, args.getCount(), args.getBuffer());
     }
+
+    IRInst* emitMakeTensorView(IRType* type, IRInst* allocator, IRInst* val);
 
     IRInst* emitMakeExistential(
         IRType* type,
@@ -3783,6 +3822,11 @@ public:
     void addDllExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
     {
         addDecoration(value, kIROp_DllExportDecoration, getStringValue(functionName));
+    }
+
+    void addTorchEntryPointDecoration(IRInst* value, UnownedStringSlice const& functionName)
+    {
+        addDecoration(value, kIROp_TorchEntryPointDecoration, getStringValue(functionName));
     }
 
     void addCudaDeviceExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
