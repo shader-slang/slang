@@ -2166,9 +2166,9 @@ namespace Slang
 
         dispatchExpr->baseFunction = parser->ParseArgExpr();
         parser->ReadToken(TokenType::Comma);
-        dispatchExpr->threadGroupSize = parser->ParseArgExpr();
-        parser->ReadToken(TokenType::Comma);
         dispatchExpr->dispatchSize = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        dispatchExpr->threadGroupSize = parser->ParseArgExpr();
         parser->ReadToken(TokenType::RParent);
 
         return dispatchExpr;

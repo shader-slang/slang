@@ -2594,6 +2594,11 @@ namespace Slang
 
     IRDynamicType* IRBuilder::getDynamicType() { return (IRDynamicType*)getType(kIROp_DynamicType); }
 
+    IRTargetTupleType* IRBuilder::getTargetTupleType(UInt count, IRType* const* types)
+    {
+        return (IRTargetTupleType*)getType(kIROp_TargetTupleType, count, (IRInst* const*)types);
+    }
+
     IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes)
     {
         return (IRAssociatedType*)getType(kIROp_AssociatedType,
@@ -2786,6 +2791,27 @@ namespace Slang
             kIROp_MatrixType,
             sizeof(operands) / sizeof(operands[0]),
             operands);
+    }
+
+    IRArrayListType* IRBuilder::getArrayListType(IRType* elementType)
+    {
+        return (IRArrayListType*)getType(
+            kIROp_ArrayListType,
+            1,
+            (IRInst**)&elementType);
+    }
+
+    IRTensorViewType* IRBuilder::getTensorViewType(IRType* elementType)
+    {
+        return (IRTensorViewType*)getType(
+            kIROp_TensorViewType,
+            1,
+            (IRInst**)&elementType);
+    }
+
+    IRTorchTensorType* IRBuilder::getTorchTensorType()
+    {
+        return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 0, nullptr);
     }
 
     IRDifferentialPairType* IRBuilder::getDifferentialPairType(
@@ -3171,6 +3197,21 @@ namespace Slang
             args.getBuffer());
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::emitCudaKernelLaunch(IRInst* baseFn, IRInst* gridDim, IRInst* blockDim, IRInst* argsArray, IRInst* cudaStream)
+    {
+        IRInst* args[5] = {baseFn, gridDim, blockDim, argsArray, cudaStream};
+        return emitIntrinsicInst(
+            getVoidType(),
+            kIROp_CudaKernelLaunch,
+            5,
+            args);
+    }
+
+    IRInst* IRBuilder::emitGetTorchCudaStream()
+    {
+        return emitIntrinsicInst(getPtrType(getVoidType()), kIROp_TorchGetCudaStream, 0, nullptr);
     }
 
     IRInst* IRBuilder::emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn)
@@ -3659,6 +3700,11 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeTuple, count, args);
     }
 
+    IRInst* IRBuilder::emitMakeTargetTuple(IRType* type, UInt count, IRInst* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeTargetTuple, count, args);
+    }
+
     IRInst* IRBuilder::emitMakeTuple(UInt count, IRInst* const* args)
     {
         List<IRType*> types;
@@ -3851,6 +3897,11 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeArray, argCount, args);
     }
 
+    IRInst* IRBuilder::emitMakeArrayList(IRType* type, UInt argCount, IRInst* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeArrayList, argCount, args);
+    }
+
     IRInst* IRBuilder::emitMakeArrayFromElement(
         IRType* type,
         IRInst* element)
@@ -3864,6 +3915,12 @@ namespace Slang
         IRInst* const* args)
     {
         return emitIntrinsicInst(type, kIROp_MakeStruct, argCount, args);
+    }
+
+    IRInst* IRBuilder::emitMakeTensorView(IRType* type, IRInst* allocator, IRInst* val)
+    {
+        IRInst* args[2] = { allocator, val };
+        return emitIntrinsicInst(type, kIROp_MakeTensorView, 2, args);
     }
 
     IRInst* IRBuilder::emitMakeExistential(

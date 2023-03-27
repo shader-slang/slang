@@ -320,8 +320,7 @@ workspace "slang"
     -- and configuration options, e.g. `bin/windows-x64/debug/`
     targetdir("bin/" .. targetName .. "/%{cfg.buildcfg:lower()}")
 
-    -- C++11
-    cppdialect "C++11"
+    cppdialect "C++17"
     -- Statically link to the C/C++ runtime rather than create a DLL dependency.
     staticruntime "On"
     -- Turn off edit and continue for all projects. This is needed to avoid
@@ -1350,7 +1349,8 @@ if enableEmbedStdLib then
             "prelude/slang-cuda-prelude.h.cpp",
             "prelude/slang-hlsl-prelude.h.cpp",
             "prelude/slang-cpp-prelude.h.cpp",
-            "prelude/slang-cpp-host-prelude.h.cpp"
+            "prelude/slang-cpp-host-prelude.h.cpp",
+            "prelude/slang-torch-prelude.h.cpp"
         }
 end
 
@@ -1460,7 +1460,8 @@ standardProject("slang", "source/slang")
         "prelude/slang-cuda-prelude.h.cpp",
         "prelude/slang-hlsl-prelude.h.cpp",
         "prelude/slang-cpp-prelude.h.cpp",
-        "prelude/slang-cpp-host-prelude.h.cpp"
+        "prelude/slang-cpp-host-prelude.h.cpp",
+        "prelude/slang-torch-prelude.h.cpp"
     }
 
     -- Similarly for any generated lookup tables
@@ -1553,7 +1554,8 @@ if enableProfile then
             "prelude/slang-cuda-prelude.h.cpp",
             "prelude/slang-hlsl-prelude.h.cpp",
             "prelude/slang-cpp-prelude.h.cpp",
-            "prelude/slang-cpp-host-prelude.h.cpp"
+            "prelude/slang-cpp-host-prelude.h.cpp",
+            "prelude/slang-torch-prelude.h.cpp"
         }
 
         -- Add the slang source

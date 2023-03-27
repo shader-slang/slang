@@ -2022,6 +2022,40 @@ namespace Slang
         return rs;
     }
 
+    Expr* SemanticsExprVisitor::visitSelectExpr(SelectExpr* expr)
+    {
+        auto result = visitInvokeExpr(expr);
+        if (as<ErrorType>(result->type.type))
+            return result;
+        auto invokeExpr = as<InvokeExpr>(result);
+        if (!result)
+            return result;
+        if (invokeExpr->arguments.getCount() != 3)
+            return result;
+
+        if (as<BasicExpressionType>(invokeExpr->arguments[0]->type.type))
+        {
+            auto newArgs = invokeExpr->arguments;
+            expr->arguments.clear();
+            expr->arguments = newArgs;
+            expr->type = invokeExpr->type;
+            return expr;
+        }
+
+        if (getParentDifferentiableAttribute())
+        {
+            // If we are in a differentiable func, issue
+            // a diagnostic on use of non short-circuiting select.
+            getSink()->diagnose(expr->loc, Diagnostics::useOfNonShortCircuitingOperatorInDiffFunc);
+        }
+        else
+        {
+            // For all other functions, we issue a warning for deprecation of vector-typed ?: operator.
+            getSink()->diagnose(expr->loc, Diagnostics::useOfNonShortCircuitingOperator);
+        }
+        return result;
+    }
+
     Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr *expr)
     {
         // check the base expression first

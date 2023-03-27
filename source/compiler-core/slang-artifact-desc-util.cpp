@@ -273,6 +273,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         case SLANG_C_SOURCE:                return Desc::make(Kind::Source, Payload::C, Style::Kernel, 0);
         case SLANG_CPP_SOURCE:              return Desc::make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
         case SLANG_HOST_CPP_SOURCE:         return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
+        case SLANG_CPP_PYTORCH_BINDING:     return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
         case SLANG_HOST_EXECUTABLE:         return Desc::make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
         case SLANG_SHADER_SHARED_LIBRARY:   return Desc::make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_SHADER_HOST_CALLABLE:    return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
