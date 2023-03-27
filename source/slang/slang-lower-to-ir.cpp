@@ -8088,7 +8088,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return type->getOp() == kIROp_ClassType;
     }
 
-    LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl)
+    LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl, bool emitBody = true)
     {
 
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
@@ -8156,7 +8156,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // (although we might have to give in eventually), so
             // this case should really only occur for builtin declarations.
         }
-        else
+        else if (emitBody)
         {
             // This is a function definition, so we need to actually
             // construct IR for the body...
@@ -8610,7 +8610,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     auto originalFuncDecl = as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
                     SLANG_RELEASE_ASSERT(originalFuncDecl);
 
-                    auto originalFuncVal = lowerFuncDeclInContext(originalSubContext, originalSubBuilder, originalFuncDecl).val;
+                    auto originalFuncVal = lowerFuncDeclInContext(originalSubContext, originalSubBuilder, originalFuncDecl, false).val;
                     if (auto originalFuncGeneric = as<IRGeneric>(originalFuncVal))
                     {
                         originalFuncVal = findGenericReturnVal(originalFuncGeneric);
