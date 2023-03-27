@@ -145,7 +145,8 @@ DifferentialPair<float> infinitesimal(DifferentialPair<float> x)
 [BackwardDifferentiable]
 float harmonicWeight(Intersection isect, no_diff Intersection aux_isect)
 {
-    return 1.0 / (pow(isect.x - aux_isect.x, 2) + no_diff(boundaryTerm(aux_isect)));
+    float x_dist = isect.x - aux_isect.x;
+    return 1.0 / ((x_dist * x_dist) + no_diff(boundaryTerm(aux_isect)));
 }
 
 [BackwardDifferentiable]
@@ -224,4 +225,5 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
     
     float d_color = 1.0;
     __bwd_diff(renderSample)(prng, d_color);
+    endpointDifferentialBuffer[2] = 1.0;//colorBuffer[0];
 }
