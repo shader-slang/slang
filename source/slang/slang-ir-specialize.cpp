@@ -2439,6 +2439,13 @@ IRInst* specializeGenericImpl(
                 // value.
                 cloneInstDecorationsAndChildren(
                     &env, module, specializeInst, specializedVal);
+
+                // If specializedVal is a function, optimize it.
+                if (auto func = as<IRFunc>(specializedVal))
+                {
+                    simplifyFunc(func);
+                }
+
                 return specializedVal;
             }
 
