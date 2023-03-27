@@ -153,6 +153,8 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     // Create the view we are going to use from the obfusctated "file".
     SourceView* obfuscatedView = sourceManager->createSourceView(obfuscatedFile, nullptr, SourceLoc());
 
+    const auto obfuscatedRange = obfuscatedView->getRange();
+
     // Okay now we want to produce a map from these locs to a new source location
     {
         // Create a "bag" and put all of the indices in it.
@@ -160,13 +162,11 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
         bag.setCount(uniqueLocCount);
 
-        const SourceLoc baseLoc = obfuscatedView->getRange().begin;
-
         {
             SourceLoc* dst = bag.getBuffer();
             for (Index i = 0; i < uniqueLocCount; ++i)
             {
-                dst[i] = baseLoc + i;
+                dst[i] = obfuscatedRange.begin + i;
             }
         }
 
@@ -227,7 +227,6 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
         {
             const auto& pair = locPairs[i];
 
-
             // First find the view
             if (curView == nullptr || 
                 !curView->getRange().contains(pair.originalLoc))
@@ -282,9 +281,11 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
             entry.sourceFileIndex = sourceFileIndex;
   
-            // i is the generated column
-            entry.generatedColumn = i;
+            // Calculate the column offset, from the pair obfuscated loc
+            entry.generatedColumn = Index(obfuscatedRange.getOffset(pair.obfuscatedLoc));
 
+            // We need to subtract 1, because handleLoc locations are 1 indexed, but SourceMap
+            // entry is 0 indexed.
             entry.sourceColumn = handleLoc.column - 1;
             entry.sourceLine = handleLoc.line - 1;
 
