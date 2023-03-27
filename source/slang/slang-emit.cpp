@@ -82,6 +82,8 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
 
+#include "../compiler-core/slang-json-source-map-util.h"
+
 #include <assert.h>
 
 Slang::String get_slang_cpp_host_prelude();
@@ -1148,7 +1150,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         RefPtr<JSONContainer> jsonContainer(new JSONContainer(&sourceMapSourceManager));
 
         JSONValue jsonValue;
-        SLANG_RETURN_ON_FAIL(sourceMap->encode(jsonContainer, &sourceMapSink, jsonValue));
+        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, &sourceMapSink, jsonValue));
 
         // Okay now convert this into a text file and then a blob
 
