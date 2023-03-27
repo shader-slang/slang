@@ -574,7 +574,7 @@ extern "C"
         SLANG_DXIL_ASM,
         SLANG_C_SOURCE,                 ///< The C language
         SLANG_CPP_SOURCE,               ///< C++ code for shader kernels.
-        SLANG_HOST_EXECUTABLE,          ///<  Standalone binary executable (for hosting CPU/OS)
+        SLANG_HOST_EXECUTABLE,          ///< Standalone binary executable (for hosting CPU/OS)
         SLANG_SHADER_SHARED_LIBRARY,    ///< A shared library/Dll for shader kernels (for hosting CPU/OS)
         SLANG_SHADER_HOST_CALLABLE,     ///< A CPU target that makes the compiled shader code available to be run immediately
         SLANG_CUDA_SOURCE,              ///< Cuda source
