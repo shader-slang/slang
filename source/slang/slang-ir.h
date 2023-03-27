@@ -2302,9 +2302,7 @@ R* composeGetters(T* t, F f, Fs... fs)
     using D = decltype(detail::thisArg(std::declval<F>));
     if(D* d = as<D>(t))
     {
-        // TODO: When we're on c++17, use std::invoke
-        // auto* n = std::invoke(f, d);
-        auto* n = (d->*f)();
+        auto* n = std::invoke(f, d);
         return composeGetters<R>(n, fs...);
     }
     return nullptr;
