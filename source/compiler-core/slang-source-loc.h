@@ -6,6 +6,8 @@
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-string-slice-pool.h"
 
+#include "slang-source-map.h"
+
 #include "../../slang-com-ptr.h"
 #include "../../slang.h"
 
@@ -245,6 +247,12 @@ public:
         /// Get the source manager this was created on
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
+        /// If set this "file" only exists as a way to obfuscate locations
+        /// The mapping between the two is specified in the specified source map
+    SourceMap* getObfuscatedSourceMap() const { return m_obfuscatedSourceMap; }
+        /// Set the obfuscated source map
+    void setObfuscatedSourceMap(SourceMap* sourceMap) { m_obfuscatedSourceMap = sourceMap; }
+
         /// Ctor
     SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize);
         /// Dtor
@@ -263,6 +271,10 @@ public:
     // we will cache the starting offset of each line break in
     // the input file:
     List<uint32_t> m_lineBreakOffsets;
+
+    // If set then this file isn't a regular source file, but provides obfuscation. 
+    // The mapping of that obfuscation can be found via the obfuscated source map
+    RefPtr<SourceMap> m_obfuscatedSourceMap;
 };
 
 enum class SourceLocType

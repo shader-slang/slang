@@ -191,6 +191,29 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 
 HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
 {
+    auto obfuscatedSourceMap = getSourceFile()->getObfuscatedSourceMap();
+    if (obfuscatedSourceMap)
+    {
+        const Index col = getRange().getOffset(loc);
+
+        const Index entryIndex = obfuscatedSourceMap->findEntry(0, col);
+        if (entryIndex >= 0)
+        {
+            const auto& entry = obfuscatedSourceMap->getEntryByIndex(entryIndex);
+
+            // Generate the HandleSourceLoc
+
+            HandleSourceLoc handleLoc;
+            handleLoc.line = entry.sourceLine + 1;
+            handleLoc.column = entry.sourceColumn + 1;
+
+            auto& managerPool = getSourceManager()->getStringSlicePool();
+
+            handleLoc.pathHandle = managerPool.add(obfuscatedSourceMap->getSourceFileName(entry.sourceFileIndex));
+            return handleLoc;
+        }
+    }
+
     const int offset = m_range.getOffset(loc);
 
     // We need the line index from the original source file
