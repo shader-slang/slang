@@ -275,6 +275,13 @@ BasicExpressionType* BasicExpressionType::_getScalarTypeOverride()
     return this;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TensorViewType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Type* TensorViewType::getElementType()
+{
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VectorExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void VectorExpressionType::_toTextOverride(StringBuilder& out)

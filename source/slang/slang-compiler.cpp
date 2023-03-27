@@ -472,6 +472,7 @@ namespace Slang
             case CodeGenTarget::CUDASource:
             case CodeGenTarget::CPPSource:
             case CodeGenTarget::HostCPPSource:
+            case CodeGenTarget::PyTorchCppBinding:
             case CodeGenTarget::CSource:
             {
                 return PassThroughMode::None;
@@ -1572,6 +1573,7 @@ namespace Slang
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::HostCPPSource:
+        case CodeGenTarget::PyTorchCppBinding:
         case CodeGenTarget::CSource:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);

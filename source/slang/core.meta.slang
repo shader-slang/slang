@@ -315,12 +315,17 @@ U operator,(T left, U right)
     return right;
 }
 
-// The ternary `?:` operator does not short-circuit in HLSL, and Slang continues to
-// follow that definition, so that this operator is effectively just an ordinary
-// function, rather than a special-case piece of syntax.
-//
+// The ternary `?:` operator does not short-circuit in HLSL, and Slang no longer
+// follow that definition for the scalar condition overload, so this declaration just serves
+// for type-checking purpose only.
+
 __generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+
+// Users are advised to use `select` instead if non-short-circuiting behavior is intended.
+__generic<T> __intrinsic_op(select) T select(bool condition, T ifTrue, T ifFalse);
+__generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+
 
 ${{{{
 // We are going to use code generation to produce the
@@ -3074,6 +3079,9 @@ attribute_syntax [DllImport(modulePath: String)] : DllImportAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [DllExport] : DllExportAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [TorchEntryPoint] : TorchEntryPointAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [CudaDeviceExport] : CudaDeviceExportAttribute;

@@ -66,6 +66,16 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     return res;
 }
 
+bool shouldEmbedPrelude(const char* const* argv, int argc)
+{
+    for (int i = 0; i < argc; i++)
+    {
+        if (UnownedStringSlice(argv[i]) == "-embed-prelude")
+            return true;
+    }
+    return false;
+}
+
 SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char*const* argv)
 {
     StdWriters::setSingleton(stdWriters);
@@ -79,14 +89,15 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobal
     if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
     {
         SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
-        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
     }
     else if (!session)
     {
         // Just create the global session in the regular way if there isn't one set
         SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()));
-        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
     }
+
+    if (!shouldEmbedPrelude(argv, argc))
+        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
     compileRequest->addSearchPath(Path::getParentDirectory(Path::getExecutablePath()).getBuffer());

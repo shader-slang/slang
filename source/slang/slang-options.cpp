@@ -2193,6 +2193,7 @@ struct OptionsParser
         if (rawOutputs.getCount() == 0 &&
             rawTargets.getCount() == 1 &&
             (rawTargets[0].format == CodeGenTarget::HostCPPSource ||
+            rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
             rawTargets[0].format == CodeGenTarget::CUDASource ||
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable))
         {
@@ -2258,7 +2259,7 @@ struct OptionsParser
                     case CodeGenTarget::ShaderHostCallable:
                     case CodeGenTarget::HostExecutable:
                     case CodeGenTarget::ShaderSharedLibrary:
-
+                    case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
 
                         rawOutput.isWholeProgram = true;

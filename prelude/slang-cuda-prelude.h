@@ -2080,4 +2080,73 @@ __forceinline__ __device__ void *traceOptiXRay(
         r0, r1
     );
 }
+
 #endif
+
+
+// TensorView
+struct TensorView
+{
+    uint8_t* data;
+    uint32_t* strides;
+    uint32_t* sizes;
+    uint32_t dimensionCount;
+
+    template<typename T>
+    __device__ T* data_ptr()
+    {
+        return reinterpret_cast<T*>(data);
+    }
+
+    template<typename T>
+    __device__ T load(uint32_t x)
+    {
+        return *reinterpret_cast<T*>(data + strides[0] * x);
+    }
+    template<typename T>
+    __device__ T load(uint32_t x, uint32_t y)
+    {
+        return *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y);
+    }
+    template<typename T>
+    __device__ T load(uint32_t x, uint32_t y, uint32_t z)
+    {
+        return *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y + strides[2] * z);
+    }
+    template<typename T>
+    __device__ T load(uint32_t x, uint32_t y, uint32_t z, uint32_t w)
+    {
+        return *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y + strides[2] * z + strides[3] * w);
+    }
+    template<typename T>
+    __device__ T load(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4)
+    {
+        return *reinterpret_cast<T*>(data + strides[0] * i0 + strides[1] * i1 + strides[2] * i2 + strides[3] * i3 + strides[4] * i4);
+    }
+    template<typename T>
+    __device__ void store(uint32_t x, T val)
+    {
+        *reinterpret_cast<T*>(data + strides[0] * x) = val;
+    }
+    template<typename T>
+    __device__ void store(uint32_t x, uint32_t y, T val)
+    {
+        *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y) = val;
+    }
+    template<typename T>
+    __device__ void store(uint32_t x, uint32_t y, uint32_t z, T val)
+    {
+        *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y + strides[2] * z) = val;
+    }
+    template<typename T>
+    __device__ void store(uint32_t x, uint32_t y, uint32_t z, uint32_t w, T val)
+    {
+        *reinterpret_cast<T*>(
+            data + strides[0] * x + strides[1] * y + strides[2] * z + strides[3] * w) = val;
+    }
+    template<typename T>
+    __device__ void store(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4, T val)
+    {
+        *reinterpret_cast<T*>(data + strides[0] * i0 + strides[1] * i1 + strides[2] * i2 + strides[3] * i3 + strides[4] * i4) = val;
+    }
+};
