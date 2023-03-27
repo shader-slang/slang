@@ -304,6 +304,18 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << ">";
             return SLANG_OK;
         }
+        case kIROp_TargetTupleType:
+        {
+            out << "std::tuple<";
+            for (UInt i = 0; i < type->getOperandCount(); i++)
+            {
+                if (i > 0) out << ", ";
+                auto elementType = (IRType*)type->getOperand(i);
+                SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
+            }
+            out << ">";
+            return SLANG_OK;
+        }
         default:
         {
             if (isNominalOp(type->getOp()))
@@ -1185,6 +1197,19 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             }
             m_writer->emit(")");
 
+            return true;
+        }
+        case kIROp_MakeTargetTuple:
+        {
+            m_writer->emit("std::make_tuple(");
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (i > 0)
+                    m_writer->emit(", ");
+                auto arg = inst->getOperand(i);
+                emitOperand(arg, getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
             return true;
         }
         case kIROp_CastFloatToInt:

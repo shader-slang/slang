@@ -1150,50 +1150,66 @@ static void addLinkageDecoration(
     {
         builder->addExportDecoration(inst, mangledName);
     }
-    if (decl->findModifier<PublicModifier>())
+    for (auto modifier : decl->modifiers)
     {
-        builder->addPublicDecoration(inst);
-        builder->addKeepAliveDecoration(inst);
-    }
-    if (decl->findModifier<HLSLExportModifier>())
-    {
-        builder->addHLSLExportDecoration(inst);
-        builder->addKeepAliveDecoration(inst);
-    }
-    if (decl->findModifier<ExternCppModifier>())
-    {
-        builder->addExternCppDecoration(inst, mangledName);
+        if (as<PublicModifier>(modifier))
+        {
+            builder->addPublicDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
+        }
+        else if (as<HLSLExportModifier>(modifier))
+        {
+            builder->addHLSLExportDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
+        }
+        else if (as<ExternCppModifier>(modifier))
+        {
+            builder->addExternCppDecoration(inst, mangledName);
+        }
+        else if (auto dllImportModifier = as<DllImportAttribute>(modifier))
+        {
+            auto libraryName = dllImportModifier->modulePath;
+            auto functionName = dllImportModifier->functionName.getLength()
+                ? dllImportModifier->functionName.getUnownedSlice()
+                : decl->getName()->text.getUnownedSlice();
+            builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), functionName);
+        }
+        else if (as<DllExportAttribute>(modifier))
+        {
+            builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addPublicDecoration(inst);
+        }
+        else if (as<CudaDeviceExportAttribute>(modifier))
+        {
+            builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addPublicDecoration(inst);
+            builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+        }
+        else if (as<CudaHostAttribute>(modifier))
+        {
+            builder->addCudaHostDecoration(inst);
+            builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+        }
+        else if (as<CudaKernelAttribute>(modifier))
+        {
+            builder->addCudaKernelDecoration(inst);
+            builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addPublicDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
+        }
+        else if (as<TorchEntryPointAttribute>(modifier))
+        {
+            builder->addTorchEntryPointDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addCudaHostDecoration(inst);
+            builder->addPublicDecoration(inst);
+            builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+        }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
-        decl->parentDecl->hasModifier<ComInterfaceAttribute>())
+        decl->parentDecl->hasModifier<ComInterfaceAttribute>() &&
+        !inst->findDecoration<IRExternCppDecoration>())
     {
         builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
-    }
-    if (auto dllImportModifier = decl->findModifier<DllImportAttribute>())
-    {
-        auto libraryName = dllImportModifier->modulePath;
-        auto functionName = dllImportModifier->functionName.getLength()
-            ? dllImportModifier->functionName.getUnownedSlice()
-            : decl->getName()->text.getUnownedSlice();
-        builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), functionName);
-    }
-    if (decl->findModifier<DllExportAttribute>())
-    {
-        builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-        builder->addPublicDecoration(inst);
-    }
-    if (decl->findModifier<CudaDeviceExportAttribute>())
-    {
-        builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-        builder->addPublicDecoration(inst);
-    }
-    if (decl->findModifier<CudaHostAttribute>())
-    {
-        builder->addCudaHostDecoration(inst);
-    }
-    if (decl->findModifier<CudaKernelAttribute>())
-    {
-        builder->addCudaKernelDecoration(inst);
     }
 }
 
@@ -4001,6 +4017,43 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             break;
         }
         return e;
+    }
+
+    LoweredValInfo visitSelectExpr(SelectExpr* expr)
+    {
+        // A vector typed `select` expr will turn into a normal `select` op.
+        if (!as<BasicExpressionType>(expr->arguments[0]->type.type))
+        {
+            return visitInvokeExpr(expr);
+        }
+
+        // In global scope? This is a constant, and we should emit as `select` inst.
+        if (!getParentFunc(context->irBuilder->getInsertLoc().getInst()))
+        {
+            return visitInvokeExpr(expr);
+        }
+
+        // A scalar typed `select` expr will turn into an if-else to implement short circuiting
+        // semantics.
+        auto builder = context->irBuilder;
+        auto thenBlock = builder->createBlock();
+        auto elseBlock = builder->createBlock();
+        auto afterBlock = builder->createBlock();
+        auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
+        builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+        builder->insertBlock(thenBlock);
+        builder->setInsertInto(thenBlock);
+        auto trueVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
+        builder->emitBranch(afterBlock, 1, &trueVal);
+        builder->insertBlock(elseBlock);
+        builder->setInsertInto(elseBlock);
+        auto falseVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[2]));
+        builder->emitBranch(afterBlock, 1, &falseVal);
+        builder->insertBlock(afterBlock);
+        builder->setInsertInto(afterBlock);
+        auto paramType = lowerType(context, expr->type.type);
+        auto result = builder->emitParam(paramType);
+        return LoweredValInfo::simple(result);
     }
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
@@ -8035,7 +8088,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return type->getOp() == kIROp_ClassType;
     }
 
-    LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl)
+    LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl, bool emitBody = true)
     {
 
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
@@ -8103,7 +8156,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // (although we might have to give in eventually), so
             // this case should really only occur for builtin declarations.
         }
-        else
+        else if (emitBody)
         {
             // This is a function definition, so we need to actually
             // construct IR for the body...
@@ -8557,7 +8610,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     auto originalFuncDecl = as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
                     SLANG_RELEASE_ASSERT(originalFuncDecl);
 
-                    auto originalFuncVal = lowerFuncDeclInContext(originalSubContext, originalSubBuilder, originalFuncDecl).val;
+                    auto originalFuncVal = lowerFuncDeclInContext(originalSubContext, originalSubBuilder, originalFuncDecl, false).val;
                     if (auto originalFuncGeneric = as<IRGeneric>(originalFuncVal))
                     {
                         originalFuncVal = findGenericReturnVal(originalFuncGeneric);

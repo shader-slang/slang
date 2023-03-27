@@ -10,7 +10,7 @@ typedef float.Differential dfloat;
 [BackwardDifferentiable]
 float f(float x, float y)
 {
-    return x > 0.5 ? x : y;
+    return x > 0.0 ? sqrt(x)*sqrt(x) : y;
 }
 
 [numthreads(1, 1, 1)]
@@ -27,7 +27,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     {
-        dpfloat dpa = dpfloat(0.3, 1.0);
+        dpfloat dpa = dpfloat(-0.3, 1.0);
         dpfloat dpb = dpfloat(0.3, 1.0);
 
         __bwd_diff(f)(dpa, dpb, 1.0);

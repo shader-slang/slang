@@ -524,6 +524,15 @@ private:
     MatrixExpressionType(Type*, IntVal*, IntVal*) {}
 };
 
+class TensorViewType : public BuiltinType
+{
+    SLANG_AST_CLASS(TensorViewType)
+
+    Type* getElementType();
+private:
+    TensorViewType(Type*) {}
+};
+
 // Base class for built in string types
 class StringTypeBase : public BuiltinType
 {

@@ -170,6 +170,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -192,6 +193,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x86\release\slang-glslang.d
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -214,6 +216,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -238,6 +241,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -263,6 +267,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x86\release\slang-glslang.d
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -288,6 +293,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -336,6 +342,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-emit-hlsl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-precedence.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-emit-torch.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-intrinsic-expand.h" />
@@ -411,6 +418,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-peephole.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-propagate-func-properties.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-pytorch-cpp-binding.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-redundancy-removal.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-remove-unused-generic-param.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h" />
@@ -489,6 +497,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\prelude\slang-cpp-prelude.h.cpp" />
     <ClCompile Include="..\..\..\prelude\slang-cuda-prelude.h.cpp" />
     <ClCompile Include="..\..\..\prelude\slang-hlsl-prelude.h.cpp" />
+    <ClCompile Include="..\..\..\prelude\slang-torch-prelude.h.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-api.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-artifact-output-util.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-builder.cpp" />
@@ -527,6 +536,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-emit-precedence.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-source-writer.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-spirv.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-emit-torch.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-glsl-extension-tracker.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-intrinsic-expand.cpp" />
@@ -599,6 +609,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-peephole.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-propagate-func-properties.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-pytorch-cpp-binding.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-redundancy-removal.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-remove-unused-generic-param.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp" />

@@ -56,6 +56,7 @@
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-simplify-for-emit.h"
+#include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -74,15 +75,19 @@
 #include "slang-emit-hlsl.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
+#include "slang-emit-torch.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
 
+#include "../compiler-core/slang-json-source-map-util.h"
+
 #include <assert.h>
 
 Slang::String get_slang_cpp_host_prelude();
+Slang::String get_slang_torch_prelude();
 
 namespace Slang {
 
@@ -401,6 +406,18 @@ Result linkAndOptimizeIR(
     finalizeAutoDiffPass(irModule);
 
     finalizeSpecialization(irModule);
+
+    switch (target)
+    {
+    case CodeGenTarget::PyTorchCppBinding:
+        generatePyTorchCppBinding(irModule, sink);
+        break;
+    case CodeGenTarget::CUDASource:
+        removeTorchKernels(irModule);
+        break;
+    default:
+        break;
+    }
 
     // If we have a target that is GPU like we use the string hashing mechanism
     // but for that to work we need to inline such that calls (or returns) of strings
@@ -969,31 +986,39 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     LinkedIR linkedIR;
 
     RefPtr<CLikeSourceEmitter> sourceEmitter;
-    
     SourceLanguage sourceLanguage = CLikeSourceEmitter::getSourceLanguage(target);
-    switch (sourceLanguage)
+    
+    switch (target)
     {
-        case SourceLanguage::CPP:
+    default:
+        switch (sourceLanguage)
         {
-            sourceEmitter = new CPPSourceEmitter(desc);
-            break;
+            case SourceLanguage::CPP:
+            {
+                sourceEmitter = new CPPSourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::GLSL:
+            {
+                sourceEmitter = new GLSLSourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::HLSL:
+            {
+                sourceEmitter = new HLSLSourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::CUDA:
+            {
+                sourceEmitter = new CUDASourceEmitter(desc);
+                break;
+            }
+            default: break;
         }
-        case SourceLanguage::GLSL:
-        {
-            sourceEmitter = new GLSLSourceEmitter(desc);
-            break;
-        }
-        case SourceLanguage::HLSL:
-        {
-            sourceEmitter = new HLSLSourceEmitter(desc);
-            break;
-        }
-        case SourceLanguage::CUDA:
-        {
-            sourceEmitter = new CUDASourceEmitter(desc);
-            break;
-        }
-        default: break;
+        break;
+    case CodeGenTarget::PyTorchCppBinding:
+        sourceEmitter = new TorchCppSourceEmitter(desc);
+        break;
     }
 
     if (!sourceEmitter)
@@ -1072,16 +1097,23 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     // Emit any front matter
     sourceEmitter->emitFrontMatter(targetRequest);
 
-    // If heterogeneous we output the prelude before everything else 
-    if (isHeterogeneousTarget(target))
+    switch (target)
     {
-        sourceWriter.emit(get_slang_cpp_host_prelude());
-    }
-    else
-    {
-        // Get the prelude
-        String prelude = session->getPreludeForLanguage(sourceLanguage);
-        sourceWriter.emit(prelude);
+    case CodeGenTarget::PyTorchCppBinding:
+        sourceWriter.emit(get_slang_torch_prelude());
+        break;
+    default:
+        if (isHeterogeneousTarget(target))
+        {
+            sourceWriter.emit(get_slang_cpp_host_prelude());
+        }
+        else
+        {
+            // Get the prelude
+            String prelude = session->getPreludeForLanguage(sourceLanguage);
+            sourceWriter.emit(prelude);
+        }
+        break;
     }
 
     // Emit anything that goes before the contents of the code generated for the module
@@ -1118,7 +1150,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         RefPtr<JSONContainer> jsonContainer(new JSONContainer(&sourceMapSourceManager));
 
         JSONValue jsonValue;
-        SLANG_RETURN_ON_FAIL(sourceMap->encode(jsonContainer, &sourceMapSink, jsonValue));
+        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, &sourceMapSink, jsonValue));
 
         // Okay now convert this into a text file and then a blob
 

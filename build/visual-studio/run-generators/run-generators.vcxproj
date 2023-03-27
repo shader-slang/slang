@@ -141,6 +141,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\prelude\slang-cpp-scalar-intrinsics.h" />
+    <ClInclude Include="..\..\..\prelude\slang-cpp-types-core.h" />
     <ClInclude Include="..\..\..\prelude\slang-cpp-types.h" />
     <ClInclude Include="..\..\..\prelude\slang-llvm.h" />
   </ItemGroup>
@@ -208,6 +209,23 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../../bin/windows-x64/release/slang-embed" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">"../../../bin/windows-aarch64/release/slang-embed" %(Identity)</Command>
       <Outputs>../../../prelude/slang-hlsl-prelude.h.cpp</Outputs>
+      <Message>slang-embed %(Identity)</Message>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../../bin/windows-x86/debug/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../bin/windows-x64/debug/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">../../../bin/windows-aarch64/debug/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../../bin/windows-x86/release/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../bin/windows-x64/release/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">../../../bin/windows-aarch64/release/slang-embed.exe</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\prelude\slang-torch-prelude.h">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../../bin/windows-x64/debug/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">"../../../bin/windows-aarch64/debug/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../../bin/windows-x86/release/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../../bin/windows-x64/release/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">"../../../bin/windows-aarch64/release/slang-embed" %(Identity)</Command>
+      <Outputs>../../../prelude/slang-torch-prelude.h.cpp</Outputs>
       <Message>slang-embed %(Identity)</Message>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../../bin/windows-x86/debug/slang-embed.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../bin/windows-x64/debug/slang-embed.exe</AdditionalInputs>

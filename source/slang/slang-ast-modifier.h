@@ -1055,6 +1055,11 @@ class DllExportAttribute : public Attribute
     SLANG_AST_CLASS(DllExportAttribute)
 };
 
+class TorchEntryPointAttribute : public Attribute
+{
+    SLANG_AST_CLASS(TorchEntryPointAttribute)
+};
+
 class CudaDeviceExportAttribute : public Attribute
 {
     SLANG_AST_CLASS(CudaDeviceExportAttribute)

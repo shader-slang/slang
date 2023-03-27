@@ -208,7 +208,6 @@ enum class ArtifactStyle : uint8_t
 
     Kernel,             ///< Compiled as `GPU kernel` style.        
     Host,               ///< Compiled in `host` style
-
     Obfuscated,         ///< Holds something specific to obfuscation, such as an obfuscated source map
 
     CountOf,

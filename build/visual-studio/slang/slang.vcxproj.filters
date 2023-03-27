@@ -114,6 +114,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-emit-torch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -337,6 +340,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-propagate-func-properties.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-pytorch-cpp-binding.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-redundancy-removal.h">
@@ -569,6 +575,9 @@
     <ClCompile Include="..\..\..\prelude\slang-hlsl-prelude.h.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\prelude\slang-torch-prelude.h.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-api.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -681,6 +690,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-emit-spirv.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-emit-torch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-emit.cpp">
@@ -897,6 +909,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-propagate-func-properties.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-pytorch-cpp-binding.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-redundancy-removal.cpp">
