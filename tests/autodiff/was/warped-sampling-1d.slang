@@ -1,9 +1,12 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=endpointDifferentialBuffer
+//TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=endpointDifferentialBuffer
 RWStructuredBuffer<float> endpointDifferentialBuffer;
 
-//TEST_INPUT:ubuffer(data=[1.0 2.0 0.0 10.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=endpointBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=endpointDifferentialBufferUInt
+RWStructuredBuffer<uint> endpointDifferentialBufferUInt;
+
+//TEST_INPUT:ubuffer(data=[0.3 0.7 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=endpointBuffer
 RWStructuredBuffer<float> endpointBuffer;
 //TEST_INPUT:ubuffer(data=[1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=colorBuffer
 RWStructuredBuffer<float> colorBuffer;
@@ -80,16 +83,38 @@ DifferentialPair<LineSegment> fwd_loadLineSegment(uint id)
     return DifferentialPair<LineSegment>(loadLineSegment(id), LineSegment.dzero());
 }
 
+void accumulateDifferentialAsUInt(
+    RWStructuredBuffer<uint> buffer, 
+    uint index,
+    float.Differential df)
+{
+    uint actualOriginalValUInt = 0;
+    uint originalValUInt = 0;
+
+    do
+    {
+        originalValUInt = buffer[index];
+        float newVal = reinterpret<float, uint>(originalValUInt) + df;
+
+        InterlockedCompareExchange(
+            buffer[index],
+            originalValUInt,
+            reinterpret<uint, float>(newVal),
+            actualOriginalValUInt);
+
+    } while (actualOriginalValUInt != originalValUInt);
+}
+
 void d_loadLineSegment(uint id, LineSegment.Differential d_ls)
 {
-    endpointDifferentialBuffer[id * 2] += d_ls.x0;
-    endpointDifferentialBuffer[id * 2 + 1] += d_ls.x1;
+    accumulateDifferentialAsUInt(endpointDifferentialBufferUInt, id * 2, d_ls.x0);
+    accumulateDifferentialAsUInt(endpointDifferentialBufferUInt, id * 2 + 1, d_ls.x1);
 }
 
 void d_fwd_loadLineSegment(uint id, DifferentialPair<LineSegment>.Differential dp_ls)
 {
-    endpointDifferentialBuffer[id * 2] += dp_ls.p.x0;
-    endpointDifferentialBuffer[id * 2 + 1] += dp_ls.p.x1;
+    accumulateDifferentialAsUInt(endpointDifferentialBufferUInt, id * 2, dp_ls.p.x0);
+    accumulateDifferentialAsUInt(endpointDifferentialBufferUInt, id * 2 + 1, dp_ls.p.x1);
 }
 
 
@@ -110,7 +135,7 @@ Intersection intersect(float x)
 {
     int id = getIntersectionID(x);
     if (id >= 0)
-        return Intersection(loadLineSegment((uint)id), x, false, 1.0);
+        return Intersection(loadLineSegment((uint)id), x, true, 1.0);
 
     return Intersection(LineSegment(0, 0, 0), x, false, 0.0);
 }
@@ -121,11 +146,18 @@ float shadeIntersection(Intersection isect)
     return isect.ls.color;
 }
 
-float sample1DNormal(PRNG prng)
+float sample1DNormal(inout PRNG prng, float mu, float sigma)
 {
     float u = prng.nextFloat1D();
     float v = prng.nextFloat1D();
-    return sqrt(-2 * log(u))*cos(2*3.1415*v);
+    return mu + (sqrt(-2 * log(u))*cos(2*3.1415*v) * sigma);
+}
+
+[BackwardDifferentiable]
+float pdf1DNormal(no_diff float x, float mu, no_diff float sigma)
+{  
+    float k = ((x - mu) / sigma);
+    return exp(-0.5 * (k * k)) / (sigma * 2.506628);
 }
 
 float boundaryTerm(Intersection isect)
@@ -133,7 +165,13 @@ float boundaryTerm(Intersection isect)
     if (!isect.isIntersected)
         return 100.0; // Large default value for missed rays.
     
-    return ((isect.ls.x1 - isect.x) * (isect.x - isect.ls.x0));
+    float leftDist = abs(isect.x - isect.ls.x0);
+    float rightDist = abs(isect.ls.x1 - isect.x);
+
+    if (leftDist > rightDist)
+        return rightDist * 30.f;
+    else
+        return leftDist * 30.f;
 }
 
 [BackwardDifferentiable]
@@ -146,7 +184,8 @@ DifferentialPair<float> infinitesimal(DifferentialPair<float> x)
 float harmonicWeight(Intersection isect, no_diff Intersection aux_isect)
 {
     float x_dist = isect.x - aux_isect.x;
-    return 1.0 / ((x_dist * x_dist) + no_diff(boundaryTerm(aux_isect)));
+    float k = 1.0 / (((x_dist * x_dist) + no_diff(boundaryTerm(aux_isect))));
+    return k;
 }
 
 [BackwardDifferentiable]
@@ -155,25 +194,39 @@ float attachToGeometry(Intersection isect)
     float leftWt = detach(isect.ls.x1 - isect.x);
     float rightWt = detach(isect.x - isect.ls.x0);
 
-    return (leftWt * isect.ls.x0 + rightWt * isect.ls.x1);
+    return (leftWt * isect.ls.x0 + rightWt * isect.ls.x1) / (leftWt + rightWt);
 }
 
 [BackwardDifferentiable]
-float warp(Intersection isect, PRNG prng)
+float warp(Intersection isect, inout PRNG prng)
 {
     float totalWeight = 0.f;
     float totalWarpedPoint = 0.f;
 
-    for (int i = 0; i < 8; i++)
+    float aux_sigma = 0.01;
+
+    for (int i = 0; i < 32; i++)
     {
-        float y = no_diff(sample1DNormal(prng));
+        float y = no_diff(sample1DNormal(prng, isect.x, aux_sigma));
+        float y_flipped = 2 * isect.x - y;
 
-        Intersection aux_isect = intersect(y + isect.x);
+        Intersection aux_isect_left = intersect(y);
 
-        if (aux_isect.isIntersected)
+        if (aux_isect_left.isIntersected)
         {
-            float wt = harmonicWeight(isect, aux_isect);
-            totalWarpedPoint += attachToGeometry(aux_isect) * wt;
+            float pdf = pdf1DNormal(y, isect.x, aux_sigma);
+            float wt = harmonicWeight(isect, aux_isect_left) * (pdf / detach(pdf));
+            totalWarpedPoint += attachToGeometry(aux_isect_left) * wt;
+            totalWeight += wt;
+        }
+        
+        Intersection aux_isect_right = intersect(detach(y_flipped));
+
+        if (aux_isect_right.isIntersected)
+        {
+            float pdf = pdf1DNormal(y_flipped, isect.x, aux_sigma);
+            float wt = harmonicWeight(isect, aux_isect_right) * (pdf / detach(pdf));
+            totalWarpedPoint += attachToGeometry(aux_isect_right) * wt;
             totalWeight += wt;
         }
     }
@@ -182,7 +235,7 @@ float warp(Intersection isect, PRNG prng)
 }
 
 [BackwardDifferentiable]
-Intersection warpedIntersect(float x, PRNG prng)
+Intersection warpedIntersect(float x, inout PRNG prng)
 {   
     // TODO: For now the jacobian here is 1.0, 
     // but we will need to adjust the warp by the jacobian for
@@ -203,27 +256,33 @@ Intersection warpedIntersect(float x, PRNG prng)
 }
 
 [BackwardDifferentiable]
-float renderSample(PRNG prng)
+float renderSample(inout PRNG prng) 
 {
     float u = no_diff(prng.nextFloat1D());
     
     float leftBound = 0.0;
-    float rightBound = 10.0;
+    float rightBound = 1.0;
 
     float sample = leftBound * u + rightBound * (1 - u);
     float weight = 1.0/(rightBound - leftBound);
-
+ 
     Intersection isect = warpedIntersect(sample, prng);
 
     return shadeIntersection(isect) * isect.wt;
 }
 
-[numthreads(1024, 1, 1)]
+[numthreads(1000, 1, 1)]
 void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 {
-    PRNG prng = PRNG(threadIdx.x);
+    uint seed = (threadIdx.x * threadIdx.x) * 30 + 3;
+    PRNG prng = PRNG(seed);
     
-    float d_color = 1.0;
+    float d_color = 1.0 / 1000.0;
     __bwd_diff(renderSample)(prng, d_color);
-    endpointDifferentialBuffer[2] = 1.0;//colorBuffer[0];
+
+    AllMemoryBarrierWithGroupSync();
+
+    if (threadIdx.x < 10)
+        endpointDifferentialBuffer[threadIdx.x] =
+            reinterpret<float, uint>(endpointDifferentialBufferUInt[threadIdx.x]);
 }
