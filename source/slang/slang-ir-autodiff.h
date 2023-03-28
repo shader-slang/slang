@@ -236,7 +236,6 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
-        //auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);
         return result;
     }

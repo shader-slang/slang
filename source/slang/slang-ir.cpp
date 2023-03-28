@@ -3705,6 +3705,12 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeTargetTuple, count, args);
     }
 
+    IRInst* IRBuilder::emitTargetTupleGetElement(IRType* elementType, IRInst* targetTupleVal, IRInst* indexVal)
+    {
+        IRInst* args[] = {targetTupleVal, indexVal};
+        return emitIntrinsicInst(elementType, kIROp_GetTargetTupleElement, 2, args);
+    }
+
     IRInst* IRBuilder::emitMakeTuple(UInt count, IRInst* const* args)
     {
         List<IRType*> types;
