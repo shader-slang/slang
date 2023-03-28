@@ -6,6 +6,14 @@
 #define SLANG_CUDA_RTC 0
 #endif
 
+#if SLANG_CUDA_RTC
+
+#else
+
+#include <cstdint>
+
+#endif
+
 // Define SLANG_CUDA_ENABLE_HALF to use the cuda_fp16 include to add half support. 
 // For this to work NVRTC needs to have the path to the CUDA SDK.
 //
@@ -162,6 +170,8 @@ typedef int2 bool2;
 typedef int3 bool3;
 typedef int4 bool4; 
 
+#if SLANG_CUDA_RTC
+
 typedef signed char int8_t;
 typedef short int16_t;
 typedef int int32_t;
@@ -171,6 +181,8 @@ typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
+
+#endif
 
 typedef long long longlong;
 typedef unsigned long long ulonglong;
