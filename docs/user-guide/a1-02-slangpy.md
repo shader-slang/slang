@@ -193,17 +193,26 @@ class MySquareFuncInSlang(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        input, = ctx.saved_tensors
+        [input] = ctx.saved_tensors
         return m.square_bwd(input, grad_output)
 ```
 
 Now we can use the autograd function `MySquareFuncInSlang` in our python script:
 
 ```python
-x = torch.randn(2,2)
+x = torch.tensor([[3.0, 4.0],[0.0, 1.0]], requires_grad=True, device=cuda_device)
 print(f"X = {x}")
-y = MySquareFuncInSlang.apply(x)
-y.backward()
+y_pred = MySquareFuncInSlang.apply(x)
+loss = y_pred.sum()
+loss.backward()
 print(f"dX = {x.grad.cpu()}")
+```
+
+Output:
+```
+X = tensor([[3., 4.],
+        [0., 1.]], device='cuda:0', requires_grad=True)
+dX = tensor([[6., 8.],
+        [0., 2.]])
 ```
 
