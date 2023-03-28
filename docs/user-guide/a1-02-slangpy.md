@@ -91,6 +91,14 @@ y = m.square_fwd(x)
 print(f"Y = {y.cpu()}")
 ```
 
+Result output:
+```
+X = tensor([[ 0.1407,  0.6594],
+        [-0.8978, -1.7230]])
+Y = tensor([[0.0198, 0.4349],
+        [0.8060, 2.9688]])
+```
+
 And that's it! `slangpy.loadModule` uses JIT compilation to compile your Slang source into CUDA binary.
 It may take a little longer the first time you execute the script, but the result will be cached and as
 long as the kernel code is not changed, future runs will not rebuild the CUDA kernel.
@@ -107,8 +115,17 @@ propagation functions automatically.
 In the following section, we walkthrough how to use Slang to generate a backward propagation function
 for `square`, and expose it to PyTorch as an autograd function.
 
-Similar to how we define `square_fwd_kernel` that performs the forward computations using the per-element
-function `square`, we can define `square_bwd_kernel` that performance backward propagation as:
+First we need to tell Slang compiler that we need the `square` function to be considered a differentiable function so Slang compiler can generate a backward derivative propagation function for it:
+```csharp
+[BackwardDifferentiable]
+float square(float x)
+{
+    return x * x;
+}
+```
+This is done by simply adding a `[BackwardDifferentiable]` attribute to our `square`function.
+
+With that, we can now define `square_bwd_kernel` that performance backward propagation as:
 
 ```csharp
 [CudaKernel]
@@ -127,7 +144,7 @@ void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_in, Tenso
 ```
 
 Note that the function follows the same structure of `square_fwd_kernel`, with the only difference being that
-instead of calling into `squre` to compute the forward value for each tensor element, we are calling `__bwd_diff(square)`
+instead of calling into `square` to compute the forward value for each tensor element, we are calling `__bwd_diff(square)`
 that represents the automatically generated backward propagation function of `squre`.
 `__bwd_diff(squre)` will have the following signature:
 ```csharp
@@ -158,6 +175,8 @@ TorchTensor<float> square_bwd(TorchTensor<float> input, TorchTensor<float> grad_
     return grad_out;
 }
 ```
+
+You can refer [this documentation](07-autodiff.md) for a detailed reference of Slang's automatic differentiation system.
 
 With this, the python script `slangpy.loadModule("square.slang")` will now return
 a scope that defines two functions, `square_fwd` and `square_bwd`. We can then use these

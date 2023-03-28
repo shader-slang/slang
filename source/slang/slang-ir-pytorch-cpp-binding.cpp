@@ -361,14 +361,16 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
 // Remove all [TorchEntryPoint] functions when emitting CUDA source.
 void removeTorchKernels(IRModule* module)
 {
+    List<IRInst*> toRemove;
     for (auto globalInst : module->getGlobalInsts())
     {
         if (!as<IRFunc>(globalInst))
             continue;
         if (globalInst->findDecoration<IRTorchEntryPointDecoration>())
-            globalInst->removeAndDeallocate();
+            toRemove.add(globalInst);
     }
-
+    for (auto inst : toRemove)
+        inst->removeAndDeallocate();
 }
 
 }
