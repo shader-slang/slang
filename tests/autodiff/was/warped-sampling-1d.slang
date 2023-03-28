@@ -89,21 +89,7 @@ void accumulateDifferentialFixedPoint(
     float.Differential df,
     float scale = 100000.f)
 {
-    int actualOriginalValInt = 0;
-    int originalValInt = 0;
-
-    do
-    {
-        originalValInt = buffer[index];
-        float newVal = originalValInt + df * scale;
-
-        InterlockedCompareExchange(
-            buffer[index],
-            originalValInt,
-            (int)round(newVal),
-            actualOriginalValInt);
-
-    } while (actualOriginalValInt != originalValInt);
+    InterlockedAdd(buffer[index], (int)round(df * scale));
 }
 
 void d_loadLineSegment(uint id, LineSegment.Differential d_ls)
