@@ -245,6 +245,7 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
             return;
         }
         auto newParam = builder.emitParam(newParamType);
+        param->transferDecorationsTo(newParam);
         newParams.add(newParam);
     }
 

@@ -86,31 +86,31 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
     case torch::kInt8:
     case torch::kUInt8:
         elementSize = 1;
-        res.data = (uint8_t*)val.data_ptr<uint8_t>();
+        res.data = (uint8_t*)val.data<uint8_t>();
         break;
     case torch::kBFloat16:
         elementSize = 2;
-        res.data = (uint8_t*)val.data_ptr<torch::BFloat16>();
+        res.data = (uint8_t*)val.data<torch::BFloat16>();
         break;
     case torch::kInt16:
         elementSize = 2;
-        res.data = (uint8_t*)val.data_ptr<int16_t>();
+        res.data = (uint8_t*)val.data<int16_t>();
         break;
     case torch::kFloat32:
         elementSize = 4;
-        res.data = (uint8_t*)val.data_ptr<float>();
+        res.data = (uint8_t*)val.data<float>();
         break;
     case torch::kInt32:
         elementSize = 4;
-        res.data = (uint8_t*)val.data_ptr<int32_t>();
+        res.data = (uint8_t*)val.data<int32_t>();
         break;
     case torch::kFloat64:
         elementSize = 8;
-        res.data = (uint8_t*)val.data_ptr<double>();
+        res.data = (uint8_t*)val.data<double>();
         break;
     case torch::kInt64:
         elementSize = 8;
-        res.data = (uint8_t*)val.data_ptr<int64_t>();
+        res.data = (uint8_t*)val.data<int64_t>();
         break;
     }
     for (int i = 0; i < val.dim(); ++i)
@@ -118,6 +118,9 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
         res.strides[i] = val.stride(i) * elementSize;
         res.sizes[i] = val.size(i);
     }
+    if (!res.data)
+        throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
+
     return res;
 }
 
