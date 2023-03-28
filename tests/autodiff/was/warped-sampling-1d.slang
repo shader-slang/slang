@@ -272,7 +272,7 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
     // 
     if (threadIdx.x < 10)
         endpointDifferentialBuffer[threadIdx.x] =
-            ((endpointDifferentialBufferInt[threadIdx.x]/100) / 1000000.f) * 100.f;
+            ((endpointDifferentialBufferInt[threadIdx.x]/1000) / 1000000.f) * 1000.f;
 
 // Note that this specific derivative estimation method is biased, so the
 // expected results are approximate. (We've fixed the RNG seed to generate
