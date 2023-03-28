@@ -77,7 +77,7 @@ To do so, we use a python package called `slangpy`. You can obtain it with
 pip install slangpy
 ```
 
-With that, you can use the following code code call Slang function from Python:
+With that, you can use the following code to call `square_fwd` from Python:
 
 ```python
 import torch
@@ -100,11 +100,12 @@ Y = tensor([[0.0198, 0.4349],
 ```
 
 And that's it! `slangpy.loadModule` uses JIT compilation to compile your Slang source into CUDA binary.
-It may take a little longer the first time you execute the script, but the result will be cached and as
+It may take a little longer the first time you execute the script, but the compiled binaries will be cached and as
 long as the kernel code is not changed, future runs will not rebuild the CUDA kernel.
 
 Because the PyTorch JIT system requires `ninja`, you need to make sure `ninja` is installed on your system
-and is discoverable from the current environment.
+and is discoverable from the current environment, you also need to have a C++ compiler available on the system.
+On Windows, this means that Visual Studio need to be installed.
 
 ### Exposing an automatically differentiated kernel to PyTorch
 
