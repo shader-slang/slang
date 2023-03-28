@@ -10,11 +10,11 @@ to provide a simple way to define kernel functions that runs extremely fast in g
 automatic differentiation and PyTorch interop features, Slang provides a streamlined solution to author auto-differentiated kernels
 that runs at the speed of light with a strongly typed, per-thread programming model.
 
-# Getting Started with `slangpy`
+## Getting Started with `slangpy`
 
 In this tutorial, we will use a simple example to walkthrough the steps to use Slang in your PyTorch project.
 
-## Writing a simple kernel function as a Slang module
+### Writing a simple kernel function as a Slang module
 
 Assume we want to write a kernel function that computes `x*x` for each element in the input tensor in Slang. To do so,
 we start by creating a `square.slang` file:
@@ -39,8 +39,8 @@ void square_fwd_kernel(TensorView<float> input, TensorView<float> output)
 
     if (globalIdx.x > input.size(0) || globalIdx.x > input.size(1))
         return;
-    float result = square(input.load(globalIdx.x, globalIdx.y));
-    output.store(globalIdx.x, globalIdx.y, result);
+    float result = square(input[globalIdx.xy]);
+    output[globalIdx.xy] = result;
 }
 ```
 
@@ -48,14 +48,14 @@ This code follows the standard pattern of a typical CUDA kernel function. It tak
 two tensors, `input` and `output`. 
 It first obtains the global dispatch index of the current thread and performs range check to make sure we don't read or write out
 of the bounds of input and output tensors, and then calls `square()` to compute the per-element result, and
-finally calls `output.store` to store the result into the corresponding location.
+store it at the corresponding location in `output` tensor.
 
 With a kernel function defined, we then need to expose a CPU(host) function that defines how this kernel is dispatched:
 ```csharp
 [TorchEntryPoint]
 TorchTensor<float> square_fwd(TorchTensor<float> input)
 {
-    var result = TorchTensor<float>.alloc(input.size(0), input.size(1));
+    var result = TorchTensor<float>.zerosLike(input);
     let blockCount = uint3(1);
     let groupSize = uint3(result.size(0), result.size(1), 1);
     __dispatch_kernel(square_fwd_kernel, blockCount, groupSize)(input, result);
@@ -68,7 +68,7 @@ Then we launch `square_fwd_kernel` with the `__dispatch_kernel` syntax. Note tha
 `TorchTensor<float>` arguments to a `TensorView<float>` parameter and the compiler will automatically convert
 the type and obtain a view into the tensor that can be accessed by the GPU kernel function.
 
-## Calling Slang module from Python
+### Calling Slang module from Python
 
 Next, let's see how we can call the `square_fwd` function we defined in the Slang module.
 To do so, we use a python package called `slangpy`. You can obtain it with
@@ -106,7 +106,7 @@ long as the kernel code is not changed, future runs will not rebuild the CUDA ke
 Because the PyTorch JIT system requires `ninja`, you need to make sure `ninja` is installed on your system
 and is discoverable from the current environment.
 
-## Exposing an automatically differentiated kernel to PyTorch
+### Exposing an automatically differentiated kernel to PyTorch
 
 The above example demonstrates how to write a simple kernel function in Slang and call it from Python.
 Another major benefit of using Slang is that the Slang compiler support generating backward derivative
@@ -129,17 +129,17 @@ With that, we can now define `square_bwd_kernel` that performance backward propa
 
 ```csharp
 [CudaKernel]
-void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_in, TensorView<float> grad_output)
+void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_out, TensorView<float> grad_propagated)
 {
     uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
 
     if (globalIdx.x > input.size(0) || globalIdx.x > input.size(1))
         return;
 
-    DifferentialPair<float> dpInput = diffPair(input.load(globalIdx.x, globalIdx.y));
-    var gradInElem = grad_in.load(globalIdx.x, globalIdx.y);
+    DifferentialPair<float> dpInput = diffPair(input[globalIdx.xy]);
+    var gradInElem = grad_out[globalIdx.xy];
     __bwd_diff(square)(dpInput, gradInElem);
-    grad_output.store(globalIdx.x, globalIdx.y, dpInput.d);
+    grad_propagated[globalIdx.xy] = dpInput.d;
 }
 ```
 
@@ -166,13 +166,13 @@ Similarly to `squre_fwd`, we can define the host side function `square_bwd` as:
 
 ```csharp
 [TorchEntryPoint]
-TorchTensor<float> square_bwd(TorchTensor<float> input, TorchTensor<float> grad_in)
+TorchTensor<float> square_bwd(TorchTensor<float> input, TorchTensor<float> grad_out)
 {
-    var grad_out = TorchTensor<float>.alloc(input.size(0), input.size(1));
+    var grad_propagated = TorchTensor<float>.zerosLike(input);
     let blockCount = uint3(1);
     let groupSize = uint3(input.size(0), input.size(1), 1);
-    __dispatch_kernel(square_bwd_kernel, blockCount, groupSize)(input, grad_in, grad_out);
-    return grad_out;
+    __dispatch_kernel(square_bwd_kernel, blockCount, groupSize)(input, grad_out, grad_propagated);
+    return grad_propagated;
 }
 ```
 
@@ -216,3 +216,51 @@ dX = tensor([[6., 8.],
         [0., 2.]])
 ```
 
+
+## Builtin Types for PyTorch Interop
+
+As shown in previous tutorial, Slang has defined the `TorchTensor<T>` and `TensorView<T>` type for interop with PyTorch
+tensors. The `TorchTensor<T>` represents the CPU view of a tensor and provides methods to allocate a new tensor object.
+The `TensorView<T>` represents the GPU view of a tensor and provides accesors to read write tensor data.
+
+Following is a list of builtin methods provided by each type.
+
+### `static TorchTensor<T> TorchTensor<T>.alloc(uint x, uint y, ...)`
+Allocates a new PyTorch tensor with the given dimensions.
+
+### `static TorchTensor<T> TorchTensor<T>.zerosLike(TorchTensor<T> other)`
+Allocates a new PyTorch tensor that has the same dimensions as `other` and initialize it to zero.
+
+### `uint TorchTensor<T>.dims()`
+Returns the tensor's dimension count.
+
+### `uint TorchTensor<T>.size(int dim)`
+Returns the tensor's size (in number of elements) at `dim`.
+
+### `uint TorchTensor<T>.stride(int dim)`
+Returns the tensor's stride (in bytes) at `dim`.
+
+### `TensorView<T>.operator[uint x, uint y, ...]`
+Provide an accessor to data content in a tensor.
+
+### `TensorView<T>.operator[vector<uint, N> index]`
+Provide an accessor to data content in a tensor, indexed by a uint vector.
+`tensor[uint3(1,2,3)]` is equivalent to `tensor[1,2,3]`.
+
+### `uint TensorView<T>.dims()`
+Returns the tensor's dimension count.
+
+### `uint TensorView<T>.size(int dim)`
+Returns the tensor's size (in number of elements) at `dim`.
+
+### `uint TensorView<T>.stride(int dim)`
+Returns the tensor's stride (in bytes) at `dim`.
+
+### `cudaThreadIdx()`
+Returns the `threadIdx` variable in CUDA.
+
+### `cudaBlockIdx()`
+Returns the `blockIdx` variable in CUDA.
+
+### `cudaBlockDim()`
+Returns the `blockDim` variable in CUDA.
