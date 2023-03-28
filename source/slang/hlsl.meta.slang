@@ -6837,10 +6837,13 @@ void debugBreak();
 
 
 __target_intrinsic(cuda, "(threadIdx)")
+[__readNone]
 uint3 cudaThreadIdx();
 
 __target_intrinsic(cuda, "(blockIdx)")
+[__readNone]
 uint3 cudaBlockIdx();
 
 __target_intrinsic(cuda, "(blockDim)")
+[__readNone]
 uint3 cudaBlockDim();
