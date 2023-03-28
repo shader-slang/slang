@@ -1216,11 +1216,11 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         {
             auto outerPrec = getInfo(EmitOp::General);
             auto prec = getInfo(EmitOp::Postfix);
-            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit(".");
-            m_writer->emit("get<");
+            m_writer->emit("std::get<");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit(">()");
+            m_writer->emit(">(");
+            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+            m_writer->emit(")");
             return true;
         }
         case kIROp_CastFloatToInt:
