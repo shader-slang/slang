@@ -210,13 +210,8 @@ void writeHashFile(
     const List<String> includes,
     const HashParams&  hashParams)
 {
-    FILE* f = nullptr;
-    fopen_s(&f, outCppPath, "wb");
-    if (!f)
-    {
-        return;
-    }
-    FileWriter   writer(f, WriterFlags(0));
+    StringBuilder sb;
+    StringWriter writer(&sb, WriterFlags(0));
     WriterHelper w(&writer);
 
     w.print("// Hash function for %s\n", valueType);
@@ -299,6 +294,8 @@ void writeHashFile(
     w.print("\n");
 
     w.print("}\n");
+
+    File::writeAllTextIfChanged(outCppPath, sb.getUnownedSlice());
 }
 
 int main(int argc, const char* const* argv)

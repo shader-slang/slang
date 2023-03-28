@@ -83,7 +83,17 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
             emitOperand(arg, getInfo(EmitOp::General));
         }
         m_writer->emit("}, torch::TensorOptions().device(torch::kCUDA).dtype(torch::");
-        switch (inst->getDataType()->getOperand(0)->getOp())
+
+        // Get the element type of the tensor.
+        auto instType = as<IRTorchTensorType>(inst->getDataType())->getOperand(0);
+
+        // If instType is a vector type, then we need to get the element type.
+        if (auto vectorType = as<IRVectorType>(instType))
+        {
+            instType = vectorType->getElementType();
+        }
+
+        switch (instType->getOp())
         {
         case kIROp_FloatType:
             m_writer->emit("kFloat32");

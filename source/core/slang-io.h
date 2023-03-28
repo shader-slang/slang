@@ -21,6 +21,8 @@ namespace Slang
 
         static SlangResult writeAllText(const String& fileName, const String& text);
 
+        static SlangResult writeAllTextIfChanged(const String& fileName, UnownedStringSlice text);
+
             /// Write as text in native form for the target (so typically may change line endings )
         static SlangResult writeNativeText(const String& filename, const void* data, size_t size);
 
