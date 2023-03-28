@@ -2315,6 +2315,13 @@ struct IRGetTupleElement : IRInst
     IRInst* getElementIndex() { return getOperand(1); }
 };
 
+struct IRGetTargetTupleElement : IRInst
+{
+    IR_LEAF_ISA(GetTargetTupleElement)
+    IRInst* getTuple() { return getOperand(0); }
+    IRInst* getElementIndex() { return getOperand(1); }
+};
+
 // An Instruction that creates a differential pair value from a
 // primal and differential.
 
@@ -3030,6 +3037,8 @@ public:
     IRInst* emitMakeRTTIObject(IRInst* typeInst);
 
     IRInst* emitMakeTargetTuple(IRType* type, UInt count, IRInst* const* args);
+
+    IRInst* emitTargetTupleGetElement(IRType* elementType, IRInst* targetTupleVal, IRInst* indexVal);
 
     IRInst* emitMakeTuple(IRType* type, UInt count, IRInst* const* args);
     IRInst* emitMakeTuple(UInt count, IRInst* const* args);
