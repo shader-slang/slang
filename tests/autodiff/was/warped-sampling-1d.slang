@@ -266,10 +266,13 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
     __bwd_diff(renderSample)(prng, d_color);
 
     AllMemoryBarrierWithGroupSync();
-
+    
+    // Convert to floating point (but with 2 fewer digits of precision to 
+    // avoid platform-specific differences in floating point precision)
+    // 
     if (threadIdx.x < 10)
         endpointDifferentialBuffer[threadIdx.x] =
-            endpointDifferentialBufferInt[threadIdx.x] / 1000000.f;
+            ((endpointDifferentialBufferInt[threadIdx.x]/100) / 1000000.f) * 100.f;
 
 // Note that this specific derivative estimation method is biased, so the
 // expected results are approximate. (We've fixed the RNG seed to generate
