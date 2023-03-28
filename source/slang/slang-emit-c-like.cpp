@@ -2407,6 +2407,17 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         {
             auto type = inst->getDataType();
             emitType(type, getName(inst));
+
+            // On targets that support empty initializers, we will emit it.
+            switch (this->getTarget())
+            {
+            case CodeGenTarget::CPPSource:
+            case CodeGenTarget::HostCPPSource:
+            case CodeGenTarget::PyTorchCppBinding:
+            case CodeGenTarget::CUDASource:
+                m_writer->emit(" = {}");
+                break;
+            }
             m_writer->emit(";\n");
         }
         break;
