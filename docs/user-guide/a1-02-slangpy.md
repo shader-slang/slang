@@ -145,10 +145,10 @@ void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_out, Tens
 
 Note that the function follows the same structure of `square_fwd_kernel`, with the only difference being that
 instead of calling into `square` to compute the forward value for each tensor element, we are calling `__bwd_diff(square)`
-that represents the automatically generated backward propagation function of `squre`.
-`__bwd_diff(squre)` will have the following signature:
+that represents the automatically generated backward propagation function of `square`.
+`__bwd_diff(square)` will have the following signature:
 ```csharp
-void __bwd_diff_squre(inout DifferentialPair<float> dpInput, float dOut);
+void __bwd_diff_square(inout DifferentialPair<float> dpInput, float dOut);
 ```
 
 Where the first parameter, `dpInput` represents a pair of original and derivative value for `input`, and the second parameter,
@@ -162,7 +162,7 @@ __bwd_diff(square)(dp, 1.0);
 // dp.d is now 6.0
 ```
 
-Similarly to `squre_fwd`, we can define the host side function `square_bwd` as:
+Similarly to `square_fwd`, we can define the host side function `square_bwd` as:
 
 ```csharp
 [TorchEntryPoint]
