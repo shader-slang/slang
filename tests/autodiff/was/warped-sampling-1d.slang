@@ -3,8 +3,8 @@
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=endpointDifferentialBuffer
 RWStructuredBuffer<float> endpointDifferentialBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=endpointDifferentialBufferUInt
-RWStructuredBuffer<uint> endpointDifferentialBufferUInt;
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=endpointDifferentialBufferInt
+RWStructuredBuffer<int> endpointDifferentialBufferInt;
 
 //TEST_INPUT:ubuffer(data=[0.3 0.7 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=endpointBuffer
 RWStructuredBuffer<float> endpointBuffer;
@@ -83,38 +83,39 @@ DifferentialPair<LineSegment> fwd_loadLineSegment(uint id)
     return DifferentialPair<LineSegment>(loadLineSegment(id), LineSegment.dzero());
 }
 
-void accumulateDifferentialAsUInt(
-    RWStructuredBuffer<uint> buffer, 
+void accumulateDifferentialFixedPoint(
+    RWStructuredBuffer<int> buffer, 
     uint index,
-    float.Differential df)
+    float.Differential df,
+    float scale = 100000.f)
 {
-    uint actualOriginalValUInt = 0;
-    uint originalValUInt = 0;
+    int actualOriginalValInt = 0;
+    int originalValInt = 0;
 
     do
     {
-        originalValUInt = buffer[index];
-        float newVal = reinterpret<float, uint>(originalValUInt) + df;
+        originalValInt = buffer[index];
+        float newVal = originalValInt + df * scale;
 
         InterlockedCompareExchange(
             buffer[index],
-            originalValUInt,
-            reinterpret<uint, float>(newVal),
-            actualOriginalValUInt);
+            originalValInt,
+            (int)round(newVal),
+            actualOriginalValInt);
 
-    } while (actualOriginalValUInt != originalValUInt);
+    } while (actualOriginalValInt != originalValInt);
 }
 
 void d_loadLineSegment(uint id, LineSegment.Differential d_ls)
 {
-    accumulateDifferentialAsUInt(endpointDifferentialBufferUInt, id * 2, d_ls.x0);
-    accumulateDifferentialAsUInt(endpointDifferentialBufferUInt, id * 2 + 1, d_ls.x1);
+    accumulateDifferentialFixedPoint(endpointDifferentialBufferInt, id * 2, d_ls.x0);
+    accumulateDifferentialFixedPoint(endpointDifferentialBufferInt, id * 2 + 1, d_ls.x1);
 }
 
 void d_fwd_loadLineSegment(uint id, DifferentialPair<LineSegment>.Differential dp_ls)
 {
-    accumulateDifferentialAsUInt(endpointDifferentialBufferUInt, id * 2, dp_ls.p.x0);
-    accumulateDifferentialAsUInt(endpointDifferentialBufferUInt, id * 2 + 1, dp_ls.p.x1);
+    accumulateDifferentialFixedPoint(endpointDifferentialBufferInt, id * 2, dp_ls.p.x0);
+    accumulateDifferentialFixedPoint(endpointDifferentialBufferInt, id * 2 + 1, dp_ls.p.x1);
 }
 
 
@@ -284,7 +285,7 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 
     if (threadIdx.x < 10)
         endpointDifferentialBuffer[threadIdx.x] =
-            reinterpret<float, uint>(endpointDifferentialBufferUInt[threadIdx.x]);
+            endpointDifferentialBufferInt[threadIdx.x] / 100000.f;
     
     // Note that this specific derivative estimation method is biased, so the 
     // expected results are approximate. (We've fixed the RNG seed to generate 
