@@ -176,7 +176,7 @@ static SlangResult _requireBlob(IArtifact* artifact, DiagnosticSink* sink, ComPt
 {
     if (ArtifactDescUtil::isText(desc))
     {
-        return File::writeNativeText(path, data, size);
+        return File::writeAllTextIfChanged(path, UnownedStringSlice((const char*)data, size));
     }
     else
     {

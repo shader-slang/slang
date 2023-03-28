@@ -993,6 +993,17 @@ namespace Slang
         return SLANG_OK;
     }
 
+    SlangResult File::writeAllTextIfChanged(const String& fileName, UnownedStringSlice text)
+    {
+        String existingContent;
+        auto result = File::readAllText(fileName, existingContent);
+        if (SLANG_FAILED(result) || existingContent != text)
+        {
+            return File::writeNativeText(fileName, text.begin(), text.getLength());
+        }
+        return SLANG_OK;
+    }
+
     /* static */SlangResult File::writeNativeText(const String& path, const void* data, size_t size)
     {
         FILE* file = fopen(path.getBuffer(), "w");
