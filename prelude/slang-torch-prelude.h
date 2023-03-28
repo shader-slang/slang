@@ -56,7 +56,7 @@ struct CudaTaskMemoryAllocator
     uint32_t* allocUIntArray(uint32_t size)
     {
         void* ptr = nullptr;
-        cudaMallocManaged(&ptr, size * sizeof(uint32_t));
+        cudaMallocHost(&ptr, size * sizeof(uint32_t));
         AT_CUDA_CHECK(cudaGetLastError());
         return (uint32_t*)ptr;
     }
@@ -74,14 +74,13 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
         throw std::runtime_error(std::string(name).append(" must be a CUDA tensor").c_str());
     if (!val.is_contiguous())
         throw std::runtime_error(std::string(name).append(" must be contiguous").c_str());
-    printf("success 1\n");
+
     TensorView res = {};
     res.dimensionCount = val.dim();
     res.strides = allocator->allocUIntArray(val.dim());
     res.sizes = allocator->allocUIntArray(val.dim());
     res.data = nullptr;
     size_t elementSize = 4;
-    printf("success 2\n");
 
     switch (val.scalar_type())
     {
@@ -115,7 +114,6 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
         res.data = (uint8_t*)val.data<int64_t>();
         break;
     }
-    printf("success 3, dim %d, data %lld\n", val.dim(), res.data);
 
     for (int i = 0; i < val.dim(); ++i)
     {
@@ -124,7 +122,6 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
     }
     if (!res.data)
         throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
-    printf("success 4, data %lld\n", res.data);
     return res;
 }
 
