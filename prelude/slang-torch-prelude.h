@@ -74,13 +74,15 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
         throw std::runtime_error(std::string(name).append(" must be a CUDA tensor").c_str());
     if (!val.is_contiguous())
         throw std::runtime_error(std::string(name).append(" must be contiguous").c_str());
-
+    printf("success 1\n");
     TensorView res = {};
     res.dimensionCount = val.dim();
     res.strides = allocator->allocUIntArray(val.dim());
     res.sizes = allocator->allocUIntArray(val.dim());
     res.data = nullptr;
     size_t elementSize = 4;
+    printf("success 2\n");
+
     switch (val.scalar_type())
     {
     case torch::kInt8:
@@ -120,7 +122,7 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
     }
     if (!res.data)
         throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
-
+    printf("success 3, data %lld\n", res.data);
     return res;
 }
 

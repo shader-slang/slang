@@ -324,6 +324,7 @@ public:
     virtual String generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor);
 
     String getName(IRInst* inst);
+    String getUnmangledName(IRInst* inst);
 
     void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
     
