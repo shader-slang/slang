@@ -4,6 +4,8 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <ATen/cuda/CUDAUtils.h>
 #include <vector>
+#include <exception>
+#include <string>
 
 #ifndef SLANG_NO_THROW
 #   define SLANG_NO_THROW
@@ -66,9 +68,13 @@ struct CudaTaskMemoryAllocator
     }
 };
 
-TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor val)
+TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor val, const char* name)
 {
-    val = val.to(torch::kCUDA);
+    if (!val.device().is_cuda())
+        throw std::exception(std::string(name).append(" must be a CUDA tensor").c_str());
+    if (!val.device().is_contiguous())
+        throw std::exception(std::string(name).append(" must be contiguous").c_str());
+
     TensorView res = {};
     res.dimensionCount = val.dim();
     res.strides = allocator->allocUIntArray(val.dim());

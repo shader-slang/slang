@@ -24,6 +24,8 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitStringLiteral(getName(inst));
         m_writer->emit(")");
         return true;
     }
