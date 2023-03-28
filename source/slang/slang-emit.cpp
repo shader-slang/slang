@@ -475,7 +475,6 @@ Result linkAndOptimizeIR(
 
     // We don't need the legalize pass for C/C++ based types
     if(options.shouldLegalizeExistentialAndResourceTypes )
-//    if (!(sourceLanguage == SourceLanguage::CPP || sourceStyle == SourceLanguage::C))
     {
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -533,6 +532,14 @@ Result linkAndOptimizeIR(
         dumpIRIfEnabled(codeGenContext, irModule, "LEGALIZED");
     #endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
+    else
+    {
+        // On CPU/CUDA targets, we simply elminate any empty types.
+        legalizeEmptyTypes(
+            irModule,
+            sink);
+        eliminateDeadCode(irModule);
     }
 
     // Once specialization and type legalization have been performed,

@@ -695,6 +695,10 @@ void legalizeResourceTypes(
     IRModule*       module,
     DiagnosticSink* sink);
 
+void legalizeEmptyTypes(
+    IRModule* module,
+    DiagnosticSink* sink);
+
 bool isResourceType(IRType* type);
 
 

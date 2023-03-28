@@ -7191,6 +7191,11 @@ namespace Slang
         case kIROp_Reinterpret:
         case kIROp_GetNativePtr:
         case kIROp_BackwardDiffIntermediateContextType:
+        case kIROp_MakeTargetTuple:
+        case kIROp_GetTargetTupleElement:
+        case kIROp_TorchGetCudaStream:
+        case kIROp_MakeTensorView:
+        case kIROp_TorchTensorGetView:
             return false;
 
         case kIROp_ForwardDifferentiate:
