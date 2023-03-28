@@ -3766,6 +3766,23 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
     }
 };
 
+struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
+{
+    IREmptyTypeLegalizationContext(IRModule* module)
+        : IRTypeLegalizationContext(module)
+    {}
+
+    bool isSpecialType(IRType*) override
+    {
+        return false;
+    }
+
+    LegalType createLegalUniformBufferType(IROp, LegalType) override
+    {
+        return LegalType();
+    }
+};
+
 // The main entry points that are used when transforming IR code
 // to get it ready for lower-level codegen are then simple
 // wrappers around `legalizeTypes()` that pick an appropriately
@@ -3789,6 +3806,14 @@ void legalizeExistentialTypeLayout(
     SLANG_UNUSED(sink);
 
     IRExistentialTypeLegalizationContext context(module);
+    legalizeTypes(&context);
+}
+
+void legalizeEmptyTypes(IRModule* module, DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+
+    IREmptyTypeLegalizationContext context(module);
     legalizeTypes(&context);
 }
 

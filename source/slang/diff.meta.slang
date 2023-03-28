@@ -31,6 +31,7 @@ __intrinsic_type($(kIROp_TensorViewType))
 struct TensorView
 {
     __target_intrinsic(cuda, "$0.data_ptr<$G0>()")
+    [__readNone]
     Ptr<T> data_ptr();
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
@@ -38,14 +39,19 @@ struct TensorView
     __init(TorchTensor<T> t);
 
     __target_intrinsic(cuda, "$0.load<$G0>($1)")
+    [__readNone]
     T load(uint x);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2)")
+    [__readNone]
     T load(uint x, uint y);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3)")
+    [__readNone]
     T load(uint x, uint y, uint z);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4)")
+    [__readNone]
     T load(uint x, uint y, uint z, uint w);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4, $5)")
+    [__readNone]
     T load(uint i0, uint i1, uint i2, uint i3, uint i4);
 
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2)")
@@ -60,12 +66,15 @@ struct TensorView
     void store(uint i0, uint i1, uint i2, uint i3, uint i4, T val);
 
     __target_intrinsic(cuda, "$0.dimensionCount")
+    [__readNone]
     uint dims();
 
     __target_intrinsic(cuda, "$0.sizes[$1]")
+    [__readNone]
     uint size(uint i);
 
     __target_intrinsic(cuda, "$0.strides[$1]")
+    [__readNone]
     uint stride(uint i);
 }
 
@@ -78,18 +87,22 @@ struct TorchTensor
 
     __target_intrinsic(cuda, "$0.dims()")
     __target_intrinsic(cpp, "$0.dims()")
+    [__readNone]
     uint dims();
 
     __target_intrinsic(cuda, "$0.size($1)")
     __target_intrinsic(cpp, "$0.size($1)")
+    [__readNone]
     uint size(uint i);
 
     __target_intrinsic(cuda, "$0.stride($1)")
     __target_intrinsic(cpp, "$0.stride($1)")
+    [__readNone]
     uint stride(uint i);
 
     __target_intrinsic(cuda, "$0.data_ptr<$G0>()")
     __target_intrinsic(cpp, "$0.data_ptr<$G0>()")
+    [__readNone]
     Ptr<T> data_ptr();
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
