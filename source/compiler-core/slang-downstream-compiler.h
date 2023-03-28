@@ -264,9 +264,6 @@ struct name##_AliasDepreciated##id \
     static const ptrdiff_t kEnd = SLANG_OFFSET_OF(name, lastField) + sizeof(name::lastField); \
 };
 
-// Specifies via kStart/kEnd a slice of a type that is the previous version.
-SLANG_ALIAS_DEPRECIATED_VERSION(DownstreamCompileOptions, 1, optimizationLevel, sourceManager)
-
 /* Used to indicate what kind of products are expected to be produced for a compilation. */
 typedef uint32_t DownstreamProductFlags;
 struct DownstreamProductFlag

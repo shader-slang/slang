@@ -549,14 +549,22 @@ extern "C"
         SLANG_STORAGE_BUFFER,
     };
 
+    /* NOTE! To keep binary compatibility care is needed with this enum!
+
+    * To add value, only add at the bottom (before COUNT_OF) 
+    * To remove a value, add _DEPRECATED as a suffix, but leave in the list
+    
+    This will make the enum values stable, and compatible with libraries that might not use the latest
+    enum values.
+    */
     typedef int SlangCompileTargetIntegral;
     enum SlangCompileTarget : SlangCompileTargetIntegral
     {
         SLANG_TARGET_UNKNOWN,
         SLANG_TARGET_NONE,
         SLANG_GLSL,
-        SLANG_GLSL_VULKAN,          //< deprecated: just use `SLANG_GLSL`
-        SLANG_GLSL_VULKAN_ONE_DESC, //< deprecated
+        SLANG_GLSL_VULKAN,              //< deprecated: just use `SLANG_GLSL`
+        SLANG_GLSL_VULKAN_ONE_DESC,     //< deprecated
         SLANG_HLSL,
         SLANG_SPIRV,
         SLANG_SPIRV_ASM,
@@ -564,18 +572,18 @@ extern "C"
         SLANG_DXBC_ASM,
         SLANG_DXIL,
         SLANG_DXIL_ASM,
-        SLANG_C_SOURCE,             ///< The C language
-        SLANG_CPP_SOURCE,           ///< C++ code for shader kernels.
-        SLANG_CPP_PYTORCH_BINDING,  ///< C++ PyTorch binding code.
-        SLANG_HOST_EXECUTABLE,           ///<  Standalone binary executable (for hosting CPU/OS)
-        SLANG_SHADER_SHARED_LIBRARY,     ///< A shared library/Dll for shader kernels (for hosting CPU/OS)
-        SLANG_SHADER_HOST_CALLABLE,      ///< A CPU target that makes the compiled shader code available to be run immediately
-        SLANG_CUDA_SOURCE,          ///< Cuda source
-        SLANG_PTX,                  ///< PTX
-        SLANG_CUDA_OBJECT_CODE,     ///< Object code that contains CUDA functions.
-        SLANG_OBJECT_CODE,          ///< Object code that can be used for later linking
-        SLANG_HOST_CPP_SOURCE,      ///< C++ code for host library or executable.
-        SLANG_HOST_HOST_CALLABLE,   ///< 
+        SLANG_C_SOURCE,                 ///< The C language
+        SLANG_CPP_SOURCE,               ///< C++ code for shader kernels.
+        SLANG_HOST_EXECUTABLE,          ///< Standalone binary executable (for hosting CPU/OS)
+        SLANG_SHADER_SHARED_LIBRARY,    ///< A shared library/Dll for shader kernels (for hosting CPU/OS)
+        SLANG_SHADER_HOST_CALLABLE,     ///< A CPU target that makes the compiled shader code available to be run immediately
+        SLANG_CUDA_SOURCE,              ///< Cuda source
+        SLANG_PTX,                      ///< PTX
+        SLANG_CUDA_OBJECT_CODE,         ///< Object code that contains CUDA functions.
+        SLANG_OBJECT_CODE,              ///< Object code that can be used for later linking
+        SLANG_HOST_CPP_SOURCE,          ///< C++ code for host library or executable.
+        SLANG_HOST_HOST_CALLABLE,       ///< Host callable host code (ie non kernel/shader) 
+        SLANG_CPP_PYTORCH_BINDING,      ///< C++ PyTorch binding code.
         SLANG_TARGET_COUNT_OF,
     };
 
