@@ -62,7 +62,7 @@ TorchTensor<float> square_fwd(TorchTensor<float> input)
     return result;
 }
 ```
-Here, we first call `TorchTensor<float>.alloc` to allocate a 2D-tensor that has the same size as the input.
+Here, we first call `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
 This function returns a `TorchTensor<float>` object that represents a CPU handle of a PyTorch tensor.
 Then we launch `square_fwd_kernel` with the `__dispatch_kernel` syntax. Note that we can directly pass
 `TorchTensor<float>` arguments to a `TensorView<float>` parameter and the compiler will automatically convert
@@ -223,7 +223,7 @@ As shown in previous tutorial, Slang has defined the `TorchTensor<T>` and `Tenso
 tensors. The `TorchTensor<T>` represents the CPU view of a tensor and provides methods to allocate a new tensor object.
 The `TensorView<T>` represents the GPU view of a tensor and provides accesors to read write tensor data.
 
-Following is a list of builtin methods provided by each type.
+Following is a list of builtin methods and attributes for PyTorch interop.
 
 ### `static TorchTensor<T> TorchTensor<T>.alloc(uint x, uint y, ...)`
 Allocates a new PyTorch tensor with the given dimensions.
@@ -264,3 +264,39 @@ Returns the `blockIdx` variable in CUDA.
 
 ### `cudaBlockDim()`
 Returns the `blockDim` variable in CUDA.
+
+### `[CudaKernel]` attribute
+Marks a function as a CUDA kernel (maps to a `__global__` function)
+
+### `[TorchEntryPoint]` attribute
+Marks a function for export to Python. Functions marked with `[TorchEntryPoint]` will be accessible from a loaded module returned by `slangpy.loadModule`.
+
+### `[CudaDeviceExport]` attribute
+Marks a function as a cuda device function, and ensures the compiler to include it in the generated cuda source.
+
+## Type Marshalling Between Slang and Python
+
+The return types and parameters types of an exported `[TorchEntryPoint]` function can be a basic type (e.g. `float`, `int` etc.), a vector type (e.g. `float3`), a `TorchTensor<T>` type, an array type, or a struct type.
+
+When you use struct or array types in the function signature, it will be exposed as a Python tuple.
+For example,
+```csharp
+struct MyReturnType
+{
+    TorchTensor<T> tensors[3];
+    float v;
+}
+
+[TorchEntryPoint]
+MyReturnType myFunc()
+{
+    ...
+}
+```
+
+Calling `myFunc` from python will result in a python tuple in the form of
+```
+[[tensor, tensor, tensor], float]
+```
+
+The same transform rules applies to parameter types.
