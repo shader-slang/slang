@@ -9,6 +9,8 @@
 #include "../../source/core/slang-dictionary.h"
 #include "tools/unit-test/slang-unit-test.h"
 
+#include <llvm/Support/SourceMgr.h>
+
 #include <mutex>
 
 enum class TestOutputMode
@@ -84,10 +86,13 @@ class TestReporter : public ITestReporter
 
         // Called for an error in the test-runner (not for an error involving a test itself).
     void message(TestMessageType type, const Slang::String& errorText);
+    SLANG_ATTR_PRINTF(3, 4)
     void messageFormat(TestMessageType type, char const* message, ...);
     virtual SLANG_NO_THROW void SLANG_MCALL message(TestMessageType type, char const* message) override;
 
     void dumpOutputDifference(const Slang::String& expectedOutput, const Slang::String& actualOutput);
+
+    void dumpLLVMDiagnostic(const llvm::SMDiagnostic& diag);
 
     void consolidateWith(TestReporter* other);
 

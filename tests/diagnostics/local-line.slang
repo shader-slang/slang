@@ -3,6 +3,7 @@
 //TEST:SIMPLE_LINE:-entry computeMain -target dxbc  -stage compute
 //TEST:SIMPLE_LINE:-entry computeMain -target dll -stage compute
 //TEST:SIMPLE_LINE:-entry computeMain -target ptx -stage compute
+//TEST:SIMPLE_LINE(filecheck=CHECK):-entry computeMain -target spirv -stage compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -37,6 +38,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         else
         {
             a = e; b = c + c; d += d + __SyntaxError(); e = doThing(e, int(dispatchThreadID.x));
+            // CHECK: [[#@LINE-1]]
             
         }
     }
