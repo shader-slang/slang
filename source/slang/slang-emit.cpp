@@ -535,11 +535,17 @@ Result linkAndOptimizeIR(
     }
     else
     {
+#if 0
         // On CPU/CUDA targets, we simply elminate any empty types.
+        // TODO: disable for now, since the CPU compute shader
+        // trampoline is still hard coded to assume there are
+        // entrypoint and global parameters. renable when
+        // we fix that logic.
         legalizeEmptyTypes(
             irModule,
             sink);
         eliminateDeadCode(irModule);
+#endif
     }
 
     // Once specialization and type legalization have been performed,
