@@ -79,59 +79,43 @@ struct TensorView
 
     __subscript(uint index) -> T
     {
-        __target_intrinsic(cuda, "$0.load<$G0>($1)")
-        [__readNone] get;
-        __target_intrinsic(cuda, "$0.store<$G0>($1, $2)")
-        set;
+        [ForceInline] [__readNone] get { return load(index); }
+        [ForceInline] set { store(index, newValue); }
     }
     __subscript(uint i1, uint i2) -> T
     {
-        __target_intrinsic(cuda, "$0.load<$G0>($1, $2)")
-        [__readNone] get;
-        __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3)")
-        set;
+        [ForceInline] [__readNone] get { return load(i1, i2); }
+        [ForceInline] set { store(i1, i2, newValue); }
     }
     __subscript(uint2 i) -> T
     {
-        __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y)")
-        [__readNone] get;
-        __target_intrinsic(cuda, "$0.store<$G0>($1.x, $1.y, $2)")
-        set;
+        [ForceInline] [__readNone] get { return load(i.x, i.y); }
+        [ForceInline] set { store(i.x, i.y, newValue); }
     }
     __subscript(uint i1, uint i2, uint i3) -> T
     {
-        __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3)")
-        [__readNone] get;
-        __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3, $4)")
-        set;
+        [ForceInline] [__readNone] get { return load(i1, i2, i3); }
+        [ForceInline] set { store(i1, i2, i3, newValue); }
     }
     __subscript(uint3 i) -> T
     {
-        __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y, $1.z)")
-        [__readNone] get;
-        __target_intrinsic(cuda, "$0.store<$G0>($1.x, $1.y, $1.z, $2)")
-        set;
+        [ForceInline] [__readNone] get { return load(i.x, i.y, i.z); }
+        [ForceInline] set { store(i.x, i.y, i.z, newValue); }
     }
     __subscript(uint i1, uint i2, uint i3, uint i4) -> T
     {
-        __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4)")
-        [__readNone] get;
-        __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3, $4, $5)")
-        set;
+        [ForceInline] [__readNone] get { return load(i1, i2, i3, i4); }
+        [ForceInline] set { store(i1, i2, i3, i4, newValue); }
     }
     __subscript(uint4 i) -> T
     {
-        __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y, $1.z, $1.w)")
-        [__readNone] get;
-        __target_intrinsic(cuda, "$0.store<$G0>($1.x, $1.y, $1.z, $1.w, $2)")
-        set;
+        [__readNone][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
+        [ForceInline] set { store(i.x, i.y, i.z, i.w, newValue); }
     }
     __subscript(uint i1, uint i2, uint i3, uint i4, uint i5) -> T
     {
-        __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4, $5)")
-        [__readNone] get;
-        __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3, $4, $5, $6)")
-        set;
+        [ForceInline] [__readNone] get { return load(i1, i2, i3, i4, i5); }
+        [ForceInline] set { store(i1, i2, i3, i4, i5, newValue); }
     }
 }
 
@@ -177,8 +161,8 @@ struct TorchTensor
     __intrinsic_op($(kIROp_AllocateTorchTensor))
     static TorchTensor<T> alloc(uint i0, uint i1, uint i2, uint i3, uint i4);
 
-    __target_intrinsic(cuda, "torch::zeros_like($0)")
-    static TorchTensor<T> zeros_like(TorchTensor<T> other);
+    __intrinsic_op($(kIROp_AllocateTorchTensor))
+    static TorchTensor<T> zerosLike(TorchTensor<T> other);
 }
 
 __generic<T: IDifferentiable>
