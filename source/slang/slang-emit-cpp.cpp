@@ -1212,6 +1212,17 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit(")");
             return true;
         }
+        case kIROp_GetTargetTupleElement:
+        {
+            auto outerPrec = getInfo(EmitOp::General);
+            auto prec = getInfo(EmitOp::Postfix);
+            m_writer->emit("std::get<");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(">(");
+            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+            m_writer->emit(")");
+            return true;
+        }
         case kIROp_CastFloatToInt:
         case kIROp_CastIntToFloat:
         case kIROp_FloatCast:
