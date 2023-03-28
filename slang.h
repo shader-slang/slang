@@ -552,7 +552,7 @@ extern "C"
     /* NOTE! To keep binary compatibility care is needed with this enum!
 
     * To add value, only add at the bottom (before COUNT_OF) 
-    * To remove a value, add _DEPRECIATED as a suffix, but leave in the list
+    * To remove a value, add _DEPRECATED as a suffix, but leave in the list
     
     This will make the enum values stable, and compatible with libraries that might not use the latest
     enum values.
