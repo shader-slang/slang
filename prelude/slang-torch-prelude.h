@@ -115,6 +115,8 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
         res.data = (uint8_t*)val.data<int64_t>();
         break;
     }
+    printf("success 3, dim %d, data %lld\n", val.dim(), res.data);
+
     for (int i = 0; i < val.dim(); ++i)
     {
         res.strides[i] = val.stride(i) * elementSize;
@@ -122,7 +124,7 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
     }
     if (!res.data)
         throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
-    printf("success 3, data %lld\n", res.data);
+    printf("success 4, data %lld\n", res.data);
     return res;
 }
 
