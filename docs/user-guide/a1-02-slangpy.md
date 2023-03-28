@@ -10,7 +10,7 @@ to provide a simple way to define kernel functions that runs extremely fast in g
 automatic differentiation and PyTorch interop features, Slang provides a streamlined solution to author auto-differentiated kernels
 that runs at the speed of light with a strongly typed, per-thread programming model.
 
-## Getting Started with `slangpy`
+## Getting Started with slangpy
 
 In this tutorial, we will use a simple example to walkthrough the steps to use Slang in your PyTorch project.
 
@@ -62,8 +62,8 @@ TorchTensor<float> square_fwd(TorchTensor<float> input)
     return result;
 }
 ```
-Here, we first call `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
-This function returns a `TorchTensor<float>` object that represents a CPU handle of a PyTorch tensor.
+Here, we mark the function with the `[TorchEntryPoint]` attribute so it will be exported to Python. In the function body, we call `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
+`zerosLike` returns a `TorchTensor<float>` object that represents a CPU handle of a PyTorch tensor.
 Then we launch `square_fwd_kernel` with the `__dispatch_kernel` syntax. Note that we can directly pass
 `TorchTensor<float>` arguments to a `TensorView<float>` parameter and the compiler will automatically convert
 the type and obtain a view into the tensor that can be accessed by the GPU kernel function.
@@ -162,7 +162,7 @@ __bwd_diff(square)(dp, 1.0);
 // dp.d is now 6.0
 ```
 
-Similarly to `square_fwd`, we can define the host side function `square_bwd` as:
+Similar to `square_fwd`, we can define the host side function `square_bwd` as:
 
 ```csharp
 [TorchEntryPoint]
@@ -176,11 +176,11 @@ TorchTensor<float> square_bwd(TorchTensor<float> input, TorchTensor<float> grad_
 }
 ```
 
-You can refer [this documentation](07-autodiff.md) for a detailed reference of Slang's automatic differentiation system.
+You can refer to [this documentation](07-autodiff.md) for a detailed reference of Slang's automatic differentiation feature.
 
 With this, the python script `slangpy.loadModule("square.slang")` will now return
 a scope that defines two functions, `square_fwd` and `square_bwd`. We can then use these
-two functions to define a PyTorch autograd kernel class:
+two functions to define a PyTorch autograd function class:
 
 ```python
 m = slangpy.loadModule("square.slang")
@@ -217,7 +217,7 @@ dX = tensor([[6., 8.],
 ```
 
 
-## Builtin Types for PyTorch Interop
+## Builtin Library Support for PyTorch Interop
 
 As shown in previous tutorial, Slang has defined the `TorchTensor<T>` and `TensorView<T>` type for interop with PyTorch
 tensors. The `TorchTensor<T>` represents the CPU view of a tensor and provides methods to allocate a new tensor object.
