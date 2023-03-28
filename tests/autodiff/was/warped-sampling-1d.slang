@@ -36,7 +36,6 @@ struct PRNG
     uint state;
 };
 
-
 struct LineSegment : IDifferentiable
 {
     float x0;
@@ -87,7 +86,7 @@ void accumulateDifferentialFixedPoint(
     RWStructuredBuffer<int> buffer, 
     uint index,
     float.Differential df,
-    float scale = 100000.f)
+    float scale = 1000000.f)
 {
     InterlockedAdd(buffer[index], (int)round(df * scale));
 }
@@ -103,7 +102,6 @@ void d_fwd_loadLineSegment(uint id, DifferentialPair<LineSegment>.Differential d
     accumulateDifferentialFixedPoint(endpointDifferentialBufferInt, id * 2, dp_ls.p.x0);
     accumulateDifferentialFixedPoint(endpointDifferentialBufferInt, id * 2 + 1, dp_ls.p.x1);
 }
-
 
 int getIntersectionID(float x)
 {
@@ -271,13 +269,16 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 
     if (threadIdx.x < 10)
         endpointDifferentialBuffer[threadIdx.x] =
-            endpointDifferentialBufferInt[threadIdx.x] / 100000.f;
-    
-    // Note that this specific derivative estimation method is biased, so the 
-    // expected results are approximate. (We've fixed the RNG seed to generate 
-    // repeatable results)
-    // 
-    // Expect: Approximately -1.0 in endpointDifferentialBuffer[0]
-    // Expect: Approximately 1.0 in endpointDifferentialBuffer[1]
-    //
+            endpointDifferentialBufferInt[threadIdx.x] / 1000000.f;
+
+// Note that this specific derivative estimation method is biased, so the
+// expected results are approximate. (We've fixed the RNG seed to generate
+// repeatable results)
+//
+// Expect: Approximately -1.0 in endpointDifferentialBuffer[0]
+// Expect: Approximately 1.0 in endpointDifferentialBuffer[1]
+//
+// Expect: Approximately 0.0 in endpointDifferentialBuffer[2]
+// Expect: Approximately 0.0 in endpointDifferentialBuffer[3]
+//
 }
