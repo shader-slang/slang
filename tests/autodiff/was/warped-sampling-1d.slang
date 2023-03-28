@@ -285,4 +285,12 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
     if (threadIdx.x < 10)
         endpointDifferentialBuffer[threadIdx.x] =
             reinterpret<float, uint>(endpointDifferentialBufferUInt[threadIdx.x]);
+    
+    // Note that this specific derivative estimation method is biased, so the 
+    // expected results are approximate. (We've fixed the RNG seed to generate 
+    // repeatable results)
+    // 
+    // Expect: Approximately -1.0 in endpointDifferentialBuffer[0]
+    // Expect: Approximately 1.0 in endpointDifferentialBuffer[1]
+    //
 }
