@@ -2440,7 +2440,10 @@ IRInst* specializeGenericImpl(
                 cloneInstDecorationsAndChildren(
                     &env, module, specializeInst, specializedVal);
 
-                // If specializedVal is a function, optimize it.
+                // Perform IR simplifications to fold constants in this specialized value if it is a function, so 
+                // further specializations from the specialized function will have as simple specialization 
+                // arguments as possible to avoid creating specializations that eventually simplified into 
+                // the same thing.
                 if (auto func = as<IRFunc>(specializedVal))
                 {
                     simplifyFunc(func);
