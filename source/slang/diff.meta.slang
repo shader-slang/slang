@@ -76,6 +76,47 @@ struct TensorView
     __target_intrinsic(cuda, "$0.strides[$1]")
     [__readNone]
     uint stride(uint i);
+
+    __subscript(uint index) -> T
+    {
+        [ForceInline] [__readNone] get { return load(index); }
+        [ForceInline] set { store(index, newValue); }
+    }
+    __subscript(uint i1, uint i2) -> T
+    {
+        [ForceInline] [__readNone] get { return load(i1, i2); }
+        [ForceInline] set { store(i1, i2, newValue); }
+    }
+    __subscript(uint2 i) -> T
+    {
+        [ForceInline] [__readNone] get { return load(i.x, i.y); }
+        [ForceInline] set { store(i.x, i.y, newValue); }
+    }
+    __subscript(uint i1, uint i2, uint i3) -> T
+    {
+        [ForceInline] [__readNone] get { return load(i1, i2, i3); }
+        [ForceInline] set { store(i1, i2, i3, newValue); }
+    }
+    __subscript(uint3 i) -> T
+    {
+        [ForceInline] [__readNone] get { return load(i.x, i.y, i.z); }
+        [ForceInline] set { store(i.x, i.y, i.z, newValue); }
+    }
+    __subscript(uint i1, uint i2, uint i3, uint i4) -> T
+    {
+        [ForceInline] [__readNone] get { return load(i1, i2, i3, i4); }
+        [ForceInline] set { store(i1, i2, i3, i4, newValue); }
+    }
+    __subscript(uint4 i) -> T
+    {
+        [__readNone][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
+        [ForceInline] set { store(i.x, i.y, i.z, i.w, newValue); }
+    }
+    __subscript(uint i1, uint i2, uint i3, uint i4, uint i5) -> T
+    {
+        [ForceInline] [__readNone] get { return load(i1, i2, i3, i4, i5); }
+        [ForceInline] set { store(i1, i2, i3, i4, i5, newValue); }
+    }
 }
 
 __generic<T>
@@ -119,6 +160,9 @@ struct TorchTensor
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
     static TorchTensor<T> alloc(uint i0, uint i1, uint i2, uint i3, uint i4);
+
+    __intrinsic_op($(kIROp_AllocateTorchTensor))
+    static TorchTensor<T> zerosLike(TorchTensor<T> other);
 }
 
 __generic<T: IDifferentiable>

@@ -945,6 +945,13 @@ String CLikeSourceEmitter::getName(IRInst* inst)
     return name;
 }
 
+String CLikeSourceEmitter::getUnmangledName(IRInst* inst)
+{
+    if (auto nameHintDecor = inst->findDecoration<IRNameHintDecoration>())
+        return nameHintDecor->getName();
+    return getName(inst);
+}
+
 void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch(inst->getOp())

@@ -6,6 +6,14 @@
 #define SLANG_CUDA_RTC 0
 #endif
 
+#if SLANG_CUDA_RTC
+
+#else
+
+#include <cstdint>
+
+#endif
+
 // Define SLANG_CUDA_ENABLE_HALF to use the cuda_fp16 include to add half support. 
 // For this to work NVRTC needs to have the path to the CUDA SDK.
 //
@@ -162,6 +170,8 @@ typedef int2 bool2;
 typedef int3 bool3;
 typedef int4 bool4; 
 
+#if SLANG_CUDA_RTC
+
 typedef signed char int8_t;
 typedef short int16_t;
 typedef int int32_t;
@@ -171,6 +181,8 @@ typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
+
+#endif
 
 typedef long long longlong;
 typedef unsigned long long ulonglong;
@@ -2099,27 +2111,27 @@ struct TensorView
     }
 
     template<typename T>
-    __device__ T load(uint32_t x)
+    __device__ T& load(uint32_t x)
     {
         return *reinterpret_cast<T*>(data + strides[0] * x);
     }
     template<typename T>
-    __device__ T load(uint32_t x, uint32_t y)
+    __device__ T& load(uint32_t x, uint32_t y)
     {
         return *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y);
     }
     template<typename T>
-    __device__ T load(uint32_t x, uint32_t y, uint32_t z)
+    __device__ T& load(uint32_t x, uint32_t y, uint32_t z)
     {
         return *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y + strides[2] * z);
     }
     template<typename T>
-    __device__ T load(uint32_t x, uint32_t y, uint32_t z, uint32_t w)
+    __device__ T& load(uint32_t x, uint32_t y, uint32_t z, uint32_t w)
     {
         return *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y + strides[2] * z + strides[3] * w);
     }
     template<typename T>
-    __device__ T load(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4)
+    __device__ T& load(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4)
     {
         return *reinterpret_cast<T*>(data + strides[0] * i0 + strides[1] * i1 + strides[2] * i2 + strides[3] * i3 + strides[4] * i4);
     }

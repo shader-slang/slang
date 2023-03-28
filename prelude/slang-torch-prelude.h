@@ -4,6 +4,8 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <ATen/cuda/CUDAUtils.h>
 #include <vector>
+#include <stdexcept>
+#include <string>
 
 #ifndef SLANG_NO_THROW
 #   define SLANG_NO_THROW
@@ -54,7 +56,7 @@ struct CudaTaskMemoryAllocator
     uint32_t* allocUIntArray(uint32_t size)
     {
         void* ptr = nullptr;
-        cudaMallocManaged(&ptr, size * sizeof(uint32_t));
+        cudaMallocHost(&ptr, size * sizeof(uint32_t));
         AT_CUDA_CHECK(cudaGetLastError());
         return (uint32_t*)ptr;
     }
@@ -66,15 +68,18 @@ struct CudaTaskMemoryAllocator
     }
 };
 
-TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor val)
+TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor val, const char* name)
 {
-    val = val.to(torch::kCUDA);
+    if (!val.device().is_cuda())
+        val = val.to(torch::kCUDA);
+ 
     TensorView res = {};
     res.dimensionCount = val.dim();
     res.strides = allocator->allocUIntArray(val.dim());
     res.sizes = allocator->allocUIntArray(val.dim());
     res.data = nullptr;
     size_t elementSize = 4;
+
     switch (val.scalar_type())
     {
     case torch::kInt8:
@@ -107,11 +112,14 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
         res.data = (uint8_t*)val.data_ptr<int64_t>();
         break;
     }
+
     for (int i = 0; i < val.dim(); ++i)
     {
         res.strides[i] = val.stride(i) * elementSize;
         res.sizes[i] = val.size(i);
     }
+    if (!res.data)
+        throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
     return res;
 }
 
