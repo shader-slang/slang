@@ -1621,10 +1621,18 @@ struct DiffTransposePass
             if (auto varToHoist = as<IRVar>(inst))
             {
                 varToHoist->insertBefore(varBlock->getFirstOrdinaryInst());
-                inst = findUniqueStoredVal(varToHoist)->getUser();
-                SLANG_ASSERT(inst);
+                auto uniqueStoreUse = findUniqueStoredVal(varToHoist);
+                if (uniqueStoreUse)
+                {
+                    inst = uniqueStoreUse->getUser();
+                    SLANG_ASSERT(inst);
 
-                defBlock = getBlock(inst);
+                    defBlock = getBlock(inst);
+                }
+                else
+                {
+                    defBlock = getBlock(inst);
+                }
             }
             else
             {

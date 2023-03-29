@@ -6446,7 +6446,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         setGlobalValue(context, inheritanceDecl, LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
         auto irSubType = lowerType(subContext, subType);
-        irWitnessTable->setOperand(0, irSubType);
+        irWitnessTable->setConcreteType(irSubType);
 
         // TODO(JS): 
         // Should the mangled name take part in obfuscation if enabled?

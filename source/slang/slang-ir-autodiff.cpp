@@ -282,15 +282,29 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     IRBuilder* builder, IRType* originalPairType)
 {
     IRInst* result = nullptr;
-    if (pairTypeCache.TryGetValue(originalPairType, result))
-        return result;
     auto pairType = as<IRDifferentialPairTypeBase>(originalPairType);
+    if (!pairType)
+        return originalPairType;
+
+    // We make our type cache keyed on the primal type, not the pair type.
+    // This is because there may be duplicate pair types for the same
+    // primal type but different witness tables, and we don't want to treat
+    // them as distinct.
+    // We might want to consider making witness tables part of IR
+    // deduplication (make them HOISTABLE insts), but that is a bigger
+    // change. Another alternative is to make the witness operand of
+    // `IRDifferentialPairTypeBase` be child instead of an operand
+    // so that it is not considered part of the type for deduplication
+    // purposes.
+
+    auto primalType = pairType->getValueType();
+    if (pairTypeCache.TryGetValue(primalType, result))
+        return result;
     if (!pairType)
     {
         result = originalPairType;
         return result;
     }
-    auto primalType = pairType->getValueType();
     if (as<IRParam>(primalType))
     {
         result = nullptr;
@@ -301,7 +315,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     if (!diffType)
         return result;
     result = _createDiffPairType(pairType->getValueType(), (IRType*)diffType);
-    pairTypeCache.Add(originalPairType, result);
+    pairTypeCache.Add(primalType, result);
 
     return result;
 }

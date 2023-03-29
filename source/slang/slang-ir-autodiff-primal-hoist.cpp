@@ -23,7 +23,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
     HashSet<IRUse*> processedUses;
 
     HashSet<IRUse*> usesToReplace;
-    
+
     auto addPrimalOperandsToWorkList = [&](IRInst* inst)
     {
         UIndex opIndex = 0;
@@ -144,7 +144,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
                 if (auto var = as<IRVar>(result.instToRecompute))
                 {
                     IRUse* storeUse = findUniqueStoredVal(var);
-                    if (!storeUse)
+                    if (storeUse)
                         workList.add(storeUse);
                 }
                 else

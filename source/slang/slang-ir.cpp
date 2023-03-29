@@ -2389,6 +2389,25 @@ namespace Slang
             capabilitySetType, kIROp_CapabilitySet, args.getCount(), args.getBuffer());
     }
 
+    static void canonicalizeInstOperands(IRBuilder& builder, IRInst* inst)
+    {
+        // For Array types, we always want to make sure its element count
+        // has an int32_t type. We will convert all other int types to int32_t
+        // to avoid things like float[8] and float[8U] being distinct types.
+        if (inst->getOp() == kIROp_ArrayType)
+        {
+            IRInst* elementCount = inst->getOperand(1);
+            if (auto intLit = as<IRIntLit>(elementCount))
+            {
+                if (intLit->getDataType()->getOp() != kIROp_IntType)
+                {
+                    IRInst* newElementCount = builder.getIntValue(builder.getIntType(), intLit->getValue());
+                    inst->getOperands()[1].usedValue = newElementCount;
+                }
+            }
+        }
+    }
+
     IRInst* IRBuilder::_findOrEmitHoistableInst(
         IRType* type,
         IROp op,
@@ -2447,6 +2466,8 @@ namespace Slang
                 }
             }
         }
+
+        canonicalizeInstOperands(*this, inst);
 
         // Find or add the key/inst
         {
@@ -2515,6 +2536,38 @@ namespace Slang
         UInt            operandCount,
         IRInst* const*  operands)
     {
+        switch (op)
+        {
+        case kIROp_ArrayType:
+            {
+                ShortList<IRInst*, 2> newOperands;
+                newOperands.addRange(operands, operandCount);
+
+                // If elementCount does not have int type, then we always cast
+                // it to an int type, to avoid having to deal with the
+                // possibility that an array<int, 2> and an array<int, 2U> are
+                // treated as distinct types.
+                if (operandCount < 2) break;
+                auto elementCount = operands[1];
+                if (elementCount->getFullType() && elementCount->getFullType()->getOp() != kIROp_IntType)
+                {
+                    auto intLit = as<IRIntLit>(elementCount);
+                    if (intLit)
+                        elementCount = getIntValue(getIntType(), intLit->getValue());
+                    else
+                        elementCount = emitIntrinsicInst(getIntType(), kIROp_IntCast, 1, &elementCount);
+                }
+                newOperands[1] = elementCount;
+                return (IRType*)createIntrinsicInst(
+                    nullptr,
+                    op,
+                    operandCount,
+                    newOperands.getArrayView().getBuffer());
+            }
+        default:
+            break;
+        }
+
         return (IRType*)createIntrinsicInst(
             nullptr,
             op,
