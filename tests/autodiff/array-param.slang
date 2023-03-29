@@ -5,7 +5,7 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-static const uint32_t N_LATENT_DIMS = 4;
+#define N_LATENT_DIMS 4
 static const uint32_t kDecoderInputCount = 6;
 struct LatentTexture
 {
