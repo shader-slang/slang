@@ -393,18 +393,19 @@ static const int kCannotExecute = 126;
     int stderrPipe[2];
     int stdinPipe[2];
 
-    if (pipe(stdoutPipe) == -1 || pipe(stderrPipe) == -1 || pipe(stdinPipe) == -1)
+    // We will create this pipe with O_CLOEXEC, so that it gets closed
+    // automatically if the child's exec succeeds
+    int execWatchPipe[2];
+
+    if (pipe(stdoutPipe) == -1 ||
+        pipe(stderrPipe) == -1 ||
+        pipe(stdinPipe) == -1 ||
+        pipe2(execWatchPipe, O_CLOEXEC) == -1)
     {
         fprintf(stderr, "error: `pipe` failed\n");
         return SLANG_FAIL;
     }
 
-    // TODO(JS): 
-    // Ideally we'd have a mechanism to test if execvp can be successfully executed (at least in principal) before
-    // doing fork. Once we have forked we then have the problem of communicating to the parent process somehow.
-    //
-    // We could do a search down PATH and test files etc, but this seems to repeat a lot of the functionality of exec.
-    //    
     pid_t childPid = fork();
     if (childPid == -1)
     {
@@ -431,6 +432,8 @@ static const int kCannotExecute = 126;
         ::close(stdinPipe[0]);
         ::close(stdinPipe[1]);
 
+        ::close(execWatchPipe[0]);
+
         // TODO(JS): Strictly speaking if m_executableType is 'Path' then we shouldn't be searching. Ie which
         // exec we use here should be dependent on the executable type.
 
@@ -446,6 +449,10 @@ static const int kCannotExecute = 126;
         }
 
         // If we get here, then `exec` failed
+
+        // Signal the failure to our parent
+        int execErr = errno;
+        ::write(execWatchPipe[1], &execErr, sizeof(execErr));
 
         // NOTE! Because we have dup2 into STDERR_FILENO, this error will *not* generally appear on
         // the terminal but in the stderrPipe. 
@@ -469,6 +476,31 @@ static const int kCannotExecute = 126;
         streams[Index(StdStreamType::Out)] = new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
         streams[Index(StdStreamType::ErrorOut)] = new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
         streams[Index(StdStreamType::In)] = new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
+
+        // Check that the exec actually succeeded
+        int execErrCode;
+        // Our success is if we read zero bytes, indicating that the pipe was
+        // closed by the child's exec and O_CLOEXEC. (and us just here)
+        ::close(execWatchPipe[1]);
+        const int readRes = ::read(execWatchPipe[0], &execErrCode, sizeof(execErrCode));
+        if(readRes < 0)
+        {
+            fprintf(stderr, "error: failed to read status of forked process\n");
+            return SLANG_FAIL;
+        }
+        else if (readRes > 0)
+        {
+            // exec failed, and the child reported back to us
+            // don't print messages by default, as we do some speculative
+            // execution of processes to see if they exist and it gets noisy
+            const bool verbose = false;
+            if (verbose)
+            {
+                fprintf(stderr, "error: exec for \"%s\" failed: %s\n", argPtrs[0],
+                        ::strerror(execErrCode));
+            }
+            return SLANG_FAIL;
+        }
 
         outProcess = new UnixProcess(childPid, streams[0].readRef());
         return SLANG_OK;
