@@ -180,7 +180,7 @@ void _encode(Index v, StringBuilder& out)
 
 /* static */SlangResult JSONSourceMapUtil::decode(JSONContainer* container, JSONValue root, DiagnosticSink* sink, RefPtr<SourceMap>& out)
 {
-    RefPtr<SourceMap> sourceMap;
+    RefPtr<SourceMap> sourceMap(new SourceMap);
 
     // Let's try and decode the JSON into native types to make this easier...
     RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
