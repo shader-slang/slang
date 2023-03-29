@@ -8,7 +8,9 @@ Using Slang to Write PyTorch Kernels
 If you are a PyTorch user looking for a way to write complex, high performance and automatically differentiated kernel functions in a per-thread instead of full-tensor style, give Slang a try. Slang is evolved from on a traditional shading language that were designed
 to provide a simple way to define kernel functions that runs extremely fast in graphics applications. With the latest addition of
 automatic differentiation and PyTorch interop features, Slang provides a streamlined solution to author auto-differentiated kernels
-that runs at the speed of light with a strongly typed, per-thread programming model. The advantage of a per-thread programming model in kernel programming is that developers no longer need to worry maintaining masks for branches. When a kernel is written in Slang, you can use all the control flow statements, composite data types (structs, arrays etc.) and and function calls without any additional efforts. Code written with these language constructs can be automatically differentiated by the compiler without restrictions.
+that runs at the speed of light with a strongly typed, per-thread programming model. 
+
+The advantage of a per-thread programming model in kernel programming is that developers no longer need to worry about maintaining masks for branches. When a kernel is written in Slang, you can use all the control flow statements, composite data types (structs, arrays etc.) and and function calls without any additional efforts. Code written with these language constructs can be automatically differentiated by the compiler without restrictions. Slang is a strongly typed language so you will never run into type errors at runtime, most code errors can be discovered as you type in your code in the editor thanks to the [compiler's coding assistance service}(https://marketplace.visualstudio.com/items?itemName=shader-slang.slang-language-extension).
 
 ## Getting Started with slangpy
 
