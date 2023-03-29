@@ -346,5 +346,6 @@ IRUse* findUniqueStoredVal(IRVar* var);
 
 bool isDerivativeContextVar(IRVar* var);
 
+bool isDiffInst(IRInst* inst);
 
 };

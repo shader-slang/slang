@@ -43,6 +43,9 @@ struct PeepholeContext : InstPassBase
         chainKey.reverse();
         if (auto updateInst = as<IRUpdateElement>(chainNode))
         {
+            // If we see an extract(updateElement(x, accessChain, val), accessChain), then
+            // we can replace the inst with val.
+
             if (updateInst->getAccessKeyCount() > (UInt)chainKey.getCount())
                 return false;
 
@@ -96,6 +99,8 @@ struct PeepholeContext : InstPassBase
             }
             else if (isAccessChainNotEqual)
             {
+                // If we see an extract(updateElement(x, accessChain, val), accessChain2), where accessChain!=accessChain2,
+                // then we can replace the inst with extract(x, accessChain2).
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto newInst = builder.emitElementExtract(updateInst->getOldValue(), chainKey.getArrayView());
@@ -445,12 +450,65 @@ struct PeepholeContext : InstPassBase
                             changed = true;
                         }
                     }
+                    else
+                    {
+                        // Check if the updated value is a chain of `updateElement` instructions that
+                        // updates every element in the same array, and if so we can replace the
+                        // whole chain with a single `makeArray` instruction.
+                        auto arrayType = as<IRArrayType>(inst->getDataType());
+                        if (!arrayType) break;
+                        auto arraySize = as<IRIntLit>(arrayType->getElementCount());
+                        if (!arraySize) break;
+                        
+                        List<IRInst*> args;
+                        args.setCount((UInt)arraySize->getValue());
+                        for (Index i = 0; i < args.getCount(); i++)
+                            args[i] = nullptr;
+
+                        for (auto updateElement = updateInst; updateElement;
+                             updateElement = as<IRUpdateElement>(updateElement->getOldValue()))
+                        {
+                            auto subKey = updateElement->getAccessKey(0);
+                            auto subConstIndex = as<IRIntLit>(subKey);
+                            if (!subConstIndex)
+                                break;
+                            auto index = (Index)subConstIndex->getValue();
+                            if (index >= args.getCount())
+                                break;
+                            // If we have already seen an update for this index, then we can't
+                            // override it with an earlier update.
+                            if (args[index])
+                                continue;
+                            args[index] = updateElement->getElementValue();
+                        }
+
+                        bool isComplete = true;
+                        for (auto arg : args)
+                        {
+                            if (!arg)
+                            {
+                                isComplete = false;
+                                break;
+                            }
+                        }
+                        if (isComplete)
+                        {
+                            IRBuilder builder(module);
+                            builder.setInsertBefore(inst);
+                            auto makeArray = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
+                            inst->replaceUsesWith(makeArray);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                        }
+                    }
                 }
                 else if (auto structKey = as<IRStructKey>(key))
                 {
                     auto oldVal = inst->getOperand(0);
                     if (oldVal->getOp() == kIROp_MakeStruct)
                     {
+                        // If we see updateElement(makeStruct(...), structKey, ...), we can
+                        // replace it with a makeStruct that has the updated value.
                         auto structType = as<IRStructType>(inst->getDataType());
                         if (!structType) break;
                         List<IRInst*> args;
@@ -483,6 +541,58 @@ struct PeepholeContext : InstPassBase
                             maybeRemoveOldInst(inst);
                             changed = true;
                         }
+                    }
+                    else
+                    {
+                        // Check if the updated `oldVal` is a chain of updateElement insts that assigns
+                        // values to every field of the struct, if so, we can just emit a makeStruct instead.
+                        Dictionary<IRStructKey*, IRInst*> mapFieldKeyToVal;
+                        for (auto updateElement = as<IRUpdateElement>(inst); updateElement;
+                             updateElement = as<IRUpdateElement>(updateElement->getOldValue()))
+                        {
+                            if (updateElement->getAccessKeyCount() != 1)
+                                break;
+                            auto subStructKey = as<IRStructKey>(updateElement->getAccessKey(0));
+                            if (!subStructKey)
+                                break;
+
+                            // If the key already exists, it means there is already a later update at this key.
+                            // We need to be careful not to override it with an earlier value.
+                            // AddIfNotExists will ensure this does not happen.
+                            mapFieldKeyToVal.AddIfNotExists(
+                                subStructKey, updateElement->getElementValue());
+                        }
+
+                        // Check if every field of the struct has a value assigned to it,
+                        // while build up arguments for makeStruct inst at the same time.
+                        auto structType = as<IRStructType>(inst->getDataType());
+                        if (!structType) break;
+                        List<IRInst*> args;
+                        bool isComplete = true;
+                        for (auto field : structType->getFields())
+                        {
+                            IRInst* arg = nullptr;
+                            if (mapFieldKeyToVal.TryGetValue(field->getKey(), arg))
+                            {
+                                args.add(arg);
+                            }
+                            else
+                            {
+                                isComplete = false;
+                                break;
+                            }
+                        }
+
+                        if (!isComplete) break;
+
+                        // Create a makeStruct inst using args.
+
+                        IRBuilder builder(module);
+                        builder.setInsertBefore(inst);
+                        auto makeStruct = builder.emitMakeStruct(structType, (UInt)args.getCount(), args.getBuffer());
+                        inst->replaceUsesWith(makeStruct);
+                        maybeRemoveOldInst(inst);
+                        changed = true;
                     }
                 }
             }

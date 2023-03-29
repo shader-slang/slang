@@ -218,7 +218,7 @@ namespace Slang
 
     class AutodiffCheckpointPolicyBase : public RefObject
     {
-        public:
+    public:
 
         AutodiffCheckpointPolicyBase(IRModule* module) : module(module)
         { }
@@ -233,14 +233,14 @@ namespace Slang
 
         virtual HoistResult classify(IRUse* diffBlockUse) = 0;
 
-        protected:
+     protected:
 
         IRModule*               module;
     };
 
     class DefaultCheckpointPolicy : public AutodiffCheckpointPolicyBase
     {
-        public:
+    public:
 
         DefaultCheckpointPolicy(IRModule* module)
             : AutodiffCheckpointPolicyBase(module)
@@ -248,6 +248,8 @@ namespace Slang
 
         virtual void preparePolicy(IRGlobalValueWithCode* func);
         virtual HoistResult classify(IRUse* use);
+
+        RefPtr<IRDominatorTree> domTree;
     };
 
     RefPtr<HoistedPrimalsInfo> applyCheckpointSet(

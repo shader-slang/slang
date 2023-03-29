@@ -1820,4 +1820,16 @@ bool isDerivativeContextVar(IRVar* var)
     return var->findDecoration<IRBackwardDerivativePrimalContextDecoration>();
 }
 
+bool isDiffInst(IRInst* inst)
+{
+    if (inst->findDecoration<IRDifferentialInstDecoration>() ||
+        inst->findDecoration<IRMixedDifferentialInstDecoration>())
+        return true;
+
+    if (auto block = as<IRBlock>(inst->getParent()))
+        return isDiffInst(block);
+
+    return false;
+}
+
 }
