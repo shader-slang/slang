@@ -45,7 +45,7 @@
 #           define SLANG_ENABLE_DXIL_SUPPORT 1
 #       endif
 #   else
-#       include <dxc/dxcapi.h>
+#       include "../../external/dxc/dxcapi.h"
 
 #       ifdef __uuidof
             // DXC's WinAdapter.h defines __uuidof(T) over types, but the existing
