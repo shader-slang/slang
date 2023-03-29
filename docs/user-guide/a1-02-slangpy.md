@@ -37,7 +37,7 @@ void square_fwd_kernel(TensorView<float> input, TensorView<float> output)
 {
     uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
 
-    if (globalIdx.x > input.size(0) || globalIdx.x > input.size(1))
+    if (globalIdx.x > input.size(0) || globalIdx.y > input.size(1))
         return;
     float result = square(input[globalIdx.xy]);
     output[globalIdx.xy] = result;
@@ -134,7 +134,7 @@ void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_out, Tens
 {
     uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
 
-    if (globalIdx.x > input.size(0) || globalIdx.x > input.size(1))
+    if (globalIdx.x > input.size(0) || globalIdx.y > input.size(1))
         return;
 
     DifferentialPair<float> dpInput = diffPair(input[globalIdx.xy]);
