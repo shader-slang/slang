@@ -8,6 +8,8 @@ If you are a PyTorch user seeking to write complex, high-performance, and automa
 
 One of the primary advantages of a per-thread programming model in kernel programming is the elimination of concerns regarding maintaining masks for branches. When developing a kernel in Slang, you can use all control flow statements, composite data types (structs, arrays, etc.), and function calls without additional effort. Code created with these language constructs can be automatically differentiated by the compiler without any restrictions. Additionally, Slang is a strongly typed language, which ensures that you will never encounter type errors at runtime. Most code errors can be identified as you type thanks to the [compiler's coding assistance service](https://marketplace.visualstudio.com/items?itemName=shader-slang.slang-language-extension), further streamlining the development process.
 
+In addition, using a per-thread programming model also results in more optimized memory usage. When writing a kernel in Slang, most intermediate results do not need to be written out to global memory and then read back, reducing global memory bandwidth consumption and the delay caused by these memory operations. As a result, a Slang kernel can typically run at higher efficiency compared to the traditional bulk-synchronous programming model.
+
 ## Getting Started with slangpy
 
 In this tutorial, we will use a simple example to walkthrough the steps to use Slang in your PyTorch project.
