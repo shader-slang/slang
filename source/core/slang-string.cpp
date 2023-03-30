@@ -373,9 +373,9 @@ namespace Slang
             wchar_t* beginData = (wchar_t*)buf.getBuffer();
             wchar_t* endData = beginData + length;
 
-            buf.detachBuffer();
-
-            return OSString(beginData, endData);
+            OSString ret;
+            ret.set(beginData, endData);
+            return ret;
         }
     }
 
