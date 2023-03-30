@@ -23,7 +23,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
     HashSet<IRUse*> processedUses;
 
     HashSet<IRUse*> usesToReplace;
-    
+
     auto addPrimalOperandsToWorkList = [&](IRInst* inst)
     {
         UIndex opIndex = 0;
@@ -144,7 +144,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
                 if (auto var = as<IRVar>(result.instToRecompute))
                 {
                     IRUse* storeUse = findUniqueStoredVal(var);
-                    if (!storeUse)
+                    if (storeUse)
                         workList.add(storeUse);
                 }
                 else
@@ -635,10 +635,187 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     return hoistInfo;
 }
 
-void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode*)
+void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)
 {
-    // Do nothing.. This is an (almost) always-store policy.
+    domTree = computeDominatorTree(func);
     return;
+}
+
+static bool doesInstHaveDiffUse(IRInst* inst)
+{
+    bool hasDiffUser = false;
+
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (isDiffInst(user))
+        {
+            // Ignore uses that is a return or MakeDiffPair
+            switch (user->getOp())
+            {
+            case kIROp_Return:
+                continue;
+            case kIROp_MakeDifferentialPair:
+                if (!user->hasMoreThanOneUse() && user->firstUse &&
+                    user->firstUse->getUser()->getOp() == kIROp_Return)
+                    continue;
+                break;
+            default:
+                break;
+            }
+            hasDiffUser = true;
+            break;
+        }
+    }
+
+    return hasDiffUser;
+}
+
+static bool doesInstHaveStore(IRInst* inst)
+{
+    SLANG_RELEASE_ASSERT(as<IRPtrTypeBase>(inst->getDataType()));
+
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        if (as<IRStore>(use->getUser()))
+            return true;
+
+        if (as<IRPtrTypeBase>(use->getUser()->getDataType()))
+        {
+            if (doesInstHaveStore(use->getUser()))
+                return true;
+        }
+    }
+
+    return false;
+}
+
+static bool isIntermediateContextType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_BackwardDiffIntermediateContextType:
+        return true;
+    case kIROp_PtrType:
+        return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());
+    case kIROp_ArrayType:
+        return isIntermediateContextType(as<IRArrayType>(type)->getElementType());
+    }
+
+    return false;
+}
+
+static bool shouldStoreVar(IRVar* var)
+{
+    // Always store intermediate context var.
+    if (auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+    {
+        // If we are specializing a callee's intermediate context with types that can't be stored,
+        // we can't store the entire context.
+        if (auto spec = as<IRSpecialize>(as<IRPtrTypeBase>(var->getDataType())->getValueType()))
+        {
+            for (UInt i = 0; i < spec->getArgCount(); i++)
+            {
+                if (!canTypeBeStored(spec->getArg(i)->getDataType()))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    if (isIntermediateContextType(var->getDataType()))
+    {
+        return true;
+    }
+
+    // For now the store policy is simple, we use two conditions:
+    // 1. Is the var used in a differential block and,
+    // 2. Does the var have a store
+    // 
+
+    return (doesInstHaveDiffUse(var) && doesInstHaveStore(var) && canTypeBeStored(as<IRPtrTypeBase>(var->getDataType())->getValueType()));
+}
+
+static bool shouldStoreInst(IRInst* inst)
+{
+    if (!inst->getDataType())
+    {
+        return false;
+    }
+
+    if (!canTypeBeStored(inst->getDataType()))
+        return false;
+
+    // Never store certain opcodes.
+    switch (inst->getOp())
+    {
+    case kIROp_CastFloatToInt:
+    case kIROp_CastIntToFloat:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_MakeVectorFromScalar:
+    case kIROp_MakeMatrixFromScalar:
+    case kIROp_Reinterpret:
+    case kIROp_BitCast:
+    case kIROp_DefaultConstruct:
+    case kIROp_MakeStruct:
+    case kIROp_MakeTuple:
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+    case kIROp_MakeDifferentialPair:
+    case kIROp_MakeOptionalNone:
+    case kIROp_MakeOptionalValue:
+    case kIROp_DifferentialPairGetDifferential:
+    case kIROp_DifferentialPairGetPrimal:
+    case kIROp_ExtractExistentialValue:
+    case kIROp_ExtractExistentialType:
+    case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_undefined:
+        return false;
+    case kIROp_GetElement:
+    case kIROp_FieldExtract:
+    case kIROp_swizzle:
+    case kIROp_UpdateElement:
+    case kIROp_OptionalHasValue:
+    case kIROp_GetOptionalValue:
+    case kIROp_MatrixReshape:
+    case kIROp_VectorReshape:
+        // If the operand is already stored, don't store the result of these insts.
+        if (inst->getOperand(0)->findDecoration<IRPrimalValueStructKeyDecoration>())
+        {
+            return false;
+        }
+        break;
+    default:
+        break;
+    }
+
+    // Only store if the inst has differential inst user.
+    bool hasDiffUser = doesInstHaveDiffUse(inst);
+    if (!hasDiffUser)
+        return false;
+
+    return true;
+}
+
+bool canRecompute(IRDominatorTree* domTree, IRUse* use)
+{
+    auto param = as<IRParam>(use->get());
+    if (!param)
+        return true;
+    auto paramBlock = as<IRBlock>(param->getParent());
+    for (auto predecessor : paramBlock->getPredecessors())
+    {
+        // If we hit this, the checkpoint policy is trying to recompute 
+        // values across a loop region boundary (we don't currently support this,
+        // and in general this is quite inefficient in both compute & memory)
+        // 
+        if (domTree->dominates(paramBlock, predecessor))
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
@@ -648,26 +825,25 @@ HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
     // 
     if (auto var = as<IRVar>(use->get()))
     {
-        if (auto spec = as<IRSpecialize>(as<IRPtrTypeBase>(var->getDataType())->getValueType()))
-        {
-            for (UInt i = 0; i < spec->getArgCount(); i++)
-            {
-                if (!canTypeBeStored(spec->getArg(i)->getDataType()))
-                    return HoistResult::recompute(use->get());
-            }
-            return HoistResult::store(use->get());    
-        }
-        else // if (canTypeBeStored(as<IRPtrTypeBase>(var->getDataType())->getValueType()));
-        {
-            return HoistResult::store(use->get());
-        }
+        if (shouldStoreVar(var))
+            return HoistResult::store(var);
+        else
+            return HoistResult::recompute(var);
     }
     else
     {
-        if (canTypeBeStored(use->get()->getDataType()))
+        if (shouldStoreInst(use->get()))
             return HoistResult::store(use->get());
         else
-            return HoistResult::recompute(use->get());
+        {
+            // We may not be able to recompute due to limitations of
+            // the unzip pass. If so we will store the result.
+            if (canRecompute(domTree, use))
+                return HoistResult::recompute(use->get());
+
+            // The fallback is to store.
+            return HoistResult::store(use->get());
+        }
     }
 }
 
