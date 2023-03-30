@@ -68,11 +68,14 @@ struct CudaTaskMemoryAllocator
     }
 };
 
-TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor val, const char* name)
+TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor val, const char* name, torch::ScalarType targetScalarType)
 {
+    // Convert device and scalar types.
     if (!val.device().is_cuda())
         val = val.to(torch::kCUDA);
- 
+    if (val.dtype() != targetScalarType)
+        val = val.to(targetScalarType);
+
     TensorView res = {};
     res.dimensionCount = val.dim();
     res.strides = allocator->allocUIntArray(val.dim());
