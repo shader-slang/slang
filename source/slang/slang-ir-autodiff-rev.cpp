@@ -519,6 +519,8 @@ namespace Slang
 
     SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func)
     {
+        removeLinkageDecorations(func);
+
         DifferentiableTypeConformanceContext diffTypeContext(autoDiffSharedContext);
         diffTypeContext.setFunc(func);
 

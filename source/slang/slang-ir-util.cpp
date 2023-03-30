@@ -582,6 +582,32 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func)
         block->insertAtEnd(func);
 }
 
+void removeLinkageDecorations(IRGlobalValueWithCode* func)
+{
+    List<IRInst*> toRemove;
+    for (auto inst : func->getDecorations())
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_ImportDecoration:
+        case kIROp_ExportDecoration:
+        case kIROp_ExternCppDecoration:
+        case kIROp_PublicDecoration:
+        case kIROp_KeepAliveDecoration:
+        case kIROp_DllImportDecoration:
+        case kIROp_CudaDeviceExportDecoration:
+        case kIROp_DllExportDecoration:
+        case kIROp_HLSLExportDecoration:
+            toRemove.add(inst);
+            break;
+        default:
+            break;
+        }
+    }
+    for (auto inst : toRemove)
+        inst->removeAndDeallocate();
+}
+
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
 {
     if (as<IRParam>(inst))
