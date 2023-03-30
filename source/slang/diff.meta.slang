@@ -74,12 +74,12 @@ struct TensorView
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3, $4, $5, $6)")
     void store(uint i0, uint i1, uint i2, uint i3, uint i4, T val);
 
-    __target_intrinsic(cuda, "atomicAdd($0.data_ptr_at<$TR>($1), $2)")
-    T InterlockedAdd(uint index, T val);
+    __target_intrinsic(cuda, "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedAdd(uint index, T val, out T oldVal);
     
     __generic<let N:int>
-    __target_intrinsic(cuda, "atomicAdd($0.data_ptr_at<$TR>($1), $2)")
-    T InterlockedAdd(vector<uint, N> index, T val);
+    __target_intrinsic(cuda, "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedAdd(vector<uint, N> index, T val, out T oldVal);
 
     __target_intrinsic(cuda, "$0.dimensionCount")
     [__readNone]
@@ -159,61 +159,55 @@ for (auto atomicIntegerTypeName : kCudaAtomicIntegerTypes)
 extension TensorView<$(atomicIntegerTypeName)>
 {
     typealias __Element = $(atomicIntegerTypeName);
-    __target_intrinsic(cuda, "atomicInc($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedIncrement(uint index, __Element val);
 
-    __generic<let N:int>
-    __target_intrinsic(cuda, "atomicInc($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedIncrement(vector<uint, N> index, __Element val);
+    __target_intrinsic(cuda, "*($3) = atomicMin($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedMin(uint index, __Element val, out __Element oldVal);
 
-    __target_intrinsic(cuda, "atomicMin($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedMin(uint index, __Element val);
-    
-    __generic<let N:int>
-    __target_intrinsic(cuda, "atomicMin($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedMin(vector<uint, N> index, __Element val);
+    __generic<let N : int>
+    __target_intrinsic(cuda, "*($3) = atomicMin($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedMin(vector<uint, N> index, __Element val, out __Element oldVal);
 
-    __target_intrinsic(cuda, "atomicMax($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedMax<T>(uint index, __Element val);
-    
-    __generic<let N:int>
-    __target_intrinsic(cuda, "atomicMax($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedMax(vector<uint, N> index, __Element val);
+    __target_intrinsic(cuda, "*($3) = atomicMax($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedMax<T>(uint index, __Element val, out __Element oldVal);
 
-    __target_intrinsic(cuda, "atomicAnd($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedAnd<T>(uint index, __Element val);
-    
-    __generic<let N:int>
-    __target_intrinsic(cuda, "atomicAnd($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedAnd(vector<uint, N> index, __Element val);
+    __generic<let N : int>
+    __target_intrinsic(cuda, "*($3) = atomicMax($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedMax(vector<uint, N> index, __Element val, out __Element oldVal);
 
-    __target_intrinsic(cuda, "atomicOr($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedOr<T>(uint index, __Element val);
-    
-    __generic<let N:int>
-    __target_intrinsic(cuda, "atomicOr($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedOr(vector<uint, N> index, __Element val);
+    __target_intrinsic(cuda, "*($3) = atomicAnd($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedAnd<T>(uint index, __Element val, out __Element oldVal);
 
-    __target_intrinsic(cuda, "atomicXor($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedXor<T>(uint index, __Element val);
-    
-    __generic<let N:int>
-    __target_intrinsic(cuda, "atomicXor($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedXor(vector<uint, N> index, __Element val);
-    
-    __target_intrinsic(cuda, "atomicExch($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedExchange(uint index, __Element val);
-    
-    __generic<let N:int>
-    __target_intrinsic(cuda, "atomicExch($0.data_ptr_at<$TR>($1), $2)")
-    __Element InterlockedExchange(vector<uint, N> index, __Element val);
+    __generic<let N : int>
+    __target_intrinsic(cuda, "*($3) = atomicAnd($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedAnd(vector<uint, N> index, __Element val, out __Element oldVal);
 
-    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<$TR>($1), $2, $3)")
-    __Element InterlockedCompareExchange(uint index, __Element compare, __Element val);
+    __target_intrinsic(cuda, "*($3) = atomicOr($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedOr<T>(uint index, __Element val, out __Element oldVal);
+
+    __generic<let N : int>
+    __target_intrinsic(cuda, "*($3) = atomicOr($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedOr(vector<uint, N> index, __Element val, out __Element oldVal);
+
+    __target_intrinsic(cuda, "*($3) = atomicXor($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedXor<T>(uint index, __Element val, out __Element oldVal);
+
+    __generic<let N : int>
+    __target_intrinsic(cuda, "*($3) = atomicXor($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedXor(vector<uint, N> index, __Element val, out __Element oldVal);
+
+    __target_intrinsic(cuda, "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedExchange(uint index, __Element va, out __Element oldVall);
     
     __generic<let N:int>
-    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<$TR>($1), $2, $3)")
-    __Element InterlockedCompareExchange(vector<uint, N> index, __Element compare, __Element val);
+    __target_intrinsic(cuda, "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)")
+    void InterlockedExchange(vector<uint, N> index, __Element val, out __Element oldVal);
+
+    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)")
+    void InterlockedCompareExchange(uint index, __Element compare, __Element val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)")
+    void InterlockedCompareExchange(vector<uint, N> index, __Element compare, __Element val);
 }
 
 ${{{{
@@ -222,12 +216,19 @@ ${{{{
 
 extension TensorView<float>
 {
-    __target_intrinsic(cuda, "atomicExch($0.data_ptr_at<$G0>($1), $2)")
-    float InterlockedExchange(uint index, float val);
+    __target_intrinsic(cuda, "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)")
+    float InterlockedExchange(uint index, float val, out float oldVal);
     
     __generic<let N:int>
-    __target_intrinsic(cuda, "atomicExch($0.data_ptr_at<$G0>($1), $2)")
-    float InterlockedExchange(vector<uint, N> index, float val);
+    __target_intrinsic(cuda, "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)")
+    float InterlockedExchange(vector<uint, N> index, float val, out float oldVal);
+
+    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<uint32_t>($1), slang_bit_cast<uint32_t>($2), slang_bit_cast<uint32_t>($3))")
+    void InterlockedCompareExchange(uint index, float compare, float val);
+
+    __generic<let N : int>
+    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<uint32_t>($1), slang_bit_cast<uint32_t>($2), slang_bit_cast<uint32_t>($3))")
+    void InterlockedCompareExchange(vector<uint, N> index, float compare, float val);
 }
 
 __generic<T>
