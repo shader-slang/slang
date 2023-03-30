@@ -1564,6 +1564,7 @@ struct AutoDiffAddressConversionPolicy : public AddressConversionPolicy
 SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
 {
     insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
+    removeLinkageDecorations(func);
 
     AutoDiffAddressConversionPolicy cvtPolicty;
     cvtPolicty.diffTypeContext = &differentiableTypeConformanceContext;
