@@ -1496,13 +1496,12 @@ namespace Slang
             }
         }
 
-        auto initExpr = getInitExpr(m_astBuilder, declRef);
-        if(!initExpr)
+        if (!getInitExpr(m_astBuilder, declRef))
             return nullptr;
 
         ensureDecl(declRef.decl, DeclCheckState::Checked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
-        return tryConstantFoldExpr(initExpr, &newCircularityInfo);
+        return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), &newCircularityInfo);
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -1546,12 +1545,7 @@ namespace Slang
         // it is possible that we are referring to a generic value param
         if (auto declRefExpr = expr.as<DeclRefExpr>())
         {
-            auto checkedExpr = as<DeclRefExpr>(CheckTerm(expr.getExpr()));
-            if (!checkedExpr)
-                return nullptr;
-
-            SubstExpr<DeclRefExpr> substExpr(checkedExpr, expr.getSubsts());
-            auto declRef = getDeclRef(m_astBuilder, substExpr);
+            auto declRef = getDeclRef(m_astBuilder, declRefExpr);
 
             if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
             {

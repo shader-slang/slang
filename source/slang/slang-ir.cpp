@@ -2389,20 +2389,22 @@ namespace Slang
             capabilitySetType, kIROp_CapabilitySet, args.getCount(), args.getBuffer());
     }
 
-    static void canonicalizeInstOperands(IRBuilder& builder, IRInst* inst)
+    static void canonicalizeInstOperands(IRBuilder& builder, IROp op, ArrayView<IRInst*> operands)
     {
         // For Array types, we always want to make sure its element count
         // has an int32_t type. We will convert all other int types to int32_t
         // to avoid things like float[8] and float[8U] being distinct types.
-        if (inst->getOp() == kIROp_ArrayType)
+        if (op == kIROp_ArrayType)
         {
-            IRInst* elementCount = inst->getOperand(1);
+            if (operands.getCount() < 2)
+                return;
+            IRInst* elementCount = operands[1];
             if (auto intLit = as<IRIntLit>(elementCount))
             {
                 if (intLit->getDataType()->getOp() != kIROp_IntType)
                 {
                     IRInst* newElementCount = builder.getIntValue(builder.getIntType(), intLit->getValue());
-                    inst->getOperands()[1].usedValue = newElementCount;
+                    operands[1] = newElementCount;
                 }
             }
         }
@@ -2422,6 +2424,13 @@ namespace Slang
         {
             operandCount += listArgCounts[ii];
         }
+
+        ShortList<IRInst*, 8> canonicalizedOperands;
+        canonicalizedOperands.setCount(fixedArgCount);
+        for (Index i = 0; i < fixedArgCount; i++)
+            canonicalizedOperands[i] = fixedArgs[i];
+
+        canonicalizeInstOperands(*this, op, canonicalizedOperands.getArrayView().arrayView);
 
         auto& memoryArena = getModule()->getMemoryArena();
         void* cursor = memoryArena.getCursor();
@@ -2449,7 +2458,7 @@ namespace Slang
             IRUse* operand = inst->getOperands();
             for (Int ii = 0; ii < fixedArgCount; ++ii)
             {
-                auto arg = fixedArgs[ii];
+                auto arg = canonicalizedOperands[ii];
                 m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
                 operand->usedValue = arg;
                 operand++;
@@ -2466,8 +2475,6 @@ namespace Slang
                 }
             }
         }
-
-        canonicalizeInstOperands(*this, inst);
 
         // Find or add the key/inst
         {
@@ -2536,38 +2543,6 @@ namespace Slang
         UInt            operandCount,
         IRInst* const*  operands)
     {
-        switch (op)
-        {
-        case kIROp_ArrayType:
-            {
-                ShortList<IRInst*, 2> newOperands;
-                newOperands.addRange(operands, operandCount);
-
-                // If elementCount does not have int type, then we always cast
-                // it to an int type, to avoid having to deal with the
-                // possibility that an array<int, 2> and an array<int, 2U> are
-                // treated as distinct types.
-                if (operandCount < 2) break;
-                auto elementCount = operands[1];
-                if (elementCount->getFullType() && elementCount->getFullType()->getOp() != kIROp_IntType)
-                {
-                    auto intLit = as<IRIntLit>(elementCount);
-                    if (intLit)
-                        elementCount = getIntValue(getIntType(), intLit->getValue());
-                    else
-                        elementCount = emitIntrinsicInst(getIntType(), kIROp_IntCast, 1, &elementCount);
-                }
-                newOperands[1] = elementCount;
-                return (IRType*)createIntrinsicInst(
-                    nullptr,
-                    op,
-                    operandCount,
-                    newOperands.getArrayView().getBuffer());
-            }
-        default:
-            break;
-        }
-
         return (IRType*)createIntrinsicInst(
             nullptr,
             op,
