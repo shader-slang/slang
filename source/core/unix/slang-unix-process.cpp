@@ -441,9 +441,6 @@ static const int kCannotExecute = 126;
 
         ::close(execWatchPipe[0]);
 
-        // TODO(JS): Strictly speaking if m_executableType is 'Path' then we shouldn't be searching. Ie which
-        // exec we use here should be dependent on the executable type.
-
         if (exe.m_type == ExecutableLocation::Type::Path)
         {
             // Use the specified path (ie don't search)
