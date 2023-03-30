@@ -5,7 +5,7 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-#define N_LATENT_DIMS 4
+static const uint32_t N_LATENT_DIMS = 4;
 static const uint32_t kDecoderInputCount = 6;
 struct LatentTexture
 {
@@ -37,24 +37,20 @@ struct LatentTexture
 
 static LatentTexture gLatents;
 
-struct Obj
+[BackwardDifferentiable]
+void test(float arr[10], out float result[3])
 {
-    float member;
-    [BackwardDifferentiable]
-    void f(float arr[10], out float result[3])
-    {
-        float sum = 0;
-        [ForceUnroll]
-        for (int i = 0; i < LatentTexture.kLatentDimsCount + kDecoderInputCount; i++)
-            sum += arr[i];
-        result[0] = sum;
-        result[1] = sum;
-        result[2] = sum;
-    }
+    float sum = 0;
+    [ForceUnroll]
+    for (int i = 0; i < LatentTexture.kLatentDimsCount + kDecoderInputCount; i++)
+        sum += arr[i];
+    result[0] = sum;
+    result[1] = sum;
+    result[2] = sum;
 }
 
 [BackwardDifferentiable]
-float g()
+float evalDecoder()
 {
     // Latent code.
     float latentCode[LatentTexture.kLatentDimsCount];
@@ -74,10 +70,8 @@ float g()
         input[kDecoderInputCount + i] = latentCode[i];
     }
 
-    Obj o;
-    o.member = 1;
     float res[3];
-    o.f(input, res);
+    test(input, res);
     return res[0] + res[1] + res[2];
 }
 
@@ -85,5 +79,5 @@ float g()
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    __bwd_diff(g)(1.0);
+    __bwd_diff(evalDecoder)(1.0);
 }
