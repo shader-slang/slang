@@ -463,9 +463,8 @@ static const int kCannotExecute = 126;
         fprintf(stderr, "error: `exec` failed\n");
 
         // Terminate with failure. 
-        exit(kCannotExecute);
-
-        return SLANG_FAIL;
+        // Call _exit() rather than exit() so we don't run anything registered with atexit()
+        ::_exit(kCannotExecute);
     }
     else
     {
