@@ -86,7 +86,7 @@ public:
 
     Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject);
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createProgram(
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
         const IShaderProgram::Desc& desc,
         IShaderProgram** outProgram,
         ISlangBlob** outDiagnosticBlob) override;
