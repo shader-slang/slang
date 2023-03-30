@@ -191,6 +191,9 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst);
 IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IRBlock*& loopBodyBlock, IRBlock*& loopBreakBlock);
 
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
+
+// Remove all linkage decorations from func.
+void removeLinkageDecorations(IRGlobalValueWithCode* func);
 }
 
 #endif
