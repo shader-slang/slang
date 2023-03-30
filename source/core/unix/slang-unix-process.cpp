@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 //#include <dirent.h>
 #include <errno.h>
@@ -370,8 +371,32 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 
 static const int kCannotExecute = 126;
 
+static int pipeCLOEXEC(int pipefd[2])
+{
+#if SLANG_APPLE_FAMILY
+    // without pipe2 on macOS, there's an unavoidable race here where
+    // another process could fork and execv with execWatchPipe before we
+    // can set CLOEXEC on it...
+    if(pipe(pipefd) == -1 ||
+       fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) == -1 ||
+       fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) == -1)
+    {
+        return -1;
+    }
+    return 0;
+#else
+    return pipe2(pipefd, O_CLOEXEC);
+#endif
+}
+
 /* static */SlangResult Process::create(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess)
 {
+    const char* whatFailed = nullptr;
+    pid_t childPid;
+
+    //
+    // Set up command line
+    //
     List<char const*> argPtrs;
 
     const auto& exe = commandLine.m_executableLocation;
@@ -389,57 +414,92 @@ static const int kCannotExecute = 126;
     // Terminate with a null
     argPtrs.add(nullptr);
 
-    int stdoutPipe[2];
-    int stderrPipe[2];
-    int stdinPipe[2];
+    //
+    // Set up pipes
+    //
+    int stdinPipe[2] = {-1, -1};
+    int stdoutPipe[2] = {-1, -1};
+    int stderrPipe[2] = {-1, -1};
 
     // We will create this pipe with O_CLOEXEC, so that it gets closed
     // automatically if the child's exec succeeds
-    int execWatchPipe[2];
+    int execWatchPipe[2] = {-1, -1};
 
-    if (pipe(stdoutPipe) == -1 ||
+    if (pipe(stdinPipe) == -1 ||
+        pipe(stdoutPipe) == -1 ||
         pipe(stderrPipe) == -1 ||
-        pipe(stdinPipe) == -1 ||
-        pipe(execWatchPipe) == -1)
+        pipeCLOEXEC(execWatchPipe) == -1)
     {
-        fprintf(stderr, "error: `pipe` failed\n");
-        return SLANG_FAIL;
+        whatFailed = "pipe";
+        goto reportErr;
     }
 
-    // macOS doesn't support pipe2, so set CLOEXEC using fcntl here
-    if(fcntl(execWatchPipe[1], F_SETFD, FD_CLOEXEC) == -1)
+    // Make sure that none of our pipes are going to be clobbered by dup2 to
+    // 0,1,2 in the child.
+    whatFailed = "fcntl";
+    int next;
+    if(stdinPipe[0] < 3)
     {
-        fprintf(stderr, "error: `fcntl` failed\n");
-        return SLANG_FAIL;
+        if(-1 == (next = fcntl(stdinPipe[0], F_DUPFD, 3)))
+        {
+            goto reportErr;
+        }
+        close(stdinPipe[0]);
+        stdinPipe[0] = next;
     }
+    if(stdoutPipe[1] < 3)
+    {
+        if(-1 == (next = fcntl(stdoutPipe[1], F_DUPFD, 3)))
+        {
+            goto reportErr;
+        }
+        close(stdoutPipe[1]);
+        stdoutPipe[1] = next;
+    }
+    if(stderrPipe[1] < 3)
+    {
+        if(-1 == (next = fcntl(stderrPipe[1], F_DUPFD, 3)))
+        {
+            goto reportErr;
+        }
+        close(stderrPipe[1]);
+        stderrPipe[1] = next;
+    }
+    if(execWatchPipe[1] < 3)
+    {
+        if(-1 == (next = fcntl(execWatchPipe[1], F_DUPFD_CLOEXEC, 3)))
+        {
+            goto reportErr;
+        }
+        close(execWatchPipe[1]);
+        execWatchPipe[1] = next;
+    }
+    whatFailed = nullptr;
 
-    pid_t childPid = fork();
+    childPid = fork();
     if (childPid == -1)
     {
-        fprintf(stderr, "error: `fork` failed\n");
-        return SLANG_FAIL;
+        whatFailed = "fork";
+        goto reportErr;
     }
 
     if (childPid == 0)
     {
         // We are the child process.
 
-        // Duplicate into standard handles
-        dup2(stdoutPipe[1], STDOUT_FILENO);
-        dup2(stderrPipe[1], STDERR_FILENO);
-        dup2(stdinPipe[0], STDIN_FILENO);
-
-        // Close all of the handles
-        ::close(stdoutPipe[0]);
-        ::close(stdoutPipe[1]);
-
-        ::close(stderrPipe[0]);
-        ::close(stderrPipe[1]);
-
-        ::close(stdinPipe[0]);
-        ::close(stdinPipe[1]);
+        // Close unused fds and duplicate into standard handles
 
         ::close(execWatchPipe[0]);
+        ::close(stdinPipe[1]);
+        ::close(stdoutPipe[0]);
+        ::close(stderrPipe[0]);
+
+        dup2(stdinPipe[0], STDIN_FILENO);
+        ::close(stdinPipe[0]);
+        dup2(stdoutPipe[1], STDOUT_FILENO);
+        ::close(stdoutPipe[1]);
+        dup2(stderrPipe[1], STDERR_FILENO);
+        ::close(stderrPipe[1]);
 
         if (exe.m_type == ExecutableLocation::Type::Path)
         {
@@ -469,27 +529,30 @@ static const int kCannotExecute = 126;
     else
     {
         // We are the parent process
+        ::close(execWatchPipe[1]);
+        ::close(stdinPipe[0]);
         ::close(stdoutPipe[1]);
         ::close(stderrPipe[1]);
-        ::close(stdinPipe[0]);
 
         RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
 
-        // Previously code didn't need to close, so we'll make stream not own the handles
+        // Previously code didn't need to close, so we'll make stream now own the handles
         streams[Index(StdStreamType::Out)] = new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
+        stdoutPipe[0] = -1;
         streams[Index(StdStreamType::ErrorOut)] = new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
+        stderrPipe[0] = -1;
         streams[Index(StdStreamType::In)] = new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
+        stdinPipe[1] = -1;
 
         // Check that the exec actually succeeded
         int execErrCode;
         // Our success is if we read zero bytes, indicating that the pipe was
-        // closed by the child's exec and O_CLOEXEC. (and us just here)
-        ::close(execWatchPipe[1]);
+        // closed by the child's exec and O_CLOEXEC. (and us just above)
         const int readRes = ::read(execWatchPipe[0], &execErrCode, sizeof(execErrCode));
         if(readRes < 0)
         {
-            fprintf(stderr, "error: failed to read status of forked process\n");
-            return SLANG_FAIL;
+            whatFailed = "read from forked process";
+            goto reportErr;
         }
         else if (readRes > 0)
         {
@@ -502,12 +565,30 @@ static const int kCannotExecute = 126;
                 fprintf(stderr, "error: exec for \"%s\" failed: %s\n", argPtrs[0],
                         ::strerror(execErrCode));
             }
-            return SLANG_FAIL;
+            whatFailed = "exec";
+            // Don't report the exec as we expect some of them to fail 
+            goto closePipes;
         }
 
         outProcess = new UnixProcess(childPid, streams[0].readRef());
-        return SLANG_OK;
     }
+
+    goto closePipes;
+
+    // Report any error and then cleanup
+reportErr:
+    fprintf(stderr, "error: `%s` failed (%s)\n", whatFailed, strerror(errno));
+closePipes:
+    ::close(execWatchPipe[0]);
+    ::close(execWatchPipe[1]);
+    ::close(stdinPipe[0]);
+    ::close(stdinPipe[1]);
+    ::close(stderrPipe[0]);
+    ::close(stderrPipe[1]);
+    ::close(stdoutPipe[0]);
+    ::close(stdoutPipe[1]);
+
+    return whatFailed ? SLANG_FAIL : SLANG_OK;
 }
 
 /* static */uint64_t Process::getClockFrequency()
