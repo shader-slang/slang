@@ -400,9 +400,16 @@ static const int kCannotExecute = 126;
     if (pipe(stdoutPipe) == -1 ||
         pipe(stderrPipe) == -1 ||
         pipe(stdinPipe) == -1 ||
-        pipe2(execWatchPipe, O_CLOEXEC) == -1)
+        pipe(execWatchPipe) == -1)
     {
         fprintf(stderr, "error: `pipe` failed\n");
+        return SLANG_FAIL;
+    }
+
+    // macOS doesn't support pipe2, so set CLOEXEC using fcntl here
+    if(fcntl(execWatchPipe[1], F_SETFD, FD_CLOEXEC) == -1)
+    {
+        fprintf(stderr, "error: `fcntl` failed\n");
         return SLANG_FAIL;
     }
 
