@@ -2405,6 +2405,11 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         m_writer->emit(";\n");
         break;
 
+        // Insts that needs to be emitted as code blocks.
+    case kIROp_CudaKernelLaunch:
+        emitInstStmtImpl(inst);
+        break;
+
     case kIROp_LiveRangeStart:
     case kIROp_LiveRangeEnd:
         emitLiveness(inst);

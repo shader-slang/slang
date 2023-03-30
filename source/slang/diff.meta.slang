@@ -34,6 +34,15 @@ struct TensorView
     [__readNone]
     Ptr<T> data_ptr();
 
+    __target_intrinsic(cuda, "$0.data_ptr_at<$G0>($1)")
+    [__readNone]
+    Ptr<T> data_ptr_at(uint index);
+
+    __generic<let N: int>
+    __target_intrinsic(cuda, "$0.data_ptr_at<$G0>($1)")
+    [__readNone]
+    Ptr<T> data_ptr_at(vector<uint, N> index);
+
     __implicit_conversion($(kConversionCost_ImplicitDereference))
     __intrinsic_op($(kIROp_TorchTensorGetView))
     __init(TorchTensor<T> t);
@@ -65,6 +74,13 @@ struct TensorView
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2, $3, $4, $5, $6)")
     void store(uint i0, uint i1, uint i2, uint i3, uint i4, T val);
 
+    __target_intrinsic(cuda, "atomicAdd($0.data_ptr_at<$TR>($1), $2)")
+    T InterlockedAdd(uint index, T val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicAdd($0.data_ptr_at<$TR>($1), $2)")
+    T InterlockedAdd(vector<uint, N> index, T val);
+
     __target_intrinsic(cuda, "$0.dimensionCount")
     [__readNone]
     uint dims();
@@ -81,42 +97,137 @@ struct TensorView
     {
         [ForceInline] [__readNone] get { return load(index); }
         [ForceInline] set { store(index, newValue); }
+        
+        __target_intrinsic(cuda, "$0.load<$G0>($1)")
+        ref;
     }
     __subscript(uint i1, uint i2) -> T
     {
         [ForceInline] [__readNone] get { return load(i1, i2); }
         [ForceInline] set { store(i1, i2, newValue); }
+        __target_intrinsic(cuda, "$0.load<$G0>($1, $2)")
+        ref;
     }
     __subscript(uint2 i) -> T
     {
         [ForceInline] [__readNone] get { return load(i.x, i.y); }
         [ForceInline] set { store(i.x, i.y, newValue); }
+        __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y)")
+        ref;
     }
     __subscript(uint i1, uint i2, uint i3) -> T
     {
         [ForceInline] [__readNone] get { return load(i1, i2, i3); }
         [ForceInline] set { store(i1, i2, i3, newValue); }
+        __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3)")
+        ref;
     }
     __subscript(uint3 i) -> T
     {
         [ForceInline] [__readNone] get { return load(i.x, i.y, i.z); }
         [ForceInline] set { store(i.x, i.y, i.z, newValue); }
+        __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y, $1.z)")
+        ref;
     }
     __subscript(uint i1, uint i2, uint i3, uint i4) -> T
     {
         [ForceInline] [__readNone] get { return load(i1, i2, i3, i4); }
         [ForceInline] set { store(i1, i2, i3, i4, newValue); }
+        __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4)")
+        ref;
     }
     __subscript(uint4 i) -> T
     {
         [__readNone][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
         [ForceInline] set { store(i.x, i.y, i.z, i.w, newValue); }
+        __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y, $1.z, $1.w)")
+        ref;
     }
     __subscript(uint i1, uint i2, uint i3, uint i4, uint i5) -> T
     {
         [ForceInline] [__readNone] get { return load(i1, i2, i3, i4, i5); }
         [ForceInline] set { store(i1, i2, i3, i4, i5, newValue); }
+        __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4, $5)")
+        ref;
     }
+}
+
+${{{{
+for (auto atomicIntegerTypeName : kCudaAtomicIntegerTypes)
+{
+}}}}
+extension TensorView<$(atomicIntegerTypeName)>
+{
+    typealias __Element = $(atomicIntegerTypeName);
+    __target_intrinsic(cuda, "atomicInc($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedIncrement(uint index, __Element val);
+
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicInc($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedIncrement(vector<uint, N> index, __Element val);
+
+    __target_intrinsic(cuda, "atomicMin($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedMin(uint index, __Element val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicMin($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedMin(vector<uint, N> index, __Element val);
+
+    __target_intrinsic(cuda, "atomicMax($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedMax<T>(uint index, __Element val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicMax($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedMax(vector<uint, N> index, __Element val);
+
+    __target_intrinsic(cuda, "atomicAnd($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedAnd<T>(uint index, __Element val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicAnd($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedAnd(vector<uint, N> index, __Element val);
+
+    __target_intrinsic(cuda, "atomicOr($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedOr<T>(uint index, __Element val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicOr($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedOr(vector<uint, N> index, __Element val);
+
+    __target_intrinsic(cuda, "atomicXor($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedXor<T>(uint index, __Element val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicXor($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedXor(vector<uint, N> index, __Element val);
+    
+    __target_intrinsic(cuda, "atomicExch($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedExchange(uint index, __Element val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicExch($0.data_ptr_at<$TR>($1), $2)")
+    __Element InterlockedExchange(vector<uint, N> index, __Element val);
+
+    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<$TR>($1), $2, $3)")
+    __Element InterlockedCompareExchange(uint index, __Element compare, __Element val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicCAS($0.data_ptr_at<$TR>($1), $2, $3)")
+    __Element InterlockedCompareExchange(vector<uint, N> index, __Element compare, __Element val);
+}
+
+${{{{
+} // end for atomicIntegerTypeName
+}}}}
+
+extension TensorView<float>
+{
+    __target_intrinsic(cuda, "atomicExch($0.data_ptr_at<$G0>($1), $2)")
+    float InterlockedExchange(uint index, float val);
+    
+    __generic<let N:int>
+    __target_intrinsic(cuda, "atomicExch($0.data_ptr_at<$G0>($1), $2)")
+    float InterlockedExchange(vector<uint, N> index, float val);
 }
 
 __generic<T>
@@ -162,8 +273,25 @@ struct TorchTensor
     static TorchTensor<T> alloc(uint i0, uint i1, uint i2, uint i3, uint i4);
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
-    static TorchTensor<T> zerosLike(TorchTensor<T> other);
+    static TorchTensor<T> emptyLike(TorchTensor<T> other);
+
+    __target_intrinsic(cpp, "$0.zero_()")
+    void fillZero();
+
+    __target_intrinsic(cpp, "$0.fill_($1)")
+    void fillValue(T val);
+
+    static TorchTensor<T> zerosLike(TorchTensor<T> other)
+    {
+        var result = emptyLike(other);
+        result.fillZero();
+        return result;
+    }
+
 }
+
+__target_intrinsic(cpp, "AT_CUDA_CHECK(cudaStreamSynchronize(at::cuda::getCurrentCUDAStream()))")
+void syncTorchCudaStream();
 
 __generic<T: IDifferentiable>
 __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
