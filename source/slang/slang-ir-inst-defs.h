@@ -69,7 +69,6 @@ INST(Nop, nop, 0, 0)
 
     INST(TensorViewType, TensorView, 1, HOISTABLE)
     INST(TorchTensorType, TorchTensor, 0, HOISTABLE)
-    INST(TorchKernelMemoryAllocatorType, TorchMemAllocatorType, 0, HOISTABLE)
     INST(ArrayListType, ArrayListVector, 1, HOISTABLE)
     
     /* BindExistentialsTypeBase */
@@ -614,7 +613,7 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)
-INST(AllocateTorchTensor, allocTorchTensor , 0, 0)
+INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
 INST(TorchGetCudaStream, TorchGetCudaStream, 0, 0)
 INST(TorchTensorGetView, TorchTensorGetView, 0, 0)
 

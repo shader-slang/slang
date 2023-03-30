@@ -268,17 +268,28 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         break;
 
         case 'T':
-            // Get the the 'element' type for the type of the param at the index
+            // Get the 'element' or `return` type for the type of the param at the index
         {
-            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
-            SLANG_RELEASE_ASSERT(m_argCount > argIndex);
-
-            IRType* type = m_args[argIndex].get()->getDataType();
-            if (auto baseTextureType = as<IRTextureType>(type))
+            IRType* type = nullptr;
+            if (*cursor == 'R')
             {
-                type = baseTextureType->getElementType();
+                // Get the return type of the call
+                cursor++;
+                type = m_callInst->getDataType();
             }
+            else
+            {
+                SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+                Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
+                SLANG_RELEASE_ASSERT(m_argCount > argIndex);
+
+                type = m_args[argIndex].get()->getDataType();
+                if (auto baseTextureType = as<IRTextureType>(type))
+                {
+                    type = baseTextureType->getElementType();
+                }
+            }
+            SLANG_RELEASE_ASSERT(type);
             m_emitter->emitType(type);
         }
         break;

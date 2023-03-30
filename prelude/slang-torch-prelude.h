@@ -41,34 +41,18 @@
 #include "slang-cpp-types-core.h"
 #include "slang-cpp-scalar-intrinsics.h"
 
+static const int kSlangTorchTensorMaxDim = 5;
+
 struct TensorView
 {
     uint8_t* data;
-    uint32_t* strides;
-    uint32_t* sizes;
+    uint32_t strides[kSlangTorchTensorMaxDim];
+    uint32_t sizes[kSlangTorchTensorMaxDim];
     uint32_t dimensionCount;
 };
 
-struct CudaTaskMemoryAllocator
-{
-    std::vector<void*> allocations;
 
-    uint32_t* allocUIntArray(uint32_t size)
-    {
-        void* ptr = nullptr;
-        cudaMallocHost(&ptr, size * sizeof(uint32_t));
-        AT_CUDA_CHECK(cudaGetLastError());
-        return (uint32_t*)ptr;
-    }
-
-    ~CudaTaskMemoryAllocator()
-    {
-        for (auto ptr : allocations)
-            cudaFree(ptr);
-    }
-};
-
-TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor val, const char* name, torch::ScalarType targetScalarType)
+TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarType targetScalarType)
 {
     // Convert device and scalar types.
     if (!val.device().is_cuda())
@@ -78,8 +62,6 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
 
     TensorView res = {};
     res.dimensionCount = val.dim();
-    res.strides = allocator->allocUIntArray(val.dim());
-    res.sizes = allocator->allocUIntArray(val.dim());
     res.data = nullptr;
     size_t elementSize = 4;
 
@@ -115,6 +97,9 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
         res.data = (uint8_t*)val.data_ptr<int64_t>();
         break;
     }
+
+    if (val.dim() > kSlangTorchTensorMaxDim)
+        throw std::runtime_error(std::string(name).append(": number of dimensions exceeds limit (").append(std::to_string(kSlangTorchTensorMaxDim)).append(")").c_str());
 
     for (int i = 0; i < val.dim(); ++i)
     {

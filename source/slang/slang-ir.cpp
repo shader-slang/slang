@@ -3951,10 +3951,9 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeStruct, argCount, args);
     }
 
-    IRInst* IRBuilder::emitMakeTensorView(IRType* type, IRInst* allocator, IRInst* val)
+    IRInst* IRBuilder::emitMakeTensorView(IRType* type, IRInst* val)
     {
-        IRInst* args[2] = { allocator, val };
-        return emitIntrinsicInst(type, kIROp_MakeTensorView, 2, args);
+        return emitIntrinsicInst(type, kIROp_MakeTensorView, 1, &val);
     }
 
     IRInst* IRBuilder::emitMakeExistential(
