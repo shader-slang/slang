@@ -8,7 +8,7 @@ Neural networks and other machine learning techniques are becoming an increasing
 
 ## Using Automatic Differentiation in Slang
 
-In this section, we briefly walkthrough how to compute forward-derivative from input, and backward propagate the derivative from output to input.
+In this section, we walk through the steps to compute forward-derivative from input, and backward propagate the derivative from output to input.
 
 ### Forward Differentiation
 
@@ -76,7 +76,7 @@ The `__bwd_diff` operator applies to a backward differentiable function and retu
 void myFunc_backProp(inout DifferentiablePair<float> a, inout DifferentiablePair<float> x, float dResult);
 ```
 
-Where `a` is an `inout DifferentiablePair` where the initial value of `a` is passed into the function as primal value (in the `.p` property), and the propagated derivative of `a` is returned via the `.p` property of the `DifferentialPair`. The same rules applies to `x`.
+Where `a` is an `inout DifferentiablePair` where the initial value of `a` is passed into the function as primal value (in the `.p` property), and the propagated derivative of `a` is returned via the `.d` property of the `DifferentialPair`. The same rules applies to `x`.
 
 The additional `dResult` parameter is the derivative of the return value to be propagated to the input parameters. Note that in a backward propagation function, an input will become a `inout DifferentiablePair` where the `.d` property of the pair is intended for receiving the propagation result, and the return value will become an input parameter that represents the source of backward propagation.
 
@@ -95,7 +95,7 @@ This completes the walkthrough of automatic differentiation features. The follow
 
 ## Mathematic Concepts and Terminologies
 
-This secions briefs reviews the mathematic theories behind differentiable programming with the intention to clarify the concepts and terminologies that will be used in the rest of this documentation. We assume the reader is already familiar with the basic theories behind neural network training, in particular the backpropagation algorithm.
+This secions briefly reviews the mathematic theories behind differentiable programming with the intention to clarify the concepts and terminologies that will be used in the rest of this documentation. We assume the reader is already familiar with the basic theories behind neural network training, in particular the backpropagation algorithm.
 
 A differentiable system can be represented a composition of differentiable functions (kernels) with learnable parameters, where each differentiable function has the form:
 
