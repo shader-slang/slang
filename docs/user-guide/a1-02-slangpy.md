@@ -126,7 +126,7 @@ float square(float x)
 ```
 This is done by simply adding a `[BackwardDifferentiable]` attribute to our `square`function.
 
-With that, we can now define `square_bwd_kernel` that performance backward propagation as:
+With that, we can now define `square_bwd_kernel` that performs backward propagation as:
 
 ```csharp
 [CudaKernel]
