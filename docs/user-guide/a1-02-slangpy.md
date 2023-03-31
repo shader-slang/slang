@@ -242,10 +242,10 @@ float computeOutputPixel(TensorView<float> input, uint2 pixelLoc)
     {
         // Skip out of bounds pixels.
         if (x < 0 || x >= width) continue;
-        if (y < 0 || y >= height) continue;
 
         for (int y = pixelLoc.y - 1; y <= pixelLoc.y + 1; y++)
         {
+            if (y < 0 || y >= height) continue;
             sumValue += input[x, y];
             count++;
         }
@@ -322,10 +322,10 @@ float computeOutputPixel(
     {
         // Skip out of bounds pixels.
         if (x < 0 || x >= width) continue;
-        if (y < 0 || y >= height) continue;
 
         for (int y = pixelLoc.y - 1; y <= pixelLoc.y + 1; y++)
         {
+            if (y < 0 || y >= height) continue;
             sumValue += getInputElement(input, inputGradToPropagateTo, uint2(x, y));
             count++;
         }
