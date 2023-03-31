@@ -226,53 +226,100 @@ The `TensorView<T>` represents the GPU view of a tensor and provides accesors to
 
 Following is a list of builtin methods and attributes for PyTorch interop.
 
-### `static TorchTensor<T> TorchTensor<T>.alloc(uint x, uint y, ...)`
+### `TorchTensor` methods
+
+#### `static TorchTensor<T> TorchTensor<T>.alloc(uint x, uint y, ...)`
 Allocates a new PyTorch tensor with the given dimensions.
 
-### `static TorchTensor<T> TorchTensor<T>.zerosLike(TorchTensor<T> other)`
+#### `static TorchTensor<T> TorchTensor<T>.emptyLike(TorchTensor<T> other)`
+Allocates a new PyTorch tensor that has the same dimensions as `other` without initializing it.
+
+#### `static TorchTensor<T> TorchTensor<T>.zerosLike(TorchTensor<T> other)`
 Allocates a new PyTorch tensor that has the same dimensions as `other` and initialize it to zero.
 
-### `uint TorchTensor<T>.dims()`
+#### `uint TorchTensor<T>.dims()`
 Returns the tensor's dimension count.
 
-### `uint TorchTensor<T>.size(int dim)`
+#### `uint TorchTensor<T>.size(int dim)`
 Returns the tensor's size (in number of elements) at `dim`.
 
-### `uint TorchTensor<T>.stride(int dim)`
+#### `uint TorchTensor<T>.stride(int dim)`
 Returns the tensor's stride (in bytes) at `dim`.
 
-### `TensorView<T>.operator[uint x, uint y, ...]`
+### `TensorView` methods
+
+#### `TensorView<T>.operator[uint x, uint y, ...]`
 Provide an accessor to data content in a tensor.
 
-### `TensorView<T>.operator[vector<uint, N> index]`
+#### `TensorView<T>.operator[vector<uint, N> index]`
 Provide an accessor to data content in a tensor, indexed by a uint vector.
 `tensor[uint3(1,2,3)]` is equivalent to `tensor[1,2,3]`.
 
-### `uint TensorView<T>.dims()`
+#### `uint TensorView<T>.dims()`
 Returns the tensor's dimension count.
 
-### `uint TensorView<T>.size(int dim)`
+#### `uint TensorView<T>.size(int dim)`
 Returns the tensor's size (in number of elements) at `dim`.
 
-### `uint TensorView<T>.stride(int dim)`
+#### `uint TensorView<T>.stride(int dim)`
 Returns the tensor's stride (in bytes) at `dim`.
 
-### `cudaThreadIdx()`
+#### `void TensorView<T>.fillZero()`
+Fills the tensor with zeros. Modifies the tensor in-place.
+
+#### `void TensorView<T>.fillValue(T value)`
+Fills the tensor with the specified value, modifies the tensor in-place.
+
+#### `T* TensorView<T>.data_ptr_at(vector<uint, N> index)`
+Returns a pointer to the element at `index`.
+
+#### `void TensorView<T>.InterlockedAdd(vector<uint, N> index, T val, out T oldVal)`
+Atomically add `val` to element at `index`. 
+
+#### `void TensorView<T>.InterlockedMin(vector<uint, N> index, T val, out T oldVal)`
+Atomically computes the min of `val` and the element at `index`. Available for 32 and 64 bit integer types only.
+
+#### `void TensorView<T>.InterlockedMax(vector<uint, N> index, T val, out T oldVal)`
+Atomically computes the max of `val` and the element at `index`. Available for 32 and 64 bit integer types only.
+
+#### `void TensorView<T>.InterlockedAnd(vector<uint, N> index, T val, out T oldVal)`
+Atomically computes the bitwise and of `val` and the element at `index`. Available for 32 and 64 bit integer types only.
+
+#### `void TensorView<T>.InterlockedOr(vector<uint, N> index, T val, out T oldVal)`
+Atomically computes the bitwise or  of `val` and the element at `index`. Available for 32 and 64 bit integer types only.
+
+#### `void TensorView<T>.InterlockedXor(vector<uint, N> index, T val, out T oldVal)`
+Atomically computes the bitwise xor  of `val` and the element at `index`. Available for 32 and 64 bit integer types only.
+
+#### `void TensorView<T>.InterlockedExchange(vector<uint, N> index, T val, out T oldVal)`
+Atomically swaps `val` into the element at `index`. Available for `float` and 32/64 bit integer types only.
+
+#### `void TensorView<T>.InterlockedCompareExchange(vector<uint, N> index, T compare, T val)`
+Atomically swaps `val` into the element at `index` if the element equals to `compare`. Available for `float` and 32/64 bit integer types only.
+
+### CUDA Support Functions
+
+#### `cudaThreadIdx()`
 Returns the `threadIdx` variable in CUDA.
 
-### `cudaBlockIdx()`
+#### `cudaBlockIdx()`
 Returns the `blockIdx` variable in CUDA.
 
-### `cudaBlockDim()`
+#### `cudaBlockDim()`
 Returns the `blockDim` variable in CUDA.
 
-### `[CudaKernel]` attribute
+#### `syncTorchCudaStream()`
+Waits for all pending CUDA kernel executions to complete on host.
+
+### Attributes for PyTorch Interop
+
+#### `[CudaKernel]` attribute
 Marks a function as a CUDA kernel (maps to a `__global__` function)
 
-### `[TorchEntryPoint]` attribute
+#### `[TorchEntryPoint]` attribute
 Marks a function for export to Python. Functions marked with `[TorchEntryPoint]` will be accessible from a loaded module returned by `slangpy.loadModule`.
 
-### `[CudaDeviceExport]` attribute
+#### `[CudaDeviceExport]` attribute
 Marks a function as a cuda device function, and ensures the compiler to include it in the generated cuda source.
 
 ## Type Marshalling Between Slang and Python

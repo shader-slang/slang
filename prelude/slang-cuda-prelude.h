@@ -2095,19 +2095,48 @@ __forceinline__ __device__ void *traceOptiXRay(
 
 #endif
 
+static const int kSlangTorchTensorMaxDim = 5;
 
 // TensorView
 struct TensorView
 {
     uint8_t* data;
-    uint32_t* strides;
-    uint32_t* sizes;
+    uint32_t strides[kSlangTorchTensorMaxDim];
+    uint32_t sizes[kSlangTorchTensorMaxDim];
     uint32_t dimensionCount;
 
     template<typename T>
     __device__ T* data_ptr()
     {
         return reinterpret_cast<T*>(data);
+    }
+
+    template<typename T>
+    __device__ T* data_ptr_at(uint32_t index)
+    {
+        uint64_t offset = strides[0] * index;
+        return reinterpret_cast<T*>(data + offset);
+    }
+
+    template<typename T>
+    __device__ T* data_ptr_at(uint2 index)
+    {
+        uint64_t offset = strides[0] * index.x + strides[1] * index.y;
+        return reinterpret_cast<T*>(data + offset);
+    }
+
+    template<typename T>
+    __device__ T* data_ptr_at(uint3 index)
+    {
+        uint64_t offset = strides[0] * index.x + strides[1] * index.y + strides[2] * index.z;
+        return reinterpret_cast<T*>(data + offset);
+    }
+
+    template<typename T>
+    __device__ T* data_ptr_at(uint4 index)
+    {
+        uint64_t offset = strides[0] * index.x + strides[1] * index.y + strides[2] * index.z + strides[3] * index.w;
+        return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>

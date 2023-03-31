@@ -332,8 +332,6 @@ public:
             {
                 if (expectDiffInstWorkListSet.Add(inst))
                 {
-                    if (inst->getFullType() && inst->getFullType()->getOp() == kIROp_IntType)
-                        printf("break");
                     expectDiffInstWorkList.add(inst);
                 }
             }

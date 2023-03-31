@@ -19,6 +19,8 @@ public:
 
 protected:
     // CPPSourceEmitter overrides 
+    virtual void emitInstStmtImpl(IRInst* inst) override;
+
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) override;
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out) override;
     virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink) override;

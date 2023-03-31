@@ -3129,7 +3129,7 @@ public:
         return emitMakeStruct(type, args.getCount(), args.getBuffer());
     }
 
-    IRInst* emitMakeTensorView(IRType* type, IRInst* allocator, IRInst* val);
+    IRInst* emitMakeTensorView(IRType* type, IRInst* val);
 
     IRInst* emitMakeExistential(
         IRType* type,

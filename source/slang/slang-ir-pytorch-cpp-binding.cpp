@@ -263,8 +263,6 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
         oldParam->removeAndDeallocate();
     }
 
-    auto allocator = builder.emitVar(builder.getType(kIROp_TorchKernelMemoryAllocatorType));
-
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
@@ -297,7 +295,7 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
             else if (auto getView = as<IRTorchTensorGetView>(inst))
             {
                 builder.setInsertBefore(getView);
-                auto makeView = builder.emitMakeTensorView(getView->getFullType(), allocator, inst->getOperand(0));
+                auto makeView = builder.emitMakeTensorView(getView->getFullType(), inst->getOperand(0));
                 getView->replaceUsesWith(makeView);
                 instsToRemove.add(getView);
             }

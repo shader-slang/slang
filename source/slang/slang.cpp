@@ -1493,6 +1493,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
 
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostHostCallable:
