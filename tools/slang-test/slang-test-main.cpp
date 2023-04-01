@@ -41,8 +41,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
 
-#include <llvm/FileCheck/FileCheck.h>
-
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -599,10 +597,10 @@ static SlangResult _gatherTestsForFile(
     return SLANG_OK;
 }
 
-static void _fileCheckDiagHandler(const llvm::SMDiagnostic & diag, void *context)
+void SLANG_STDCALL _fileCheckDiagnosticCallback(void* data, const TestMessageType messageType, const char* message) noexcept
 {
-    auto testReporter = static_cast<TestReporter*>(context);
-    testReporter->dumpLLVMDiagnostic(diag);
+    auto& testReporter = *reinterpret_cast<TestReporter*>(data);
+    testReporter.message(messageType, message);
 }
 
 //
@@ -610,48 +608,33 @@ static void _fileCheckDiagHandler(const llvm::SMDiagnostic & diag, void *context
 //
 // Returns TestResult::Ignored if this isn't a FileCheck test
 //
-static TestResult _fileCheckTest(TestContext* context, const TestInput& fileCheckRules, const String& outputToCheck)
+static TestResult _fileCheckTest(TestContext& context, const TestInput& fileCheckRules, const String& outputToCheck)
 {
-    auto toLLVMStringRef = [](const String& s){return llvm::StringRef(s.begin(), s.getLength());};
-
     String fileCheckPrefix;
     if(!fileCheckRules.testOptions->getFileCheckPrefix(fileCheckPrefix))
     {
         return TestResult::Ignored;
     }
 
-    // Set up our FileCheck session
-    llvm::FileCheckRequest fcReq;
-    fcReq.CheckPrefixes = {toLLVMStringRef(fileCheckPrefix)};
-    llvm::FileCheck fc(fcReq);
+    auto& testReporter = *context.getTestReporter();
 
-    // Set up the LLVM source manager for diagnostic output from our input buffers
-    llvm::SourceMgr sourceManager;
-    String inputText;
-    Slang::File::readAllText(fileCheckRules.filePath, inputText);
-    auto inputStringRef = toLLVMStringRef(inputText);
-    sourceManager.AddNewSourceBuffer(
-        llvm::MemoryBuffer::getMemBuffer(inputStringRef, toLLVMStringRef(fileCheckRules.filePath)),
-        llvm::SMLoc());
-    auto outputStringRef = toLLVMStringRef(outputToCheck);
-    sourceManager.AddNewSourceBuffer(
-        llvm::MemoryBuffer::getMemBuffer(outputStringRef, "actual-output"),
-        llvm::SMLoc());
-    sourceManager.setDiagHandler(_fileCheckDiagHandler, static_cast<void*>(context->getTestReporter()));
-
-    auto checkPrefix = fc.buildCheckPrefixRegex();
-    if(fc.readCheckFile(sourceManager, inputStringRef, checkPrefix))
+    IFileCheck* fc = context.getFileCheck();
+    if(!fc)
     {
-        // FileCheck failed to find or understand any FileCheck rules in
-        // the input file, automatic fail, and reported to the diag handler .
+        testReporter.message(TestMessageType::RunError, "FileCheck is not available");
         return TestResult::Fail;
     }
-    else if(!fc.checkInput(sourceManager, outputStringRef))
-    {
-        // An ordinary failure, the FileCheck rules didn't match
-        return TestResult::Fail;
-    }
-    return TestResult::Pass;
+
+    const CharSlice outputCS(outputToCheck);
+    return fc->performTest(
+        "slang-test",
+        fileCheckRules.filePath.begin(),
+        fileCheckPrefix.begin(),
+        &outputCS,
+        "actual-output",
+        _fileCheckDiagnosticCallback,
+        &testReporter,
+        testReporter.m_dumpOutputOnFailure && testReporter.canWriteStdError());
 }
 
 static SlangResult _readExpected(const UnownedStringSlice& stem, String& out);
@@ -672,7 +655,7 @@ static TestResult _validateOutput(
 
     if(input.testOptions->isFileCheckTest())
     {
-        result = _fileCheckTest(context, input, actualOutput);
+        result = _fileCheckTest(*context, input, actualOutput);
     }
     else
     {
@@ -2210,8 +2193,8 @@ TestResult runSimpleCompareCommandLineTest(TestContext* context, TestInput& inpu
 TestResult runReflectionTest(TestContext* context, TestInput& input)
 {
     const auto& options = context->options;
-    auto filePath = input.filePath;
-    auto outputStem = input.outputStem;
+    const auto& filePath = input.filePath;
+    auto& outputStem = input.outputStem;
 
     bool isCPUTest = input.testOptions->command.startsWith("CPU_");
 
@@ -2729,7 +2712,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 
     if(isFileCheckTest)
     {
-        result = _fileCheckTest(context, input, actualOutput);
+        result = _fileCheckTest(*context, input, actualOutput);
         // TODO: It might be a good idea to sanity check any expected output
         // source files against the filecheck rules if they're applicable.
         //

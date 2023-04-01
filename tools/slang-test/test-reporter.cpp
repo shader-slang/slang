@@ -4,9 +4,6 @@
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-process-util.h"
 
-#include <llvm/Support/SourceMgr.h>
-#include <llvm/Support/raw_ostream.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -211,40 +208,6 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_ignoredTestCount += other->m_ignoredTestCount;
     m_passedTestCount += other->m_passedTestCount;
     m_totalTestCount += other->m_totalTestCount;
-}
-
-class raw_slang_string_ostream : public llvm::raw_ostream {
-  String &OS;
-  void write_impl(const char *Ptr, size_t Size) override
-  {
-      OS.append(Ptr, Ptr +Size);
-  }
-  uint64_t current_pos() const override { return OS.getLength(); }
-
-public:
-  explicit raw_slang_string_ostream(String &O) : OS(O) {
-    SetUnbuffered();
-  }
-  void reserveExtraSpace(uint64_t ExtraSize) override {
-    OS.prepareForAppend(ExtraSize);
-  }
-};
-
-void TestReporter::dumpLLVMDiagnostic(const llvm::SMDiagnostic &diag)
-{
-    StringBuilder builder;
-
-    if (m_dumpOutputOnFailure && canWriteStdError())
-    {
-        diag.print("slang-test", llvm::errs());
-        fflush(stderr);
-    }
-    String s;
-    raw_slang_string_ostream o(s);
-    diag.print("slang-llvm", o);
-
-    // Add to the m_currentInfo
-    message(TestMessageType::TestFailure, s);
 }
 
 void TestReporter::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)

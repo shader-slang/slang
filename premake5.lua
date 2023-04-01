@@ -899,14 +899,10 @@ tool "slang-embed"
 -- currently relies on include paths being set up so that it can find
 -- the core headers:
 --
-
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
-    -- We link with llvm here for FileCheck support, LLVM-14 is the
-    -- library required according to llvm-config (llvm-config isn't in the
-    -- binary llvm distribution on Windows, so just inline the output here)
-    links { "compiler-core", "slang", "core", "miniz", "lz4", "LLVM-13" }
+    links { "compiler-core", "slang", "core", "miniz", "lz4" }
     dependson { "slang-reflection-test-tool", "render-test-tool", "slang-unit-test-tool", "gfx-unit-test-tool" }
     -- We want to set to the root of the project, but that doesn't seem to work with '.'.
     -- So set a path that resolves to the same place.

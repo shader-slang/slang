@@ -9,8 +9,6 @@
 #include "../../source/core/slang-dictionary.h"
 #include "tools/unit-test/slang-unit-test.h"
 
-#include <llvm/Support/SourceMgr.h>
-
 #include <mutex>
 
 enum class TestOutputMode
@@ -91,8 +89,6 @@ class TestReporter : public ITestReporter
     virtual SLANG_NO_THROW void SLANG_MCALL message(TestMessageType type, char const* message) override;
 
     void dumpOutputDifference(const Slang::String& expectedOutput, const Slang::String& actualOutput);
-
-    void dumpLLVMDiagnostic(const llvm::SMDiagnostic& diag);
 
     void consolidateWith(TestReporter* other);
 
