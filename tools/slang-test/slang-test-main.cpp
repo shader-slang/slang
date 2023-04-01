@@ -49,7 +49,6 @@
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
 
-
 #include <atomic>
 #include <thread>
 
@@ -80,13 +79,13 @@ struct TestOptions
     }
 
     // Small helper to help consistently interrogating for filecheck usage
-    bool isFileCheckTest() const
-    {
-        return commandOptions.ContainsKey("filecheck");
-    }
     bool getFileCheckPrefix(String& prefix) const
     {
         return commandOptions.TryGetValue("filecheck", prefix);
+    }
+    bool getFileCheckBufferPrefix(String& prefix) const
+    {
+        return commandOptions.TryGetValue("filecheck-buffer", prefix);
     }
 
     Type type = Type::Normal;
@@ -147,6 +146,24 @@ typedef TestResult(*TestCallback)(TestContext* context, TestInput& input);
 static void _addRenderTestOptions(const Options& options, CommandLine& cmdLine);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+// Tries to read in order
+// - The file specific to this test:      input.outputStem + suffix
+// - The general file for a set of tests: input.fileName + suffix;
+static SlangResult _readTestFile(const TestInput& input, const String& suffix, String& out)
+{
+    StringBuilder buf;
+    buf << input.outputStem << suffix;
+    if(auto r = Slang::File::readAllText(buf, out); SLANG_SUCCEEDED(r))
+    {
+        return r;
+    }
+
+    buf.Clear();
+    buf << input.filePath << suffix;
+    return Slang::File::readAllText(buf, out);
+}
+
 
 bool match(char const** ioCursor, char const* expected)
 {
@@ -597,7 +614,7 @@ static SlangResult _gatherTestsForFile(
     return SLANG_OK;
 }
 
-void SLANG_STDCALL _fileCheckDiagnosticCallback(void* data, const TestMessageType messageType, const char* message) noexcept
+static void SLANG_STDCALL _fileCheckDiagnosticCallback(void* data, const TestMessageType messageType, const char* message) noexcept
 {
     auto& testReporter = *reinterpret_cast<TestReporter*>(data);
     testReporter.message(messageType, message);
@@ -606,16 +623,12 @@ void SLANG_STDCALL _fileCheckDiagnosticCallback(void* data, const TestMessageTyp
 //
 // Check some generated output with FileCheck
 //
-// Returns TestResult::Ignored if this isn't a FileCheck test
-//
-static TestResult _fileCheckTest(TestContext& context, const TestInput& fileCheckRules, const String& outputToCheck)
+static TestResult _fileCheckTest(
+    TestContext& context,
+    const String& fileCheckRules,
+    const String& fileCheckPrefix,
+    const String& outputToCheck)
 {
-    String fileCheckPrefix;
-    if(!fileCheckRules.testOptions->getFileCheckPrefix(fileCheckPrefix))
-    {
-        return TestResult::Ignored;
-    }
-
     auto& testReporter = *context.getTestReporter();
 
     IFileCheck* fc = context.getFileCheck();
@@ -626,65 +639,76 @@ static TestResult _fileCheckTest(TestContext& context, const TestInput& fileChec
     }
 
     const CharSlice outputCS(outputToCheck);
+    const bool coloredOutput = true;
     return fc->performTest(
         "slang-test",
-        fileCheckRules.filePath.begin(),
+        fileCheckRules.begin(),
         fileCheckPrefix.begin(),
         &outputCS,
         "actual-output",
         _fileCheckDiagnosticCallback,
         &testReporter,
-        testReporter.m_dumpOutputOnFailure && testReporter.canWriteStdError());
+        coloredOutput);
 }
 
-static SlangResult _readExpected(const UnownedStringSlice& stem, String& out);
+template<typename Compare>
+static TestResult _fileComparisonTest(
+    TestContext& context,
+    const TestInput& input,
+    const bool allowMissingExpected,
+    const char* expectedFileSuffix,
+    const String& actualOutput,
+    Compare compare)
+{
+    String expectedOutput;
+
+    if (SLANG_FAILED(_readTestFile(input, expectedFileSuffix, expectedOutput)) && !allowMissingExpected)
+    {
+        context.getTestReporter()->messageFormat(TestMessageType::RunError,
+            "Unable to read %s output for '%s'\n",
+            expectedFileSuffix,
+            input.outputStem.getBuffer());
+        return TestResult::Fail;
+    }
+
+    // If no expected output file was found, then we
+    // expect everything to be empty
+    if (expectedOutput.getLength() == 0)
+    {
+        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
+    }
+
+    // Otherwise we compare to the expected output
+    if (!compare(actualOutput, expectedOutput))
+    {
+        context.getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
+        return TestResult::Fail;
+    }
+    return TestResult::Pass;
+}
+
+static bool _areLinesEqual(const String& a, const String& e)
+{
+    return StringUtil::areLinesEqual(a.getUnownedSlice(), e.getUnownedSlice());
+}
 
 // Either run FileCheck over the result, or read and compare with a .expected file
 // On a comparison failure, dump the difference
 // On any failure, write a .actual file.
-template<typename Compare>
+template<typename Compare = decltype(_areLinesEqual)>
 static TestResult _validateOutput(
-    TestContext* context,
-    TestInput& input,
+    TestContext* const context,
+    const TestInput& input,
     const String& actualOutput,
-    const bool forceFailure,
-    const bool allowMissingExpected,
-    Compare compare)
+    const bool forceFailure = false,
+    const bool allowMissingExpected = true,
+    const Compare compare = _areLinesEqual)
 {
-    TestResult result = TestResult::Pass;
-
-    if(input.testOptions->isFileCheckTest())
-    {
-        result = _fileCheckTest(*context, input, actualOutput);
-    }
-    else
-    {
-        String expectedOutputPath = input.outputStem + ".expected";
-        String expectedOutput;
-
-        // Slang::File::readAllText(expectedOutputPath, expectedOutput);
-        if (SLANG_FAILED(_readExpected(input.outputStem.getUnownedSlice(), expectedOutput)) && !allowMissingExpected)
-        {
-            StringBuilder buf;
-            buf << "Unable to find expected output for '" << input.outputStem << "'";
-            context->getTestReporter()->message(TestMessageType::TestFailure, buf);
-            return TestResult::Fail;
-        }
-
-        // If no expected output file was found, then we
-        // expect everything to be empty
-        if (expectedOutput.getLength() == 0)
-        {
-            expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
-        }
-
-        // Otherwise we compare to the expected output
-        if (!compare(actualOutput, expectedOutput))
-        {
-            result = TestResult::Fail;
-            context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-        }
-    }
+    String fileCheckPrefix;
+    const TestResult result =
+        input.testOptions->getFileCheckPrefix(fileCheckPrefix)
+            ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
+            : _fileComparisonTest(*context, input, allowMissingExpected, ".expected", actualOutput, compare);
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
@@ -700,23 +724,6 @@ static TestResult _validateOutput(
         return result;
     }
 }
-
-static TestResult _validateOutput(
-    TestContext* context,
-    TestInput& input,
-    const String& actualOutput,
-    const bool forceFailure = false,
-    const bool allowMissingExpected = true)
-{
-    return _validateOutput(
-        context,
-        input,
-        actualOutput,
-        forceFailure,
-        allowMissingExpected,
-        [](auto a, auto e){return StringUtil::areLinesEqual(a.getUnownedSlice(), e.getUnownedSlice());});
-}
-
 
 Result spawnAndWaitExe(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
@@ -1349,7 +1356,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
     }
 
     // Couldn't find either 
-    printf("referenceOutput '%s' or '%s' not found.\n", defaultBuf.getBuffer(), specializedBuf.getBuffer());
+    fprintf(stderr, "referenceOutput '%s' or '%s' not found.\n", defaultBuf.getBuffer(), specializedBuf.getBuffer());
 
     return "";
 }
@@ -2051,39 +2058,6 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         [&input](auto e, auto a){return _areResultsEqual(input.testOptions->type, e, a);});
 }
 
-SlangResult _readText(const UnownedStringSlice& path, String& out)
-{
-    return Slang::File::readAllText(path, out);
-}
-
-static SlangResult _readExpected(const UnownedStringSlice& stem, String& out)
-{
-    StringBuilder buf;
-
-    // See if we have a trailing . index, and try *without* that first
-    const Index dotIndex = stem.lastIndexOf('.');
-    if (dotIndex >= 0)
-    {
-        const UnownedStringSlice postfix = stem.tail(dotIndex + 1);
-
-        Int value;
-        if (SLANG_SUCCEEDED(StringUtil::parseInt(postfix, value)))
-        {
-            UnownedStringSlice head = stem.head(dotIndex);
-
-            buf << head << ".expected";
-
-            if (SLANG_SUCCEEDED(_readText(buf.getUnownedSlice(), out)))
-            {
-                return SLANG_OK;
-            }
-        }
-    }
-
-    buf << stem << ".expected";
-    return _readText(buf.getUnownedSlice(), out);
-}
-
 TestResult runSimpleLineTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
@@ -2228,23 +2202,6 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     }
 
     return _validateOutput(context, input, actualOutput);
-}
-
-String getExpectedOutput(String const& outputStem)
-{
-    String expectedOutputPath = outputStem + ".expected";
-    String expectedOutput;
-    
-    Slang::File::readAllText(expectedOutputPath, expectedOutput);
-    
-    // If no expected output file was found, then we
-    // expect everything to be empty
-    if (expectedOutput.getLength() == 0)
-    {
-        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
-    }
-
-    return expectedOutput;
 }
 
 static String _calcSummary(IArtifactDiagnostics* inDiagnostics)
@@ -2683,7 +2640,8 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     // Or, in the case of a filecheck test, instead of comparing against the
     // +".glsl" version, we run some filecheck rules on it
 
-    const bool isFileCheckTest = input.testOptions->isFileCheckTest();
+    String fileCheckPrefix;
+    const bool isFileCheckTest = input.testOptions->getFileCheckPrefix(fileCheckPrefix);
 
     String actualOutput;
     if(TestResult r = generateActualOutput(context, input, actualOutput); r != TestResult::Pass)
@@ -2712,7 +2670,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 
     if(isFileCheckTest)
     {
-        result = _fileCheckTest(*context, input, actualOutput);
+        result = _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput);
         // TODO: It might be a good idea to sanity check any expected output
         // source files against the filecheck rules if they're applicable.
         //
@@ -3198,53 +3156,39 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
         return TestResult::Pass;
     }
 
+    // Check the stdout/stderr from the compiler process
+    auto actualOutput = getOutput(exeRes);
+    _validateOutput(context, input, actualOutput);
+
     const String referenceOutputFile = findExpectedPath(input, ".expected.txt");
     if (referenceOutputFile.getLength() <= 0)
     {
         return TestResult::Fail;
     }
-
-    auto actualOutput = getOutput(exeRes);
-    auto expectedOutput = getExpectedOutput(outputStem);
     
-    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
-    {
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        return TestResult::Fail;
-    }
-
 	// check against reference output
-    if (!File::exists(actualOutputFile))
-    {
-        printf("render-test not producing expected outputs.\n");
-        printf("render-test output:\n%s\n", actualOutput.getBuffer());
-		return TestResult::Fail;
-    }
-    if (!File::exists(referenceOutputFile))
-    {
-        printf("referenceOutput %s not found.\n", referenceOutputFile.getBuffer());
-		return TestResult::Fail;
-    }
-    String actualOutputContent, referenceOutputContent;
-
-    File::readAllText(actualOutputFile, actualOutputContent);
-    File::readAllText(referenceOutputFile, referenceOutputContent);
-
-    if (SLANG_FAILED(_compareWithType(actualOutputContent.getUnownedSlice(), referenceOutputContent.getUnownedSlice())))
+    String actualOutputContent;
+    if (SLANG_FAILED(File::readAllText(actualOutputFile, actualOutputContent)))
     {
         context->getTestReporter()->messageFormat(
-            TestMessageType::TestFailure,
-            "output mismatch! actual output: {\n%s\n}, \n%s\n",
-            actualOutputContent.getBuffer(),
-            referenceOutputContent.getBuffer());
-        return TestResult::Fail;
+            TestMessageType::RunError,
+            "Unable to read render-test output: %s\n",
+            actualOutput.getBuffer());
+		return TestResult::Fail;
     }
 
-	return TestResult::Pass;
+    String fileCheckPrefix;
+    return input.testOptions->getFileCheckBufferPrefix(fileCheckPrefix)
+        ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutputContent)
+        : _fileComparisonTest(
+            *context,
+            input,
+            false,
+            ".expected.txt",
+            actualOutputContent,
+            [](const auto& a, const auto& e){
+                return SLANG_SUCCEEDED(_compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
+            });
 }
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
@@ -3489,7 +3433,8 @@ TestResult runHLSLRenderComparisonTestImpl(
     char const* expectedArg,
     char const* actualArg)
 {
-    if(input.testOptions->isFileCheckTest())
+    String _fileCheckPrefix;
+    if(input.testOptions->getFileCheckPrefix(_fileCheckPrefix))
     {
         context->getTestReporter()->message(
             TestMessageType::RunError,
