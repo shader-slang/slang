@@ -3900,15 +3900,20 @@ static bool shouldRunTest(
     if(!endsWithAllowedExtension(context, filePath))
         return false;
 
-    if( context->options.testPrefix )
+    if(!context->options.testPrefixes.getCount())
     {
-        if( strncmp(context->options.testPrefix, filePath.begin(), strlen(context->options.testPrefix)) != 0 )
-        {
-            return false;
-        }
+        return true;
     }
 
-    return true;
+    // If we have prefixes, it has to match one of them
+    for(auto& p : context->options.testPrefixes)
+    {
+        if(filePath.startsWith(p))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void getFilesInDirectory(String directoryPath, List<String>& files)
