@@ -655,27 +655,27 @@ template<typename Compare>
 static TestResult _fileComparisonTest(
     TestContext& context,
     const TestInput& input,
-    const bool allowMissingExpected,
+    const char* defaultExpectedContent,
     const char* expectedFileSuffix,
     const String& actualOutput,
     Compare compare)
 {
     String expectedOutput;
 
-    if (SLANG_FAILED(_readTestFile(input, expectedFileSuffix, expectedOutput)) && !allowMissingExpected)
+    if (SLANG_FAILED(_readTestFile(input, expectedFileSuffix, expectedOutput)))
     {
-        context.getTestReporter()->messageFormat(TestMessageType::RunError,
-            "Unable to read %s output for '%s'\n",
-            expectedFileSuffix,
-            input.outputStem.getBuffer());
-        return TestResult::Fail;
-    }
-
-    // If no expected output file was found, then we
-    // expect everything to be empty
-    if (expectedOutput.getLength() == 0)
-    {
-        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
+        if(defaultExpectedContent)
+        {
+            expectedOutput = defaultExpectedContent;
+        }
+        else
+        {
+            context.getTestReporter()->messageFormat(TestMessageType::RunError,
+                "Unable to read %s output for '%s'\n",
+                expectedFileSuffix,
+                input.outputStem.getBuffer());
+            return TestResult::Fail;
+        }
     }
 
     // Otherwise we compare to the expected output
@@ -701,14 +701,14 @@ static TestResult _validateOutput(
     const TestInput& input,
     const String& actualOutput,
     const bool forceFailure = false,
-    const bool allowMissingExpected = true,
+    const char* defaultExpectedContent = nullptr,
     const Compare compare = _areLinesEqual)
 {
     String fileCheckPrefix;
     const TestResult result =
         input.testOptions->getFileCheckPrefix(fileCheckPrefix)
             ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
-            : _fileComparisonTest(*context, input, allowMissingExpected, ".expected", actualOutput, compare);
+            : _fileComparisonTest(*context, input, defaultExpectedContent, ".expected", actualOutput, compare);
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
@@ -2054,7 +2054,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         input,
         actualOutput,
         false,
-        true,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a){return _areResultsEqual(input.testOptions->type, e, a);});
 }
 
@@ -2104,7 +2104,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
         actualOutput << "No output diagnostics\n";
     }
 
-    return _validateOutput(context, input, actualOutput, false, false);
+    return _validateOutput(context, input, actualOutput, false);
 }
 
 TestResult runCompile(TestContext* context, TestInput& input)
@@ -3158,13 +3158,12 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
     // Check the stdout/stderr from the compiler process
     auto actualOutput = getOutput(exeRes);
-    _validateOutput(context, input, actualOutput);
-
-    const String referenceOutputFile = findExpectedPath(input, ".expected.txt");
-    if (referenceOutputFile.getLength() <= 0)
-    {
-        return TestResult::Fail;
-    }
+    auto compileResult = _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n");
     
 	// check against reference output
     String actualOutputContent;
@@ -3178,17 +3177,18 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     }
 
     String fileCheckPrefix;
-    return input.testOptions->getFileCheckBufferPrefix(fileCheckPrefix)
+    auto bufferResult = input.testOptions->getFileCheckBufferPrefix(fileCheckPrefix)
         ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutputContent)
         : _fileComparisonTest(
             *context,
             input,
-            false,
+            nullptr,
             ".expected.txt",
             actualOutputContent,
             [](const auto& a, const auto& e){
                 return SLANG_SUCCEEDED(_compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
             });
+    return std::max(compileResult, bufferResult);
 }
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
