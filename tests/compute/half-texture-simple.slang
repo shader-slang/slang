@@ -35,7 +35,7 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int idx = dispatchThreadID.x;
+    uint idx = dispatchThreadID.x;
     float u = idx * (1.0f / 4);
     
     float val = 0.0f;
