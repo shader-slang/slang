@@ -1088,10 +1088,12 @@ top:
                         builder->emitElementExtract(base,swizzleInfo->elementCoords[i].row),
                         swizzleInfo->elementCoords[i].col);
                 }
-                return LoweredValInfo::simple(builder->emitMakeVector(
-                    builder->getVectorType(type->getElementType(), swizzleInfo->elementCount),
-                    swizzleInfo->elementCount,
-                    components));
+                return swizzleInfo->elementCount == 1
+                    ? LoweredValInfo::simple(components[0])
+                    : LoweredValInfo::simple(builder->emitMakeVector(
+                        builder->getVectorType(type->getElementType(), swizzleInfo->elementCount),
+                        swizzleInfo->elementCount,
+                        components));
             }
             else
             {
