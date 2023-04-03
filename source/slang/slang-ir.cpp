@@ -2389,6 +2389,27 @@ namespace Slang
             capabilitySetType, kIROp_CapabilitySet, args.getCount(), args.getBuffer());
     }
 
+    static void canonicalizeInstOperands(IRBuilder& builder, IROp op, ArrayView<IRInst*> operands)
+    {
+        // For Array types, we always want to make sure its element count
+        // has an int32_t type. We will convert all other int types to int32_t
+        // to avoid things like float[8] and float[8U] being distinct types.
+        if (op == kIROp_ArrayType)
+        {
+            if (operands.getCount() < 2)
+                return;
+            IRInst* elementCount = operands[1];
+            if (auto intLit = as<IRIntLit>(elementCount))
+            {
+                if (intLit->getDataType()->getOp() != kIROp_IntType)
+                {
+                    IRInst* newElementCount = builder.getIntValue(builder.getIntType(), intLit->getValue());
+                    operands[1] = newElementCount;
+                }
+            }
+        }
+    }
+
     IRInst* IRBuilder::_findOrEmitHoistableInst(
         IRType* type,
         IROp op,
@@ -2403,6 +2424,13 @@ namespace Slang
         {
             operandCount += listArgCounts[ii];
         }
+
+        ShortList<IRInst*, 8> canonicalizedOperands;
+        canonicalizedOperands.setCount(fixedArgCount);
+        for (Index i = 0; i < fixedArgCount; i++)
+            canonicalizedOperands[i] = fixedArgs[i];
+
+        canonicalizeInstOperands(*this, op, canonicalizedOperands.getArrayView().arrayView);
 
         auto& memoryArena = getModule()->getMemoryArena();
         void* cursor = memoryArena.getCursor();
@@ -2430,7 +2458,7 @@ namespace Slang
             IRUse* operand = inst->getOperands();
             for (Int ii = 0; ii < fixedArgCount; ++ii)
             {
-                auto arg = fixedArgs[ii];
+                auto arg = canonicalizedOperands[ii];
                 m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
                 operand->usedValue = arg;
                 operand++;
@@ -3923,10 +3951,9 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeStruct, argCount, args);
     }
 
-    IRInst* IRBuilder::emitMakeTensorView(IRType* type, IRInst* allocator, IRInst* val)
+    IRInst* IRBuilder::emitMakeTensorView(IRType* type, IRInst* val)
     {
-        IRInst* args[2] = { allocator, val };
-        return emitIntrinsicInst(type, kIROp_MakeTensorView, 2, args);
+        return emitIntrinsicInst(type, kIROp_MakeTensorView, 1, &val);
     }
 
     IRInst* IRBuilder::emitMakeExistential(
@@ -7191,6 +7218,11 @@ namespace Slang
         case kIROp_Reinterpret:
         case kIROp_GetNativePtr:
         case kIROp_BackwardDiffIntermediateContextType:
+        case kIROp_MakeTargetTuple:
+        case kIROp_GetTargetTupleElement:
+        case kIROp_TorchGetCudaStream:
+        case kIROp_MakeTensorView:
+        case kIROp_TorchTensorGetView:
             return false;
 
         case kIROp_ForwardDifferentiate:

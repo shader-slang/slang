@@ -245,6 +245,7 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
             return;
         }
         auto newParam = builder.emitParam(newParamType);
+        param->transferDecorationsTo(newParam);
         newParams.add(newParam);
     }
 
@@ -261,8 +262,6 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
         oldParam->replaceUsesWith(convertedParam);
         oldParam->removeAndDeallocate();
     }
-
-    auto allocator = builder.emitVar(builder.getType(kIROp_TorchKernelMemoryAllocatorType));
 
     for (auto block : func->getBlocks())
     {
@@ -296,7 +295,7 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
             else if (auto getView = as<IRTorchTensorGetView>(inst))
             {
                 builder.setInsertBefore(getView);
-                auto makeView = builder.emitMakeTensorView(getView->getFullType(), allocator, inst->getOperand(0));
+                auto makeView = builder.emitMakeTensorView(getView->getFullType(), inst->getOperand(0));
                 getView->replaceUsesWith(makeView);
                 instsToRemove.add(getView);
             }
@@ -361,14 +360,16 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
 // Remove all [TorchEntryPoint] functions when emitting CUDA source.
 void removeTorchKernels(IRModule* module)
 {
+    List<IRInst*> toRemove;
     for (auto globalInst : module->getGlobalInsts())
     {
         if (!as<IRFunc>(globalInst))
             continue;
         if (globalInst->findDecoration<IRTorchEntryPointDecoration>())
-            globalInst->removeAndDeallocate();
+            toRemove.add(globalInst);
     }
-
+    for (auto inst : toRemove)
+        inst->removeAndDeallocate();
 }
 
 }

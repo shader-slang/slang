@@ -158,6 +158,18 @@ struct DifferentiableTypeConformanceContext
     IRInst* lookUpConformanceForType(IRInst* type);
 
     IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key);
+
+    IRType* differentiateType(IRBuilder* builder, IRInst* primalType);
+
+    IRInst* tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType);
+
+    IRInst* getOrCreateDifferentiablePairWitness(IRBuilder* builder, IRDifferentialPairTypeBase* pairType);
+
+    IRInst* getArrayWitness(IRBuilder* builder, IRArrayType* pairType);
+
+    IRInst* getExtractExistensialTypeWitness(IRBuilder* builder, IRExtractExistentialType* extractExistentialType);
+
+    IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness);
     
     IRInst* getDifferentialTypeFromDiffPairType(IRBuilder* builder, IRDifferentialPairTypeBase* diffPairType);
 
@@ -334,5 +346,6 @@ IRUse* findUniqueStoredVal(IRVar* var);
 
 bool isDerivativeContextVar(IRVar* var);
 
+bool isDiffInst(IRInst* inst);
 
 };

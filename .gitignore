@@ -76,3 +76,4 @@ build/**/*.recipe
 build/**/*.log
 *.dll
 *.dxil
+/tests/serialization/*.map

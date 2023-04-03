@@ -50,7 +50,7 @@ SLANG_NO_THROW void SLANG_MCALL CommandQueueImpl::executeCommandBuffers(
 SLANG_NO_THROW void SLANG_MCALL CommandQueueImpl::waitOnHost()
 {
     auto resultCode = cuStreamSynchronize(stream);
-    if (resultCode != cudaSuccess)
+    if (resultCode != CUDA_SUCCESS)
         SLANG_CUDA_HANDLE_ERROR(resultCode);
 }
 

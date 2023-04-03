@@ -239,6 +239,13 @@ namespace gfx_test
         void* extDescPtr = &extDesc;
         deviceDesc.extendedDescs = &extDescPtr;
 
+        // TODO: We should also set the debug callback
+        // (And in general reduce the differences (and duplication) between
+        // here and render-test-main.cpp)
+#ifdef _DEBUG
+        gfx::gfxEnableDebugLayer();
+#endif
+
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))
         {

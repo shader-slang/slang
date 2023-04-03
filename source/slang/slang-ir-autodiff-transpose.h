@@ -1621,10 +1621,18 @@ struct DiffTransposePass
             if (auto varToHoist = as<IRVar>(inst))
             {
                 varToHoist->insertBefore(varBlock->getFirstOrdinaryInst());
-                inst = findUniqueStoredVal(varToHoist)->getUser();
-                SLANG_ASSERT(inst);
+                auto uniqueStoreUse = findUniqueStoredVal(varToHoist);
+                if (uniqueStoreUse)
+                {
+                    inst = uniqueStoreUse->getUser();
+                    SLANG_ASSERT(inst);
 
-                defBlock = getBlock(inst);
+                    defBlock = getBlock(inst);
+                }
+                else
+                {
+                    defBlock = getBlock(inst);
+                }
             }
             else
             {
@@ -1896,9 +1904,11 @@ struct DiffTransposePass
                 auto var = builder->emitVar(arg->getDataType());
 
                 auto diffType = (IRType*)diffTypeContext.getDifferentialForType(builder, pairType->getValueType());
+                auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, pairType->getValueType());
+                SLANG_ASSERT(zeroMethod);
                 auto diffZero = builder->emitCallInst(
                     diffType,
-                    diffTypeContext.getZeroMethodForType(builder, pairType->getValueType()),
+                    zeroMethod,
                     List<IRInst*>());
 
                 // Initialize this var to (arg.primal, 0).

@@ -139,6 +139,9 @@ namespace Slang
             case kIROp_GetTupleElement:
             case kIROp_GetResultError:
             case kIROp_GetResultValue:
+            case kIROp_Call:
+            case kIROp_UpdateElement:
+            case kIROp_GetTargetTupleElement:
                 if (inst->getDataType()->getOp() == kIROp_VoidType)
                 {
                     IRBuilder builder(module);

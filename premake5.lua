@@ -354,7 +354,7 @@ workspace "slang"
         -- Warnings
         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses" }
     filter { "toolset:clang or gcc*", "language:C++" }
-        buildoptions { "-Wno-reorder", "-Wno-class-memaccess"}
+        buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }
 
     filter { "toolset:gcc*" }
         buildoptions { "-Wno-implicit-fallthrough", "-Wno-maybe-uninitialized" }

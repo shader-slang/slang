@@ -9,6 +9,9 @@ tests/diagnostics/gh-1374.slang(11): error 39999: the initial-value expression f
 tests/diagnostics/gh-1374.slang(14): error 39999: the initial-value expression for variable 'kB' depends on the value of the variable itself
     static const int kB = kA;
                      ^~
+tests/diagnostics/gh-1374.slang(13): error 39999: the initial-value expression for variable 'kA' depends on the value of the variable itself
+    static const int kA = kB;
+                     ^~
 }
 standard output = {
 }

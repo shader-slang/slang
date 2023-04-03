@@ -75,7 +75,7 @@ static const StructRttiInfo _makeJSONSourceMap_Rtti()
 /* static */const StructRttiInfo JSONSourceMap::g_rttiInfo = _makeJSONSourceMap_Rtti();
 
 // Encode a 6 bit value to VLQ encoding
-static const char g_vlqEncodeTable[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const unsigned char g_vlqEncodeTable[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 struct VlqDecodeTable
 {
@@ -88,7 +88,7 @@ struct VlqDecodeTable
         }
     }
         /// Returns a *negative* value if invalid
-    SLANG_FORCE_INLINE int8_t operator[](char c) const { return (c & ~char(0x7f)) ? -1 : map[c]; }
+    SLANG_FORCE_INLINE int8_t operator[](unsigned char c) const { return (c & ~char(0x7f)) ? -1 : map[c]; }
 
     int8_t map[128];
 };
@@ -180,7 +180,7 @@ void _encode(Index v, StringBuilder& out)
 
 /* static */SlangResult JSONSourceMapUtil::decode(JSONContainer* container, JSONValue root, DiagnosticSink* sink, RefPtr<SourceMap>& out)
 {
-    RefPtr<SourceMap> sourceMap;
+    RefPtr<SourceMap> sourceMap(new SourceMap);
 
     // Let's try and decode the JSON into native types to make this easier...
     RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();

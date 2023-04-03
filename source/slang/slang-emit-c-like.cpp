@@ -945,6 +945,13 @@ String CLikeSourceEmitter::getName(IRInst* inst)
     return name;
 }
 
+String CLikeSourceEmitter::getUnmangledName(IRInst* inst)
+{
+    if (auto nameHintDecor = inst->findDecoration<IRNameHintDecoration>())
+        return nameHintDecor->getName();
+    return getName(inst);
+}
+
 void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch(inst->getOp())
@@ -2398,6 +2405,11 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         m_writer->emit(";\n");
         break;
 
+        // Insts that needs to be emitted as code blocks.
+    case kIROp_CudaKernelLaunch:
+        emitInstStmtImpl(inst);
+        break;
+
     case kIROp_LiveRangeStart:
     case kIROp_LiveRangeEnd:
         emitLiveness(inst);
@@ -2407,6 +2419,17 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         {
             auto type = inst->getDataType();
             emitType(type, getName(inst));
+
+            // On targets that support empty initializers, we will emit it.
+            switch (this->getTarget())
+            {
+            case CodeGenTarget::CPPSource:
+            case CodeGenTarget::HostCPPSource:
+            case CodeGenTarget::PyTorchCppBinding:
+            case CodeGenTarget::CUDASource:
+                m_writer->emit(" = {}");
+                break;
+            }
             m_writer->emit(";\n");
         }
         break;

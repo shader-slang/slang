@@ -1496,13 +1496,12 @@ namespace Slang
             }
         }
 
-        auto initExpr = getInitExpr(m_astBuilder, declRef);
-        if(!initExpr)
+        if (!getInitExpr(m_astBuilder, declRef))
             return nullptr;
 
         ensureDecl(declRef.decl, DeclCheckState::Checked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
-        return tryConstantFoldExpr(initExpr, &newCircularityInfo);
+        return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), &newCircularityInfo);
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(

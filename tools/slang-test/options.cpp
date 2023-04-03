@@ -310,18 +310,7 @@ static bool _isSubCommand(const char* arg)
 
 
     // first positional argument is source shader path
-    if (positionalArgs.getCount())
-    {
-        optionsOut->testPrefix = positionalArgs[0];
-        positionalArgs.removeAt(0);
-    }
-
-    // any remaining arguments represent an error
-    if (positionalArgs.getCount() != 0)
-    {
-        stdError.print("unexpected arguments\n");
-        return SLANG_FAIL;
-    }
+    optionsOut->testPrefixes = std::move(positionalArgs);
 
     if (optionsOut->binDir.getLength() == 0)
     {

@@ -244,6 +244,9 @@ namespace Slang
         {kIROp_Leq, "leq", "<=", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
     };
 
+    // Integer types that can be used in atomic operations in CUDA.
+    static const char* kCudaAtomicIntegerTypes[] = { "int", "uint", "uint64_t", "int64_t" };
+
     // Both the following functions use these macros.
     // NOTE! They require a variable named path to emit the #line correctly if in source file.
 #define SLANG_RAW(TEXT) sb << TEXT;

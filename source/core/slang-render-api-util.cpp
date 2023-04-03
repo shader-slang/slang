@@ -277,7 +277,7 @@ static bool _canLoadSharedLibrary(const char* libName)
         default: break; 
     }
 #elif SLANG_UNIX_FAMILY
-    // Assume on unix target we have Opengl and Vulkan for now
+    // Assume on unix target we never have D3D
     switch (type)
     {
         case RenderApiType::OpenGl:
@@ -286,6 +286,10 @@ static bool _canLoadSharedLibrary(const char* libName)
             return true;
         }
         case RenderApiType::CPU:
+        {
+            return true;
+        }
+        case RenderApiType::CUDA:
         {
             return true;
         }

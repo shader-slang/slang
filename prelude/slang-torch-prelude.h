@@ -4,6 +4,8 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <ATen/cuda/CUDAUtils.h>
 #include <vector>
+#include <stdexcept>
+#include <string>
 
 #ifndef SLANG_NO_THROW
 #   define SLANG_NO_THROW
@@ -39,42 +41,30 @@
 #include "slang-cpp-types-core.h"
 #include "slang-cpp-scalar-intrinsics.h"
 
+static const int kSlangTorchTensorMaxDim = 5;
+
 struct TensorView
 {
     uint8_t* data;
-    uint32_t* strides;
-    uint32_t* sizes;
+    uint32_t strides[kSlangTorchTensorMaxDim];
+    uint32_t sizes[kSlangTorchTensorMaxDim];
     uint32_t dimensionCount;
 };
 
-struct CudaTaskMemoryAllocator
+
+TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarType targetScalarType)
 {
-    std::vector<void*> allocations;
+    // Convert device and scalar types.
+    if (!val.device().is_cuda())
+        val = val.to(torch::kCUDA);
+    if (val.dtype() != targetScalarType)
+        val = val.to(targetScalarType);
 
-    uint32_t* allocUIntArray(uint32_t size)
-    {
-        void* ptr = nullptr;
-        cudaMallocManaged(&ptr, size * sizeof(uint32_t));
-        AT_CUDA_CHECK(cudaGetLastError());
-        return (uint32_t*)ptr;
-    }
-
-    ~CudaTaskMemoryAllocator()
-    {
-        for (auto ptr : allocations)
-            cudaFree(ptr);
-    }
-};
-
-TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor val)
-{
-    val = val.to(torch::kCUDA);
     TensorView res = {};
     res.dimensionCount = val.dim();
-    res.strides = allocator->allocUIntArray(val.dim());
-    res.sizes = allocator->allocUIntArray(val.dim());
     res.data = nullptr;
     size_t elementSize = 4;
+
     switch (val.scalar_type())
     {
     case torch::kInt8:
@@ -107,11 +97,17 @@ TensorView make_tensor_view(CudaTaskMemoryAllocator* allocator, torch::Tensor va
         res.data = (uint8_t*)val.data_ptr<int64_t>();
         break;
     }
+
+    if (val.dim() > kSlangTorchTensorMaxDim)
+        throw std::runtime_error(std::string(name).append(": number of dimensions exceeds limit (").append(std::to_string(kSlangTorchTensorMaxDim)).append(")").c_str());
+
     for (int i = 0; i < val.dim(); ++i)
     {
         res.strides[i] = val.stride(i) * elementSize;
         res.sizes[i] = val.size(i);
     }
+    if (!res.data)
+        throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
     return res;
 }
 

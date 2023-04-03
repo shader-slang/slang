@@ -17,7 +17,7 @@ struct S<let n : int>
     int doSomething()
     {
         table<M>(0) = M;
-        return table<M>(0);
+        return int(table<M>(0));
     }
 }
 
