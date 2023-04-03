@@ -15,7 +15,7 @@ void computeMain(uint tid : SV_GroupIndex)
 
     // 0 2
     // 0 0
-    m._m01 = 2;
+    const float x = m._m01 = 2;
 
-    outputBuffer[tid] = m[tid/2][tid%2];
+    outputBuffer[tid] = x + m[tid/2][tid%2];
 }
