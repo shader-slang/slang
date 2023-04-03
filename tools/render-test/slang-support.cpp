@@ -10,6 +10,7 @@
 #include <stdio.h>
 
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-test-tool-util.h"
 
 namespace renderer_test {
 using namespace Slang;
@@ -199,7 +200,7 @@ void ShaderCompilerUtil::Output::reset()
 
     if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
     {
-        fprintf(stderr, "%s", diagnostics);
+        StdWriters::getError().print("%s", diagnostics);
     }
 
     SLANG_RETURN_ON_FAIL(res);

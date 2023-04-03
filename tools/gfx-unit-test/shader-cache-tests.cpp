@@ -141,7 +141,8 @@ namespace gfx_test
                 [this, func] (IDevice* device, UnitTestContext* ctx)
                 {
                     this->device = device;
-                    device->queryInterface(SLANG_UUID_IShaderCache, (void**)this->shaderCache.writeRef());
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        device->queryInterface(SLANG_UUID_IShaderCache, (void**)this->shaderCache.writeRef())));
                     func();
                     this->device = nullptr;
                     this->shaderCache = nullptr;
