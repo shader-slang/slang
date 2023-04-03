@@ -19,7 +19,7 @@
 
 #   define WIN32_LEAN_AND_MEAN
 #   define VC_EXTRALEAN
-#   include <Windows.h>
+#   include <windows.h>
 #endif
 
 #if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY

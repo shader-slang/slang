@@ -12,8 +12,8 @@
 
 #include "slang-gfx.h"
 
-#include <D3Dcommon.h>
-#include <DXGIFormat.h>
+#include <d3dcommon.h>
+#include <dxgiformat.h>
 #include <dxgi.h>
 #include <d3d12.h>
 

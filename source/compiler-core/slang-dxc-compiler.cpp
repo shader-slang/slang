@@ -36,8 +36,8 @@
 #   ifdef _WIN32
 #       define WIN32_LEAN_AND_MEAN
 #       define NOMINMAX
-#       include <Windows.h>
-#       include <Unknwn.h>
+#       include <windows.h>
+#       include <unknwn.h>
 #       include "../../external/dxc/dxcapi.h"
 #       undef WIN32_LEAN_AND_MEAN
 #       undef NOMINMAX

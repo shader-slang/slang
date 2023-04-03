@@ -27,7 +27,7 @@
 #if ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
 #    define WIN32_LEAN_AND_MEAN
-#    include <Windows.h>
+#    include <windows.h>
 #endif
 
 namespace renderer_test {
