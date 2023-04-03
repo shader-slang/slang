@@ -4671,7 +4671,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         // Assign to 'bs' the elements from 'as' according to the first 'n' indices in 'is'
         auto backpermute = [](UInt n, const auto* as, const int* is, auto* bs)
         {
-            for(auto i = 0; i < n; ++i)
+            for(UInt i = 0; i < n; ++i)
             {
                 bs[i] = as[is[i]];
             }
