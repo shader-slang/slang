@@ -52,8 +52,8 @@ struct Options
     // Directory to use when looking for binaries to run. If empty it's not set.
     Slang::String binDir;
 
-    // only run test cases with names that have this prefix. 
-    char const* testPrefix = nullptr;
+    // only run test cases with names have one of these prefixes.
+    Slang::List<const char *> testPrefixes;
 
     // generate extra output (notably: command lines we run)
     bool shouldBeVerbose = false;

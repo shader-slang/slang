@@ -12,7 +12,9 @@ namespace debug
 class DebugDevice : public DebugObject<IDevice>
 {
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL;
+    SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) noexcept override;
+    SLANG_COM_OBJECT_IUNKNOWN_ADD_REF;
+    SLANG_COM_OBJECT_IUNKNOWN_RELEASE;
 
 public:
     DebugDevice();

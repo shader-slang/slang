@@ -26,6 +26,20 @@ using namespace Slang;
 namespace debug
 {
 
+SlangResult DebugDevice::queryInterface(SlangUUID const& uuid, void** outObject) noexcept
+{
+    void* intf = getInterface(uuid);
+    if (intf)
+    {
+        addRef();
+        *outObject = intf;
+        return SLANG_OK;
+    }
+
+    // Fallback to trying to get the interface from the debugged object
+    return baseObject->queryInterface(uuid, outObject);
+}
+
 Result DebugDevice::getNativeDeviceHandles(InteropHandles* outHandles)
 {
     return baseObject->getNativeDeviceHandles(outHandles);
