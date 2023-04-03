@@ -14,7 +14,7 @@ namespace Slang
     {
         SharedGenericsLoweringContext* sharedContext;
 
-        void processInst(IRInst* inst)
+        IRInst* processInst(IRInst* inst)
         {
             // Ensure public struct types has RTTI object defined.
             if (as<IRStructType>(inst))
@@ -27,7 +27,7 @@ namespace Slang
 
             // Don't modify type insts themselves.
             if (as<IRType>(inst))
-                return;
+                return inst;
 
             IRBuilder builderStorage(sharedContext->module);
             auto builder = &builderStorage;
@@ -35,7 +35,7 @@ namespace Slang
            
             auto newType = sharedContext->lowerType(builder, inst->getFullType());
             if (newType != inst->getFullType())
-                inst->setFullType((IRType*)newType);
+                inst = builder->replaceOperand(&inst->typeUse, newType);
 
             switch (inst->getOp())
             {
@@ -51,6 +51,7 @@ namespace Slang
                 }
                 break;
             }
+            return inst;
         }
 
         void processModule()
@@ -64,7 +65,7 @@ namespace Slang
                 sharedContext->workList.removeLast();
                 sharedContext->workListSet.Remove(inst);
 
-                processInst(inst);
+                inst = processInst(inst);
 
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {

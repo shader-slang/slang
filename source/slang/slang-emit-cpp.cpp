@@ -1335,13 +1335,12 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             }
             else if (as<IRMatrixType>(baseType))
             {
-                m_writer->emit("&(");
+                m_writer->emit("(");
                 auto outerPrec = getInfo(EmitOp::General);
                 auto prec = getInfo(EmitOp::Postfix);
                 emitOperand(baseInst, leftSide(outerPrec, prec));
-                m_writer->emit("->rows[");
+                m_writer->emit("->rows + ");
                 emitOperand(getElementInst->getIndex(), getInfo(EmitOp::General));
-                m_writer->emit("]");
                 m_writer->emit(")");
                 return true;
             }
