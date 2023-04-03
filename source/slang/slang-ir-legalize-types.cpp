@@ -2159,6 +2159,8 @@ static LegalVal legalizeInst(
             if (newArgs[aa] != inst->getOperand(aa))
                 recreate = true;
         }
+        if (inst->getFullType() != legalType.getSimple())
+            recreate = true;
         if (recreate)
         {
             IRBuilder builder(inst->getModule());
@@ -2169,8 +2171,6 @@ static LegalVal legalizeInst(
             context->replacedInstructions.add(inst);
             return LegalVal::simple(newInst);
         }
-        if (inst->getFullType() != legalType.getSimple())
-            inst->setFullType(legalType.getSimple());
         return LegalVal::simple(inst);
     }
 
@@ -3641,7 +3641,10 @@ struct IRTypeLegalizationPass
         //
         // * `i` is a user of `inst`, or
         // * `i` is a child of `inst`.
-        // 
+        //
+        if (legalVal.flavor == LegalVal::Flavor::simple)
+            inst = legalVal.irValue;
+
         for( auto use = inst->firstUse; use; use = use->nextUse )
         {
             auto user = use->getUser();
