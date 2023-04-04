@@ -277,6 +277,7 @@ DIAGNOSTIC(30053, Error, breakLabelNotFound, "label '$0' used as break target is
 DIAGNOSTIC(30054, Error, targetLabelDoesNotMarkBreakableStmt, "invalid break target: statement labeled '$0' is not breakable.")
 DIAGNOSTIC(30055, Error, useOfNonShortCircuitingOperatorInDiffFunc, "non-short-circuiting `?:` operator is not allowed in a differentiable function, use `select` instead.")
 DIAGNOSTIC(30056, Warning, useOfNonShortCircuitingOperator, "non-short-circuiting `?:` operator is deprecated, use 'select' instead.")
+DIAGNOSTIC(30057, Error, assignmentInPredicateExpr, "use an assignment operation as predicate expression is not allowed, wrap the assignment with '()' to clarify the intent.")
 
 DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 
