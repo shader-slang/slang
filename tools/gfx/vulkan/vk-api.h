@@ -270,6 +270,11 @@ struct VulkanExtendedFeatureProperties
     // Robustness2 features
     VkPhysicalDeviceRobustness2FeaturesEXT robustness2Features = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
+
+    // Clock features
+    VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures = { 
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR
+    };
 };
 
 struct VulkanApi
