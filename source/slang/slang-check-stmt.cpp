@@ -151,6 +151,10 @@ namespace Slang
 
     Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     {
+        if (as<AssignExpr>(expr))
+        {
+            getSink()->diagnose(expr, Diagnostics::assignmentInPredicateExpr);
+        }
         Expr* e = expr;
         e = CheckTerm(e);
         e = coerce(m_astBuilder->getBoolType(), e);
