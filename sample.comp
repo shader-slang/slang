@@ -1,0 +1,4613 @@
+#version 450
+layout(row_major) uniform;
+layout(row_major) buffer;
+
+#line 13 0
+struct PRNG_0
+{
+    uint state_0;
+};
+
+
+#line 15
+PRNG_0 PRNG_x24init_0(uint seed_0)
+{
+
+#line 15
+    PRNG_0 _S1;
+
+    _S1.state_0 = seed_0;
+
+#line 15
+    return _S1;
+}
+
+
+#line 37
+struct s_diff_LineSegment_0
+{
+    float x0_0;
+    float x1_0;
+    float color_0;
+};
+
+
+#line 2575 1
+s_diff_LineSegment_0 LineSegment_Differential_x24_syn_dzero_0()
+{
+
+#line 2575
+    s_diff_LineSegment_0 result_0;
+
+#line 2575
+    result_0.x0_0 = 0.0;
+
+#line 2575
+    result_0.x1_0 = 0.0;
+
+#line 2575
+    result_0.color_0 = 0.0;
+
+#line 2575
+    return result_0;
+}
+
+
+#line 2575
+s_diff_LineSegment_0 LineSegment_Differential_x24_syn_dadd_0(s_diff_LineSegment_0 SLANG_anonymous_0_0, s_diff_LineSegment_0 SLANG_anonymous_1_0)
+{
+
+#line 2575
+    s_diff_LineSegment_0 result_1;
+
+#line 2575
+    result_1.x0_0 = SLANG_anonymous_0_0.x0_0 + SLANG_anonymous_1_0.x0_0;
+
+#line 2575
+    result_1.x1_0 = SLANG_anonymous_0_0.x1_0 + SLANG_anonymous_1_0.x1_0;
+
+#line 2575
+    result_1.color_0 = SLANG_anonymous_0_0.color_0 + SLANG_anonymous_1_0.color_0;
+
+#line 2575
+    return result_1;
+}
+
+
+#line 53 0
+struct s_diff_Intersection_0
+{
+    s_diff_LineSegment_0 ls_0;
+    float x_0;
+    float wt_0;
+};
+
+
+#line 53
+s_diff_Intersection_0 Intersection_Differential_x24_syn_dzero_0()
+{
+
+#line 53
+    s_diff_Intersection_0 result_2;
+
+#line 53
+    result_2.ls_0 = LineSegment_Differential_x24_syn_dzero_0();
+
+#line 53
+    result_2.x_0 = 0.0;
+
+#line 53
+    result_2.wt_0 = 0.0;
+
+#line 53
+    return result_2;
+}
+
+
+#line 53
+s_diff_Intersection_0 Intersection_Differential_x24_syn_dadd_0(s_diff_Intersection_0 SLANG_anonymous_0_1, s_diff_Intersection_0 SLANG_anonymous_1_1)
+{
+
+#line 53
+    s_diff_Intersection_0 result_3;
+
+#line 53
+    result_3.ls_0 = LineSegment_Differential_x24_syn_dadd_0(SLANG_anonymous_0_1.ls_0, SLANG_anonymous_1_1.ls_0);
+
+#line 53
+    result_3.x_0 = SLANG_anonymous_0_1.x_0 + SLANG_anonymous_1_1.x_0;
+
+#line 53
+    result_3.wt_0 = SLANG_anonymous_0_1.wt_0 + SLANG_anonymous_1_1.wt_0;
+
+#line 53
+    return result_3;
+}
+
+
+#line 53
+s_diff_LineSegment_0 LineSegment_x24_syn_dzero_0()
+{
+
+#line 53
+    s_diff_LineSegment_0 result_4;
+
+#line 53
+    result_4.x0_0 = 0.0;
+
+#line 53
+    result_4.x1_0 = 0.0;
+
+#line 53
+    result_4.color_0 = 0.0;
+
+#line 53
+    return result_4;
+}
+
+
+#line 53
+s_diff_LineSegment_0 LineSegment_x24_syn_dadd_0(s_diff_LineSegment_0 SLANG_anonymous_0_2, s_diff_LineSegment_0 SLANG_anonymous_1_2)
+{
+
+#line 53
+    s_diff_LineSegment_0 result_5;
+
+#line 53
+    result_5.x0_0 = SLANG_anonymous_0_2.x0_0 + SLANG_anonymous_1_2.x0_0;
+
+#line 53
+    result_5.x1_0 = SLANG_anonymous_0_2.x1_0 + SLANG_anonymous_1_2.x1_0;
+
+#line 53
+    result_5.color_0 = SLANG_anonymous_0_2.color_0 + SLANG_anonymous_1_2.color_0;
+
+#line 53
+    return result_5;
+}
+
+
+#line 53
+s_diff_Intersection_0 Intersection_x24_syn_dzero_0()
+{
+
+#line 53
+    s_diff_Intersection_0 result_6;
+
+#line 53
+    result_6.ls_0 = LineSegment_x24_syn_dzero_0();
+
+#line 53
+    result_6.x_0 = 0.0;
+
+#line 53
+    result_6.wt_0 = 0.0;
+
+#line 53
+    return result_6;
+}
+
+
+#line 53
+s_diff_Intersection_0 Intersection_x24_syn_dadd_0(s_diff_Intersection_0 SLANG_anonymous_0_3, s_diff_Intersection_0 SLANG_anonymous_1_3)
+{
+
+#line 53
+    s_diff_Intersection_0 result_7;
+
+#line 53
+    result_7.ls_0 = LineSegment_x24_syn_dadd_0(SLANG_anonymous_0_3.ls_0, SLANG_anonymous_1_3.ls_0);
+
+#line 53
+    result_7.x_0 = SLANG_anonymous_0_3.x_0 + SLANG_anonymous_1_3.x_0;
+
+#line 53
+    result_7.wt_0 = SLANG_anonymous_0_3.wt_0 + SLANG_anonymous_1_3.wt_0;
+
+#line 53
+    return result_7;
+}
+
+
+#line 20
+uint PRNG_next_0(inout PRNG_0 this_0)
+{
+    uint _S2 = this_0.state_0 ^ this_0.state_0 << 13;
+    uint _S3 = _S2 ^ _S2 >> 7;
+    uint _S4 = _S3 ^ _S3 << 17;
+
+#line 24
+    this_0.state_0 = _S4;
+    return _S4;
+}
+
+float PRNG_nextFloat1D_0(inout PRNG_0 this_1)
+{
+    uint _S5 = PRNG_next_0(this_1);
+
+#line 30
+    return float(_S5) / 4294967296.0;
+}
+
+
+#line 4
+layout(std430, binding = 0) buffer _S6 {
+    float _data[];
+} endpointDifferentialBuffer_0;
+
+#line 4
+struct DiffPair_s_diff_LineSegment_0
+{
+    s_diff_LineSegment_0 primal_0;
+    s_diff_LineSegment_0 differential_0;
+};
+
+
+#line 89
+void d_fwd_loadLineSegment_0(uint id_0, DiffPair_s_diff_LineSegment_0 dp_ls_0)
+{
+    uint _S7 = id_0 * 2U;
+
+#line 91
+    ((endpointDifferentialBuffer_0)._data[(_S7)]) = ((endpointDifferentialBuffer_0)._data[(_S7)]) + dp_ls_0.primal_0.x0_0;
+    ((endpointDifferentialBuffer_0)._data[(_S7 + 1U)]) = ((endpointDifferentialBuffer_0)._data[(_S7 + 1U)]) + dp_ls_0.primal_0.x1_0;
+    return;
+}
+
+
+#line 37
+struct LineSegment_0
+{
+    float x0_1;
+    float x1_1;
+    float color_1;
+};
+
+
+#line 37
+struct DiffPair_LineSegment_0
+{
+    LineSegment_0 primal_0;
+    s_diff_LineSegment_0 differential_0;
+};
+
+
+#line 7
+layout(std430, binding = 1) buffer _S8 {
+    float _data[];
+} endpointBuffer_0;
+
+#line 9
+layout(std430, binding = 2) buffer _S9 {
+    float _data[];
+} colorBuffer_0;
+
+#line 72
+LineSegment_0 loadLineSegment_0(uint id_1)
+{
+    uint _S10 = id_1 * 2U;
+
+#line 74
+    float _S11 = ((endpointBuffer_0)._data[(_S10)]);
+
+#line 74
+    float _S12 = ((endpointBuffer_0)._data[(_S10 + 1U)]);
+
+#line 74
+    LineSegment_0 _S13 = { _S11, _S12, ((colorBuffer_0)._data[(id_1)]) };
+
+#line 74
+    return _S13;
+}
+
+
+DiffPair_LineSegment_0 fwd_loadLineSegment_0(uint id_2)
+{
+    LineSegment_0 _S14 = loadLineSegment_0(id_2);
+
+#line 80
+    DiffPair_LineSegment_0 _S15 = { _S14, LineSegment_x24_syn_dzero_0() };
+
+#line 80
+    return _S15;
+}
+
+void d_loadLineSegment_0(uint id_3, s_diff_LineSegment_0 d_ls_0)
+{
+    uint _S16 = id_3 * 2U;
+
+#line 85
+    ((endpointDifferentialBuffer_0)._data[(_S16)]) = ((endpointDifferentialBuffer_0)._data[(_S16)]) + d_ls_0.x0_0;
+    ((endpointDifferentialBuffer_0)._data[(_S16 + 1U)]) = ((endpointDifferentialBuffer_0)._data[(_S16 + 1U)]) + d_ls_0.x1_0;
+    return;
+}
+
+
+#line 96
+int getIntersectionID_0(float x_1)
+{
+
+#line 96
+    int id_4 = 0;
+
+#line 96
+    for(;;)
+    {
+
+        if(id_4 < 2)
+        {
+        }
+        else
+        {
+
+#line 99
+            break;
+        }
+        LineSegment_0 ls_1 = loadLineSegment_0(uint(id_4));
+        if(x_1 > ls_1.x0_1 && x_1 < ls_1.x1_1)
+        {
+
+#line 103
+            return id_4;
+        }
+
+#line 99
+        id_4 = id_4 + 1;
+
+#line 99
+    }
+
+#line 105
+    return -1;
+}
+
+
+#line 124
+float sample1DNormal_0(PRNG_0 prng_0)
+{
+
+#line 124
+    PRNG_0 _S17 = prng_0;
+
+    float u_0 = PRNG_nextFloat1D_0(_S17);
+    float v_0 = PRNG_nextFloat1D_0(_S17);
+    return sqrt(-2.0 * log(u_0)) * cos(6.28299999237060546875 * v_0);
+}
+
+
+#line 53
+struct Intersection_0
+{
+    LineSegment_0 ls_2;
+    float x_2;
+    bool isIntersected_0;
+    float wt_1;
+};
+
+
+#line 131
+float boundaryTerm_0(Intersection_0 isect_0)
+{
+    if(!isect_0.isIntersected_0)
+    {
+
+#line 134
+        return 100.0;
+    }
+    return (isect_0.ls_2.x1_1 - isect_0.x_2) * (isect_0.x_2 - isect_0.ls_2.x0_1);
+}
+
+
+#line 222
+struct DiffPair_Intersection_0
+{
+    Intersection_0 primal_0;
+    s_diff_Intersection_0 differential_0;
+};
+
+
+#line 222
+struct DiffPair_float_0
+{
+    float primal_0;
+    float differential_0;
+};
+
+
+#line 222
+struct s_bwd_s_fwd_intersect_Intermediates_0
+{
+    DiffPair_LineSegment_0 _S18;
+    uint _S19;
+    DiffPair_float_0 _S20;
+    DiffPair_float_0 _S21;
+    DiffPair_float_0 _S22;
+    DiffPair_float_0 _S23;
+    DiffPair_LineSegment_0 _S24;
+    DiffPair_float_0 _S25;
+    DiffPair_float_0 _S26;
+    DiffPair_float_0 _S27;
+    bool _S28;
+    bool _S29;
+};
+
+
+#line 222
+struct s_bwd_s_fwd_harmonicWeight_Intermediates_0
+{
+    float x_dist_0;
+    float _S30;
+    float s_diff_x_dist_0;
+    float _S31;
+    float _S32;
+    float _S33;
+    float _S34;
+    float _S35;
+};
+
+
+#line 222
+struct s_bwd_s_fwd_attachToGeometry_Intermediates_0
+{
+    float _S36;
+    float _S37;
+    float leftWt_0;
+    float _S38;
+    float _S39;
+    float rightWt_0;
+    float _S40;
+};
+
+
+#line 222
+struct s_bwd_s_fwd_warp_Intermediates_0
+{
+    DiffPair_Intersection_0  _S41[10U];
+    s_bwd_s_fwd_intersect_Intermediates_0  _S42[10U];
+    s_bwd_s_fwd_harmonicWeight_Intermediates_0  _S43[10U];
+    DiffPair_float_0  _S44[10U];
+    bool  _S45[10U];
+    s_bwd_s_fwd_attachToGeometry_Intermediates_0  _S46[10U];
+    bool  _S47[10U];
+    float  _S48[10U];
+    bool  _S49[10U];
+    int _S50;
+    float  _S51[10U];
+    float  _S52[10U];
+    float  _S53[10U];
+    bool  _S54[10U];
+    DiffPair_Intersection_0  _S55[10U];
+    Intersection_0  _S56[10U];
+    float  _S57[10U];
+    float  _S58[10U];
+    float  _S59[10U];
+    float  _S60[10U];
+    bool  _S61[10U];
+    float _S62;
+    float _S63;
+    float _S64;
+    float _S65;
+};
+
+
+#line 222
+struct s_bwd_intersect_Intermediates_0
+{
+    LineSegment_0 _S66;
+    uint _S67;
+    LineSegment_0 _S68;
+    bool _S69;
+    bool _S70;
+};
+
+
+#line 222
+struct s_bwd_warpedIntersect_Intermediates_0
+{
+    s_bwd_s_fwd_warp_Intermediates_0 _S71;
+    s_bwd_intersect_Intermediates_0 _S72;
+    DiffPair_Intersection_0 _S73;
+    DiffPair_float_0 _S74;
+    float _S75;
+    float _S76;
+};
+
+
+#line 222
+struct s_bwd_renderSample_Intermediates_0
+{
+    s_bwd_warpedIntersect_Intermediates_0 _S77;
+    PRNG_0 _S78;
+    float sample_0;
+    Intersection_0 _S79;
+    float _S80;
+    float _S81;
+};
+
+
+#line 65
+LineSegment_0 s_bwd_loadLineSegment_0(uint _S82)
+{
+
+#line 65
+    LineSegment_0 _S83 = loadLineSegment_0(_S82);
+
+#line 65
+    return _S83;
+}
+
+
+#line 65
+Intersection_0 s_bwd_primal_Intersection_x24init_0(LineSegment_0 dp_ls_1, float dp_x_0, bool _isIntersected_0, float dp_wt_0)
+{
+
+#line 61
+    Intersection_0 _S84;
+
+#line 61
+    Intersection_0 _S85 = _S84;
+
+#line 61
+    _S85.ls_2 = dp_ls_1;
+
+#line 61
+    _S85.x_2 = dp_x_0;
+
+#line 61
+    _S85.isIntersected_0 = _isIntersected_0;
+
+#line 61
+    _S85.wt_1 = dp_wt_0;
+
+#line 61
+    return _S85;
+}
+
+
+#line 61
+LineSegment_0 s_bwd_primal_LineSegment_x24init_0(float dp_x0_0, float dp_x1_0, float dp_color_0)
+{
+
+#line 61
+    LineSegment_0 _S86;
+
+#line 61
+    LineSegment_0 _S87 = _S86;
+
+#line 61
+    _S87.x0_1 = dp_x0_0;
+
+#line 61
+    _S87.x1_1 = dp_x1_0;
+
+#line 61
+    _S87.color_1 = dp_color_0;
+
+#line 61
+    return _S87;
+}
+
+
+#line 61
+Intersection_0 s_bwd_primal_intersect_0(float dpx_0, inout s_bwd_intersect_Intermediates_0 _s_diff_ctx_0)
+{
+
+#line 61
+    LineSegment_0 _S88 = { 0.0, 0.0, 0.0 };
+
+#line 61
+    _s_diff_ctx_0._S66 = _S88;
+
+#line 61
+    _s_diff_ctx_0._S67 = 0U;
+
+#line 61
+    _s_diff_ctx_0._S68 = _S88;
+
+#line 61
+    _s_diff_ctx_0._S69 = false;
+
+#line 61
+    _s_diff_ctx_0._S70 = false;
+
+#line 61
+    _s_diff_ctx_0._S66.x0_1 = 0.0;
+
+#line 61
+    _s_diff_ctx_0._S66.x1_1 = 0.0;
+
+#line 61
+    _s_diff_ctx_0._S66.color_1 = 0.0;
+
+#line 61
+    _s_diff_ctx_0._S67 = 0U;
+
+#line 61
+    _s_diff_ctx_0._S68.x0_1 = 0.0;
+
+#line 61
+    _s_diff_ctx_0._S68.x1_1 = 0.0;
+
+#line 61
+    _s_diff_ctx_0._S68.color_1 = 0.0;
+
+#line 61
+    int id_5 = getIntersectionID_0(dpx_0);
+
+#line 61
+    bool _S89 = id_5 >= 0;
+
+#line 61
+    _s_diff_ctx_0._S69 = _S89;
+
+#line 61
+    Intersection_0 _S90;
+
+#line 61
+    if(_S89)
+    {
+
+#line 61
+        uint _S91 = uint(id_5);
+
+#line 61
+        _s_diff_ctx_0._S67 = _S91;
+
+#line 61
+        LineSegment_0 _S92 = s_bwd_loadLineSegment_0(_S91);
+
+#line 61
+        _s_diff_ctx_0._S66 = _S92;
+
+#line 61
+        _S90 = s_bwd_primal_Intersection_x24init_0(_S92, dpx_0, false, 1.0);
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+    }
+
+#line 61
+    bool _S93 = !_S89;
+
+#line 61
+    _s_diff_ctx_0._S70 = _S93;
+
+#line 61
+    if(_S93)
+    {
+
+#line 61
+        LineSegment_0 _S94 = s_bwd_primal_LineSegment_x24init_0(0.0, 0.0, 0.0);
+
+#line 61
+        _s_diff_ctx_0._S68 = _S94;
+
+#line 61
+        _S90 = s_bwd_primal_Intersection_x24init_0(_S94, dpx_0, false, 0.0);
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+    }
+
+#line 61
+    return _S90;
+}
+
+
+#line 61
+s_diff_LineSegment_0 s_bwd_primal_LineSegment_Differential_x24_syn_dzero_0()
+{
+
+#line 61
+    s_diff_LineSegment_0 result_8;
+
+#line 61
+    s_diff_LineSegment_0 _S95 = result_8;
+
+#line 61
+    _S95.x0_0 = 0.0;
+
+#line 61
+    _S95.x1_0 = 0.0;
+
+#line 61
+    _S95.color_0 = 0.0;
+
+#line 61
+    return _S95;
+}
+
+
+#line 61
+s_diff_Intersection_0 s_bwd_primal_Intersection_Differential_x24_syn_dzero_0()
+{
+
+#line 61
+    s_diff_LineSegment_0 _S96 = s_bwd_primal_LineSegment_Differential_x24_syn_dzero_0();
+
+#line 61
+    s_diff_Intersection_0 result_9;
+
+#line 61
+    s_diff_Intersection_0 _S97 = result_9;
+
+#line 61
+    _S97.ls_0 = _S96;
+
+#line 61
+    _S97.x_0 = 0.0;
+
+#line 61
+    _S97.wt_0 = 0.0;
+
+#line 61
+    return _S97;
+}
+
+
+#line 61
+float s_bwd_primal_float_dzero_0()
+{
+
+#line 61
+    return 0.0;
+}
+
+
+#line 61
+DiffPair_LineSegment_0 s_bwd_fwd_loadLineSegment_0(uint _S98)
+{
+
+#line 61
+    DiffPair_LineSegment_0 _S99 = fwd_loadLineSegment_0(_S98);
+
+#line 61
+    return _S99;
+}
+
+
+#line 61
+s_diff_LineSegment_0 s_bwd_primal_LineSegment_x24_syn_dzero_0()
+{
+
+#line 61
+    s_diff_LineSegment_0 result_10;
+
+#line 61
+    s_diff_LineSegment_0 _S100 = result_10;
+
+#line 61
+    _S100.x0_0 = 0.0;
+
+#line 61
+    _S100.x1_0 = 0.0;
+
+#line 61
+    _S100.color_0 = 0.0;
+
+#line 61
+    return _S100;
+}
+
+
+#line 61
+s_diff_Intersection_0 s_bwd_primal_Intersection_x24_syn_dzero_0()
+{
+
+#line 61
+    s_diff_LineSegment_0 _S101 = s_bwd_primal_LineSegment_x24_syn_dzero_0();
+
+#line 61
+    s_diff_Intersection_0 result_11;
+
+#line 61
+    s_diff_Intersection_0 _S102 = result_11;
+
+#line 61
+    _S102.ls_0 = _S101;
+
+#line 61
+    _S102.x_0 = 0.0;
+
+#line 61
+    _S102.wt_0 = 0.0;
+
+#line 61
+    return _S102;
+}
+
+
+#line 61
+DiffPair_Intersection_0 s_bwd_primal_s_fwd_Intersection_x24init_0(DiffPair_LineSegment_0 dpdp_ls_0, DiffPair_float_0 dpdp_x_0, bool _isIntersected_1, DiffPair_float_0 dpdp_wt_0)
+{
+
+#line 61
+    Intersection_0 _S103;
+
+#line 61
+    s_diff_Intersection_0 _S104 = s_bwd_primal_Intersection_x24_syn_dzero_0();
+
+#line 61
+    Intersection_0 _S105 = _S103;
+
+#line 61
+    _S105.ls_2 = dpdp_ls_0.primal_0;
+
+#line 61
+    s_diff_Intersection_0 _S106 = _S104;
+
+#line 61
+    _S106.ls_0 = dpdp_ls_0.differential_0;
+
+#line 61
+    _S105.x_2 = dpdp_x_0.primal_0;
+
+#line 61
+    _S106.x_0 = dpdp_x_0.differential_0;
+
+#line 61
+    _S105.isIntersected_0 = _isIntersected_1;
+
+#line 61
+    _S105.wt_1 = dpdp_wt_0.primal_0;
+
+#line 61
+    _S106.wt_0 = dpdp_wt_0.differential_0;
+
+#line 61
+    DiffPair_Intersection_0 _S107 = { _S105, _S106 };
+
+#line 61
+    return _S107;
+}
+
+
+#line 61
+DiffPair_LineSegment_0 s_bwd_primal_s_fwd_LineSegment_x24init_0(DiffPair_float_0 dpdp_x0_0, DiffPair_float_0 dpdp_x1_0, DiffPair_float_0 dpdp_color_0)
+{
+
+#line 61
+    LineSegment_0 _S108;
+
+#line 61
+    s_diff_LineSegment_0 _S109 = s_bwd_primal_LineSegment_x24_syn_dzero_0();
+
+#line 61
+    LineSegment_0 _S110 = _S108;
+
+#line 61
+    _S110.x0_1 = dpdp_x0_0.primal_0;
+
+#line 61
+    s_diff_LineSegment_0 _S111 = _S109;
+
+#line 61
+    _S111.x0_0 = dpdp_x0_0.differential_0;
+
+#line 61
+    _S110.x1_1 = dpdp_x1_0.primal_0;
+
+#line 61
+    _S111.x1_0 = dpdp_x1_0.differential_0;
+
+#line 61
+    _S110.color_1 = dpdp_color_0.primal_0;
+
+#line 61
+    _S111.color_0 = dpdp_color_0.differential_0;
+
+#line 61
+    DiffPair_LineSegment_0 _S112 = { _S110, _S111 };
+
+#line 61
+    return _S112;
+}
+
+
+#line 61
+DiffPair_Intersection_0 s_bwd_primal_s_fwd_intersect_0(DiffPair_float_0 dpdpx_0, inout s_bwd_s_fwd_intersect_Intermediates_0 _s_diff_ctx_1)
+{
+
+#line 61
+    LineSegment_0 _S113 = { 0.0, 0.0, 0.0 };
+
+#line 61
+    s_diff_LineSegment_0 _S114 = { 0.0, 0.0, 0.0 };
+
+#line 61
+    DiffPair_LineSegment_0 _S115 = { _S113, _S114 };
+
+#line 61
+    DiffPair_float_0 _S116 = { 0.0, 0.0 };
+
+#line 61
+    _s_diff_ctx_1._S18 = _S115;
+
+#line 61
+    _s_diff_ctx_1._S19 = 0U;
+
+#line 61
+    _s_diff_ctx_1._S20 = _S116;
+
+#line 61
+    _s_diff_ctx_1._S21 = _S116;
+
+#line 61
+    _s_diff_ctx_1._S22 = _S116;
+
+#line 61
+    _s_diff_ctx_1._S23 = _S116;
+
+#line 61
+    _s_diff_ctx_1._S24 = _S115;
+
+#line 61
+    _s_diff_ctx_1._S25 = _S116;
+
+#line 61
+    _s_diff_ctx_1._S26 = _S116;
+
+#line 61
+    _s_diff_ctx_1._S27 = _S116;
+
+#line 61
+    _s_diff_ctx_1._S28 = false;
+
+#line 61
+    _s_diff_ctx_1._S29 = false;
+
+#line 61
+    _s_diff_ctx_1._S18.primal_0 = _S113;
+
+#line 61
+    _s_diff_ctx_1._S18.differential_0 = _S114;
+
+#line 61
+    _s_diff_ctx_1._S19 = 0U;
+
+#line 61
+    _s_diff_ctx_1._S20.primal_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S20.differential_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S21.primal_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S21.differential_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S22.primal_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S22.differential_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S23.primal_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S23.differential_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S24.primal_0 = _S113;
+
+#line 61
+    _s_diff_ctx_1._S24.differential_0 = _S114;
+
+#line 61
+    _s_diff_ctx_1._S25.primal_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S25.differential_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S26.primal_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S26.differential_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S27.primal_0 = 0.0;
+
+#line 61
+    _s_diff_ctx_1._S27.differential_0 = 0.0;
+
+#line 61
+    int id_6 = getIntersectionID_0(dpdpx_0.primal_0);
+
+#line 61
+    bool _S117 = id_6 >= 0;
+
+#line 61
+    _s_diff_ctx_1._S28 = _S117;
+
+#line 61
+    DiffPair_Intersection_0 _S118;
+
+#line 61
+    if(_S117)
+    {
+
+#line 61
+        uint _S119 = uint(id_6);
+
+#line 61
+        _s_diff_ctx_1._S19 = _S119;
+
+#line 61
+        DiffPair_LineSegment_0 _S120 = s_bwd_fwd_loadLineSegment_0(_S119);
+
+#line 61
+        DiffPair_LineSegment_0 _S121 = { _S120.primal_0, _S120.differential_0 };
+
+#line 61
+        _s_diff_ctx_1._S24.primal_0 = _S120.primal_0;
+
+#line 61
+        _s_diff_ctx_1._S24.differential_0 = _S120.differential_0;
+
+#line 61
+        DiffPair_float_0 _S122 = { dpdpx_0.primal_0, dpdpx_0.differential_0 };
+
+#line 61
+        _s_diff_ctx_1._S23.primal_0 = dpdpx_0.primal_0;
+
+#line 61
+        _s_diff_ctx_1._S23.differential_0 = dpdpx_0.differential_0;
+
+#line 61
+        float _S123 = s_bwd_primal_float_dzero_0();
+
+#line 61
+        DiffPair_float_0 _S124 = { 1.0, _S123 };
+
+#line 61
+        _s_diff_ctx_1._S25.primal_0 = 1.0;
+
+#line 61
+        _s_diff_ctx_1._S25.differential_0 = _S123;
+
+#line 61
+        DiffPair_Intersection_0 _S125 = s_bwd_primal_s_fwd_Intersection_x24init_0(_S121, _S122, false, _S124);
+
+#line 61
+        _S118.primal_0 = _S125.primal_0;
+
+#line 61
+        _S118.differential_0 = _S125.differential_0;
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+    }
+
+#line 61
+    bool _S126 = !_S117;
+
+#line 61
+    _s_diff_ctx_1._S29 = _S126;
+
+#line 61
+    if(_S126)
+    {
+
+#line 61
+        float _S127 = s_bwd_primal_float_dzero_0();
+
+#line 61
+        DiffPair_float_0 _S128 = { 0.0, _S127 };
+
+#line 61
+        _s_diff_ctx_1._S27.primal_0 = 0.0;
+
+#line 61
+        _s_diff_ctx_1._S27.differential_0 = _S127;
+
+#line 61
+        _s_diff_ctx_1._S20.primal_0 = 0.0;
+
+#line 61
+        _s_diff_ctx_1._S20.differential_0 = _S127;
+
+#line 61
+        _s_diff_ctx_1._S22.primal_0 = 0.0;
+
+#line 61
+        _s_diff_ctx_1._S22.differential_0 = _S127;
+
+#line 61
+        DiffPair_LineSegment_0 _S129 = s_bwd_primal_s_fwd_LineSegment_x24init_0(_S128, _S128, _S128);
+
+#line 61
+        DiffPair_LineSegment_0 _S130 = { _S129.primal_0, _S129.differential_0 };
+
+#line 61
+        _s_diff_ctx_1._S18.primal_0 = _S129.primal_0;
+
+#line 61
+        _s_diff_ctx_1._S18.differential_0 = _S129.differential_0;
+
+#line 61
+        DiffPair_float_0 _S131 = { dpdpx_0.primal_0, dpdpx_0.differential_0 };
+
+#line 61
+        _s_diff_ctx_1._S26.primal_0 = dpdpx_0.primal_0;
+
+#line 61
+        _s_diff_ctx_1._S26.differential_0 = dpdpx_0.differential_0;
+
+#line 61
+        _s_diff_ctx_1._S21.primal_0 = 0.0;
+
+#line 61
+        _s_diff_ctx_1._S21.differential_0 = _S127;
+
+#line 61
+        DiffPair_Intersection_0 _S132 = s_bwd_primal_s_fwd_Intersection_x24init_0(_S130, _S131, false, _S128);
+
+#line 61
+        _S118.primal_0 = _S132.primal_0;
+
+#line 61
+        _S118.differential_0 = _S132.differential_0;
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+    }
+
+#line 61
+    return _S118;
+}
+
+
+#line 61
+DiffPair_float_0 s_bwd_primal_s_fwd_harmonicWeight_0(DiffPair_Intersection_0 dpdpisect_0, Intersection_0 aux_isect_0, inout s_bwd_s_fwd_harmonicWeight_Intermediates_0 _s_diff_ctx_2)
+{
+
+#line 146
+    _s_diff_ctx_2.x_dist_0 = 0.0;
+
+#line 146
+    _s_diff_ctx_2._S30 = 0.0;
+
+#line 146
+    _s_diff_ctx_2.s_diff_x_dist_0 = 0.0;
+
+#line 146
+    _s_diff_ctx_2._S31 = 0.0;
+
+#line 146
+    _s_diff_ctx_2._S32 = 0.0;
+
+#line 146
+    _s_diff_ctx_2._S33 = 0.0;
+
+#line 146
+    _s_diff_ctx_2._S34 = 0.0;
+
+#line 146
+    _s_diff_ctx_2._S35 = 0.0;
+
+#line 146
+    float x_dist_1 = dpdpisect_0.primal_0.x_2 - aux_isect_0.x_2;
+
+#line 146
+    _s_diff_ctx_2.x_dist_0 = x_dist_1;
+
+#line 146
+    float _S133 = s_bwd_primal_float_dzero_0();
+
+#line 146
+    _s_diff_ctx_2._S30 = _S133;
+
+#line 146
+    float s_diff_x_dist_1 = dpdpisect_0.differential_0.x_0 - _S133;
+
+#line 146
+    _s_diff_ctx_2.s_diff_x_dist_0 = s_diff_x_dist_1;
+
+#line 146
+    float _S134 = s_diff_x_dist_1 * x_dist_1 + x_dist_1 * s_diff_x_dist_1;
+
+#line 146
+    float _S135 = x_dist_1 * x_dist_1 + boundaryTerm_0(aux_isect_0);
+
+#line 146
+    _s_diff_ctx_2._S31 = _S135;
+
+#line 146
+    float _S136 = _S134 + _S133;
+
+#line 146
+    float _S137 = 1.0 / _S135;
+
+#line 146
+    float _S138 = _S135 * _S135;
+
+#line 146
+    _s_diff_ctx_2._S32 = _S138;
+
+#line 146
+    float _S139 = _S133 * _S135 - _S136;
+
+#line 146
+    _s_diff_ctx_2._S33 = _S139;
+
+#line 146
+    _s_diff_ctx_2._S34 = _S138;
+
+#line 146
+    float _S140 = _S139 / _S138;
+
+#line 146
+    _s_diff_ctx_2._S35 = _S138 * _S138;
+
+#line 146
+    DiffPair_float_0 _S141 = { _S137, _S140 };
+
+#line 146
+    return _S141;
+}
+
+
+#line 146
+DiffPair_float_0 s_bwd_primal_s_fwd_attachToGeometry_0(DiffPair_Intersection_0 dpdpisect_1, inout s_bwd_s_fwd_attachToGeometry_Intermediates_0 _s_diff_ctx_3)
+{
+
+#line 146
+    _s_diff_ctx_3._S36 = 0.0;
+
+#line 146
+    _s_diff_ctx_3._S37 = 0.0;
+
+#line 146
+    _s_diff_ctx_3.leftWt_0 = 0.0;
+
+#line 146
+    _s_diff_ctx_3._S38 = 0.0;
+
+#line 146
+    _s_diff_ctx_3._S39 = 0.0;
+
+#line 146
+    _s_diff_ctx_3.rightWt_0 = 0.0;
+
+#line 146
+    _s_diff_ctx_3._S40 = 0.0;
+
+#line 146
+    _s_diff_ctx_3._S36 = dpdpisect_1.primal_0.ls_2.x1_1;
+
+#line 146
+    _s_diff_ctx_3._S37 = dpdpisect_1.differential_0.ls_0.x1_0;
+
+#line 146
+    float _S142 = dpdpisect_1.primal_0.ls_2.x1_1 - dpdpisect_1.primal_0.x_2;
+
+#line 146
+    _s_diff_ctx_3.leftWt_0 = _S142;
+
+#line 146
+    _s_diff_ctx_3._S38 = dpdpisect_1.primal_0.ls_2.x0_1;
+
+#line 146
+    _s_diff_ctx_3._S39 = dpdpisect_1.differential_0.ls_0.x0_0;
+
+#line 146
+    float _S143 = dpdpisect_1.primal_0.x_2 - dpdpisect_1.primal_0.ls_2.x0_1;
+
+#line 146
+    _s_diff_ctx_3.rightWt_0 = _S143;
+
+#line 146
+    float _S144 = _S142 * dpdpisect_1.primal_0.ls_2.x0_1;
+
+#line 146
+    float _S145 = s_bwd_primal_float_dzero_0();
+
+#line 146
+    _s_diff_ctx_3._S40 = _S145;
+
+#line 146
+    DiffPair_float_0 _S146 = { _S144 + _S143 * dpdpisect_1.primal_0.ls_2.x1_1, _S145 * dpdpisect_1.primal_0.ls_2.x0_1 + _S142 * dpdpisect_1.differential_0.ls_0.x0_0 + (_S145 * dpdpisect_1.primal_0.ls_2.x1_1 + _S143 * dpdpisect_1.differential_0.ls_0.x1_0) };
+
+#line 146
+    return _S146;
+}
+
+
+#line 146
+DiffPair_float_0 s_bwd_primal_s_fwd_warp_0(DiffPair_Intersection_0 dpdpisect_2, PRNG_0 prng_1, inout s_bwd_s_fwd_warp_Intermediates_0 _s_diff_ctx_4)
+{
+
+#line 162
+    LineSegment_0 _S147 = { 0.0, 0.0, 0.0 };
+
+#line 162
+    Intersection_0 _S148 = { _S147, 0.0, false, 0.0 };
+
+#line 162
+    s_diff_LineSegment_0 _S149 = { 0.0, 0.0, 0.0 };
+
+#line 162
+    s_diff_Intersection_0 _S150 = { _S149, 0.0, 0.0 };
+
+#line 162
+    DiffPair_Intersection_0 _S151 = { _S148, _S150 };
+
+#line 162
+    DiffPair_Intersection_0  _S152[10U] = { _S151, _S151, _S151, _S151, _S151, _S151, _S151, _S151, _S151, _S151 };
+
+#line 162
+    DiffPair_LineSegment_0 _S153 = { _S147, _S149 };
+
+#line 162
+    DiffPair_float_0 _S154 = { 0.0, 0.0 };
+
+#line 162
+    s_bwd_s_fwd_intersect_Intermediates_0 _S155 = { _S153, 0U, _S154, _S154, _S154, _S154, _S153, _S154, _S154, _S154, false, false };
+
+#line 162
+    s_bwd_s_fwd_intersect_Intermediates_0  _S156[10U] = { _S155, _S155, _S155, _S155, _S155, _S155, _S155, _S155, _S155, _S155 };
+
+#line 162
+    s_bwd_s_fwd_harmonicWeight_Intermediates_0 _S157 = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 162
+    s_bwd_s_fwd_harmonicWeight_Intermediates_0  _S158[10U] = { _S157, _S157, _S157, _S157, _S157, _S157, _S157, _S157, _S157, _S157 };
+
+#line 162
+    DiffPair_float_0  _S159[10U] = { _S154, _S154, _S154, _S154, _S154, _S154, _S154, _S154, _S154, _S154 };
+
+#line 162
+    bool  _S160[10U] = { false, false, false, false, false, false, false, false, false, false };
+
+#line 162
+    s_bwd_s_fwd_attachToGeometry_Intermediates_0 _S161 = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 162
+    s_bwd_s_fwd_attachToGeometry_Intermediates_0  _S162[10U] = { _S161, _S161, _S161, _S161, _S161, _S161, _S161, _S161, _S161, _S161 };
+
+#line 162
+    float  _S163[10U] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 162
+    Intersection_0  _S164[10U] = { _S148, _S148, _S148, _S148, _S148, _S148, _S148, _S148, _S148, _S148 };
+
+#line 162
+    _s_diff_ctx_4._S41 = _S152;
+
+#line 162
+    _s_diff_ctx_4._S42 = _S156;
+
+#line 162
+    _s_diff_ctx_4._S43 = _S158;
+
+#line 162
+    _s_diff_ctx_4._S44 = _S159;
+
+#line 162
+    _s_diff_ctx_4._S45 = _S160;
+
+#line 162
+    _s_diff_ctx_4._S46 = _S162;
+
+#line 162
+    _s_diff_ctx_4._S47 = _S160;
+
+#line 162
+    _s_diff_ctx_4._S48 = _S163;
+
+#line 162
+    _s_diff_ctx_4._S49 = _S160;
+
+#line 162
+    _s_diff_ctx_4._S50 = 0;
+
+#line 162
+    _s_diff_ctx_4._S51 = _S163;
+
+#line 162
+    _s_diff_ctx_4._S52 = _S163;
+
+#line 162
+    _s_diff_ctx_4._S53 = _S163;
+
+#line 162
+    _s_diff_ctx_4._S54 = _S160;
+
+#line 162
+    _s_diff_ctx_4._S55 = _S152;
+
+#line 162
+    _s_diff_ctx_4._S56 = _S164;
+
+#line 162
+    _s_diff_ctx_4._S57 = _S163;
+
+#line 162
+    _s_diff_ctx_4._S58 = _S163;
+
+#line 162
+    _s_diff_ctx_4._S59 = _S163;
+
+#line 162
+    _s_diff_ctx_4._S60 = _S163;
+
+#line 162
+    _s_diff_ctx_4._S61 = _S160;
+
+#line 162
+    _s_diff_ctx_4._S62 = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S63 = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S64 = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S65 = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S41[0] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[1] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[2] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[3] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[4] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[5] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[6] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[7] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[8] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S41[9] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S42[0] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[1] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[2] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[3] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[4] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[5] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[6] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[7] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[8] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S42[9] = _S155;
+
+#line 162
+    _s_diff_ctx_4._S43[0] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[1] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[2] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[3] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[4] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[5] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[6] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[7] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[8] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S43[9] = _S157;
+
+#line 162
+    _s_diff_ctx_4._S44[0] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[1] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[2] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[3] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[4] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[5] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[6] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[7] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[8] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S44[9] = _S154;
+
+#line 162
+    _s_diff_ctx_4._S45[0] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[1] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[2] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[3] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[4] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[5] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[6] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[7] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[8] = false;
+
+#line 162
+    _s_diff_ctx_4._S45[9] = false;
+
+#line 162
+    _s_diff_ctx_4._S46[0] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[1] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[2] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[3] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[4] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[5] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[6] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[7] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[8] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S46[9] = _S161;
+
+#line 162
+    _s_diff_ctx_4._S47[0] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[1] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[2] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[3] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[4] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[5] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[6] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[7] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[8] = false;
+
+#line 162
+    _s_diff_ctx_4._S47[9] = false;
+
+#line 162
+    _s_diff_ctx_4._S48[0] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[1] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[2] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[3] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[4] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[5] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[6] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[7] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[8] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S48[9] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S49[0] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[1] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[2] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[3] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[4] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[5] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[6] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[7] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[8] = false;
+
+#line 162
+    _s_diff_ctx_4._S49[9] = false;
+
+#line 162
+    _s_diff_ctx_4._S50 = 0;
+
+#line 162
+    _s_diff_ctx_4._S51[0] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[1] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[2] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[3] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[4] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[5] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[6] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[7] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[8] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S51[9] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[0] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[1] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[2] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[3] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[4] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[5] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[6] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[7] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[8] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S52[9] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[0] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[1] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[2] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[3] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[4] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[5] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[6] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[7] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[8] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S53[9] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S54[0] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[1] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[2] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[3] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[4] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[5] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[6] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[7] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[8] = false;
+
+#line 162
+    _s_diff_ctx_4._S54[9] = false;
+
+#line 162
+    _s_diff_ctx_4._S55[0] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[1] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[2] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[3] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[4] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[5] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[6] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[7] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[8] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S55[9] = _S151;
+
+#line 162
+    _s_diff_ctx_4._S56[0] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[1] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[2] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[3] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[4] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[5] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[6] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[7] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[8] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S56[9] = _S148;
+
+#line 162
+    _s_diff_ctx_4._S57[0] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[1] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[2] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[3] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[4] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[5] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[6] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[7] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[8] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S57[9] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[0] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[1] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[2] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[3] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[4] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[5] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[6] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[7] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[8] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S58[9] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[0] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[1] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[2] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[3] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[4] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[5] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[6] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[7] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[8] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S59[9] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[0] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[1] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[2] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[3] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[4] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[5] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[6] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[7] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[8] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S60[9] = 0.0;
+
+#line 162
+    _s_diff_ctx_4._S61[0] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[1] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[2] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[3] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[4] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[5] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[6] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[7] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[8] = false;
+
+#line 162
+    _s_diff_ctx_4._S61[9] = false;
+
+#line 162
+    float _S165 = sample1DNormal_0(prng_1) + dpdpisect_2.primal_0.x_2;
+
+#line 162
+    float _S166 = s_bwd_primal_float_dzero_0();
+
+#line 162
+    float _S167 = _S166 + dpdpisect_2.differential_0.x_0;
+
+#line 162
+    DiffPair_float_0 _S168 = { _S165, _S167 };
+
+#line 162
+    DiffPair_Intersection_0 _S169 = { dpdpisect_2.primal_0, dpdpisect_2.differential_0 };
+
+#line 162
+    bool _bflag_0 = true;
+
+#line 162
+    int i_0 = 0;
+
+#line 162
+    float totalWarpedPoint_0 = 0.0;
+
+#line 162
+    float s_diff_totalWarpedPoint_0 = _S166;
+
+#line 162
+    float totalWeight_0 = 0.0;
+
+#line 162
+    float s_diff_totalWeight_0 = _S166;
+
+#line 162
+    int _pc_0 = 0;
+
+#line 162
+    for(;;)
+    {
+
+#line 162
+        _s_diff_ctx_4._S49[_pc_0] = _bflag_0;
+
+#line 162
+        _s_diff_ctx_4._S52[_pc_0] = totalWeight_0;
+
+#line 162
+        _s_diff_ctx_4._S53[_pc_0] = totalWarpedPoint_0;
+
+#line 162
+        _s_diff_ctx_4._S58[_pc_0] = s_diff_totalWarpedPoint_0;
+
+#line 162
+        _s_diff_ctx_4._S59[_pc_0] = s_diff_totalWeight_0;
+
+#line 162
+        if(_bflag_0)
+        {
+        }
+        else
+        {
+
+#line 162
+            break;
+        }
+
+#line 162
+        bool _S170 = i_0 < 8;
+
+#line 162
+        _s_diff_ctx_4._S54[_pc_0] = _S170;
+
+#line 162
+        int _S171;
+
+#line 162
+        float totalWarpedPoint_1;
+
+#line 162
+        float s_diff_totalWarpedPoint_1;
+
+#line 162
+        float totalWeight_1;
+
+#line 162
+        float s_diff_totalWeight_1;
+
+#line 162
+        if(_S170)
+        {
+
+#line 162
+            _s_diff_ctx_4._S44[_pc_0].primal_0 = _S165;
+
+#line 162
+            _s_diff_ctx_4._S44[_pc_0].differential_0 = _S167;
+
+#line 162
+            s_bwd_s_fwd_intersect_Intermediates_0 _S172;
+
+#line 162
+            _S172._S18 = _S153;
+
+#line 162
+            _S172._S19 = 0U;
+
+#line 162
+            _S172._S20 = _S154;
+
+#line 162
+            _S172._S21 = _S154;
+
+#line 162
+            _S172._S22 = _S154;
+
+#line 162
+            _S172._S23 = _S154;
+
+#line 162
+            _S172._S24 = _S153;
+
+#line 162
+            _S172._S25 = _S154;
+
+#line 162
+            _S172._S26 = _S154;
+
+#line 162
+            _S172._S27 = _S154;
+
+#line 162
+            _S172._S28 = false;
+
+#line 162
+            _S172._S29 = false;
+
+#line 162
+            DiffPair_Intersection_0 _S173 = s_bwd_primal_s_fwd_intersect_0(_S168, _S172);
+
+#line 162
+            _s_diff_ctx_4._S42[_pc_0] = _S172;
+
+#line 162
+            _s_diff_ctx_4._S56[_pc_0] = _S173.primal_0;
+
+#line 162
+            _s_diff_ctx_4._S45[_pc_0] = _S173.primal_0.isIntersected_0;
+
+#line 162
+            if(_S173.primal_0.isIntersected_0)
+            {
+
+#line 162
+                _s_diff_ctx_4._S55[_pc_0].primal_0 = dpdpisect_2.primal_0;
+
+#line 162
+                _s_diff_ctx_4._S55[_pc_0].differential_0 = dpdpisect_2.differential_0;
+
+#line 162
+                s_bwd_s_fwd_harmonicWeight_Intermediates_0 _S174;
+
+#line 162
+                _S174.x_dist_0 = 0.0;
+
+#line 162
+                _S174._S30 = 0.0;
+
+#line 162
+                _S174.s_diff_x_dist_0 = 0.0;
+
+#line 162
+                _S174._S31 = 0.0;
+
+#line 162
+                _S174._S32 = 0.0;
+
+#line 162
+                _S174._S33 = 0.0;
+
+#line 162
+                _S174._S34 = 0.0;
+
+#line 162
+                _S174._S35 = 0.0;
+
+#line 162
+                DiffPair_float_0 _S175 = s_bwd_primal_s_fwd_harmonicWeight_0(_S169, _S173.primal_0, _S174);
+
+#line 162
+                _s_diff_ctx_4._S43[_pc_0] = _S174;
+
+#line 162
+                _s_diff_ctx_4._S48[_pc_0] = _S175.primal_0;
+
+#line 162
+                _s_diff_ctx_4._S57[_pc_0] = _S175.differential_0;
+
+#line 162
+                DiffPair_Intersection_0 _S176 = { _S173.primal_0, _S173.differential_0 };
+
+#line 162
+                _s_diff_ctx_4._S41[_pc_0].primal_0 = _S173.primal_0;
+
+#line 162
+                _s_diff_ctx_4._S41[_pc_0].differential_0 = _S173.differential_0;
+
+#line 162
+                s_bwd_s_fwd_attachToGeometry_Intermediates_0 _S177;
+
+#line 162
+                _S177._S36 = 0.0;
+
+#line 162
+                _S177._S37 = 0.0;
+
+#line 162
+                _S177.leftWt_0 = 0.0;
+
+#line 162
+                _S177._S38 = 0.0;
+
+#line 162
+                _S177._S39 = 0.0;
+
+#line 162
+                _S177.rightWt_0 = 0.0;
+
+#line 162
+                _S177._S40 = 0.0;
+
+#line 162
+                DiffPair_float_0 _S178 = s_bwd_primal_s_fwd_attachToGeometry_0(_S176, _S177);
+
+#line 162
+                _s_diff_ctx_4._S46[_pc_0] = _S177;
+
+#line 162
+                _s_diff_ctx_4._S51[_pc_0] = _S178.primal_0;
+
+#line 162
+                _s_diff_ctx_4._S60[_pc_0] = _S178.differential_0;
+
+#line 162
+                float s_diff_totalWarpedPoint_2 = s_diff_totalWarpedPoint_0 + (_S178.differential_0 * _S175.primal_0 + _S178.primal_0 * _S175.differential_0);
+
+#line 162
+                float totalWeight_2 = totalWeight_0 + _S175.primal_0;
+
+#line 162
+                float s_diff_totalWeight_2 = s_diff_totalWeight_0 + _S175.differential_0;
+
+#line 162
+                totalWarpedPoint_1 = totalWarpedPoint_0 + _S178.primal_0 * _S175.primal_0;
+
+#line 162
+                s_diff_totalWarpedPoint_1 = s_diff_totalWarpedPoint_2;
+
+#line 162
+                totalWeight_1 = totalWeight_2;
+
+#line 162
+                s_diff_totalWeight_1 = s_diff_totalWeight_2;
+
+#line 162
+            }
+            else
+            {
+
+#line 162
+                totalWarpedPoint_1 = totalWarpedPoint_0;
+
+#line 162
+                s_diff_totalWarpedPoint_1 = s_diff_totalWarpedPoint_0;
+
+#line 162
+                totalWeight_1 = totalWeight_0;
+
+#line 162
+                s_diff_totalWeight_1 = s_diff_totalWeight_0;
+
+#line 162
+            }
+
+#line 162
+            _S171 = 1;
+
+#line 162
+        }
+        else
+        {
+
+#line 162
+            _S171 = 0;
+
+#line 162
+        }
+
+#line 162
+        bool _S179 = _S171 != 1;
+
+#line 162
+        _s_diff_ctx_4._S47[_pc_0] = _S179;
+
+#line 162
+        bool _bflag_1;
+
+#line 162
+        if(_S179)
+        {
+
+#line 162
+            _bflag_1 = false;
+
+#line 162
+        }
+        else
+        {
+
+#line 162
+            _bflag_1 = _bflag_0;
+
+#line 162
+        }
+
+#line 162
+        _s_diff_ctx_4._S61[_pc_0] = _bflag_1;
+
+#line 162
+        int i_1;
+
+#line 162
+        float totalWarpedPoint_2;
+
+#line 162
+        float s_diff_totalWarpedPoint_3;
+
+#line 162
+        float totalWeight_3;
+
+#line 162
+        float s_diff_totalWeight_3;
+
+#line 162
+        if(_bflag_1)
+        {
+
+#line 162
+            i_1 = i_0 + 1;
+
+#line 162
+            totalWarpedPoint_2 = totalWarpedPoint_1;
+
+#line 162
+            s_diff_totalWarpedPoint_3 = s_diff_totalWarpedPoint_1;
+
+#line 162
+            totalWeight_3 = totalWeight_1;
+
+#line 162
+            s_diff_totalWeight_3 = s_diff_totalWeight_1;
+
+#line 162
+        }
+        else
+        {
+
+#line 162
+            i_1 = i_0;
+
+#line 162
+            totalWarpedPoint_2 = totalWarpedPoint_0;
+
+#line 162
+            s_diff_totalWarpedPoint_3 = s_diff_totalWarpedPoint_0;
+
+#line 162
+            totalWeight_3 = totalWeight_0;
+
+#line 162
+            s_diff_totalWeight_3 = s_diff_totalWeight_0;
+
+#line 162
+        }
+
+#line 162
+        int _S180 = _pc_0 + 1;
+
+#line 162
+        _bflag_0 = _bflag_1;
+
+#line 162
+        i_0 = i_1;
+
+#line 162
+        totalWarpedPoint_0 = totalWarpedPoint_2;
+
+#line 162
+        s_diff_totalWarpedPoint_0 = s_diff_totalWarpedPoint_3;
+
+#line 162
+        totalWeight_0 = totalWeight_3;
+
+#line 162
+        s_diff_totalWeight_0 = s_diff_totalWeight_3;
+
+#line 162
+        _pc_0 = _S180;
+
+#line 162
+    }
+
+#line 162
+    float _S181 = totalWarpedPoint_0 / totalWeight_0;
+
+#line 162
+    float _S182 = totalWeight_0 * totalWeight_0;
+
+#line 162
+    _s_diff_ctx_4._S62 = _S182;
+
+#line 162
+    float _S183 = s_diff_totalWarpedPoint_0 * totalWeight_0 - totalWarpedPoint_0 * s_diff_totalWeight_0;
+
+#line 162
+    _s_diff_ctx_4._S63 = _S183;
+
+#line 162
+    _s_diff_ctx_4._S64 = _S182;
+
+#line 162
+    float _S184 = _S183 / _S182;
+
+#line 162
+    _s_diff_ctx_4._S65 = _S182 * _S182;
+
+#line 162
+    DiffPair_float_0 _S185 = { _S181, _S184 };
+
+#line 162
+    _s_diff_ctx_4._S50 = _pc_0;
+
+#line 162
+    return _S185;
+}
+
+
+#line 162
+DiffPair_float_0 s_bwd_primal_infinitesimal_0(DiffPair_float_0 dpx_1)
+{
+
+#line 162
+    float _S186 = dpx_1.primal_0;
+
+#line 162
+    float _S187 = dpx_1.differential_0;
+
+#line 162
+    DiffPair_float_0 _S188 = { _S186 - _S186, _S187 - _S187 };
+
+#line 162
+    return _S188;
+}
+
+
+#line 162
+Intersection_0 s_bwd_primal_warpedIntersect_0(float dpx_2, PRNG_0 prng_2, inout s_bwd_warpedIntersect_Intermediates_0 _s_diff_ctx_5)
+{
+
+#line 185
+    LineSegment_0 _S189 = { 0.0, 0.0, 0.0 };
+
+#line 185
+    Intersection_0 _S190 = { _S189, 0.0, false, 0.0 };
+
+#line 185
+    s_diff_LineSegment_0 _S191 = { 0.0, 0.0, 0.0 };
+
+#line 185
+    s_diff_Intersection_0 _S192 = { _S191, 0.0, 0.0 };
+
+#line 185
+    DiffPair_Intersection_0 _S193 = { _S190, _S192 };
+
+#line 185
+    DiffPair_Intersection_0  _S194[10U] = { _S193, _S193, _S193, _S193, _S193, _S193, _S193, _S193, _S193, _S193 };
+
+#line 185
+    DiffPair_LineSegment_0 _S195 = { _S189, _S191 };
+
+#line 185
+    DiffPair_float_0 _S196 = { 0.0, 0.0 };
+
+#line 185
+    s_bwd_s_fwd_intersect_Intermediates_0 _S197 = { _S195, 0U, _S196, _S196, _S196, _S196, _S195, _S196, _S196, _S196, false, false };
+
+#line 185
+    s_bwd_s_fwd_intersect_Intermediates_0  _S198[10U] = { _S197, _S197, _S197, _S197, _S197, _S197, _S197, _S197, _S197, _S197 };
+
+#line 185
+    s_bwd_s_fwd_harmonicWeight_Intermediates_0 _S199 = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 185
+    s_bwd_s_fwd_harmonicWeight_Intermediates_0  _S200[10U] = { _S199, _S199, _S199, _S199, _S199, _S199, _S199, _S199, _S199, _S199 };
+
+#line 185
+    DiffPair_float_0  _S201[10U] = { _S196, _S196, _S196, _S196, _S196, _S196, _S196, _S196, _S196, _S196 };
+
+#line 185
+    bool  _S202[10U] = { false, false, false, false, false, false, false, false, false, false };
+
+#line 185
+    s_bwd_s_fwd_attachToGeometry_Intermediates_0 _S203 = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 185
+    s_bwd_s_fwd_attachToGeometry_Intermediates_0  _S204[10U] = { _S203, _S203, _S203, _S203, _S203, _S203, _S203, _S203, _S203, _S203 };
+
+#line 185
+    float  _S205[10U] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 185
+    Intersection_0  _S206[10U] = { _S190, _S190, _S190, _S190, _S190, _S190, _S190, _S190, _S190, _S190 };
+
+#line 185
+    s_bwd_s_fwd_warp_Intermediates_0 _S207 = { _S194, _S198, _S200, _S201, _S202, _S204, _S202, _S205, _S202, 0, _S205, _S205, _S205, _S202, _S194, _S206, _S205, _S205, _S205, _S205, _S202, 0.0, 0.0, 0.0, 0.0 };
+
+#line 185
+    s_bwd_intersect_Intermediates_0 _S208 = { _S189, 0U, _S189, false, false };
+
+#line 185
+    _s_diff_ctx_5._S71 = _S207;
+
+#line 185
+    _s_diff_ctx_5._S72 = _S208;
+
+#line 185
+    _s_diff_ctx_5._S73 = _S193;
+
+#line 185
+    _s_diff_ctx_5._S74 = _S196;
+
+#line 185
+    _s_diff_ctx_5._S75 = 0.0;
+
+#line 185
+    _s_diff_ctx_5._S76 = 0.0;
+
+#line 185
+    Intersection_0 _S209 = s_bwd_primal_intersect_0(dpx_2, _s_diff_ctx_5._S72);
+
+#line 185
+    s_diff_Intersection_0 _S210 = s_bwd_primal_Intersection_Differential_x24_syn_dzero_0();
+
+#line 185
+    _S210.x_0 = 1.0;
+
+#line 185
+    DiffPair_Intersection_0 _S211 = { _S209, _S210 };
+
+#line 185
+    _s_diff_ctx_5._S73.primal_0 = _S209;
+
+#line 185
+    _s_diff_ctx_5._S73.differential_0 = _S210;
+
+#line 185
+    DiffPair_float_0 _S212 = s_bwd_primal_s_fwd_warp_0(_S211, prng_2, _s_diff_ctx_5._S71);
+
+#line 185
+    _s_diff_ctx_5._S74 = _S212;
+
+#line 185
+    DiffPair_float_0 _S213 = s_bwd_primal_infinitesimal_0(_S212);
+
+#line 185
+    float _S214 = _S209.x_2 + _S213.primal_0;
+
+#line 185
+    Intersection_0 _S215 = _S209;
+
+#line 185
+    _S215.x_2 = _S214;
+
+#line 185
+    _s_diff_ctx_5._S75 = _S209.wt_1;
+
+#line 185
+    float _S216 = 1.0 + _S213.differential_0;
+
+#line 185
+    _s_diff_ctx_5._S76 = _S216;
+
+#line 185
+    _S215.wt_1 = _S209.wt_1 * _S216;
+
+#line 185
+    return _S215;
+}
+
+
+#line 185
+float s_bwd_primal_shadeIntersection_0(Intersection_0 dpisect_0)
+{
+
+#line 185
+    return dpisect_0.ls_2.color_1;
+}
+
+
+#line 185
+float s_bwd_primal_renderSample_0(PRNG_0 prng_3, inout s_bwd_renderSample_Intermediates_0 _s_diff_ctx_6)
+{
+
+#line 206
+    LineSegment_0 _S217 = { 0.0, 0.0, 0.0 };
+
+#line 206
+    Intersection_0 _S218 = { _S217, 0.0, false, 0.0 };
+
+#line 206
+    s_diff_LineSegment_0 _S219 = { 0.0, 0.0, 0.0 };
+
+#line 206
+    s_diff_Intersection_0 _S220 = { _S219, 0.0, 0.0 };
+
+#line 206
+    DiffPair_Intersection_0 _S221 = { _S218, _S220 };
+
+#line 206
+    DiffPair_Intersection_0  _S222[10U] = { _S221, _S221, _S221, _S221, _S221, _S221, _S221, _S221, _S221, _S221 };
+
+#line 206
+    DiffPair_LineSegment_0 _S223 = { _S217, _S219 };
+
+#line 206
+    DiffPair_float_0 _S224 = { 0.0, 0.0 };
+
+#line 206
+    s_bwd_s_fwd_intersect_Intermediates_0 _S225 = { _S223, 0U, _S224, _S224, _S224, _S224, _S223, _S224, _S224, _S224, false, false };
+
+#line 206
+    s_bwd_s_fwd_intersect_Intermediates_0  _S226[10U] = { _S225, _S225, _S225, _S225, _S225, _S225, _S225, _S225, _S225, _S225 };
+
+#line 206
+    s_bwd_s_fwd_harmonicWeight_Intermediates_0 _S227 = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 206
+    s_bwd_s_fwd_harmonicWeight_Intermediates_0  _S228[10U] = { _S227, _S227, _S227, _S227, _S227, _S227, _S227, _S227, _S227, _S227 };
+
+#line 206
+    DiffPair_float_0  _S229[10U] = { _S224, _S224, _S224, _S224, _S224, _S224, _S224, _S224, _S224, _S224 };
+
+#line 206
+    bool  _S230[10U] = { false, false, false, false, false, false, false, false, false, false };
+
+#line 206
+    s_bwd_s_fwd_attachToGeometry_Intermediates_0 _S231 = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 206
+    s_bwd_s_fwd_attachToGeometry_Intermediates_0  _S232[10U] = { _S231, _S231, _S231, _S231, _S231, _S231, _S231, _S231, _S231, _S231 };
+
+#line 206
+    float  _S233[10U] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+#line 206
+    Intersection_0  _S234[10U] = { _S218, _S218, _S218, _S218, _S218, _S218, _S218, _S218, _S218, _S218 };
+
+#line 206
+    s_bwd_s_fwd_warp_Intermediates_0 _S235 = { _S222, _S226, _S228, _S229, _S230, _S232, _S230, _S233, _S230, 0, _S233, _S233, _S233, _S230, _S222, _S234, _S233, _S233, _S233, _S233, _S230, 0.0, 0.0, 0.0, 0.0 };
+
+#line 206
+    s_bwd_intersect_Intermediates_0 _S236 = { _S217, 0U, _S217, false, false };
+
+#line 206
+    s_bwd_warpedIntersect_Intermediates_0 _S237 = { _S235, _S236, _S221, _S224, 0.0, 0.0 };
+
+#line 206
+    PRNG_0 _S238 = { 0U };
+
+#line 206
+    _s_diff_ctx_6._S77 = _S237;
+
+#line 206
+    _s_diff_ctx_6._S78 = _S238;
+
+#line 206
+    _s_diff_ctx_6.sample_0 = 0.0;
+
+#line 206
+    _s_diff_ctx_6._S79 = _S218;
+
+#line 206
+    _s_diff_ctx_6._S80 = 0.0;
+
+#line 206
+    _s_diff_ctx_6._S81 = 0.0;
+
+#line 206
+    PRNG_0 _S239 = prng_3;
+
+#line 206
+    float u_1 = PRNG_nextFloat1D_0(_S239);
+
+#line 206
+    _s_diff_ctx_6._S78 = _S239;
+
+#line 206
+    float _S240 = 10.0 * (1.0 - u_1);
+
+#line 206
+    _s_diff_ctx_6.sample_0 = _S240;
+
+#line 206
+    Intersection_0 _S241 = s_bwd_primal_warpedIntersect_0(_S240, _S239, _s_diff_ctx_6._S77);
+
+#line 206
+    _s_diff_ctx_6._S79 = _S241;
+
+#line 206
+    float _S242 = s_bwd_primal_shadeIntersection_0(_S241);
+
+#line 206
+    _s_diff_ctx_6._S80 = _S242;
+
+#line 206
+    _s_diff_ctx_6._S81 = _S241.wt_1;
+
+#line 206
+    return _S242 * _S241.wt_1;
+}
+
+
+#line 206
+void s_bwd_shadeIntersection_0(inout DiffPair_Intersection_0 dpisect_1, float _s_dOut_0)
+{
+
+#line 206
+    s_diff_LineSegment_0 _S243 = LineSegment_x24_syn_dzero_0();
+
+#line 206
+    _S243.color_0 = _s_dOut_0;
+
+#line 206
+    s_diff_Intersection_0 _S244 = Intersection_x24_syn_dzero_0();
+
+#line 206
+    _S244.ls_0 = _S243;
+
+#line 206
+    dpisect_1.primal_0 = dpisect_1.primal_0;
+
+#line 206
+    dpisect_1.differential_0 = _S244;
+
+#line 206
+    return;
+}
+
+
+#line 1 2
+struct DiffPair_0
+{
+    DiffPair_float_0 primal_0;
+    DiffPair_float_0 differential_0;
+};
+
+
+#line 1
+void s_bwd_infinitesimal_0(inout DiffPair_0 dpx_3, DiffPair_float_0 _s_dOut_1)
+{
+
+#line 1
+    DiffPair_float_0 _S245 = { _s_dOut_1.primal_0, _s_dOut_1.differential_0 };
+
+#line 1
+    dpx_3.primal_0 = dpx_3.primal_0;
+
+#line 1
+    dpx_3.differential_0 = _S245;
+
+#line 1
+    return;
+}
+
+
+#line 1
+struct DiffPair_s_diff_Intersection_0
+{
+    s_diff_Intersection_0 primal_0;
+    s_diff_Intersection_0 differential_0;
+};
+
+
+#line 1
+struct DiffPair_1
+{
+    DiffPair_Intersection_0 primal_0;
+    DiffPair_s_diff_Intersection_0 differential_0;
+};
+
+
+#line 1
+void s_bwd_s_fwd_attachToGeometry_0(inout DiffPair_1 dpdpisect_3, DiffPair_float_0 _s_dOut_2, s_bwd_s_fwd_attachToGeometry_Intermediates_0 _s_diff_ctx_7)
+{
+
+#line 1
+    float _S246 = _s_diff_ctx_7.rightWt_0 * _s_dOut_2.differential_0;
+
+#line 1
+    float _S247 = _s_diff_ctx_7._S40 * _s_dOut_2.differential_0;
+
+#line 1
+    float _S248 = _s_diff_ctx_7.leftWt_0 * _s_dOut_2.differential_0;
+
+#line 461 1
+    float _S249 = _S247 + _s_diff_ctx_7.leftWt_0 * _s_dOut_2.primal_0;
+
+#line 461
+    float _S250 = _S247 + _s_diff_ctx_7.rightWt_0 * _s_dOut_2.primal_0;
+
+#line 461
+    s_diff_LineSegment_0 _S251 = LineSegment_Differential_x24_syn_dzero_0();
+
+#line 461
+    _S251.x0_0 = _S248;
+
+#line 461
+    _S251.x1_0 = _S246;
+
+#line 461
+    s_diff_LineSegment_0 _S252 = LineSegment_x24_syn_dzero_0();
+
+#line 461
+    _S252.x0_0 = _S249;
+
+#line 461
+    _S252.x1_0 = _S250;
+
+#line 461
+    s_diff_Intersection_0 _S253 = Intersection_x24_syn_dzero_0();
+
+#line 461
+    _S253.x_0 = -0.0;
+
+#line 461
+    _S253.ls_0 = _S252;
+
+#line 461
+    s_diff_Intersection_0 _S254 = Intersection_Differential_x24_syn_dzero_0();
+
+#line 461
+    s_diff_Intersection_0 _S255 = _S254;
+
+#line 461
+    _S255.ls_0 = _S251;
+
+#line 461
+    DiffPair_s_diff_Intersection_0 _S256 = { Intersection_x24_syn_dadd_0(_S253, _S254), Intersection_Differential_x24_syn_dadd_0(_S254, _S255) };
+
+#line 461
+    dpdpisect_3.primal_0 = dpdpisect_3.primal_0;
+
+#line 461
+    dpdpisect_3.differential_0 = _S256;
+
+#line 461
+    return;
+}
+
+
+#line 461
+void s_bwd_s_fwd_harmonicWeight_0(inout DiffPair_1 dpdpisect_4, Intersection_0 aux_isect_1, DiffPair_float_0 _s_dOut_3, s_bwd_s_fwd_harmonicWeight_Intermediates_0 _s_diff_ctx_8)
+{
+
+#line 146 0
+    float _S257 = _s_dOut_3.differential_0 / _s_diff_ctx_8._S35;
+
+#line 146
+    float _S258 = _s_diff_ctx_8._S34 * _S257;
+
+#line 146
+    float _S259 = _s_diff_ctx_8._S31 * (_s_diff_ctx_8._S33 * - _S257);
+
+#line 146
+    float _S260 = - _S258;
+
+#line 146
+    float _S261 = _s_diff_ctx_8.x_dist_0 * _S260;
+
+#line 146
+    float _S262 = _s_diff_ctx_8.s_diff_x_dist_0 * _S260;
+
+#line 146
+    float _S263 = _s_diff_ctx_8.x_dist_0 * (_S259 + _S259 + _s_diff_ctx_8._S30 * _S258 + - (_s_dOut_3.primal_0 / _s_diff_ctx_8._S32));
+
+#line 461 1
+    float _S264 = _S261 + _S261;
+
+#line 461
+    float _S265 = _S262 + _S262 + _S263 + _S263;
+
+#line 461
+    s_diff_Intersection_0 _S266 = Intersection_x24_syn_dzero_0();
+
+#line 461
+    _S266.x_0 = _S265;
+
+#line 461
+    s_diff_Intersection_0 _S267 = Intersection_Differential_x24_syn_dzero_0();
+
+#line 461
+    s_diff_Intersection_0 _S268 = _S267;
+
+#line 461
+    _S268.x_0 = _S264;
+
+#line 461
+    DiffPair_s_diff_Intersection_0 _S269 = { Intersection_x24_syn_dadd_0(_S266, _S267), Intersection_Differential_x24_syn_dadd_0(_S267, _S268) };
+
+#line 461
+    dpdpisect_4.primal_0 = dpdpisect_4.primal_0;
+
+#line 461
+    dpdpisect_4.differential_0 = _S269;
+
+#line 461
+    return;
+}
+
+
+#line 193 3
+DiffPair_s_diff_LineSegment_0 _S270()
+{
+
+#line 193
+    s_diff_LineSegment_0 _S271 = LineSegment_x24_syn_dzero_0();
+
+#line 193
+    DiffPair_s_diff_LineSegment_0 _S272 = { _S271, _S271 };
+
+#line 193
+    return _S272;
+}
+
+
+#line 193
+struct DiffPair_2
+{
+    DiffPair_LineSegment_0 primal_0;
+    DiffPair_s_diff_LineSegment_0 differential_0;
+};
+
+
+#line 193
+struct DiffPair_3
+{
+    DiffPair_LineSegment_0 primal_0;
+    DiffPair_s_diff_LineSegment_0 differential_0;
+};
+
+
+#line 193
+void s_bwd_s_fwd_Intersection_x24init_0(inout DiffPair_2 dpdp_ls_1, inout DiffPair_0 dpdp_x_1, bool _isIntersected_2, inout DiffPair_0 dpdp_wt_1, DiffPair_s_diff_Intersection_0 _s_dOut_4)
+{
+
+#line 61 0
+    s_diff_LineSegment_0 _S273 = LineSegment_Differential_x24_syn_dzero_0();
+
+#line 61
+    DiffPair_float_0 _S274 = { _s_dOut_4.primal_0.wt_0, _s_dOut_4.differential_0.wt_0 };
+
+#line 61
+    dpdp_wt_1.primal_0 = dpdp_wt_1.primal_0;
+
+#line 61
+    dpdp_wt_1.differential_0 = _S274;
+
+#line 61
+    DiffPair_float_0 _S275 = { _s_dOut_4.primal_0.x_0, _s_dOut_4.differential_0.x_0 };
+
+#line 61
+    dpdp_x_1.primal_0 = dpdp_x_1.primal_0;
+
+#line 61
+    dpdp_x_1.differential_0 = _S275;
+
+#line 61
+    DiffPair_s_diff_LineSegment_0 _S276 = { LineSegment_x24_syn_dadd_0(_s_dOut_4.primal_0.ls_0, _S273), LineSegment_Differential_x24_syn_dadd_0(_S273, _s_dOut_4.differential_0.ls_0) };
+
+#line 61
+    dpdp_ls_1.primal_0 = dpdp_ls_1.primal_0;
+
+#line 61
+    dpdp_ls_1.differential_0 = _S276;
+
+#line 61
+    return;
+}
+
+
+#line 61
+void s_bwd_s_fwd_LineSegment_x24init_0(inout DiffPair_0 dpdp_x0_1, inout DiffPair_0 dpdp_x1_1, inout DiffPair_0 dpdp_color_1, DiffPair_s_diff_LineSegment_0 _s_dOut_5)
+{
+
+#line 61
+    DiffPair_float_0 _S277 = { _s_dOut_5.primal_0.color_0, _s_dOut_5.differential_0.color_0 };
+
+#line 61
+    dpdp_color_1.primal_0 = dpdp_color_1.primal_0;
+
+#line 61
+    dpdp_color_1.differential_0 = _S277;
+
+#line 61
+    DiffPair_float_0 _S278 = { _s_dOut_5.primal_0.x1_0, _s_dOut_5.differential_0.x1_0 };
+
+#line 61
+    dpdp_x1_1.primal_0 = dpdp_x1_1.primal_0;
+
+#line 61
+    dpdp_x1_1.differential_0 = _S278;
+
+#line 61
+    DiffPair_float_0 _S279 = { _s_dOut_5.primal_0.x0_0, _s_dOut_5.differential_0.x0_0 };
+
+#line 61
+    dpdp_x0_1.primal_0 = dpdp_x0_1.primal_0;
+
+#line 61
+    dpdp_x0_1.differential_0 = _S279;
+
+#line 61
+    return;
+}
+
+
+#line 61
+void s_bwd_fwd_loadLineSegment_1(uint _S280, DiffPair_s_diff_LineSegment_0 _S281)
+{
+
+#line 61
+    d_fwd_loadLineSegment_0(_S280, _S281);
+
+#line 61
+    return;
+}
+
+
+#line 61
+void s_bwd_s_fwd_intersect_0(inout DiffPair_0 dpdpx_1, DiffPair_s_diff_Intersection_0 _s_dOut_6, s_bwd_s_fwd_intersect_Intermediates_0 _s_diff_ctx_9)
+{
+
+#line 61
+    DiffPair_float_0 _S282 = { 0.0, 0.0 };
+
+#line 61
+    int id_7 = getIntersectionID_0(dpdpx_1.primal_0.primal_0);
+
+#line 61
+    if(_s_diff_ctx_9._S28)
+    {
+
+#line 61
+        DiffPair_LineSegment_0 _S283 = s_bwd_fwd_loadLineSegment_0(uint(id_7));
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+    }
+
+#line 61
+    s_diff_Intersection_0 _S284 = Intersection_Differential_x24_syn_dzero_0();
+
+#line 61
+    s_diff_Intersection_0 _S285 = Intersection_x24_syn_dzero_0();
+
+#line 61
+    s_diff_Intersection_0 _S286 = Intersection_x24_syn_dadd_0(_s_dOut_6.primal_0, _S285);
+
+#line 61
+    s_diff_Intersection_0 _S287 = Intersection_Differential_x24_syn_dadd_0(_s_dOut_6.differential_0, _S285);
+
+#line 61
+    DiffPair_s_diff_Intersection_0 _S288;
+
+#line 61
+    float _S289;
+
+#line 61
+    float _S290;
+
+#line 61
+    if(_s_diff_ctx_9._S29)
+    {
+
+#line 61
+        DiffPair_s_diff_Intersection_0 _S291 = { Intersection_x24_syn_dadd_0(_S284, _S286), Intersection_Differential_x24_syn_dadd_0(_S287, _S284) };
+
+#line 61
+        DiffPair_s_diff_LineSegment_0 _S292 = _S270();
+
+#line 61
+        DiffPair_2 _S293;
+
+#line 61
+        _S293.primal_0 = _s_diff_ctx_9._S18;
+
+#line 61
+        _S293.differential_0 = _S292;
+
+#line 61
+        DiffPair_0 _S294;
+
+#line 61
+        _S294.primal_0 = _s_diff_ctx_9._S26;
+
+#line 61
+        _S294.differential_0 = _S282;
+
+#line 61
+        DiffPair_0 _S295;
+
+#line 61
+        _S295.primal_0 = _s_diff_ctx_9._S21;
+
+#line 61
+        _S295.differential_0 = _S282;
+
+#line 61
+        s_bwd_s_fwd_Intersection_x24init_0(_S293, _S294, false, _S295, _S291);
+
+#line 61
+        s_diff_LineSegment_0 _S296 = LineSegment_Differential_x24_syn_dzero_0();
+
+#line 61
+        DiffPair_s_diff_LineSegment_0 _S297 = { LineSegment_x24_syn_dadd_0(_S296, _S293.differential_0.primal_0), LineSegment_Differential_x24_syn_dadd_0(_S293.differential_0.differential_0, _S296) };
+
+#line 61
+        DiffPair_0 _S298;
+
+#line 61
+        _S298.primal_0 = _s_diff_ctx_9._S27;
+
+#line 61
+        _S298.differential_0 = _S282;
+
+#line 61
+        DiffPair_0 _S299;
+
+#line 61
+        _S299.primal_0 = _s_diff_ctx_9._S20;
+
+#line 61
+        _S299.differential_0 = _S282;
+
+#line 61
+        DiffPair_0 _S300;
+
+#line 61
+        _S300.primal_0 = _s_diff_ctx_9._S22;
+
+#line 61
+        _S300.differential_0 = _S282;
+
+#line 61
+        s_bwd_s_fwd_LineSegment_x24init_0(_S298, _S299, _S300, _S297);
+
+#line 61
+        _S288.primal_0 = _S285;
+
+#line 61
+        _S288.differential_0 = _S285;
+
+#line 61
+        _S289 = _S294.differential_0.primal_0;
+
+#line 61
+        _S290 = _S294.differential_0.differential_0;
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+        s_diff_Intersection_0 _S301 = Intersection_Differential_x24_syn_dadd_0(_S287, _S285);
+
+#line 61
+        _S288.primal_0 = Intersection_x24_syn_dadd_0(_S286, _S285);
+
+#line 61
+        _S288.differential_0 = _S301;
+
+#line 61
+        _S289 = 0.0;
+
+#line 61
+        _S290 = 0.0;
+
+#line 61
+    }
+
+#line 61
+    if(_s_diff_ctx_9._S28)
+    {
+
+#line 61
+        DiffPair_s_diff_Intersection_0 _S302 = { Intersection_x24_syn_dadd_0(_S284, _S288.primal_0), Intersection_Differential_x24_syn_dadd_0(_S288.differential_0, _S284) };
+
+#line 61
+        DiffPair_s_diff_LineSegment_0 _S303 = _S270();
+
+#line 61
+        DiffPair_2 _S304;
+
+#line 61
+        _S304.primal_0 = _s_diff_ctx_9._S24;
+
+#line 61
+        _S304.differential_0 = _S303;
+
+#line 61
+        DiffPair_0 _S305;
+
+#line 61
+        _S305.primal_0 = _s_diff_ctx_9._S23;
+
+#line 61
+        _S305.differential_0 = _S282;
+
+#line 61
+        DiffPair_0 _S306;
+
+#line 61
+        _S306.primal_0 = _s_diff_ctx_9._S25;
+
+#line 61
+        _S306.differential_0 = _S282;
+
+#line 61
+        s_bwd_s_fwd_Intersection_x24init_0(_S304, _S305, false, _S306, _S302);
+
+#line 61
+        s_diff_LineSegment_0 _S307 = LineSegment_Differential_x24_syn_dzero_0();
+
+#line 61
+        DiffPair_s_diff_LineSegment_0 _S308 = { LineSegment_x24_syn_dadd_0(_S307, _S304.differential_0.primal_0), LineSegment_Differential_x24_syn_dadd_0(_S304.differential_0.differential_0, _S307) };
+
+#line 61
+        s_bwd_fwd_loadLineSegment_1(_s_diff_ctx_9._S19, _S308);
+
+#line 461 1
+        float _S309 = _S305.differential_0.differential_0 + _S290;
+
+#line 461
+        _S289 = _S305.differential_0.primal_0 + _S289;
+
+#line 461
+        _S290 = _S309;
+
+#line 461
+    }
+    else
+    {
+
+#line 461
+    }
+
+#line 461
+    DiffPair_float_0 _S310 = { _S289, _S290 };
+
+#line 461
+    dpdpx_1.primal_0 = dpdpx_1.primal_0;
+
+#line 461
+    dpdpx_1.differential_0 = _S310;
+
+#line 461
+    return;
+}
+
+
+#line 461
+void s_bwd_s_fwd_warp_0(inout DiffPair_1 dpdpisect_5, PRNG_0 prng_4, DiffPair_float_0 _s_dOut_7, s_bwd_s_fwd_warp_Intermediates_0 _s_diff_ctx_10)
+{
+
+#line 162 0
+    float s_diff_totalWeight_4;
+
+#line 162
+    float totalWeight_4;
+
+#line 162
+    float s_diff_totalWarpedPoint_4;
+
+#line 162
+    float totalWarpedPoint_3;
+
+#line 162
+    float s_diff_totalWeight_5;
+
+#line 162
+    float totalWeight_5;
+
+#line 162
+    float s_diff_totalWarpedPoint_5;
+
+#line 162
+    float totalWarpedPoint_4;
+
+#line 162
+    int _S311;
+
+#line 162
+    LineSegment_0 _S312 = { 0.0, 0.0, 0.0 };
+
+#line 162
+    s_diff_LineSegment_0 _S313 = { 0.0, 0.0, 0.0 };
+
+#line 162
+    DiffPair_LineSegment_0 _S314 = { _S312, _S313 };
+
+#line 162
+    DiffPair_float_0 _S315 = { 0.0, 0.0 };
+
+#line 162
+    float _S316 = s_bwd_primal_float_dzero_0();
+
+#line 162
+    DiffPair_float_0 _S317 = { sample1DNormal_0(prng_4) + dpdpisect_5.primal_0.primal_0.x_2, _S316 + dpdpisect_5.primal_0.differential_0.x_0 };
+
+#line 162
+    DiffPair_Intersection_0 _S318 = { dpdpisect_5.primal_0.primal_0, dpdpisect_5.primal_0.differential_0 };
+
+#line 162
+    int _S319 = _s_diff_ctx_10._S50 - 1;
+
+#line 162
+    s_diff_Intersection_0 _S320 = Intersection_Differential_x24_syn_dzero_0();
+
+#line 162
+    s_diff_Intersection_0 _S321 = Intersection_x24_syn_dzero_0();
+
+#line 162
+    float _S322 = _s_dOut_7.differential_0 / _s_diff_ctx_10._S65;
+
+#line 162
+    float _S323 = _s_diff_ctx_10._S64 * _S322;
+
+#line 162
+    float _S324 = _s_dOut_7.primal_0 / _s_diff_ctx_10._S62;
+
+#line 162
+    DiffPair_s_diff_Intersection_0 _S325 = { _S321, _S320 };
+
+#line 162
+    float _S326 = _s_diff_ctx_10._S58[_S319] * _S323;
+
+#line 162
+    float _S327 = _s_diff_ctx_10._S52[_S319] * _S323;
+
+#line 162
+    float _S328 = _s_diff_ctx_10._S52[_S319] * _S324;
+
+#line 162
+    bool _bflag_2 = true;
+
+#line 162
+    int i_2 = 0;
+
+#line 162
+    float totalWarpedPoint_5 = 0.0;
+
+#line 162
+    float s_diff_totalWarpedPoint_6 = _S316;
+
+#line 162
+    float totalWeight_6 = 0.0;
+
+#line 162
+    float s_diff_totalWeight_6 = _S316;
+
+#line 162
+    int _pc_1 = 0;
+
+#line 162
+    for(;;)
+    {
+
+#line 162
+        if(_bflag_2)
+        {
+        }
+        else
+        {
+
+#line 162
+            break;
+        }
+
+#line 162
+        if(i_2 < 8)
+        {
+
+#line 162
+            s_bwd_s_fwd_intersect_Intermediates_0 _S329;
+
+#line 162
+            _S329._S18 = _S314;
+
+#line 162
+            _S329._S19 = 0U;
+
+#line 162
+            _S329._S20 = _S315;
+
+#line 162
+            _S329._S21 = _S315;
+
+#line 162
+            _S329._S22 = _S315;
+
+#line 162
+            _S329._S23 = _S315;
+
+#line 162
+            _S329._S24 = _S314;
+
+#line 162
+            _S329._S25 = _S315;
+
+#line 162
+            _S329._S26 = _S315;
+
+#line 162
+            _S329._S27 = _S315;
+
+#line 162
+            _S329._S28 = false;
+
+#line 162
+            _S329._S29 = false;
+
+#line 162
+            DiffPair_Intersection_0 _S330 = s_bwd_primal_s_fwd_intersect_0(_S317, _S329);
+
+#line 162
+            if(_S330.primal_0.isIntersected_0)
+            {
+
+#line 162
+                s_bwd_s_fwd_harmonicWeight_Intermediates_0 _S331;
+
+#line 162
+                _S331.x_dist_0 = 0.0;
+
+#line 162
+                _S331._S30 = 0.0;
+
+#line 162
+                _S331.s_diff_x_dist_0 = 0.0;
+
+#line 162
+                _S331._S31 = 0.0;
+
+#line 162
+                _S331._S32 = 0.0;
+
+#line 162
+                _S331._S33 = 0.0;
+
+#line 162
+                _S331._S34 = 0.0;
+
+#line 162
+                _S331._S35 = 0.0;
+
+#line 162
+                DiffPair_float_0 _S332 = s_bwd_primal_s_fwd_harmonicWeight_0(_S318, _S330.primal_0, _S331);
+
+#line 162
+                DiffPair_Intersection_0 _S333 = { _S330.primal_0, _S330.differential_0 };
+
+#line 162
+                s_bwd_s_fwd_attachToGeometry_Intermediates_0 _S334;
+
+#line 162
+                _S334._S36 = 0.0;
+
+#line 162
+                _S334._S37 = 0.0;
+
+#line 162
+                _S334.leftWt_0 = 0.0;
+
+#line 162
+                _S334._S38 = 0.0;
+
+#line 162
+                _S334._S39 = 0.0;
+
+#line 162
+                _S334.rightWt_0 = 0.0;
+
+#line 162
+                _S334._S40 = 0.0;
+
+#line 162
+                DiffPair_float_0 _S335 = s_bwd_primal_s_fwd_attachToGeometry_0(_S333, _S334);
+
+#line 162
+                float s_diff_totalWarpedPoint_7 = s_diff_totalWarpedPoint_6 + (_S335.differential_0 * _S332.primal_0 + _S335.primal_0 * _S332.differential_0);
+
+#line 162
+                float totalWeight_7 = totalWeight_6 + _S332.primal_0;
+
+#line 162
+                float s_diff_totalWeight_7 = s_diff_totalWeight_6 + _S332.differential_0;
+
+#line 162
+                totalWarpedPoint_4 = totalWarpedPoint_5 + _S335.primal_0 * _S332.primal_0;
+
+#line 162
+                s_diff_totalWarpedPoint_5 = s_diff_totalWarpedPoint_7;
+
+#line 162
+                totalWeight_5 = totalWeight_7;
+
+#line 162
+                s_diff_totalWeight_5 = s_diff_totalWeight_7;
+
+#line 162
+            }
+            else
+            {
+
+#line 162
+                totalWarpedPoint_4 = totalWarpedPoint_5;
+
+#line 162
+                s_diff_totalWarpedPoint_5 = s_diff_totalWarpedPoint_6;
+
+#line 162
+                totalWeight_5 = totalWeight_6;
+
+#line 162
+                s_diff_totalWeight_5 = s_diff_totalWeight_6;
+
+#line 162
+            }
+
+#line 162
+            _S311 = 1;
+
+#line 162
+        }
+        else
+        {
+
+#line 162
+            _S311 = 0;
+
+#line 162
+        }
+
+#line 162
+        bool _bflag_3;
+
+#line 162
+        if(_S311 != 1)
+        {
+
+#line 162
+            _bflag_3 = false;
+
+#line 162
+        }
+        else
+        {
+
+#line 162
+            _bflag_3 = _bflag_2;
+
+#line 162
+        }
+
+#line 162
+        int i_3;
+
+#line 162
+        if(_bflag_3)
+        {
+
+#line 162
+            i_3 = i_2 + 1;
+
+#line 162
+            totalWarpedPoint_3 = totalWarpedPoint_4;
+
+#line 162
+            s_diff_totalWarpedPoint_4 = s_diff_totalWarpedPoint_5;
+
+#line 162
+            totalWeight_4 = totalWeight_5;
+
+#line 162
+            s_diff_totalWeight_4 = s_diff_totalWeight_5;
+
+#line 162
+        }
+        else
+        {
+
+#line 162
+            i_3 = i_2;
+
+#line 162
+            totalWarpedPoint_3 = totalWarpedPoint_5;
+
+#line 162
+            s_diff_totalWarpedPoint_4 = s_diff_totalWarpedPoint_6;
+
+#line 162
+            totalWeight_4 = totalWeight_6;
+
+#line 162
+            s_diff_totalWeight_4 = s_diff_totalWeight_6;
+
+#line 162
+        }
+
+#line 162
+        int _S336 = _pc_1 + 1;
+
+#line 162
+        _bflag_2 = _bflag_3;
+
+#line 162
+        i_2 = i_3;
+
+#line 162
+        totalWarpedPoint_5 = totalWarpedPoint_3;
+
+#line 162
+        s_diff_totalWarpedPoint_6 = s_diff_totalWarpedPoint_4;
+
+#line 162
+        totalWeight_6 = totalWeight_4;
+
+#line 162
+        s_diff_totalWeight_6 = s_diff_totalWeight_4;
+
+#line 162
+        _pc_1 = _S336;
+
+#line 162
+    }
+
+#line 162
+    float _S337 = _s_diff_ctx_10._S52[_S319] * (_s_diff_ctx_10._S63 * - _S322);
+
+#line 162
+    float _S338 = - _S323;
+
+#line 162
+    float _S339 = _s_diff_ctx_10._S53[_S319] * _S338;
+
+#line 461 1
+    float _S340 = _S337 + _S337 + _S326 + _s_diff_ctx_10._S53[_S319] * - _S324;
+
+#line 461
+    totalWarpedPoint_4 = _s_diff_ctx_10._S59[_S319] * _S338 + _S328;
+
+#line 461
+    s_diff_totalWarpedPoint_5 = _S327;
+
+#line 461
+    totalWeight_5 = _S340;
+
+#line 461
+    s_diff_totalWeight_5 = _S339;
+
+#line 461
+    _S311 = _s_diff_ctx_10._S50;
+
+#line 461
+    totalWarpedPoint_3 = 0.0;
+
+#line 461
+    s_diff_totalWarpedPoint_4 = 0.0;
+
+#line 461
+    s_diff_Intersection_0 _S341 = _S321;
+
+#line 461
+    s_diff_Intersection_0 _S342 = _S320;
+
+#line 461
+    s_diff_Intersection_0 _S343 = _S321;
+
+#line 461
+    s_diff_Intersection_0 _S344 = _S320;
+
+#line 461
+    for(;;)
+    {
+
+#line 461
+        if(_S311 != 0)
+        {
+        }
+        else
+        {
+
+#line 461
+            break;
+        }
+
+#line 461
+        int _S345 = _S311 - 1;
+
+#line 461
+        float _S346;
+
+#line 461
+        float _S347;
+
+#line 461
+        float _S348;
+
+#line 461
+        float _S349;
+
+#line 461
+        float _S350;
+
+#line 461
+        float _S351;
+
+#line 461
+        if(_s_diff_ctx_10._S61[_S345])
+        {
+
+#line 461
+            totalWeight_4 = totalWarpedPoint_4;
+
+#line 461
+            s_diff_totalWeight_4 = s_diff_totalWarpedPoint_5;
+
+#line 461
+            _S346 = totalWeight_5;
+
+#line 461
+            _S347 = s_diff_totalWeight_5;
+
+#line 461
+            _S348 = 0.0;
+
+#line 461
+            _S349 = 0.0;
+
+#line 461
+            _S350 = 0.0;
+
+#line 461
+            _S351 = 0.0;
+
+#line 461
+        }
+        else
+        {
+
+#line 461
+            totalWeight_4 = 0.0;
+
+#line 461
+            s_diff_totalWeight_4 = 0.0;
+
+#line 461
+            _S346 = 0.0;
+
+#line 461
+            _S347 = 0.0;
+
+#line 461
+            _S348 = totalWeight_5;
+
+#line 461
+            _S349 = s_diff_totalWeight_5;
+
+#line 461
+            _S350 = totalWarpedPoint_4;
+
+#line 461
+            _S351 = s_diff_totalWarpedPoint_5;
+
+#line 461
+        }
+
+#line 461
+        float _S352;
+
+#line 461
+        float _S353;
+
+#line 461
+        float _S354;
+
+#line 461
+        float _S355;
+
+#line 461
+        float _S356;
+
+#line 461
+        float _S357;
+
+#line 461
+        s_diff_Intersection_0 _S358;
+
+#line 461
+        s_diff_Intersection_0 _S359;
+
+#line 461
+        s_diff_Intersection_0 _S360;
+
+#line 461
+        s_diff_Intersection_0 _S361;
+
+#line 461
+        if(_s_diff_ctx_10._S54[_S345])
+        {
+
+#line 461
+            if(_s_diff_ctx_10._S45[_S345])
+            {
+
+#line 461
+                float _S362 = _s_diff_ctx_10._S51[_S345] * s_diff_totalWeight_4;
+
+#line 461
+                float _S363 = _s_diff_ctx_10._S60[_S345] * s_diff_totalWeight_4;
+
+#line 461
+                float _S364 = _s_diff_ctx_10._S51[_S345] * totalWeight_4;
+
+#line 461
+                DiffPair_float_0 _S365 = { _s_diff_ctx_10._S57[_S345] * s_diff_totalWeight_4 + _s_diff_ctx_10._S48[_S345] * totalWeight_4, _s_diff_ctx_10._S48[_S345] * s_diff_totalWeight_4 };
+
+#line 461
+                DiffPair_1 _S366;
+
+#line 461
+                _S366.primal_0 = _s_diff_ctx_10._S41[_S345];
+
+#line 461
+                _S366.differential_0 = _S325;
+
+#line 461
+                s_bwd_s_fwd_attachToGeometry_0(_S366, _S365, _s_diff_ctx_10._S46[_S345]);
+
+#line 461
+                DiffPair_float_0 _S367 = { _S346 + _S363 + _S364, _S347 + _S362 };
+
+#line 461
+                DiffPair_1 _S368;
+
+#line 461
+                _S368.primal_0 = _s_diff_ctx_10._S55[_S345];
+
+#line 461
+                _S368.differential_0 = _S325;
+
+#line 461
+                s_bwd_s_fwd_harmonicWeight_0(_S368, _s_diff_ctx_10._S56[_S345], _S367, _s_diff_ctx_10._S43[_S345]);
+
+#line 461
+                s_diff_Intersection_0 _S369 = Intersection_x24_syn_dadd_0(_S366.differential_0.primal_0, _S343);
+
+#line 461
+                s_diff_Intersection_0 _S370 = Intersection_Differential_x24_syn_dadd_0(_S368.differential_0.differential_0, _S342);
+
+#line 461
+                float _S371 = _S346 + _S348;
+
+#line 461
+                float _S372 = _S347 + _S349;
+
+#line 461
+                float _S373 = totalWeight_4 + _S350;
+
+#line 461
+                float _S374 = s_diff_totalWeight_4 + _S351;
+
+#line 461
+                s_diff_Intersection_0 _S375 = Intersection_x24_syn_dadd_0(_S368.differential_0.primal_0, _S341);
+
+#line 461
+                _S358 = Intersection_Differential_x24_syn_dadd_0(_S366.differential_0.differential_0, _S344);
+
+#line 461
+                _S359 = _S369;
+
+#line 461
+                _S352 = _S373;
+
+#line 461
+                _S353 = _S374;
+
+#line 461
+                _S354 = _S371;
+
+#line 461
+                _S355 = _S372;
+
+#line 461
+                _S360 = _S375;
+
+#line 461
+                _S361 = _S370;
+
+#line 461
+            }
+            else
+            {
+
+#line 461
+                float _S376 = _S346 + _S348;
+
+#line 461
+                float _S377 = _S347 + _S349;
+
+#line 461
+                float _S378 = totalWeight_4 + _S350;
+
+#line 461
+                float _S379 = s_diff_totalWeight_4 + _S351;
+
+#line 461
+                _S358 = _S344;
+
+#line 461
+                _S359 = _S343;
+
+#line 461
+                _S352 = _S378;
+
+#line 461
+                _S353 = _S379;
+
+#line 461
+                _S354 = _S376;
+
+#line 461
+                _S355 = _S377;
+
+#line 461
+                _S360 = _S341;
+
+#line 461
+                _S361 = _S342;
+
+#line 461
+            }
+
+#line 461
+            DiffPair_s_diff_Intersection_0 _S380 = { Intersection_x24_syn_dadd_0(_S320, _S359), Intersection_Differential_x24_syn_dadd_0(_S358, _S320) };
+
+#line 461
+            DiffPair_0 _S381;
+
+#line 461
+            _S381.primal_0 = _s_diff_ctx_10._S44[_S345];
+
+#line 461
+            _S381.differential_0 = _S315;
+
+#line 461
+            s_bwd_s_fwd_intersect_0(_S381, _S380, _s_diff_ctx_10._S42[_S345]);
+
+#line 461
+            float _S382 = _S381.differential_0.primal_0 + s_diff_totalWarpedPoint_4;
+
+#line 461
+            _S356 = _S381.differential_0.differential_0 + totalWarpedPoint_3;
+
+#line 461
+            _S357 = _S382;
+
+#line 461
+            _S358 = _S360;
+
+#line 461
+            _S359 = _S361;
+
+#line 461
+            _S360 = _S321;
+
+#line 461
+            _S361 = _S320;
+
+#line 461
+        }
+        else
+        {
+
+#line 461
+            _S352 = _S350;
+
+#line 461
+            _S353 = _S351;
+
+#line 461
+            _S354 = _S348;
+
+#line 461
+            _S355 = _S349;
+
+#line 461
+            _S356 = totalWarpedPoint_3;
+
+#line 461
+            _S357 = s_diff_totalWarpedPoint_4;
+
+#line 461
+            _S358 = _S341;
+
+#line 461
+            _S359 = _S342;
+
+#line 461
+            _S360 = _S343;
+
+#line 461
+            _S361 = _S344;
+
+#line 461
+        }
+
+#line 461
+        totalWarpedPoint_4 = _S352;
+
+#line 461
+        s_diff_totalWarpedPoint_5 = _S353;
+
+#line 461
+        totalWeight_5 = _S354;
+
+#line 461
+        s_diff_totalWeight_5 = _S355;
+
+#line 461
+        _S311 = _S345;
+
+#line 461
+        totalWarpedPoint_3 = _S356;
+
+#line 461
+        s_diff_totalWarpedPoint_4 = _S357;
+
+#line 461
+        _S341 = _S358;
+
+#line 461
+        _S342 = _S359;
+
+#line 461
+        _S343 = _S360;
+
+#line 461
+        _S344 = _S361;
+
+#line 461
+    }
+
+#line 461
+    s_diff_Intersection_0 _S383 = _S321;
+
+#line 461
+    _S383.x_0 = s_diff_totalWarpedPoint_4;
+
+#line 461
+    s_diff_Intersection_0 _S384 = Intersection_x24_syn_dadd_0(_S341, _S383);
+
+#line 461
+    s_diff_Intersection_0 _S385 = _S320;
+
+#line 461
+    _S385.x_0 = totalWarpedPoint_3;
+
+#line 461
+    DiffPair_s_diff_Intersection_0 _S386 = { Intersection_x24_syn_dadd_0(_S384, _S320), Intersection_Differential_x24_syn_dadd_0(_S320, Intersection_Differential_x24_syn_dadd_0(_S342, _S385)) };
+
+#line 461
+    dpdpisect_5.primal_0 = dpdpisect_5.primal_0;
+
+#line 461
+    dpdpisect_5.differential_0 = _S386;
+
+#line 461
+    return;
+}
+
+
+#line 461
+void s_bwd_Intersection_x24init_0(inout DiffPair_LineSegment_0 dp_ls_2, inout DiffPair_float_0 dp_x_1, bool _isIntersected_3, inout DiffPair_float_0 dp_wt_1, s_diff_Intersection_0 _s_dOut_8)
+{
+
+#line 61 0
+    dp_wt_1.primal_0 = dp_wt_1.primal_0;
+
+#line 61
+    dp_wt_1.differential_0 = _s_dOut_8.wt_0;
+
+#line 61
+    dp_x_1.primal_0 = dp_x_1.primal_0;
+
+#line 61
+    dp_x_1.differential_0 = _s_dOut_8.x_0;
+
+#line 61
+    dp_ls_2.primal_0 = dp_ls_2.primal_0;
+
+#line 61
+    dp_ls_2.differential_0 = _s_dOut_8.ls_0;
+
+#line 61
+    return;
+}
+
+
+#line 61
+void s_bwd_LineSegment_x24init_0(inout DiffPair_float_0 dp_x0_1, inout DiffPair_float_0 dp_x1_1, inout DiffPair_float_0 dp_color_1, s_diff_LineSegment_0 _s_dOut_9)
+{
+
+#line 61
+    dp_color_1.primal_0 = dp_color_1.primal_0;
+
+#line 61
+    dp_color_1.differential_0 = _s_dOut_9.color_0;
+
+#line 61
+    dp_x1_1.primal_0 = dp_x1_1.primal_0;
+
+#line 61
+    dp_x1_1.differential_0 = _s_dOut_9.x1_0;
+
+#line 61
+    dp_x0_1.primal_0 = dp_x0_1.primal_0;
+
+#line 61
+    dp_x0_1.differential_0 = _s_dOut_9.x0_0;
+
+#line 61
+    return;
+}
+
+
+#line 61
+void s_bwd_loadLineSegment_1(uint _S387, s_diff_LineSegment_0 _S388)
+{
+
+#line 61
+    d_loadLineSegment_0(_S387, _S388);
+
+#line 61
+    return;
+}
+
+
+#line 61
+void s_bwd_intersect_0(inout DiffPair_float_0 dpx_4, s_diff_Intersection_0 _s_dOut_10, s_bwd_intersect_Intermediates_0 _s_diff_ctx_11)
+{
+
+#line 61
+    DiffPair_float_0 _S389 = dpx_4;
+
+#line 61
+    int id_8 = getIntersectionID_0(dpx_4.primal_0);
+
+#line 61
+    if(_s_diff_ctx_11._S69)
+    {
+
+#line 61
+        LineSegment_0 _S390 = s_bwd_loadLineSegment_0(uint(id_8));
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+    }
+
+#line 61
+    s_diff_Intersection_0 _S391 = Intersection_x24_syn_dzero_0();
+
+#line 61
+    s_diff_Intersection_0 _S392 = Intersection_x24_syn_dadd_0(_s_dOut_10, _S391);
+
+#line 61
+    s_diff_Intersection_0 _S393;
+
+#line 61
+    float _S394;
+
+#line 61
+    if(_s_diff_ctx_11._S70)
+    {
+
+#line 61
+        s_diff_LineSegment_0 _S395 = LineSegment_x24_syn_dzero_0();
+
+#line 61
+        DiffPair_LineSegment_0 _S396;
+
+#line 61
+        _S396.primal_0 = _s_diff_ctx_11._S68;
+
+#line 61
+        _S396.differential_0 = _S395;
+
+#line 61
+        DiffPair_float_0 _S397;
+
+#line 61
+        _S397.primal_0 = _S389.primal_0;
+
+#line 61
+        _S397.differential_0 = 0.0;
+
+#line 61
+        DiffPair_float_0 _S398;
+
+#line 61
+        _S398.primal_0 = 0.0;
+
+#line 61
+        _S398.differential_0 = 0.0;
+
+#line 61
+        s_bwd_Intersection_x24init_0(_S396, _S397, false, _S398, _S392);
+
+#line 61
+        DiffPair_float_0 _S399;
+
+#line 61
+        _S399.primal_0 = 0.0;
+
+#line 61
+        _S399.differential_0 = 0.0;
+
+#line 61
+        DiffPair_float_0 _S400;
+
+#line 61
+        _S400.primal_0 = 0.0;
+
+#line 61
+        _S400.differential_0 = 0.0;
+
+#line 61
+        DiffPair_float_0 _S401;
+
+#line 61
+        _S401.primal_0 = 0.0;
+
+#line 61
+        _S401.differential_0 = 0.0;
+
+#line 61
+        s_bwd_LineSegment_x24init_0(_S399, _S400, _S401, _S396.differential_0);
+
+#line 61
+        _S393 = _S391;
+
+#line 61
+        _S394 = _S397.differential_0;
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+        _S393 = Intersection_x24_syn_dadd_0(_S392, _S391);
+
+#line 61
+        _S394 = 0.0;
+
+#line 61
+    }
+
+#line 61
+    if(_s_diff_ctx_11._S69)
+    {
+
+#line 61
+        s_diff_LineSegment_0 _S402 = LineSegment_x24_syn_dzero_0();
+
+#line 61
+        DiffPair_LineSegment_0 _S403;
+
+#line 61
+        _S403.primal_0 = _s_diff_ctx_11._S66;
+
+#line 61
+        _S403.differential_0 = _S402;
+
+#line 61
+        DiffPair_float_0 _S404;
+
+#line 61
+        _S404.primal_0 = _S389.primal_0;
+
+#line 61
+        _S404.differential_0 = 0.0;
+
+#line 61
+        DiffPair_float_0 _S405;
+
+#line 61
+        _S405.primal_0 = 1.0;
+
+#line 61
+        _S405.differential_0 = 0.0;
+
+#line 61
+        s_bwd_Intersection_x24init_0(_S403, _S404, false, _S405, _S393);
+
+#line 61
+        s_bwd_loadLineSegment_1(_s_diff_ctx_11._S67, _S403.differential_0);
+
+#line 61
+        _S394 = _S404.differential_0 + _S394;
+
+#line 61
+    }
+    else
+    {
+
+#line 61
+    }
+
+#line 61
+    dpx_4.primal_0 = dpx_4.primal_0;
+
+#line 61
+    dpx_4.differential_0 = _S394;
+
+#line 61
+    return;
+}
+
+
+#line 61
+void s_bwd_warpedIntersect_0(inout DiffPair_float_0 dpx_5, PRNG_0 prng_5, s_diff_Intersection_0 _s_dOut_11, s_bwd_warpedIntersect_Intermediates_0 _s_diff_ctx_12)
+{
+
+#line 185
+    s_bwd_intersect_Intermediates_0 _S406 = _s_diff_ctx_12._S72;
+
+#line 185
+    Intersection_0 _S407 = s_bwd_primal_intersect_0(dpx_5.primal_0, _S406);
+
+#line 185
+    s_diff_Intersection_0 _S408 = _s_dOut_11;
+
+#line 185
+    _S408.wt_0 = 0.0;
+
+#line 185
+    float _S409 = _s_diff_ctx_12._S75 * _s_dOut_11.wt_0;
+
+#line 185
+    float _S410 = _s_diff_ctx_12._S76 * _s_dOut_11.wt_0;
+
+#line 185
+    _S408.x_0 = 0.0;
+
+#line 185
+    DiffPair_float_0 _S411 = { _s_dOut_11.x_0, _S409 };
+
+#line 185
+    DiffPair_float_0 _S412 = { 0.0, 0.0 };
+
+#line 185
+    DiffPair_0 _S413;
+
+#line 185
+    _S413.primal_0 = _s_diff_ctx_12._S74;
+
+#line 185
+    _S413.differential_0 = _S412;
+
+#line 185
+    s_bwd_infinitesimal_0(_S413, _S411);
+
+#line 195 3
+    s_diff_Intersection_0 _S414 = Intersection_x24_syn_dzero_0();
+
+#line 195
+    DiffPair_s_diff_Intersection_0 _S415 = { _S414, Intersection_Differential_x24_syn_dzero_0() };
+
+#line 195
+    DiffPair_1 _S416;
+
+#line 195
+    _S416.primal_0 = _s_diff_ctx_12._S73;
+
+#line 195
+    _S416.differential_0 = _S415;
+
+#line 195
+    s_bwd_s_fwd_warp_0(_S416, prng_5, _S413.differential_0, _s_diff_ctx_12._S71);
+
+#line 195
+    s_diff_Intersection_0 _S417 = Intersection_x24_syn_dadd_0(_S408, _S416.differential_0.primal_0);
+
+#line 195
+    s_diff_Intersection_0 _S418 = _S414;
+
+#line 195
+    _S418.wt_0 = _S410;
+
+#line 195
+    _S418.x_0 = 0.0;
+
+#line 195
+    s_diff_Intersection_0 _S419 = Intersection_x24_syn_dadd_0(_S417, _S418);
+
+#line 195
+    DiffPair_float_0 _S420;
+
+#line 195
+    _S420.primal_0 = dpx_5.primal_0;
+
+#line 195
+    _S420.differential_0 = 0.0;
+
+#line 195
+    s_bwd_intersect_0(_S420, _S419, _s_diff_ctx_12._S72);
+
+#line 195
+    dpx_5.primal_0 = dpx_5.primal_0;
+
+#line 195
+    dpx_5.differential_0 = _S420.differential_0;
+
+#line 195
+    return;
+}
+
+
+#line 195
+void s_bwd_renderSample_0(PRNG_0 prng_6, float _s_dOut_12, s_bwd_renderSample_Intermediates_0 _s_diff_ctx_13)
+{
+
+#line 206 0
+    PRNG_0 _S421 = prng_6;
+
+#line 206
+    float u_2 = PRNG_nextFloat1D_0(_S421);
+
+#line 206
+    float _S422 = _s_diff_ctx_13._S80 * _s_dOut_12;
+
+#line 206
+    float _S423 = _s_diff_ctx_13._S81 * _s_dOut_12;
+
+#line 206
+    s_diff_Intersection_0 _S424 = Intersection_x24_syn_dzero_0();
+
+#line 206
+    DiffPair_Intersection_0 _S425;
+
+#line 206
+    _S425.primal_0 = _s_diff_ctx_13._S79;
+
+#line 206
+    _S425.differential_0 = _S424;
+
+#line 206
+    s_bwd_shadeIntersection_0(_S425, _S423);
+
+#line 206
+    s_diff_Intersection_0 _S426 = _S424;
+
+#line 206
+    _S426.wt_0 = _S422;
+
+#line 206
+    s_diff_Intersection_0 _S427 = Intersection_x24_syn_dadd_0(_S425.differential_0, _S426);
+
+#line 206
+    DiffPair_float_0 _S428;
+
+#line 206
+    _S428.primal_0 = _s_diff_ctx_13.sample_0;
+
+#line 206
+    _S428.differential_0 = 0.0;
+
+#line 206
+    s_bwd_warpedIntersect_0(_S428, _s_diff_ctx_13._S78, _S427, _s_diff_ctx_13._S77);
+
+#line 206
+    return;
+}
+
+
+#line 206
+void s_bwd_renderSample_1(PRNG_0 _S429, float _S430)
+{
+
+#line 206
+    s_bwd_renderSample_Intermediates_0 _S431;
+
+#line 206
+    float _S432 = s_bwd_primal_renderSample_0(_S429, _S431);
+
+#line 206
+    s_bwd_renderSample_0(_S429, _S430, _S431);
+
+#line 206
+    return;
+}
+
+
+#line 222
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+
+
+    s_bwd_renderSample_1(PRNG_x24init_0(gl_GlobalInvocationID.x), 1.0);
+    ((endpointDifferentialBuffer_0)._data[(2U)]) = 1.0;
+    return;
+}
+
