@@ -424,6 +424,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.robustness2Features.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.robustness2Features;
 
+        // clock features
+        extendedFeatures.clockFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.clockFeatures;
+
         // Atomic Float
         // To detect atomic float we need
         // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderAtomicFloatFeaturesEXT.html
@@ -573,6 +577,16 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceCreateInfo.pNext = &extendedFeatures.robustness2Features;
             deviceExtensions.add(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
             m_features.add("robustness2");
+        }
+
+        if (extendedFeatures.clockFeatures.shaderDeviceClock)
+        {
+            deviceExtensions.add(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
+
+            extendedFeatures.clockFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.clockFeatures;
+
+            m_features.add("realtime-clock");
         }
 
         VkPhysicalDeviceProperties2 extendedProps = {
