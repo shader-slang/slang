@@ -67,6 +67,21 @@ bool ExtFileArtifactRepresentation::exists()
     return SLANG_SUCCEEDED(res) && pathType == getPathType();
 }
 
+const char* ExtFileArtifactRepresentation::getUniqueIdentity()
+{
+    if (m_uniqueIdentity.getLength() == 0)
+    {
+        ComPtr<ISlangBlob> uniqueIdentityBlob;
+        if (SLANG_FAILED(m_fileSystem->getFileUniqueIdentity(m_path.getBuffer(), uniqueIdentityBlob.writeRef())))
+        {
+            return nullptr;
+        }
+        m_uniqueIdentity = StringUtil::getString(uniqueIdentityBlob);
+    }
+
+    return m_uniqueIdentity.getLength() ? m_uniqueIdentity.getBuffer() : nullptr;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SourceBlobWithPathArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* SourceBlobWithPathInfoArtifactRepresentation::getInterface(const Guid& guid)
@@ -185,6 +200,23 @@ bool OSFileArtifactRepresentation::exists()
 
     // It exists if it is a file
     return SLANG_SUCCEEDED(res) && pathType == SLANG_PATH_TYPE_FILE;
+}
+
+const char* OSFileArtifactRepresentation::getUniqueIdentity()
+{
+    if (m_uniqueIdentity.getLength() == 0)
+    {
+        auto fileSystem = _getFileSystem();
+
+        ComPtr<ISlangBlob> uniqueIdentityBlob;
+        if (SLANG_FAILED(fileSystem->getFileUniqueIdentity(m_path.getBuffer(), uniqueIdentityBlob.writeRef())))
+        {
+            return nullptr;
+        }
+        m_uniqueIdentity = StringUtil::getString(uniqueIdentityBlob);
+    }
+
+    return m_uniqueIdentity.getLength() ? m_uniqueIdentity.getBuffer() : nullptr;
 }
 
 void OSFileArtifactRepresentation::disown()

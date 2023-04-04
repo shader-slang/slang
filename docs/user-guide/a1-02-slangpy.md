@@ -379,7 +379,8 @@ void getInputElement_bwd(
     uint2 loc,
     float derivative)
 {
-    inputGradToPropagateTo.InterlockedAdd(loc, derivative);
+    float oldVal;
+    inputGradToPropagateTo.InterlockedAdd(loc, derivative, oldVal);
 }
 ```
 

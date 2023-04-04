@@ -16,6 +16,9 @@ class IPathArtifactRepresentation : public IArtifactRepresentation
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;
         /// Get type
     virtual SLANG_NO_THROW SlangPathType SLANG_MCALL getPathType() = 0;
+        /// Returns the unique identity. If a unique identity is not supported
+        /// or available will return nullptr.
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() = 0;
 };
 
 /* Represents a path to a file  held on an ISlangFileSystem. */
