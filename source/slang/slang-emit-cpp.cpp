@@ -1270,13 +1270,26 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
             IRInst* baseInst = getElementInst->getBase();
             IRType* baseType = baseInst->getDataType();
-            if (as<IRVectorType>(baseType))
+            if (auto vectorBaseType = as<IRVectorType>(baseType))
             {
-                m_writer->emit("_slang_vector_get_element(");
-                emitOperand(baseInst, getInfo(EmitOp::General));
-                m_writer->emit(", ");
-                emitOperand(getElementInst->getIndex(), getInfo(EmitOp::General));
-                m_writer->emit(")");
+                if (auto intLitIndex = as<IRIntLit>(getElementInst->getIndex()))
+                {
+                    // For static index, we can emit simpler code using the `.x`, `.y` members.
+                    auto outerPrec = getInfo(EmitOp::General);
+                    auto prec = getInfo(EmitOp::Postfix);
+                    emitOperand(baseInst, leftSide(outerPrec, prec));
+                    m_writer->emit(".");
+                    m_writer->emit(getVectorElementNames(vectorBaseType)[intLitIndex->getValue()]);
+                }
+                else
+                {
+                    // For dynamic index, we emit using `_slang_vector_get_element` intrinsics.
+                    m_writer->emit("_slang_vector_get_element(");
+                    emitOperand(baseInst, getInfo(EmitOp::General));
+                    m_writer->emit(", ");
+                    emitOperand(getElementInst->getIndex(), getInfo(EmitOp::General));
+                    m_writer->emit(")");
+                }
                 return true;
             }
             else if (as<IRMatrixType>(baseType))
@@ -1297,24 +1310,37 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
             IRInst* baseInst = getElementInst->getBase();
             IRType* baseType = as<IRPtrTypeBase>(baseInst->getDataType())->getValueType();
-            if (as<IRVectorType>(baseType))
+            if (auto vectorBaseType = as<IRVectorType>(baseType))
             {
-                m_writer->emit("_slang_vector_get_element_ptr(");
-                emitOperand(baseInst, getInfo(EmitOp::General));
-                m_writer->emit(", ");
-                emitOperand(getElementInst->getIndex(), getInfo(EmitOp::General));
-                m_writer->emit(")");
+                if (auto intLitIndex = as<IRIntLit>(getElementInst->getIndex()))
+                {
+                    // For static index, we can emit simpler code using the `.x`, `.y` members.
+                    m_writer->emit("&(");
+                    auto outerPrec = getInfo(EmitOp::General);
+                    auto prec = getInfo(EmitOp::Postfix);
+                    emitOperand(baseInst, leftSide(outerPrec, prec));
+                    m_writer->emit("->");
+                    m_writer->emit(getVectorElementNames(vectorBaseType)[intLitIndex->getValue()]);
+                    m_writer->emit(")");
+                }
+                else
+                {
+                    m_writer->emit("_slang_vector_get_element_ptr(");
+                    emitOperand(baseInst, getInfo(EmitOp::General));
+                    m_writer->emit(", ");
+                    emitOperand(getElementInst->getIndex(), getInfo(EmitOp::General));
+                    m_writer->emit(")");
+                }
                 return true;
             }
             else if (as<IRMatrixType>(baseType))
             {
-                m_writer->emit("&(");
+                m_writer->emit("(");
                 auto outerPrec = getInfo(EmitOp::General);
                 auto prec = getInfo(EmitOp::Postfix);
                 emitOperand(baseInst, leftSide(outerPrec, prec));
-                m_writer->emit("->rows[");
+                m_writer->emit("->rows + ");
                 emitOperand(getElementInst->getIndex(), getInfo(EmitOp::General));
-                m_writer->emit("]");
                 m_writer->emit(")");
                 return true;
             }
