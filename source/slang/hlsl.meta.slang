@@ -6835,6 +6835,38 @@ __specialized_for_target(glsl)
 [[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
 void debugBreak();
 
+// 
+// Realtime Clock support
+//
+
+// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_realtime_clock.txt
+
+[__requiresNVAPI]
+__target_intrinsic(hlsl, "NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO)")
+__glsl_extension(GL_EXT_shader_realtime_clock)
+__target_intrinsic(glsl, "clockRealtime2x32EXT().x")
+__target_intrinsic(cuda, "clock")
+uint getRealtimeClockLow();
+
+__target_intrinsic(cuda, "clock64")
+int64_t __cudaGetRealtimeClock();
+
+[__requiresNVAPI]
+__target_intrinsic(hlsl, "uint2(NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO), NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_HI)) ")
+__glsl_extension(GL_EXT_shader_realtime_clock)
+__target_intrinsic(glsl, "clockRealtime2x32EXT()")
+uint2 getRealtimeClock();
+
+__specialized_for_target(cuda)
+uint2 getRealtimeClock()
+{
+    int64_t ticks = __cudaGetRealtimeClock();
+    return uint2(uint(ticks), uint(uint64_t(ticks) >> 32)); 
+}
+
+// 
+// CUDA specific 
+// 
 
 __target_intrinsic(cuda, "(threadIdx)")
 [__readNone]
