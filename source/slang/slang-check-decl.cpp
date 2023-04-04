@@ -6923,15 +6923,18 @@ namespace Slang
         auto ctx = visitor->withExprLocalScope(&scope);
         auto subVisitor = SemanticsVisitor(ctx);
         auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
-        visitor->ensureDecl(as<DeclRefExpr>(checkedFuncExpr)->declRef, DeclCheckState::TypesFullyResolved);
-        auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
-        auto resolved = subVisitor.ResolveInvoke(invokeExpr);
-        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+        if (auto derivFuncDeclRef = as<DeclRefExpr>(checkedFuncExpr)->declRef)
         {
-            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+            visitor->ensureDecl(derivFuncDeclRef, DeclCheckState::TypesFullyResolved);
+            auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
+            auto resolved = subVisitor.ResolveInvoke(invokeExpr);
+            if (auto resolvedInvoke = as<InvokeExpr>(resolved))
             {
-                attr->funcExpr = calleeDeclRef;
-                return;
+                if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+                {
+                    attr->funcExpr = calleeDeclRef;
+                    return;
+                }
             }
         }
         visitor->getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
