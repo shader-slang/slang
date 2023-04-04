@@ -1495,9 +1495,9 @@ namespace Slang
 
     protected:
         void _addSourceFile(SourceFile* sourceFile);
-        /* Given an artifact, find a PathInfo. If the pathInfo is for a fileSystem output it. 
+        /* Given an artifact, find a PathInfo. 
         If no PathInfo can be found will return an unknown PathInfo */
-        PathInfo _findSourcePathInfo(IArtifact* artifact, ISlangFileSystemExt** outFileSystem);
+        PathInfo _findSourcePathInfo(IArtifact* artifact);
 
         List<ComPtr<IArtifact>> m_sourceArtifacts;
         // The source file(s) that will be compiled to form this translation unit

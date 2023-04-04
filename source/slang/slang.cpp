@@ -1583,64 +1583,16 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
     _addSourceFile(sourceFile);
 }
 
-PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact, ISlangFileSystemExt** outFileSystem)
+PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
 {
-    // Set the output to nullptr for now
-    *outFileSystem = nullptr;
-
     auto pathRep = findRepresentation<IPathArtifactRepresentation>(artifact);
     
     if (pathRep && pathRep->getPathType() == SLANG_PATH_TYPE_FILE)
     {
-        ISlangFileSystemExt* extFileSystem = nullptr;
-
-        if (auto extRep = as<IExtFileArtifactRepresentation>(pathRep))
-        {
-            extFileSystem = extRep->getFileSystem();
-        }
-        else if (auto osRep = as<IOSFileArtifactRepresentation>(pathRep))
-        {
-            // TODO(JS):
-            // 
-            // We could check if the kind seems reasonable.
-            // For example "name" could always be fail. 
-            //
-            // We don't worry about this for now though, as it will typically fail anyway
-            //auto kind = osRep->getKind();
-
-            extFileSystem = OSFileSystem::getExtSingleton();
-        }
-        
-        // Set the file system we are using
-        *outFileSystem = extFileSystem;
-
-        // TODO(JS):
-        // Ideally we'd confirm that the file system was the same, such we could know that the unique
-        // identity is appropriate for the current file system.
-        //
-        // We just assume compatibility for the moment, because repro will be a different file system
-        // but we need to use the unique identity that is there.
-
-        //if (extFileSystem != linkageFileSystem)
-        //{
-        //}
-
         // See if we have a unique identity set with the path
         if (const auto uniqueIdentity = pathRep->getUniqueIdentity())
         {
             return PathInfo::makeNormal(pathRep->getPath(), uniqueIdentity);
-        }
-
-        // If there is a filesystem we can look for a unique identity
-        if (extFileSystem)
-        {
-            // Get the unique identity
-            ComPtr<ISlangBlob> uniqueIdentityBlob;
-            if (SLANG_SUCCEEDED(extFileSystem->getFileUniqueIdentity(pathRep->getPath(), uniqueIdentityBlob.writeRef())) && uniqueIdentityBlob)
-            {
-                auto uniqueIdentity = StringUtil::getString(uniqueIdentityBlob);
-                return PathInfo::makeNormal(pathRep->getPath(), uniqueIdentity);
-            }
         }
 
         // If we couldn't get a unique identity, just use the path
@@ -1673,8 +1625,7 @@ SlangResult TranslationUnitRequest::requireSourceFiles()
     {
         IArtifact* artifact = m_sourceArtifacts[i];
 
-        ISlangFileSystemExt* fileSystem;
-        const PathInfo pathInfo = _findSourcePathInfo(artifact, &fileSystem);
+        const PathInfo pathInfo = _findSourcePathInfo(artifact);
         
         SourceFile* sourceFile = nullptr;
         ComPtr<ISlangBlob> blob;
