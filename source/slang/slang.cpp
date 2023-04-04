@@ -1625,6 +1625,12 @@ PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact, ISlang
         //{
         //}
 
+        // See if we have a unique identity set with the path
+        if (const auto uniqueIdentity = pathRep->getUniqueIdentity())
+        {
+            return PathInfo::makeNormal(pathRep->getPath(), uniqueIdentity);
+        }
+
         // If there is a filesystem we can look for a unique identity
         if (extFileSystem)
         {
