@@ -322,7 +322,8 @@ namespace Slang
                 return;
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTableType->getConformanceType()));
             interfaceRequirementVal = sharedContext->findInterfaceRequirementVal(interfaceType, lookupInst->getRequirementKey());
-            lookupInst->setFullType((IRType*)interfaceRequirementVal);
+            IRBuilder builder(lookupInst);
+            builder.replaceOperand(&lookupInst->typeUse, interfaceRequirementVal);
         }
 
         void lowerSpecialize(IRSpecialize* specializeInst)

@@ -238,13 +238,15 @@ float computeOutputPixel(TensorView<float> input, uint2 pixelLoc)
     float sumValue = 0.0;
 
     // Iterate through the surrounding area.
-    for (int x = pixelLoc.x - 1; x <= pixelLoc.x + 1; x++)
+    for (int offsetX = -1; offsetX <= 1; offsetX++)
     {
         // Skip out of bounds pixels.
+        int x = pixelLoc.x + offsetX;
         if (x < 0 || x >= width) continue;
 
-        for (int y = pixelLoc.y - 1; y <= pixelLoc.y + 1; y++)
+        for (int offsetY = -1; offsetY <= 1; offsetY++)
         {
+            int y = pixelLoc.y + offsetY;
             if (y < 0 || y >= height) continue;
             sumValue += input[x, y];
             count++;
@@ -318,13 +320,15 @@ float computeOutputPixel(
     float sumValue = 0.0;
 
     // Iterate through the surrounding area.
-    for (int x = pixelLoc.x - 1; x <= pixelLoc.x + 1; x++)
+    for (int offsetX = -1; offsetX <= 1; offsetX++)
     {
         // Skip out of bounds pixels.
+        int x = pixelLoc.x + offsetX;
         if (x < 0 || x >= width) continue;
 
-        for (int y = pixelLoc.y - 1; y <= pixelLoc.y + 1; y++)
+        for (int offsetY = -1; offsetY <= 1; offsetY++)
         {
+            int y = pixelLoc.y + offsetY;
             if (y < 0 || y >= height) continue;
             sumValue += getInputElement(input, inputGradToPropagateTo, uint2(x, y));
             count++;
