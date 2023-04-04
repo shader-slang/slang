@@ -27,5 +27,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     uint2 ticks = getRealtimeClock();
     
-    outputBuffer[idx] = int(idx + ticksLow - ticksLow + ticks.x ^ ticks.x);
+    outputBuffer[idx] = int(idx + ((ticksLow ^ ticks.x) ^ (ticks.x ^ ticksLow)));
 }

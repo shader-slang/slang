@@ -24,6 +24,10 @@
 #    define ENABLE_DEBUG_LAYER 0
 #endif
 
+#ifdef GFX_NVAPI
+#    include "../nvapi/nvapi-include.h"
+#endif
+
 namespace gfx
 {
 namespace d3d12
