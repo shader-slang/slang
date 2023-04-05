@@ -6,6 +6,7 @@
 #include "../../source/core/slang-hex-dump-util.h"
 #include "../../source/core/slang-type-text-util.h"
 #include "../../source/core/slang-memory-arena.h"
+#include "../../source/core/slang-castable.h"
 
 #include "../../source/compiler-core/slang-artifact-desc-util.h"
 #include "../../source/compiler-core/slang-artifact-helper.h"
@@ -21,8 +22,6 @@
 #include "../../source/core/slang-render-api-util.h"
 
 #include "../../source/core/slang-shared-library.h"
-
-#include "../../source/core/slang-destroyable.h"
 
 #include "tools/unit-test/slang-unit-test.h"
 #undef SLANG_UNIT_TEST

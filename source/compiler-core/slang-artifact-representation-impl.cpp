@@ -9,7 +9,7 @@
 
 #include "slang-artifact-util.h"
 
-#include "../core/slang-castable-util.h"
+#include "../core/slang-castable.h"
 
 namespace Slang {
 

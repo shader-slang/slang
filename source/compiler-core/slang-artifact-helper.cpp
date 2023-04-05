@@ -9,7 +9,7 @@
 
 #include "../compiler-core/slang-slice-allocator.h"
 
-#include "../core/slang-castable-util.h"
+#include "../core/slang-castable.h"
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"

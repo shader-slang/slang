@@ -9,15 +9,13 @@
 #include "slang-artifact-helper.h"
 #include "slang-artifact-util.h"
 
-#include "../core/slang-castable-util.h"
+#include "../core/slang-castable.h"
 
 #include "slang-slice-allocator.h"
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
-
-#include "../core/slang-destroyable.h"
 
 namespace Slang {
 

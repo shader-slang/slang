@@ -1,6 +1,6 @@
-// slang-castable-util.h
-#ifndef SLANG_CASTABLE_UTIL_H
-#define SLANG_CASTABLE_UTIL_H
+// slang-castable.h
+#ifndef SLANG_CASTABLE_H
+#define SLANG_CASTABLE_H
 
 
 #include "../../slang-com-helper.h"
@@ -10,6 +10,30 @@
 
 namespace Slang
 {
+
+// Dynamic cast of ICastable derived types
+template <typename T>
+SLANG_FORCE_INLINE T* dynamicCast(ICastable* castable)
+{
+    if (castable)
+    {
+        void* obj = castable->castAs(T::getTypeGuid());
+        return obj ? reinterpret_cast<T*>(obj) : ((T*)nullptr);
+    }
+    return nullptr;
+}
+
+// as style cast
+template <typename T>
+SLANG_FORCE_INLINE T* as(ICastable* castable)
+{
+    if (castable)
+    {
+        void* obj = castable->castAs(T::getTypeGuid());
+        return obj ? reinterpret_cast<T*>(obj) : ((T*)nullptr);
+    }
+    return nullptr;
+}
 
 /* Adapter interface to make a non castable types work as ICastable */
 class IUnknownCastableAdapter : public ICastable
@@ -60,6 +84,22 @@ struct CastableUtil
         /// Can use UnknownCastableAdapter if can't queryInterface unk to ICastable
     static ComPtr<ICastable> getCastable(ISlangUnknown* unk);
 };
+
+
+// A way to clone an interface (that derives from IClonable) such that it returns an interface 
+// of the same type.
+template <typename T>
+SLANG_FORCE_INLINE ComPtr<T> cloneInterface(T* in)
+{
+    SLANG_ASSERT(in);
+    // Must be derivable from clonable
+    IClonable* clonable = in;
+    // We can clone with the same interface
+    T* clone = (T*)clonable->clone(T::getTypeGuid());
+    // Clone must exist
+    SLANG_ASSERT(clone);
+    return ComPtr<T>(clone);
+}
 
 } // namespace Slang
 

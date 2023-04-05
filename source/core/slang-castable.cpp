@@ -1,5 +1,5 @@
-// slang-castable-util.cpp
-#include "slang-castable-util.h"
+// slang-castable.cpp
+#include "slang-castable.h"
 
 namespace Slang {
 

@@ -7,13 +7,12 @@
 
 #include "../core/slang-math.h"
 #include "../core/slang-type-text-util.h"
+#include "../core/slang-castable.h"
 
 #include "slang-options.h"
 
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
-
-#include "../core/slang-destroyable.h"
 
 #include "../compiler-core/slang-source-loc.h"
 

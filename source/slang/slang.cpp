@@ -6,14 +6,13 @@
 #include "../core/slang-archive-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-castable.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
-
-#include "../core/slang-destroyable.h"
 
 #include "slang-module-library.h"
 

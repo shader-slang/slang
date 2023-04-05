@@ -8,11 +8,9 @@
 
 #include "slang-artifact-handler-impl.h"
 
-#include "../core/slang-destroyable.h"
-
 #include "slang-slice-allocator.h"
 
-#include "../core/slang-castable-util.h"
+#include "../core/slang-castable.h"
 
 namespace Slang {
 

@@ -6,7 +6,7 @@
 
 #include "slang-artifact-desc-util.h"
 
-#include "../core/slang-destroyable.h"
+#include "../core/slang-castable.h"
 #include "../core/slang-io.h"
 
 namespace Slang {

@@ -12,7 +12,7 @@
 #include "../core/slang-blob.h"
 #include "../core/slang-char-util.h"
 
-#include "../core/slang-castable-util.h"
+#include "../core/slang-castable.h"
 
 #include "slang-artifact-impl.h"
 #include "slang-artifact-representation-impl.h"
