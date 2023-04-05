@@ -399,6 +399,13 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             else
             {
                 differentiableWitnessDictionary.Add((IRType*)item->getConcreteType(), item->getWitness());
+
+                // Also register the type's differential type with the same witness.
+                IRBuilder subBuilder(item->getConcreteType());
+                differentiableWitnessDictionary.AddIfNotExists(
+                    (IRType*)_lookupWitness(&subBuilder, item->getWitness(), sharedContext->differentialAssocTypeStructKey), 
+                    item->getWitness());
+
                 if (auto diffPairType = as<IRDifferentialPairTypeBase>(item->getConcreteType()))
                 {
                     // For differential pair types, register the differential type as well.
@@ -896,55 +903,6 @@ bool canTypeBeStored(IRInst* type)
     default:
         return false;
     }
-}
-
-
-struct HigherOrderDifferentialTypeRegPass : InstPassBase
-{
-    HigherOrderDifferentialTypeRegPass(IRModule* module, AutoDiffSharedContext* autodiffContext) :
-        InstPassBase(module), autodiffContext(autodiffContext)
-    {
-    }
-
-    void processModule()
-    {
-        processInstsOfType<IRDifferentiableTypeDictionaryDecoration>(
-            kIROp_DifferentiableTypeDictionaryDecoration, [&](IRDifferentiableTypeDictionaryDecoration* diffTypeDictDecoration)
-            {
-                IRBuilder builder(module);
-
-                Dictionary<IRType*, IRWitnessTable*> diffTypeDict;
-                for (auto child : diffTypeDictDecoration->getChildren())
-                {
-                    if (auto entry = as<IRDifferentiableTypeDictionaryItem>(child))
-                    {
-                        SLANG_ASSERT(as<IRWitnessTable>(entry->getWitness()));
-                        diffTypeDict[(IRType*)entry->getConcreteType()] = as<IRWitnessTable>(entry->getWitness());
-                    }
-                }
-
-                for (auto entry : diffTypeDict)
-                {
-                    auto witness = entry.Value;
-
-                    IRType* diffType = nullptr;
-
-                    for (auto witnessTableEntry : witness->getEntries())
-                        if (witnessTableEntry->getRequirementKey() == autodiffContext->differentialAssocTypeStructKey)
-                            diffType = (IRType*) witnessTableEntry->getSatisfyingVal();
-
-                    if (!diffTypeDict.ContainsKey(diffType))
-                        builder.addDifferentiableTypeEntry(diffTypeDictDecoration, diffType, witness);
-                }
-            });
-    }
-
-    AutoDiffSharedContext* autodiffContext;
-};
-
-void logHigherOrderDifferentialTypes(IRModule* module, AutoDiffSharedContext* autodiffContext)
-{
-    HigherOrderDifferentialTypeRegPass(module, autodiffContext).processModule();
 }
 
 struct AutoDiffPass : public InstPassBase
@@ -1643,7 +1601,6 @@ struct AutoDiffPass : public InstPassBase
 
             // Now go through the differentiable types dictionary in each method and add an entry
             // for the differential type itself (for higher order differentiation).
-            logHigherOrderDifferentialTypes(module, autodiffContext);
 
             hasChanges |= changed;
         }
