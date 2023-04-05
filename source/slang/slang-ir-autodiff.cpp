@@ -402,9 +402,13 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 
                 // Also register the type's differential type with the same witness.
                 IRBuilder subBuilder(item->getConcreteType());
-                differentiableWitnessDictionary.AddIfNotExists(
-                    (IRType*)_lookupWitness(&subBuilder, item->getWitness(), sharedContext->differentialAssocTypeStructKey), 
-                    item->getWitness());
+                // TODO: What do we do for second order derivatives through interfaces?
+                if (!as<IRInterfaceType>(item->getConcreteType()))
+                {
+                    differentiableWitnessDictionary.AddIfNotExists(
+                        (IRType*)_lookupWitness(&subBuilder, item->getWitness(), sharedContext->differentialAssocTypeStructKey), 
+                        item->getWitness());
+                }
 
                 if (auto diffPairType = as<IRDifferentialPairTypeBase>(item->getConcreteType()))
                 {
