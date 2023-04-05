@@ -356,6 +356,13 @@ class IArtifact : public ICastable
 public:
     SLANG_COM_INTERFACE(0x57375e20, 0xbed, 0x42b6, { 0x9f, 0x5e, 0x59, 0x4f, 0x6, 0x2b, 0xe6, 0x90 })
 
+    enum class ContainedKind
+    {
+        Representation,
+        Associated,
+        Children,
+    };
+
     enum class FindStyle : uint8_t
     {
         Self,                   ///< Just on self
@@ -422,6 +429,11 @@ public:
 
         /// Get the children, will only remain valid if no mutation of children list
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
+
+        /// Clear all of the contained kind
+    virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) = 0;
+        /// Remove entry at index for the specified kind
+    virtual SLANG_NO_THROW void SLANG_MCALL removeAt(ContainedKind kind, Index i) = 0;
 };
 
 /* Interface for an artifact that *contain* a hierarchy of other child artifacts.
@@ -447,10 +459,6 @@ public:
 
         /// Add the artifact to the list
     virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) = 0;
-        /// Removes the child at index, keeps other artifacts in the same order
-    virtual SLANG_NO_THROW void SLANG_MCALL removeChildAt(Index index) = 0;
-        /// Clear the list
-    virtual SLANG_NO_THROW void SLANG_MCALL clearChildren() = 0;
 };
 
 template <typename T>

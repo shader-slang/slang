@@ -106,6 +106,26 @@ void Artifact::setHandler(IArtifactHandler* handler)
     m_handler = handler;
 }
 
+void Artifact::clear(IArtifact::ContainedKind kind)
+{
+    switch (kind)
+    {
+        case ContainedKind::Associated:     m_associated.clear(); break;
+        case ContainedKind::Representation: m_representations.clear(); break;
+        default: break;
+    }
+}
+
+void Artifact::removeAt(ContainedKind kind, Index i)
+{
+    switch (kind)
+    {
+        case ContainedKind::Associated:     m_associated.removeAt(i); break;
+        case ContainedKind::Representation: m_representations.removeAt(i); break;
+        default: break;
+    }
+}
+
 SlangResult Artifact::getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable)
 {
     auto handler = _getHandler();
@@ -257,18 +277,27 @@ void ArtifactContainer::addChild(IArtifact* artifact)
     m_children.add(ComPtr<IArtifact>(artifact));
 }
 
-void ArtifactContainer::removeChildAt(Index index)
+void ArtifactContainer::clear(IArtifact::ContainedKind kind)
 {
-    _requireChildren();
-
-    m_children.removeAt(index);
+    switch (kind)
+    {
+        case ContainedKind::Associated:     m_associated.clear(); break;
+        case ContainedKind::Representation: m_representations.clear(); break;
+        case ContainedKind::Children:       m_children.clear(); break;
+        default: break;
+    }
 }
 
-void ArtifactContainer::clearChildren()
+void ArtifactContainer::removeAt(ContainedKind kind, Index i)
 {
-    _requireChildren();
+    switch (kind)
+    {
+        case ContainedKind::Associated:     m_associated.removeAt(i); break;
+        case ContainedKind::Representation: m_representations.removeAt(i); break;
+        case ContainedKind::Children:       m_children.removeAt(i); break;
 
-    m_children.clearAndDeallocate();
+        default: break;
+    }
 }
 
 } // namespace Slang

@@ -63,14 +63,15 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL setHandler(IArtifactHandler* handler) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE { return Slice<IArtifact*>(nullptr, 0); }
+    
+    virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL removeAt(ContainedKind kind, Index i) SLANG_OVERRIDE;
 
     // IArtifactCollection (Not implemented)
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
     virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact** children, Count count) SLANG_OVERRIDE { SLANG_UNUSED(children); SLANG_UNUSED(count); SLANG_UNREACHABLE("Not implemented"); }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
     virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) SLANG_OVERRIDE { SLANG_UNUSED(artifact); SLANG_UNREACHABLE("Not implemented"); }
-    virtual SLANG_NO_THROW void SLANG_MCALL removeChildAt(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); SLANG_UNREACHABLE("Not implemented"); }
-    virtual SLANG_NO_THROW void SLANG_MCALL clearChildren() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
 
     static ComPtr<IArtifact> create(const Desc& desc) { return ComPtr<IArtifact>(new Artifact(desc)); }
     static ComPtr<IArtifact> create(const Desc& desc, const UnownedStringSlice& name) { return ComPtr<IArtifact>(new Artifact(desc, name)); }
@@ -115,14 +116,14 @@ public:
 
     /// IArtifact
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE;
-    
+    virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL removeAt(ContainedKind kind, Index i) SLANG_OVERRIDE;
+
     // IArtifactCollection
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() SLANG_OVERRIDE { return m_expandResult; }
     virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact** children, Count count) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL removeChildAt(Index index) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL clearChildren() SLANG_OVERRIDE;
     
     static ComPtr<IArtifactContainer> create(const Desc& desc) { return ComPtr<IArtifactContainer>(new ArtifactContainer(desc)); }
     static ComPtr<IArtifactContainer> create(const Desc& desc, const UnownedStringSlice& name) { return ComPtr<IArtifactContainer>(new ArtifactContainer(desc, name)); }
