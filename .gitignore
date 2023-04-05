@@ -77,3 +77,4 @@ build/**/*.log
 *.dll
 *.dxil
 /tests/serialization/*.map
+/slang-tag-version.h

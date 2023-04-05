@@ -164,7 +164,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;..\..\..\tools\gfx;..\..\..\tools\platform;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -178,6 +178,9 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-x86\debug\render-test-tool.lib</ImportLibrary>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x86/" "../../../bin/windows-x86/debug/" "windows-x86"</Command>
     </PostBuildEvent>
@@ -186,7 +189,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;..\..\..\tools\gfx;..\..\..\tools\platform;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -200,6 +203,9 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-x64\debug\render-test-tool.lib</ImportLibrary>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x64/" "../../../bin/windows-x64/debug/" "windows-x64"</Command>
     </PostBuildEvent>
@@ -208,7 +214,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;..\..\..\tools\gfx;..\..\..\tools\platform;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -222,6 +228,9 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-aarch64\debug\render-test-tool.lib</ImportLibrary>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/aarch64/" "../../../bin/windows-aarch64/debug/" "windows-aarch64"</Command>
     </PostBuildEvent>
@@ -247,6 +256,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-x86\release\render-test-tool.lib</ImportLibrary>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x86/" "../../../bin/windows-x86/release/" "windows-x86"</Command>
     </PostBuildEvent>
@@ -272,6 +284,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-x64\release\render-test-tool.lib</ImportLibrary>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x64/" "../../../bin/windows-x64/release/" "windows-x64"</Command>
     </PostBuildEvent>
@@ -297,6 +312,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-aarch64\release\render-test-tool.lib</ImportLibrary>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/aarch64/" "../../../bin/windows-aarch64/release/" "windows-aarch64"</Command>
     </PostBuildEvent>

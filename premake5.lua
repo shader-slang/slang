@@ -1501,9 +1501,12 @@ standardProject("slang", "source/slang")
             local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-glslang")            
             postbuildcommands {
                 "{COPY} " .. slangGlslangPath .. "/bin/" .. targetName .. "/release/" .. sharedLibName .. " %{cfg.targetdir}"
-            }        
-    end
-
+            }
+        end
+    filter { "system:windows" } 
+        prebuildcommands {
+            'powershell "' .. path.join(solution().basedir, 'extras/update-version-tag.ps1"') .. ' -outputFile "' .. path.join(solution().basedir, "slang-tag-version.h") .. '"'
+        }
     filter {"configurations:debug"}
         defines { "SLANG_ENABLE_IR_BREAK_ALLOC=1" }
     filter {}
