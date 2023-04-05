@@ -17,10 +17,7 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-IArtifactHandler* Artifact::_getHandler()
-{
-    return m_handler ? m_handler : DefaultArtifactHandler::getSingleton();
-}
+
 
 void* Artifact::castAs(const Guid& guid)
 {
@@ -46,6 +43,21 @@ void* Artifact::getObject(const Guid& uuid)
 {
     SLANG_UNUSED(uuid);
     return nullptr;
+}
+
+IArtifactHandler* Artifact::_getHandler()
+{
+    return m_handler ? m_handler : DefaultArtifactHandler::getSingleton();
+}
+
+void Artifact::_requireChildren()
+{
+    if (m_expandResult == SLANG_E_UNINITIALIZED)
+    {
+        const auto res = expandChildren();
+        SLANG_UNUSED(res);
+        SLANG_ASSERT(SLANG_SUCCEEDED(res));
+    }
 }
 
 bool Artifact::exists()
@@ -115,6 +127,7 @@ void Artifact::clear(IArtifact::ContainedKind kind)
     {
         case ContainedKind::Associated:     m_associated.clear(); break;
         case ContainedKind::Representation: m_representations.clear(); break;
+        case ContainedKind::Children:       m_children.clear(); break;
         default: break;
     }
 }
@@ -125,6 +138,7 @@ void Artifact::removeAt(ContainedKind kind, Index i)
     {
         case ContainedKind::Associated:     m_associated.removeAt(i); break;
         case ContainedKind::Representation: m_representations.removeAt(i); break;
+        case ContainedKind::Children:       m_children.removeAt(i); break;
         default: break;
     }
 }
@@ -234,36 +248,7 @@ Slice<ICastable*> Artifact::getRepresentations()
     return Slice<ICastable*>(view.begin()->readRef(), view.getCount());
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainer !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-void* ArtifactContainer::getInterface(const Guid& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IArtifact::getTypeGuid() ||
-        guid == IArtifactContainer::getTypeGuid())
-    {
-        return static_cast<IArtifactContainer*>(this);
-    }
-    return nullptr;
-}
-
-void* ArtifactContainer::getObject(const Guid& guid)
-{
-    SLANG_UNUSED(guid);
-    return nullptr;
-}
-
-void* ArtifactContainer::castAs(const Guid& guid)
-{
-    if (auto ptr = getInterface(guid))
-    {
-        return ptr;
-    }
-    return getObject(guid);
-}
-
-void ArtifactContainer::setChildren(IArtifact** children, Count count)
+void Artifact::setChildren(IArtifact*const* children, Count count)
 {
     m_expandResult = SLANG_OK;
 
@@ -277,20 +262,19 @@ void ArtifactContainer::setChildren(IArtifact** children, Count count)
     }
 }
 
-SlangResult ArtifactContainer::expandChildren()
+SlangResult Artifact::expandChildren()
 {
     auto handler = _getHandler();
     return handler->expandChildren(this);
 }
 
-Slice<IArtifact*> ArtifactContainer::getChildren()
+Slice<IArtifact*> Artifact::getChildren()
 {
     _requireChildren();
-
     return Slice<IArtifact*>((IArtifact**)m_children.getBuffer(), m_children.getCount());
 }
 
-void ArtifactContainer::addChild(IArtifact* artifact)
+void Artifact::addChild(IArtifact* artifact)
 {
     SLANG_ASSERT(artifact);
     SLANG_ASSERT(m_children.indexOf(artifact) < 0);
@@ -298,29 +282,6 @@ void ArtifactContainer::addChild(IArtifact* artifact)
     _requireChildren();
 
     m_children.add(ComPtr<IArtifact>(artifact));
-}
-
-void ArtifactContainer::clear(IArtifact::ContainedKind kind)
-{
-    switch (kind)
-    {
-        case ContainedKind::Associated:     m_associated.clear(); break;
-        case ContainedKind::Representation: m_representations.clear(); break;
-        case ContainedKind::Children:       m_children.clear(); break;
-        default: break;
-    }
-}
-
-void ArtifactContainer::removeAt(ContainedKind kind, Index i)
-{
-    switch (kind)
-    {
-        case ContainedKind::Associated:     m_associated.removeAt(i); break;
-        case ContainedKind::Representation: m_representations.removeAt(i); break;
-        case ContainedKind::Children:       m_children.removeAt(i); break;
-
-        default: break;
-    }
 }
 
 } // namespace Slang

@@ -32,12 +32,6 @@ struct ArtifactUtil
         /// Find by desc exactly
     static IArtifact* findArtifactByDesc(IArtifact* artifact, FindStyle findStyle, const ArtifactDesc& desc);
 
-        /// Create an empty container which is compatible with the desc
-    static ComPtr<IArtifactContainer> createContainer(const ArtifactDesc& desc);
-
-        /// Create a generic container
-    static ComPtr<IArtifactContainer> createResultsContainer();
-
         /// Creates an empty artifact for a type
     static ComPtr<IArtifact> createArtifactForCompileTarget(SlangCompileTarget target);
 

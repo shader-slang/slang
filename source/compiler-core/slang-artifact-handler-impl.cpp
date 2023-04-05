@@ -93,8 +93,9 @@ SlangResult DefaultArtifactHandler::_addRepresentation(IArtifact* artifact, Arti
 	return SLANG_OK;
 }
 
-SlangResult DefaultArtifactHandler::expandChildren(IArtifactContainer* container)
+SlangResult DefaultArtifactHandler::expandChildren(IArtifact* container)
 {
+	// First check if it has already been expanded
 	SlangResult res = container->getExpandChildrenResult();
 	if (res != SLANG_E_UNINITIALIZED)
 	{
@@ -109,6 +110,7 @@ SlangResult DefaultArtifactHandler::expandChildren(IArtifactContainer* container
 		container->setChildren(nullptr, 0);
 		return SLANG_OK;
 	}
+
 	// TODO(JS):
 	// Proper implementation should (for example) be able to expand a Zip file etc.
 	return SLANG_E_NOT_IMPLEMENTED;

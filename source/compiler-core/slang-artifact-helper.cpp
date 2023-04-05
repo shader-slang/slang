@@ -65,15 +65,6 @@ SlangResult DefaultArtifactHelper::createArtifact(const ArtifactDesc& desc, cons
 	return SLANG_OK;
 }
 
-SlangResult DefaultArtifactHelper::createArtifactContainer(const ArtifactDesc& desc, const char* inName, IArtifactContainer** outArtifactContainer)
-{
-	*outArtifactContainer = inName ?
-		ArtifactContainer::create(desc, UnownedStringSlice(inName)).detach() :
-		ArtifactContainer::create(desc).detach();
-
-	return SLANG_OK;
-}
-
 ArtifactKind DefaultArtifactHelper::getKindParent(ArtifactKind kind) { return getParent(kind); }
 UnownedStringSlice DefaultArtifactHelper::getKindName(ArtifactKind kind) { return getName(kind); }
 bool DefaultArtifactHelper::isKindDerivedFrom(ArtifactKind kind, ArtifactKind base) { return isDerivedFrom(kind, base); }

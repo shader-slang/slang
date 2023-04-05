@@ -29,17 +29,6 @@ static bool _checkRecursive(ArtifactUtil::FindStyle findStyle)
  
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */ComPtr<IArtifactContainer> ArtifactUtil::createContainer(const ArtifactDesc& desc)
-{
-    const auto containerDesc = ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults, desc.style);
-    return ArtifactContainer::create(containerDesc);
-}
-
-/* static */ComPtr<IArtifactContainer> ArtifactUtil::createResultsContainer()
-{
-    return ArtifactContainer::create(ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults));
-}
-
 /* static */ComPtr<IArtifact> ArtifactUtil::createArtifact(const ArtifactDesc& desc, const char* name)
 {
     auto artifact = createArtifact(desc);
@@ -49,18 +38,7 @@ static bool _checkRecursive(ArtifactUtil::FindStyle findStyle)
 
 /* static */ComPtr<IArtifact> ArtifactUtil::createArtifact(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::Container))
-    {
-        auto container = ArtifactContainer::create(desc);
-
-        ComPtr<IArtifact> artifact;
-        artifact.attach(container.detach());
-        return artifact;
-    }
-    else
-    {
-        return Artifact::create(desc);
-    }
+    return Artifact::create(desc);
 }
 
 /* static */ComPtr<IArtifact> ArtifactUtil::createArtifactForCompileTarget(SlangCompileTarget target)

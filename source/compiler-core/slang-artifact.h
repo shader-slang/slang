@@ -421,6 +421,15 @@ public:
         /// Set the handler associated with this artifact. Setting nullptr will use the default handler.
     virtual SLANG_NO_THROW void SLANG_MCALL setHandler(IArtifactHandler* handler) = 0;
 
+        /// Returns the result of expansion. Will return SLANG_E_UNINITIALIZED if expansion hasn't happened
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() = 0;
+        /// Sets all of the children, will set the expansion state to SLANG_OK
+    virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact*const* children, Count count) = 0;
+        /// Will be called implicitly on access to children
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() = 0;
+
+        /// Add the artifact to the list
+    virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) = 0;
         /// Get the children, will only remain valid if no mutation of children list
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
 
@@ -430,31 +439,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) = 0;
         /// Remove entry at index for the specified kind
     virtual SLANG_NO_THROW void SLANG_MCALL removeAt(ContainedKind kind, Index i) = 0;
-};
-
-/* Interface for an artifact that *contain* a hierarchy of other child artifacts.
-
-Containment is a different concept to *association*. An association can hold any interface, and associations are for
-objects that are associated with an artifact - like diagnostics or meta data. Children artifacts can build up hierarchies
-and the children can be thought to be contained by the artifact they are a child of. 
-
-The IArtifactContainer interface exists additionally to provide some type safety, and make it clear
-in code where a container or just 'an artifact' is required. 
-*/
-class IArtifactContainer : public IArtifact
-{
-public:
-    SLANG_COM_INTERFACE(0xa96e29bd, 0xb546, 0x4e79, { 0xa0, 0xdc, 0x67, 0x49, 0x22, 0x2c, 0x39, 0xad })
-
-        /// Returns the result of expansion. Will return SLANG_E_UNINITIALIZED if expansion hasn't happened
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() = 0;
-        /// Sets all of the children, will set the expansion state to SLANG_OK
-    virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact**children, Count count) = 0;
-        /// Will be called implicitly on access to children
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() = 0;
-
-        /// Add the artifact to the list
-    virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) = 0;
 };
 
 template <typename T>
@@ -494,7 +478,7 @@ class IArtifactHandler : public ICastable
     SLANG_COM_INTERFACE(0x6a646f57, 0xb3ac, 0x4c6a, { 0xb6, 0xf1, 0x33, 0xb6, 0xef, 0x60, 0xa6, 0xae });
 
         /// Given an artifact expands children
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifactContainer* container) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifact* container) = 0;
         /// Given an artifact gets or creates a representation. 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable) = 0;
 };

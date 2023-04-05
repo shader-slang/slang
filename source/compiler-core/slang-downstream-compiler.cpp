@@ -224,13 +224,12 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     if (artifactList.getCount())
     {
         // Holds all of the artifacts that are relatated to the final artifact - such as debug files, ancillary file and lock files
-        auto artifactContainer = ArtifactUtil::createContainer(ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::Unknown, ArtifactStyle::Unknown));
+        auto artifactContainer = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::Unknown, ArtifactStyle::Unknown));
 
-        for (IArtifact* child : artifactList)
-        {
-            artifactContainer->addChild(child);
-        }
+        auto slice = SliceUtil::asSlice(artifactList);
 
+        artifactContainer->setChildren(slice.data, slice.count);
+        
         artifact->addAssociated(artifactContainer);
     }
 

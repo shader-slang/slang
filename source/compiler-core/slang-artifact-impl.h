@@ -24,13 +24,10 @@ as the main structure. Within this it can contain kernels, and then a json manif
 This all 'works', in that we can add an element of ISlangFileSystem with a desc of Container. Code that uses this can then go through the process 
 of finding, and getting the blob, and find from the manifest what it means. That does sound a little tedious though. Perhaps we just have an interface
 that handles this detail, such that we search for that first. That interface is just attached to the artifact as an element.
-
-Note: Implementation of the IArtifact interface. We derive from IArtifactContainer, such that we don't have the 
-irritating multiple inheritance issue. */
-class Artifact : public ComBaseObject, public IArtifactContainer
+*/
+class Artifact : public ComBaseObject, public IArtifact
 {
 public:
-    
     SLANG_COM_BASE_IUNKNOWN_ALL
     
     /// ICastable
@@ -58,17 +55,15 @@ public:
     virtual SLANG_NO_THROW IArtifactHandler* SLANG_MCALL getHandler() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setHandler(IArtifactHandler* handler) SLANG_OVERRIDE;
 
-    virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE { return Slice<IArtifact*>(nullptr, 0); }
-    
+    virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() SLANG_OVERRIDE { return m_expandResult; }
+    virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact*const* children, Count count) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) SLANG_OVERRIDE;
+
     virtual SLANG_NO_THROW void* SLANG_MCALL find(ContainedKind kind, const Guid& unk) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL removeAt(ContainedKind kind, Index i) SLANG_OVERRIDE;
-
-    // IArtifactCollection (Not implemented)
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
-    virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact** children, Count count) SLANG_OVERRIDE { SLANG_UNUSED(children); SLANG_UNUSED(count); SLANG_UNREACHABLE("Not implemented"); }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
-    virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) SLANG_OVERRIDE { SLANG_UNUSED(artifact); SLANG_UNREACHABLE("Not implemented"); }
 
     static ComPtr<IArtifact> create(const Desc& desc) { return ComPtr<IArtifact>(new Artifact(desc)); }
     static ComPtr<IArtifact> create(const Desc& desc, const UnownedStringSlice& name) { return ComPtr<IArtifact>(new Artifact(desc, name)); }
@@ -78,73 +73,27 @@ protected:
     /// Ctor
     Artifact(const Desc& desc, const UnownedStringSlice& name) :
         m_desc(desc),
-        m_name(name),
-        m_parent(nullptr)
+        m_name(name)
     {}
     Artifact(const Desc& desc) :
-        m_desc(desc),
-        m_parent(nullptr)
+        m_desc(desc)
     {}
 
     IArtifactHandler* _getHandler();
+    void _requireChildren();
 
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
     Desc m_desc;                                ///< Description of the artifact
-    IArtifact* m_parent;                        ///< Artifact this artifact belongs to
-
     String m_name;                              ///< Name of this artifact
-
-    ComPtr<IArtifactHandler> m_handler;         ///< The handler. Can be nullptr and then default handler is used.
-
-    List<ComPtr<ICastable>> m_associated;
-    List<ComPtr<ICastable>> m_representations;
-};
-
-class ArtifactContainer : public Artifact
-{
-public:
-    typedef Artifact Super;
-    SLANG_COM_BASE_IUNKNOWN_QUERY_INTERFACE
-
-    /// ICastable
-    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
-
-    /// IArtifact
-    virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL removeAt(ContainedKind kind, Index i) SLANG_OVERRIDE;
-
-    // IArtifactCollection
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() SLANG_OVERRIDE { return m_expandResult; }
-    virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact** children, Count count) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) SLANG_OVERRIDE;
-    
-    static ComPtr<IArtifactContainer> create(const Desc& desc) { return ComPtr<IArtifactContainer>(new ArtifactContainer(desc)); }
-    static ComPtr<IArtifactContainer> create(const Desc& desc, const UnownedStringSlice& name) { return ComPtr<IArtifactContainer>(new ArtifactContainer(desc, name)); }
-
-protected:
-    /// Ctor
-    ArtifactContainer(const Desc& desc, const UnownedStringSlice& name) :Super(desc, name) {}
-    ArtifactContainer(const Desc& desc) : Super(desc) {}
-
-    void* getInterface(const Guid& uuid);
-    void* getObject(const Guid& uuid);
-    void _requireChildren()
-    {
-        if (m_expandResult == SLANG_E_UNINITIALIZED)
-        {
-            const auto res = expandChildren();
-            SLANG_UNUSED(res);
-            SLANG_ASSERT(SLANG_SUCCEEDED(res));
-        }
-    }
-
     SlangResult m_expandResult = SLANG_E_UNINITIALIZED;
 
-    List<ComPtr<IArtifact>> m_children;
+    ComPtr<IArtifactHandler> m_handler;             ///< The handler. Can be nullptr and then default handler is used.
+
+    List<ComPtr<ICastable>> m_representations;      ///< All the representation of this artifact
+    List<ComPtr<ICastable>> m_associated;           ///< All the items associated with this artifact
+    List<ComPtr<IArtifact>> m_children;             ///< All the child artifacts owned 
 };
 
 } // namespace Slang
