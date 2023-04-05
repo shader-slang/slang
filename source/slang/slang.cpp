@@ -13,6 +13,8 @@
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
 
+#include "../core/slang-destroyable.h"
+
 #include "slang-module-library.h"
 
 #include "slang-check.h"

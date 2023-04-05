@@ -17,6 +17,8 @@
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
 
+#include "../core/slang-destroyable.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DefaultArtifactHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

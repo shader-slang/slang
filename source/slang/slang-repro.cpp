@@ -13,6 +13,8 @@
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 
+#include "../core/slang-destroyable.h"
+
 #include "../compiler-core/slang-source-loc.h"
 
 namespace Slang {

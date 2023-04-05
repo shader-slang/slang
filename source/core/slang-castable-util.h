@@ -2,12 +2,13 @@
 #ifndef SLANG_CASTABLE_UTIL_H
 #define SLANG_CASTABLE_UTIL_H
 
-#include "slang-castable-list.h"
 
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
 #include "../core/slang-com-object.h"
+
+#include "../core/slang-castable-list.h"
 
 namespace Slang
 {

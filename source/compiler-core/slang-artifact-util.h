@@ -5,6 +5,8 @@
 #include "slang-artifact.h"
 #include "slang-artifact-representation.h"
 
+#include "../../slang-com-ptr.h"
+
 namespace Slang
 {
 

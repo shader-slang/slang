@@ -307,7 +307,6 @@
     <ClInclude Include="..\..\..\source\core\slang-http.h" />
     <ClInclude Include="..\..\..\source\core\slang-implicit-directory-collector.h" />
     <ClInclude Include="..\..\..\source\core\slang-io.h" />
-    <ClInclude Include="..\..\..\source\core\slang-lazy-castable-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-linked-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-lz4-compression-system.h" />
@@ -368,7 +367,6 @@
     <ClCompile Include="..\..\..\source\core\slang-http.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-implicit-directory-collector.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-io.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-lazy-castable-list.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-file-system.cpp" />

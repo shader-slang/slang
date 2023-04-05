@@ -99,9 +99,6 @@
     <ClInclude Include="..\..\..\source\core\slang-io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\core\slang-lazy-castable-list.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-linked-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -276,9 +273,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-io.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\core\slang-lazy-castable-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp">

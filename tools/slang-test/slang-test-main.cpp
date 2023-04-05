@@ -22,6 +22,8 @@
 
 #include "../../source/core/slang-shared-library.h"
 
+#include "../../source/core/slang-destroyable.h"
+
 #include "tools/unit-test/slang-unit-test.h"
 #undef SLANG_UNIT_TEST
 

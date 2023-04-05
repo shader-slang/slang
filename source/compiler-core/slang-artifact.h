@@ -3,8 +3,7 @@
 #define SLANG_ARTIFACT_H
 
 #include "../core/slang-basic.h"
-
-#include "../core/slang-castable-list.h"
+#include "../../slang-com-helper.h"
 
 namespace Slang
 {
@@ -403,9 +402,6 @@ public:
 
         /// Add data associated with this artifact
     virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) = 0;
-        /// Find an associated item
-    virtual SLANG_NO_THROW void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) = 0;
-        /// TODO(JS): We may want this to return nullptr if it's empty.
         /// Get the list of associated items
     virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getAssociated() = 0;
     
@@ -413,8 +409,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) = 0;
         /// Add a representation that doesn't derive from IArtifactRepresentation
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) = 0;
-        /// Find representation
-    virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(const Guid& guid) = 0;
         /// Get all the representations
     virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getRepresentations() = 0;
 
@@ -430,6 +424,8 @@ public:
         /// Get the children, will only remain valid if no mutation of children list
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
 
+        /// Find an associated item
+    virtual SLANG_NO_THROW void* SLANG_MCALL find(ContainedKind kind, const Guid& unk) = 0;
         /// Clear all of the contained kind
     virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) = 0;
         /// Remove entry at index for the specified kind
@@ -464,13 +460,13 @@ public:
 template <typename T>
 SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
 {
-    return reinterpret_cast<T*>(artifact->findRepresentation(T::getTypeGuid()));
+    return reinterpret_cast<T*>(artifact->find(IArtifact::ContainedKind::Representation, T::getTypeGuid()));
 }
 
 template <typename T>
 SLANG_FORCE_INLINE T* findAssociated(IArtifact* artifact)
 {
-    return reinterpret_cast<T*>(artifact->findAssociated(T::getTypeGuid()));
+    return reinterpret_cast<T*>(artifact->find(IArtifact::ContainedKind::Associated, T::getTypeGuid()));
 }
 
 /* The IArtifactRepresentation interface represents a single representation that can be part of an artifact. It's special in so far

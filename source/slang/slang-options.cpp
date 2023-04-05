@@ -28,6 +28,8 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-core-diagnostics.h"
 
+#include "../core/slang-destroyable.h"
+
 #include "../core/slang-char-util.h"
 
 #include <assert.h>

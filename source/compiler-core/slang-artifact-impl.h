@@ -4,8 +4,6 @@
 
 #include "slang-artifact.h"
 
-#include "../core/slang-lazy-castable-list.h"
-
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
@@ -50,12 +48,10 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL setName(const char* name) SLANG_OVERRIDE { m_name = name; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void* SLANG_MCALL findAssociated(const Guid& unk) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getAssociated() SLANG_OVERRIDE;
     
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(const Guid& guid) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getRepresentations() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable) SLANG_OVERRIDE;
 
@@ -64,6 +60,7 @@ public:
 
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE { return Slice<IArtifact*>(nullptr, 0); }
     
+    virtual SLANG_NO_THROW void* SLANG_MCALL find(ContainedKind kind, const Guid& unk) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL removeAt(ContainedKind kind, Index i) SLANG_OVERRIDE;
 
@@ -101,8 +98,8 @@ protected:
 
     ComPtr<IArtifactHandler> m_handler;         ///< The handler. Can be nullptr and then default handler is used.
 
-    LazyCastableList m_associated;              ///< Associated items
-    LazyCastableList m_representations;         ///< Representations
+    List<ComPtr<ICastable>> m_associated;
+    List<ComPtr<ICastable>> m_representations;
 };
 
 class ArtifactContainer : public Artifact

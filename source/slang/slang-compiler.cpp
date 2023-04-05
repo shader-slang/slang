@@ -24,6 +24,8 @@
 #include "../compiler-core/slang-artifact-associated.h"
 #include "../compiler-core/slang-artifact-diagnostic-util.h"
 
+#include "../core/slang-destroyable.h"
+
 // Artifact output
 #include "slang-artifact-output-util.h"
 
