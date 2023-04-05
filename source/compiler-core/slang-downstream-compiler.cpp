@@ -21,8 +21,6 @@
 #include "slang-artifact-helper.h"
 #include "slang-artifact-desc-util.h"
 
-#include "../core/slang-castable-list-impl.h"
-
 namespace Slang
 {
 
@@ -83,9 +81,8 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
 
     auto helper = DefaultArtifactHelper::getSingleton();
-
-    // Holds all of the artifacts that are relatated to the final artifact - such as debug files, ancillary file and lock files
-    auto artifactList = CastableList::create();
+    
+    List<ComPtr<IArtifact>> artifactList;
 
     // It may be necessary to produce a temporary file 'lock file'.
     ComPtr<IOSFileArtifactRepresentation> lockFile;
@@ -103,7 +100,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         auto lockArtifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::Lock, ArtifactStyle::None));
         lockArtifact->addRepresentation(lockFile);
 
-        artifactList->add(lockArtifact);
+        artifactList.add(lockArtifact);
 
         // Add the source files such that they can exist
         modulePath = lockFile->getPath();
@@ -129,7 +126,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
                 productArtifact = artifact;
             }
 
-            artifactList->add(artifact);
+            artifactList.add(ComPtr<IArtifact>(artifact));
         }
     }
     
@@ -163,11 +160,12 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     // This is useful because `calcCompileProducts` is conservative and may produce artifacts for products that aren't actually 
     // produced, by the compilation.
     {
-        Count count = artifactList->getCount();
+        
+        Count count = artifactList.getCount();
         for (Index i = 0; i < count; ++i)
         {
-            auto artifact = as<IArtifact>(artifactList->getAt(i));
-
+            IArtifact* artifact = artifactList[i];
+            
             if (!artifact->exists())
             {
                 // We should find a file rep and if we do we can disown it. Disowning will mean
@@ -184,7 +182,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
                 }
 
                 // Remove from the list
-                artifactList->removeAt(i);
+                artifactList.removeAt(i);
                 --count;
                 --i;
             }
@@ -199,7 +197,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             // If it has a lock file we can assume it's a temporary
             if (fileRep->getLockFile())
             {
-                artifactList->add(sourceArtifact);
+                artifactList.add(ComPtr<IArtifact>(sourceArtifact));
             }
         }
     }
@@ -223,9 +221,17 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     }
 
     // Add the artifact list if there is anything in it
-    if (artifactList->getCount())
+    if (artifactList.getCount())
     {
-        artifact->addAssociated(artifactList);
+        // Holds all of the artifacts that are relatated to the final artifact - such as debug files, ancillary file and lock files
+        auto artifactContainer = ArtifactUtil::createContainer(ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::Unknown, ArtifactStyle::Unknown));
+
+        for (IArtifact* child : artifactList)
+        {
+            artifactContainer->addChild(child);
+        }
+
+        artifact->addAssociated(artifactContainer);
     }
 
     *outArtifact = artifact.detach();

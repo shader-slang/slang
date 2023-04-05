@@ -272,8 +272,6 @@
     <ClInclude Include="..\..\..\source\core\slang-basic.h" />
     <ClInclude Include="..\..\..\source\core\slang-blob.h" />
     <ClInclude Include="..\..\..\source\core\slang-byte-encode-util.h" />
-    <ClInclude Include="..\..\..\source\core\slang-castable-list-impl.h" />
-    <ClInclude Include="..\..\..\source\core\slang-castable-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-castable-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-encode.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-util.h" />
@@ -341,7 +339,6 @@
     <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-blob.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-byte-encode-util.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-castable-list-impl.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-castable-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-encode.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp" />

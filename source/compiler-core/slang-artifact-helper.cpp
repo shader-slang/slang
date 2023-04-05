@@ -9,7 +9,6 @@
 
 #include "../compiler-core/slang-slice-allocator.h"
 
-#include "../core/slang-castable-list-impl.h"
 #include "../core/slang-castable-util.h"
 
 #include "../core/slang-file-system.h"
@@ -122,19 +121,6 @@ ArtifactDesc DefaultArtifactHelper::makeDescForCompileTarget(SlangCompileTarget 
 void DefaultArtifactHelper::getCastable(ISlangUnknown* unk, ICastable** outCastable)
 {
 	*outCastable = CastableUtil::getCastable(unk).detach();
-}
-
-SlangResult DefaultArtifactHelper::createCastableList(const Guid& guid, ICastableList** outList)
-{
-	auto list = new CastableList;
-	if (auto ptr = list->getInterface(guid))
-	{
-		list->addRef();
-		*outList = (ICastableList*)ptr;
-		return SLANG_OK;
-	}
-	delete list;
-	return SLANG_E_NO_INTERFACE;
 }
 
 SlangResult DefaultArtifactHelper::createOSFileArtifactRepresentation(

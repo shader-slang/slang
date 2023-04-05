@@ -61,10 +61,6 @@ class IArtifactHelper : public ICastable
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createExtFileArtifactRepresentation(const CharSlice& path, ISlangFileSystemExt* system, IExtFileArtifactRepresentation** outRep) = 0;
 
-		/// Create an empty ICastableList
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) = 0;
-
-
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createOSFileArtifact(const ArtifactDesc& desc, const CharSlice& slice, IArtifact** outArtifact) = 0;
 };
 
@@ -104,8 +100,6 @@ public:
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescForCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) SLANG_OVERRIDE;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createOSFileArtifactRepresentation(
 		IOSFileArtifactRepresentation::Kind kind, const CharSlice& path, IOSFileArtifactRepresentation* lockFile, IOSFileArtifactRepresentation** outRep) SLANG_OVERRIDE;
