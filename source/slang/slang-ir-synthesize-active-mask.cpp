@@ -270,6 +270,11 @@ struct SynthesizeActiveMaskForModuleContext
 
     void markAndModifyFuncsIndirectlyUsingActiveMask(IRFunc* callee)
     {
+        // This transform does not apply to host or kernel callees.
+        if (callee->findDecoration<IRCudaHostDecoration>() ||
+            callee->findDecoration<IRCudaKernelDecoration>())
+            return;
+
         // In order to detect functions that indirectly use the active
         // mask through `callee`, we need to identify call sites.
         //
@@ -819,8 +824,22 @@ struct SynthesizeActiveMaskForFunctionContext
         IRBuilder builder(m_module);
         builder.setInsertBefore(block->getFirstOrdinaryInst());
 
-        auto activeMaskParam = builder.emitParam(m_maskType);
+        auto parentFunc = block->getParent();
+        SLANG_ASSERT(parentFunc);
 
+        IRInst* activeMaskParam = nullptr;
+        if (block == parentFunc->getFirstBlock() &&
+            parentFunc->findDecoration<IRCudaKernelDecoration>())
+        {
+            // This is the first block of a kernel function, the mask is full.
+            activeMaskParam = builder.emitBitNot(m_maskType, builder.emitDefaultConstruct(m_maskType));
+        }
+        else
+        {
+            // This is not the first block of a kernel function,
+            // emit a param to represent the mask.
+            activeMaskParam = builder.emitParam(m_maskType);
+        }
         m_activeMaskForBlock.Add(block, activeMaskParam);
     }
 
