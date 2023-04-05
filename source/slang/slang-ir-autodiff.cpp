@@ -402,7 +402,6 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 
                 // Also register the type's differential type with the same witness.
                 IRBuilder subBuilder(item->getConcreteType());
-                // TODO: What do we do for second order derivatives through interfaces?
                 if (!as<IRInterfaceType>(item->getConcreteType()))
                 {
                     differentiableWitnessDictionary.AddIfNotExists(
@@ -1603,9 +1602,6 @@ struct AutoDiffPass : public InstPassBase
             // be confused with the semantics of a DifferentialPair type during future autodiff code gen.
             rewriteDifferentialPairToUserCode(module);
 
-            // Now go through the differentiable types dictionary in each method and add an entry
-            // for the differential type itself (for higher order differentiation).
-
             hasChanges |= changed;
         }
 
@@ -1722,7 +1718,6 @@ struct RemoveDetachInstsPass : InstPassBase
             });
     }
 };
-
 
 void removeDetachInsts(IRModule* module)
 {
