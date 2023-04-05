@@ -14,6 +14,15 @@
 
 namespace Slang {
 
+namespace { // anonymous
+
+template <typename T>
+SLANG_FORCE_INLINE ConstArrayView<T*> _getView(const List<ComPtr<T>>& in)
+{
+    return makeConstArrayView((T*const*)in.getBuffer(), in.getCount());
+}
+
+} // anonymous
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -62,10 +71,9 @@ void Artifact::_requireChildren()
 
 bool Artifact::exists()
 {
-    for (auto rep : m_representations.getArrayView())
+    for (ICastable* rep : m_representations.getArrayView())
     {
-        ICastable* castable = rep.get();
-        if (auto artifactRep = as<IArtifactRepresentation>(castable))
+        if (auto artifactRep = as<IArtifactRepresentation>(rep))
         {
             // It is an artifact rep and it exists, we are done
             if (artifactRep->exists())
@@ -171,21 +179,21 @@ void Artifact::addAssociated(ICastable* castable)
 
 void* Artifact::find(ContainedKind kind, const Guid& guid)
 {
-    Slice<ICastable*> slice;
+    ConstArrayView<ICastable*> view;
 
     switch (kind)
     {
-        case ContainedKind::Associated:         slice = SliceUtil::asSlice(m_associated); break;
-        case ContainedKind::Representation:     slice = SliceUtil::asSlice(m_representations); break; 
+        case ContainedKind::Associated:         view = _getView(m_associated); break;
+        case ContainedKind::Representation:     view = _getView(m_representations); break; 
         case ContainedKind::Children:
         {
             const auto children = getChildren();
-            slice = Slice<ICastable*>((ICastable*const*)children.data, children.count);
+            view = makeConstArrayView((ICastable*const*)children.data, children.count);
             break;
         }
     }
 
-    for (const auto& cur : slice)
+    for (const auto& cur : view)
     {
         if (cur->castAs(guid))
         {
@@ -197,18 +205,20 @@ void* Artifact::find(ContainedKind kind, const Guid& guid)
 
 Slice<ICastable*> Artifact::getAssociated()
 {
-    auto view = m_associated.getArrayView();
-    return Slice<ICastable*>(view.begin()->readRef(), view.getCount());
+    return SliceUtil::asSlice(m_associated);
 }
 
 void Artifact::addRepresentation(ICastable* castable)
 {
     SLANG_ASSERT(castable);
-    if (m_representations.indexOf(castable) >= 0)
+
+    auto view = _getView(m_representations);
+    if (view.indexOf(castable) >= 0)
     {
         SLANG_ASSERT_FAILURE("Already have this representation");
         return;
     }
+
     m_representations.add(ComPtr<ICastable>(castable));
 }
 
@@ -228,7 +238,7 @@ void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
     ComPtr<ICastable> castable;
     if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
     {
-        if (m_representations.indexOf(castable) >= 0)
+        if (_getView(m_representations).indexOf(castable) >= 0)
         {
             SLANG_ASSERT_FAILURE("Already have this representation");
             return;
@@ -244,8 +254,7 @@ void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
 
 Slice<ICastable*> Artifact::getRepresentations()
 {
-    const auto view = m_representations.getArrayView();
-    return Slice<ICastable*>(view.begin()->readRef(), view.getCount());
+    return SliceUtil::asSlice(m_representations);
 }
 
 void Artifact::setChildren(IArtifact*const* children, Count count)
@@ -271,13 +280,13 @@ SlangResult Artifact::expandChildren()
 Slice<IArtifact*> Artifact::getChildren()
 {
     _requireChildren();
-    return Slice<IArtifact*>((IArtifact**)m_children.getBuffer(), m_children.getCount());
+    return SliceUtil::asSlice(m_children);
 }
 
 void Artifact::addChild(IArtifact* artifact)
 {
     SLANG_ASSERT(artifact);
-    SLANG_ASSERT(m_children.indexOf(artifact) < 0);
+    SLANG_ASSERT(_getView(m_children).indexOf(artifact) < 0);
 
     _requireChildren();
 

@@ -1,4 +1,4 @@
-// slang-artifact.cpp
+// slang-artifact-util.cpp
 #include "slang-artifact-util.h"
 
 #include "slang-artifact-impl.h"
@@ -224,7 +224,7 @@ static bool _isName(IArtifact* artifact, void* data)
     return findArtifactByPredicate(artifact, findStyle, _isDesc, &const_cast<ArtifactDesc&>(desc));
 }
 
-/* static */IArtifact* ArtifactUtil::findArtifactByPredicate(IArtifact* artifact, FindStyle findStyle, ArtifactFindFunc func, void* data)
+/* static */IArtifact* ArtifactUtil::findArtifactByPredicate(IArtifact* artifact, FindStyle findStyle, FindFunc func, void* data)
 {
     if (_checkSelf(findStyle) && func(artifact, data))
     {
