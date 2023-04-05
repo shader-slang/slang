@@ -704,7 +704,8 @@ struct SynthesizeActiveMaskForFunctionContext
         // The easy case is ordinary functions (ones that aren't entry
         // points).
         //
-        if( !m_func->findDecoration<IREntryPointDecoration>() )
+        if (!m_func->findDecoration<IREntryPointDecoration>() &&
+            !m_func->findDecoration<IRCudaKernelDecoration>())
         {
             // We simplyu need to add a new parameter to the entry block
             // (which holds the parameters for the function itself).
@@ -824,22 +825,8 @@ struct SynthesizeActiveMaskForFunctionContext
         IRBuilder builder(m_module);
         builder.setInsertBefore(block->getFirstOrdinaryInst());
 
-        auto parentFunc = block->getParent();
-        SLANG_ASSERT(parentFunc);
+        auto activeMaskParam = builder.emitParam(m_maskType);
 
-        IRInst* activeMaskParam = nullptr;
-        if (block == parentFunc->getFirstBlock() &&
-            parentFunc->findDecoration<IRCudaKernelDecoration>())
-        {
-            // This is the first block of a kernel function, the mask is full.
-            activeMaskParam = builder.emitBitNot(m_maskType, builder.emitDefaultConstruct(m_maskType));
-        }
-        else
-        {
-            // This is not the first block of a kernel function,
-            // emit a param to represent the mask.
-            activeMaskParam = builder.emitParam(m_maskType);
-        }
         m_activeMaskForBlock.Add(block, activeMaskParam);
     }
 
