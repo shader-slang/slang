@@ -353,7 +353,7 @@ More long term goals would be to
 class IArtifact : public ICastable
 {
 public:
-    SLANG_COM_INTERFACE(0x57375e20, 0xbed, 0x42b6, { 0x9f, 0x5e, 0x59, 0x4f, 0x6, 0x2b, 0xe6, 0x90 })
+    SLANG_COM_INTERFACE(0xf90acdb0, 0x9a4a, 0x414e, { 0x85, 0x45, 0x8b, 0x26, 0xc9, 0x2d, 0x94, 0x42 })
 
     enum class ContainedKind
     {
@@ -362,21 +362,13 @@ public:
         Children,
     };
 
-    enum class FindStyle : uint8_t
-    {
-        Self,                   ///< Just on self
-        SelfOrChildren,         ///< Self, or if container just the children
-        Recursive,              ///< On self plus any children recursively
-        Children,               ///< Only on children
-        ChildrenRecursive,      ///< Only on children recursively
-    };
-
     typedef ArtifactDesc Desc;
 
     typedef ArtifactKind Kind;
     typedef ArtifactPayload Payload;
     typedef ArtifactStyle Style;
     typedef ArtifactFlags Flags;
+
     typedef ArtifactKeep Keep;
     
         /// Get the Desc defining the contents of the artifact
@@ -433,8 +425,8 @@ public:
         /// Get the children, will only remain valid if no mutation of children list
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
 
-        /// Find an associated item
-    virtual SLANG_NO_THROW void* SLANG_MCALL find(ContainedKind kind, const Guid& unk) = 0;
+        /// Find item which can cast to guid from the kind list
+    virtual SLANG_NO_THROW void* SLANG_MCALL find(ContainedKind kind, const Guid& guid) = 0;
         /// Clear all of the contained kind
     virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) = 0;
         /// Remove entry at index for the specified kind
@@ -461,7 +453,7 @@ as
 */
 class IArtifactRepresentation : public ICastable
 {
-    SLANG_COM_INTERFACE(0x311457a8, 0x1796, 0x4ebb, { 0x9a, 0xfc, 0x46, 0xa5, 0x44, 0xc7, 0x6e, 0xa9 })
+    SLANG_COM_INTERFACE(0xa3790eb, 0x22b9, 0x430e, { 0xbf, 0xc6, 0x24, 0x6c, 0x5b, 0x5c, 0xcd, 0x0 })
 
         /// Create a representation of the specified typeGuid interface. 
         /// Calling castAs on the castable will return the specific type

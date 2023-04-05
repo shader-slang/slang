@@ -236,9 +236,9 @@ static bool _isName(IArtifact* artifact, void* data)
         return nullptr;
     }
 
-    // We could force an expansion of children here...
-    // 
-  
+    // Expand the children so we can search them 
+    artifact->expandChildren();
+
     auto children = artifact->getChildren();
     if (children.count == 0)
     {
