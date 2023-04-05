@@ -10,6 +10,22 @@
 
 namespace Slang {
 
+static bool _checkSelf(ArtifactUtil::FindStyle findStyle)
+{
+    return Index(findStyle) <= Index(ArtifactUtil::FindStyle::SelfOrChildren);
+}
+
+static bool _checkChildren(ArtifactUtil::FindStyle findStyle)
+{
+    return Index(findStyle) >= Index(ArtifactUtil::FindStyle::SelfOrChildren);
+}
+
+static bool _checkRecursive(ArtifactUtil::FindStyle findStyle)
+{
+    return findStyle == ArtifactUtil::FindStyle::Recursive || 
+        findStyle == ArtifactUtil::FindStyle::ChildrenRecursive;
+}
+ 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */ComPtr<IArtifactContainer> ArtifactUtil::createContainer(const ArtifactDesc& desc)
@@ -92,7 +108,7 @@ namespace Slang {
 
 /* static */IArtifact* ArtifactUtil::findSignificant(IArtifact* artifact) 
 { 
-    return artifact->findArtifactByPredicate(IArtifact::FindStyle::SelfOrChildren, &ArtifactUtil::isSignificant, nullptr);
+    return findArtifactByPredicate(artifact, FindStyle::SelfOrChildren, &ArtifactUtil::isSignificant, nullptr);
 }
 
 UnownedStringSlice ArtifactUtil::findPath(IArtifact* artifact)
@@ -188,6 +204,90 @@ static SlangResult _calcInferred(IArtifact* artifact, const UnownedStringSlice& 
     {
         return _calcInferred(artifact, baseName, outName);
     }
+}
+
+static bool _isByDerivedDesc(IArtifact* artifact, void* data)
+{
+    const ArtifactDesc& desc = *(const ArtifactDesc*)data;
+    return ArtifactDescUtil::isDescDerivedFrom(artifact->getDesc(), desc);
+}
+
+static bool _isDesc(IArtifact* artifact, void* data)
+{
+    const ArtifactDesc& desc = *(const ArtifactDesc*)data;
+    return artifact->getDesc() == desc;
+}
+
+static bool _isName(IArtifact* artifact, void* data)
+{
+    const char* name = (const char*)data;
+    const auto artifactName = artifact->getName();
+
+    if (name == nullptr || artifactName == nullptr)
+    {
+        return name == artifactName;
+    }
+    return ::strcmp(name, artifactName) == 0;
+}
+
+/* static */IArtifact* ArtifactUtil::findArtifactByDerivedDesc(IArtifact* artifact, FindStyle findStyle, const ArtifactDesc& desc)
+{
+    return findArtifactByPredicate(artifact, findStyle, _isByDerivedDesc, &const_cast<ArtifactDesc&>(desc));
+}
+
+/* static */IArtifact* ArtifactUtil::findArtifactByName(IArtifact* artifact, FindStyle findStyle, const char* name)
+{
+    return findArtifactByPredicate(artifact, findStyle, _isName, const_cast<char*>(name));
+}
+
+/* static */IArtifact* ArtifactUtil::findArtifactByDesc(IArtifact* artifact, FindStyle findStyle, const ArtifactDesc& desc)
+{
+    return findArtifactByPredicate(artifact, findStyle, _isDesc, &const_cast<ArtifactDesc&>(desc));
+}
+
+/* static */IArtifact* ArtifactUtil::findArtifactByPredicate(IArtifact* artifact, FindStyle findStyle, ArtifactFindFunc func, void* data)
+{
+    if (_checkSelf(findStyle) && func(artifact, data))
+    {
+        return artifact;
+    }
+
+    if (!_checkChildren(findStyle))
+    {
+        return nullptr;
+    }
+
+    // We could force an expansion of children here...
+    // 
+  
+    auto children = artifact->getChildren();
+    if (children.count == 0)
+    {
+        return nullptr;
+    }
+
+    // Check the children
+    for (auto child : children)
+    {
+        if (func(child, data))
+        {
+            return child;
+        }
+    }
+
+    // If it's recursive, we check all the children of children 
+    if (_checkRecursive(findStyle))
+    {
+        for (auto child : children)
+        {
+            if (auto found = findArtifactByPredicate(child, FindStyle::ChildrenRecursive, func, data))
+            {
+                return found;
+            }
+        }
+    }
+ 
+    return nullptr;
 }
 
 } // namespace Slang

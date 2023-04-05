@@ -10,6 +10,26 @@ namespace Slang
 
 struct ArtifactUtil
 {
+    typedef bool (*ArtifactFindFunc)(IArtifact* artifact, void* data);
+    enum class FindStyle : uint8_t
+    {
+        Self,                   ///< Just on self
+        SelfOrChildren,         ///< Self, or if container just the children
+        Recursive,              ///< On self plus any children recursively
+        Children,               ///< Only on children
+        ChildrenRecursive,      ///< Only on children recursively
+    };
+
+
+        /// Find an artifact that matches desc allowing derivations. Flags is ignored
+    static IArtifact* findArtifactByDerivedDesc(IArtifact* artifact, FindStyle findStyle, const ArtifactDesc& desc);
+        /// Find an artifact that predicate matches
+    static IArtifact* findArtifactByPredicate(IArtifact* artifact, FindStyle findStyle, ArtifactFindFunc func, void* data);
+        /// Find by name
+    static IArtifact* findArtifactByName(IArtifact* artifact, FindStyle findStyle, const char* name);
+        /// Find by desc exactly
+    static IArtifact* findArtifactByDesc(IArtifact* artifact, FindStyle findStyle, const ArtifactDesc& desc);
+
         /// Create an empty container which is compatible with the desc
     static ComPtr<IArtifactContainer> createContainer(const ArtifactDesc& desc);
 

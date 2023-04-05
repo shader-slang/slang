@@ -1975,11 +1975,15 @@ namespace Slang
         {
             Index nameCount = 0;
 
-            auto associated = m_containerArtifact->getAssociated();
-            const Count count = associated->getCount();
-            for (Index i = 0; i < count; ++i)
+            auto associatedSlice = m_containerArtifact->getAssociated();
+            for (auto curAssociated : associatedSlice)
             {
-                IArtifact* artifact = as<IArtifact>(associated->getAt(i));
+                IArtifact* artifact = as<IArtifact>(curAssociated);
+                if (!artifact)
+                {
+                    continue;
+                }
+
                 auto desc = artifact->getDesc();
 
                 if (isDerivedFrom(desc.payload, ArtifactPayload::SourceMap))

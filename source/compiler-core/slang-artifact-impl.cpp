@@ -12,15 +12,6 @@
 
 namespace Slang {
 
-static bool _checkSelf(IArtifact::FindStyle findStyle)
-{
-    return Index(findStyle) <= Index(IArtifact::FindStyle::SelfOrChildren);
-}
-
-static bool _checkChildren(IArtifact::FindStyle findStyle)
-{
-    return Index(findStyle) >= Index(IArtifact::FindStyle::SelfOrChildren);
-}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -146,15 +137,10 @@ void* Artifact::findAssociated(const Guid& guid)
     return m_associated.find(guid);
 }
 
-
-ICastable* Artifact::findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data)
+Slice<ICastable*> Artifact::getAssociated()
 {
-    return m_associated.findWithPredicate(findFunc, data);
-}
-
-ICastableList* Artifact::getAssociated()
-{
-    return m_associated.requireList();
+    auto view = m_associated.getView();
+    return Slice<ICastable*>(view.getBuffer(), view.getCount());
 }
 
 void Artifact::addRepresentation(ICastable* castable)
@@ -199,40 +185,10 @@ void* Artifact::findRepresentation(const Guid& guid)
     return m_representations.find(guid);
 }
 
-ICastable* Artifact::findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data)
-{
-    return m_representations.findWithPredicate(findFunc, data);
-}
-
 Slice<ICastable*> Artifact::getRepresentations()
 {
     const auto view = m_representations.getView();
     return Slice<ICastable*>(view.getBuffer(), view.getCount());
-}
-
-ICastableList* Artifact::getRepresentationList()
-{
-    return m_representations.requireList();
-}
-
-IArtifact* Artifact::findArtifactByDerivedDesc(FindStyle findStyle, const ArtifactDesc& from)
-{
-    return (_checkSelf(findStyle) && ArtifactDescUtil::isDescDerivedFrom(m_desc, from)) ? this : nullptr;
-}
-
-IArtifact* Artifact::findArtifactByPredicate(FindStyle findStyle, FindFunc func, void* data)
-{
-    return (_checkSelf(findStyle) && func(this, data)) ? this : nullptr;
-}
-
-IArtifact* Artifact::findArtifactByName(FindStyle findStyle, const char* name)
-{
-    return (_checkSelf(findStyle) && m_name == name) ? this : nullptr;
-}
-
-IArtifact* Artifact::findArtifactByDesc(FindStyle findStyle, const ArtifactDesc& desc)
-{
-    return (_checkSelf(findStyle) && m_desc == desc) ? this : nullptr;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainer !!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -313,82 +269,6 @@ void ArtifactContainer::clearChildren()
     _requireChildren();
 
     m_children.clearAndDeallocate();
-}
-
-static bool _isDerivedDesc(IArtifact* artifact, void* data)
-{
-    const ArtifactDesc& from = *(const ArtifactDesc*)data;
-    return ArtifactDescUtil::isDescDerivedFrom(artifact->getDesc(), from);
-}
-
-static bool _isDesc(IArtifact* artifact, void* data)
-{
-    const ArtifactDesc& desc = *(const ArtifactDesc*)data;
-    return desc == artifact->getDesc();
-}
-
-static bool _isName(IArtifact* artifact, void* data)
-{
-    const char* name = (const char*)data;
-    const char* artifactName = artifact->getName();
-    if (artifactName == nullptr)
-    {
-        return false;
-    }
-    return ::strcmp(name, artifactName) == 0;
-}
-
-
-IArtifact* ArtifactContainer::findArtifactByDerivedDesc(FindStyle findStyle, const ArtifactDesc& from)
-{
-    return findArtifactByPredicate(findStyle, _isDerivedDesc, const_cast<ArtifactDesc*>(&from));
-}
-
-IArtifact* ArtifactContainer::findArtifactByName(FindStyle findStyle, const char* name)
-{
-    return findArtifactByPredicate(findStyle, _isName, const_cast<char*>(name));
-}
-
-IArtifact* ArtifactContainer::findArtifactByDesc(FindStyle findStyle, const ArtifactDesc& desc)
-{
-    return findArtifactByPredicate(findStyle, _isDesc, const_cast<ArtifactDesc*>(&desc));
-}
-
-IArtifact* ArtifactContainer::findArtifactByPredicate(FindStyle findStyle, FindFunc func, void* data)
-{
-    if (_checkSelf(findStyle) && func(this, data))
-    {
-        return this;
-    }
-
-    if (_checkChildren(findStyle))
-    {
-        auto children = getChildren();
-
-        // First search the children
-        for (auto child : children)
-        {
-            if (func(child, data))
-            {
-                return child;
-            }
-        }
-
-        // Then the childrens recursively
-        if (findStyle == FindStyle::Recursive ||
-            findStyle == FindStyle::ChildrenRecursive)
-        {
-            for (auto child : children)
-            {
-                if (auto found = child->findArtifactByPredicate(FindStyle::ChildrenRecursive, func, data))
-                {
-                    return found;
-                }
-            }
-        }
-    }
-
-    return nullptr;
 }
 
 } // namespace Slang

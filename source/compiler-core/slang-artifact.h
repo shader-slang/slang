@@ -356,7 +356,6 @@ class IArtifact : public ICastable
 public:
     SLANG_COM_INTERFACE(0x57375e20, 0xbed, 0x42b6, { 0x9f, 0x5e, 0x59, 0x4f, 0x6, 0x2b, 0xe6, 0x90 })
 
-    typedef bool (*FindFunc)(IArtifact* artifact, void* data);
     enum class FindStyle : uint8_t
     {
         Self,                   ///< Just on self
@@ -401,22 +400,16 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) = 0;
         /// TODO(JS): We may want this to return nullptr if it's empty.
         /// Get the list of associated items
-    virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getAssociated() = 0;
-        /// Find first associated that matches the predicate
-    virtual SLANG_NO_THROW ICastable* SLANG_MCALL findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
-
+    virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getAssociated() = 0;
+    
         /// Add a representation 
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) = 0;
         /// Add a representation that doesn't derive from IArtifactRepresentation
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) = 0;
         /// Find representation
     virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(const Guid& guid) = 0;
-        /// Find first representation that matches the predicate 
-    virtual SLANG_NO_THROW ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
         /// Get all the representations
     virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getRepresentations() = 0;
-        /// Get the list of all representations
-    virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getRepresentationList() = 0;
 
         /// Given a typeGuid representing the desired type get or create the representation.
         /// If found outCastable holds an entity that *must* be castable to typeGuid
@@ -429,15 +422,6 @@ public:
 
         /// Get the children, will only remain valid if no mutation of children list
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
-
-        /// Find an artifact that matches desc allowing derivations. Flags is ignored
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findArtifactByDerivedDesc(FindStyle findStyle, const ArtifactDesc& desc) = 0;
-        /// Find an artifact that predicate matches
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findArtifactByPredicate(FindStyle findStyle, FindFunc func, void* data) = 0;
-        /// Find by name
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findArtifactByName(FindStyle findStyle, const char* name) = 0;
-        /// Find by desc exactly
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findArtifactByDesc(FindStyle findStyle, const ArtifactDesc& desc) = 0;
 };
 
 /* Interface for an artifact that *contain* a hierarchy of other child artifacts.
