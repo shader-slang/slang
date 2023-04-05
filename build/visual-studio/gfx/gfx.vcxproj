@@ -164,7 +164,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -178,9 +178,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-x86\debug\gfx.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x86\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x86\debug" &gt; nul)
 IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x86\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x86\debug" &gt; nul)
@@ -191,7 +188,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -205,9 +202,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-x64\debug\gfx.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x64\debug" &gt; nul)
 IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x64\debug" &gt; nul)
@@ -218,7 +212,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -232,9 +226,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-aarch64\debug\gfx.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul)
 IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul)
@@ -262,9 +253,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-x86\release\gfx.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x86\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x86\release" &gt; nul)
 IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x86\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x86\release" &gt; nul)
@@ -292,9 +280,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-x64\release\gfx.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x64\release" &gt; nul)
 IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x64\release" &gt; nul)
@@ -322,9 +307,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-aarch64\release\gfx.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul)
 IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul)

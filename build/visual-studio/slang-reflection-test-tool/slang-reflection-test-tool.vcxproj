@@ -163,7 +163,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -177,15 +177,12 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-x86\debug\slang-reflection-test-tool.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -199,15 +196,12 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-x64\debug\slang-reflection-test-tool.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -221,9 +215,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-aarch64\debug\slang-reflection-test-tool.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -246,9 +237,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-x86\release\slang-reflection-test-tool.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -271,9 +259,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-x64\release\slang-reflection-test-tool.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">
     <ClCompile>
@@ -296,9 +281,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-aarch64\release\slang-reflection-test-tool.lib</ImportLibrary>
     </Link>
-    <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\slang-reflection-test\slang-reflection-test-main.cpp" />

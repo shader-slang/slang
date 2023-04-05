@@ -163,7 +163,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_DYNAMIC_EXPORT;SLANG_WITHOUT_EMBEDDED_STD_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_DYNAMIC_EXPORT;SLANG_WITHOUT_EMBEDDED_STD_LIB;SLANG_ENABLE_IR_BREAK_ALLOC=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -178,7 +178,7 @@
       <ImportLibrary>..\..\..\bin\windows-x86\debug\slang.lib</ImportLibrary>
     </Link>
     <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+      <Command>powershell "$(SolutionDir)extras/update-version-tag.ps1" -outputFile "$(SolutionDir)slang-tag-version.h"</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\debug &gt; nul)
@@ -189,7 +189,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x86\release\slang-glslang.d
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_DYNAMIC_EXPORT;SLANG_WITHOUT_EMBEDDED_STD_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_DYNAMIC_EXPORT;SLANG_WITHOUT_EMBEDDED_STD_LIB;SLANG_ENABLE_IR_BREAK_ALLOC=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -204,7 +204,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x86\release\slang-glslang.d
       <ImportLibrary>..\..\..\bin\windows-x64\debug\slang.lib</ImportLibrary>
     </Link>
     <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+      <Command>powershell "$(SolutionDir)extras/update-version-tag.ps1" -outputFile "$(SolutionDir)slang-tag-version.h"</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\debug &gt; nul)
@@ -215,7 +215,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_ENABLE_IR_BREAK_ALLOC=1;SLANG_DYNAMIC_EXPORT;SLANG_WITHOUT_EMBEDDED_STD_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_DYNAMIC_EXPORT;SLANG_WITHOUT_EMBEDDED_STD_LIB;SLANG_ENABLE_IR_BREAK_ALLOC=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -230,7 +230,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
       <ImportLibrary>..\..\..\bin\windows-aarch64\debug\slang.lib</ImportLibrary>
     </Link>
     <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+      <Command>powershell "$(SolutionDir)extras/update-version-tag.ps1" -outputFile "$(SolutionDir)slang-tag-version.h"</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\debug &gt; nul)
@@ -259,7 +259,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
       <ImportLibrary>..\..\..\bin\windows-x86\release\slang.lib</ImportLibrary>
     </Link>
     <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+      <Command>powershell "$(SolutionDir)extras/update-version-tag.ps1" -outputFile "$(SolutionDir)slang-tag-version.h"</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\release &gt; nul)
@@ -288,7 +288,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x86\release\slang-glslang.d
       <ImportLibrary>..\..\..\bin\windows-x64\release\slang.lib</ImportLibrary>
     </Link>
     <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+      <Command>powershell "$(SolutionDir)extras/update-version-tag.ps1" -outputFile "$(SolutionDir)slang-tag-version.h"</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\release &gt; nul)
@@ -317,7 +317,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
       <ImportLibrary>..\..\..\bin\windows-aarch64\release\slang.lib</ImportLibrary>
     </Link>
     <PreBuildEvent>
-      <Command>powershell "D:/git_repo/slang/extras/update-version-tag.ps1" -outputFile "D:/git_repo/slang/slang-tag-version.h"</Command>
+      <Command>powershell "$(SolutionDir)extras/update-version-tag.ps1" -outputFile "$(SolutionDir)slang-tag-version.h"</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\release &gt; nul)
