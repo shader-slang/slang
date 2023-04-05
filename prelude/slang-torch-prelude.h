@@ -38,12 +38,8 @@
 #   include <stdint.h>
 #endif // SLANG_LLVM
 
-<<<<<<< HEAD
 
 #define SLANG_PRELUDE_NAMESPACE
-=======
-#define SLANG_PRELUDE_NAMESPACE 1
->>>>>>> a3ab76c7 (Fix cuda and cpp prelude for torch binding.)
 
 #include "slang-cpp-types-core.h"
 #include "slang-cpp-scalar-intrinsics.h"
