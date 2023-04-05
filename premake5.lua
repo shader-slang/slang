@@ -1505,7 +1505,7 @@ standardProject("slang", "source/slang")
         end
     filter { "system:windows" } 
         prebuildcommands {
-            'powershell "$(SolutionDir)extras/update-version-tag.ps1" -outputFile "$(SolutionDir)slang-tag-version.h"'
+            'cmd /C "powershell ^"$(SolutionDir)extras/update-version-tag.ps1^" -outputFile ^"$(SolutionDir)slang-tag-version.h^"  || exit /b 0" '
         }
     filter {"configurations:debug"}
         defines { "SLANG_ENABLE_IR_BREAK_ALLOC=1" }
