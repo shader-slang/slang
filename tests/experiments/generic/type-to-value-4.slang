@@ -52,12 +52,12 @@ interface IGetE
 	static Enum getE();    
 };
 
-public struct A : IGetE
+struct A : IGetE
 {
     static Enum getE() { return Enum::A; }
 };
 
-public struct B : IGetE
+struct B : IGetE
 {
     static Enum getE() { return Enum::B; }
 };
