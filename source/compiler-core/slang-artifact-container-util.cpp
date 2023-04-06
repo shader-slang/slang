@@ -73,6 +73,10 @@ blah/desc.json
 blah/associated/...
 blah/children/...
 ```
+
+Perhaps we want to special case for scenarios where we have artifact "leaves" (ie where they have no associated, or children)
+in that case placing in a directory all on it's own is perhaps not needed.
+
 */
 
 struct ArtifactContainerWriter
@@ -168,7 +172,6 @@ SlangResult ArtifactContainerWriter::getBaseName(IArtifact* artifact, String& ou
 {
     String baseName;
 
-
     const auto artifactDesc = artifact->getDesc();
 
     {
@@ -256,10 +259,19 @@ SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
     String baseName;
     SLANG_RETURN_ON_FAIL(getBaseName(artifact, baseName));
 
-    Scope artifactScope;
-    SLANG_RETURN_ON_FAIL(artifactScope.pushAndRequireDirectory(this, baseName));
-
-    SLANG_RETURN_ON_FAIL(writeInDirectory(artifact, baseName));
+    // Special case if there are no children/associated, we can just write into the same directory
+    if (artifact->getChildren().count == 0 &&
+        artifact->getAssociated().count == 0)
+    {
+        // I guess this assumes the name doesn't clash with any name we already have
+        SLANG_RETURN_ON_FAIL(writeInDirectory(artifact, baseName));
+    }
+    else
+    {
+        Scope artifactScope;
+        SLANG_RETURN_ON_FAIL(artifactScope.pushAndRequireDirectory(this, baseName));
+        SLANG_RETURN_ON_FAIL(writeInDirectory(artifact, baseName));
+    }
 
     return SLANG_OK;
 }
