@@ -1,4 +1,4 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
 /* Test here is to try and associate a value with a type
 
