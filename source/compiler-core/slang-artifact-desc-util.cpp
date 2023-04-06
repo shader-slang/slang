@@ -732,6 +732,16 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             out << "json";
             return SLANG_OK;
         }
+        case ArtifactKind::CompileBinary:
+        {
+            if (isDerivedFrom(desc.payload, ArtifactPayload::SlangIR) ||
+                isDerivedFrom(desc.payload, ArtifactPayload::SlangAST))
+            {
+                out << "slang-module";
+                return SLANG_OK;
+            }
+            break;
+        }
         default: break;
     }
 

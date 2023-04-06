@@ -47,12 +47,13 @@ static bool _checkRecursive(ArtifactUtil::FindStyle findStyle)
     return createArtifact(desc);
 }
 
-/* static */bool ArtifactUtil::isSignificant(IArtifact* artifact, void* data)
+/* static */bool ArtifactUtil::isSignificant(IArtifact* artifact)
 {
-    SLANG_UNUSED(data);
+    return isSignificant(artifact->getDesc());
+}
 
-    const auto desc = artifact->getDesc();
-
+/* static */bool ArtifactUtil::isSignificant(const ArtifactDesc& desc)
+{
     // Containers are not significant as of themselves, they may contain something tho
     if (isDerivedFrom(desc.kind, ArtifactKind::Container))
     {
@@ -83,6 +84,13 @@ static bool _checkRecursive(ArtifactUtil::FindStyle findStyle)
     }
 
     return true;
+}
+
+
+/* static */bool ArtifactUtil::isSignificant(IArtifact* artifact, void* data)
+{
+    SLANG_UNUSED(data);
+    return isSignificant(artifact->getDesc());
 }
 
 /* static */IArtifact* ArtifactUtil::findSignificant(IArtifact* artifact) 

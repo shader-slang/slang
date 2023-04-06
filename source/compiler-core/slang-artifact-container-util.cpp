@@ -147,8 +147,11 @@ struct ArtifactContainerWriter
         m_entryStack.removeLast();
     }
 
+    SlangResult getBaseName(IArtifact* artifact, String& out);
+
         /// Write the artifact in the current scope
     SlangResult write(IArtifact* artifact);
+    SlangResult writeInDirectory(IArtifact* artifact, const String& baseName);
 
     ArtifactContainerWriter(ISlangMutableFileSystem* fileSystem):
         m_fileSystem(fileSystem)
@@ -161,13 +164,10 @@ struct ArtifactContainerWriter
     ISlangMutableFileSystem* m_fileSystem;
 };
 
-SlangResult ArtifactContainerWriter::writeContained(IArtifact* artifact)
+SlangResult ArtifactContainerWriter::getBaseName(IArtifact* artifact, String& out)
 {
-}
+    String baseName;
 
-SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
-{
-    String dirName;
 
     const auto artifactDesc = artifact->getDesc();
 
@@ -175,43 +175,58 @@ SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
         auto artifactName = artifact->getName();
         if (artifactName && artifactName[0] != 0)
         {
-            dirName = ArtifactDescUtil::getBaseNameFromPath(artifactDesc, UnownedStringSlice(artifactName));
+            baseName = ArtifactDescUtil::getBaseNameFromPath(artifactDesc, UnownedStringSlice(artifactName));
         }
     }
 
     // If we don't have name, use a generated one 
-    if (dirName.getLength() == 0)
+    if (baseName.getLength() == 0)
     {
-        dirName.append(m_entry.uniqueIndex++);
+        baseName.append(m_entry.uniqueIndex++);
     }
 
-    Scope artifactScope;
-    SLANG_RETURN_ON_FAIL(artifactScope.pushAndRequireDirectory(this, dirName));
+    out = baseName;
+    return SLANG_OK;
+}
 
-    // Get the name of the artifact
-    StringBuilder artifactName;
-    SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcNameForDesc(artifactDesc, dirName.getUnownedSlice(), artifactName));
-
+SlangResult ArtifactContainerWriter::writeInDirectory(IArtifact* artifact, const String& baseName)
+{
+    
     // TODO(JS):
     // We could now output information about the desc/artifact, say as some json.
     // For now we assume the extension is good enough for most purposes.
-
-    // We can't write it without a blob
-    ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
-
-    {
-        const auto combinedPath = Path::combine(m_entry.path, artifactName);
-        // Write out the blob
-        SLANG_RETURN_ON_FAIL(m_fileSystem->saveFileBlob(combinedPath.getBuffer(), blob));
-    }
     
+    {
+        // We can't write it without a blob
+        ComPtr<ISlangBlob> blob;
+        const auto res = artifact->loadBlob(ArtifactKeep::No, blob.writeRef());
+
+        if (SLANG_FAILED(res))
+        {
+            // If it failed and it's significant the whole write fails
+            if (ArtifactUtil::isSignificant(artifact))
+            {
+                return res;
+            }
+        }
+        
+        {
+            // Get the name of the artifact
+            StringBuilder artifactName;
+            SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcNameForDesc(artifact->getDesc(), baseName.getUnownedSlice(), artifactName));
+
+            const auto combinedPath = Path::combine(m_entry.path, artifactName);
+            // Write out the blob
+            SLANG_RETURN_ON_FAIL(m_fileSystem->saveFileBlob(combinedPath.getBuffer(), blob));
+        }
+    }
+
     {
         auto children = artifact->getChildren();
         if (children.count)
         {
             Scope childrenScope;
-            SLANG_RETURN_ON_FAIL(childrenScope.pushAndRequireDirectory(this, ("children")));
+            SLANG_RETURN_ON_FAIL(childrenScope.pushAndRequireDirectory(this, "children"));
 
             for (IArtifact* child : children)
             {
@@ -224,7 +239,7 @@ SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
         if (associatedSlice.count)
         {
             Scope associatedScope;
-            SLANG_RETURN_ON_FAIL(associatedScope.pushAndRequireDirectory(this, ("associated")));
+            SLANG_RETURN_ON_FAIL(associatedScope.pushAndRequireDirectory(this, "associated"));
 
             for (IArtifact* associated : associatedSlice)
             {
@@ -236,11 +251,41 @@ SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
     return SLANG_OK;
 }
 
-/* static */SlangResult ArtifactContainerUtil::writeContainer(IArtifact* artifact, ISlangMutableFileSystem* fileSystem)
+SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
+{
+    String baseName;
+    SLANG_RETURN_ON_FAIL(getBaseName(artifact, baseName));
+
+    Scope artifactScope;
+    SLANG_RETURN_ON_FAIL(artifactScope.pushAndRequireDirectory(this, baseName));
+
+    SLANG_RETURN_ON_FAIL(writeInDirectory(artifact, baseName));
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult ArtifactContainerUtil::writeContainer(IArtifact* artifact, const String& defaultFileName, ISlangMutableFileSystem* fileSystem)
 {
     ArtifactContainerWriter writer(fileSystem);
 
-    SLANG_RETURN_ON_FAIL(writer.write(artifact));
+    String baseName;
+    
+    {
+        const char* name = artifact->getName();
+        if (name == nullptr || name[0] == 0)
+        {
+            // Try to get the name from the defaultFileName
+            baseName = Path::getFileNameWithoutExt(defaultFileName);
+        }
+    }
+
+    // If it's still not set try generating it.
+    if (baseName.getLength() == 0)
+    {
+        SLANG_RETURN_ON_FAIL(writer.getBaseName(artifact, baseName));            
+    }
+    
+    SLANG_RETURN_ON_FAIL(writer.writeInDirectory(artifact, baseName));
 
     return SLANG_OK;
 }
@@ -339,7 +384,7 @@ static SlangResult _remove(ISlangMutableFileSystem* fileSystem, const String& pa
         SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
 
         // Write everything out
-        SLANG_RETURN_ON_FAIL(writeContainer(artifact, fileSystem));
+        SLANG_RETURN_ON_FAIL(writeContainer(artifact, fileName, fileSystem));
 
         // Now write out to the output file
         IArchiveFileSystem* archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
@@ -365,7 +410,7 @@ static SlangResult _remove(ISlangMutableFileSystem* fileSystem, const String& pa
 
         ComPtr<ISlangMutableFileSystem> fileSystem(new RelativeFileSystem(osFileSystem, path));
 
-        SLANG_RETURN_ON_FAIL(writeContainer(artifact, fileSystem));
+        SLANG_RETURN_ON_FAIL(writeContainer(artifact, fileName, fileSystem));
     }
     else
     {

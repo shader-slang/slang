@@ -28,7 +28,9 @@ struct ArtifactContainerUtil
         /// Uses the extension of the path to determine how to write
     static SlangResult writeContainer(IArtifact* artifact, const String& path);
 
-    static SlangResult writeContainer(IArtifact* artifact, ISlangMutableFileSystem* fileSystem);
+        /// If there isn't a suitable name on artifact, the filename is used to generate a name. If it's not set
+        /// a name may be generated.
+    static SlangResult writeContainer(IArtifact* artifact, const String& defaultFileName, ISlangMutableFileSystem* fileSystem);
 
     static SlangResult readContainer(ISlangFileSystemExt* fileSystem, ComPtr<IArtifact>& outArtifact);
 };
