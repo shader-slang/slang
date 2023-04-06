@@ -1469,10 +1469,7 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        if (metadata)
-        {
-            artifact->addAssociated(metadata);
-        }
+        ArtifactUtil::addAssociated(artifact, metadata);
 
         // Set the artifact
         outArtifact.swap(artifact);

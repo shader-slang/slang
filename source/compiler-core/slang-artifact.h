@@ -183,6 +183,8 @@ enum class ArtifactPayload : uint8_t
 
     SourceMap,      ///< A source map
 
+    PostEmitMetadata,   ///< Meta data from post emit (binding information)
+
     CountOf,
 };
 
@@ -393,9 +395,9 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL setName(const char* name) = 0;
 
         /// Add data associated with this artifact
-    virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(IArtifact* artifact) = 0;
         /// Get the list of associated items
-    virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getAssociated() = 0;
+    virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getAssociated() = 0;
     
         /// Add a representation 
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) = 0;

@@ -4,6 +4,7 @@
 
 #include "slang-artifact.h"
 #include "slang-artifact-representation.h"
+#include "slang-artifact-associated.h"
 
 #include "../../slang-com-ptr.h"
 
@@ -62,6 +63,11 @@ struct ArtifactUtil
 
         /// Given a desc and a baseName works out the the output file name
     static SlangResult calcName(IArtifact* artifact, const UnownedStringSlice& baseName, StringBuilder& outName);
+
+        /// Convenience function that adds metadata to artifact. If metadata is nullptr nothing is added.
+    static void addAssociated(IArtifact* artifact, IArtifactPostEmitMetadata* metadata);
+        /// Convenience function that adds diagnostics artifact to artifact. If diagnostics is nullptr nothing is added.
+    static void addAssociated(IArtifact* artifact, IArtifactDiagnostics* diagnostics);
 };
 
 } // namespace Slang

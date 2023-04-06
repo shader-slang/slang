@@ -210,9 +210,8 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
 
-    // Add the artifact
-    artifact->addAssociated(diagnostics);
-    
+    ArtifactUtil::addAssociated(artifact, diagnostics);
+
     // Find the rep from the 'main' artifact, we'll just use the same representation on the output 
     // artifact. Sharing is desirable, because the rep owns the file.
     if (auto fileRep = productArtifact ? findRepresentation<IOSFileArtifactRepresentation>(productArtifact) : nullptr)

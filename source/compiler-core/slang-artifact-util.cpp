@@ -74,7 +74,7 @@ static bool _checkRecursive(ArtifactUtil::FindStyle findStyle)
         return true;
     }
 
-    /* Hmm, we might want to have a base class for 'signifiant' payloads,
+    /* Hmm, we might want to have a base class for 'significant' payloads,
     where signifiance here means somewhat approximately 'the meat' of a compilation result,
     as contrasted with 'meta data', 'diagnostics etc'*/
     if (isDerivedFrom(desc.payload, ArtifactPayload::Metadata))
@@ -267,6 +267,26 @@ static bool _isName(IArtifact* artifact, void* data)
     }
  
     return nullptr;
+}
+
+/* static */void ArtifactUtil::addAssociated(IArtifact* artifact, IArtifactPostEmitMetadata* metadata)
+{
+    if (metadata)
+    {
+        auto metadataArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Instance, ArtifactPayload::PostEmitMetadata));
+        metadataArtifact->addRepresentation(metadata);
+        artifact->addAssociated(metadataArtifact);
+    }
+}
+
+/* static */void ArtifactUtil::addAssociated(IArtifact* artifact, IArtifactDiagnostics* diagnostics)
+{
+    if (diagnostics)
+    {
+        auto diagnosticsArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Instance, ArtifactPayload::Diagnostics));
+        diagnosticsArtifact->addRepresentation(diagnostics);
+        artifact->addAssociated(diagnosticsArtifact);   
+    }
 }
 
 } // namespace Slang

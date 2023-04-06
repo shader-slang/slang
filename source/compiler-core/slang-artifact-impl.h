@@ -44,8 +44,8 @@ public:
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
     virtual SLANG_NO_THROW void SLANG_MCALL setName(const char* name) SLANG_OVERRIDE { m_name = name; }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getAssociated() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(IArtifact* artifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getAssociated() SLANG_OVERRIDE;
     
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) SLANG_OVERRIDE;
@@ -92,7 +92,7 @@ protected:
     ComPtr<IArtifactHandler> m_handler;             ///< The handler. Can be nullptr and then default handler is used.
 
     List<ComPtr<ICastable>> m_representations;      ///< All the representation of this artifact
-    List<ComPtr<ICastable>> m_associated;           ///< All the items associated with this artifact
+    List<ComPtr<IArtifact>> m_associated;           ///< All the items associated with this artifact
     List<ComPtr<IArtifact>> m_children;             ///< All the child artifacts owned 
 };
 
