@@ -1,0 +1,38 @@
+// slang-artifact-container-util.h
+#ifndef SLANG_ARTIFACT_CONTAINER_UTIL_H
+#define SLANG_ARTIFACT_CONTAINER_UTIL_H
+
+#include "slang-artifact-representation.h"
+
+#include "../../slang-com-helper.h"
+#include "../../slang-com-ptr.h"
+
+namespace Slang
+{
+
+/* Functionality to save of and read artifact hierarchies via the slang 
+artifact container style. This style treats storage as a file system.
+
+Since this represention, is not directly a file system representation 
+some conventions are used to associate data, via names etc.
+
+The use of ISlangMutableFileSystem, allows writing this structure, to memory, zip, riff, directory 
+or other file like representations
+*/
+struct ArtifactContainerUtil 
+{
+        /// Writes using the legacy mechanism
+    static SlangResult writeLegacy(IArtifact* artifact, const String& filename);
+
+        /// Write the container using the specified path.
+        /// Uses the extension of the path to determine how to write
+    static SlangResult writeContainer(IArtifact* artifact, const String& path);
+
+    static SlangResult writeContainer(IArtifact* artifact, ISlangMutableFileSystem* fileSystem);
+
+    static SlangResult readContainer(ISlangFileSystemExt* fileSystem, ComPtr<IArtifact>& outArtifact);
+};
+
+} // namespace Slang
+
+#endif

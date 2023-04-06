@@ -105,15 +105,25 @@ SlangResult DefaultArtifactHandler::expandChildren(IArtifact* container)
 
 	// For the generic container type, we just expand as empty
 	const auto desc = container->getDesc();
-	if (desc.kind == ArtifactKind::Container)
+    if (desc.kind == ArtifactKind::Container)
+    {
+        // If it's just a generic container, we can assume it's expanded, and be done
+        return SLANG_OK;
+    }
+
+	if (isDerivedFrom(desc.kind, ArtifactKind::Container))
 	{
+        // TODO(JS):
+        // Proper implementation should (for example) be able to expand a Zip file etc.
+
+        // For now we just set that there are no children, and be done
 		container->setChildren(nullptr, 0);
-		return SLANG_OK;
+		return SLANG_E_NOT_IMPLEMENTED;
 	}
 
-	// TODO(JS):
-	// Proper implementation should (for example) be able to expand a Zip file etc.
-	return SLANG_E_NOT_IMPLEMENTED;
+    // We can't expand non container like types, so we just make sure it's empty
+    container->setChildren(nullptr, 0);
+	return SLANG_OK;
 }
 
 SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable)
