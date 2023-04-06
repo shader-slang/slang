@@ -6923,20 +6923,34 @@ namespace Slang
         auto ctx = visitor->withExprLocalScope(&scope);
         auto subVisitor = SemanticsVisitor(ctx);
         auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
-        if (auto derivFuncDeclRef = as<DeclRefExpr>(checkedFuncExpr)->declRef)
+        if (auto declRefExpr = as<DeclRefExpr>(checkedFuncExpr))
         {
-            visitor->ensureDecl(derivFuncDeclRef, DeclCheckState::TypesFullyResolved);
-            auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
-            auto resolved = subVisitor.ResolveInvoke(invokeExpr);
-            if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+            visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+        }
+        else if (auto overloadedExpr = as<OverloadedExpr>(checkedFuncExpr))
+        {
+            for (auto candidate : overloadedExpr->lookupResult2.items)
             {
-                if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
-                {
-                    attr->funcExpr = calleeDeclRef;
-                    return;
-                }
+                visitor->ensureDecl(candidate.declRef, DeclCheckState::TypesFullyResolved);
             }
         }
+        else
+        {   
+            visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
+            return;
+        }
+        
+        auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
+        auto resolved = subVisitor.ResolveInvoke(invokeExpr);
+        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+        {
+            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+            {
+                attr->funcExpr = calleeDeclRef;
+                return;
+            }
+        }
+        
         visitor->getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
     }
 
