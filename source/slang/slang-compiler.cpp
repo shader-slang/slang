@@ -1120,7 +1120,7 @@ namespace Slang
         ComPtr<IArtifactPostEmitMetadata> metadata;
         if (sourceArtifact)
         {
-            metadata = findAssociated<IArtifactPostEmitMetadata>(sourceArtifact);
+            metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(sourceArtifact);
 
             // Set the source artifacts
             options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
@@ -1412,7 +1412,7 @@ namespace Slang
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
         if (diagnostics->getCount())
         {

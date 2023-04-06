@@ -177,7 +177,7 @@ void Artifact::addAssociated(ICastable* castable)
     m_associated.add(ComPtr<ICastable>(castable));
 }
 
-void* Artifact::find(ContainedKind kind, const Guid& guid)
+void* Artifact::findRepresentation(ContainedKind kind, const Guid& guid)
 {
     ConstArrayView<ICastable*> view;
 
@@ -187,17 +187,22 @@ void* Artifact::find(ContainedKind kind, const Guid& guid)
         case ContainedKind::Representation:     view = _getView(m_representations); break; 
         case ContainedKind::Children:
         {
-            const auto children = getChildren();
-            view = makeConstArrayView((ICastable*const*)children.data, children.count);
+            for (auto child : getChildren())
+            {
+                if (auto rep = child->findRepresentation(ContainedKind::Representation, guid))
+                {
+                    return rep;
+                }
+            }
             break;
         }
     }
 
     for (const auto& cur : view)
     {
-        if (cur->castAs(guid))
+        if (auto ptr = cur->castAs(guid))
         {
-            return cur;
+            return ptr;
         }
     }
     return nullptr;

@@ -2287,7 +2287,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
         return TestResult::Fail;
     }
 
-    auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
     if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
     {
@@ -2413,7 +2413,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 
     String actualOutput;
 
-    auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
     // If the actual compilation failed, then the output will be the summary
     if (diagnostics && SLANG_FAILED(diagnostics->getResult()))

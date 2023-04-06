@@ -425,8 +425,8 @@ public:
         /// Get the children, will only remain valid if no mutation of children list
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
 
-        /// Find item which can cast to guid from the kind list
-    virtual SLANG_NO_THROW void* SLANG_MCALL find(ContainedKind kind, const Guid& guid) = 0;
+        /// Find a represention from the specified list 
+    virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(ContainedKind kind, const Guid& guid) = 0;
         /// Clear all of the contained kind
     virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) = 0;
         /// Remove entry at index for the specified kind
@@ -436,14 +436,21 @@ public:
 template <typename T>
 SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
 {
-    return reinterpret_cast<T*>(artifact->find(IArtifact::ContainedKind::Representation, T::getTypeGuid()));
+    return reinterpret_cast<T*>(artifact->findRepresentation(IArtifact::ContainedKind::Representation, T::getTypeGuid()));
 }
 
 template <typename T>
-SLANG_FORCE_INLINE T* findAssociated(IArtifact* artifact)
+SLANG_FORCE_INLINE T* findAssociatedRepresentation(IArtifact* artifact)
 {
-    return reinterpret_cast<T*>(artifact->find(IArtifact::ContainedKind::Associated, T::getTypeGuid()));
+    return reinterpret_cast<T*>(artifact->findRepresentation(IArtifact::ContainedKind::Associated, T::getTypeGuid()));
 }
+
+template <typename T>
+SLANG_FORCE_INLINE T* findChildRepresentation(IArtifact* artifact)
+{
+    return reinterpret_cast<T*>(artifact->findRepresentation(IArtifact::ContainedKind::Children, T::getTypeGuid()));
+}
+
 
 /* The IArtifactRepresentation interface represents a single representation that can be part of an artifact. It's special in so far
 as

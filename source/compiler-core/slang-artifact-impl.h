@@ -61,7 +61,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) SLANG_OVERRIDE;
 
-    virtual SLANG_NO_THROW void* SLANG_MCALL find(ContainedKind kind, const Guid& unk) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(ContainedKind kind, const Guid& unk) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clear(ContainedKind kind) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL removeAt(ContainedKind kind, Index i) SLANG_OVERRIDE;
 

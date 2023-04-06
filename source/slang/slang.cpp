@@ -5379,7 +5379,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
         return SLANG_E_INVALID_ARG;
 
     // Find a rep
-    auto metadata = findAssociated<IArtifactPostEmitMetadata>(artifact);
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 
