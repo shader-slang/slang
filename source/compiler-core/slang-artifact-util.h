@@ -66,7 +66,7 @@ struct ArtifactUtil
 
         /// Convenience function that adds metadata to artifact. If metadata is nullptr nothing is added.
     static void addAssociated(IArtifact* artifact, IArtifactPostEmitMetadata* metadata);
-        /// Convenience function that adds diagnostics artifact to artifact. If diagnostics is nullptr nothing is added.
+        /// Convenience function that adds diagnostics to artifact. If diagnostics is nullptr nothing is added.
     static void addAssociated(IArtifact* artifact, IArtifactDiagnostics* diagnostics);
 };
 

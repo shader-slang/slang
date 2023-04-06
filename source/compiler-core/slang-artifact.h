@@ -183,7 +183,7 @@ enum class ArtifactPayload : uint8_t
 
     SourceMap,      ///< A source map
 
-    PostEmitMetadata,   ///< Meta data from post emit (binding information)
+    PostEmitMetadata,   ///< Metadata from post emit (binding information)
 
     CountOf,
 };
@@ -334,23 +334,18 @@ files could be a Container containing artifacts for
 There are several types of ways to associate data with an artifact:
 
 * A representation
-* Associated data
+* An associated artifact
 * A child artifact
 
 A `representation` has to wholly represent the artifact. That representation could be a blob, a file on the file system,
 an in memory representation. There are two classes of `Representation` - ones that can be turned into blobs (and therefore 
 derive from IArtifactRepresentation) and ones that are in of themselves a representation (such as a blob or or ISlangSharedLibrary).
 
-`Associated data` is information that is associated with the artifact, but isn't a (whole) representation. It could be part 
+`Associated artifacts` hold information that is associated with the artifact. It could be part 
 of the representation, or useful for the implementation of a representation. Could also be considered as a kind of side channel
-to associate arbitrary temporary data with an artifact.
+to associate arbitrary data including temporary data with an artifact.
 
-A `child artifact` belongs to the artifact, within the hierarchy of artifacts. Child artifacts are held in an IArtifactList.
-
-More long term goals would be to
-
-* Make Diagnostics into an interface (such it can be added to a Artifact result)
-* Use Artifact and related types for downstream compiler
+A `child artifact` belongs to the artifact, within the hierarchy of artifacts.
 */
 class IArtifact : public ICastable
 {
@@ -394,7 +389,7 @@ public:
         /// Set the name associated with the artifact
     virtual SLANG_NO_THROW void SLANG_MCALL setName(const char* name) = 0;
 
-        /// Add data associated with this artifact
+        /// Add associated artifacts with this artifact
     virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(IArtifact* artifact) = 0;
         /// Get the list of associated items
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getAssociated() = 0;
@@ -408,6 +403,7 @@ public:
 
         /// Given a typeGuid representing the desired type get or create the representation.
         /// If found outCastable holds an entity that *must* be castable to typeGuid
+        /// Use the keep parameter to determine if the representation should be cached on the artifact/s or not.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable) = 0;
     
         /// Get the handler used for this artifact. If nullptr means the default handler will be used.
@@ -453,11 +449,11 @@ SLANG_FORCE_INLINE T* findChildRepresentation(IArtifact* artifact)
     return reinterpret_cast<T*>(artifact->findRepresentation(IArtifact::ContainedKind::Children, T::getTypeGuid()));
 }
 
-
 /* The IArtifactRepresentation interface represents a single representation that can be part of an artifact. It's special in so far
 as
 
 * IArtifactRepresentation can be queried for it's underlying object class
+* Can determine if the representation exists (for example if it's on the file system)
 * Can optionally serialize into a blob
 */
 class IArtifactRepresentation : public ICastable
