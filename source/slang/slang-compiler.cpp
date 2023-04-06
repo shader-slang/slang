@@ -1973,26 +1973,19 @@ namespace Slang
         {
             Index nameCount = 0;
 
-            auto associatedSlice = m_containerArtifact->getAssociated();
-            for (auto curAssociated : associatedSlice)
+            for (auto associatedArtifact : m_containerArtifact->getAssociated())
             {
-                IArtifact* artifact = as<IArtifact>(curAssociated);
-                if (!artifact)
-                {
-                    continue;
-                }
-
-                auto desc = artifact->getDesc();
+                auto desc = associatedArtifact->getDesc();
 
                 if (isDerivedFrom(desc.payload, ArtifactPayload::SourceMap))
                 {
                     StringBuilder artifactFilename;
 
                     // Dump out
-                    const char* artifactName = artifact->getName();
+                    const char* artifactName = associatedArtifact->getName();
                     if (artifactName && artifactName[0] != 0)
                     {
-                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(artifact, UnownedStringSlice(artifactName), artifactFilename));
+                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(associatedArtifact, UnownedStringSlice(artifactName), artifactFilename));
                     }
                     else
                     {
@@ -2007,13 +2000,13 @@ namespace Slang
                             baseName.append(nameCount);
                         }
 
-                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(artifact, baseName.getUnownedSlice(), artifactFilename));
+                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(associatedArtifact, baseName.getUnownedSlice(), artifactFilename));
 
                         nameCount ++;
                     }
 
                     ComPtr<ISlangBlob> blob;
-                    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+                    SLANG_RETURN_ON_FAIL(associatedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
 
                     // Try to write it out
                     {
