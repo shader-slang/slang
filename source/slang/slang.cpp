@@ -13,6 +13,9 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
+#include "../compiler-core/slang-artifact-container-util.h"
+
+#include "../core/slang-memory-file-system.h"
 
 #include "slang-module-library.h"
 
@@ -5232,6 +5235,23 @@ SlangResult EndToEndCompileRequest::getTargetHostCallable(int targetIndex,ISlang
 char const* EndToEndCompileRequest::getEntryPointSource(int entryPointIndex)
 {
     return (char const*)getEntryPointCode(entryPointIndex, nullptr);
+}
+
+ISlangMutableFileSystem* EndToEndCompileRequest::getCompileRequestResult()
+{
+    if (!m_containerFileSystem)
+    {
+        if (m_containerArtifact)
+        {
+            ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+            if (SLANG_SUCCEEDED(ArtifactContainerUtil::writeContainer(m_containerArtifact, "", fileSystem)))
+            {
+                m_containerFileSystem.swap(fileSystem);
+            }
+        }
+    }
+
+    return m_containerFileSystem;
 }
 
 void const* EndToEndCompileRequest::getCompileRequestCode(size_t* outSize)

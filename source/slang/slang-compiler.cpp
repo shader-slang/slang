@@ -1853,7 +1853,6 @@ namespace Slang
         {
         case ContainerFormat::SlangModule:
         {
-
             OwnedMemoryStream stream(FileAccess::Write);
             SlangResult res = writeContainerToStream(&stream);
             if (SLANG_FAILED(res))
@@ -1869,7 +1868,6 @@ namespace Slang
             auto containerBlob = ListBlob::moveCreate(blobData);
 
             m_containerArtifact = Artifact::create(ArtifactDesc::make(Artifact::Kind::CompileBinary, ArtifactPayload::SlangIR, ArtifactStyle::Unknown));
-
             m_containerArtifact->addRepresentationUnknown(containerBlob);
 
             return res;

@@ -13,90 +13,62 @@
 
 namespace Slang {
 
-/* What is the structure we want here?
+/* 
+Artifact file structure
+=======================
 
-Lets say we have an artifact with "blah.spv". One approach would be to take the base name and so end up with
+There is many ways this could work, with different trade offs. The approach taken here is 
+to make *very* artifact be a directory. There are two special case directories "associated" and "children",
+which hold the artifacts associated with this artifact. 
 
-```
-blah/
-blah/blah.spv
-blah/associated/...
-blah/children/...
-```
+So for example if we have 
 
-This is relatively simple and certainly pretty simple to implement. 
-
-This doesn't hold additional information - such as what might be held in the ArtifactDesc. We could use .dsc 
-to describe that. We could also remove the kernels name, as we already have that encoded in the directory name. 
-So 
-
-```
-blah/
-blah/bin.spv
-blah/desc.json
-blah/associated/...
-blah/children/...
-```
-
-What happens if we have data that *doesn't* have a name? We can just produce names by incrementing some counter.
-
-This works but seems a little weird, in that the name of the output kernel is not reflected. We could just use an extension
-that we use for directories for this additional data. Note that it would be "nice" to make this work with just the basename,
-but there is a problem with files that don't have an extension (as seen with executables on unix-like scenarios).
-
-```
-blah.spv
-blah.artifact/
-blah.artifact/desc.json
-blah.artifact/associated
-blah.artifact/... can just hold children directly
-```
-If we just hold children directly then their names could clash with standard names. 
-
-We might want an extension such that we know it is an artifact. 
-
-Other considerations
-
-* Wanting to be able to easily combine containers (by hand if necessary in a file system)
-  * Doing so implies we don't want some kind of global, or directory manifest.
-* Wanting to easily be able to 
-
-Given these constraints it seems like a good combination is
-
-* Everything associated with an artifact is in a directory on it's own
-* The name of the item should probably be stored as is in the directory
-* Any ArtifactDesc or additional information should be held in a file in the directory
-* Children and associated items should be stored in their own directories (which will follow the same mechanisms recursively)
-
-```
-blah/
-blah/blah.spv
-blah/desc.json
-blah/associated/...
-blah/children/...
-```
-
-Perhaps we want to special case for scenarios where we have artifact "leaves" (ie where they have no associated, or children)
-in that case placing in a directory all on it's own is perhaps not needed.
-
-If we are going expose this representation as the way users navigage a "container", then we will need to make sure it's pretty simple.
-As client side code will (largely) need to be able to reinterpret. We could simplify this by for example providing an API call that
-will take a file system and return paths to things with their types (for example). 
-
-Issues:
-
-* The root can only be a single artifact?
-  * If there is a desire to combine artifacts, then it will need to contain multiple directories
-  * A directory full of directories becomes a "container"
-
-The simplest way to process, is every artifact is a directory. The root is a special case
-
-The simplest scenario...
 ```
 thing.spv
+  diagnostics
 ```
 
-A directory containing just "children" is a container. 
+It will become
+
+```
+thing.spv
+associated/0/diagnostics.diag
+```
+
+```
+somemodule
+  diagnostics
+  0a0a0a.map
+  0b0b0b.map
+```
+
+Becomes
+
+```
+somemodule.slang-module
+associated/0/diagnostics
+associated/0a0a0a/0a0a0a.map
+associated/0b0b0b/0b0b0b.map
+```
+
+That is a little verbose, but if the associated artifacts have children/associated, then things still work.
+
+```
+container
+  a.spv 
+    diagnostics
+  b.dxil
+    diagnostics
+    sourcemap
+```
+
+```
+a/a.spv
+a/associated/0/diagostics.diagnostics
+b/b.spv
+b/associated/0/diagnostics.diagnostics
+b/associated/1/sourcemap.map
+```
 
 */
 
@@ -280,17 +252,10 @@ SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
     String baseName;
     SLANG_RETURN_ON_FAIL(getBaseName(artifact, baseName));
 
-#if 0
-    // Special case if there are no children/associated, we can just write into the same directory
-
-    if (artifact->getChildren().count == 0 &&
-        artifact->getAssociated().count == 0)
-    {
-        // I guess this assumes the name doesn't clash with any name we already have
-        SLANG_RETURN_ON_FAIL(writeInDirectory(artifact, baseName));
-    }
-    else
-#endif
+    // We don't special case if the artifact contains no children/associated.
+    // We always create a directory for all artifacts. This makes it more verbose,
+    // but simplifies things, because *generally* an artifact including it's children/associated
+    // meta data is all contained in a single directory
 
     {
         Scope artifactScope;
