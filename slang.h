@@ -947,6 +947,20 @@ extern "C"
         return guid; \
     }
 
+// Helper to fill in pairs of GUIDs and return pointers. This ensures that the
+// type of the GUID passed matches the pointer type, and that it is derived
+// from ISlangUnknown,
+// TODO(c++20): would is_derived_from be more appropriate here for private inheritance of ISlangUnknown?
+//
+// with     : void createFoo(SlangUUID, void**);
+//            Slang::ComPtr<Bar> myBar;
+// call with: createFoo(SLANG_IID_PPV_ARGS(myBar.writeRef()))
+// to call  : createFoo(Bar::getTypeGuid(), (void**)(myBar.writeRef()))
+#define SLANG_IID_PPV_ARGS(ppType) \
+    std::decay_t<decltype(**(ppType))>::getTypeGuid(), \
+    ((void)[]{static_assert(std::is_base_of_v<ISlangUnknown, std::decay_t<decltype(**(ppType))>>);}, reinterpret_cast<void**>(ppType))
+
+
     /** Base interface for components exchanged through the API.
 
     This interface definition is compatible with the COM `IUnknown`,
