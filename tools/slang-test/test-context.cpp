@@ -70,13 +70,13 @@ SlangResult TestContext::locateFileCheck()
         return SLANG_FAIL;
     }
 
-    using CreateFileCheckFunc = SlangResult (*)(const SlangUUID&, Slang::IFileCheck**);
+    using CreateFileCheckFunc = SlangResult (*)(const SlangUUID&, void**);
     auto fn = reinterpret_cast<CreateFileCheckFunc>(library->findFuncByName("createLLVMFileCheck_V1"));
     if(!fn)
     {
         return SLANG_FAIL;
     }
-    return fn(IFileCheck::getTypeGuid(), m_fileCheck.writeRef());
+    return fn(SLANG_IID_PPV_ARGS(m_fileCheck.writeRef()));
 }
 
 Result TestContext::init(const char* inExePath)
