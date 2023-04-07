@@ -3111,7 +3111,7 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
     SLANG_ASSERT(request);
     EndToEndCompileRequest* endToEndRequest = nullptr;
     // NOTE! We aren't using to access an interface, so *doesn't* return with a refcount
-    request->queryInterface(EndToEndCompileRequest::getTypeGuid(), (void**)&endToEndRequest);
+    request->queryInterface(SLANG_IID_PPV_ARGS(&endToEndRequest));
     SLANG_ASSERT(endToEndRequest);
     return endToEndRequest;
 }

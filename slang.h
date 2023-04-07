@@ -932,19 +932,17 @@ extern "C"
 // It is not necessary to use the multiple parameters (we can wrap in parens), but this is simple.
 #define SLANG_COM_INTERFACE(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7) \
     public: \
-    SLANG_FORCE_INLINE static const SlangUUID& getTypeGuid() \
+    SLANG_FORCE_INLINE constexpr static SlangUUID getTypeGuid() \
     { \
-        static const SlangUUID guid = { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
-        return guid; \
+        return { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
     }
 
 // Sometimes it's useful to associate a guid with a class to identify it. This macro can used for this,
 // and the guid extracted via the getTypeGuid() function defined in the type
 #define SLANG_CLASS_GUID(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7) \
-    SLANG_FORCE_INLINE static const SlangUUID& getTypeGuid() \
+    SLANG_FORCE_INLINE constexpr static SlangUUID getTypeGuid() \
     { \
-        static const SlangUUID guid = { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
-        return guid; \
+        return { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
     }
 
 // Helper to fill in pairs of GUIDs and return pointers. This ensures that the
