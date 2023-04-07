@@ -3,11 +3,13 @@
 
 #include "slang-artifact-util.h"
 #include "slang-artifact-desc-util.h"
+#include "slang-artifact-representation-impl.h"
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
 #include "../core/slang-zip-file-system.h"
 #include "../core/slang-castable.h"
+#include "../core/slang-string-slice-pool.h"
 
 namespace Slang {
 
@@ -76,6 +78,25 @@ blah/children/...
 
 Perhaps we want to special case for scenarios where we have artifact "leaves" (ie where they have no associated, or children)
 in that case placing in a directory all on it's own is perhaps not needed.
+
+If we are going expose this representation as the way users navigage a "container", then we will need to make sure it's pretty simple.
+As client side code will (largely) need to be able to reinterpret. We could simplify this by for example providing an API call that
+will take a file system and return paths to things with their types (for example). 
+
+Issues:
+
+* The root can only be a single artifact?
+  * If there is a desire to combine artifacts, then it will need to contain multiple directories
+  * A directory full of directories becomes a "container"
+
+The simplest way to process, is every artifact is a directory. The root is a special case
+
+The simplest scenario...
+```
+thing.spv
+```
+
+A directory containing just "children" is a container. 
 
 */
 
@@ -259,7 +280,9 @@ SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
     String baseName;
     SLANG_RETURN_ON_FAIL(getBaseName(artifact, baseName));
 
+#if 0
     // Special case if there are no children/associated, we can just write into the same directory
+
     if (artifact->getChildren().count == 0 &&
         artifact->getAssociated().count == 0)
     {
@@ -267,6 +290,8 @@ SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
         SLANG_RETURN_ON_FAIL(writeInDirectory(artifact, baseName));
     }
     else
+#endif
+
     {
         Scope artifactScope;
         SLANG_RETURN_ON_FAIL(artifactScope.pushAndRequireDirectory(this, baseName));
@@ -275,6 +300,182 @@ SlangResult ArtifactContainerWriter::write(IArtifact* artifact)
 
     return SLANG_OK;
 }
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainerParser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+struct FileSystemContents
+{
+    // The first entry is always the root path
+
+    struct IndexRange
+    {
+        SLANG_FORCE_INLINE Index getCount() const { return endIndex - startIndex; }
+        
+        SLANG_FORCE_INLINE Index begin() const { return startIndex; }
+        SLANG_FORCE_INLINE Index end() const { return endIndex; }
+
+        void set(Index inStart, Index inEnd) { startIndex = inStart; endIndex = inEnd; }
+
+        static IndexRange make(Index inStart, Index inEnd) { IndexRange range; range.set(inStart, inEnd); return range; }
+
+        Index startIndex;
+        Index endIndex;
+    };
+
+    struct Entry
+    {
+        bool isFile() const { return range.startIndex < 0; }
+        bool isDirectory() const { return range.startIndex >= 0; }
+
+        void setDirectory() { range.set(0, 0); }
+        void setFile() { range.set(-1, -1); }
+
+        void setType(SlangPathType type) { (type == SLANG_PATH_TYPE_FILE) ? setFile() : setDirectory(); }
+
+        void setDirectoryRange(Index inStartIndex, Index inEndIndex)
+        {
+            SLANG_ASSERT(inEndIndex >= inStartIndex);
+            SLANG_ASSERT(isDirectory());
+            range.set(inStartIndex, inEndIndex);
+        }
+
+        Index parentDirectoryIndex = -1;                ///< The directory this entry is in. -1 is root.
+        UnownedStringSlice name;                        ///< Name of this entry
+        IndexRange range = IndexRange::make(-1, -1);    ///< Default to file
+    };
+    
+    void clear()
+    {
+        m_pool.clear();
+        m_entries.clear();
+    }
+    
+    IndexRange getContentsRange(Index index) const { return m_entries[index].range; }
+    
+    ConstArrayView<Entry> getContents(Index index) const { return getContents(m_entries[index]); } 
+    ConstArrayView<Entry> getContents(const Entry& entry) const
+    {
+        return entry.range.getCount() ? 
+            makeConstArrayView(m_entries.getBuffer() + entry.range.startIndex, entry.range.getCount()) :
+            makeConstArrayView<Entry>(nullptr, 0);
+    }
+     
+    void appendPath(Index entryIndex, StringBuilder& buf);
+
+    SlangResult find(ISlangFileSystemExt* fileSyste, const UnownedStringSlice& path);
+
+    FileSystemContents():
+        m_pool(StringSlicePool::Style::Default)
+    {
+        clear();
+    }
+
+    static void _add(SlangPathType pathType, const char* name, void* userData)
+    {
+        FileSystemContents* contents = (FileSystemContents*)userData;
+
+        Entry entry;
+        
+        entry.parentDirectoryIndex = contents->m_currentParent;
+        entry.name = contents->m_pool.addAndGetSlice(name);
+        entry.setType(pathType);
+
+        contents->m_entries.add(entry);
+    }
+
+    Index m_currentParent = -1;             ///< Convenience for adding entries when using enumerate
+
+    StringSlicePool m_pool;                 ///< Holds strings
+    List<Entry> m_entries;                  ///< The entries
+};
+
+void FileSystemContents::appendPath(Index entryIndex, StringBuilder& buf)
+{
+    const auto& entry = m_entries[entryIndex];
+    if (entry.parentDirectoryIndex >= 0)
+    {
+        // If there is a parent recurse to append that first
+        appendPath(entry.parentDirectoryIndex, buf);
+    }
+
+    // If the buffer is non zero, we need to add a separator
+    if (buf.getLength() > 0)
+    {
+        buf.appendChar('/');
+    }
+
+    buf.append(entry.name);
+}
+
+SlangResult FileSystemContents::find(ISlangFileSystemExt* fileSystem, const UnownedStringSlice& inPath)
+{
+    clear();
+
+    StringBuilder currentPath;
+    currentPath.append(inPath);
+
+    // If there is no name, just go with .
+    const char* checkPath = currentPath.getLength() ? currentPath.getBuffer() : ".";
+
+    SlangPathType pathType;
+    SLANG_RETURN_ON_FAIL(fileSystem->getPathType(checkPath, &pathType));
+
+    if (pathType == SLANG_PATH_TYPE_FILE)
+    {
+        Entry directoryEntry;
+        directoryEntry.parentDirectoryIndex = -1;
+        directoryEntry.name = m_pool.addAndGetSlice(Path::getParentDirectory(inPath));
+        directoryEntry.range.set(1, 2);
+        SLANG_ASSERT(directoryEntry.isDirectory());
+
+        m_entries.add(directoryEntry);
+
+        Entry entry;
+        entry.parentDirectoryIndex = 0;
+        entry.name = m_pool.addAndGetSlice(Path::getFileName(inPath));
+        SLANG_ASSERT(entry.isFile());
+
+        m_entries.add(entry);
+    }
+    else
+    {
+        Entry directoryEntry;
+        directoryEntry.setDirectory();
+        
+        directoryEntry.name = m_pool.addAndGetSlice(inPath);
+        m_entries.add(directoryEntry);
+
+        for (Index i = 0; i < m_entries.getCount(); ++i)
+        {
+            const Entry entry = m_entries[i];
+
+            if (entry.isDirectory())
+            {
+                // Clear the current path
+                currentPath.Clear();
+
+                appendPath(i, currentPath);
+
+                // Makes all the items added have this set as their parent
+                m_currentParent = i;
+
+                const auto startIndex = m_entries.getCount();
+
+                const char*const path = currentPath.getLength() ? currentPath.getBuffer() : ".";
+
+                const auto res = fileSystem->enumeratePathContents(path, _add, this);
+                
+                m_entries[i].setDirectoryRange(startIndex, m_entries.getCount());
+            
+                SLANG_RETURN_ON_FAIL(res);
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainerUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */SlangResult ArtifactContainerUtil::writeContainer(IArtifact* artifact, const String& defaultFileName, ISlangMutableFileSystem* fileSystem)
 {
@@ -407,7 +608,7 @@ static SlangResult _remove(ISlangMutableFileSystem* fileSystem, const String& pa
 
         // Okay we can now write out the zip
         SLANG_RETURN_ON_FAIL(osFileSystem->saveFileBlob(fileName.getBuffer(), blob));
-
+        
         return SLANG_OK;
     }
     else if (ext == toSlice("dir"))
@@ -433,14 +634,187 @@ static SlangResult _remove(ISlangMutableFileSystem* fileSystem, const String& pa
     return SLANG_OK;
 }
 
+struct ArtifactContainerReader
+{
+    SlangResult read(ISlangFileSystemExt* fileSystem, ComPtr<IArtifact>& outArtifact);
+
+        /// A directory that contains multiple artifact directories
+    SlangResult _readContainerDirectory(Index directoryIndex, IArtifact::ContainedKind kind, IArtifact* container);
+        /// A directory that holds a single  
+    SlangResult _readArtifactDirectory(Index directoryIndex, ComPtr<IArtifact>& outArtifact);
+
+    SlangResult _readFile(Index fileIndex, ComPtr<IArtifact>& outArtifact);
+
+    FileSystemContents m_contents;
+    ISlangFileSystemExt* m_fileSystem;
+};
+
+SlangResult ArtifactContainerReader::read(ISlangFileSystemExt* fileSystem, ComPtr<IArtifact>& outArtifact)
+{
+    m_fileSystem = fileSystem;
+    m_contents.find(fileSystem, toSlice(""));
+
+    return _readArtifactDirectory(0, outArtifact);
+}
+
+
+SlangResult ArtifactContainerReader::_readFile(Index fileIndex, ComPtr<IArtifact>& outArtifact)
+{
+    outArtifact.setNull();
+    
+    const auto& entry = m_contents.m_entries[fileIndex];
+    SLANG_ASSERT(entry.isFile());
+
+    ArtifactDesc desc;
+
+    auto ext = Path::getPathExt(entry.name);
+    if (ext.getLength() == 0)
+    {
+        // I guess we'll assume it's an executable for now. We should use some kind of associated information/manifest 
+        // probly
+        desc = ArtifactDesc::make(ArtifactKind::Executable, ArtifactPayload::HostCPU);
+    }
+    else
+    {
+        desc = ArtifactDescUtil::getDescFromPath(entry.name);
+    }
+
+    // Don't know what this is. 
+    if (desc.kind == ArtifactKind::Unknown ||
+        desc.kind == ArtifactKind::Invalid)
+    {
+        return SLANG_OK;
+    }
+
+    // I guess I can just make an artifact for this
+    auto artifact = ArtifactUtil::createArtifact(desc);
+
+    if (entry.name.getLength())
+    {
+        // We can set the name on the artifact if set
+        // We know it's 0 terminated, because all names are in the pool 
+        // and therefore have to have 0 termination
+        artifact->setName(entry.name.begin());
+    }
+
+    StringBuilder path;
+    m_contents.appendPath(fileIndex, path);
+
+    IExtFileArtifactRepresentation* rep = new ExtFileArtifactRepresentation(path.getUnownedSlice(), m_fileSystem);
+    artifact->addRepresentation(rep);
+ 
+    outArtifact = artifact;
+    return SLANG_OK;
+}
+
+SlangResult ArtifactContainerReader::_readContainerDirectory(Index directoryIndex, IArtifact::ContainedKind kind, IArtifact* containerArtifact)
+{
+    // This directory only contains other directories which are artifacts
+    // Files are ignored 
+
+    auto indexRange = m_contents.getContentsRange(directoryIndex);
+
+    for (Index i = indexRange.startIndex; i < indexRange.endIndex; ++i)
+    {
+        const auto& entry = m_contents.m_entries[i];
+
+        // We ignore files
+        if (entry.isFile())
+        {
+            continue;
+        }
+
+        ComPtr<IArtifact> artifact;
+
+        SLANG_RETURN_ON_FAIL(_readArtifactDirectory(i, artifact));
+        
+        if (artifact)
+        {
+            containerArtifact->addArtifact(kind, artifact);
+        }
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult ArtifactContainerReader::_readArtifactDirectory(Index directoryIndex, ComPtr<IArtifact>& outArtifact)
+{
+    auto indexRange = m_contents.getContentsRange(directoryIndex);
+
+    Index childrenIndex = -1;
+    Index associatedIndex = -1;
+
+    ComPtr<IArtifact> artifact;
+
+    // Look for files
+    for (Index i = indexRange.startIndex; i < indexRange.endIndex; ++i)
+    {
+        const auto& entry = m_contents.m_entries[i];
+        if (entry.isFile())
+        {
+            ComPtr<IArtifact> readArtifact;
+            SLANG_RETURN_ON_FAIL(_readFile(i, readArtifact));
+            
+            if (readArtifact)
+            {
+                if (artifact)
+                {
+                    // We can only have one artifact in the directory
+                    return SLANG_FAIL;
+                }
+                artifact = readArtifact;
+            }
+        }
+        else if (entry.isDirectory())
+        {
+            if (entry.name == toSlice("associated"))
+            {
+                associatedIndex = i;
+            }
+            else if (entry.name == toSlice("children"))
+            {
+                childrenIndex = i;
+            }
+        }
+    }
+
+    // If we didn't find an artifact so far
+    if (!artifact)
+    {
+        // If we have children/associated we can assume it's a container
+        if (childrenIndex >= 0 || associatedIndex >= 0)
+        {
+            artifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::Unknown));
+            artifact->setName(m_contents.m_entries[directoryIndex].name.begin());
+        }
+        else
+        {
+            // Didn't find anything
+            return SLANG_OK;
+        }
+    }
+
+    if (childrenIndex >= 0)
+    {
+        SLANG_RETURN_ON_FAIL(_readContainerDirectory(childrenIndex, IArtifact::ContainedKind::Children, artifact));
+    }
+    if (associatedIndex >= 0)
+    {
+        SLANG_RETURN_ON_FAIL(_readContainerDirectory(associatedIndex, IArtifact::ContainedKind::Associated, artifact));
+    }
+
+    outArtifact = artifact;
+    return SLANG_OK;
+}
+
 /* static */SlangResult ArtifactContainerUtil::readContainer(ISlangFileSystemExt* fileSystem, ComPtr<IArtifact>& outArtifact)
 {
-    SLANG_UNUSED(fileSystem);
     SLANG_UNUSED(outArtifact);
 
-    // We traverse the file system creating the artifacts
+    ArtifactContainerReader reader;
+    SLANG_RETURN_ON_FAIL(reader.read(fileSystem, outArtifact));
 
-    return SLANG_E_NOT_IMPLEMENTED;
+    return SLANG_OK;
 }
 
 } // namespace Slang

@@ -423,6 +423,8 @@ public:
         /// Get the children, will only remain valid if no mutation of children list
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
 
+        /// Add an artifact. Kind can only be associated or child
+    virtual SLANG_NO_THROW void SLANG_MCALL addArtifact(ContainedKind kind, IArtifact* artifact) = 0;
         /// Find a represention from the specified list 
     virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(ContainedKind kind, const Guid& guid) = 0;
         /// Clear all of the contained kind
