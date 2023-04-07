@@ -44,6 +44,7 @@ Items with ^ means there is some discussion about support later in the document 
 | [RWByteAddressBuffer Atomic](#byte-address-atomic)  |     No       |   Yes ^      |   Yes ^    |     Yes       |    No +
 | [Shader Execution Reordering](#ser)                 |     No       |   Yes ^      |   Yes ^    |     No        |    No 
 | [debugBreak](#debug-break)                          |     No       |   No         |   Yes      |     Yes       |    Yes
+| [realtime clock](#realtime-clock)                   |     No       |   Yes ^      |   Yes      |     Yes       |    No
 
 <a id="half"></a>
 ## Half Type
@@ -276,3 +277,23 @@ Some additional details:
 
 * If [slang-llvm](cpu-target.md#slang-llvm) is being used as the downstream compiler (as is typical with `host-callable`), it will crash into the debugger, but may not produce a usable stack trace.
 * For "normal" C++ downstream compilers such as Clang/Gcc/Visual Studio, to break into readable source code, debug information is typically necessary. Disabling optimizations may be useful to break on the appropriate specific line, and have variables inspectable.
+
+<a id="realtime-clock"></a>
+## Realtime Clock
+
+Realtime clock support is available via the API
+
+```
+// Get low 32 bits of realtime clock
+uint getRealtimeClockLow();
+// Get 64 bit realtime clock, with low bits in .x and high bits in .y
+uint2 getRealtimeClock();
+```
+
+On D3D this is supported through NVAPI via `NvGetSpecial`. 
+
+On Vulkan this is supported via [VK_KHR_shader_clock extension](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_shader_clock.html)
+
+On CUDA this is supported via [clock](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#time-function).
+
+Currently this is not supported on CPU, although this will potentially be added in the future.

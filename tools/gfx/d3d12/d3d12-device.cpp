@@ -24,6 +24,10 @@
 #    define ENABLE_DEBUG_LAYER 0
 #endif
 
+#ifdef GFX_NVAPI
+#    include "../nvapi/nvapi-include.h"
+#endif
+
 namespace gfx
 {
 namespace d3d12
@@ -595,6 +599,11 @@ Result DeviceImpl::initialize(const Desc& desc)
         if (isSupportedNVAPIOp(m_device, NV_EXTN_OP_FP32_ATOMIC))
         {
             m_features.add("atomic-float");
+        }
+
+        // If we have NVAPI well assume we have realtime clock
+        {
+            m_features.add("realtime-clock");
         }
 
         m_nvapi = true;

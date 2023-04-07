@@ -196,6 +196,11 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
             m_features.add("atomic-float");
         }
 
+        // If we have NVAPI well assume we have realtime clock
+        {
+            m_features.add("realtime-clock");
+        }
+
         m_nvapi = true;
 #endif
     }
