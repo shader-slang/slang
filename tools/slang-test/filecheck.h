@@ -18,7 +18,7 @@ public:
         const char* programName,        // Included in diagnostic messages, for example "slang-test"
         const char* rulesFilePath,      // The file from which to read the FileCheck rules
         const char* fileCheckPrefix,    // The name of the FileCheck files to use in the rules file
-        const CharSlice* stringToCheck, // The string to match with the rules
+        const char* stringToCheck, // The string to match with the rules
         const char* stringToCheckName,  // The name of that string, for example "actual-output"
         ReportDiagnostic testReporter,  // A callback for reporting diagnostic messages
         void* reporterData,             // Some data to pass on to the callback

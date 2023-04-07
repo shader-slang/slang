@@ -638,13 +638,12 @@ static TestResult _fileCheckTest(
         return TestResult::Fail;
     }
 
-    const CharSlice outputCS(outputToCheck);
     const bool coloredOutput = true;
     return fc->performTest(
         "slang-test",
         fileCheckRules.begin(),
         fileCheckPrefix.begin(),
-        &outputCS,
+        outputToCheck.begin(),
         "actual-output",
         _fileCheckDiagnosticCallback,
         &testReporter,
