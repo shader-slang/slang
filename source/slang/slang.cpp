@@ -3393,7 +3393,7 @@ ComponentType* asInternal(slang::IComponentType* inComponentType)
     // (without even `addRef`-ing it).
     //
     ComPtr<slang::IComponentType> componentType;
-    inComponentType->queryInterface(slang::IComponentType::getTypeGuid(), (void**) componentType.writeRef());
+    inComponentType->queryInterface(SLANG_IID_PPV_ARGS(componentType.writeRef()));
     return static_cast<ComponentType*>(componentType.get());
 }
 
@@ -4454,7 +4454,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
             else
             {
                 // See if we have the full ISlangFileSystemExt interface, if we do just use it
-                inFileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
+                inFileSystem->queryInterface(SLANG_IID_PPV_ARGS(m_fileSystemExt.writeRef()));
 
                 // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
                 if (!m_fileSystemExt)
