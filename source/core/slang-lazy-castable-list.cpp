@@ -150,7 +150,7 @@ Index LazyCastableList::indexOfUnknown(ISlangUnknown* unk) const
     // Try as a ICastable first
     {
         ComPtr<ICastable> castable;
-        if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+        if (SLANG_SUCCEEDED(unk->queryInterface(SLANG_IID_PPV_ARGS(castable.writeRef()))) && castable)
         {
             return indexOf(castable);
         }

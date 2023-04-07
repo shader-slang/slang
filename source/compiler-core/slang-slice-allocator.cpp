@@ -39,7 +39,7 @@ namespace Slang {
 
     // See if it has a castable interface
     ComPtr<ICastable> castable;
-    if (SLANG_SUCCEEDED(blob->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())))
+    if (SLANG_SUCCEEDED(blob->queryInterface(SLANG_IID_PPV_ARGS(castable.writeRef()))))
     {
         if (castable->castAs(SlangTerminatedChars::getTypeGuid()))
         {
