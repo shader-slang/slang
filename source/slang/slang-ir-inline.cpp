@@ -40,35 +40,54 @@ struct InliningPassBase
         return considerAllCallSitesRec(m_module->getModuleInst());
     }
 
+    bool considerCallSiteInFunc(IRFunc* func)
+    {
+        bool result = false;
+
+        // Repeat until we run out of callees to inline.
+        for (;;)
+        {
+            bool changed = false;
+
+            // Collect all the call sites in the function.
+            List<IRCall*> callsites;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    if (auto call = as<IRCall>(inst))
+                    {
+                        callsites.add(call);
+                    }
+                }
+            }
+
+            // Consider each call site.
+            for (auto call : callsites)
+            {
+                changed |= considerCallSite(call);
+            }
+            result |= changed;
+            if (!changed)
+                break;
+        }
+        return result;
+    }
+
         /// Consider all call sites at or under `inst` for inlining
     bool considerAllCallSitesRec(IRInst* inst)
     {
         bool changed = false;
-        if( auto call = as<IRCall>(inst) )
+
+        if( auto func = as<IRFunc>(inst) )
         {
-            changed = considerCallSite(call);
+            changed = considerCallSiteInFunc(func);
         }
 
-        // Note: we iterate until no more changes can be applied.
-        // This is defensive against changes made by inlining one callsite
-        // and make sure we get to process all callsites.
-        //
-        for (;;)
+        // Recursively consider the children of inst.
+        for (auto child : inst->getModifiableChildren())
         {
-            bool changedInThisIteration = false;
-            // Note: getModifiableChildren will skip any insts that are no
-            // longer the chhild of `inst`. If we process one callsite, the
-            // remaining insts of the block will be moved into a different
-            // block and therefore we won't process them during this iteration.
-            // However, those callsites will eventually be processed
-            // by the outer loop.
-            for (auto child : inst->getModifiableChildren())
-            {
-                changedInThisIteration = considerAllCallSitesRec(child);
-                changed |= changedInThisIteration;
-            }
-            if (!changedInThisIteration)
-                break;
+            changed |= considerAllCallSitesRec(child);
         }
         return changed;
     }
@@ -768,6 +787,12 @@ void performForceInlining(IRModule* module)
 {
     ForceInliningPass pass(module);
     pass.considerAllCallSites();
+}
+
+bool performForceInlining(IRGlobalValueWithCode* func)
+{
+    ForceInliningPass pass(func->getModule());
+    return pass.considerAllCallSitesRec(func);
 }
 
     // Defined in slang-ir-specialize-resource.cpp
