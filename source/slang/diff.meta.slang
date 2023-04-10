@@ -754,10 +754,16 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
     [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
-    DifferentialPair<matrix<T, M, N>> __d_##NAME##_m(DifferentialPair<matrix<T, M, N>> dpx)  \
+    DifferentialPair<matrix<T, M, N>> __d_##NAME##_m(DifferentialPair<matrix<T, M, N>> dpm)  \
     {                                                                                        \
-        typealias ReturnType = matrix<T, M, N>;                                              \
-        return DifferentialPair<ReturnType>(NAME(dpx.p), FWD_DIFF_FUNC);                     \
+        typealias ReturnType = vector<T,N>;                                                  \
+        matrix<T,M,N>.Differential diff;                                                     \
+        [ForceUnroll] for (int i = 0; i < M; i++)                                            \
+        {                                                                                    \
+            var dpx = diffPair(dpm.p[i], dpm.d[i]);                                          \
+            diff[i] = FWD_DIFF_FUNC;                                                         \
+        }                                                                                    \
+        return diffPair(NAME(dpm.p), diff);                              \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType>                                                \
     [BackwardDifferentiable]                                                                 \
@@ -780,10 +786,17 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME##_matrix(                                                                \
-            inout DifferentialPair<matrix<T, M, N>> dpx, matrix<T, M, N>.Differential dOut)  \
+            inout DifferentialPair<matrix<T, M, N>> m, matrix<T, M, N>.Differential mdOut)   \
     {                                                                                        \
-        typealias ReturnType = matrix<T, M, N>;                                              \
-        dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                \
+        typealias ReturnType = vector<T, N>;                                                 \
+        matrix<T, M, N>.Differential diff;                                                   \
+        [ForceUnroll] for (int i = 0; i < M; i++)                                            \
+        {                                                                                    \
+            var dpx = diffPair(m.p[i], m.d[i]);                                              \
+            var dOut = mdOut[i];                                                             \
+            diff[i] = BWD_DIFF_FUNC;                                                         \
+        }                                                                                    \
+        m = diffPair(m.p, diff);                                                             \
     }
 #define SIMPLE_UNARY_DERIVATIVE_IMPL(NAME, DIFF_FUNC) UNARY_DERIVATIVE_IMPL(NAME, ReturnType.dmul(DIFF_FUNC, dpx.d), ReturnType.dmul(DIFF_FUNC, dOut))
 

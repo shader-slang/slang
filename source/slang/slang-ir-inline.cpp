@@ -49,13 +49,26 @@ struct InliningPassBase
             changed = considerCallSite(call);
         }
 
-        // Note: we defensively iterate through the child instructions
-        // so that even if `child` gets removed (because of inlining)
-        // we automatically start at the next instruction after it.
+        // Note: we iterate until no more changes can be applied.
+        // This is defensive against changes made by inlining one callsite
+        // and make sure we get to process all callsites.
         //
-        for (auto child : inst->getModifiableChildren())
+        for (;;)
         {
-            changed |= considerAllCallSitesRec(child);
+            bool changedInThisIteration = false;
+            // Note: getModifiableChildren will skip any insts that are no
+            // longer the chhild of `inst`. If we process one callsite, the
+            // remaining insts of the block will be moved into a different
+            // block and therefore we won't process them during this iteration.
+            // However, those callsites will eventually be processed
+            // by the outer loop.
+            for (auto child : inst->getModifiableChildren())
+            {
+                changedInThisIteration = considerAllCallSitesRec(child);
+                changed |= changedInThisIteration;
+            }
+            if (!changedInThisIteration)
+                break;
         }
         return changed;
     }
