@@ -783,7 +783,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             inout DifferentialPair<matrix<T, M, N>> dpx, matrix<T, M, N>.Differential dOut)  \
     {                                                                                        \
         typealias ReturnType = matrix<T, M, N>;                                              \
-        dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                                  \
+        dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                \
     }
 #define SIMPLE_UNARY_DERIVATIVE_IMPL(NAME, DIFF_FUNC) UNARY_DERIVATIVE_IMPL(NAME, ReturnType.dmul(DIFF_FUNC, dpx.d), ReturnType.dmul(DIFF_FUNC, dOut))
 
