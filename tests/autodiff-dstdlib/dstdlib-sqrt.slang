@@ -41,7 +41,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpx = dpfloat(0.0, 1.0);
         dpfloat res = __fwd_diff(diffSqrt)(dpx);
         outputBuffer[4] = res.p; // Expect: 0.000000
-        outputBuffer[5] = res.d; // Expect: 0.000000
+        outputBuffer[5] = res.d; // Expect: 1581.138916
     }
 
     {

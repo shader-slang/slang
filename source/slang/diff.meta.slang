@@ -740,6 +740,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<T> __d_##NAME(DifferentialPair<T> dpx)                                  \
     {                                                                                        \
+        typealias ReturnType = T;                                                            \
         return DifferentialPair<T>(NAME(dpx.p), FWD_DIFF_FUNC);                              \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
@@ -747,40 +748,23 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<vector<T, N>> __d_##NAME##_vector(DifferentialPair<vector<T, N>> dpx)   \
     {                                                                                        \
-        vector<T, N> result;                                                                 \
-        vector<T, N>.Differential d_result;                                                  \
-        [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
-        {                                                                                    \
-            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
-                DifferentialPair<T>(dpx.p[i], __slang_noop_cast<T.Differential>(dpx.d[i]))); \
-            result[i] = dp_elem.p;                                                           \
-            d_result[i] = __slang_noop_cast<T>(dp_elem.d);                                   \
-        }                                                                                    \
-        return DifferentialPair<vector<T, N>>(result, d_result);                             \
+        typealias ReturnType = vector<T, N>;                                                 \
+        return DifferentialPair<ReturnType>(NAME(dpx.p), FWD_DIFF_FUNC);                     \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
     [BackwardDifferentiable]                                                                 \
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<matrix<T, M, N>> __d_##NAME##_m(DifferentialPair<matrix<T, M, N>> dpx)  \
     {                                                                                        \
-        matrix<T, M, N> result;                                                              \
-        matrix<T, M, N>.Differential d_result;                                               \
-        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
-        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
-        {                                                                                    \
-            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
-               DifferentialPair<T>(dpx.p[i][j],                                              \
-                                   __slang_noop_cast<T.Differential>(dpx.d[i][j])));         \
-            result[i][j] = dp_elem.p;                                                        \
-            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
-        }                                                                                    \
-        return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
+        typealias ReturnType = matrix<T, M, N>;                                              \
+        return DifferentialPair<ReturnType>(NAME(dpx.p), FWD_DIFF_FUNC);                     \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType>                                                \
     [BackwardDifferentiable]                                                                 \
     [BackwardDerivativeOf(NAME)]                                                             \
     void __d_##NAME(inout DifferentialPair<T> dpx, T.Differential dOut)                      \
     {                                                                                        \
+        typealias ReturnType = T;                                                            \
         dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
@@ -789,14 +773,8 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     void __d_##NAME##_vector(                                                                \
             inout DifferentialPair<vector<T, N>> dpx, vector<T, N>.Differential dOut)        \
     {                                                                                        \
-        vector<T, N>.Differential d_result;                                                  \
-        [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
-        {                                                                                    \
-            DifferentialPair<T> dp_elem = diffPair(dpx.p[i], T.dzero());                     \
-            __d_##NAME(dp_elem, __slang_noop_cast<T.Differential>(dOut[i]));                 \
-            d_result[i] = __slang_noop_cast<T>(dp_elem.d);                                   \
-        }                                                                                    \
-        dpx = diffPair(dpx.p, d_result);                                                     \
+        typealias ReturnType = vector<T, N>;                                                 \
+        dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
     [BackwardDifferentiable]                                                                 \
@@ -804,17 +782,10 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     void __d_##NAME##_matrix(                                                                \
             inout DifferentialPair<matrix<T, M, N>> dpx, matrix<T, M, N>.Differential dOut)  \
     {                                                                                        \
-        matrix<T, M, N>.Differential d_result;                                               \
-        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
-        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
-        {                                                                                    \
-            DifferentialPair<T> dp_elem = diffPair(dpx.p[i][j], T.dzero());                  \
-            __d_##NAME(dp_elem, __slang_noop_cast<T.Differential>(dOut[i][j]));              \
-            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
-        }                                                                                    \
-        dpx = diffPair(dpx.p, d_result);                                                     \
+        typealias ReturnType = matrix<T, M, N>;                                              \
+        dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                                  \
     }
-#define SIMPLE_UNARY_DERIVATIVE_IMPL(NAME, DIFF_FUNC) UNARY_DERIVATIVE_IMPL(NAME, T.dmul(DIFF_FUNC, dpx.d), T.dmul(DIFF_FUNC, dOut))
+#define SIMPLE_UNARY_DERIVATIVE_IMPL(NAME, DIFF_FUNC) UNARY_DERIVATIVE_IMPL(NAME, ReturnType.dmul(DIFF_FUNC, dpx.d), ReturnType.dmul(DIFF_FUNC, dOut))
 
 // Detach and set derivatives to zero
 __generic<T : IDifferentiable>
@@ -824,9 +795,9 @@ T detach(T x);
 #define SLANG_SQR(x) ((x)*(x))
 
 // Absolute value
-UNARY_DERIVATIVE_IMPL(abs, (dpx.p > T(0.0) ? dpx.d : T.dmul(T(-1.0), dpx.d)), (T.dmul(__slang_noop_cast<T>(sign(dpx.p)), dOut)))
+UNARY_DERIVATIVE_IMPL(abs, select(dpx.p > T(0.0), dpx.d, ReturnType.dmul(T(-1.0), dpx.d)), (ReturnType.dmul(__slang_noop_cast<ReturnType>(sign(dpx.p)), dOut)))
 // Saturate
-UNARY_DERIVATIVE_IMPL(saturate, (dpx.p < T(0.0) || dpx.p > T(1.0) ? T.dzero() : dpx.d), (dpx.p < T(0.0) || dpx.p > T(1.0) ? T.dzero() : dOut))
+UNARY_DERIVATIVE_IMPL(saturate, select(dpx.p < T(0.0) || dpx.p > T(1.0), ReturnType.dzero(), dpx.d), select(dpx.p < T(0.0) || dpx.p > T(1.0), ReturnType.dzero(), dOut))
 // frac
 UNARY_DERIVATIVE_IMPL(frac, dpx.d, dOut)
 // raidans, degrees
@@ -849,9 +820,9 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(log, T(1.0) / dpx.p)
 SIMPLE_UNARY_DERIVATIVE_IMPL(log10, T(1.0) / (dpx.p * T(52.3025850929940456840179914546844)))
 SIMPLE_UNARY_DERIVATIVE_IMPL(log2, T(1.0) / (dpx.p * T(50.69314718055994530941723212145818)))
 // Square root
-SIMPLE_UNARY_DERIVATIVE_IMPL(sqrt, (dpx.p < T(1e-7) ? T(0.0) : T(0.5) / sqrt(dpx.p)))
+SIMPLE_UNARY_DERIVATIVE_IMPL(sqrt, T(0.5) / sqrt(max(ReturnType(T(1e-7)), dpx.p)))
 // Reciprocal
-SIMPLE_UNARY_DERIVATIVE_IMPL(rcp, (dpx.p < T(1e-7) ? T(0.0) : T(-1.0) / (dpx.p * dpx.p)))
+SIMPLE_UNARY_DERIVATIVE_IMPL(rcp, T(-1.0) / max(ReturnType(T(1e-7)), dpx.p * dpx.p))
 // rsqrt
 SIMPLE_UNARY_DERIVATIVE_IMPL(rsqrt, T(-0.5) / (dpx.p * sqrt(dpx.p)))
 // Arc-sin
