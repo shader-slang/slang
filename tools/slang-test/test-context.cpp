@@ -96,6 +96,15 @@ Result TestContext::init(const char* inExePath)
 
 TestContext::~TestContext()
 {
+#if SLANG_WINDOWS_FAMILY && defined(_DEBUG)
+    // TODO(JS)
+    // HACK!!!! Causes memory leak!
+    // Added because releasing m_fileCheck appears to cause an exception on debug 
+    {
+        m_fileCheck.detach();
+    }
+#endif
+    
     if (m_languageServerConnection)
     {
         m_languageServerConnection->sendCall(
