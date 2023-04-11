@@ -1,7 +1,7 @@
-//DISABLE_TEST:SIMPLE: -target cuda -line-directive-mode none
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none
+//TEST:SIMPLE(filecheck=TORCH): -target torch -line-directive-mode none
 
-// Verify that we can output a cuda device function with [CudaDeviceExport].
-// Disabled until we have FileCheck.
+// Verify that we can output a cuda device function with [CudaKernel].
 
 struct MySubType
 {
@@ -20,6 +20,7 @@ struct MyInput
     float normalVal;
 }
 
+// CUDA: __global__ void myKernel(TensorView inValues_[[#]], TensorView outValues_[[#]])
 [CudaKernel]
 void myKernel(TensorView<float> inValues, TensorView<float> outValues)
 {
@@ -28,6 +29,11 @@ void myKernel(TensorView<float> inValues, TensorView<float> outValues)
     outValues.store(cudaThreadIdx().x, sin(inValues.load(cudaThreadIdx().x)));
 }
 
+// TORCH:      {{^SLANG_PRELUDE_EXPORT$}}
+// TORCH-NEXT: void myKernel(TensorView {{[[:alnum:]_]+}}, TensorView {{[[:alnum:]_]+}});
+//
+// TORCH:      {{^SLANG_PRELUDE_EXPORT$}}
+// TORCH-NEXT: std::tuple<std::tuple<float, float>, std::tuple<std::tuple<std::tuple<torch::Tensor, torch::Tensor>>, std::tuple<std::tuple<torch::Tensor, torch::Tensor>>>> runCompute(std::tuple<torch::Tensor, float> input_[[#]])
 [TorchEntryPoint]
 public __extern_cpp MyType runCompute(MyInput input)
 {
