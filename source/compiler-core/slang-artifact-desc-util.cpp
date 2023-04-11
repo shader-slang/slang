@@ -222,6 +222,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(DebugInfo, Metadata) \
                 x(PdbDebugInfo, DebugInfo) \
             x(Diagnostics, Metadata) \
+            x(PostEmitMetadata, Metadata) \
         x(Miscellaneous, Base) \
             x(Log, Miscellaneous) \
             x(Lock, Miscellaneous) \

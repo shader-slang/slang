@@ -6,6 +6,7 @@
 #include "../core/slang-archive-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-castable.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
@@ -3393,7 +3394,7 @@ ComponentType* asInternal(slang::IComponentType* inComponentType)
     // (without even `addRef`-ing it).
     //
     ComPtr<slang::IComponentType> componentType;
-    inComponentType->queryInterface(slang::IComponentType::getTypeGuid(), (void**) componentType.writeRef());
+    inComponentType->queryInterface(SLANG_IID_PPV_ARGS(componentType.writeRef()));
     return static_cast<ComponentType*>(componentType.get());
 }
 
@@ -4454,7 +4455,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
             else
             {
                 // See if we have the full ISlangFileSystemExt interface, if we do just use it
-                inFileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
+                inFileSystem->queryInterface(SLANG_IID_PPV_ARGS(m_fileSystemExt.writeRef()));
 
                 // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
                 if (!m_fileSystemExt)
@@ -5378,7 +5379,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
         return SLANG_E_INVALID_ARG;
 
     // Find a rep
-    auto metadata = findAssociated<IArtifactPostEmitMetadata>(artifact);
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 

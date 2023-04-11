@@ -3,13 +3,13 @@
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
+#include "../core/slang-castable.h"
+
 #include "slang-io.h"
 #include "slang-string-util.h"
 #include "slang-blob.h"
 
 #include "slang-riff-file-system.h"
-
-#include "slang-destroyable.h"
 
 // Compression systems
 #include "slang-deflate-compression-system.h"

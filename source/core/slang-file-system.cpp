@@ -338,7 +338,7 @@ void CacheFileSystem::setInnerFileSystem(ISlangFileSystem* fileSystem, UniqueIde
     if (fileSystem)
     {
         // Try to get the more sophisticated interface
-        fileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
+        fileSystem->queryInterface(SLANG_IID_PPV_ARGS(m_fileSystemExt.writeRef()));
     }
 
     // Determine how paths map
@@ -826,7 +826,7 @@ RelativeFileSystem::RelativeFileSystem(ISlangFileSystem* fileSystem, const Strin
     m_osPathKind = OSPathKind::None;
 
     ComPtr<ISlangFileSystemExt> ext;
-    if (SLANG_SUCCEEDED(fileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)ext.writeRef())))
+    if (SLANG_SUCCEEDED(fileSystem->queryInterface(SLANG_IID_PPV_ARGS(ext.writeRef()))))
     {
         m_osPathKind = ext->getOSPathKind();
 

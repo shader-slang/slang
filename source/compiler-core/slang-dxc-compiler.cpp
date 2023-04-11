@@ -640,7 +640,9 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     }
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
-    artifact->addAssociated(diagnostics);
+
+    ArtifactUtil::addAssociated(artifact, diagnostics);
+
     if (dxcResultBlob)
     {
         artifact->addRepresentationUnknown((ISlangBlob*)dxcResultBlob.get());

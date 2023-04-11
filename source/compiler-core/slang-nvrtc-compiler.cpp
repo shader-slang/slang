@@ -928,7 +928,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& inO
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
     auto diagnostics = ArtifactDiagnostics::create();
 
-    artifact->addAssociated(diagnostics);
+    ArtifactUtil::addAssociated(artifact, diagnostics);
 
     ComPtr<ISlangBlob> blob;
 

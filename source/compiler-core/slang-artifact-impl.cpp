@@ -8,26 +8,24 @@
 
 #include "slang-artifact-handler-impl.h"
 
-#include "../core/slang-castable-util.h"
+#include "slang-slice-allocator.h"
+
+#include "../core/slang-castable.h"
 
 namespace Slang {
 
-static bool _checkSelf(IArtifact::FindStyle findStyle)
+namespace { // anonymous
+
+/* Get a view as a slice of *raw* pointers */
+template <typename T>
+SLANG_FORCE_INLINE ConstArrayView<T*> _getRawView(const List<ComPtr<T>>& in)
 {
-    return Index(findStyle) <= Index(IArtifact::FindStyle::SelfOrChildren);
+    return makeConstArrayView((T*const*)in.getBuffer(), in.getCount());
 }
 
-static bool _checkChildren(IArtifact::FindStyle findStyle)
-{
-    return Index(findStyle) >= Index(IArtifact::FindStyle::SelfOrChildren);
-}
+} // anonymous
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-IArtifactHandler* Artifact::_getHandler()
-{
-    return m_handler ? m_handler : DefaultArtifactHandler::getSingleton();
-}
 
 void* Artifact::castAs(const Guid& guid)
 {
@@ -55,9 +53,24 @@ void* Artifact::getObject(const Guid& uuid)
     return nullptr;
 }
 
+IArtifactHandler* Artifact::_getHandler()
+{
+    return m_handler ? m_handler : DefaultArtifactHandler::getSingleton();
+}
+
+void Artifact::_requireChildren()
+{
+    if (m_expandResult == SLANG_E_UNINITIALIZED)
+    {
+        const auto res = expandChildren();
+        SLANG_UNUSED(res);
+        SLANG_ASSERT(SLANG_SUCCEEDED(res));
+    }
+}
+
 bool Artifact::exists()
 {
-    for (auto rep : m_representations.getView())
+    for (ICastable* rep : m_representations.getArrayView())
     {
         if (auto artifactRep = as<IArtifactRepresentation>(rep))
         {
@@ -115,6 +128,28 @@ void Artifact::setHandler(IArtifactHandler* handler)
     m_handler = handler;
 }
 
+void Artifact::clear(IArtifact::ContainedKind kind)
+{
+    switch (kind)
+    {
+        case ContainedKind::Associated:     m_associated.clear(); break;
+        case ContainedKind::Representation: m_representations.clear(); break;
+        case ContainedKind::Children:       m_children.clear(); break;
+        default: break;
+    }
+}
+
+void Artifact::removeAt(ContainedKind kind, Index i)
+{
+    switch (kind)
+    {
+        case ContainedKind::Associated:     m_associated.removeAt(i); break;
+        case ContainedKind::Representation: m_representations.removeAt(i); break;
+        case ContainedKind::Children:       m_children.removeAt(i); break;
+        default: break;
+    }
+}
+
 SlangResult Artifact::getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable)
 {
     auto handler = _getHandler();
@@ -135,52 +170,87 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
     return SLANG_OK;
 }
 
-void Artifact::addAssociated(ICastable* castable)
+void Artifact::addAssociated(IArtifact* artifact)
 {
-    SLANG_ASSERT(castable);
-    m_associated.add(castable);
-}
- 
-void* Artifact::findAssociated(const Guid& guid)
-{
-    return m_associated.find(guid);
+    SLANG_ASSERT(artifact);
+    m_associated.add(ComPtr<IArtifact>(artifact));
 }
 
-
-ICastable* Artifact::findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data)
+static void* _findRepresentation(const ConstArrayView<ICastable*>& castables, const Guid& guid)
 {
-    return m_associated.findWithPredicate(findFunc, data);
+    for (const auto& cur : castables)
+    {
+        if (auto ptr = cur->castAs(guid))
+        {
+            return ptr;
+        }
+    }
+    return nullptr;
 }
 
-ICastableList* Artifact::getAssociated()
+static void* _findRepresentation(const ConstArrayView<IArtifact*>& artifacts, const Guid& guid)
 {
-    return m_associated.requireList();
+    for (auto child : artifacts)
+    {
+        if (auto rep = child->findRepresentation(Artifact::ContainedKind::Representation, guid))
+        {
+            return rep;
+        }
+    }
+    return nullptr;
+}
+
+void* Artifact::findRepresentation(ContainedKind kind, const Guid& guid)
+{
+    switch (kind)
+    {
+        case ContainedKind::Associated:         return _findRepresentation(_getRawView(m_associated), guid);
+        case ContainedKind::Representation:     return _findRepresentation(_getRawView(m_representations), guid);
+        case ContainedKind::Children:           
+        {
+            _requireChildren();
+            return _findRepresentation(_getRawView(m_children), guid);
+        }
+    }
+    return nullptr;
+}
+
+Slice<IArtifact*> Artifact::getAssociated()
+{
+    return SliceUtil::asSlice(m_associated);
 }
 
 void Artifact::addRepresentation(ICastable* castable)
 {
     SLANG_ASSERT(castable);
-    if (m_representations.indexOf(castable) >= 0)
+
+    auto view = _getRawView(m_representations);
+    if (view.indexOf(castable) >= 0)
     {
         SLANG_ASSERT_FAILURE("Already have this representation");
         return;
     }
-    m_representations.add(castable);
+
+    m_representations.add(ComPtr<ICastable>(castable));
 }
 
 void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
 {
     SLANG_ASSERT(unk);
-    if (m_representations.indexOfUnknown(unk) >= 0)
+
     {
-        SLANG_ASSERT_FAILURE("Already have this representation");
-        return;
+        const auto view = makeConstArrayView((ISlangUnknown*const*)m_representations.getBuffer(), m_representations.getCount());
+        if (view.indexOf(unk) >= 0)
+        {
+            SLANG_ASSERT_FAILURE("Already have this representation");
+            return;
+        }
     }
 
     ComPtr<ICastable> castable;
-    if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+    if (SLANG_SUCCEEDED(unk->queryInterface(SLANG_IID_PPV_ARGS(castable.writeRef()))) && castable)
     {
-        if (m_representations.indexOf(castable) >= 0)
+        if (_getRawView(m_representations).indexOf(castable) >= 0)
         {
             SLANG_ASSERT_FAILURE("Already have this representation");
             return;
@@ -190,81 +260,16 @@ void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
     else
     {
         UnknownCastableAdapter* adapter = new UnknownCastableAdapter(unk);
-        m_representations.add(adapter);
+        m_representations.add(ComPtr<ICastable>(adapter));
     }
-}
-
-void* Artifact::findRepresentation(const Guid& guid)
-{
-    return m_representations.find(guid);
-}
-
-ICastable* Artifact::findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data)
-{
-    return m_representations.findWithPredicate(findFunc, data);
 }
 
 Slice<ICastable*> Artifact::getRepresentations()
 {
-    const auto view = m_representations.getView();
-    return Slice<ICastable*>(view.getBuffer(), view.getCount());
+    return SliceUtil::asSlice(m_representations);
 }
 
-ICastableList* Artifact::getRepresentationList()
-{
-    return m_representations.requireList();
-}
-
-IArtifact* Artifact::findArtifactByDerivedDesc(FindStyle findStyle, const ArtifactDesc& from)
-{
-    return (_checkSelf(findStyle) && ArtifactDescUtil::isDescDerivedFrom(m_desc, from)) ? this : nullptr;
-}
-
-IArtifact* Artifact::findArtifactByPredicate(FindStyle findStyle, FindFunc func, void* data)
-{
-    return (_checkSelf(findStyle) && func(this, data)) ? this : nullptr;
-}
-
-IArtifact* Artifact::findArtifactByName(FindStyle findStyle, const char* name)
-{
-    return (_checkSelf(findStyle) && m_name == name) ? this : nullptr;
-}
-
-IArtifact* Artifact::findArtifactByDesc(FindStyle findStyle, const ArtifactDesc& desc)
-{
-    return (_checkSelf(findStyle) && m_desc == desc) ? this : nullptr;
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainer !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-void* ArtifactContainer::getInterface(const Guid& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IArtifact::getTypeGuid() ||
-        guid == IArtifactContainer::getTypeGuid())
-    {
-        return static_cast<IArtifactContainer*>(this);
-    }
-    return nullptr;
-}
-
-void* ArtifactContainer::getObject(const Guid& guid)
-{
-    SLANG_UNUSED(guid);
-    return nullptr;
-}
-
-void* ArtifactContainer::castAs(const Guid& guid)
-{
-    if (auto ptr = getInterface(guid))
-    {
-        return ptr;
-    }
-    return getObject(guid);
-}
-
-void ArtifactContainer::setChildren(IArtifact** children, Count count)
+void Artifact::setChildren(IArtifact*const* children, Count count)
 {
     m_expandResult = SLANG_OK;
 
@@ -278,117 +283,26 @@ void ArtifactContainer::setChildren(IArtifact** children, Count count)
     }
 }
 
-SlangResult ArtifactContainer::expandChildren()
+SlangResult Artifact::expandChildren()
 {
     auto handler = _getHandler();
     return handler->expandChildren(this);
 }
 
-Slice<IArtifact*> ArtifactContainer::getChildren()
+Slice<IArtifact*> Artifact::getChildren()
 {
     _requireChildren();
-
-    return Slice<IArtifact*>((IArtifact**)m_children.getBuffer(), m_children.getCount());
+    return SliceUtil::asSlice(m_children);
 }
 
-void ArtifactContainer::addChild(IArtifact* artifact)
+void Artifact::addChild(IArtifact* artifact)
 {
     SLANG_ASSERT(artifact);
-    SLANG_ASSERT(m_children.indexOf(artifact) < 0);
+    SLANG_ASSERT(_getRawView(m_children).indexOf(artifact) < 0);
 
     _requireChildren();
 
     m_children.add(ComPtr<IArtifact>(artifact));
-}
-
-void ArtifactContainer::removeChildAt(Index index)
-{
-    _requireChildren();
-
-    m_children.removeAt(index);
-}
-
-void ArtifactContainer::clearChildren()
-{
-    _requireChildren();
-
-    m_children.clearAndDeallocate();
-}
-
-static bool _isDerivedDesc(IArtifact* artifact, void* data)
-{
-    const ArtifactDesc& from = *(const ArtifactDesc*)data;
-    return ArtifactDescUtil::isDescDerivedFrom(artifact->getDesc(), from);
-}
-
-static bool _isDesc(IArtifact* artifact, void* data)
-{
-    const ArtifactDesc& desc = *(const ArtifactDesc*)data;
-    return desc == artifact->getDesc();
-}
-
-static bool _isName(IArtifact* artifact, void* data)
-{
-    const char* name = (const char*)data;
-    const char* artifactName = artifact->getName();
-    if (artifactName == nullptr)
-    {
-        return false;
-    }
-    return ::strcmp(name, artifactName) == 0;
-}
-
-
-IArtifact* ArtifactContainer::findArtifactByDerivedDesc(FindStyle findStyle, const ArtifactDesc& from)
-{
-    return findArtifactByPredicate(findStyle, _isDerivedDesc, const_cast<ArtifactDesc*>(&from));
-}
-
-IArtifact* ArtifactContainer::findArtifactByName(FindStyle findStyle, const char* name)
-{
-    return findArtifactByPredicate(findStyle, _isName, const_cast<char*>(name));
-}
-
-IArtifact* ArtifactContainer::findArtifactByDesc(FindStyle findStyle, const ArtifactDesc& desc)
-{
-    return findArtifactByPredicate(findStyle, _isDesc, const_cast<ArtifactDesc*>(&desc));
-}
-
-IArtifact* ArtifactContainer::findArtifactByPredicate(FindStyle findStyle, FindFunc func, void* data)
-{
-    if (_checkSelf(findStyle) && func(this, data))
-    {
-        return this;
-    }
-
-    if (_checkChildren(findStyle))
-    {
-        auto children = getChildren();
-
-        // First search the children
-        for (auto child : children)
-        {
-            if (func(child, data))
-            {
-                return child;
-            }
-        }
-
-        // Then the childrens recursively
-        if (findStyle == FindStyle::Recursive ||
-            findStyle == FindStyle::ChildrenRecursive)
-        {
-            for (auto child : children)
-            {
-                if (auto found = child->findArtifactByPredicate(FindStyle::ChildrenRecursive, func, data))
-                {
-                    return found;
-                }
-            }
-        }
-    }
-
-    return nullptr;
 }
 
 } // namespace Slang

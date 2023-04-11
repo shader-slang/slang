@@ -20,6 +20,7 @@
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
 
+#include "../core/slang-castable.h"
 #include "../core/slang-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-hex-dump-util.h"

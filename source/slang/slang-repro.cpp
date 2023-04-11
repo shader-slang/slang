@@ -7,6 +7,7 @@
 
 #include "../core/slang-math.h"
 #include "../core/slang-type-text-util.h"
+#include "../core/slang-castable.h"
 
 #include "slang-options.h"
 

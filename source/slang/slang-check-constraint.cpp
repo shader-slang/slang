@@ -469,6 +469,16 @@ namespace Slang
             auto sub = getSub(m_astBuilder, constraintDeclRef);
             auto sup = getSup(m_astBuilder, constraintDeclRef);
 
+            if (sub->equals(sup))
+            {
+                // We are trying to use an interface type itself to conform to the
+                // type constraint. We can reach this case when the user code does
+                // not provide an explicit type parameter to specialize a generic
+                // and the type parameter cannot be inferred from any arguments.
+                // In this case, we should fail the constraint check.
+                return SubstitutionSet();
+            }
+
             // Search for a witness that shows the constraint is satisfied.
             auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
             if(subTypeWitness)

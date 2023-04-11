@@ -13,6 +13,7 @@
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-inline.h"
 
 namespace Slang
 {
@@ -520,6 +521,8 @@ namespace Slang
     SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func)
     {
         removeLinkageDecorations(func);
+
+        performForceInlining(func);
 
         DifferentiableTypeConformanceContext diffTypeContext(autoDiffSharedContext);
         diffTypeContext.setFunc(func);
