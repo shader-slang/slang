@@ -9,8 +9,7 @@
 
 #include "../../source/core/slang-deflate-compression-system.h"
 #include "../../source/core/slang-lz4-compression-system.h"
-
-#include "../../source/core/slang-destroyable.h"
+#include "../../source/core/slang-castable.h"
 
 #include "../../source/core/slang-io.h"
 

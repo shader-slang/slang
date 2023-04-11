@@ -225,7 +225,8 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
 
     // Set the diagnostics result
     diagnostics->setResult(invokeResult);
-    artifact->addAssociated(diagnostics);
+
+    ArtifactUtil::addAssociated(artifact, diagnostics);
 
     if (SLANG_FAILED(invokeResult))
     {

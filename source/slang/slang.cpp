@@ -6,6 +6,7 @@
 #include "../core/slang-archive-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-castable.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
@@ -5378,7 +5379,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
         return SLANG_E_INVALID_ARG;
 
     // Find a rep
-    auto metadata = findAssociated<IArtifactPostEmitMetadata>(artifact);
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 

@@ -329,7 +329,8 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     }
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
-    artifact->addAssociated(diagnostics);
+
+    ArtifactUtil::addAssociated(artifact, diagnostics);
 
     if (codeBlob)
     {

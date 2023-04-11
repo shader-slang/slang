@@ -1146,10 +1146,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
     artifact->addRepresentationUnknown(StringBlob::moveCreate(finalResult));
 
-    if (metadata)
-    {
-        artifact->addAssociated(metadata);
-    }
+    ArtifactUtil::addAssociated(artifact, metadata);
 
     if (sourceMap)
     {
@@ -1210,10 +1207,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
-    if (linkedIR.metadata)
-    {
-        artifact->addAssociated(linkedIR.metadata);
-    }
+    ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
 
     outArtifact.swap(artifact);
 
