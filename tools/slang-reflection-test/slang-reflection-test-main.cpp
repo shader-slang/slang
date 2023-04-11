@@ -138,7 +138,7 @@ static void write(PrettyWriter& writer, uint64_t val)
 static void write(PrettyWriter& writer, int64_t val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%ll", (long long)val);
+    Slang::StdWriters::getOut().print("%lld", (long long)val);
 }
 
 static void write(PrettyWriter& writer, int32_t val)
@@ -501,7 +501,7 @@ static void emitReflectionScalarTypeInfoJSON(
         write(writer, "unknown");
         assert(!"unhandled case");
         break;
-#define CASE(TAG, ID) case slang::TypeReflection::ScalarType::TAG: write(writer, #ID); break
+#define CASE(TAG, ID) case static_cast<SlangScalarType>(slang::TypeReflection::ScalarType::TAG): write(writer, #ID); break
         CASE(Void, void);
         CASE(Bool, bool);
 

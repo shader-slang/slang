@@ -22,9 +22,10 @@ namespace Slang
 
     ComPtr<IDownstreamCompiler> downstreamCompiler;
 
-    if (auto fnV3 = (CreateDownstreamCompilerFunc)library->findFuncByName("createLLVMDownstreamCompiler_V3"))
+    // Only accept V4, so we can update IArtifact without breaking anything
+    if (auto fnV4 = (CreateDownstreamCompilerFunc)library->findFuncByName("createLLVMDownstreamCompiler_V4"))
     {
-        SLANG_RETURN_ON_FAIL(fnV3(IDownstreamCompiler::getTypeGuid(), downstreamCompiler.writeRef()));
+        SLANG_RETURN_ON_FAIL(fnV4(IDownstreamCompiler::getTypeGuid(), downstreamCompiler.writeRef()));
     }
     else
     {

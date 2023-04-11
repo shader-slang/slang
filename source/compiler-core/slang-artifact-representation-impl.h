@@ -33,6 +33,7 @@ public:
     // IPathArtifactRepresentation
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
     virtual SLANG_NO_THROW SlangPathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return SLANG_PATH_TYPE_FILE; }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() SLANG_OVERRIDE;
 
     // IOSFileArtifactRepresentation
     virtual SLANG_NO_THROW Kind SLANG_MCALL getKind() SLANG_OVERRIDE { return m_kind; }
@@ -64,6 +65,8 @@ protected:
 
     Kind m_kind;
     String m_path;
+    String m_uniqueIdentity;
+
     ComPtr<IOSFileArtifactRepresentation> m_lockFile;
     ComPtr<ISlangMutableFileSystem> m_fileSystem;
 };
@@ -85,7 +88,8 @@ public:
     // IPathArtifactRepresentation
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
     virtual SLANG_NO_THROW SlangPathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return SLANG_PATH_TYPE_FILE; }
-
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() SLANG_OVERRIDE;
+    
     // IExtFileArtifactRepresentation
     virtual SLANG_NO_THROW ISlangFileSystemExt* SLANG_MCALL getFileSystem() SLANG_OVERRIDE { return m_fileSystem; }
 
@@ -104,6 +108,7 @@ protected:
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
+    String m_uniqueIdentity;
     String m_path;
     ComPtr<ISlangFileSystemExt> m_fileSystem;
 };
@@ -125,6 +130,7 @@ public:
     // IPathArtifactRepresentation
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_pathInfo.getName().getBuffer(); }
     virtual SLANG_NO_THROW SlangPathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return SLANG_PATH_TYPE_FILE; }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() SLANG_OVERRIDE { return m_pathInfo.hasUniqueIdentity() ? m_pathInfo.uniqueIdentity.getBuffer() : nullptr; }
 
     SourceBlobWithPathInfoArtifactRepresentation(const PathInfo& pathInfo, ISlangBlob* sourceBlob) :
         m_pathInfo(pathInfo),

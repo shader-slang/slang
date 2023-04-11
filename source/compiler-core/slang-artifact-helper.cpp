@@ -9,8 +9,7 @@
 
 #include "../compiler-core/slang-slice-allocator.h"
 
-#include "../core/slang-castable-list-impl.h"
-#include "../core/slang-castable-util.h"
+#include "../core/slang-castable.h"
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
@@ -66,15 +65,6 @@ SlangResult DefaultArtifactHelper::createArtifact(const ArtifactDesc& desc, cons
 	return SLANG_OK;
 }
 
-SlangResult DefaultArtifactHelper::createArtifactContainer(const ArtifactDesc& desc, const char* inName, IArtifactContainer** outArtifactContainer)
-{
-	*outArtifactContainer = inName ?
-		ArtifactContainer::create(desc, UnownedStringSlice(inName)).detach() :
-		ArtifactContainer::create(desc).detach();
-
-	return SLANG_OK;
-}
-
 ArtifactKind DefaultArtifactHelper::getKindParent(ArtifactKind kind) { return getParent(kind); }
 UnownedStringSlice DefaultArtifactHelper::getKindName(ArtifactKind kind) { return getName(kind); }
 bool DefaultArtifactHelper::isKindDerivedFrom(ArtifactKind kind, ArtifactKind base) { return isDerivedFrom(kind, base); }
@@ -122,19 +112,6 @@ ArtifactDesc DefaultArtifactHelper::makeDescForCompileTarget(SlangCompileTarget 
 void DefaultArtifactHelper::getCastable(ISlangUnknown* unk, ICastable** outCastable)
 {
 	*outCastable = CastableUtil::getCastable(unk).detach();
-}
-
-SlangResult DefaultArtifactHelper::createCastableList(const Guid& guid, ICastableList** outList)
-{
-	auto list = new CastableList;
-	if (auto ptr = list->getInterface(guid))
-	{
-		list->addRef();
-		*outList = (ICastableList*)ptr;
-		return SLANG_OK;
-	}
-	delete list;
-	return SLANG_E_NO_INTERFACE;
 }
 
 SlangResult DefaultArtifactHelper::createOSFileArtifactRepresentation(

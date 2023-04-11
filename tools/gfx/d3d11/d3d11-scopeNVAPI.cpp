@@ -20,7 +20,7 @@ SlangResult ScopeNVAPI::init(DeviceImpl* device, Index regIndex)
     }
 
 #ifdef GFX_NVAPI
-    NvAPI_Status nvapiStatus = NvAPI_D3D11_SetNvShaderExtnSlot(renderer->m_device, NvU32(regIndex));
+    NvAPI_Status nvapiStatus = NvAPI_D3D11_SetNvShaderExtnSlot(device->m_device, NvU32(regIndex));
     if (nvapiStatus != NVAPI_OK)
     {
         return SLANG_FAIL;

@@ -6,6 +6,7 @@
 #include "../core/slang-archive-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-castable.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
@@ -1583,6 +1584,32 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
     _addSourceFile(sourceFile);
 }
 
+PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
+{
+    auto pathRep = findRepresentation<IPathArtifactRepresentation>(artifact);
+    
+    if (pathRep && pathRep->getPathType() == SLANG_PATH_TYPE_FILE)
+    {
+        // See if we have a unique identity set with the path
+        if (const auto uniqueIdentity = pathRep->getUniqueIdentity())
+        {
+            return PathInfo::makeNormal(pathRep->getPath(), uniqueIdentity);
+        }
+
+        // If we couldn't get a unique identity, just use the path
+        return PathInfo::makePath(pathRep->getPath());
+    }
+
+    // If there isn't a path, we can try with the name
+    const char* name = artifact->getName();
+    if (name && name[0] != 0)
+    {
+        return PathInfo::makeFromString(name);
+    }
+
+    return PathInfo::makeUnknown();
+}
+
 SlangResult TranslationUnitRequest::requireSourceFiles()
 {
     SLANG_ASSERT(m_sourceFiles.getCount() <= m_sourceArtifacts.getCount());
@@ -1595,84 +1622,60 @@ SlangResult TranslationUnitRequest::requireSourceFiles()
     auto sink = compileRequest->getSink();
     SourceManager* sourceManager = compileRequest->getSourceManager();
 
-    // Get he linkage file system
-    //ISlangFileSystemExt* linkageFileSystem = compileRequest->getLinkage()->getFileSystemExt();
-
     for (Index i = m_sourceFiles.getCount(); i < m_sourceArtifacts.getCount(); ++i)
     {
         IArtifact* artifact = m_sourceArtifacts[i];
 
-        PathInfo pathInfo = PathInfo::makeUnknown();
-
-        if (auto extRep = findRepresentation<IExtFileArtifactRepresentation>(artifact))
-        {
-            auto extFileSystem = extRep->getFileSystem();
-
-            // TODO(JS):
-            // Ideally we'd confirm that the file system was the same, such we could know that the unique
-            // identity is appropriate for the current file system.
-            //
-            // We just assume compatibility for the moment, because repro will be a different file system
-            // but we need to use the unique identity that is there.
-
-            //if (extFileSystem == linkageFileSystem)
-            {
-                // Get the unique identity
-                ComPtr<ISlangBlob> uniqueIdentityBlob;
-                if (SLANG_SUCCEEDED(extFileSystem->getFileUniqueIdentity(extRep->getPath(), uniqueIdentityBlob.writeRef())) && uniqueIdentityBlob)
-                {
-                    auto uniqueIdentity = StringUtil::getString(uniqueIdentityBlob);
-
-                    // See if this an already loaded source file
-                    if (auto sourceFile = sourceManager->findSourceFileRecursively(uniqueIdentity))
-                    {
-                        // If the source file has a blob, and the artifact doesn't copy over that representation
-                        if (sourceFile->getContentBlob() && findRepresentation<ISlangBlob>(artifact) == nullptr)
-                        {
-                            artifact->addRepresentationUnknown(sourceFile->getContentBlob());
-                        }
-
-                        _addSourceFile(sourceFile);
-                        continue;
-                    }
-
-                    pathInfo = PathInfo::makeNormal(extRep->getPath(), uniqueIdentity);
-                }
-                else
-                {
-                    pathInfo = PathInfo::makePath(extRep->getPath());
-                }
-            }
-        }
-
-        if (pathInfo.type == PathInfo::Type::Unknown)
-        {
-            const auto path = ArtifactUtil::findPath(artifact);
-
-            // If has a path representation we'll make it a FoundPath
-            if (findRepresentation<IPathArtifactRepresentation>(artifact))
-            {
-                pathInfo = PathInfo::makePath(path);
-            }
-            else
-            {
-                // Otherwise we'll assume it's created from a 'String' even if that's not quite the case
-                pathInfo = PathInfo::makeFromString(path);
-            }
-        }
-
+        const PathInfo pathInfo = _findSourcePathInfo(artifact);
+        
+        SourceFile* sourceFile = nullptr;
         ComPtr<ISlangBlob> blob;
-        const SlangResult blobRes = artifact->loadBlob(ArtifactKeep::Yes, blob.writeRef());
-        if (SLANG_FAILED(blobRes))
+
+        // If we have a unique identity see if we have it already
+        if (pathInfo.hasUniqueIdentity())
         {
-            // Report couldn't load
-            sink->diagnose(SourceLoc(),
-                Diagnostics::cannotOpenFile,
-                pathInfo.getName());
-            return blobRes;
+            // See if this an already loaded source file
+            sourceFile = sourceManager->findSourceFileRecursively(pathInfo.uniqueIdentity);
+            // If we have a sourceFile see if it has a blob
+            if (sourceFile)
+            {
+                blob = sourceFile->getContentBlob();
+            }
         }
 
-        auto sourceFile = sourceManager->createSourceFileWithBlob(pathInfo, blob);
+        // If we *don't* have a blob try and get a blob from the artifact
+        if (!blob)
+        {
+            const SlangResult res = artifact->loadBlob(ArtifactKeep::Yes, blob.writeRef());
+            if (SLANG_FAILED(res))
+            {
+                // Report couldn't load
+                sink->diagnose(SourceLoc(), Diagnostics::cannotOpenFile, pathInfo.getName());
+                return res;
+            }
+        }
+
+        // If we don't have a blob on the artifact we can now add the one we have
+        if (!findRepresentation<ISlangBlob>(artifact))
+        {
+            artifact->addRepresentationUnknown(blob);
+        }
+
+        // If we have a sourceFile check if it has contents, and set the blob if doesn't
+        if (sourceFile)
+        {
+            if (!sourceFile->getContentBlob())
+            {
+                sourceFile->setContents(blob);
+            }
+        }
+        else
+        {
+            // Create a new source file, using the pathInfo and blob
+            sourceFile = sourceManager->createSourceFileWithBlob(pathInfo, blob);
+        }
+  
+        // Finally add the source file
         _addSourceFile(sourceFile);
     }
 
@@ -3391,7 +3394,7 @@ ComponentType* asInternal(slang::IComponentType* inComponentType)
     // (without even `addRef`-ing it).
     //
     ComPtr<slang::IComponentType> componentType;
-    inComponentType->queryInterface(slang::IComponentType::getTypeGuid(), (void**) componentType.writeRef());
+    inComponentType->queryInterface(SLANG_IID_PPV_ARGS(componentType.writeRef()));
     return static_cast<ComponentType*>(componentType.get());
 }
 
@@ -4452,7 +4455,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
             else
             {
                 // See if we have the full ISlangFileSystemExt interface, if we do just use it
-                inFileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
+                inFileSystem->queryInterface(SLANG_IID_PPV_ARGS(m_fileSystemExt.writeRef()));
 
                 // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
                 if (!m_fileSystemExt)
@@ -5376,7 +5379,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
         return SLANG_E_INVALID_ARG;
 
     // Find a rep
-    auto metadata = findAssociated<IArtifactPostEmitMetadata>(artifact);
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 

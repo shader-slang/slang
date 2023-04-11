@@ -6,6 +6,7 @@
 #include "../../source/core/slang-hex-dump-util.h"
 #include "../../source/core/slang-type-text-util.h"
 #include "../../source/core/slang-memory-arena.h"
+#include "../../source/core/slang-castable.h"
 
 #include "../../source/compiler-core/slang-artifact-desc-util.h"
 #include "../../source/compiler-core/slang-artifact-helper.h"
@@ -2334,7 +2335,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
         return TestResult::Fail;
     }
 
-    auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
     if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
     {
@@ -2460,7 +2461,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 
     String actualOutput;
 
-    auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
     // If the actual compilation failed, then the output will be the summary
     if (diagnostics && SLANG_FAILED(diagnostics->getResult()))

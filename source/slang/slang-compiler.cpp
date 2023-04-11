@@ -8,6 +8,7 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-castable.h"
 
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -1119,7 +1120,7 @@ namespace Slang
         ComPtr<IArtifactPostEmitMetadata> metadata;
         if (sourceArtifact)
         {
-            metadata = findAssociated<IArtifactPostEmitMetadata>(sourceArtifact);
+            metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(sourceArtifact);
 
             // Set the source artifacts
             options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
@@ -1411,7 +1412,7 @@ namespace Slang
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
         if (diagnostics->getCount())
         {
@@ -1468,10 +1469,7 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        if (metadata)
-        {
-            artifact->addAssociated(metadata);
-        }
+        ArtifactUtil::addAssociated(artifact, metadata);
 
         // Set the artifact
         outArtifact.swap(artifact);
@@ -1975,22 +1973,19 @@ namespace Slang
         {
             Index nameCount = 0;
 
-            auto associated = m_containerArtifact->getAssociated();
-            const Count count = associated->getCount();
-            for (Index i = 0; i < count; ++i)
+            for (auto associatedArtifact : m_containerArtifact->getAssociated())
             {
-                IArtifact* artifact = as<IArtifact>(associated->getAt(i));
-                auto desc = artifact->getDesc();
+                auto desc = associatedArtifact->getDesc();
 
                 if (isDerivedFrom(desc.payload, ArtifactPayload::SourceMap))
                 {
                     StringBuilder artifactFilename;
 
                     // Dump out
-                    const char* artifactName = artifact->getName();
+                    const char* artifactName = associatedArtifact->getName();
                     if (artifactName && artifactName[0] != 0)
                     {
-                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(artifact, UnownedStringSlice(artifactName), artifactFilename));
+                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(associatedArtifact, UnownedStringSlice(artifactName), artifactFilename));
                     }
                     else
                     {
@@ -2005,13 +2000,13 @@ namespace Slang
                             baseName.append(nameCount);
                         }
 
-                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(artifact, baseName.getUnownedSlice(), artifactFilename));
+                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(associatedArtifact, baseName.getUnownedSlice(), artifactFilename));
 
                         nameCount ++;
                     }
 
                     ComPtr<ISlangBlob> blob;
-                    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+                    SLANG_RETURN_ON_FAIL(associatedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
 
                     // Try to write it out
                     {

@@ -38,6 +38,9 @@
 #   include <stdint.h>
 #endif // SLANG_LLVM
 
+
+#define SLANG_PRELUDE_NAMESPACE
+
 #include "slang-cpp-types-core.h"
 #include "slang-cpp-scalar-intrinsics.h"
 

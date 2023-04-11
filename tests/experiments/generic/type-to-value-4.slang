@@ -1,4 +1,4 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
 /* Test here is to try and associate a value with a type
 
@@ -52,26 +52,25 @@ interface IGetE
 	static Enum getE();    
 };
 
-public struct A : IGetE
+struct A : IGetE
 {
     static Enum getE() { return Enum::A; }
 };
 
-public struct B : IGetE
+struct B : IGetE
 {
     static Enum getE() { return Enum::B; }
 };
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
-    int index = dispatchThreadID.x;
+{
    
     // Err.. even though IGetE doesn't require an instanciation, not clear how to set it. So lets try with instanciation
     B b;
     IGetE g = b;
 
     let e = g.getE();
-    
+
     outputBuffer[dispatchThreadID.x] = int(e);
 }

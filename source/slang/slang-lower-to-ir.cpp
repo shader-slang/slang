@@ -6168,6 +6168,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 #undef IGNORED_CASE
 
+    void ensureInsertAtGlobalScope(IRBuilder* builder)
+    {
+        auto inst = builder->getInsertLoc().getInst();
+        if (inst->getOp() == kIROp_Module)
+            return;
+
+        while (inst && inst->getParent() && inst->getParent()->getOp() != kIROp_Module)
+        {
+            inst = inst->getParent();
+        }
+        if (inst)
+        {
+            builder->setInsertBefore(inst);
+        }
+    }
+
     LoweredValInfo visitTypeDefDecl(TypeDefDecl* decl)
     {
         // A type alias declaration may be generic, if it is
@@ -6176,6 +6192,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nested(this);
         auto subBuilder = nested.getBuilder();
         auto subContext = nested.getContext();
+
+        ensureInsertAtGlobalScope(nested.getBuilder());
+
         IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         // TODO: if a type alias declaration can have linkage,

@@ -11,6 +11,7 @@
 #include "slang-ir-addr-inst-elimination.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-inline.h"
 
 namespace Slang
 {
@@ -1565,6 +1566,8 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
 {
     insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
     removeLinkageDecorations(func);
+
+    performForceInlining(func);
 
     AutoDiffAddressConversionPolicy cvtPolicty;
     cvtPolicty.diffTypeContext = &differentiableTypeConformanceContext;

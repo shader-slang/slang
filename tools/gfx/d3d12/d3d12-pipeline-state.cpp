@@ -240,7 +240,7 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 SIZE_T(programImpl->m_shaders[0].code.getCount()) };
 
 #ifdef GFX_NVAPI
-            if (m_nvapi)
+            if (m_device->m_nvapi)
             {
                 // Also fill the extension structure.
                 // Use the same UAV slot index and register space that are declared in the shader.

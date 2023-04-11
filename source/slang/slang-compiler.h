@@ -1495,6 +1495,9 @@ namespace Slang
 
     protected:
         void _addSourceFile(SourceFile* sourceFile);
+        /* Given an artifact, find a PathInfo. 
+        If no PathInfo can be found will return an unknown PathInfo */
+        PathInfo _findSourcePathInfo(IArtifact* artifact);
 
         List<ComPtr<IArtifact>> m_sourceArtifacts;
         // The source file(s) that will be compiled to form this translation unit
@@ -3111,7 +3114,7 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
     SLANG_ASSERT(request);
     EndToEndCompileRequest* endToEndRequest = nullptr;
     // NOTE! We aren't using to access an interface, so *doesn't* return with a refcount
-    request->queryInterface(EndToEndCompileRequest::getTypeGuid(), (void**)&endToEndRequest);
+    request->queryInterface(SLANG_IID_PPV_ARGS(&endToEndRequest));
     SLANG_ASSERT(endToEndRequest);
     return endToEndRequest;
 }
