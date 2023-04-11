@@ -1,12 +1,26 @@
 // gh-841.slang
 
 //TEST:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
+//TEST:CROSS_COMPILE(filecheck=SPV): -profile ps_5_0 -entry main -target spirv-assembly
+//TEST:CROSS_COMPILE(filecheck=GLSL): -profile ps_5_0 -entry main -target glsl
 
 // GitHub issue #841: failing to emit `flat` modifier in output GLSL when required
 
 struct RasterVertex
 {
+  // location 0
 	float4 c : COLOR;
+
+  // Make sure that the input value in location 1 is decorated as Flat
+  // SPV-DAG: [[#VAL:]]{{.*}}:{{.*}} Variable Input
+  // SPV-DAG: Decorate [[#VAL]]{{.*}} Location 1
+  // SPV-DAG: Decorate [[#VAL]]{{.*}} Flat
+  //
+  // Likewise for GLSL
+  // GLSL:      flat layout(location = 1)
+  // GLSL-NEXT: in uint {{[[:alnum:]_]+}};
+  //
+  // location 1
 	uint u : FLAGS;
 };
 

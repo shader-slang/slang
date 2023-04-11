@@ -5,6 +5,8 @@
 #include "../core/slang-basic.h"
 #include "../../slang-com-helper.h"
 
+#include <type_traits>
+
 namespace Slang
 {
 
@@ -47,7 +49,9 @@ struct CharSlice : public Slice<char>
     explicit CharSlice(const char* in) :Super(in, ::strlen(in)) {}
     CharSlice(const char* in, Count inCount) :Super(in, inCount) {}
     CharSlice() :Super(nullptr, 0) {}
+    explicit CharSlice(const String& s) :CharSlice(s.begin(), s.getLength()){};
 };
+static_assert(std::is_trivially_copyable_v<CharSlice>);
 
 struct TerminatedCharSlice : public CharSlice
 {
@@ -64,6 +68,7 @@ struct TerminatedCharSlice : public CharSlice
     TerminatedCharSlice(const char* in, Count inCount) :Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }
     TerminatedCharSlice() :Super("", 0) {}
 };
+static_assert(std::is_trivially_copyable_v<TerminatedCharSlice>);
 
 /* As a rule of thumb, if we can define some aspect in a hierarchy then we should do so at the highest level. 
 If some aspect can apply to multiple items identically we move that to a separate enum. 

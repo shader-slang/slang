@@ -17,6 +17,8 @@
 
 #include "../../slang-com-ptr.h"
 
+#include "filecheck.h"
+
 #include "options.h"
 
 #include <mutex>
@@ -170,8 +172,12 @@ class TestContext
     std::mutex mutex;
     Slang::RefPtr<Slang::JSONRPCConnection> m_languageServerConnection;
 
+    Slang::IFileCheck* getFileCheck() { return m_fileCheck; };
+
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
+
+    SlangResult locateFileCheck();
 
     struct SharedLibraryTool
     {
@@ -186,6 +192,8 @@ protected:
     SlangSession* m_session;
 
     Slang::Dictionary<Slang::String, SharedLibraryTool> m_sharedLibTools;
+
+    Slang::ComPtr<Slang::IFileCheck> m_fileCheck;
 };
 
 #endif // TEST_CONTEXT_H_INCLUDED

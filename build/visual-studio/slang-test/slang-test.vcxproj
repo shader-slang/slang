@@ -278,6 +278,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\tools\slang-test\directory-util.h" />
+    <ClInclude Include="..\..\..\tools\slang-test\filecheck.h" />
     <ClInclude Include="..\..\..\tools\slang-test\options.h" />
     <ClInclude Include="..\..\..\tools\slang-test\parse-diagnostic-util.h" />
     <ClInclude Include="..\..\..\tools\slang-test\slangc-tool.h" />
