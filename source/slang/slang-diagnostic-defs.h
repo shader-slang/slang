@@ -278,6 +278,7 @@ DIAGNOSTIC(30054, Error, targetLabelDoesNotMarkBreakableStmt, "invalid break tar
 DIAGNOSTIC(30055, Error, useOfNonShortCircuitingOperatorInDiffFunc, "non-short-circuiting `?:` operator is not allowed in a differentiable function, use `select` instead.")
 DIAGNOSTIC(30056, Warning, useOfNonShortCircuitingOperator, "non-short-circuiting `?:` operator is deprecated, use 'select' instead.")
 DIAGNOSTIC(30057, Error, assignmentInPredicateExpr, "use an assignment operation as predicate expression is not allowed, wrap the assignment with '()' to clarify the intent.")
+DIAGNOSTIC(30058, Warning, danglingEqualityExpr, "result of '==' not used, did you intend '='?")
 
 DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 
@@ -355,8 +356,9 @@ DIAGNOSTIC(31143, Error, missingOriginalDefintionOfExternDecl, "no original defi
 DIAGNOSTIC(31145, Error, invalidCustomDerivative, "invalid custom derivative attribute.")
 DIAGNOSTIC(31146, Error, declAlreadyHasAttribute, "'$0' already has attribute '[$1]'.")
 DIAGNOSTIC(31147, Error, cannotResolveOriginalFunctionForDerivative, "cannot resolve the original function for the the custom derivative.")
+DIAGNOSTIC(31148, Error, cannotResolveDerivativeFunction, "cannot resolve the custom derivative function")
 
-DIAGNOSTIC(31148, Error, differentiableGenericInterfaceMethodNotSupported, "`[ForwardDifferentiable] and [BackwardDifferentiable] are not supported on generic interface requirements.")
+DIAGNOSTIC(31149, Error, differentiableGenericInterfaceMethodNotSupported, "`[ForwardDifferentiable] and [BackwardDifferentiable] are not supported on generic interface requirements.")
 
 // Enums
 
