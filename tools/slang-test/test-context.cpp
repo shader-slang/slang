@@ -61,6 +61,10 @@ TestReporter* TestContext::getTestReporter()
 
 SlangResult TestContext::locateFileCheck()
 {
+    // TODO(JS):
+    // Hack for now, disabling IFileCheck, as appears to cause crashes.
+
+#if 0
     DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
     ComPtr<ISlangSharedLibrary> library;
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("slang-llvm", library.writeRef()));
@@ -77,6 +81,9 @@ SlangResult TestContext::locateFileCheck()
         return SLANG_FAIL;
     }
     return fn(SLANG_IID_PPV_ARGS(m_fileCheck.writeRef()));
+#else
+    return SLANG_FAIL;
+#endif
 }
 
 Result TestContext::init(const char* inExePath)
@@ -96,15 +103,6 @@ Result TestContext::init(const char* inExePath)
 
 TestContext::~TestContext()
 {
-#if SLANG_WINDOWS_FAMILY && defined(_DEBUG)
-    // TODO(JS)
-    // HACK!!!! Causes memory leak!
-    // Added because releasing m_fileCheck appears to cause an exception on debug 
-    {
-        m_fileCheck.detach();
-    }
-#endif
-    
     if (m_languageServerConnection)
     {
         m_languageServerConnection->sendCall(
