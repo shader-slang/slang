@@ -12,6 +12,9 @@
     <ClInclude Include="..\..\..\tools\slang-test\directory-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-test\filecheck.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\slang-test\options.h">
       <Filter>Header Files</Filter>
     </ClInclude>

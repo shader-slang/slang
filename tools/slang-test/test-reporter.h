@@ -84,6 +84,7 @@ class TestReporter : public ITestReporter
 
         // Called for an error in the test-runner (not for an error involving a test itself).
     void message(TestMessageType type, const Slang::String& errorText);
+    SLANG_ATTR_PRINTF(3, 4)
     void messageFormat(TestMessageType type, char const* message, ...);
     virtual SLANG_NO_THROW void SLANG_MCALL message(TestMessageType type, char const* message) override;
 
