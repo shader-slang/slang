@@ -201,17 +201,6 @@ static void* _findRepresentation(const ConstArrayView<IArtifact*>& artifacts, co
     return nullptr;
 }
 
-
-void Artifact::addArtifact(ContainedKind kind, IArtifact* artifact)
-{
-    switch (kind)
-    {
-        case ContainedKind::Associated:         return addAssociated(artifact);
-        case ContainedKind::Children:           return addChild(artifact);
-        default: SLANG_ASSERT(!"Can't add artifact to this kind");
-    }
-}
-
 void* Artifact::findRepresentation(ContainedKind kind, const Guid& guid)
 {
     switch (kind)

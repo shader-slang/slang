@@ -18,14 +18,15 @@ Artifact file structure
 =======================
 
 There is many ways this could work, with different trade offs. The approach taken here is 
-to make *very* artifact be a directory. There are two special case directories "associated" and "children",
-which hold the artifacts associated with this artifact. 
+to make *every* artifact be a directory. There are two special case directories "associated" and "children",
+which hold the artifacts associated/chidren artifacts. 
 
 So for example if we have 
 
 ```
 thing.spv
-  diagnostics
+  associated
+    diagnostics
 ```
 
 It will become
@@ -37,9 +38,10 @@ associated/0/diagnostics.diag
 
 ```
 somemodule
-  diagnostics
-  0a0a0a.map
-  0b0b0b.map
+  associated
+    diagnostics
+    0a0a0a.map
+    0b0b0b.map
 ```
 
 Becomes
@@ -56,15 +58,17 @@ That is a little verbose, but if the associated artifacts have children/associat
 ```
 container
   a.spv 
-    diagnostics
+    associated
+        diagnostics
   b.dxil
-    diagnostics
-    sourcemap
+    associated
+        diagnostics
+        sourcemap
 ```
 
 ```
 a/a.spv
-a/associated/0/diagostics.diagnostics
+a/associated/0/diagnostics.diagnostics
 b/b.spv
 b/associated/0/diagnostics.diagnostics
 b/associated/1/sourcemap.map
@@ -695,7 +699,12 @@ SlangResult ArtifactContainerReader::_readContainerDirectory(Index directoryInde
         
         if (artifact)
         {
-            containerArtifact->addArtifact(kind, artifact);
+            switch (kind)
+            {
+                case IArtifact::ContainedKind::Associated:         containerArtifact->addAssociated(artifact); break;
+                case IArtifact::ContainedKind::Children:           containerArtifact->addChild(artifact); break;
+                default: SLANG_ASSERT(!"Can't add artifact to this kind"); return SLANG_FAIL;
+            }
         }
     }
 
