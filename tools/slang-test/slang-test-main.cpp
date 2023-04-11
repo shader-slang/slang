@@ -635,8 +635,14 @@ static TestResult _fileCheckTest(
     IFileCheck* fc = context.getFileCheck();
     if(!fc)
     {
+        // TODO(JS):
+        // For now if IFileCheck isn't available ignore...
+#if 0
         testReporter.message(TestMessageType::RunError, "FileCheck is not available");
         return TestResult::Fail;
+#else
+        return TestResult::Ignored;
+#endif
     }
 
     const bool coloredOutput = true;
