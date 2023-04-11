@@ -2594,7 +2594,7 @@ namespace Slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCodeBlob(int targetIndex, ISlangBlob** outBlob) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(int targetIndex, ISlangSharedLibrary** outSharedLibrary) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void const* SLANG_MCALL getCompileRequestCode(size_t* outSize) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getCompileRequestResult() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getCompileRequestResultAsFileSystem() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getContainerCode(ISlangBlob** outBlob) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadRepro(ISlangFileSystem* fileSystem, const void* data, size_t size) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveRepro(ISlangBlob** outBlob) SLANG_OVERRIDE;

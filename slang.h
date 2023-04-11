@@ -3934,8 +3934,10 @@ namespace slang
             size_t*                 outSize) = 0;
 
             /** Get the compilation result as a file system.
+            The result is not written to the actual OS file system, but is made avaiable as an 
+            in memory representation.
             */
-        virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getCompileRequestResult() = 0;
+        virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getCompileRequestResultAsFileSystem() = 0;
 
             /** Return the container code as a blob. The container blob is created as part of a compilation (with spCompile),
             and a container is produced with a suitable ContainerFormat. 

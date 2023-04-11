@@ -5237,7 +5237,7 @@ char const* EndToEndCompileRequest::getEntryPointSource(int entryPointIndex)
     return (char const*)getEntryPointCode(entryPointIndex, nullptr);
 }
 
-ISlangMutableFileSystem* EndToEndCompileRequest::getCompileRequestResult()
+ISlangMutableFileSystem* EndToEndCompileRequest::getCompileRequestResultAsFileSystem()
 {
     if (!m_containerFileSystem)
     {
