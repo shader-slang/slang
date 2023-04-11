@@ -339,6 +339,16 @@ namespace Slang
     void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt *stmt)
     {
         stmt->expression = CheckExpr(stmt->expression);
+        if (auto operatorExpr = as<OperatorExpr>(stmt->expression))
+        {
+            if (auto func = as<VarExpr>(operatorExpr->functionExpr))
+            {
+                if (func->name && func->name->text == "==")
+                {
+                    getSink()->diagnose(operatorExpr, Diagnostics::danglingEqualityExpr);
+                }
+            }
+        }
     }
 
     void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)

@@ -68,7 +68,7 @@ SlangResult DefaultArtifactHandler::_addRepresentation(IArtifact* artifact, Arti
 	// See if it implements ICastable
 	{
 		ComPtr<ICastable> castable;
-		if (SLANG_SUCCEEDED(rep->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+		if (SLANG_SUCCEEDED(rep->queryInterface(SLANG_IID_PPV_ARGS(castable.writeRef()))) && castable)
 		{
 			return _addRepresentation(artifact, keep, castable, outCastable);
 		}

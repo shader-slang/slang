@@ -399,6 +399,16 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             else
             {
                 differentiableWitnessDictionary.Add((IRType*)item->getConcreteType(), item->getWitness());
+
+                // Also register the type's differential type with the same witness.
+                IRBuilder subBuilder(item->getConcreteType());
+                if (!as<IRInterfaceType>(item->getConcreteType()))
+                {
+                    differentiableWitnessDictionary.AddIfNotExists(
+                        (IRType*)_lookupWitness(&subBuilder, item->getWitness(), sharedContext->differentialAssocTypeStructKey), 
+                        item->getWitness());
+                }
+
                 if (auto diffPairType = as<IRDifferentialPairTypeBase>(item->getConcreteType()))
                 {
                     // For differential pair types, register the differential type as well.

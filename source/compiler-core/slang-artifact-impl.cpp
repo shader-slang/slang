@@ -248,7 +248,7 @@ void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
     }
 
     ComPtr<ICastable> castable;
-    if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+    if (SLANG_SUCCEEDED(unk->queryInterface(SLANG_IID_PPV_ARGS(castable.writeRef()))) && castable)
     {
         if (_getRawView(m_representations).indexOf(castable) >= 0)
         {
