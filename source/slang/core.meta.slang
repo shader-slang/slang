@@ -87,6 +87,9 @@ interface __BuiltinArithmeticType : __BuiltinType
 {
         /// Initialize from a 32-bit signed integer value.
     __init(int value);
+
+        /// Initialize from the same type.
+    __init(This value);
 }
 
 /// A type that can be used for logical/bitwise operations
@@ -382,7 +385,6 @@ ${{{{
     }
 }}}}
 {
-
 ${{{{
     // Declare initializers to convert from various other types
     for (int ss = 0; ss < kBaseTypeCount; ++ss)

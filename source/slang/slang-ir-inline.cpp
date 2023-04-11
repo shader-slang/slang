@@ -40,19 +40,51 @@ struct InliningPassBase
         return considerAllCallSitesRec(m_module->getModuleInst());
     }
 
+    bool considerCallSiteInFunc(IRFunc* func)
+    {
+        bool result = false;
+
+        // Repeat until we run out of callees to inline.
+        for (;;)
+        {
+            bool changed = false;
+
+            // Collect all the call sites in the function.
+            List<IRCall*> callsites;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    if (auto call = as<IRCall>(inst))
+                    {
+                        callsites.add(call);
+                    }
+                }
+            }
+
+            // Consider each call site.
+            for (auto call : callsites)
+            {
+                changed |= considerCallSite(call);
+            }
+            result |= changed;
+            if (!changed)
+                break;
+        }
+        return result;
+    }
+
         /// Consider all call sites at or under `inst` for inlining
     bool considerAllCallSitesRec(IRInst* inst)
     {
         bool changed = false;
-        if( auto call = as<IRCall>(inst) )
+
+        if( auto func = as<IRFunc>(inst) )
         {
-            changed = considerCallSite(call);
+            changed = considerCallSiteInFunc(func);
         }
 
-        // Note: we defensively iterate through the child instructions
-        // so that even if `child` gets removed (because of inlining)
-        // we automatically start at the next instruction after it.
-        //
+        // Recursively consider the children of inst.
         for (auto child : inst->getModifiableChildren())
         {
             changed |= considerAllCallSitesRec(child);
@@ -755,6 +787,12 @@ void performForceInlining(IRModule* module)
 {
     ForceInliningPass pass(module);
     pass.considerAllCallSites();
+}
+
+bool performForceInlining(IRGlobalValueWithCode* func)
+{
+    ForceInliningPass pass(func->getModule());
+    return pass.considerAllCallSitesRec(func);
 }
 
     // Defined in slang-ir-specialize-resource.cpp
