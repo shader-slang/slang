@@ -2594,6 +2594,7 @@ namespace Slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCodeBlob(int targetIndex, ISlangBlob** outBlob) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(int targetIndex, ISlangSharedLibrary** outSharedLibrary) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void const* SLANG_MCALL getCompileRequestCode(size_t* outSize) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getCompileRequestResultAsFileSystem() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getContainerCode(ISlangBlob** outBlob) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadRepro(ISlangFileSystem* fileSystem, const void* data, size_t size) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveRepro(ISlangBlob** outBlob) SLANG_OVERRIDE;
@@ -2632,6 +2633,8 @@ namespace Slang
             /// Where the container is stored. This is calculated as part of compile if m_containerFormat is set to
             /// a supported format. 
         ComPtr<IArtifact> m_containerArtifact;
+            /// Holds the container as a file system
+        ComPtr<ISlangMutableFileSystem> m_containerFileSystem;
 
             // Path to output container to
         String m_containerOutputPath;
