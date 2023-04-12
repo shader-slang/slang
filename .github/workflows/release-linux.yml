@@ -9,11 +9,11 @@ name: Linux Release
 jobs:
   build:
     name: Upload Release Asset
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         configuration: ['release']
-        compiler: ['gcc']
+        compiler: ['gcc-10']
         platform: ['x64'] 
         targetPlatform: ['x64'] 
     steps:

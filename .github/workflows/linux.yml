@@ -9,12 +9,12 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         configuration: ['debug', 'release']
-        compiler: ['gcc', 'clang']
-        platform: ['x64'] 
+        compiler: ['gcc-10', 'clang']
+        platform: ['x64']
     steps:
     - uses: actions/checkout@v3
       with:
