@@ -267,6 +267,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-associated-impl.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-associated.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-container-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-desc-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-diagnostic-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-handler-impl.h" />
@@ -316,6 +317,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-associated-impl.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-container-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-desc-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-diagnostic-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-handler-impl.cpp" />

@@ -635,6 +635,8 @@ static TestResult _fileCheckTest(
     IFileCheck* fc = context.getFileCheck();
     if(!fc)
     {
+        // TODO(JS):
+        // Do we want to fail or ignore if we don't find file check?
         testReporter.message(TestMessageType::RunError, "FileCheck is not available");
         return TestResult::Fail;
     }

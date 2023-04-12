@@ -244,8 +244,9 @@ Slang supports the following expression forms with nearly identical syntax to HL
 * Operators: `-a`, `b + c`, `d++`, `e %= f`
 
 > #### Note ####
-> Like HLSL but unlike most other C-family languages, the operators `&&` and `||`, along with the conditional operator `?:` do *not* currently perform "short-circuiting";
+> Like HLSL but unlike most other C-family languages, the `&&` and `||` operators do *not* currently perform "short-circuiting". 
 > they evaluate all of their operands unconditionally.
+> However, the `?:` operator do perform short-circuiting if the condition is a scalar. Use of `?:` where the condition is a vector is deprecated in Slang. The vector version of `?:` operator does *not* perform short-circuiting, and the user is advised to call `select` instead.
 > The default behavior of these operators is likely to change in a future Slang release.
 
 Additional expression forms specific to shading languages follow.

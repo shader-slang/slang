@@ -2807,7 +2807,7 @@ public:
 
     IRArrayListType* getArrayListType(IRType* elementType);
     IRTensorViewType* getTensorViewType(IRType* elementType);
-    IRTorchTensorType* getTorchTensorType();
+    IRTorchTensorType* getTorchTensorType(IRType* elementType);
 
     IRDifferentialPairType* getDifferentialPairType(
         IRType* valueType,

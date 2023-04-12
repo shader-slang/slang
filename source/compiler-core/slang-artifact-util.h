@@ -40,8 +40,15 @@ struct ArtifactUtil
     static ComPtr<IArtifact> createArtifact(const ArtifactDesc& desc, const char* name);
     static ComPtr<IArtifact> createArtifact(const ArtifactDesc& desc);
 
-        /// Returns true if an artifact is 'significant'
-    static bool isSignificant(IArtifact* artifact, void* data = nullptr);
+        /// True if is significant
+    static bool isSignificant(IArtifact* artifact);
+        /// True if is significant
+    static bool isSignificant(const ArtifactDesc& desc);
+
+        /// Returns true if an artifact is 'significant'. 
+        /// The data parameter is unused and just used to make work as FindFunc
+    static bool isSignificant(IArtifact* artifact, void* data);
+
         /// Find a significant artifact
     static IArtifact* findSignificant(IArtifact* artifact);
 

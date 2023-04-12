@@ -2837,9 +2837,9 @@ namespace Slang
             (IRInst**)&elementType);
     }
 
-    IRTorchTensorType* IRBuilder::getTorchTensorType()
+    IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
     {
-        return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 0, nullptr);
+        return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 1, (IRInst**)&elementType);
     }
 
     IRDifferentialPairType* IRBuilder::getDifferentialPairType(

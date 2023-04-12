@@ -15,6 +15,9 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-associated.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-container-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-desc-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -156,6 +159,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-associated-impl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-container-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-desc-util.cpp">
