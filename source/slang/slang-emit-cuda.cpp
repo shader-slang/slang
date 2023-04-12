@@ -741,7 +741,7 @@ void CUDASourceEmitter::emitSimpleValueImpl(IRInst* inst)
             return;
         }
     }
-    CLikeSourceEmitter::emitSimpleValueImpl(inst);
+    Super::emitSimpleValueImpl(inst);
 }
 
 

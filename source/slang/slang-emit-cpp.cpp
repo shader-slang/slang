@@ -846,6 +846,30 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoint
     m_writer->emit("SLANG_PRELUDE_EXPORT\n");
 }
 
+bool isPublicOrExportedFunc(IRFunc* func)
+{
+    for (auto decor : func->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+            case kIROp_PublicDecoration:
+            case kIROp_EntryPointDecoration:
+            case kIROp_HLSLExportDecoration:
+            case kIROp_DllExportDecoration:
+            case kIROp_DllImportDecoration:
+            case kIROp_CudaDeviceExportDecoration:
+            case kIROp_CudaHostDecoration:
+            case kIROp_CudaKernelDecoration:
+            {
+                return true;
+            }
+            default:
+                break;
+        }
+    }
+    return false;
+}
+
 void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     // Emit function decorations
@@ -858,6 +882,11 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     // Deal with decorations that need
     // to be emitted as attributes
 
+    // If `func` is not public or exported, emit `static` to prevent linking clash.
+    if (!isPublicOrExportedFunc(func))
+    {
+        m_writer->emit("static ");
+    }
     // We start by emitting the result type and function name.
     //
     if (IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
@@ -990,7 +1019,16 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     default:
         CLikeSourceEmitter::_emitType(type, declarator);
         break;
-
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+    {
+        StringBuilder sb;
+        calcTypeName(type, m_target, sb);
+        m_writer->emit(sb.ProduceString());
+        m_writer->emit(" ");
+        emitDeclarator(declarator);
+        break;
+    }
     case kIROp_PtrType:
     case kIROp_InOutType:
     case kIROp_OutType:
