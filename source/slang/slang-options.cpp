@@ -332,7 +332,7 @@ struct OptionsParser
         String path = String(inPath);
         String ext = Path::getPathExt(path);
 
-        if (ext == "slang-module" || ext == "slang-lib")
+        if (ext == "slang-module" || ext == "slang-lib" || ext == "dir" || ext == "zip")
         {
             compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
             requestImpl->m_containerOutputPath = path;

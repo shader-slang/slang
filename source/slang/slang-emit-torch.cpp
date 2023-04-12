@@ -165,6 +165,15 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
                 auto arg = inst->getOperand(i);
                 emitOperand(arg, getInfo(EmitOp::General));
             }
+            if (as<IRTorchTensorType>(inst->getDataType()))
+            {
+                if (auto vectorType = as<IRVectorType>(inst->getDataType()->getOperand(0)))
+                {
+                    // If the element type of the tensor is a vector, we need to add the vector size to the shape.
+                    m_writer->emit(", ");
+                    emitOperand(vectorType->getElementCount(), getInfo(EmitOp::General));
+                }
+            }
             m_writer->emit("}, torch::TensorOptions().device(torch::kCUDA).dtype(");
             emitTorchScalarTypeName(m_writer, inst->getDataType());
             m_writer->emit("))");
