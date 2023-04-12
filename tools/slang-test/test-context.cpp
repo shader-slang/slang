@@ -61,10 +61,6 @@ TestReporter* TestContext::getTestReporter()
 
 SlangResult TestContext::locateFileCheck()
 {
-    // TODO(JS):
-    // Hack for now, disabling IFileCheck, as appears to cause crashes.
-
-#if 0
     DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
     
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("slang-llvm", m_fileCheckLibrary.writeRef()));
@@ -81,9 +77,6 @@ SlangResult TestContext::locateFileCheck()
         return SLANG_FAIL;
     }
     return fn(SLANG_IID_PPV_ARGS(m_fileCheck.writeRef()));
-#else
-    return SLANG_FAIL;
-#endif
 }
 
 Result TestContext::init(const char* inExePath)
