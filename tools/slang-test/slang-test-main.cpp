@@ -636,13 +636,9 @@ static TestResult _fileCheckTest(
     if(!fc)
     {
         // TODO(JS):
-        // For now if IFileCheck isn't available ignore...
-#if 0
+        // Do we want to fail or ignore if we don't find file check?
         testReporter.message(TestMessageType::RunError, "FileCheck is not available");
         return TestResult::Fail;
-#else
-        return TestResult::Ignored;
-#endif
     }
 
     const bool coloredOutput = true;
