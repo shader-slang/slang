@@ -193,6 +193,7 @@ protected:
 
     Slang::Dictionary<Slang::String, SharedLibraryTool> m_sharedLibTools;
 
+    Slang::ComPtr<ISlangSharedLibrary> m_fileCheckLibrary;
     Slang::ComPtr<Slang::IFileCheck> m_fileCheck;
 };
 

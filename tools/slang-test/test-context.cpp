@@ -62,16 +62,16 @@ TestReporter* TestContext::getTestReporter()
 SlangResult TestContext::locateFileCheck()
 {
     DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
-    ComPtr<ISlangSharedLibrary> library;
-    SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("slang-llvm", library.writeRef()));
+    
+    SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("slang-llvm", m_fileCheckLibrary.writeRef()));
 
-    if (!library)
+    if (!m_fileCheckLibrary)
     {
         return SLANG_FAIL;
     }
 
     using CreateFileCheckFunc = SlangResult (*)(const SlangUUID&, void**);
-    auto fn = reinterpret_cast<CreateFileCheckFunc>(library->findFuncByName("createLLVMFileCheck_V1"));
+    auto fn = reinterpret_cast<CreateFileCheckFunc>(m_fileCheckLibrary->findFuncByName("createLLVMFileCheck_V1"));
     if(!fn)
     {
         return SLANG_FAIL;
