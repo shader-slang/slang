@@ -64,7 +64,8 @@ void Artifact::_requireChildren()
     {
         const auto res = expandChildren();
         SLANG_UNUSED(res);
-        SLANG_ASSERT(SLANG_SUCCEEDED(res));
+
+        SLANG_ASSERT(SLANG_SUCCEEDED(res) || res == SLANG_E_NOT_IMPLEMENTED);
     }
 }
 
