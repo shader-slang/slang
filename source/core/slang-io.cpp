@@ -154,8 +154,22 @@ namespace Slang
         // As long as file extension is executable, it can be executed
         return SLANG_OK;
 #else
-        const int ret = ::chmod(fileName.getBuffer(), S_IXUSR);
-        return (ret == 0) ? SLANG_OK : SLANG_FAIL;
+        struct stat st;
+        if(::stat(fileName.getBuffer(), &st) != 0)
+        {
+            return SLANG_FAIL;
+        }
+        if(st.st_mode & S_IXUSR)
+        {
+            return SLANG_OK;
+        }
+        // It would probably be slightly neater to set all executable bits
+        // aside from those in umask..
+        if(::chmod(fileName.getBuffer(), st.st_mode & 07777 | S_IXUSR) != 0)
+        {
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
 #endif
     }
 
