@@ -114,12 +114,4 @@ TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarTy
     return res;
 }
 
-size_t slangGetCudaKernelSharedMemSize(const void* func)
-{
-    cudaFuncAttributes attr = {};
-    cudaFuncGetAttributes(&attr, func);
-    AT_CUDA_CHECK(cudaGetLastError());
-    return attr.sharedSizeBytes;
-}
-
 #define SLANG_PRELUDE_EXPORT
