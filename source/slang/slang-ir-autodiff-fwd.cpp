@@ -877,19 +877,6 @@ InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
     return InstPair(nullptr, nullptr);
 }
 
-IRInst* ForwardDiffTranscriber::findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
-{
-    for (UInt i = 0; i < type->getOperandCount(); i++)
-    {
-        if (auto req = as<IRInterfaceRequirementEntry>(type->getOperand(i)))
-        {
-            if (req->getRequirementKey() == key)
-                return req->getRequirementVal();
-        }
-    }
-    return nullptr;
-}
-
 InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
 {
     auto primalBase = findOrTranscribePrimalInst(builder, origSpecialize->getBase());
@@ -1810,6 +1797,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
     case kIROp_DetachDerivative:
+    case kIROp_GetSequentialID:
         return trascribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,

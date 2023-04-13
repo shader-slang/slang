@@ -62,8 +62,6 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeConst(IRBuilder* builder, IRInst* origInst);
 
-    IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
-
     InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize);
 
     InstPair transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst);
