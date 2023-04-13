@@ -273,8 +273,9 @@ namespace Slang
         // What we do instead is see if there's already been a declRef
         // constructed for this expression and rest assured that it's already
         // had a diagnostic emitted.
-        auto originalDecl = as<DeclRefExpr>(originalExpr);
-        if(originalDecl && originalDecl->declRef)
+        auto originalAppExpr = as<AppExprBase>(originalExpr);
+        auto originalAppFunDecl = originalAppExpr ? as<DeclRefExpr>(originalAppExpr->functionExpr) : nullptr;
+        if(originalAppFunDecl && originalAppFunDecl->declRef)
         {
             return;
         }
