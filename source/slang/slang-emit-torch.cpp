@@ -94,9 +94,7 @@ void TorchCppSourceEmitter::emitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
 
             // shared mem
-            m_writer->emit("slangGetCudaKernelSharedMemSize((const void*)(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")), ");
+            m_writer->emit("0, ");
 
             // stream
             m_writer->emit("((cudaStream_t)");
