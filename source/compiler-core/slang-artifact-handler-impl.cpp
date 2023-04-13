@@ -238,6 +238,10 @@ SlangResult DefaultArtifactHandler::_createOSFile(IArtifact* artifact, ArtifactK
 
 	// Write the contents
 	SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
+    if(artifact->getDesc().kind == ArtifactKind::Executable)
+    {
+        SLANG_RETURN_ON_FAIL(File::makeExecutable(path));
+    }
 
 	ComPtr<IOSFileArtifactRepresentation> fileRep;
 
