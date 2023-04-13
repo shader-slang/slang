@@ -958,7 +958,7 @@ class ImplicitConversionModifier : public Modifier
     ConversionCost cost;
 
     // A builtin identifier for identifying conversions that need special treatment.
-    BuiltinConversionName builtinName;
+    BuiltinConversionKind builtinConversionKind;
 };
 
 class FormatAttribute : public Attribute 

@@ -559,7 +559,7 @@ namespace Slang
                     if (!typeChecked)
                     {
                         arg = CheckTerm(arg);
-                        arg = coerce(CoercionContext::Argument, paramDecl->getType(), arg);
+                        arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg);
                     }
                 }
                 paramIndex++;

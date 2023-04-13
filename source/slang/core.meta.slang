@@ -407,14 +407,14 @@ ${{{{
             kBaseTypes[tt],
             kBaseTypes[ss]);
 
-        BuiltinConversionName builtinConversionName = kBuiltinConversion_Unknown;
+        BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
         if (kBaseTypes[tt].tag == BaseType::Double &&
             kBaseTypes[ss].tag == BaseType::Float)
-            builtinConversionName = kBuiltinConversion_FloatToDouble;
+            builtinConversionKind = kBuiltinConversion_FloatToDouble;
 }}}}
 
     __intrinsic_op($(intrinsicOpCode))
-    __implicit_conversion($(conversionCost), $(builtinConversionName))
+    __implicit_conversion($(conversionCost), $(builtinConversionKind))
     __init($(kBaseTypes[ss].name) value);
 
 ${{{{

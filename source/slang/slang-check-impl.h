@@ -219,7 +219,7 @@ namespace Slang
         Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
     };
 
-    enum class CoercionContext
+    enum class CoercionSite
     {
         General,
         Assignment,
@@ -782,7 +782,7 @@ namespace Slang
         ConversionCost getImplicitConversionCost(
             Decl* decl);
 
-        BuiltinConversionName getImplicitConversionBuiltinName(
+        BuiltinConversionKind getImplicitConversionBuiltinKind(
             Decl* decl);
 
         bool isEffectivelyScalarForInitializerLists(
@@ -898,7 +898,7 @@ namespace Slang
             /// should be emitted on failure.
             ///
         bool _coerce(
-            CoercionContext context,
+            CoercionSite site,
             Type*    toType,
             Expr**   outToExpr,
             Type*    fromType,
@@ -937,7 +937,7 @@ namespace Slang
 
             /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
         Expr* coerce(
-            CoercionContext context,
+            CoercionSite site,
             Type*    toType,
             Expr*    fromExpr);
 

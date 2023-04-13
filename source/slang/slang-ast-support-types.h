@@ -128,8 +128,8 @@ namespace Slang
         kConversionCost_Impossible = 0xFFFFFFFF,
     };
 
-    typedef unsigned int BuiltinConversionName;
-    enum : BuiltinConversionName
+    typedef unsigned int BuiltinConversionKind;
+    enum : BuiltinConversionKind
     {
         kBuiltinConversion_Unknown = 0,
         kBuiltinConversion_FloatToDouble = 1,

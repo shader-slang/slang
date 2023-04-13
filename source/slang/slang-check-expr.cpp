@@ -1618,13 +1618,13 @@ namespace Slang
         switch (coercionType)
         {
         case IntegerConstantExpressionCoercionType::SpecificType:
-            expr = coerce(CoercionContext::General, expectedType, inExpr);
+            expr = coerce(CoercionSite::General, expectedType, inExpr);
             break;
         case IntegerConstantExpressionCoercionType::AnyInteger:
             if (isScalarIntegerType(inExpr->type))
                 expr = inExpr;
             else
-                expr = coerce(CoercionContext::General, m_astBuilder->getIntType(), inExpr);
+                expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
             break;
         default:
             break;
@@ -1862,7 +1862,7 @@ namespace Slang
         expr->left = maybeOpenRef(expr->left);
         auto type = expr->left->type;
         auto right = maybeOpenRef(expr->right);
-        expr->right = coerce(CoercionContext::Assignment, type, right);
+        expr->right = coerce(CoercionSite::Assignment, type, right);
 
         if (!type.isLeftValue)
         {
@@ -2650,7 +2650,7 @@ namespace Slang
                             initListExpr->loc = expr->loc;
                             auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
-                            return coerce(CoercionContext::General, typeExp.type, checkedInitListExpr);
+                            return coerce(CoercionSite::General, typeExp.type, checkedInitListExpr);
                         }
                     }
                 }

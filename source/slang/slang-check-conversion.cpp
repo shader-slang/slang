@@ -23,12 +23,12 @@ namespace Slang
         return kConversionCost_Explicit;
     }
 
-    BuiltinConversionName SemanticsVisitor::getImplicitConversionBuiltinName(
+    BuiltinConversionKind SemanticsVisitor::getImplicitConversionBuiltinKind(
         Decl* decl)
     {
         if (auto modifier = decl->findModifier<ImplicitConversionModifier>())
         {
-            return modifier->builtinName;
+            return modifier->builtinConversionKind;
         }
 
         return kBuiltinConversion_Unknown;
@@ -132,7 +132,7 @@ namespace Slang
         {
             ioInitArgIndex++;
             return _coerce(
-                CoercionContext::Initializer,
+                CoercionSite::Initializer,
                 toType,
                 outToExpr,
                 firstInitExpr->type,
@@ -223,7 +223,7 @@ namespace Slang
             {
                 auto arg = fromInitializerListExpr->args[ioArgIndex++];
                 return _coerce(
-                    CoercionContext::Initializer,
+                    CoercionSite::Initializer,
                     toType,
                     outToExpr,
                     arg->type,
@@ -629,7 +629,7 @@ namespace Slang
     }
 
     bool SemanticsVisitor::_coerce(
-        CoercionContext context,
+        CoercionSite site,
         Type*    toType,
         Expr**   outToExpr,
         Type*    fromType,
@@ -866,7 +866,7 @@ namespace Slang
             }
 
             if(!_coerce(
-                context,
+                site,
                 toType,
                 outToExpr,
                 fromElementType,
@@ -923,7 +923,7 @@ namespace Slang
             }
 
             if (!_coerce(
-                context,
+                site,
                 toType,
                 outToExpr,
                 fromValueType,
@@ -966,7 +966,7 @@ namespace Slang
         AddTypeOverloadCandidates(toType, overloadContext);
 
         // After all of the overload candidates have been added
-        // to the context and processed, we need to see whether
+        // to the site and processed, we need to see whether
         // there was one best overload or not.
         //
         if(overloadContext.bestCandidates.getCount() != 0)
@@ -1070,11 +1070,11 @@ namespace Slang
                     }
                 }
                 
-                if (context == CoercionContext::Argument)
+                if (site == CoercionSite::Argument)
                 {
-                    auto builtinConversionName = getImplicitConversionBuiltinName(
+                    auto builtinConversionKind = getImplicitConversionBuiltinKind(
                         overloadContext.bestCandidate->item.declRef.getDecl());
-                    if (builtinConversionName == kBuiltinConversion_FloatToDouble)
+                    if (builtinConversionKind == kBuiltinConversion_FloatToDouble)
                     {
                         if (!as<FloatingPointLiteralExpr>(fromExpr))
                             getSink()->diagnose(fromExpr, Diagnostics::implicitConversionToDouble);
@@ -1173,7 +1173,7 @@ namespace Slang
         // during the coercion process.
         //
         bool rs = _coerce(
-            CoercionContext::General,
+            CoercionSite::General,
             toType,
             nullptr,
             fromType,
@@ -1243,13 +1243,13 @@ namespace Slang
 
 
     Expr* SemanticsVisitor::coerce(
-        CoercionContext context,
+        CoercionSite site,
         Type*    toType,
         Expr*    fromExpr)
     {
         Expr* expr = nullptr;
         if (!_coerce(
-            context,
+            site,
             toType,
             &expr,
             fromExpr->type,
