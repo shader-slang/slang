@@ -2811,9 +2811,9 @@ namespace Slang
 
     IRVectorType* IRBuilder::getVectorType(
         IRType* elementType,
-        UInt    elementCount)
+        IRIntegerValue elementCount)
     {
-        return getVectorType(elementType, getIntValue(getUIntType(), elementCount));
+        return getVectorType(elementType, getIntValue(getIntType(), elementCount));
     }
 
     IRMatrixType* IRBuilder::getMatrixType(
@@ -4614,9 +4614,9 @@ namespace Slang
 
     IRInst* IRBuilder::emitElementExtract(
         IRInst* base,
-        UInt    index)
+        IRIntegerValue index)
     {
-        return emitElementExtract(base, getIntValue(getUIntType(), index));
+        return emitElementExtract(base, getIntValue(getIntType(), index));
     }
 
     IRInst* IRBuilder::emitElementExtract(
@@ -4667,9 +4667,9 @@ namespace Slang
 
     IRInst* IRBuilder::emitElementAddress(
         IRInst* basePtr,
-        UInt    index)
+        IRIntegerValue index)
     {
-        return emitElementAddress(basePtr, getIntValue(getUIntType(), index));
+        return emitElementAddress(basePtr, getIntValue(getIntType(), index));
     }
 
     IRInst* IRBuilder::emitElementAddress(
@@ -4747,9 +4747,9 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitUpdateElement(IRInst* base, UInt index, IRInst* newElement)
+    IRInst* IRBuilder::emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement)
     {
-        return emitUpdateElement(base, getIntValue(getUIntType(), index), newElement);
+        return emitUpdateElement(base, getIntValue(getIntType(), index), newElement);
     }
 
     IRInst* IRBuilder::emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement)
