@@ -5974,7 +5974,9 @@ LoweredValInfo tryGetAddress(
             newSwizzleInfo->type = originalSwizzleInfo->type;
             newSwizzleInfo->elementCount = elementCount;
             for(UInt ee = 0; ee < elementCount; ++ee)
+            {
                 newSwizzleInfo->elementCoords[ee] = originalSwizzleInfo->elementCoords[ee];
+            }
 
             return LoweredValInfo::swizzledMatrixLValue(newSwizzleInfo);
         }
@@ -6165,7 +6167,8 @@ top:
                 ++rowSize;
             }
 
-            const auto rType = irRightVal->getDataType();
+            const auto rElemType =
+                composeGetters<IRType>(irRightVal, &IRInst::getDataType, &IRVectorType::getElementType);
 
             switch( loweredBase.flavor )
             {
@@ -6181,9 +6184,9 @@ top:
                         }
                         const auto rowAddr = builder->emitElementAddress(loweredBase.val, r);
                         // Only select the RHS elements if it's a vector
-                        const auto rSwizzled = as<IRVectorType>(rType)
+                        const auto rSwizzled = rElemType
                             ? builder->emitSwizzle(
-                                rType,
+                                builder->getVectorType(rElemType, rowSizes[r]),
                                 irRightVal,
                                 rowSizes[r],
                                 rowIndices[r])
