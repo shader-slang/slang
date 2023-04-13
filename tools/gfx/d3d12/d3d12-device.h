@@ -6,6 +6,7 @@
 #include "d3d12-texture.h"
 
 #include <d3d12.h>
+#include <d3d12sdklayers.h>
 
 namespace gfx
 {
