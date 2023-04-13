@@ -6221,8 +6221,8 @@ top:
                     builder->emitStore(tmpVar, beforeLValue);
 
                     // Make a new swizzle write to write into this pointer
-                    auto swizzleInfo = left.getSwizzledMatrixLValueInfo();
-                    SwizzledMatrixLValueInfo nextInfo = *swizzleInfo;
+                    auto nextSwizzleInfo = left.getSwizzledMatrixLValueInfo();
+                    SwizzledMatrixLValueInfo nextInfo = *nextSwizzleInfo;
                     nextInfo.base = LoweredValInfo::ptr(tmpVar);
 
                     // Perform that swizzling assignment
