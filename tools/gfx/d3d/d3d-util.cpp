@@ -6,10 +6,13 @@
 #include <dxgi1_4.h>
 #include <dxgidebug.h>
 
+#include <mutex>
+
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
 #include "core/slang-basic.h"
+#include "core/slang-platform.h"
 
 namespace gfx {
 using namespace Slang;
@@ -498,15 +501,23 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 }
 
-/* static */HMODULE D3DUtil::getDxgiModule()
+/* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
 {
-    static HMODULE s_dxgiModule = LoadLibraryA("dxgi.dll");
-    if (!s_dxgiModule)
-    {
-        fprintf(stderr, "error: failed load 'dxgi.dll'\n");
-        return nullptr;
-    }
-
+    static std::once_flag once;
+    static SharedLibrary::Handle s_dxgiModule = nullptr;
+    std::call_once(once, [](){
+#if SLANG_WINDOWS_FAMILY
+        const char* libPath = "dxgi";
+#else
+        const char* libPath = "dxvk_dxgi";
+#endif
+        SharedLibrary::load(libPath, s_dxgiModule);
+        if (!s_dxgiModule)
+        {
+            fprintf(stderr, "error: failed to load dll '%s'\n", libPath);
+            return nullptr;
+        }
+    });
     return s_dxgiModule;
 }
 
@@ -522,7 +533,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
 
     {
-        auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)::GetProcAddress(dxgiModule, "CreateDXGIFactory2");
+        auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory2");
         if (createFactory2)
         {
             UINT dxgiFlags = 0;
@@ -541,7 +552,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 
     {
-        auto createFactory = (PFN_DXGI_CREATE_FACTORY)::GetProcAddress(dxgiModule, "CreateDXGIFactory");
+        auto createFactory = (PFN_DXGI_CREATE_FACTORY)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory");
         if (!createFactory)
         {
             fprintf(stderr, "error: failed load symbol '%s'\n", "CreateDXGIFactory");
