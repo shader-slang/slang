@@ -848,7 +848,7 @@ struct PeepholeContext : InstPassBase
                     if (!intLitIndex)
                         return;
                     if (intLitIndex->getValue() < (Int)makeVector->getOperandCount())
-                        vals.add(makeVector->getOperand(intLitIndex->getValue()));
+                        vals.add(makeVector->getOperand((UInt)intLitIndex->getValue()));
                     else
                         return;
                 }
