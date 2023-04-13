@@ -219,6 +219,15 @@ namespace Slang
         Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
     };
 
+    enum class CoercionSite
+    {
+        General,
+        Assignment,
+        Argument,
+        Return,
+        Initializer,
+    };
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -773,6 +782,9 @@ namespace Slang
         ConversionCost getImplicitConversionCost(
             Decl* decl);
 
+        BuiltinConversionKind getImplicitConversionBuiltinKind(
+            Decl* decl);
+
         bool isEffectivelyScalarForInitializerLists(
             Type*    type);
 
@@ -886,6 +898,7 @@ namespace Slang
             /// should be emitted on failure.
             ///
         bool _coerce(
+            CoercionSite site,
             Type*    toType,
             Expr**   outToExpr,
             Type*    fromType,
@@ -924,6 +937,7 @@ namespace Slang
 
             /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
         Expr* coerce(
+            CoercionSite site,
             Type*    toType,
             Expr*    fromExpr);
 

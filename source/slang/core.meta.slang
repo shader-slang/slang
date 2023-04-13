@@ -405,10 +405,15 @@ ${{{{
         IROp intrinsicOpCode = getBaseTypeConversionOp(
             kBaseTypes[tt],
             kBaseTypes[ss]);
+
+        BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
+        if (kBaseTypes[tt].tag == BaseType::Double &&
+            kBaseTypes[ss].tag == BaseType::Float)
+            builtinConversionKind = kBuiltinConversion_FloatToDouble;
 }}}}
 
     __intrinsic_op($(intrinsicOpCode))
-    __implicit_conversion($(conversionCost))
+    __implicit_conversion($(conversionCost), $(builtinConversionKind))
     __init($(kBaseTypes[ss].name) value);
 
 ${{{{
