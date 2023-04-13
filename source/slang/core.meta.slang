@@ -1,4 +1,3 @@
-
 // Slang `core` library
 
 // Aliases for base types

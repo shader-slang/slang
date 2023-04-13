@@ -966,7 +966,7 @@ namespace Slang
         AddTypeOverloadCandidates(toType, overloadContext);
 
         // After all of the overload candidates have been added
-        // to the site and processed, we need to see whether
+        // to the context and processed, we need to see whether
         // there was one best overload or not.
         //
         if(overloadContext.bestCandidates.getCount() != 0)
