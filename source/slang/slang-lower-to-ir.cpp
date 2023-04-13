@@ -7145,6 +7145,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         entry->setRequirementVal(requirementVal);
                         break;
                     }
+                    if (requirementDecl->findModifier<HLSLStaticModifier>())
+                    {
+                        getBuilder()->addStaticRequirementDecoration(requirementKey);
+                    }
                 }
             }
             irInterface->setOperand(entryIndex, entry);
@@ -7807,6 +7811,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // to the newly construct generic value.
                     typeBuilder.setInsertBefore(parentGeneric);
                     auto typeGeneric = typeBuilder.emitGeneric();
+                    typeGeneric->setFullType(typeBuilder.getGenericKind());
                     typeBuilder.setInsertInto(typeGeneric);
                     typeBuilder.emitBlock();
                     

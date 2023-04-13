@@ -86,19 +86,11 @@ namespace Slang
         // Get a list of all witness tables whose conformance type is `interfaceType`.
         List<IRWitnessTable*> getWitnessTablesFromInterfaceType(IRInst* interfaceType);
 
-        IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
-        {
-            for (auto entry : table->getEntries())
-            {
-                if (entry->getRequirementKey() == key)
-                    return entry->getSatisfyingVal();
-            }
-            return nullptr;
-        }
-
-            /// Does the given `concreteType` fit within the any-value size deterined by `interfaceType`?
+        /// Does the given `concreteType` fit within the any-value size deterined by `interfaceType`?
         bool doesTypeFitInAnyValue(IRType* concreteType, IRInterfaceType* interfaceType, IRIntegerValue* outTypeSize = nullptr, IRIntegerValue* outLimit = nullptr);
     };
+
+    List<IRWitnessTable*> getWitnessTablesFromInterfaceType(IRModule* module, IRInst* interfaceType);
 
     bool isPolymorphicType(IRInst* typeInst);
 

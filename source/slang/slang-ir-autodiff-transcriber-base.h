@@ -111,8 +111,6 @@ struct AutoDiffTranscriberBase
 
     IRType* tryGetDiffPairType(IRBuilder* builder, IRType* primalType);
 
-    IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
-
     IRInst* getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType);
 
     InstPair trascribeNonDiffInst(IRBuilder* builder, IRInst* origInst);

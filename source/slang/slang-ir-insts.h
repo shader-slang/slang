@@ -198,6 +198,14 @@ struct IRAnyValueSizeDecoration : IRDecoration
     }
 };
 
+struct IRDispatchFuncDecoration : IRDecoration
+{
+    enum { kOp = kIROp_DispatchFuncDecoration };
+    IR_LEAF_ISA(DispatchFuncDecoration)
+
+    IRInst* getFunc() { return getOperand(0); }
+};
+
 struct IRSpecializeDecoration : IRDecoration
 {
     enum { kOp = kIROp_SpecializeDecoration };
@@ -265,6 +273,7 @@ IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitObjectAttributesDecoration)
 
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -326,6 +335,7 @@ IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
 IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
+IR_SIMPLE_DECORATION(StaticRequirementDecoration)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {
@@ -3911,6 +3921,16 @@ public:
     void addAnyValueSizeDecoration(IRInst* inst, IRIntegerValue value)
     {
         addDecoration(inst, kIROp_AnyValueSizeDecoration, getIntValue(getIntType(), value));
+    }
+
+    void addDispatchFuncDecoration(IRInst* inst, IRInst* func)
+    {
+        addDecoration(inst, kIROp_DispatchFuncDecoration, func);
+    }
+
+    void addStaticRequirementDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_StaticRequirementDecoration);
     }
 
     void addSpecializeDecoration(IRInst* inst)

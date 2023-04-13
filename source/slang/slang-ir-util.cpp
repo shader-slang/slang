@@ -698,6 +698,29 @@ bool isPureFunctionalCall(IRCall* call)
     return false;
 }
 
+IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
+{
+    for (UInt i = 0; i < type->getOperandCount(); i++)
+    {
+        if (auto req = as<IRInterfaceRequirementEntry>(type->getOperand(i)))
+        {
+            if (req->getRequirementKey() == key)
+                return req->getRequirementVal();
+        }
+    }
+    return nullptr;
+}
+
+IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
+{
+    for (auto entry : table->getEntries())
+    {
+        if (entry->getRequirementKey() == key)
+            return entry->getSatisfyingVal();
+    }
+    return nullptr;
+}
+
 struct GenericChildrenMigrationContextImpl
 {
     IRCloneEnv cloneEnv;

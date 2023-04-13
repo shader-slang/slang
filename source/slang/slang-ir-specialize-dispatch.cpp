@@ -3,6 +3,7 @@
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -112,7 +113,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
             builder->setInsertInto(defaultBlock);
         }
 
-        auto callee = sharedContext->findWitnessTableEntry(witnessTable, requirementKey);
+        auto callee = findWitnessTableEntry(witnessTable, requirementKey);
         SLANG_ASSERT(callee);
         auto specializedCallInst = builder->emitCallInst(callInst->getFullType(), callee, params);
         if (callInst->getDataType()->getOp() == kIROp_VoidType)

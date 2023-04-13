@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-lower-witness-lookup.h"
 
 namespace Slang
 {
@@ -43,6 +44,7 @@ struct SpecializationContext
     // For convenience, we will keep a pointer to the module
     // we are specializing.
     IRModule* module;
+    DiagnosticSink* sink;
 
     bool changed = false;
 
@@ -932,7 +934,11 @@ struct SpecializationContext
             }
             else
             {
-                break;
+                // If we run out of specialization opportunities, consider
+                // lower lookupWitnessMethod insts into dynamic dispatch calls.
+                iterChanged = lowerWitnessLookup(module, sink);
+                if (!iterChanged || sink->getErrorCount())
+                    break;
             }
         }
 
@@ -2329,10 +2335,12 @@ struct SpecializationContext
 };
 
 bool specializeModule(
-    IRModule*   module)
+    IRModule*   module,
+    DiagnosticSink* sink)
 {
     SpecializationContext context;
     context.module = module;
+    context.sink = sink;
     context.processModule();
     return context.changed;
 }
@@ -2349,6 +2357,7 @@ void finalizeSpecialization(IRModule* module)
             case kIROp_ExistentialFuncSpecializationDictionary:
             case kIROp_ExistentialTypeSpecializationDictionary:
             case kIROp_GenericSpecializationDictionary:
+            case kIROp_DispatchFuncDecoration:
                 decor->removeAndDeallocate();
                 break;
             default:

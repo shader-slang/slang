@@ -411,6 +411,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-reinterpret.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-result-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-witness-lookup.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-marshal-native-call.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-metadata.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
@@ -602,6 +603,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-reinterpret.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-result-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-witness-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-marshal-native-call.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-metadata.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
