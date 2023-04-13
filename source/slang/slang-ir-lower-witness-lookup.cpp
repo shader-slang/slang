@@ -39,12 +39,24 @@ struct WitnessLookupLoweringContext
     {
         if (!type)
             return false;
-        if (type->getOp() == kIROp_AssociatedType)
-            return true;
-        for (UInt i = 0; i < type->getOperandCount(); i++)
+        
+        HashSet<IRInst*> processedSet;
+        List<IRInst*> workList;
+        workList.add(type);
+        processedSet.add(type);
+        for (Index i = 0; i < workList.getCount(); i++)
         {
-            if (hasAssocType(type->getOperand(i)))
+            auto inst = workList[i];
+            if (inst->getOp() == kIROp_AssociatedType)
                 return true;
+            
+            for (UInt j = 0; j < inst->getOperandCount(); j++)
+            {
+                if (!inst->getOperand(j))
+                    continue;
+                if (processedSet.Add(inst->getOperand(j)))
+                    workList.add(inst->getOperand(j));
+            }
         }
         return false;
     }
