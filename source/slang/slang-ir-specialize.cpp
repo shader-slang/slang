@@ -1329,7 +1329,6 @@ struct SpecializationContext
             IRInst* curInst = localWorkList.getLast();
 
             localWorkList.removeLast();
-            processedInsts.Remove(curInst);
 
             switch (curInst->getOp())
             {

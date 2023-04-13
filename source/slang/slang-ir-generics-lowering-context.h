@@ -74,7 +74,7 @@ namespace Slang
         IRInst* maybeEmitRTTIObject(IRInst* typeInst);
 
         static IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
-        IRType* lowerAssociatedType(IRBuilder* builder, IRInst* type);
+        static IRType* lowerAssociatedType(IRBuilder* builder, IRInst* type);
 
         IRType* lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping, IRType* concreteType);
 

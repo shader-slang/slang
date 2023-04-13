@@ -1,4 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile sm_5_0 -output-using-type
+//TEST:LANG_SERVER:
+//HOVER:6,15
 
 // Test that we can specialize a generic method called through a dynamic interface.
 
@@ -23,30 +24,26 @@ interface IInterface
 struct Add : IInterface
 {
     float base;
-    typealias V = SimpleVal;
-    V run<let N : int>(float arr[N])
+    typealias V
+    float run<let N : int>(float arr[N])
     {
         float sum = base;
         for (int i = 0; i < N; i++)
             sum += arr[i];
-        V rs;
-        rs.val = sum;
-        return rs;
+        return sum;
     }
 }
 
 struct Mul : IInterface
 {
     float base;
-    typealias V = SimpleVal;
-    V run<let N : int>(float arr[N])
+
+    float run<let N : int>(float arr[N])
     {
         float sum = base;
         for (int i = 0; i < N; i++)
             sum *= arr[i];
-         V rs;
-        rs.val = sum;
-        return rs;
+        return sum;
     }
 }
 
@@ -61,5 +58,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var obj = createDynamicObject<IInterface>(1, 1.0); // Add.
     float arr[3] = { 2, 3, 4 };
-    gOutputBuffer[0] = obj.run(arr).getVal();
+    gOutputBuffer[0] = obj.run(arr);
+
 }

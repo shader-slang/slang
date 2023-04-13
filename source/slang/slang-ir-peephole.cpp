@@ -827,6 +827,50 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_swizzle:
+            {
+                // If we see a swizzle(makeVector) then we can replace it with the values from makeVector.
+                auto makeVector = inst->getOperand(0);
+                if (makeVector->getOp() != kIROp_MakeVector)
+                    break;
+                auto swizzle = as<IRSwizzle>(inst);
+                List<IRInst*> vals;
+                auto vectorType = as<IRVectorType>(makeVector->getDataType());
+                auto vectorSize = as<IRIntLit>(vectorType->getElementCount());
+                if (!vectorSize)
+                    break;
+                if (makeVector->getOperandCount() != (UInt)vectorSize->getValue())
+                    break;
+                for (UInt i = 0; i < swizzle->getElementCount(); i++)
+                {
+                    auto index = swizzle->getElementIndex(i);
+                    auto intLitIndex = as<IRIntLit>(index);
+                    if (!intLitIndex)
+                        return;
+                    if (intLitIndex->getValue() < (Int)makeVector->getOperandCount())
+                        vals.add(makeVector->getOperand(intLitIndex->getValue()));
+                    else
+                        return;
+                }
+                if (vals.getCount() == 1)
+                {
+                    inst->replaceUsesWith(vals[0]);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                else
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    auto newMakeVector = builder.emitMakeVector(
+                        swizzle->getDataType(), (UInt)vals.getCount(), vals.getBuffer());
+                    inst->replaceUsesWith(newMakeVector);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+
         default:
             break;
         }

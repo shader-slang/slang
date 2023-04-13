@@ -35,8 +35,24 @@ struct WitnessLookupLoweringContext
         }
     }
 
+    bool hasAssocType(IRInst* type)
+    {
+        if (!type)
+            return false;
+        if (type->getOp() == kIROp_AssociatedType)
+            return true;
+        for (UInt i = 0; i < type->getOperandCount(); i++)
+        {
+            if (hasAssocType(type->getOperand(i)))
+                return true;
+        }
+        return false;
+    }
+
     IRType* translateType(IRBuilder builder, IRInst* type)
     {
+        if (!type)
+            return nullptr;
         if (auto genType = as<IRGeneric>(type))
         {
             IRCloneEnv cloneEnv;
@@ -52,6 +68,10 @@ struct WitnessLookupLoweringContext
         else if (auto thisType = as<IRThisType>(type))
         {
             return (IRType*)thisType->getConstraintType();
+        }
+        else if (auto assocType = as<IRAssociatedType>(type))
+        {
+            return assocType;
         }
         
         if (as<IRBasicType>(type))
@@ -95,8 +115,10 @@ struct WitnessLookupLoweringContext
         auto witnessTableOperand = lookupInst->getWitnessTable();
         auto witnessTableType = as<IRWitnessTableTypeBase>(witnessTableOperand->getDataType());
         SLANG_RELEASE_ASSERT(witnessTableType);
-        auto interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+        auto interfaceType = as<IRInterfaceType>(unwrapAttributedType(witnessTableType->getConformanceType()));
         SLANG_RELEASE_ASSERT(interfaceType);
+        if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+            return nullptr;
         auto requirementType = findInterfaceRequirement(interfaceType, requirementKey);
         SLANG_RELEASE_ASSERT(requirementType);
 
@@ -104,14 +126,31 @@ struct WitnessLookupLoweringContext
         // Our front end will stick a StaticRequirementDecoration on the IRStructKey for static member requirements.
         if (lookupInst->getRequirementKey()->findDecoration<IRStaticRequirementDecoration>())
             return nullptr;
-
-        if (auto funcType = as<IRFuncType>(getResolvedInstForDecorations(requirementType)))
+        auto interfaceMethodFuncType = as<IRFuncType>(getResolvedInstForDecorations(requirementType));
+        if (interfaceMethodFuncType)
         {
+            // Detect cases that we currently does not support and exit.
+            
             // If this is a non static function requirement, we should
             // make sure the first parameter is the interface type. If not, something has gone wrong.
-            if (funcType->getParamCount() == 0)
+            if (interfaceMethodFuncType->getParamCount() == 0)
                 return nullptr;
-            if (!as<IRThisType>(funcType->getParamType(0)))
+            if (!as<IRThisType>(interfaceMethodFuncType->getParamType(0)))
+                return nullptr;
+
+            // The function has any associated type parameter, we currently can't lower it early in this pass.
+            // We will lower it in the catch all generic lowering pass.
+            for (UInt i = 1; i < interfaceMethodFuncType->getParamCount(); i++)
+            {
+                if (hasAssocType(interfaceMethodFuncType->getParamType(i)))
+                    return nullptr;
+            }
+
+            // If return type is a composite type containing an assoc type, we won't lower it now.
+            // Supporting general use of assoc type is possible, but would require more complex logic
+            // in this pass to marshal things to and from existential types.
+            if (interfaceMethodFuncType->getResultType()->getOp() != kIROp_AssociatedType &&
+                hasAssocType(interfaceMethodFuncType->getResultType()))
                 return nullptr;
         }
         else
@@ -133,31 +172,39 @@ struct WitnessLookupLoweringContext
         {
             IRCloneEnv cloneEnv;
             parentGeneric = as<IRGeneric>(cloneInst(&cloneEnv, &builder, genericRequirement));
-            parentGeneric->setFullType(translateType(builder, requirementType));
 
             auto returnInst = as<IRReturn>(parentGeneric->getFirstBlock()->getLastInst());
             SLANG_RELEASE_ASSERT(returnInst);
             builder.setInsertBefore(returnInst);
-            dispatchFuncType = as<IRFuncType>(returnInst->getVal());
-            dispatchFuncType = as<IRFuncType>(translateType(builder, dispatchFuncType));
+            auto oldDispatchFuncType = as<IRFuncType>(returnInst->getVal());
+            if (!oldDispatchFuncType)
+                return nullptr;
+
+            dispatchFuncType = as<IRFuncType>(translateType(builder, oldDispatchFuncType));
+
             SLANG_RELEASE_ASSERT(dispatchFuncType);
 
             dispatchFunc = builder.createFunc();
             dispatchFunc->setFullType(dispatchFuncType);
             builder.emitReturn(dispatchFunc);
             returnInst->removeAndDeallocate();
+
+            parentGeneric->setFullType(translateType(builder, requirementType));
         }
         else
         {
-            dispatchFuncType = as<IRFuncType>(translateType(builder, requirementType->getFullType()));
+            dispatchFuncType = as<IRFuncType>(translateType(builder, requirementType));
             dispatchFunc = builder.createFunc();
             dispatchFunc->setFullType(dispatchFuncType);
         }
 
         // Collect generic params.
         List<IRInst*> genericParams;
-        for (auto param : parentGeneric->getParams())
-            genericParams.add(param);
+        if (parentGeneric)
+        {
+            for (auto param : parentGeneric->getParams())
+                genericParams.add(param);
+        }
 
         // Emit the body of the dispatch func.
         builder.setInsertInto(dispatchFunc);
@@ -208,12 +255,25 @@ struct WitnessLookupLoweringContext
                 // Reinterpret the first arg into the concrete type.
                 args[0] = builder.emitReinterpret(witnessTable->getConcreteType(),
                     builder.emitExtractExistentialValue(builder.emitExtractExistentialType(args[0]), args[0]));
-
+                
+                auto calleeFuncType = as<IRFuncType>(getResolvedInstForDecorations(entry)->getFullType());
+                auto callReturnType = calleeFuncType->getResultType();
+                if (callReturnType->getParent() != module->getModuleInst())
+                {
+                    // the return type is dependent on generic parameter, use the type from dispatchFuncType instead.
+                    callReturnType = dispatchFuncType->getResultType();
+                }
+                
                 auto call = builder.emitCallInst(
-                    dispatchFuncType->getResultType(),
+                    callReturnType,
                     entry,
                     (UInt)args.getCount(),
                     args.getBuffer());
+                // If result type is an associated type, we need to pack it into an anyValue.
+                if (as<IRAssociatedType>(dispatchFuncType->getResultType()))
+                {
+                    call = builder.emitPackAnyValue(dispatchFuncType->getResultType(), call);
+                }
                 builder.emitReturn(call);
             }
             builder.setInsertInto(firstBlock);
