@@ -245,7 +245,6 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
     return RenderApiType::Unknown;
 }
 
-#if SLANG_WINDOWS_FAMILY
 static bool _canLoadSharedLibrary(const char* libName)
 {
     SharedLibrary::Handle handle;
@@ -257,45 +256,31 @@ static bool _canLoadSharedLibrary(const char* libName)
     SharedLibrary::unload(handle);
     return true;
 }
-#endif
 
 /* static */bool RenderApiUtil::calcHasApi(RenderApiType type)
 {
+    switch (type)
+    {
 #if SLANG_WINDOWS_FAMILY
-    switch (type)
-    {
-        case RenderApiType::OpenGl:    return _canLoadSharedLibrary("opengl32");
-        case RenderApiType::Vulkan:    return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
-        case RenderApiType::D3D11:     return _canLoadSharedLibrary("d3d11"); 
-        case RenderApiType::D3D12:     return _canLoadSharedLibrary("d3d12");
-        case RenderApiType::CPU:       return true;
-        case RenderApiType::CUDA:
-        {
-            // We'll assume it's available, and if not trying to create it will detect it
-            return true;
-        }
-        default: break; 
-    }
+        case RenderApiType::OpenGl: return _canLoadSharedLibrary("opengl32");
+        case RenderApiType::Vulkan: return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
+        case RenderApiType::D3D11:  return _canLoadSharedLibrary("d3d11");
+        case RenderApiType::D3D12:  return _canLoadSharedLibrary("d3d12");
 #elif SLANG_UNIX_FAMILY
-    // Assume on unix target we never have D3D
-    switch (type)
-    {
-        case RenderApiType::OpenGl:
-        case RenderApiType::Vulkan:
-        {
-            return true;
-        }
-        case RenderApiType::CPU:
-        {
-            return true;
-        }
-        case RenderApiType::CUDA:
-        {
-            return true;
-        }
-        default: break; 
-    }
+        case RenderApiType::D3D11:  return false;
+        case RenderApiType::D3D12:  return false;
+        // The below can be used once they're confirmed working with gfx
+        // case RenderApiType::D3D11:  return _canLoadSharedLibrary("dxvk_d3d11");
+        // case RenderApiType::D3D12:  return _canLoadSharedLibrary("vkd3d-proton-d3d12");
+
+        case RenderApiType::OpenGl: return true;
+        case RenderApiType::Vulkan: return true;
 #endif
+        case RenderApiType::CPU:    return true;
+        // We'll assume CUDA is available, and if not, trying to create it will detect it
+        case RenderApiType::CUDA:   return true;
+        default: break;
+    }
     return false;
 }
 
