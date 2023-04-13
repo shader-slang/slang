@@ -1797,6 +1797,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
     case kIROp_DetachDerivative:
+    case kIROp_GetSequentialID:
         return trascribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,

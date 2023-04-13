@@ -135,7 +135,7 @@ struct WitnessLookupLoweringContext
             // make sure the first parameter is the interface type. If not, something has gone wrong.
             if (interfaceMethodFuncType->getParamCount() == 0)
                 return nullptr;
-            if (!as<IRThisType>(interfaceMethodFuncType->getParamType(0)))
+            if (!as<IRThisType>(unwrapAttributedType(interfaceMethodFuncType->getParamType(0))))
                 return nullptr;
 
             // The function has any associated type parameter, we currently can't lower it early in this pass.
@@ -196,6 +196,14 @@ struct WitnessLookupLoweringContext
             dispatchFuncType = as<IRFuncType>(translateType(builder, requirementType));
             dispatchFunc = builder.createFunc();
             dispatchFunc->setFullType(dispatchFuncType);
+        }
+
+        // We need to inline this function if the requirement is differentiable,
+        // so that the autodiff pass doesn't need to handle the dispatch function.
+        if (requirementKey->findDecoration<IRForwardDerivativeDecoration>()||
+            requirementKey->findDecoration<IRBackwardDerivativeDecoration>())
+        {
+            builder.addForceInlineDecoration(dispatchFunc);
         }
 
         // Collect generic params.

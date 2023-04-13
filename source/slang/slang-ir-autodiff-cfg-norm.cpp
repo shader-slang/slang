@@ -410,6 +410,7 @@ struct CFGNormalizationPass
                 }
 
                 case kIROp_loop:
+                case kIROp_Switch:
                 {
                     auto breakBlock = normalizeBreakableRegion(terminator);
 
