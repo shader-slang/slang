@@ -320,7 +320,7 @@ namespace Slang
                 }
                 else
                 {
-                    arg = coerce(getType(m_astBuilder, valParamRef), arg);
+                    arg = coerce(CoercionContext::Argument, getType(m_astBuilder, valParamRef), arg);
                 }
 
                 // If we have an argument to work with, then we will
@@ -427,7 +427,7 @@ namespace Slang
             }
             else
             {
-                arg = coerce(paramType, arg);
+                arg = coerce(CoercionContext::Argument, paramType, arg);
             }
         }
         return true;

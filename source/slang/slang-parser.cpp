@@ -6560,14 +6560,19 @@ namespace Slang
     static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userData*/)
     {
         ImplicitConversionModifier* modifier = parser->astBuilder->create<ImplicitConversionModifier>();
-
+        BuiltinConversionName builtinName = kBuiltinConversion_Unknown;
         ConversionCost cost = kConversionCost_Default;
         if( AdvanceIf(parser, TokenType::LParent) )
         {
             cost = ConversionCost(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+            if (AdvanceIf(parser, TokenType::Comma))
+            {
+                builtinName = BuiltinConversionName(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+            }
             parser->ReadToken(TokenType::RParent);
         }
         modifier->cost = cost;
+        modifier->builtinName = builtinName;
         return modifier;
     }
 

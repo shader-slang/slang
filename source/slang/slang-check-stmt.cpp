@@ -157,7 +157,7 @@ namespace Slang
         }
         Expr* e = expr;
         e = CheckTerm(e);
-        e = coerce(m_astBuilder->getBoolType(), e);
+        e = coerce(CoercionContext::General, m_astBuilder->getBoolType(), e);
         return e;
     }
 
@@ -313,7 +313,7 @@ namespace Slang
             {
                 if (function)
                 {
-                    stmt->expression = coerce(function->returnType.Ptr(), stmt->expression);
+                    stmt->expression = coerce(CoercionContext::Return, function->returnType.Ptr(), stmt->expression);
                 }
                 else
                 {
