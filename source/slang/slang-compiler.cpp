@@ -1812,6 +1812,25 @@ namespace Slang
     }
 
     
+    bool _shouldWriteSourceLocs(Linkage* linkage)
+    {
+        // If debug information or source manager are not avaiable we can't/shouldn't write out locs
+        if (linkage->debugInfoLevel == DebugInfoLevel::None || 
+            linkage->getSourceManager() == nullptr)
+        {
+            return false;
+        }
+        // If obfuscation is enabled, and source maps aren't generated theres no point outputting
+        // locs
+        if (linkage->m_obfuscateCode && !linkage->m_generateSourceMap)
+        {
+            return false;
+        }
+
+        // Otherwise we do want to write out the locs
+        return true;
+    }
+
     SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     {
         auto linkage = getLinkage();
@@ -1828,16 +1847,11 @@ namespace Slang
             options.optionFlags &= ~SerialOptionFlag::ASTModule;
         }
         
-        if (linkage->debugInfoLevel != DebugInfoLevel::None && linkage->getSourceManager())
+        // If debug information is enabled, enable writing out source locs
+        if (_shouldWriteSourceLocs(linkage))
         {
-            // If there is no obfuscation, or there is obfuscation with source map 
-            // enable writing out of locs
-            if (linkage->m_obfuscateCode == false ||
-                linkage->m_generateSourceMap)
-            {
-                options.optionFlags |= SerialOptionFlag::SourceLocation;
-                options.sourceManager = linkage->getSourceManager();
-            }
+            options.optionFlags |= SerialOptionFlag::SourceLocation;
+            options.sourceManager = linkage->getSourceManager();
         }
 
         {
