@@ -26,6 +26,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-obfuscate-loc.h"
+#include "slang-ir-use-uninitialized-out-param.h"
 
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -9607,6 +9608,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.
+
+    // Check for using uninitialized out parameters.
+    checkForUsingUninitializedOutParams(module, compileRequest->getSink());
 
     checkForMissingReturns(module, compileRequest->getSink());
 
