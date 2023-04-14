@@ -6,8 +6,7 @@
 #include "slang-string-util.h"
 
 #if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <windows.h>
 #elif defined(__linux__) || defined(SLANG_OSX)
 #include <dlfcn.h>
 #endif

@@ -19,7 +19,7 @@
 #include "spirv-tools/libspirv.h"
 
 #ifdef _WIN32
-#   include <Windows.h>
+#   include <windows.h>
 #endif
 
 #include <memory>

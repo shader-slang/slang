@@ -93,12 +93,6 @@ void CommandQueueImpl::dispatchCompute(int x, int y, int z)
     UInt threadGroupSize[3];
     programLayout->getKernelThreadGroupSize(kernelId, threadGroupSize);
 
-    int sharedSizeInBytes;
-    cuFuncGetAttribute(
-        &sharedSizeInBytes,
-        CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES,
-        currentPipeline->shaderProgram->cudaKernel);
-
     // Copy global parameter data to the `SLANG_globalParams` symbol.
     {
         CUdeviceptr globalParamsSymbol = 0;
@@ -144,7 +138,7 @@ void CommandQueueImpl::dispatchCompute(int x, int y, int z)
         int(threadGroupSize[0]),
         int(threadGroupSize[1]),
         int(threadGroupSize[2]),
-        sharedSizeInBytes,
+        0,
         stream,
         nullptr,
         extraOptions);

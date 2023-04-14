@@ -1456,9 +1456,6 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
 
     const auto fileName = fileRep->getPath();
 
-    // Make executable... (for linux/unix like targets)
-    SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
-
     // Execute it
     ExecutableLocation exe;
     exe.setPath(fileName);
@@ -1665,8 +1662,6 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
         exe.setPath(moduleExePath);
 
         cmdLine.setExecutableLocation(exe);
-
-        File::makeExecutable(moduleExePath);
 
         ExecuteResult exeRes;
         if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))

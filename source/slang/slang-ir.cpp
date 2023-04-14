@@ -2809,6 +2809,13 @@ namespace Slang
             operands);
     }
 
+    IRVectorType* IRBuilder::getVectorType(
+        IRType* elementType,
+        IRIntegerValue elementCount)
+    {
+        return getVectorType(elementType, getIntValue(getIntType(), elementCount));
+    }
+
     IRMatrixType* IRBuilder::getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
@@ -4607,6 +4614,13 @@ namespace Slang
 
     IRInst* IRBuilder::emitElementExtract(
         IRInst* base,
+        IRIntegerValue index)
+    {
+        return emitElementExtract(base, getIntValue(getIntType(), index));
+    }
+
+    IRInst* IRBuilder::emitElementExtract(
+        IRInst* base,
         const ArrayView<IRInst*>& accessChain)
     {
         for (auto access : accessChain)
@@ -4653,6 +4667,13 @@ namespace Slang
 
     IRInst* IRBuilder::emitElementAddress(
         IRInst* basePtr,
+        IRIntegerValue index)
+    {
+        return emitElementAddress(basePtr, getIntValue(getIntType(), index));
+    }
+
+    IRInst* IRBuilder::emitElementAddress(
+        IRInst* basePtr,
         IRInst* index)
     {
         IRType* type = nullptr;
@@ -4668,6 +4689,11 @@ namespace Slang
         else if (auto matrixType = as<IRMatrixType>(basePtrType->getValueType()))
         {
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+        }
+        else if (auto basicType = as<IRBasicType>(basePtrType->getValueType()))
+        {
+            // HLSL support things like float.x, in which case we just return the base pointer.
+            return basePtr;
         }
         SLANG_RELEASE_ASSERT(type);
         auto inst = createInst<IRGetElementPtr>(
@@ -4724,6 +4750,11 @@ namespace Slang
 
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement)
+    {
+        return emitUpdateElement(base, getIntValue(getIntType(), index), newElement);
     }
 
     IRInst* IRBuilder::emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement)

@@ -198,6 +198,14 @@ struct IRAnyValueSizeDecoration : IRDecoration
     }
 };
 
+struct IRDispatchFuncDecoration : IRDecoration
+{
+    enum { kOp = kIROp_DispatchFuncDecoration };
+    IR_LEAF_ISA(DispatchFuncDecoration)
+
+    IRInst* getFunc() { return getOperand(0); }
+};
+
 struct IRSpecializeDecoration : IRDecoration
 {
     enum { kOp = kIROp_SpecializeDecoration };
@@ -265,6 +273,7 @@ IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitObjectAttributesDecoration)
 
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -326,6 +335,7 @@ IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
 IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
+IR_SIMPLE_DECORATION(StaticRequirementDecoration)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {
@@ -2800,6 +2810,10 @@ public:
         IRType* elementType,
         IRInst* elementCount);
 
+    IRVectorType* getVectorType(
+        IRType* elementType,
+        IRIntegerValue elementCount);
+
     IRMatrixType* getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
@@ -3314,6 +3328,10 @@ public:
 
     IRInst* emitElementExtract(
         IRInst* base,
+        IRIntegerValue index);
+
+    IRInst* emitElementExtract(
+        IRInst* base,
         const ArrayView<IRInst*>& accessChain);
 
     IRInst* emitElementAddress(
@@ -3327,9 +3345,14 @@ public:
 
     IRInst* emitElementAddress(
         IRInst* basePtr,
+        IRIntegerValue index);
+
+    IRInst* emitElementAddress(
+        IRInst* basePtr,
         const ArrayView<IRInst*>& accessChain);
 
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
+    IRInst* emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement);
 
     IRInst* emitGetAddress(
@@ -3911,6 +3934,16 @@ public:
     void addAnyValueSizeDecoration(IRInst* inst, IRIntegerValue value)
     {
         addDecoration(inst, kIROp_AnyValueSizeDecoration, getIntValue(getIntType(), value));
+    }
+
+    void addDispatchFuncDecoration(IRInst* inst, IRInst* func)
+    {
+        addDecoration(inst, kIROp_DispatchFuncDecoration, func);
+    }
+
+    void addStaticRequirementDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_StaticRequirementDecoration);
     }
 
     void addSpecializeDecoration(IRInst* inst)

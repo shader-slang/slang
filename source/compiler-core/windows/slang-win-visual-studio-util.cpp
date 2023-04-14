@@ -10,12 +10,7 @@
 #include "../slang-visual-studio-compiler-util.h"
 
 #ifdef _WIN32
-#   define WIN32_LEAN_AND_MEAN
-#   define NOMINMAX
-#   include <Windows.h>
-#   undef WIN32_LEAN_AND_MEAN
-#   undef NOMINMAX
-
+#   include <windows.h>
 #   include <Shlobj.h>
 #pragma comment(lib, "advapi32")
 #pragma comment(lib, "Shell32")

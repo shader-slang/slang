@@ -194,6 +194,10 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
 // Remove all linkage decorations from func.
 void removeLinkageDecorations(IRGlobalValueWithCode* func);
+
+IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
+
+IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 }
 
 #endif

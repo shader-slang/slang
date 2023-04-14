@@ -1,4 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
+//TEST(smoke,compute):COMPARE_COMPUTE:-dx12 -use-dxil -shaderobj
 //TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj
 

@@ -174,14 +174,15 @@ static SlangResult _requireBlob(IArtifact* artifact, DiagnosticSink* sink, ComPt
 
 /* static */SlangResult ArtifactOutputUtil::writeToFile(const ArtifactDesc& desc, const void* data, size_t size, const String& path)
 {
-    if (ArtifactDescUtil::isText(desc))
+    const SlangResult res = ArtifactDescUtil::isText(desc)
+        ? File::writeAllTextIfChanged(path, UnownedStringSlice((const char*)data, size))
+        : File::writeAllBytes(path, data, size);
+    if(desc.kind == ArtifactKind::Executable)
     {
-        return File::writeAllTextIfChanged(path, UnownedStringSlice((const char*)data, size));
+        // Ignore any success code here, assume the one from the actual write is more important.
+        SLANG_RETURN_ON_FAIL(File::makeExecutable(path));
     }
-    else
-    {
-        return File::writeAllBytes(path, data, size);
-    }
+    return res;
 }
 
 /* static */SlangResult ArtifactOutputUtil::writeToFile(const ArtifactDesc& desc, ISlangBlob* blob, const String& path)

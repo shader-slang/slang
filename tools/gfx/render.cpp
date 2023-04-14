@@ -256,13 +256,9 @@ extern "C"
             break;
         case DeviceType::OpenGl:
             return SLANG_E_NOT_IMPLEMENTED;
-        case DeviceType::Vulkan:
-            SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
-            break;
-        case DeviceType::CUDA:
-            SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters));
-            break;
-#elif SLANG_LINUX_FAMILY && !defined(__CYGWIN__)
+#endif
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+        // Assume no Vulkan or CUDA on MacOS or Cygwin
         case DeviceType::Vulkan:
             SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
             break;
@@ -304,10 +300,6 @@ extern "C"
             {
                 return createVKDevice(desc, outDevice);
             }
-        case DeviceType::CUDA:
-            {
-                return createCUDADevice(desc, outDevice);
-            }
         case DeviceType::Default:
             {
                 IDevice::Desc newDesc = *desc;
@@ -332,11 +324,11 @@ extern "C"
         {
             return createVKDevice(desc, outDevice);
         }
+#endif
         case DeviceType::CUDA:
         {
             return createCUDADevice(desc, outDevice);
         }
-#endif
         case DeviceType::CPU:
             {
                 return createCPUDevice(desc, outDevice);

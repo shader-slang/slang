@@ -740,7 +740,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
     INST(SpecializeDecoration, SpecializeDecoration, 0, 0)
     INST(SequentialIDDecoration, SequentialIDDecoration, 1, 0)
-
+    INST(StaticRequirementDecoration, StaticRequirementDecoration, 0, 0)
+    INST(DispatchFuncDecoration, DispatchFuncDecoration, 1, 0)
     INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
 
     

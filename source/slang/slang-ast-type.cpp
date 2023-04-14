@@ -69,8 +69,8 @@ Type* Type::getCanonicalType()
         // TODO(tfoley): worry about thread safety here?
         auto canType = et->createCanonicalType();
         et->canonicalType = canType;
-
-        SLANG_ASSERT(et->canonicalType);
+        if (!et->canonicalType)
+            return getASTBuilder()->getErrorType();
     }
     return et->canonicalType;
 }
@@ -481,7 +481,9 @@ Type* NamedExpressionType::_createCanonicalTypeOverride()
 {
     if (!innerType)
         innerType = getType(m_astBuilder, declRef);
-    return innerType->getCanonicalType();
+    if (innerType)
+        return innerType->getCanonicalType();
+    return nullptr;
 }
 
 HashCode NamedExpressionType::_getHashCodeOverride()

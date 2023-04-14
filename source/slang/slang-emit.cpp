@@ -374,7 +374,9 @@ Result linkAndOptimizeIR(
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
-            changed |= specializeModule(irModule);
+            changed |= specializeModule(irModule, codeGenContext->getSink());
+        if (codeGenContext->getSink()->getErrorCount() != 0)
+            return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
 
         eliminateDeadCode(irModule);

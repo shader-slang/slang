@@ -956,6 +956,9 @@ class ImplicitConversionModifier : public Modifier
  
     // The conversion cost, used to rank conversions
     ConversionCost cost;
+
+    // A builtin identifier for identifying conversions that need special treatment.
+    BuiltinConversionKind builtinConversionKind;
 };
 
 class FormatAttribute : public Attribute 

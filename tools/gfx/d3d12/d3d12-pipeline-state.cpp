@@ -11,6 +11,8 @@
 #include "d3d12-shader-program.h"
 #include "d3d12-vertex-layout.h"
 
+#include <climits>
+
 namespace gfx
 {
 namespace d3d12

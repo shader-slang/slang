@@ -75,7 +75,7 @@ struct AssociatedTypeLookupSpecializationContext
                 builder.setInsertInto(defaultBlock);
             }
 
-            auto resultWitnessTable = sharedContext->findWitnessTableEntry(witnessTable, key);
+            auto resultWitnessTable = findWitnessTableEntry(witnessTable, key);
             auto resultWitnessTableIDDecoration =
                 resultWitnessTable->findDecoration<IRSequentialIDDecoration>();
             SLANG_ASSERT(resultWitnessTableIDDecoration);

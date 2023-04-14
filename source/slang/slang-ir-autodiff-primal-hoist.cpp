@@ -771,6 +771,7 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_undefined:
+    case kIROp_GetSequentialID:
         return false;
     case kIROp_GetElement:
     case kIROp_FieldExtract:

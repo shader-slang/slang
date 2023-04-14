@@ -16,10 +16,7 @@
 
 #ifdef _WIN32
 #   include <direct.h>
-
-#   define WIN32_LEAN_AND_MEAN
-#   define VC_EXTRALEAN
-#   include <Windows.h>
+#   include <windows.h>
 #endif
 
 #if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY
@@ -154,8 +151,22 @@ namespace Slang
         // As long as file extension is executable, it can be executed
         return SLANG_OK;
 #else
-        const int ret = ::chmod(fileName.getBuffer(), S_IXUSR);
-        return (ret == 0) ? SLANG_OK : SLANG_FAIL;
+        struct stat st;
+        if(::stat(fileName.getBuffer(), &st) != 0)
+        {
+            return SLANG_FAIL;
+        }
+        if(st.st_mode & S_IXUSR)
+        {
+            return SLANG_OK;
+        }
+        // It would probably be slightly neater to set all executable bits
+        // aside from those in umask..
+        if(::chmod(fileName.getBuffer(), st.st_mode & 07777 | S_IXUSR) != 0)
+        {
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
 #endif
     }
 
