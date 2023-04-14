@@ -175,7 +175,7 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 #    define SLANG_ENABLE_DXVK 0
 #    define SLANG_ENABLE_VKD3D_PROTON 0
 #elif SLANG_LINUX_FAMILY
-#    define SLANG_ENABLE_DIRECTX 0
+#    define SLANG_ENABLE_DIRECTX 1
 #    define SLANG_ENABLE_DXGI_DEBUG 0
 #    define SLANG_ENABLE_DXBC_SUPPORT 0
 #    define SLANG_ENABLE_PIX 0
