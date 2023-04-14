@@ -393,6 +393,12 @@ workspace "slang"
         -- allow libraries to be listed in any order (do not require dependency order)
         linkgroups "On"
 
+    filter {}
+        -- For including windows.h in a way that minimized namespace pollution.
+        -- Although we define these here, we still set them manually in any header
+        -- files which may be included by another project
+        defines { "WIN32_LEAN_AND_MEAN", "VC_EXTRALEAN", "NOMINMAX" }
+
 function dump(o)
     if type(o) == 'table' then
         local s = '{ '

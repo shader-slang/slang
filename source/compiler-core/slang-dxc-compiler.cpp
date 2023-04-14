@@ -34,13 +34,9 @@
 #if SLANG_ENABLE_DXIL_SUPPORT
 
 #   ifdef _WIN32
-#       define WIN32_LEAN_AND_MEAN
-#       define NOMINMAX
 #       include <windows.h>
 #       include <unknwn.h>
 #       include "../../external/dxc/dxcapi.h"
-#       undef WIN32_LEAN_AND_MEAN
-#       undef NOMINMAX
 #   else
 #       include "../../external/dxc/dxcapi.h"
 
