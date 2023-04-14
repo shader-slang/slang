@@ -9648,7 +9648,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // We don't do the obfuscation remapping here, because DCE and other passes may 
         // change what locs are actually needed, we need to be sure 
         // that if we have obfuscation enabled we don't forget to obfuscate.
-        stripOptions.stripSourceLocs = linkage->m_obfuscateCode && !linkage->m_generateSourceMap;
+        stripOptions.stripSourceLocs = false;
         stripFrontEndOnlyInstructions(module, stripOptions);
     
         // Stripping out decorations could leave some dead code behind
@@ -9663,7 +9663,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         options.keepExportsAlive = true;
         eliminateDeadCode(module, options);
 
-        if (linkage->m_obfuscateCode && linkage->m_generateSourceMap)
+        if (linkage->m_obfuscateCode)
         {
             // The obfuscated source map is stored on the module
             obfuscateModuleLocs(module, compileRequest->getSourceManager());

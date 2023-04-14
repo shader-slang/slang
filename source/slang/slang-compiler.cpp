@@ -1918,7 +1918,8 @@ namespace Slang
 
             auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap();
 
-            if (sourceMap)
+            // If we have a source map *and* we want to generate them for output add to the container
+            if (sourceMap && getLinkage()->m_generateSourceMap)
             {
                 // Write it out
                 String json;
