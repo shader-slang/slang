@@ -73,7 +73,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     List<LocPair> locPairs;
 
     // We want the hash to be stable. One problem is the source locs depend on their order of inclusion.
-    // To work around this we are going 
+    // To work around this we are going to hash via offsets, not locs.
     {
         SourceView* sourceView = nullptr;
 
@@ -99,10 +99,12 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                     // Combine the name
                     hash = combineHash(hash, getHashCode(sourceView->getViewPathInfo().getName().getUnownedSlice()));
                 }
-                SLANG_ASSERT(sourceView);
 
-                // We combine the *offset* which is stable
-                hash = combineHash(hash, getHashCode(sourceView->getRange().getOffset(curLoc)));
+                if (sourceView)
+                {
+                    // We combine the *offset* which is stable
+                    hash = combineHash(hash, getHashCode(sourceView->getRange().getOffset(curLoc)));
+                }
             }
         }
     }
