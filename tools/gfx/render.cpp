@@ -326,9 +326,9 @@ extern "C"
         }
 #endif
         case DeviceType::CUDA:
-        {
-            return createCUDADevice(desc, outDevice);
-        }
+            {
+                return createCUDADevice(desc, outDevice);
+            }
         case DeviceType::CPU:
             {
                 return createCPUDevice(desc, outDevice);
