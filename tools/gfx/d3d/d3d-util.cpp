@@ -6,8 +6,6 @@
 #include <dxgi1_4.h>
 #include <dxgidebug.h>
 
-#include <mutex>
-
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
@@ -503,21 +501,20 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 
 /* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
 {
-    static std::once_flag once;
-    static SharedLibrary::Handle s_dxgiModule = nullptr;
-    std::call_once(once, [](){
 #if SLANG_WINDOWS_FAMILY
-        const char* libPath = "dxgi";
+    const char* const libPath = "dxgi";
 #else
-        const char* libPath = "dxvk_dxgi";
+    const char* const libPath = "dxvk_dxgi";
 #endif
-        SharedLibrary::load(libPath, s_dxgiModule);
-        if (!s_dxgiModule)
+    static SharedLibrary::Handle s_dxgiModule = [&](){
+        SharedLibrary::Handle h = nullptr;
+        SharedLibrary::load(libPath, h);
+        if (!h)
         {
             fprintf(stderr, "error: failed to load dll '%s'\n", libPath);
-            return nullptr;
         }
-    });
+        return h;
+    }();
     return s_dxgiModule;
 }
 
