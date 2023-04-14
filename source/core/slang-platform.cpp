@@ -177,9 +177,14 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 /* static */SlangResult SharedLibrary::loadWithPlatformPath(char const* platformFileName, Handle& handleOut)
 {
     handleOut = nullptr;
+    const auto dxcName = "libdxcompiler";
+    const bool isDXC = strncmp(platformFileName, dxcName, strlen(dxcName)) == 0;
     if (strlen(platformFileName) == 0)
         platformFileName = nullptr;
-    void *h = dlopen(platformFileName, RTLD_NOW | RTLD_GLOBAL);
+    // Work around https://github.com/microsoft/DirectXShaderCompiler/issues/5119
+    // libdxcompiler.so invokes UB on dlclose
+    const auto mode = RTLD_NOW | RTLD_GLOBAL | (isDXC ? RTLD_NODELETE : 0);
+    void *h = dlopen(platformFileName, mode);
     if (!h)
     {
 #if 0
