@@ -24,6 +24,7 @@
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-desc-util.h"
 
+// Enable DXIL by default unless told not to
 #ifndef SLANG_ENABLE_DXIL_SUPPORT
 #   define SLANG_ENABLE_DXIL_SUPPORT 1
 #endif
@@ -40,10 +41,6 @@
 #       include "../../external/dxc/dxcapi.h"
 #       undef WIN32_LEAN_AND_MEAN
 #       undef NOMINMAX
-
-#       ifndef SLANG_ENABLE_DXIL_SUPPORT
-#           define SLANG_ENABLE_DXIL_SUPPORT 1
-#       endif
 #   else
 #       include "../../external/dxc/dxcapi.h"
 
