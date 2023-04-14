@@ -356,6 +356,10 @@ workspace "slang"
     filter { "toolset:clang or gcc*", "language:C++" }
         buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }
 
+    filter { "files:source/compiler-core/slang-dxc-compiler.cpp", "toolset:clang or gcc" }
+        -- For the DXC headers
+        buildoptions { "-fms-extensions" }
+
     filter { "toolset:gcc*" }
         buildoptions { "-Wno-implicit-fallthrough", "-Wno-maybe-uninitialized" }
 
