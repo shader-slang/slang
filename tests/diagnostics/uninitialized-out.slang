@@ -17,6 +17,31 @@ float bar(out float x)
 // This should also warn pointing at the implicit return
 void baz(out float x) {}
 
+void twoReturns(bool b, out float y)
+{
+    if(b)
+    {
+        // Should warn
+        return;
+    }
+    y = 0;
+    // Shouldn't warn
+    return;
+}
+
+void twoOkReturns(bool b, out float y)
+{
+    if(b)
+    {
+        // Shouldn't warn
+        unused(y);
+        return;
+    }
+    y = 0;
+    // Shouldn't warn
+    return;
+}
+
 // TODO: This should warn that n is potentially uninitialized
 int ok(bool b, out int n)
 {

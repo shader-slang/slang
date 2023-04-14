@@ -33,6 +33,7 @@ bool traceRayClosestHit(
         //primitiveIndex = q.CommittedPrimitiveIndex();
         return true;
     }
+    unused(t);
     return false;
 }
 

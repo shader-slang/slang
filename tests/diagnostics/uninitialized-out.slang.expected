@@ -12,6 +12,9 @@ tests/diagnostics/uninitialized-out.slang(14): warning 41016: returning without 
 tests/diagnostics/uninitialized-out.slang(18): warning 41016: returning without initializing out parameter 'x'
 void baz(out float x) {}
                        ^
+tests/diagnostics/uninitialized-out.slang(25): warning 41016: returning without initializing out parameter 'y'
+        return;
+        ^~~~~~
 }
 standard output = {
 }
