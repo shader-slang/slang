@@ -353,5 +353,9 @@ GUI::~GUI()
 #include "external/imgui/imgui.cpp"
 #include "external/imgui/imgui_draw.cpp"
 #ifdef _WIN32
+// imgui_impl_win32 defines these, so make sure it doesn't error because
+// they're already there
+#undef WIN32_LEAN_AND_MEAN
+#undef NOMINMAX
 #include "external/imgui/examples/imgui_impl_win32.cpp"
 #endif

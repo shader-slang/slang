@@ -9,15 +9,10 @@
 #include "../../../slang-com-helper.h"
 
 #ifdef _WIN32
-// Include Windows header in a way that minimized namespace pollution.
 // TODO: We could try to avoid including this at all, but it would
 // mean trying to hide certain struct layouts, which would add
 // more dynamic allocation.
-#   define WIN32_LEAN_AND_MEAN
-#   define NOMINMAX
-#   include <Windows.h>
-#   undef WIN32_LEAN_AND_MEAN
-#   undef NOMINMAX
+#   include <windows.h>
 #endif
 
 #include <stdio.h>

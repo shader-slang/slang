@@ -6,6 +6,7 @@
 #include "d3d12-texture.h"
 
 #include <d3d12.h>
+#include <d3d12sdklayers.h>
 
 namespace gfx
 {
@@ -207,7 +208,7 @@ public:
         const RayTracingPipelineStateDesc& desc, IPipelineState** outState) override;
 
 public:
-    static PROC loadProc(HMODULE module, char const* name);
+    static void* loadProc(SharedLibrary::Handle module, char const* name);
 
     Result createCommandQueueImpl(CommandQueueImpl** outQueue);
 
@@ -248,7 +249,7 @@ public:
     ResourceCommandRecordInfo encodeResourceCommands();
     void submitResourceCommandsAndWait(const ResourceCommandRecordInfo& info);
 private:
-    void processExperimentalFeaturesDesc(void* d3dModule, void* desc);
+    void processExperimentalFeaturesDesc(SharedLibrary::Handle d3dModule, void* desc);
 };
 
 } // namespace d3d12

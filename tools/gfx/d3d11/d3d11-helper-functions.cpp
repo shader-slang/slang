@@ -337,7 +337,7 @@ namespace d3d11
             default: assert(!"Unknown dimension");
             }
 
-            descOut.Texture2DArray.ArraySize = max(textureDesc.size.depth, arraySize);
+            descOut.Texture2DArray.ArraySize = std::max(textureDesc.size.depth, arraySize);
             descOut.Texture2DArray.MostDetailedMip = 0;
             descOut.Texture2DArray.MipLevels = textureDesc.numMipLevels;
             descOut.Texture2DArray.FirstArraySlice = 0;

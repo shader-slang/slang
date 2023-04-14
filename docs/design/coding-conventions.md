@@ -124,7 +124,7 @@ In general, includes should be grouped as follows:
 * Finally, any includes for other features in the project
 
 Within each group, includes should be sorted alphabetically.
-If this breaks because of ordering issues for system/OS/third-party headers (e.g., `<Windows.h>` must be included before `<GL/GL.h>`), then ideally those includes should be mediated by a Slang-project-internal header that features can include.
+If this breaks because of ordering issues for system/OS/third-party headers (e.g., `<windows.h>` must be included before `<GL/GL.h>`), then ideally those includes should be mediated by a Slang-project-internal header that features can include.
 
 Namespaces
 ----------

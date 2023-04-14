@@ -14,12 +14,19 @@
 #include "d3d12-descriptor-heap.h"
 #include "d3d12-resource.h"
 
-#define _CRT_SECURE_NO_WARNINGS
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
+#pragma push_macro("WIN32_LEAN_AND_MEAN")
+#pragma push_macro("NOMINMAX")
+#pragma push_macro("_CRT_SECURE_NO_WARNINGS")
 #undef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
 #undef NOMINMAX
+#define NOMINMAX
+#undef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#include <windows.h>
+#pragma pop_macro("_CRT_SECURE_NO_WARNINGS")
+#pragma pop_macro("NOMINMAX")
+#pragma pop_macro("WIN32_LEAN_AND_MEAN")
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
