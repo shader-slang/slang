@@ -15,6 +15,8 @@
 #include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../compiler-core/slang-artifact-container-util.h"
 
+#include "../compiler-core/slang-json-source-map-util.h"
+
 #include "../core/slang-memory-file-system.h"
 
 #include "slang-module-library.h"
@@ -4833,9 +4835,87 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact, ModuleLibrary* moduleLibrary)
+{
+    FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
+    frontEndRequest->m_extraEntryPoints.addRange(moduleLibrary->m_entryPoints.getBuffer(), moduleLibrary->m_entryPoints.getCount());
+
+    // Add to the m_libModules
+    auto linkage = req->getLinkage();
+    linkage->m_libModules.add(ComPtr<IArtifact>(artifact));
+
+    return SLANG_OK;
+}
+
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact)
 {
     auto desc = artifact->getDesc();
+
+    // TODO(JS):
+    // This isn't perhaps the best way to handle this scenario, as IArtifact can 
+    // support lazy evaluation, with suitable hander.
+    // For now we just read in and strip out the bits we want.
+    if (isDerivedFrom(desc.kind, ArtifactKind::Container) && 
+        isDerivedFrom(desc.payload, ArtifactPayload::CompileResults))
+    {
+        // We want to read as a file system
+        ComPtr<IArtifact> container;
+
+        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::readContainer(artifact, container));
+
+        // Find the payload... It should be linkable
+        if (!ArtifactDescUtil::isLinkable(container->getDesc()))
+        {
+            return SLANG_FAIL;
+        }
+
+        ComPtr<IModuleLibrary> libraryIntf;
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, container, req, libraryIntf));
+
+        auto library = as<ModuleLibrary>(libraryIntf);
+        
+        // Look for source maps
+        for (auto associated : container->getAssociated())
+        {
+            auto assocDesc = associated->getDesc();
+
+            // We are just looking for obfuscated source maps...
+            if (!isDerivedFrom(assocDesc.style, ArtifactStyle::Obfuscated))
+            {
+                continue;
+            }
+
+            if (isDerivedFrom(assocDesc.kind, ArtifactKind::Json) && isDerivedFrom(assocDesc.payload, ArtifactPayload::SourceMap))
+            {
+                ComPtr<ISlangBlob> sourceMapBlob;
+                SLANG_RETURN_ON_FAIL(associated->loadBlob(ArtifactKeep::No, sourceMapBlob.writeRef()));
+
+                RefPtr<SourceMap> sourceMap;
+                SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::read(sourceMapBlob, nullptr, sourceMap));
+                
+                // I guess we add to all ir modules?
+
+                for (auto irModule : library->m_modules)
+                {
+                    irModule->setObfuscatedSourceMap(sourceMap);
+                }
+
+                // Look up the source file
+                auto sourceManager = req->getSink()->getSourceManager();
+
+                auto name = Path::getFileNameWithoutExt(associated->getName());
+
+                if (name.getLength())
+                {
+                    auto sourceFile = sourceManager->findSourceFileByPathRecursively(name);
+                    sourceFile->setObfuscatedSourceMap(sourceMap);
+                }
+            }
+        }
+
+        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, container, library));
+        return SLANG_OK;
+    }
 
     if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::SlangIR)
     {
@@ -4849,14 +4929,12 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
             return SLANG_FAIL;
         }
 
-        FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
-        frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
+        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, artifact, library));
+        return SLANG_OK;
     }
-    else
-    {
-        // TODO(JS):
-        // Do we want to check the path exists?
-    }
+
+    // TODO(JS):
+    // Do we want to check the path exists?
 
     // Add to the m_libModules
     auto linkage = req->getLinkage();

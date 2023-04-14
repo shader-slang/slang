@@ -460,7 +460,15 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactDescUtil::isLinkable(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
+    // If is a container with compile results *assume* that result is linkable
+    if (isDerivedFrom(desc.kind, ArtifactKind::Container) &&
+        isDerivedFrom(desc.payload, ArtifactPayload::CompileResults))
+    {
+        return true;
+    }
+
+    // if it's a compile binary or a container
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary)) 
     {
         if (isDerivedFrom(desc.payload, ArtifactPayload::KernelLike))
         {

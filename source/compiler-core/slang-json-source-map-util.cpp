@@ -461,4 +461,39 @@ SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* conta
     return SLANG_OK;
 }
 
+SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink, RefPtr<SourceMap>& outSourceMap)
+{
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
+    DiagnosticSink sink(&sourceManager, nullptr);
+
+    sink.setParentSink(parentSink);
+
+    RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+
+    JSONValue rootValue;
+    {
+        // Now need to parse as JSON
+        SourceFile* sourceFile = sourceManager.createSourceFileWithBlob(PathInfo::makeUnknown(), blob);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        rootValue = builder.getRootValue();
+    }
+
+    RefPtr<SourceMap> sourceMap;
+
+    SLANG_RETURN_ON_FAIL(decode(container, rootValue, &sink, sourceMap));
+
+    outSourceMap = sourceMap;
+    return SLANG_OK;
+}
+
 } // namespace Slang

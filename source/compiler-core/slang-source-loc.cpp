@@ -677,6 +677,37 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
     return nullptr;
 }
 
+SourceFile* SourceManager::findSourceFileByPathRecursively(const String& name) const
+{
+    // Start with this manager
+    const SourceManager* manager = this;
+    do
+    {
+        SourceFile* sourceFile = manager->findSourceFileByPath(name);
+        // If we found a hit we are done
+        if (sourceFile)
+        {
+            return sourceFile;
+        }
+        // Try the parent
+        manager = manager->m_parent;
+    } while (manager);
+    // Didn't find it
+    return nullptr;
+}
+
+SourceFile* SourceManager::findSourceFileByPath(const String& name) const
+{
+    for(auto sourceFile : m_sourceFiles)
+    {
+        if (sourceFile->getPathInfo().foundPath == name)
+        {
+            return sourceFile;
+        }
+    }
+    return nullptr;
+}
+
 SourceFile* SourceManager::findSourceFile(const String& uniqueIdentity) const
 {
     SourceFile*const* filePtr = m_sourceFileMap.TryGetValue(uniqueIdentity);

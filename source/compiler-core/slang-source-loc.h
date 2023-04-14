@@ -441,6 +441,11 @@ struct SourceManager
         /// Find if the source file is defined on this manager.
     SourceFile* findSourceFile(const String& uniqueIdentity) const;
 
+        /// Find a source file by path.
+    SourceFile* findSourceFileByPath(const String& name) const;
+        /// Find a source file by path recursively.
+    SourceFile* findSourceFileByPathRecursively(const String& name) const;
+
         /// Searches this manager, and then the parent to see if can find a match
     SourceFile* findSourceFileByContentRecursively(const char* text);
         /// Find the source file that contains *the memory* text points to. 

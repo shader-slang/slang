@@ -33,6 +33,9 @@ struct ArtifactContainerUtil
     static SlangResult writeContainer(IArtifact* artifact, const String& defaultFileName, ISlangMutableFileSystem* fileSystem);
 
     static SlangResult readContainer(ISlangFileSystemExt* fileSystem, ComPtr<IArtifact>& outArtifact);
+
+        /// Read an artifact that represents a container as an artifact hierarchy
+    static SlangResult readContainer(IArtifact* artifact, ComPtr<IArtifact>& outArtifact);
 };
 
 } // namespace Slang
