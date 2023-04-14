@@ -6,7 +6,9 @@ RWStructuredBuffer<float> outputBuffer;
 
 // This test checks obfuscated source map loc tracking through a round trip, and producing a location correctly from slang-module that has a source map
 
-import obfuscated_loc_module;
+// We *don't* import because if we do we'll get a fresh compilation from source... we want to make sure it's using the -r module
+//import obfuscated_loc_module;
+int silly(int v);
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

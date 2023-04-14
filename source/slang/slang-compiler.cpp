@@ -1820,13 +1820,7 @@ namespace Slang
         {
             return false;
         }
-        // If obfuscation is enabled, and source maps aren't generated theres no point outputting
-        // locs
-        if (linkage->m_obfuscateCode && !linkage->m_generateSourceMap)
-        {
-            return false;
-        }
-
+        
         // Otherwise we do want to write out the locs
         return true;
     }
