@@ -1028,6 +1028,9 @@ tool "gfx"
     else
         -- Linux like
         addSourceDir "tools/gfx/vulkan"
+        addSourceDir "tools/gfx/d3d"
+        addSourceDir "tools/gfx/d3d11"
+        addSourceDir "tools/gfx/d3d12"
         --addSourceDir "tools/gfx/open-gl"
     end
 
