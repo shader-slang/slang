@@ -47,10 +47,10 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 
     // Rather than statically link against D3D, we load it dynamically.
     SharedLibrary::Handle d3dModule;
-#if SLANG_WINDOWS_FAMILY
-    const char* libName = "d3d11";
-#else
+#if SLANG_ENABLE_DXVK
     const char* libName = "dxvk_d3d11";
+#else
+    const char* libName = "d3d11";
 #endif
     if (SLANG_FAILED(SharedLibrary::load(libName, d3dModule)))
     {
