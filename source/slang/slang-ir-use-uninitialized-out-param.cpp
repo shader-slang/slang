@@ -37,6 +37,7 @@ namespace Slang
                 {
                 case kIROp_VerticesType:
                 case kIROp_IndicesType:
+                case kIROp_PrimitivesType:
                     continue;
                 default:
                     break;
