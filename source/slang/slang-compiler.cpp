@@ -1827,10 +1827,17 @@ namespace Slang
             // Also currently only IR is needed.
             options.optionFlags &= ~SerialOptionFlag::ASTModule;
         }
-        else if (linkage->debugInfoLevel != DebugInfoLevel::None && linkage->getSourceManager())
+        
+        if (linkage->debugInfoLevel != DebugInfoLevel::None && linkage->getSourceManager())
         {
-            options.optionFlags |= SerialOptionFlag::SourceLocation;
-            options.sourceManager = linkage->getSourceManager();
+            // If there is no obfuscation, or there is obfuscation with source map 
+            // enable writing out of locs
+            if (linkage->m_obfuscateCode == false ||
+                linkage->m_generateSourceMap)
+            {
+                options.optionFlags |= SerialOptionFlag::SourceLocation;
+                options.sourceManager = linkage->getSourceManager();
+            }
         }
 
         {

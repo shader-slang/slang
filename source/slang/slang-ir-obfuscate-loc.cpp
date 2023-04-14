@@ -138,16 +138,27 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 dst[i * 2 + 1] = CharUtil::getHexChar(data[i] >> 4);
             }
             buf.appendInPlace(dst, charsCount);
+
+            // Make it clear this "source" is actually just for obfuscation.
+            buf << toSlice("-obfuscated");
+
             obfusctatedPathInfo = PathInfo::makePath(buf);
         }
     }
 
     SourceFile* obfuscatedFile = sourceManager->createSourceFileWithSize(obfusctatedPathInfo, uniqueLocCount);
 
-    // We have only one line for all locs, just set up that way...
+    // We put each loc on it's own line. We do this over a single line because
+   // it means the `#line` directives can still do something meaningful
     {
-        const uint32_t offsets[2] = { 0, uint32_t(uniqueLocCount) };
-        obfuscatedFile->setLineBreakOffsets(offsets, SLANG_COUNT_OF(offsets));
+        List<uint32_t> offsets;
+        offsets.setCount(uniqueLocCount + 1);
+        for (Index i = 0; i < uniqueLocCount + 1; ++i)
+        {
+            offsets[i] = uint32_t(i);
+        }
+
+        obfuscatedFile->setLineBreakOffsets(offsets.getBuffer(), offsets.getCount());
     }
     
     // Create the view we are going to use from the obfusctated "file".
