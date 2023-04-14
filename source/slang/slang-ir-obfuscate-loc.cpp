@@ -114,6 +114,11 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 {
                     sourceView = sourceManager->findSourceViewRecursively(curLoc);
                     SLANG_ASSERT(sourceView);
+                    // If there is no source view we can't apply to the hash
+                    if (sourceView == nullptr)
+                    {
+                        continue;
+                    }
 
                     const auto pathInfo = sourceView->getViewPathInfo();
                     const auto name = pathInfo.getName();
@@ -123,13 +128,9 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                     hash = combineHash(hash, nameHash);
                 }
 
-                if (sourceView)
-                {
-                    const auto offset = sourceView->getRange().getOffset(curLoc);
-                    
-                    // We combine the *offset* which is stable
-                    hash = combineHash(hash, getHashCode(offset));
-                }
+                // We combine the *offset* which is stable
+                const auto offset = sourceView->getRange().getOffset(curLoc);
+                hash = combineHash(hash, getHashCode(offset));
             }    
         }
     }
