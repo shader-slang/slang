@@ -476,27 +476,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     SLANG_RETURN_ON_FAIL(hr);
     shaderBlobOut.swap(shaderBlob);
     return SLANG_OK;
-}
-
-/* static */void D3DUtil::appendWideChars(const char* in, List<wchar_t>& out)
-{
-    size_t len = ::strlen(in);
-
-    const DWORD dwFlags = 0;
-    int outSize = ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), nullptr, 0);
-
-    if (outSize > 0)
-    {
-        const Index prevSize = out.getCount();
-        out.setCount(prevSize + len + 1);
-
-        WCHAR* dst = out.getBuffer() + prevSize;
-        ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), dst, outSize);
-        // Make null terminated
-        dst[outSize] = 0;
-        // Remove terminating 0 from array
-        out.unsafeShrinkToCount(prevSize + outSize);
-    }
+#endif // SLANG_HAVE_D3DCOMPILER
 }
 
 /* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
