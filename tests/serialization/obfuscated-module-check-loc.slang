@@ -1,4 +1,6 @@
-//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate -source-map
+//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate -source-map 
+//TEST:SIMPLE:-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.zip 
+//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate 
 //TEST:SIMPLE:-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.zip 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -9,11 +11,14 @@ RWStructuredBuffer<float> outputBuffer;
 // We *don't* import because if we do we'll get a fresh compilation from source... we want to make sure it's using the -r module
 //import obfuscated_loc_module;
 int silly(int v);
+int billy(int v);
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int x = int(dispatchThreadID.x);
+    
+    x = billy(x);
     
     // Will produce an error, because silly has an error.
     int v = silly(x);
