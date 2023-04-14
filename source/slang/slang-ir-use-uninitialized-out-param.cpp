@@ -24,8 +24,28 @@ namespace Slang
 
         for (auto param : firstBlock->getParams())
         {
-            if (!as<IROutType>(param->getFullType()))
+            if (auto outType = as<IROutType>(param->getFullType()))
+            {
+                // Don't check `out Vertices<T>` or `out Indices<T>` parameters
+                // in mesh shaders.
+                // TODO: we should find a better way to represent these mesh shader
+                // parameters so they conform to the initialize before use convention.
+                // For example, we can use a `OutputVetices` and `OutputIndices` type
+                // to represent an output, like `OutputPatch` in domain shader.
+                // For now, we just skip the check for these parameters.
+                switch (outType->getValueType()->getOp())
+                {
+                case kIROp_VerticesType:
+                case kIROp_IndicesType:
+                    continue;
+                default:
+                    break;
+                }
+            }
+            else
+            {
                 continue;
+            }
             List<IRInst*> addresses;
             addresses.add(param);
             List<StoreSite> stores;
