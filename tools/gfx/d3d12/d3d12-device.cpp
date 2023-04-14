@@ -407,7 +407,7 @@ Result DeviceImpl::initialize(const Desc& desc)
 
     SharedLibrary::Handle d3dModule;
 #if SLANG_WINDOWS_FAMILY
-    const char* libName = "d3d11";
+    const char* libName = "d3d12";
 #else
     const char* libName = "vkd3d-proton-d3d12";
 #endif
