@@ -13,11 +13,15 @@
 #include "slang-com-ptr.h"
 #include "../flag-combiner.h"
 
+#pragma push_macro("WIN32_LEAN_AND_MEAN")
+#pragma push_macro("NOMINMAX")
+#undef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#undef NOMINMAX
 #define NOMINMAX
 #include <windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
+#pragma pop_macro("NOMINMAX")
+#pragma pop_macro("WIN32_LEAN_AND_MEAN")
 
 #include <d3d11_2.h>
 #include <d3dcompiler.h>

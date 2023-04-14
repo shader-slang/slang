@@ -7,11 +7,15 @@
 // On windows if we include NVAPI, we must include windows.h first
 
 #   ifdef _WIN32
+#       pragma push_macro("WIN32_LEAN_AND_MEAN")
+#       pragma push_macro("NOMINMAX")
+#       undef WIN32_LEAN_AND_MEAN
 #       define WIN32_LEAN_AND_MEAN
+#       undef NOMINMAX
 #       define NOMINMAX
 #       include <windows.h>
-#       undef WIN32_LEAN_AND_MEAN
-#   undef NOMINMAX
+#       pragma pop_macro("NOMINMAX")
+#       pragma pop_macro("WIN32_LEAN_AND_MEAN")
 #   endif
 
 #   include <nvapi.h>
