@@ -257,12 +257,15 @@ extern "C"
         case DeviceType::OpenGl:
             return SLANG_E_NOT_IMPLEMENTED;
 #endif
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+        // Assume no Vulkan or CUDA on MacOS or Cygwin
         case DeviceType::Vulkan:
             SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
             break;
         case DeviceType::CUDA:
             SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters));
             break;
+#endif
         case DeviceType::CPU:
             return SLANG_E_NOT_IMPLEMENTED;
         default:
