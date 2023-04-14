@@ -46,6 +46,17 @@ static void _findInstsRec(IRInst* inst, List<InstWithLoc>& out)
     }
 }
 
+// We assume the root source manager is the stdlibs
+static SourceLoc _getStdLibLastLoc(SourceManager* sourceManager)
+{
+    auto rootManager = sourceManager;
+    while (rootManager->getParent())
+    {
+        rootManager = rootManager->getParent();
+    }
+    return rootManager->getNextRangeStart();
+}
+
 SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 {
     // There shouldn't be an obfuscated source map set
@@ -60,14 +71,14 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     instWithLocs.sort();
         
     // Lets produce a hash, so we can use as a key for random number generation.
-    // We could base it on time, or some other thing as there is no requirement for 
-    // stability or consistency.
-    // We use a hash because it avoids issues around clocks, and availability of a clock
-    // as a good source of entropy.
-    //
-    // An argument *could* be made to generate the name via some mechanism that uniquely identified the 
-    // combination of flags, options, files, names that identified the compilation, but that is 
-    // not easily achieved.
+    // 
+    // We could base it on time, or some other random seed. But it would be preferable
+    // if it was stable, and compilations of the same module on different machines
+    // produce the same hash. 
+    // 
+    // Doing so would mean that we could use the obfuscated location ouput to output 
+    // the origin.
+
     HashCode hash = 0;
 
     List<LocPair> locPairs;
@@ -77,9 +88,11 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     {
         SourceView* sourceView = nullptr;
 
+        const SourceLoc endStdLibLoc = _getStdLibLastLoc(sourceManager);
+
         SourceLoc curLoc;
         for (const auto& instWithLoc : instWithLocs)
-        {
+        {            
             if (instWithLoc.loc != curLoc)
             {
                 LocPair locPair;
@@ -89,6 +102,12 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 // This is the current loc
                 curLoc = instWithLoc.loc;
             
+                // Ignore any stdlib locs in the hash
+                if (instWithLoc.loc.getRaw() < endStdLibLoc.getRaw())
+                {
+                    continue;
+                }
+
                 // If the loc isn't in the view, lookup the view it is in
                 if (sourceView == nullptr || 
                     !sourceView->getRange().contains(curLoc))
@@ -96,16 +115,22 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                     sourceView = sourceManager->findSourceViewRecursively(curLoc);
                     SLANG_ASSERT(sourceView);
 
+                    const auto pathInfo = sourceView->getViewPathInfo();
+                    const auto name = pathInfo.getName();
+                    const auto nameHash = getHashCode(pathInfo.getName().getUnownedSlice());
+                    
                     // Combine the name
-                    hash = combineHash(hash, getHashCode(sourceView->getViewPathInfo().getName().getUnownedSlice()));
+                    hash = combineHash(hash, nameHash);
                 }
 
                 if (sourceView)
                 {
+                    const auto offset = sourceView->getRange().getOffset(curLoc);
+                    
                     // We combine the *offset* which is stable
-                    hash = combineHash(hash, getHashCode(sourceView->getRange().getOffset(curLoc)));
+                    hash = combineHash(hash, getHashCode(offset));
                 }
-            }
+            }    
         }
     }
 
