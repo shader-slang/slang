@@ -1,90 +1,14 @@
 // slang-ir-ssa-register-allocate.cpp
 #include "slang-ir-ssa-register-allocate.h"
 
+#include "slang-ir-reachability.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-dominators.h"
 
 
-namespace Slang {
-
-// A context for computing and caching reachability between blocks on the CFG.
-struct ReachabilityContext
+namespace Slang
 {
-    struct BlockPair
-    {
-        IRBlock* first;
-        IRBlock* second;
-        HashCode getHashCode()
-        {
-            Hasher h;
-            h.hashValue(first);
-            h.hashValue(second);
-            return h.getResult();
-        }
-        bool operator == (const BlockPair& other)
-        {
-            return first == other.first && second == other.second;
-        }
-    };
-    Dictionary<BlockPair, bool> reachabilityResults;
-
-    List<IRBlock*> workList;
-    HashSet<IRBlock*> reachableBlocks;
-
-    // Computes whether block1 can reach block2.
-    // A block is considered not reachable from itself unless there is a backedge in the CFG.
-    bool computeReachability(IRBlock* block1, IRBlock* block2)
-    {
-        workList.clear();
-        reachableBlocks.Clear();
-        workList.add(block1);
-        for (Index i = 0; i < workList.getCount(); i++)
-        {
-            auto src = workList[i];
-            for (auto successor : src->getSuccessors())
-            {
-                if (successor == block2)
-                    return true;
-                if (reachableBlocks.Add(successor))
-                    workList.add(successor);
-            }
-        }
-        return false;
-    }
-
-    bool isBlockReachable(IRBlock* from, IRBlock* to)
-    {
-        BlockPair pair;
-        pair.first = from;
-        pair.second = to;
-        bool result = false;
-        if (reachabilityResults.TryGetValue(pair, result))
-            return result;
-        result = computeReachability(from, to);
-        reachabilityResults[pair] = result;
-        return result;
-    }
-
-    bool isInstReachable(IRInst* inst1, IRInst* inst2)
-    {
-        if (isBlockReachable(as<IRBlock>(inst1->getParent()), as<IRBlock>(inst2->getParent())))
-            return true;
-
-        // If the parent blocks are not reachable, but inst1 and inst2 are in the same block,
-        // we test if inst2 appears after inst1.
-        if (inst1->getParent() == inst2->getParent())
-        {
-            for (auto inst = inst1->getNextInst(); inst; inst = inst->getNextInst())
-            {
-                if (inst == inst2)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-};
 
 struct RegisterAllocateContext
 {
@@ -119,7 +43,7 @@ struct RegisterAllocateContext
             break;
         }
 
-        // If isnts have the same name, prefer to coalesce them.
+        // If insts have the same name, prefer to coalesce them.
         auto name1 = inst0->findDecoration<IRNameHintDecoration>();
         auto name2 = inst1->findDecoration<IRNameHintDecoration>();
         if (name1 && name2 && name1->getName() == name2->getName())

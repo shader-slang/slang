@@ -6889,6 +6889,8 @@ namespace Slang
         SLANG_ASSERT(other);
         if (other->getPrevInst() == this)
             return;
+        if (other == this)
+            return;
         _insertAt(other->getPrevInst(), other, other->getParent());
     }
 
