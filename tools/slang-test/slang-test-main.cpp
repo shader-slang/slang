@@ -3700,6 +3700,12 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         TestDetails synthTestDetails(srcTest.options);
         TestOptions& synthOptions = synthTestDetails.options;
 
+        // If there's a category associated with this render api, add it to the synthesized test
+        if(auto c = context->categorySet.find(RenderApiUtil::getApiName(synthRenderApiType)))
+        {
+            synthOptions.categories.add(c);
+        }
+
         // Mark as synthesized
         synthOptions.isSynthesized = true;
 
