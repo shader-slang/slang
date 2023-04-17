@@ -420,6 +420,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-peephole.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-propagate-func-properties.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-pytorch-cpp-binding.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-reachability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-redundancy-removal.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-remove-unused-generic-param.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h" />
@@ -446,6 +447,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-strip.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-union.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-util.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-validate.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.h" />
@@ -612,6 +614,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-peephole.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-propagate-func-properties.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-pytorch-cpp-binding.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-reachability.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-redundancy-removal.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-remove-unused-generic-param.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp" />
@@ -638,6 +641,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-strip.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-union.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-util.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-validate.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.cpp" />

@@ -1812,6 +1812,19 @@ namespace Slang
     }
 
     
+    bool _shouldWriteSourceLocs(Linkage* linkage)
+    {
+        // If debug information or source manager are not avaiable we can't/shouldn't write out locs
+        if (linkage->debugInfoLevel == DebugInfoLevel::None || 
+            linkage->getSourceManager() == nullptr)
+        {
+            return false;
+        }
+        
+        // Otherwise we do want to write out the locs
+        return true;
+    }
+
     SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     {
         auto linkage = getLinkage();
@@ -1827,7 +1840,9 @@ namespace Slang
             // Also currently only IR is needed.
             options.optionFlags &= ~SerialOptionFlag::ASTModule;
         }
-        else if (linkage->debugInfoLevel != DebugInfoLevel::None && linkage->getSourceManager())
+        
+        // If debug information is enabled, enable writing out source locs
+        if (_shouldWriteSourceLocs(linkage))
         {
             options.optionFlags |= SerialOptionFlag::SourceLocation;
             options.sourceManager = linkage->getSourceManager();
@@ -1897,7 +1912,8 @@ namespace Slang
 
             auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap();
 
-            if (sourceMap)
+            // If we have a source map *and* we want to generate them for output add to the container
+            if (sourceMap && getLinkage()->m_generateSourceMap)
             {
                 // Write it out
                 String json;

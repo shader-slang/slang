@@ -713,6 +713,18 @@ namespace Slang
                 return false;
             }
         }
+        else if (auto deprecatedAttr = as<DeprecatedAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+
+            String message;
+            if(!checkLiteralStringVal(attr->args[0], &message))
+            {
+                return false;
+            }
+
+            deprecatedAttr->message = message;
+        }
         else
         {
             if(attr->args.getCount() == 0)

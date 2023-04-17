@@ -3129,3 +3129,6 @@ attribute_syntax [noinline] : NoInlineAttribute;
 
 __attributeTarget(StructDecl)
 attribute_syntax [payload] : PayloadAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;

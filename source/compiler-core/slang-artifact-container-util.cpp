@@ -626,7 +626,6 @@ SlangResult ArtifactContainerReader::read(ISlangFileSystemExt* fileSystem, ComPt
     return _readArtifactDirectory(0, outArtifact);
 }
 
-
 SlangResult ArtifactContainerReader::_readFile(Index fileIndex, ComPtr<IArtifact>& outArtifact)
 {
     outArtifact.setNull();
@@ -653,6 +652,19 @@ SlangResult ArtifactContainerReader::_readFile(Index fileIndex, ComPtr<IArtifact
         desc.kind == ArtifactKind::Invalid)
     {
         return SLANG_OK;
+    }
+
+    // We don't have manifest, so for now well assume if the name ends in "-obfuscated" and it's a source map
+    // it's an obfuscated one
+    if (desc.kind == ArtifactKind::Json &&
+        desc.payload == ArtifactPayload::SourceMap)
+    {
+        auto name = Path::getFileNameWithoutExt(entry.name);
+
+        if (name.endsWith(toSlice("-obfuscated")))
+        {
+            desc.style = ArtifactStyle::Obfuscated;
+        }
     }
 
     // I guess I can just make an artifact for this
@@ -778,6 +790,40 @@ SlangResult ArtifactContainerReader::_readArtifactDirectory(Index directoryIndex
     }
 
     outArtifact = artifact;
+    return SLANG_OK;
+}
+
+SlangResult ArtifactContainerUtil::readContainer(IArtifact* artifact, ComPtr<IArtifact>& outArtifact)
+{
+    auto desc = artifact->getDesc();
+
+    ComPtr<ISlangMutableFileSystem> fileSystem;
+ 
+    switch (desc.kind)
+    {
+        case ArtifactKind::Zip:
+        {
+            SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
+
+            ComPtr<ISlangBlob> blob;
+            SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+
+            // Load into the zip
+
+            // Now write out to the output file
+            IArchiveFileSystem* archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+            SLANG_ASSERT(archiveFileSystem);
+
+            SLANG_RETURN_ON_FAIL(archiveFileSystem->loadArchive(blob->getBufferPointer(), blob->getBufferSize()));
+            break;
+        }
+        default:
+        {
+            return SLANG_FAIL;
+        }
+    }
+
+    SLANG_RETURN_ON_FAIL(readContainer(fileSystem, outArtifact));
     return SLANG_OK;
 }
 
