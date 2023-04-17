@@ -3,6 +3,7 @@
 
 #include "../core/slang-string-util.h"
 #include "../core/slang-string-escape-util.h"
+#include "../core/slang-char-encode.h"
 
 #include "slang-artifact-representation-impl.h"
 #include "slang-artifact-impl.h"
@@ -189,44 +190,118 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
     m_entries.add(entry);
 }
 
+SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView* sourceView, SourceLoc loc, HandleSourceLoc& outLoc)
+{
+    auto sourceFile = sourceView->getSourceFile();
+
+    // Hold a list of sourceFiles visited so we can't end up in a loop of lookups
+    List<SourceFile*> sourceFiles;
+    sourceFiles.add(sourceFile);
+
+    Index entryIndex = -1;
+
+    // Do the initial lookup using the loc
+    {    
+        const auto offset = sourceView->getRange().getOffset(loc);
+    
+        const auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
+        const auto colIndex = sourceFile->calcColumnIndex(lineIndex, offset);
+
+        // If we are in this function the sourceFile should have a map
+        auto sourceMap = sourceFile->getSourceMap();
+        SLANG_ASSERT(sourceMap);
+
+        entryIndex = sourceMap->findEntry(lineIndex, colIndex);   
+    }
+
+    if (entryIndex < 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Keep searching through source maps 
+    do 
+    {
+        auto sourceMap = sourceFile->getSourceMap();
+
+        // Find the entry
+        const auto& entry = sourceMap->getEntryByIndex(entryIndex);
+        const auto sourceFileName = sourceMap->getSourceFileName(entry.sourceFileIndex);
+
+        // If we have a source name, see if it already exists in source manager
+        if (sourceFileName.getLength())
+        {
+            if (auto foundSourceFile = lookupSourceManager->findSourceFileByPathRecursively(sourceFileName))
+            {
+                // We only follow if the source file hasn't already been visisted
+                if (sourceFiles.indexOf(foundSourceFile) < 0)
+                {
+                    // Add so we don't reprocess
+                    sourceFiles.add(foundSourceFile);
+
+                    // If it has a source map, we try and look up the current location in it's source map
+                    if (auto foundSourceMap = foundSourceFile->getSourceMap())
+                    {
+                        const auto foundEntryIndex = foundSourceMap->findEntry(entry.sourceLine, entry.sourceColumn);
+
+                        // If we found the entry repeat the lookup
+                        if (foundEntryIndex >= 0)
+                        {
+                            sourceFile = foundSourceFile;
+                            entryIndex = foundEntryIndex;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+    } while (false);
+
+    // Generate the HandleSourceLoc
+    auto sourceMap = sourceFile->getSourceMap();
+    const auto& entry = sourceMap->getEntryByIndex(entryIndex);
+
+    // We need to add the pool of the originating source view/file
+    const auto originatingSourceManager = sourceView->getSourceManager();
+
+    auto& managerPool = originatingSourceManager->getStringSlicePool();
+
+    outLoc.line = entry.sourceLine + 1;
+    outLoc.column = entry.sourceColumn + 1;
+    outLoc.pathHandle = managerPool.add(sourceMap->getSourceFileName(entry.sourceFileIndex));
+
+    return SLANG_OK;
+}
+
 HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
 {
-    auto obfuscatedSourceMap = getSourceFile()->getObfuscatedSourceMap();
-    if (obfuscatedSourceMap)
+    // If it's nominal
+    if (type == SourceLocType::Nominal && m_sourceFile->getSourceMap())
     {
-        const Index col = getRange().getOffset(loc);
+        // TODO(JS): 
+        // Ideally we'd do the lookup on the "current" source manager rather than the source manager on this 
+        // view, which may be a parent to the current one. 
+        auto lookupSourceManager = m_sourceFile->getSourceManager();
 
-        const Index entryIndex = obfuscatedSourceMap->findEntry(0, col);
-        if (entryIndex >= 0)
+        HandleSourceLoc handleLoc;
+        if (SLANG_SUCCEEDED(_findLocWithSourceMap(lookupSourceManager, this, loc, handleLoc)))
         {
-            const auto& entry = obfuscatedSourceMap->getEntryByIndex(entryIndex);
-
-            // Generate the HandleSourceLoc
-
-            HandleSourceLoc handleLoc;
-            handleLoc.line = entry.sourceLine + 1;
-            handleLoc.column = entry.sourceColumn + 1;
-
-            auto& managerPool = getSourceManager()->getStringSlicePool();
-
-            handleLoc.pathHandle = managerPool.add(obfuscatedSourceMap->getSourceFileName(entry.sourceFileIndex));
             return handleLoc;
         }
     }
 
+    // Get the offset in bytes for this loc 
     const int offset = m_range.getOffset(loc);
 
     // We need the line index from the original source file
     const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
 
-    // TODO: we should really translate the byte index in the line
-    // to deal with:
-    //
-    // - Non-ASCII characters, while might consume multiple bytes
-    //
+    // TODO: 
     // - Tab characters, which should really adjust how we report
     //   columns (although how are we supposed to know the setting
-    //   that an IDE expects us to use when reporting locations?)    
+    //   that an IDE expects us to use when reporting locations?)
+    //   
+    //   For now we just count tabs as single chars
     const int columnIndex = m_sourceFile->calcColumnIndex(lineIndex, offset);
 
     HandleSourceLoc handleLoc;
@@ -409,10 +484,41 @@ int SourceFile::calcLineIndexFromOffset(int offset)
     return int(lo);
 }
 
-int SourceFile::calcColumnIndex(int lineIndex, int offset)
+int SourceFile::calcColumnOffset(int lineIndex, int offset)
 {
     const auto& lineBreakOffsets = getLineBreakOffsets();
     return offset - lineBreakOffsets[lineIndex];   
+}
+
+int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
+{
+    const int colOffset = calcColumnOffset(lineIndex, offset);
+
+    // If we don't have the content of the file, the best we can do is to assume there is a char per column
+    if (!hasContent())
+    {
+        return colOffset;
+    }
+
+    const auto line = getLineAtIndex(lineIndex);
+
+    const auto head = line.head(colOffset);
+
+    auto colCount = UTF8Util::calcCodePointCount(head);
+    
+    if (tabSize >= 0)
+    {
+        Count tabCount = 0;
+        for (auto c : head)
+        {
+            tabCount += Count(c == '\t');
+        }
+
+        // We substract one from tabSize, because colCount will already holds a +1 for each tab.
+        colCount += tabCount * (tabSize - 1);
+    }
+
+    return int(colCount);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -674,6 +780,37 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
     }
     while (manager);
     // Didn't find it
+    return nullptr;
+}
+
+SourceFile* SourceManager::findSourceFileByPathRecursively(const String& name) const
+{
+    // Start with this manager
+    const SourceManager* manager = this;
+    do
+    {
+        SourceFile* sourceFile = manager->findSourceFileByPath(name);
+        // If we found a hit we are done
+        if (sourceFile)
+        {
+            return sourceFile;
+        }
+        // Try the parent
+        manager = manager->m_parent;
+    } while (manager);
+    // Didn't find it
+    return nullptr;
+}
+
+SourceFile* SourceManager::findSourceFileByPath(const String& name) const
+{
+    for(auto sourceFile : m_sourceFiles)
+    {
+        if (sourceFile->getPathInfo().foundPath == name)
+        {
+            return sourceFile;
+        }
+    }
     return nullptr;
 }
 

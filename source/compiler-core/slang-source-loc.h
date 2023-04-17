@@ -218,8 +218,13 @@ public:
         /// Calculate the line based on the offset 
     int calcLineIndexFromOffset(int offset);
 
-        /// Calculate the offset for a line
-    int calcColumnIndex(int line, int offset);
+        /// Calculate the offset (in bytes) for a line
+    int calcColumnOffset(int line, int offset);
+
+        /// Given a line and offset (in bytes for the whole file), return the column index, taking into account tabs
+        /// and utf8 encoding.
+        /// Passing tabSize uses the default tab size (currently tab set to 1)
+    int calcColumnIndex(int line, int offset, int tabSize = -1);
 
         /// Get the content holding blob
     ISlangBlob* getContentBlob() const { return m_contentBlob;  }
@@ -247,11 +252,11 @@ public:
         /// Get the source manager this was created on
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
-        /// If set this "file" only exists as a way to obfuscate locations
-        /// The mapping between the two is specified in the specified source map
-    SourceMap* getObfuscatedSourceMap() const { return m_obfuscatedSourceMap; }
-        /// Set the obfuscated source map
-    void setObfuscatedSourceMap(SourceMap* sourceMap) { m_obfuscatedSourceMap = sourceMap; }
+        /// Get the source map associated with this file. If it's set when doing 
+        /// lookup for source locations, the source map will be used
+    SourceMap* getSourceMap() const { return m_sourceMap; }
+        /// Set a source map
+    void setSourceMap(SourceMap* sourceMap) { m_sourceMap = sourceMap; }
 
         /// Ctor
     SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize);
@@ -272,15 +277,15 @@ public:
     // the input file:
     List<uint32_t> m_lineBreakOffsets;
 
-    // If set then this file isn't a regular source file, but provides obfuscation. 
-    // The mapping of that obfuscation can be found via the obfuscated source map
-    RefPtr<SourceMap> m_obfuscatedSourceMap;
+    // If set then the locations in this file are really from locations from elsewhere, 
+    // where the SourceMap specifies that mapping
+    RefPtr<SourceMap> m_sourceMap;
 };
 
 enum class SourceLocType
 {
-    Nominal,                ///< The normal interpretation which takes into account #line directives 
-    Actual,                 ///< Ignores #line directives - and is the location as seen in the actual file
+    Nominal,                ///< The normal interpretation which takes into account #line directives and source maps
+    Actual,                 ///< Ignores #line directives/source maps - and is the location as seen in the actual file
 };
 
 // A source location in a format a human might like to see
@@ -440,6 +445,11 @@ struct SourceManager
     SourceFile* findSourceFileRecursively(const String& uniqueIdentity) const;
         /// Find if the source file is defined on this manager.
     SourceFile* findSourceFile(const String& uniqueIdentity) const;
+
+        /// Find a source file by path.
+    SourceFile* findSourceFileByPath(const String& name) const;
+        /// Find a source file by path recursively.
+    SourceFile* findSourceFileByPathRecursively(const String& name) const;
 
         /// Searches this manager, and then the parent to see if can find a match
     SourceFile* findSourceFileByContentRecursively(const char* text);
