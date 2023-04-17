@@ -176,8 +176,9 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
     SourceFile* obfuscatedFile = sourceManager->createSourceFileWithSize(obfusctatedPathInfo, uniqueLocCount);
 
-    // We put each loc on it's own line. We do this over a single line because
-   // it means the `#line` directives can still do something meaningful
+    // We put each loc on it's own line. We do this rather than using a single line because
+    // it means the `#line` directives can still do something meaningful, since the best resolution
+    // they have is a single line.
     {
         List<uint32_t> offsets;
         offsets.setCount(uniqueLocCount + 1);
@@ -249,10 +250,16 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     RefPtr<SourceMap> sourceMap = new SourceMap;
     sourceMap->m_file = obfusctatedPathInfo.getName();
 
-    // Make sure we have line 0.
-    // We only end up with one line in the obfuscated map.
-    sourceMap->advanceToLine(0);
-
+    // Set up entries one per line
+    List<SourceMap::Entry> entries;
+    {
+        entries.setCount(uniqueLocCount);
+        for (auto& entry : entries)
+        {
+            entry.init();
+        }
+    }
+    
     {        
         // Current view, with cached "View" based sourceFileIndex
         SourceView* curView = nullptr;
@@ -314,23 +321,31 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 sourceFileIndex = curPathSourceFileIndex;
             }
 
-            // Create the entry
-            SourceMap::Entry entry;
-            entry.init();
+            // Calculate the line index associated with this loc
+            const Index generatedLineIndex = Index(obfuscatedRange.getOffset(pair.obfuscatedLoc));
+
+            // Set it up
+            SourceMap::Entry& entry = entries[generatedLineIndex];
 
             entry.sourceFileIndex = sourceFileIndex;
   
-            // Calculate the column offset, from the pair obfuscated loc
-            entry.generatedColumn = Index(obfuscatedRange.getOffset(pair.obfuscatedLoc));
-
+            // The generated has a line per loc, so the generated column is always 0
+            entry.generatedColumn = 0;
+            
             // We need to subtract 1, because handleLoc locations are 1 indexed, but SourceMap
             // entry is 0 indexed.
             entry.sourceColumn = handleLoc.column - 1;
             entry.sourceLine = handleLoc.line - 1;
-
-            // Add it to the source map
-            sourceMap->addEntry(entry);
         }
+    }
+
+    // Add all of the entries in line order to the source map
+    for (Index i = 0; i < uniqueLocCount; ++i)
+    {
+        // Advance to the current line.
+        sourceMap->advanceToLine(i);
+        // Add it to the source map
+        sourceMap->addEntry(entries[i]);
     }
 
     // Associate the sourceMap with the obfuscated file

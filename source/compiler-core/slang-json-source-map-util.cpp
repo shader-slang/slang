@@ -105,34 +105,31 @@ static SlangResult _decode(UnownedStringSlice& ioEncoded, Index& out)
 {
     Index v = 0;
 
-    Index shift = 0;
     const char* cur = ioEncoded.begin();
     const char* end = ioEncoded.end();
 
-    // Must have some chars
-    if (cur >= end)
     {
-        return SLANG_FAIL;
-    }
-
-    for (; cur < end; ++cur)
-    {
-        const Index value = g_vlqDecodeTable[*cur];
-        if (value < 0)
+        Index shift = 0;
+        Index decodeValue = 0;
+        do
         {
-            return SLANG_FAIL;
-        }
+            // Must have a char to decode
+            if (cur >= end)
+            {
+                return SLANG_FAIL;
+            }
+
+            decodeValue = g_vlqDecodeTable[*cur++];
+            if (decodeValue < 0)
+            {
+                return SLANG_FAIL;
+            }
         
-        v += (value & 0x1f) << shift;
+            v += (decodeValue & 0x1f) << shift;
 
-        // If the continuation bit is not set we are done
-        if (( value & 0x20) == 0)
-        {
-            ++cur;
-            break;
+            shift += 5;
         }
-
-        shift += 5;
+        while (decodeValue & 0x20);
     }
 
     // Save out the remaining part
@@ -158,20 +155,16 @@ void _encode(Index v, StringBuilder& out)
 
     do 
     {
-        // Encode it
-        const auto nextV  = v >> 5;
+        const Index nextV = v >> 5;
+        const Index encodeValue = (v & 0x1f) + (nextV ? 0x20 : 0);
 
-        // Encode 5 bits
-        char c = g_vlqEncodeTable[(v & 0x1f)];
-
-        // See what bits are remaining
-        v = (v >> 5);
-
-        // Set the continuation bit's if there is more to encode
-        c |= v ? 0x20 : 0;
-
+        // Encode 5 bits, plus continuation bit
+        char c = g_vlqEncodeTable[encodeValue];
+        
         // Save the char
         *cur++ = c;
+    
+        v = nextV;
     }
     while (v);
 

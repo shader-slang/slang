@@ -194,9 +194,9 @@ HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
     auto obfuscatedSourceMap = getSourceFile()->getObfuscatedSourceMap();
     if (obfuscatedSourceMap)
     {
-        const Index col = getRange().getOffset(loc);
+        const Index line = getRange().getOffset(loc);
 
-        const Index entryIndex = obfuscatedSourceMap->findEntry(0, col);
+        const Index entryIndex = obfuscatedSourceMap->findEntry(line, 0);
         if (entryIndex >= 0)
         {
             const auto& entry = obfuscatedSourceMap->getEntryByIndex(entryIndex);
