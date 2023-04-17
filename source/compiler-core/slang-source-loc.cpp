@@ -190,13 +190,12 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
     m_entries.add(entry);
 }
 
-SlangResult _findLocWithSourceMap(SourceManager* sourceManager, SourceView* sourceView, SourceLoc loc, HandleSourceLoc& outLoc)
+SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView* sourceView, SourceLoc loc, HandleSourceLoc& outLoc)
 {
     auto sourceFile = sourceView->getSourceFile();
 
-    // Hold a list of sourceFiles visited so we can't end up in a loop
+    // Hold a list of sourceFiles visited so we can't end up in a loop of lookups
     List<SourceFile*> sourceFiles;
-
     sourceFiles.add(sourceFile);
 
     Index entryIndex = -1;
@@ -208,14 +207,16 @@ SlangResult _findLocWithSourceMap(SourceManager* sourceManager, SourceView* sour
         const auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
         const auto colIndex = sourceFile->calcColumnIndex(lineIndex, offset);
 
+        // If we are in this function the sourceFile should have a map
         auto sourceMap = sourceFile->getSourceMap();
         SLANG_ASSERT(sourceMap);
 
-        entryIndex = sourceMap->findEntry(lineIndex, colIndex);
-        if (entryIndex < 0)
-        {
-            return SLANG_FAIL;
-        }
+        entryIndex = sourceMap->findEntry(lineIndex, colIndex);   
+    }
+
+    if (entryIndex < 0)
+    {
+        return SLANG_FAIL;
     }
 
     // Keep searching through source maps 
@@ -230,7 +231,7 @@ SlangResult _findLocWithSourceMap(SourceManager* sourceManager, SourceView* sour
         // If we have a source name, see if it already exists in source manager
         if (sourceFileName.getLength())
         {
-            if (auto foundSourceFile = sourceManager->findSourceFileByPathRecursively(sourceFileName))
+            if (auto foundSourceFile = lookupSourceManager->findSourceFileByPathRecursively(sourceFileName))
             {
                 // We only follow if the source file hasn't already been visisted
                 if (sourceFiles.indexOf(foundSourceFile) < 0)
@@ -260,14 +261,15 @@ SlangResult _findLocWithSourceMap(SourceManager* sourceManager, SourceView* sour
     auto sourceMap = sourceFile->getSourceMap();
     const auto& entry = sourceMap->getEntryByIndex(entryIndex);
 
-    auto& managerPool = sourceManager->getStringSlicePool();
+    // We need to add the pool of the originating source view/file
+    const auto originatingSourceManager = sourceView->getSourceManager();
 
-    HandleSourceLoc handleLoc;
-    handleLoc.line = entry.sourceLine + 1;
-    handleLoc.column = entry.sourceColumn + 1;
+    auto& managerPool = originatingSourceManager->getStringSlicePool();
 
-    handleLoc.pathHandle = managerPool.add(sourceMap->getSourceFileName(entry.sourceFileIndex));
-    outLoc = handleLoc;
+    outLoc.line = entry.sourceLine + 1;
+    outLoc.column = entry.sourceColumn + 1;
+    outLoc.pathHandle = managerPool.add(sourceMap->getSourceFileName(entry.sourceFileIndex));
+
     return SLANG_OK;
 }
 
@@ -277,12 +279,12 @@ HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
     if (type == SourceLocType::Nominal && m_sourceFile->getSourceMap())
     {
         // TODO(JS): 
-        // Do we want the originating source manager really, not the one associated with 
-        // this view? 
-        auto sourceManager = m_sourceFile->getSourceManager();
+        // Ideally we'd do the lookup on the "current" source manager rather than the source manager on this 
+        // view, which may be a parent to the current one. 
+        auto lookupSourceManager = m_sourceFile->getSourceManager();
 
         HandleSourceLoc handleLoc;
-        if (SLANG_SUCCEEDED(_findLocWithSourceMap(sourceManager, this, loc, handleLoc)))
+        if (SLANG_SUCCEEDED(_findLocWithSourceMap(lookupSourceManager, this, loc, handleLoc)))
         {
             return handleLoc;
         }
