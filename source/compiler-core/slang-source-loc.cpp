@@ -190,34 +190,105 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
     m_entries.add(entry);
 }
 
+SlangResult _findLocWithSourceMap(SourceManager* sourceManager, SourceView* sourceView, SourceLoc loc, HandleSourceLoc& outLoc)
+{
+    auto sourceFile = sourceView->getSourceFile();
+
+    // Hold a list of sourceFiles visited so we can't end up in a loop
+    List<SourceFile*> sourceFiles;
+
+    sourceFiles.add(sourceFile);
+
+    Index entryIndex = -1;
+
+    // Do the initial lookup using the loc
+    {    
+        const auto offset = sourceView->getRange().getOffset(loc);
+    
+        const auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
+        const auto colIndex = sourceFile->calcColumnIndex(lineIndex, offset);
+
+        auto sourceMap = sourceFile->getSourceMap();
+        SLANG_ASSERT(sourceMap);
+
+        entryIndex = sourceMap->findEntry(lineIndex, colIndex);
+        if (entryIndex < 0)
+        {
+            return SLANG_FAIL;
+        }
+    }
+
+    // Keep searching through source maps 
+    do 
+    {
+        auto sourceMap = sourceFile->getSourceMap();
+
+        // Find the entry
+        const auto& entry = sourceMap->getEntryByIndex(entryIndex);
+        const auto sourceFileName = sourceMap->getSourceFileName(entry.sourceFileIndex);
+
+        // If we have a source name, see if it already exists in source manager
+        if (sourceFileName.getLength())
+        {
+            if (auto foundSourceFile = sourceManager->findSourceFileByPathRecursively(sourceFileName))
+            {
+                // We only follow if the source file hasn't already been visisted
+                if (sourceFiles.indexOf(foundSourceFile) < 0)
+                {
+                    // Add so we don't reprocess
+                    sourceFiles.add(foundSourceFile);
+
+                    // If it has a source map, we try and look up the current location in it's source map
+                    if (auto foundSourceMap = foundSourceFile->getSourceMap())
+                    {
+                        const auto foundEntryIndex = foundSourceMap->findEntry(entry.sourceLine, entry.sourceColumn);
+
+                        // If we found the entry repeat the lookup
+                        if (foundEntryIndex >= 0)
+                        {
+                            sourceFile = foundSourceFile;
+                            entryIndex = foundEntryIndex;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+    } while (false);
+
+    // Generate the HandleSourceLoc
+    auto sourceMap = sourceFile->getSourceMap();
+    const auto& entry = sourceMap->getEntryByIndex(entryIndex);
+
+    auto& managerPool = sourceManager->getStringSlicePool();
+
+    HandleSourceLoc handleLoc;
+    handleLoc.line = entry.sourceLine + 1;
+    handleLoc.column = entry.sourceColumn + 1;
+
+    handleLoc.pathHandle = managerPool.add(sourceMap->getSourceFileName(entry.sourceFileIndex));
+    outLoc = handleLoc;
+    return SLANG_OK;
+}
+
 HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
 {
-    auto obfuscatedSourceMap = m_sourceFile->getObfuscatedSourceMap();
-    if (obfuscatedSourceMap)
+    // If it's nominal
+    if (type == SourceLocType::Nominal && m_sourceFile->getSourceMap())
     {
-        const auto offset = getRange().getOffset(loc);
+        // TODO(JS): 
+        // Do we want the originating source manager really, not the one associated with 
+        // this view? 
+        auto sourceManager = m_sourceFile->getSourceManager();
 
-        const auto lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
-        const auto colIndex = m_sourceFile->calcColumnIndex(lineIndex, offset);
-
-        const Index entryIndex = obfuscatedSourceMap->findEntry(lineIndex, colIndex);
-        if (entryIndex >= 0)
+        HandleSourceLoc handleLoc;
+        if (SLANG_SUCCEEDED(_findLocWithSourceMap(sourceManager, this, loc, handleLoc)))
         {
-            const auto& entry = obfuscatedSourceMap->getEntryByIndex(entryIndex);
-
-            // Generate the HandleSourceLoc
-
-            HandleSourceLoc handleLoc;
-            handleLoc.line = entry.sourceLine + 1;
-            handleLoc.column = entry.sourceColumn + 1;
-
-            auto& managerPool = getSourceManager()->getStringSlicePool();
-
-            handleLoc.pathHandle = managerPool.add(obfuscatedSourceMap->getSourceFileName(entry.sourceFileIndex));
             return handleLoc;
         }
     }
 
+    // Get the offset in bytes for this loc 
     const int offset = m_range.getOffset(loc);
 
     // We need the line index from the original source file

@@ -4879,13 +4879,10 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
         {
             auto assocDesc = associated->getDesc();
 
-            // We are just looking for obfuscated source maps...
-            if (!isDerivedFrom(assocDesc.style, ArtifactStyle::Obfuscated))
-            {
-                continue;
-            }
-
-            if (isDerivedFrom(assocDesc.kind, ArtifactKind::Json) && isDerivedFrom(assocDesc.payload, ArtifactPayload::SourceMap))
+            // If we find an obfuscated source map load it and associate
+            if (isDerivedFrom(assocDesc.kind, ArtifactKind::Json) && 
+                isDerivedFrom(assocDesc.payload, ArtifactPayload::SourceMap) &&
+                isDerivedFrom(assocDesc.style, ArtifactStyle::Obfuscated))
             {
                 ComPtr<ISlangBlob> sourceMapBlob;
                 SLANG_RETURN_ON_FAIL(associated->loadBlob(ArtifactKeep::No, sourceMapBlob.writeRef()));
@@ -4908,7 +4905,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
                 if (name.getLength())
                 {
                     auto sourceFile = sourceManager->findSourceFileByPathRecursively(name);
-                    sourceFile->setObfuscatedSourceMap(sourceMap);
+                    sourceFile->setSourceMap(sourceMap);
                 }
             }
         }
