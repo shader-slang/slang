@@ -254,7 +254,7 @@ namespace Slang
         return SourceLoc();
     }
 
-    void SemanticsVisitor::DiagnoseDeprecatedDeclRefUsage(
+    void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
         DeclRef<Decl> declRef,
         SourceLoc loc,
         Expr* originalExpr)
@@ -301,7 +301,7 @@ namespace Slang
 
         // This is the bottleneck for using declarations which might be
         // deprecated, diagnose here.
-        DiagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
+        diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
 
         // Construct an appropriate expression based on the structured of
         // the declaration reference.
