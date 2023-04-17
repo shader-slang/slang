@@ -1902,9 +1902,6 @@ namespace Slang
 
         auto frontEndReq = getFrontEndReq();
 
-        auto sourceManager = frontEndReq->getSourceManager();
-        auto sink = getSink();
-
         for (auto translationUnit : frontEndReq->translationUnits)
         {
             // Hmmm do I have to therefore add a map for all translation units(!)
@@ -1915,29 +1912,14 @@ namespace Slang
             // If we have a source map *and* we want to generate them for output add to the container
             if (sourceMap && getLinkage()->m_generateSourceMap)
             {
-                // Write it out
-                String json;
-                {
-                    RefPtr<JSONContainer> jsonContainer(new JSONContainer(sourceManager));
-
-                    JSONValue jsonValue;
-
-                    SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, sink, jsonValue));
-
-                    // Convert into a string
-                    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-                    jsonContainer->traverseRecursively(jsonValue, &writer);
-
-                    json = writer.getBuilder();
-                }
-
-                auto jsonSourceMapBlob = StringBlob::moveCreate(json);
+                ComPtr<ISlangBlob> blob;
+                SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(sourceMap, getSink(), blob));
 
                 auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
 
                 // Create the source map artifact
                 auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->m_file.getUnownedSlice());
-                sourceMapArtifact->addRepresentationUnknown(jsonSourceMapBlob);
+                sourceMapArtifact->addRepresentationUnknown(blob);
 
                 // Associate with the container
                 m_containerArtifact->addAssociated(sourceMapArtifact);

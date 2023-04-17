@@ -1152,25 +1152,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        SourceManager sourceMapSourceManager;
-        sourceMapSourceManager.initialize(nullptr, nullptr);
-
-        // Create a sink
-        DiagnosticSink sourceMapSink(&sourceMapSourceManager, nullptr);
-
-        // Turn into JSON
-        RefPtr<JSONContainer> jsonContainer(new JSONContainer(&sourceMapSourceManager));
-
-        JSONValue jsonValue;
-        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, &sourceMapSink, jsonValue));
-
-        // Okay now convert this into a text file and then a blob
-
-        // Convert into a string
-        JSONWriter writer(JSONWriter::IndentationStyle::KNR);
-        jsonContainer->traverseRecursively(jsonValue, &writer);
-
-        auto sourceMapBlob = StringBlob::moveCreate(writer.getBuilder());
+        ComPtr<ISlangBlob> sourceMapBlob;
+        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(sourceMap, sourceMapBlob));
 
         auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::None));
         sourceMapArtifact->addRepresentationUnknown(sourceMapBlob);
