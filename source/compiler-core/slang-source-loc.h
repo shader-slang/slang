@@ -218,8 +218,13 @@ public:
         /// Calculate the line based on the offset 
     int calcLineIndexFromOffset(int offset);
 
-        /// Calculate the offset for a line
-    int calcColumnIndex(int line, int offset);
+        /// Calculate the offset (in bytes) for a line
+    int calcColumnOffset(int line, int offset);
+
+        /// Given a line and offset (in bytes for the whole file), return the column index, taking into account tabs
+        /// and utf8 encoding.
+        /// Passing tabSize uses the default tab size (currently tab set to 1)
+    int calcColumnIndex(int line, int offset, int tabSize = -1);
 
         /// Get the content holding blob
     ISlangBlob* getContentBlob() const { return m_contentBlob;  }

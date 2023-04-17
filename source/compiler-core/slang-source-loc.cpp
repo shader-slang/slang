@@ -3,6 +3,7 @@
 
 #include "../core/slang-string-util.h"
 #include "../core/slang-string-escape-util.h"
+#include "../core/slang-char-encode.h"
 
 #include "slang-artifact-representation-impl.h"
 #include "slang-artifact-impl.h"
@@ -191,12 +192,15 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 
 HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
 {
-    auto obfuscatedSourceMap = getSourceFile()->getObfuscatedSourceMap();
+    auto obfuscatedSourceMap = m_sourceFile->getObfuscatedSourceMap();
     if (obfuscatedSourceMap)
     {
-        const Index line = getRange().getOffset(loc);
+        const auto offset = getRange().getOffset(loc);
 
-        const Index entryIndex = obfuscatedSourceMap->findEntry(line, 0);
+        const auto lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
+        const auto colIndex = m_sourceFile->calcColumnIndex(lineIndex, offset);
+
+        const Index entryIndex = obfuscatedSourceMap->findEntry(lineIndex, colIndex);
         if (entryIndex >= 0)
         {
             const auto& entry = obfuscatedSourceMap->getEntryByIndex(entryIndex);
@@ -219,14 +223,12 @@ HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
     // We need the line index from the original source file
     const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
 
-    // TODO: we should really translate the byte index in the line
-    // to deal with:
-    //
-    // - Non-ASCII characters, while might consume multiple bytes
-    //
+    // TODO: 
     // - Tab characters, which should really adjust how we report
     //   columns (although how are we supposed to know the setting
-    //   that an IDE expects us to use when reporting locations?)    
+    //   that an IDE expects us to use when reporting locations?)
+    //   
+    //   For now we just count tabs as single chars
     const int columnIndex = m_sourceFile->calcColumnIndex(lineIndex, offset);
 
     HandleSourceLoc handleLoc;
@@ -409,10 +411,41 @@ int SourceFile::calcLineIndexFromOffset(int offset)
     return int(lo);
 }
 
-int SourceFile::calcColumnIndex(int lineIndex, int offset)
+int SourceFile::calcColumnOffset(int lineIndex, int offset)
 {
     const auto& lineBreakOffsets = getLineBreakOffsets();
     return offset - lineBreakOffsets[lineIndex];   
+}
+
+int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
+{
+    const int colOffset = calcColumnOffset(lineIndex, offset);
+
+    // If we don't have the content of the file, the best we can do is to assume there is a char per column
+    if (!hasContent())
+    {
+        return colOffset;
+    }
+
+    const auto line = getLineAtIndex(lineIndex);
+
+    const auto head = line.head(colOffset);
+
+    auto colCount = UTF8Util::calcCodePointCount(head);
+    
+    if (tabSize >= 0)
+    {
+        Count tabCount = 0;
+        for (auto c : head)
+        {
+            tabCount += Count(c == '\t');
+        }
+
+        // We substract one from tabSize, because colCount will already holds a +1 for each tab.
+        colCount += tabCount * (tabSize - 1);
+    }
+
+    return int(colCount);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
