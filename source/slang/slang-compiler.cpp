@@ -15,8 +15,6 @@
 
 #include "../compiler-core/slang-lexer.h"
 
-#include "../compiler-core/slang-json-source-map-util.h"
-
 // Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-representation-impl.h"
@@ -1912,14 +1910,14 @@ namespace Slang
             // If we have a source map *and* we want to generate them for output add to the container
             if (sourceMap && getLinkage()->m_generateSourceMap)
             {
-                ComPtr<ISlangBlob> blob;
-                SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(sourceMap, getSink(), blob));
-
                 auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
 
                 // Create the source map artifact
                 auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->m_file.getUnownedSlice());
-                sourceMapArtifact->addRepresentationUnknown(blob);
+
+                // Add the repesentation
+                ComPtr<IObjectCastableAdapter> castableAdapter(new ObjectCastableAdapter(sourceMap));
+                sourceMapArtifact->addRepresentation(castableAdapter);
 
                 // Associate with the container
                 m_containerArtifact->addAssociated(sourceMapArtifact);

@@ -13,6 +13,8 @@ namespace Slang {
 class SourceMap : public RefObject
 {
 public:
+    SLANG_CLASS_GUID(0x731383ea, 0xe516, 0x4cc3, { 0xa6, 0xcf, 0x37, 0xd2, 0x8c, 0x24, 0x5c, 0x5e });
+
     struct Entry
     {
         void init()

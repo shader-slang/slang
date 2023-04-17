@@ -20,6 +20,37 @@ namespace Slang {
     return castable;
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ObjectCastableAdapter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* ObjectCastableAdapter::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+void* ObjectCastableAdapter::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IObjectCastableAdapter::getTypeGuid())
+    {
+        return static_cast<IObjectCastableAdapter*>(this);
+    }
+    return nullptr;
+}
+
+void* ObjectCastableAdapter::getObject(const Guid& guid)
+{
+    if (guid == m_containedGuid)
+    {
+        return m_contained;
+    }
+    return nullptr;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnknownCastableAdapter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* UnknownCastableAdapter::castAs(const Guid& guid)

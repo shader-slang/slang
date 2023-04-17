@@ -455,6 +455,11 @@ SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* conta
     return SLANG_OK;
 }
 
+/* static */SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, RefPtr<SourceMap>& outSourceMap)
+{
+    return read(blob, nullptr, outSourceMap);
+}
+
 SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink, RefPtr<SourceMap>& outSourceMap)
 {
     SourceManager sourceManager;

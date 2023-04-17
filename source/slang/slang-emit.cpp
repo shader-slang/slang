@@ -82,7 +82,7 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
 
-#include "../compiler-core/slang-json-source-map-util.h"
+#include "../core/slang-castable.h"
 
 #include <assert.h>
 
@@ -1152,11 +1152,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        ComPtr<ISlangBlob> sourceMapBlob;
-        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(sourceMap, sourceMapBlob));
-
         auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::None));
-        sourceMapArtifact->addRepresentationUnknown(sourceMapBlob);
+
+        ComPtr<IObjectCastableAdapter> castableAdapter(new ObjectCastableAdapter(sourceMap));
+        sourceMapArtifact->addRepresentation(castableAdapter);
 
         artifact->addAssociated(sourceMapArtifact);
     }
