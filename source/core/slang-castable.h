@@ -52,9 +52,7 @@ class IBoxValue : public IBoxValueBase
     public:
 
     SLANG_FORCE_INLINE T& get() { return *reinterpret_cast<T*>(getValuePtr()); }
-    SLANG_FORCE_INLINE const T& get() const { return *reinterpret_cast<T*>(getValuePtr()); }
     SLANG_FORCE_INLINE T* getPtr() { return reinterpret_cast<T*>(getValuePtr()); }
-    SLANG_FORCE_INLINE const T* getPtr() const { return reinterpret_cast<T*>(getValuePtr()); }
 };
 
 // Cast into a boxed value type
