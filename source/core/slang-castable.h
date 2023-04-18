@@ -57,6 +57,14 @@ class IBoxValue : public IBoxValueBase
     SLANG_FORCE_INLINE const T* getPtr() const { return reinterpret_cast<T*>(getValuePtr()); }
 };
 
+// Cast into a boxed value type
+template <typename T>
+SLANG_FORCE_INLINE IBoxValue<T>* asBoxValue(ICastable* castable)
+{
+    IBoxValueBase* base = as<IBoxValueBase*>(castable);
+    return (base && base->getValueTypeGuid() == T::getTypeGuid()) ? static_cast<IBoxValue<T>>(castable) : nullptr;
+}
+
 template <typename T>
 class BoxValue : public ComBaseObject, public IBoxValue<T>
 {

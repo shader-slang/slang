@@ -4884,9 +4884,9 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
             {
                 ComPtr<ICastable> castable;
                 SLANG_RETURN_ON_FAIL(associated->getOrCreateRepresentation(SourceMap::getTypeGuid(), ArtifactKeep::Yes, castable.writeRef()));
-
-                auto sourceMap = as<SourceMap>(castable);
-
+                auto sourceMap = asBoxValue<SourceMap>(castable);
+                SLANG_ASSERT(sourceMap);
+                
                 // I guess we add to all ir modules?
 
                 for (auto irModule : library->m_modules)
