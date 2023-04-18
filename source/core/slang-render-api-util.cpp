@@ -273,7 +273,10 @@ static bool _canLoadSharedLibrary(const char* libName)
 #endif
 #if SLANG_ENABLE_DIRECTX
 #if SLANG_ENABLE_DXVK
-        case RenderApiType::D3D11:  return _canLoadSharedLibrary("dxvk_d3d11");
+        // Strictly speaking, the d3d11 lib would be sufficient, however slang
+        // can't really do much without d3dcompiler_47 on dx11 and it trips a
+        // bunch of corner cases
+        case RenderApiType::D3D11:  return _canLoadSharedLibrary("dxvk_d3d11") && _canLoadSharedLibrary("d3dcompiler_47");
 #else
         case RenderApiType::D3D11:  return _canLoadSharedLibrary("d3d11");
 #endif
