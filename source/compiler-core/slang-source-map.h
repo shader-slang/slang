@@ -10,7 +10,7 @@
 
 namespace Slang {
 
-class SourceMap : public RefObject
+class SourceMap 
 {
 public:
     typedef SourceMap ThisType;
