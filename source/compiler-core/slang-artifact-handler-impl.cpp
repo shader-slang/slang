@@ -130,7 +130,7 @@ SlangResult DefaultArtifactHandler::expandChildren(IArtifact* container)
 	return SLANG_OK;
 }
 
-static SlangResult _loadSourceMap(IArtifact* artifact, ArtifactKeep intermediateKeep, RefPtr<SourceMap>& outSourceMap)
+static SlangResult _loadSourceMap(IArtifact* artifact, ArtifactKeep intermediateKeep, SourceMap& outSourceMap)
 {
 	const auto desc = artifact->getDesc();
 	if (isDerivedFrom(desc.kind, ArtifactKind::Json) &&
@@ -139,10 +139,7 @@ static SlangResult _loadSourceMap(IArtifact* artifact, ArtifactKeep intermediate
 		ComPtr<ISlangBlob> blob;
 		SLANG_RETURN_ON_FAIL(artifact->loadBlob(intermediateKeep, blob.writeRef()));
 
-		RefPtr<SourceMap> sourceMap;
-		SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::read(blob, sourceMap));
-
-		outSourceMap = sourceMap;
+		SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::read(blob, outSourceMap));
 		return SLANG_OK;
 	}
 
@@ -183,10 +180,9 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 	if (guid == SourceMap::getTypeGuid())
 	{
 		// Blob -> SourceMap
-		RefPtr<SourceMap> sourceMap;
-		SLANG_RETURN_ON_FAIL(_loadSourceMap(artifact, getIntermediateKeep(keep), sourceMap));
-		ComPtr<IObjectCastableAdapter> castable(new ObjectCastableAdapter(sourceMap));
-		return _addRepresentation(artifact, keep, castable, outCastable);
+		ComPtr<IBoxValue<SourceMap>> sourceMap(new BoxValue<SourceMap>);
+		SLANG_RETURN_ON_FAIL(_loadSourceMap(artifact, getIntermediateKeep(keep), sourceMap->get()));
+		return _addRepresentation(artifact, keep, sourceMap, outCastable);
 	}
 	else if (guid == ISlangSharedLibrary::getTypeGuid())
 	{
@@ -208,7 +204,7 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 			{
 				// SourceMap -> Blob
 				ComPtr<ISlangBlob> blob;
-				SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(sourceMap, blob));
+				SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(*sourceMap, blob));
 				// Add the rep
 				return _addRepresentation(artifact, keep, blob, outCastable);
 			}

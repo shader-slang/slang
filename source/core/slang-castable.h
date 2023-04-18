@@ -35,18 +35,30 @@ SLANG_FORCE_INLINE T* as(ICastable* castable)
     return nullptr;
 }
 
-/* Adapter interface to make non castable ref counted object usable as ICastable */
-class IObjectCastableAdapter : public ICastable
+/* An interface for boxing values */
+class IBoxValueBase: public ICastable
 {
     SLANG_COM_INTERFACE(0x8b4aad81, 0x4934, 0x4a67, { 0xb2, 0xe2, 0xe9, 0x17, 0xfc, 0x29, 0x12, 0x54 });
 
         /// Get the contained object
-    virtual SLANG_NO_THROW RefObject* SLANG_MCALL getContained() = 0;
+    virtual SLANG_NO_THROW void* SLANG_MCALL getValuePtr() = 0;
         /// Get the guid that represents the contained ref object
-    virtual SLANG_NO_THROW SlangUUID getContainedGuid() = 0;
+    virtual SLANG_NO_THROW SlangUUID SLANG_MCALL getValueTypeGuid() = 0;
 };
 
-class ObjectCastableAdapter : public ComBaseObject, public IObjectCastableAdapter
+template <typename T>
+class IBoxValue : public IBoxValueBase
+{
+    public:
+
+    SLANG_FORCE_INLINE T& get() { return *reinterpret_cast<T*>(getValuePtr()); }
+    SLANG_FORCE_INLINE const T& get() const { return *reinterpret_cast<T*>(getValuePtr()); }
+    SLANG_FORCE_INLINE T* getPtr() { return reinterpret_cast<T*>(getValuePtr()); }
+    SLANG_FORCE_INLINE const T* getPtr() const { return reinterpret_cast<T*>(getValuePtr()); }
+};
+
+template <typename T>
+class BoxValue : public ComBaseObject, public IBoxValue<T>
 {
 public:
     SLANG_COM_BASE_IUNKNOWN_ALL
@@ -54,39 +66,59 @@ public:
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
-    // IObjectCastableAdapter
-    virtual SLANG_NO_THROW RefObject* SLANG_MCALL getContained() SLANG_OVERRIDE { return m_contained; }
-    virtual SlangUUID getContainedGuid() SLANG_OVERRIDE { return m_containedGuid; }
+    // IBoxValue
+    virtual SLANG_NO_THROW void* SLANG_MCALL getValuePtr() SLANG_OVERRIDE { return &m_value; }
+    virtual SlangUUID SLANG_MCALL getValueTypeGuid() SLANG_OVERRIDE { return T::getTypeGuid(); }
 
-    template <typename T>
-    explicit ObjectCastableAdapter(T* ptr)
-    {
-        m_containedGuid = T::getTypeGuid();
-        m_contained = ptr;
-    }
-    template <typename T>
-    explicit ObjectCastableAdapter(const RefPtr<T>& ptr)
-    {
-        m_containedGuid = T::getTypeGuid();
-        m_contained = ptr;
-    }
+    BoxValue() {}
 
-    ObjectCastableAdapter(RefObject* obj, const Guid& containedGuid) :
-        m_contained(obj),
-        m_containedGuid(containedGuid)
+    explicit BoxValue(const T& rhs):
+        m_value(rhs)
     {
-        SLANG_ASSERT(obj);
     }
 
 protected:
-    void* getInterface(const Guid& guid);
+    void* getInterface(const Guid& guid); 
     void* getObject(const Guid& guid);
-
-    RefPtr<RefObject> m_contained;
-    SlangUUID m_containedGuid;
+    
+    T m_value;
 };
 
+// ------------------------------------------------------------
+template <typename T>
+void* BoxValue<T>::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IBoxValueBase::getTypeGuid())
+    {
+        return static_cast<IBoxValueBase*>(this);
+    }
+    return nullptr;
+}
 
+// ------------------------------------------------------------
+template <typename T>
+void* BoxValue<T>::getObject(const Guid& guid)
+{
+    if (guid == T::getTypeGuid())
+    {
+        return &m_value;
+    }
+    return nullptr;
+}
+
+// ------------------------------------------------------------
+template <typename T>
+void* BoxValue<T>::castAs(const Guid& guid)
+{
+    if (auto ptr = getObject(guid))
+    {
+        return ptr;
+    }
+    return getInterface(guid);
+}
+ 
 /* Adapter interface to make a non castable types work as ICastable */
 class IUnknownCastableAdapter : public ICastable
 {

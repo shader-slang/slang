@@ -2385,7 +2385,7 @@ void FrontEndCompileRequest::generateIR()
         if (useSerialIRBottleneck)
         {
             // Keep the obfuscated source map (if there is one)
-            RefPtr<SourceMap> obfuscatedSourceMap = irModule->getObfuscatedSourceMap();
+            ComPtr<IBoxValue<SourceMap>> obfuscatedSourceMap(irModule->getObfuscatedSourceMap());
 
             IRSerialData serialData;
             {
