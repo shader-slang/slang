@@ -82,7 +82,7 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
 
-#include "../compiler-core/slang-json-source-map-util.h"
+#include "../core/slang-castable.h"
 
 #include <assert.h>
 
@@ -1152,28 +1152,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        SourceManager sourceMapSourceManager;
-        sourceMapSourceManager.initialize(nullptr, nullptr);
-
-        // Create a sink
-        DiagnosticSink sourceMapSink(&sourceMapSourceManager, nullptr);
-
-        // Turn into JSON
-        RefPtr<JSONContainer> jsonContainer(new JSONContainer(&sourceMapSourceManager));
-
-        JSONValue jsonValue;
-        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, &sourceMapSink, jsonValue));
-
-        // Okay now convert this into a text file and then a blob
-
-        // Convert into a string
-        JSONWriter writer(JSONWriter::IndentationStyle::KNR);
-        jsonContainer->traverseRecursively(jsonValue, &writer);
-
-        auto sourceMapBlob = StringBlob::moveCreate(writer.getBuilder());
-
         auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::None));
-        sourceMapArtifact->addRepresentationUnknown(sourceMapBlob);
+
+        ComPtr<IObjectCastableAdapter> castableAdapter(new ObjectCastableAdapter(sourceMap));
+        sourceMapArtifact->addRepresentation(castableAdapter);
 
         artifact->addAssociated(sourceMapArtifact);
     }

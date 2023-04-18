@@ -3,6 +3,7 @@
 #include "../../slang-com-helper.h"
 
 #include "../core/slang-string-util.h"
+#include "../core/slang-blob.h"
 
 #include "slang-json-native.h"
 
@@ -454,6 +455,11 @@ SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* conta
     return SLANG_OK;
 }
 
+/* static */SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, RefPtr<SourceMap>& outSourceMap)
+{
+    return read(blob, nullptr, outSourceMap);
+}
+
 SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink, RefPtr<SourceMap>& outSourceMap)
 {
     SourceManager sourceManager;
@@ -486,6 +492,43 @@ SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink
     SLANG_RETURN_ON_FAIL(decode(container, rootValue, &sink, sourceMap));
 
     outSourceMap = sourceMap;
+    return SLANG_OK;
+}
+
+
+/* static */SlangResult JSONSourceMapUtil::write(SourceMap* sourceMap, ComPtr<ISlangBlob>& outBlob)
+{
+    SourceManager sourceMapSourceManager;
+    sourceMapSourceManager.initialize(nullptr, nullptr);
+
+    // Create a sink
+    DiagnosticSink sourceMapSink(&sourceMapSourceManager, nullptr);
+
+    SLANG_RETURN_ON_FAIL(write(sourceMap, &sourceMapSink, outBlob));
+    return SLANG_OK;
+}
+
+/* static */ SlangResult JSONSourceMapUtil::write(SourceMap* sourceMap, DiagnosticSink* sink, ComPtr<ISlangBlob>& outBlob)
+{
+    auto sourceManager = sink->getSourceManager();
+
+    // Write it out
+    String json;
+    {
+        RefPtr<JSONContainer> jsonContainer(new JSONContainer(sourceManager));
+
+        JSONValue jsonValue;
+
+        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, sink, jsonValue));
+
+        // Convert into a string
+        JSONWriter writer(JSONWriter::IndentationStyle::Allman);
+        jsonContainer->traverseRecursively(jsonValue, &writer);
+
+        json = writer.getBuilder();
+    }
+
+    outBlob = StringBlob::moveCreate(json);
     return SLANG_OK;
 }
 

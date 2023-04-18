@@ -15,8 +15,6 @@
 #include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../compiler-core/slang-artifact-container-util.h"
 
-#include "../compiler-core/slang-json-source-map-util.h"
-
 #include "../core/slang-memory-file-system.h"
 
 #include "slang-module-library.h"
@@ -4884,12 +4882,11 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
                 isDerivedFrom(assocDesc.payload, ArtifactPayload::SourceMap) &&
                 isDerivedFrom(assocDesc.style, ArtifactStyle::Obfuscated))
             {
-                ComPtr<ISlangBlob> sourceMapBlob;
-                SLANG_RETURN_ON_FAIL(associated->loadBlob(ArtifactKeep::No, sourceMapBlob.writeRef()));
+                ComPtr<ICastable> castable;
+                SLANG_RETURN_ON_FAIL(associated->getOrCreateRepresentation(SourceMap::getTypeGuid(), ArtifactKeep::Yes, castable.writeRef()));
 
-                RefPtr<SourceMap> sourceMap;
-                SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::read(sourceMapBlob, nullptr, sourceMap));
-                
+                auto sourceMap = as<SourceMap>(castable);
+
                 // I guess we add to all ir modules?
 
                 for (auto irModule : library->m_modules)
