@@ -2782,9 +2782,6 @@ namespace Slang
 
         void init();
 
-        SlangResult _createContainer();
-        SlangResult _completeContainer();
-
         Session*                        m_session = nullptr;
         RefPtr<Linkage>                 m_linkage;
         DiagnosticSink                  m_sink;

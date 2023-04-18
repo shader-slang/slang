@@ -191,11 +191,12 @@ SlangResult ArtifactContainerWriter::getBaseName(IArtifact* artifact, String& ou
 
 SlangResult ArtifactContainerWriter::writeInDirectory(IArtifact* artifact, const String& baseName)
 {
-    
     // TODO(JS):
     // We could now output information about the desc/artifact, say as some json.
     // For now we assume the extension is good enough for most purposes.
     
+    // If it's an "arbitrary" container, we don't need to write it
+    if (artifact->getDesc().kind != ArtifactKind::Container)
     {
         // We can't write it without a blob
         ComPtr<ISlangBlob> blob;
@@ -209,7 +210,7 @@ SlangResult ArtifactContainerWriter::writeInDirectory(IArtifact* artifact, const
                 return res;
             }
         }
-        
+        else
         {
             // Get the name of the artifact
             StringBuilder artifactName;
