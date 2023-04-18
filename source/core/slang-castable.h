@@ -59,7 +59,7 @@ class IBoxValue : public IBoxValueBase
 template <typename T>
 SLANG_FORCE_INLINE IBoxValue<T>* asBoxValue(ICastable* castable)
 {
-    IBoxValueBase* base = as<IBoxValueBase*>(castable);
+    IBoxValueBase* base = as<IBoxValueBase>(castable);
     return (base && base->getValueTypeGuid() == T::getTypeGuid()) ? static_cast<IBoxValue<T>>(castable) : nullptr;
 }
 
