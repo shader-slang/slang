@@ -196,18 +196,17 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		SLANG_RETURN_ON_FAIL(_createOSFile(artifact, getIntermediateKeep(keep), fileRep.writeRef()));
 		return _addRepresentation(artifact, keep, fileRep, outCastable);
 	}
-	else if (guid == ISlangBlob::getTypeGuid())
+
+	// Handle known conversion to blobs 
+	if (guid == ISlangBlob::getTypeGuid())
 	{
-		for (ICastable* rep : reps)
-		{
-			if (SourceMap* sourceMap = as<SourceMap>(rep))
-			{
-				// SourceMap -> Blob
-				ComPtr<ISlangBlob> blob;
-				SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(*sourceMap, blob));
-				// Add the rep
-				return _addRepresentation(artifact, keep, blob, outCastable);
-			}
+		if (auto sourceMap = findRepresentation<SourceMap>(artifact))
+		{	
+			// SourceMap -> Blob
+			ComPtr<ISlangBlob> blob;
+			SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(*sourceMap, blob));
+			// Add the rep
+			return _addRepresentation(artifact, keep, blob, outCastable);
 		}
 	}
 
