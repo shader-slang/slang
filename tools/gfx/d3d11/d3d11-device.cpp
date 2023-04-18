@@ -1428,6 +1428,8 @@ void DeviceImpl::bindRootShaderObject(IShaderObject* shaderObject)
 {
     RootShaderObjectImpl* rootShaderObjectImpl = static_cast<RootShaderObjectImpl*>(shaderObject);
     RefPtr<PipelineStateBase> specializedPipeline;
+    // TODO: Do something less crappy than just asserting on failure here
+    SLANG_ASSERT_VOID_ON_FAIL(maybeSpecializePipeline(m_currentPipelineState, rootShaderObjectImpl, specializedPipeline));
     maybeSpecializePipeline(m_currentPipelineState, rootShaderObjectImpl, specializedPipeline);
     PipelineStateImpl* specializedPipelineImpl = static_cast<PipelineStateImpl*>(specializedPipeline.Ptr());
     setPipelineState(specializedPipelineImpl);
