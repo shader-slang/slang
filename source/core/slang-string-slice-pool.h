@@ -99,6 +99,9 @@ public:
         /// Get the index of the first added handle
     Index getFirstAddedIndex() const { return m_style == Style::Default ? kDefaultHandlesCount : 0; }
 
+        /// Swap this with rhs
+    void swapWith(ThisType& rhs);
+
         /// Ctor
     explicit StringSlicePool(Style style);
 

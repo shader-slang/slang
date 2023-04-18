@@ -83,6 +83,7 @@ namespace Slang
     public:
         typedef TValue ValueType;
         typedef TKey KeyType;
+		typedef Dictionary ThisType;
 	private:
 		inline int GetProbeOffset(int /*probeId*/) const
 		{
@@ -481,6 +482,10 @@ namespace Slang
 		{
 			return _count;
 		}
+
+			/// Swap this with rhs
+		void swapWith(ThisType& rhs);
+
 	private:
 		template<typename... Args>
 		void Init(const KeyValuePair<TKey, TValue> & kvPair, Args... args)
@@ -542,6 +547,16 @@ namespace Slang
 			Free();
 		}
 	};
+
+	// ---------------------------------------------------------
+	template<typename TKey, typename TValue>
+	void Dictionary<TKey, TValue>::swapWith(ThisType& rhs)
+	{
+		Swap(bucketSizeMinusOne, rhs.bucketSizeMinusOne);
+		Swap(_count, rhs._count);
+		marks.swapWith(rhs.marks);
+		Swap(hashMap, rhs.hashMap);
+	}
 
 	class _DummyClass
 	{};

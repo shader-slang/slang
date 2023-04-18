@@ -63,6 +63,22 @@ void FreeList::init(size_t elementSize, size_t alignment, size_t elemsPerBlock)
 	_init(elementSize, alignment, elemsPerBlock);
 }
 
+void FreeList::swapWith(ThisType& rhs)
+{
+	Swap(m_top, rhs.m_top);
+	Swap(m_end, rhs.m_end);
+
+	Swap(m_activeBlocks, rhs.m_activeBlocks);
+	Swap(m_freeBlocks, rhs.m_freeBlocks);
+	
+	Swap(m_freeElements, rhs.m_freeElements);
+	
+	Swap(m_elementSize, rhs.m_elementSize);
+	Swap(m_alignment, rhs.m_alignment);
+	Swap(m_blockSize, rhs.m_blockSize);
+	Swap(m_blockAllocationSize, rhs.m_blockAllocationSize);	
+}
+
 void FreeList::_deallocateBlocks(Block* block)
 {
 	while (block)
