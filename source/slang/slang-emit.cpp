@@ -972,7 +972,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     ComPtr<IBoxValue<SourceMap>> sourceMap;
 
     // If SourceMap is enabled, we create one and associate it with the sourceWriter
-    if (targetRequest->getLinkage()->m_generateSourceMap)
+    if (lineDirectiveMode == LineDirectiveMode::SourceMap)
     {
         sourceMap = new BoxValue<SourceMap>;
     }

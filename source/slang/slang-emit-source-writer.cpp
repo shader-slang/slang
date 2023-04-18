@@ -391,6 +391,7 @@ void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocat
     auto mode = getLineDirectiveMode();
     switch (mode)
     {
+        case LineDirectiveMode::SourceMap:
         case LineDirectiveMode::None:
             return;
 
@@ -451,6 +452,7 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
         switch (mode)
         {
             default:
+            case LineDirectiveMode::SourceMap:
             case LineDirectiveMode::None:
                 SLANG_UNEXPECTED("should not be trying to emit '#line' directive");
                 return;

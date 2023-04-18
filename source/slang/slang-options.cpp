@@ -591,6 +591,8 @@ struct OptionsParser
             "  -line-directive-mode <mode>: Sets how the `#line` directives should be\n"
             "      produced. Available options are:\n"
             "        none : Don't emit `#line` directives at all\n"
+            "        source-map : Use source map to track line associations (doen't emit #line)\n"
+            "        default : Default behavior\n"
             "      If not specified, default behavior is to use C-style `#line` directives\n"
             "      for HLSL and C/C++ output, and traditional GLSL-style `#line` directives\n"
             "      for GLSL output.\n"
@@ -1178,10 +1180,6 @@ struct OptionsParser
                 {
                     getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
                 }
-                else if(argValue == "-source-map")
-                {
-                    requestImpl->getLinkage()->m_generateSourceMap = true;
-                }
                 else if (argValue == "-ir-compression")
                 {
                     CommandLineArg name;
@@ -1448,9 +1446,18 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
                     SlangLineDirectiveMode mode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
-                    if(name.value == "none")
+
+                    if(name.value == toSlice("none"))
                     {
                         mode = SLANG_LINE_DIRECTIVE_MODE_NONE;
+                    }
+                    else if (name.value == toSlice("source-map"))
+                    {
+                        mode = SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP;
+                    }
+                    else if (name.value == toSlice("default"))
+                    {
+                        mode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
                     }
                     else
                     {
@@ -1459,7 +1466,6 @@ struct OptionsParser
                     }
 
                     compileRequest->setLineDirectiveMode(mode);
-
                 }
                 else if( argValue == "-fp-mode" || argValue == "-floating-point-mode" )
                 {

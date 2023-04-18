@@ -104,6 +104,7 @@ namespace Slang
         None        = SLANG_LINE_DIRECTIVE_MODE_NONE,
         Standard    = SLANG_LINE_DIRECTIVE_MODE_STANDARD,
         GLSL        = SLANG_LINE_DIRECTIVE_MODE_GLSL,
+        SourceMap   = SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP,
     };
 
     enum class ResultFormat
@@ -1771,8 +1772,7 @@ namespace Slang
         SourceManager* m_sourceManager = nullptr;
 
         bool m_obfuscateCode = false;
-        bool m_generateSourceMap = false;
-
+        
         /// Holds any args that are destined for downstream compilers/tools etc
         DownstreamArgs m_downstreamArgs;
 

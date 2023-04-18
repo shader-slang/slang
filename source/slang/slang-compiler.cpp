@@ -1116,11 +1116,8 @@ namespace Slang
             sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
         }
 
-        ComPtr<IArtifactPostEmitMetadata> metadata;
         if (sourceArtifact)
         {
-            metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(sourceArtifact);
-
             // Set the source artifacts
             options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
         }
@@ -1468,7 +1465,14 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        ArtifactUtil::addAssociated(artifact, metadata);
+        // Copy over all of the information associated with the source into the output
+        if (sourceArtifact)
+        {
+            for (auto associatedArtifact : sourceArtifact->getAssociated())
+            {
+                artifact->addAssociated(associatedArtifact);
+            }
+        }
 
         // Set the artifact
         outArtifact.swap(artifact);
@@ -1904,11 +1908,7 @@ namespace Slang
         {
             // Hmmm do I have to therefore add a map for all translation units(!)
             // I guess this is okay in so far as an association can always be looked up by name
-
-            auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap();
-
-            // If we have a source map *and* we want to generate them for output add to the container
-            if (sourceMap && getLinkage()->m_generateSourceMap)
+            if (auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap())
             {
                 auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
 
