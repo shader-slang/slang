@@ -77,6 +77,10 @@ public:
     {
         clear();
     }
+        /// Copy Ctor
+    SourceMap(const ThisType& rhs);
+        /// Assignment
+    ThisType& operator=(const ThisType& rhs);
 
     String m_file;
     String m_sourceRoot;

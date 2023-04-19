@@ -23,6 +23,35 @@ void SourceMap::clear()
     m_slicePool.clear();
 }
 
+SourceMap::SourceMap(const ThisType& rhs) :
+    m_file(rhs.m_file),
+    m_sourceRoot(rhs.m_sourceRoot),
+    m_sources(rhs.m_sources),
+    m_sourcesContent(rhs.m_sourcesContent),
+    m_names(rhs.m_names),
+    m_lineStarts(rhs.m_lineStarts),
+    m_lineEntries(rhs.m_lineEntries),
+    m_slicePool(rhs.m_slicePool)
+{
+}
+
+SourceMap::ThisType& SourceMap::operator=(const ThisType& rhs)
+{
+    if (this != &rhs)
+    {
+        m_file = rhs.m_file;
+        m_sourceRoot = rhs.m_sourceRoot;
+        m_sources = rhs.m_sources;
+        m_names = rhs.m_names;
+        m_sourcesContent = rhs.m_sourcesContent;
+        m_lineStarts = rhs.m_lineStarts;
+        m_lineEntries = rhs.m_lineEntries;
+        m_slicePool = rhs.m_slicePool;
+    }
+
+    return *this;
+}
+
 void SourceMap::swapWith(ThisType& rhs)
 {
     m_file.swapWith(rhs.m_file);

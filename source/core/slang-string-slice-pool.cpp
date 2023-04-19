@@ -14,9 +14,101 @@ StringSlicePool::StringSlicePool(Style style) :
     clear();
 }
 
+StringSlicePool::StringSlicePool(const ThisType& rhs)
+{
+    // Assume it's the empty style for now
+    m_style = Style::Empty;
+
+    // Set with rhs
+    _set(rhs);
+}
+
+void StringSlicePool::operator=(const ThisType& rhs)
+{
+    if (&rhs != this)
+    {
+        _set(rhs);
+    }
+}
+
+void StringSlicePool::_set(const ThisType& rhs)
+{
+    SLANG_ASSERT(this != &rhs);
+    m_style = rhs.m_style;
+
+    clear();
+
+    const Index startIndex = rhs.getFirstAddedIndex();
+    const Count count = rhs.m_slices.getCount();
+
+    m_slices.setCount(count);
+
+    size_t totalSize = 0;
+
+    for (Index i = startIndex; i < count; ++i)
+    {
+        const auto slice = rhs.m_slices[i];
+        totalSize += slice.getLength() + 1;
+    }
+
+    char* dst = (char*)m_arena.allocate(totalSize);
+
+    for (Index i = startIndex; i < count; ++i)
+    {
+        const auto srcSlice = rhs.m_slices[i];
+        const auto sliceSize = srcSlice.getLength();
+
+        // Copy over the src slices contents
+        ::memcpy(dst, srcSlice.begin(), sliceSize);
+        // Zero terminate
+        dst[sliceSize] = 0;
+
+        const UnownedStringSlice dstSlice(dst, sliceSize);
+        // Set the slice
+        m_slices[i] = dstSlice;
+
+        // Add to the map
+        m_map.Add(dstSlice, Handle(i));
+
+        // Skip to next allocation
+        dst += sliceSize + 1;
+    }
+}
+
+bool StringSlicePool::operator==(const ThisType& rhs) const
+{
+    if (this == &rhs)
+    {
+        return true;
+    }
+
+    if (m_style != rhs.m_style)
+    {
+        return false;
+    }
+
+    const auto count = m_slices.getCount();
+
+    if (count != rhs.m_slices.getCount())
+    {
+        return false;
+    }
+
+    for (Index i = 0; i < count; ++i)
+    {
+        if (m_slices[i] != rhs.m_slices[i])
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void StringSlicePool::clear()
 {
     m_map.Clear();
+    m_arena.deallocateAll();
 
     switch (m_style)
     {
