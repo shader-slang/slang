@@ -15,8 +15,6 @@
 
 #include "../compiler-core/slang-lexer.h"
 
-#include "../compiler-core/slang-json-source-map-util.h"
-
 // Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-representation-impl.h"
@@ -1812,6 +1810,19 @@ namespace Slang
     }
 
     
+    bool _shouldWriteSourceLocs(Linkage* linkage)
+    {
+        // If debug information or source manager are not avaiable we can't/shouldn't write out locs
+        if (linkage->debugInfoLevel == DebugInfoLevel::None || 
+            linkage->getSourceManager() == nullptr)
+        {
+            return false;
+        }
+        
+        // Otherwise we do want to write out the locs
+        return true;
+    }
+
     SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     {
         auto linkage = getLinkage();
@@ -1827,7 +1838,9 @@ namespace Slang
             // Also currently only IR is needed.
             options.optionFlags &= ~SerialOptionFlag::ASTModule;
         }
-        else if (linkage->debugInfoLevel != DebugInfoLevel::None && linkage->getSourceManager())
+        
+        // If debug information is enabled, enable writing out source locs
+        if (_shouldWriteSourceLocs(linkage))
         {
             options.optionFlags |= SerialOptionFlag::SourceLocation;
             options.sourceManager = linkage->getSourceManager();
@@ -1887,9 +1900,6 @@ namespace Slang
 
         auto frontEndReq = getFrontEndReq();
 
-        auto sourceManager = frontEndReq->getSourceManager();
-        auto sink = getSink();
-
         for (auto translationUnit : frontEndReq->translationUnits)
         {
             // Hmmm do I have to therefore add a map for all translation units(!)
@@ -1897,31 +1907,17 @@ namespace Slang
 
             auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap();
 
-            if (sourceMap)
+            // If we have a source map *and* we want to generate them for output add to the container
+            if (sourceMap && getLinkage()->m_generateSourceMap)
             {
-                // Write it out
-                String json;
-                {
-                    RefPtr<JSONContainer> jsonContainer(new JSONContainer(sourceManager));
-
-                    JSONValue jsonValue;
-
-                    SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, sink, jsonValue));
-
-                    // Convert into a string
-                    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-                    jsonContainer->traverseRecursively(jsonValue, &writer);
-
-                    json = writer.getBuilder();
-                }
-
-                auto jsonSourceMapBlob = StringBlob::moveCreate(json);
-
                 auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
 
                 // Create the source map artifact
                 auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->m_file.getUnownedSlice());
-                sourceMapArtifact->addRepresentationUnknown(jsonSourceMapBlob);
+
+                // Add the repesentation
+                ComPtr<IObjectCastableAdapter> castableAdapter(new ObjectCastableAdapter(sourceMap));
+                sourceMapArtifact->addRepresentation(castableAdapter);
 
                 // Associate with the container
                 m_containerArtifact->addAssociated(sourceMapArtifact);

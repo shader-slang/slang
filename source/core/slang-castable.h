@@ -35,6 +35,58 @@ SLANG_FORCE_INLINE T* as(ICastable* castable)
     return nullptr;
 }
 
+/* Adapter interface to make non castable ref counted object usable as ICastable */
+class IObjectCastableAdapter : public ICastable
+{
+    SLANG_COM_INTERFACE(0x8b4aad81, 0x4934, 0x4a67, { 0xb2, 0xe2, 0xe9, 0x17, 0xfc, 0x29, 0x12, 0x54 });
+
+        /// Get the contained object
+    virtual SLANG_NO_THROW RefObject* SLANG_MCALL getContained() = 0;
+        /// Get the guid that represents the contained ref object
+    virtual SLANG_NO_THROW SlangUUID getContainedGuid() = 0;
+};
+
+class ObjectCastableAdapter : public ComBaseObject, public IObjectCastableAdapter
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IObjectCastableAdapter
+    virtual SLANG_NO_THROW RefObject* SLANG_MCALL getContained() SLANG_OVERRIDE { return m_contained; }
+    virtual SlangUUID getContainedGuid() SLANG_OVERRIDE { return m_containedGuid; }
+
+    template <typename T>
+    explicit ObjectCastableAdapter(T* ptr)
+    {
+        m_containedGuid = T::getTypeGuid();
+        m_contained = ptr;
+    }
+    template <typename T>
+    explicit ObjectCastableAdapter(const RefPtr<T>& ptr)
+    {
+        m_containedGuid = T::getTypeGuid();
+        m_contained = ptr;
+    }
+
+    ObjectCastableAdapter(RefObject* obj, const Guid& containedGuid) :
+        m_contained(obj),
+        m_containedGuid(containedGuid)
+    {
+        SLANG_ASSERT(obj);
+    }
+
+protected:
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
+
+    RefPtr<RefObject> m_contained;
+    SlangUUID m_containedGuid;
+};
+
+
 /* Adapter interface to make a non castable types work as ICastable */
 class IUnknownCastableAdapter : public ICastable
 {
@@ -43,6 +95,7 @@ class IUnknownCastableAdapter : public ICastable
     /// When using the adapter, this provides a way to directly get the internal no ICastable type
     virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getContained() = 0;
 };
+
 
 /* An adapter such that types which aren't derived from ICastable, can be used as such. 
 

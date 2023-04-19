@@ -302,6 +302,7 @@ DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 DIAGNOSTIC(   -1, Note, noteExplicitConversionPossible, "explicit conversion from '$0' to '$1' is possible")
 DIAGNOSTIC(30080, Error, ambiguousConversion, "more than one implicit conversion exists from '$0' to '$1'")
 DIAGNOSTIC(30081, Warning, unrecommendedImplicitConversion, "implicit conversion from '$0' to '$1' is not recommended")
+DIAGNOSTIC(30082, Warning, implicitConversionToDouble, " implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended.")
 DIAGNOSTIC(30090, Error, tryClauseMustApplyToInvokeExpr, "expression in a 'try' clause must be a call to a function or operator overload.")
 DIAGNOSTIC(30091, Error, tryInvokeCalleeShouldThrow, "'$0' called from a 'try' clause does not throw an error, make sure the callee is marked as 'throws'")
 DIAGNOSTIC(30092, Error, calleeOfTryCallMustBeFunc, "callee in a 'try' clause must be a function")
@@ -359,6 +360,8 @@ DIAGNOSTIC(31147, Error, cannotResolveOriginalFunctionForDerivative, "cannot res
 DIAGNOSTIC(31148, Error, cannotResolveDerivativeFunction, "cannot resolve the custom derivative function")
 
 DIAGNOSTIC(31149, Error, differentiableGenericInterfaceMethodNotSupported, "`[ForwardDifferentiable] and [BackwardDifferentiable] are not supported on generic interface requirements.")
+
+DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 
 // Enums
 
@@ -592,6 +595,7 @@ DIAGNOSTIC(40020, Error, cannotUnrollLoop, "loop does not terminate within the l
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 
 DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
+DIAGNOSTIC(41015, Error, usingUninitializedValue, "use of uninitialized value.")
 
 DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in the size required by its conforming interface.")
 DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")

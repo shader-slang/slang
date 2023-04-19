@@ -64,7 +64,7 @@ TransientResourceHeapImpl::QueueWaitInfo& TransientResourceHeapImpl::getQueueWai
     for (auto i = oldCount; i < m_waitInfos.getCount(); i++)
     {
         m_waitInfos[i].waitValue = 0;
-        m_waitInfos[i].fenceEvent = CreateEventEx(nullptr, false, 0, EVENT_ALL_ACCESS);
+        m_waitInfos[i].fenceEvent = CreateEventEx(nullptr, FALSE, 0, EVENT_ALL_ACCESS);
     }
     return m_waitInfos[queueIndex];
 }

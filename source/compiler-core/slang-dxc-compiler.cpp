@@ -24,24 +24,35 @@
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-desc-util.h"
 
-// Enable calling through to  `dxc` to
-// generate code on Windows.
-#ifdef _WIN32
-#   define WIN32_LEAN_AND_MEAN
-#   define NOMINMAX
-#   include <Windows.h>
-#   include <Unknwn.h>
-#   include "../../external/dxc/dxcapi.h"
-#   undef WIN32_LEAN_AND_MEAN
-#   undef NOMINMAX
-
-#   ifndef SLANG_ENABLE_DXIL_SUPPORT
-#       define SLANG_ENABLE_DXIL_SUPPORT 1
-#   endif
+// Enable DXIL by default unless told not to
+#ifndef SLANG_ENABLE_DXIL_SUPPORT
+#   define SLANG_ENABLE_DXIL_SUPPORT 1
 #endif
 
-#ifndef SLANG_ENABLE_DXIL_SUPPORT
-#   define SLANG_ENABLE_DXIL_SUPPORT 0
+// Enable calling through to  `dxc` to
+// generate code on Windows.
+#if SLANG_ENABLE_DXIL_SUPPORT
+
+#   ifdef _WIN32
+#       include <windows.h>
+#       include <unknwn.h>
+#       include "../../external/dxc/dxcapi.h"
+#   else
+#       include "../../external/dxc/dxcapi.h"
+
+#       ifdef __uuidof
+            // DXC's WinAdapter.h defines __uuidof(T) over types, but the existing
+            // usage in this file is over values (both are accepted on MSVC.)
+            // We also need to decay through Slang::ComPtr, hence the helper struct
+            template <typename T>
+            struct StripSlangComPtr { using type = T; };
+            template <typename T>
+            struct StripSlangComPtr<Slang::ComPtr<T>> { using type = T; };
+#           undef __uuidof
+#           define __uuidof(x) __emulated_uuidof<StripSlangComPtr<std::decay_t<decltype(x)>>::type>()
+#       endif
+#   endif
+
 #endif
 
 namespace Slang
@@ -93,7 +104,7 @@ class DxcIncludeHandler : public IDxcIncludeHandler
 {
 public:
     // Implement IUnknown
-    SLANG_NO_THROW HRESULT SLANG_MCALL QueryInterface(const IID& uuid, void** out)
+    SLANG_NO_THROW HRESULT SLANG_MCALL QueryInterface(const IID& uuid, void** out) override
     {
         ISlangUnknown* intf = getInterface(reinterpret_cast<const Guid&>(uuid));
         if (intf)
@@ -739,7 +750,7 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
     else
     {
         // If we don't have the commitHash, we use the library timestamp, to uniquely identify.
-        versionString << " " << SharedLibraryUtils::getSharedLibraryTimestamp(m_createInstance);
+        versionString << " " << SharedLibraryUtils::getSharedLibraryTimestamp(reinterpret_cast<void*>(m_createInstance));
     }
 
     *outVersionString = StringBlob::moveCreate(versionString).detach();

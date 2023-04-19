@@ -356,6 +356,10 @@ workspace "slang"
     filter { "toolset:clang or gcc*", "language:C++" }
         buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }
 
+    filter { "files:source/compiler-core/slang-dxc-compiler.cpp", "toolset:clang or gcc" }
+        -- For the DXC headers
+        buildoptions { "-fms-extensions" }
+
     filter { "toolset:gcc*" }
         buildoptions { "-Wno-implicit-fallthrough", "-Wno-maybe-uninitialized" }
 
@@ -388,6 +392,12 @@ workspace "slang"
         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined" }
         -- allow libraries to be listed in any order (do not require dependency order)
         linkgroups "On"
+
+    filter {}
+        -- For including windows.h in a way that minimized namespace pollution.
+        -- Although we define these here, we still set them manually in any header
+        -- files which may be included by another project
+        defines { "WIN32_LEAN_AND_MEAN", "VC_EXTRALEAN", "NOMINMAX" }
 
 function dump(o)
     if type(o) == 'table' then

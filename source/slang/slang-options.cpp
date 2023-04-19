@@ -1623,6 +1623,12 @@ struct OptionsParser
                         desc.kind = ArtifactKind::Library;
                     }
 
+                    // If its a zip we'll *assume* its a zip holding compilation results
+                    if (desc.kind == ArtifactKind::Zip)
+                    {
+                        desc.payload = ArtifactPayload::CompileResults;
+                    }
+                    
                     if (!ArtifactDescUtil::isLinkable(desc))
                     {
                         sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));

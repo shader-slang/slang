@@ -3,6 +3,7 @@
 #include "../../slang-com-helper.h"
 
 #include "../core/slang-string-util.h"
+#include "../core/slang-blob.h"
 
 #include "slang-json-native.h"
 
@@ -105,34 +106,31 @@ static SlangResult _decode(UnownedStringSlice& ioEncoded, Index& out)
 {
     Index v = 0;
 
-    Index shift = 0;
     const char* cur = ioEncoded.begin();
     const char* end = ioEncoded.end();
 
-    // Must have some chars
-    if (cur >= end)
     {
-        return SLANG_FAIL;
-    }
-
-    for (; cur < end; ++cur)
-    {
-        const Index value = g_vlqDecodeTable[*cur];
-        if (value < 0)
+        Index shift = 0;
+        Index decodeValue = 0;
+        do
         {
-            return SLANG_FAIL;
-        }
+            // Must have a char to decode
+            if (cur >= end)
+            {
+                return SLANG_FAIL;
+            }
+
+            decodeValue = g_vlqDecodeTable[*cur++];
+            if (decodeValue < 0)
+            {
+                return SLANG_FAIL;
+            }
         
-        v += (value & 0x1f) << shift;
+            v += (decodeValue & 0x1f) << shift;
 
-        // If the continuation bit is not set we are done
-        if (( value & 0x20) == 0)
-        {
-            ++cur;
-            break;
+            shift += 5;
         }
-
-        shift += 5;
+        while (decodeValue & 0x20);
     }
 
     // Save out the remaining part
@@ -158,20 +156,16 @@ void _encode(Index v, StringBuilder& out)
 
     do 
     {
-        // Encode it
-        const auto nextV  = v >> 5;
+        const Index nextV = v >> 5;
+        const Index encodeValue = (v & 0x1f) + (nextV ? 0x20 : 0);
 
-        // Encode 5 bits
-        char c = g_vlqEncodeTable[(v & 0x1f)];
-
-        // See what bits are remaining
-        v = (v >> 5);
-
-        // Set the continuation bit's if there is more to encode
-        c |= v ? 0x20 : 0;
-
+        // Encode 5 bits, plus continuation bit
+        char c = g_vlqEncodeTable[encodeValue];
+        
         // Save the char
         *cur++ = c;
+    
+        v = nextV;
     }
     while (v);
 
@@ -458,6 +452,83 @@ SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* conta
         SLANG_RETURN_ON_FAIL(converter.convert(GetRttiInfo<JSONSourceMap>::get(), &native, outValue));
     }
 
+    return SLANG_OK;
+}
+
+/* static */SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, RefPtr<SourceMap>& outSourceMap)
+{
+    return read(blob, nullptr, outSourceMap);
+}
+
+SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink, RefPtr<SourceMap>& outSourceMap)
+{
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
+    DiagnosticSink sink(&sourceManager, nullptr);
+
+    sink.setParentSink(parentSink);
+
+    RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+
+    JSONValue rootValue;
+    {
+        // Now need to parse as JSON
+        SourceFile* sourceFile = sourceManager.createSourceFileWithBlob(PathInfo::makeUnknown(), blob);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        rootValue = builder.getRootValue();
+    }
+
+    RefPtr<SourceMap> sourceMap;
+
+    SLANG_RETURN_ON_FAIL(decode(container, rootValue, &sink, sourceMap));
+
+    outSourceMap = sourceMap;
+    return SLANG_OK;
+}
+
+
+/* static */SlangResult JSONSourceMapUtil::write(SourceMap* sourceMap, ComPtr<ISlangBlob>& outBlob)
+{
+    SourceManager sourceMapSourceManager;
+    sourceMapSourceManager.initialize(nullptr, nullptr);
+
+    // Create a sink
+    DiagnosticSink sourceMapSink(&sourceMapSourceManager, nullptr);
+
+    SLANG_RETURN_ON_FAIL(write(sourceMap, &sourceMapSink, outBlob));
+    return SLANG_OK;
+}
+
+/* static */ SlangResult JSONSourceMapUtil::write(SourceMap* sourceMap, DiagnosticSink* sink, ComPtr<ISlangBlob>& outBlob)
+{
+    auto sourceManager = sink->getSourceManager();
+
+    // Write it out
+    String json;
+    {
+        RefPtr<JSONContainer> jsonContainer(new JSONContainer(sourceManager));
+
+        JSONValue jsonValue;
+
+        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, sink, jsonValue));
+
+        // Convert into a string
+        JSONWriter writer(JSONWriter::IndentationStyle::Allman);
+        jsonContainer->traverseRecursively(jsonValue, &writer);
+
+        json = writer.getBuilder();
+    }
+
+    outBlob = StringBlob::moveCreate(json);
     return SLANG_OK;
 }
 

@@ -22,11 +22,8 @@
 // TODO(tfoley): eventually we should be able to run these
 // tests on non-Windows targets to confirm that cross-compilation
 // at least *works* on those platforms...
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
+
+#include <windows.h>
 
 #ifdef _MSC_VER
 #include <stddef.h>

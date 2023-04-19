@@ -956,6 +956,9 @@ class ImplicitConversionModifier : public Modifier
  
     // The conversion cost, used to rank conversions
     ConversionCost cost;
+
+    // A builtin identifier for identifying conversions that need special treatment.
+    BuiltinConversionKind builtinConversionKind;
 };
 
 class FormatAttribute : public Attribute 
@@ -1251,6 +1254,18 @@ class NoInlineAttribute : public Attribute
 class PayloadAttribute : public Attribute
 {
     SLANG_AST_CLASS(PayloadAttribute)
+};
+
+    /// A `[deprecated("message")]` attribute indicates the target is
+    /// deprecated.
+    /// A compiler warning including the message will be raised if the
+    /// deprecated value is used.
+    ///
+class DeprecatedAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DeprecatedAttribute)
+
+    String message;
 };
 
     /// A modifier that applies to types rather than declarations.

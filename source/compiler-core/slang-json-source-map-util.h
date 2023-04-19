@@ -14,6 +14,16 @@ struct  JSONSourceMapUtil
 
         /// Converts the source map contents into JSON
     static SlangResult encode(SourceMap* sourceMap, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue);
+
+        /// Read the blob (encoded as JSON) as a source map. 
+        /// Sink is optional, and can be passed as nullptr
+    static SlangResult read(ISlangBlob* blob, DiagnosticSink* sink, RefPtr<SourceMap>& outSourceMap);
+    static SlangResult read(ISlangBlob* blob, RefPtr<SourceMap>& outSourceMap);
+
+        /// Write source map to outBlob JSON
+    static SlangResult write(SourceMap* sourceMap, ComPtr<ISlangBlob>& outBlob);
+        /// Write out the source map into a blob
+    static SlangResult write(SourceMap* sourceMap, DiagnosticSink* sink, ComPtr<ISlangBlob>& outBlob);
 };
 
 } // namespace Slang
