@@ -1844,11 +1844,6 @@ namespace Slang
     {
         m_containerArtifact.setNull();
 
-        if (m_containerFormat == ContainerFormat::None)
-        {
-            return SLANG_OK;
-        }
-
         List<ComPtr<IArtifact>> artifacts;
 
         auto linkage = getLinkage();
@@ -1919,6 +1914,7 @@ namespace Slang
         }
 
         // Get all of the source obfuscated source maps and add those 
+        if (m_containerArtifact)
         {
             auto frontEndReq = getFrontEndReq();
 
