@@ -512,7 +512,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 
     typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY)(REFIID riid, void   **ppFactory);
-    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
+    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, void **ppFactory);
 
     {
         auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory2");
