@@ -1617,24 +1617,18 @@ namespace Slang
         ArtifactOutputUtil::maybeConvertAndWrite(session, artifact, sink, toSlice("stdout"), getWriter(WriterChannel::StdOutput));
     }
 
-    void EndToEndCompileRequest::writeWholeProgramResult(
-        TargetRequest* targetReq)
+    String EndToEndCompileRequest::_getWholeProgramPath(TargetRequest* targetReq)
     {
-        auto program = getSpecializedGlobalAndEntryPointsComponentType();
-        auto targetProgram = program->getTargetProgram(targetReq);
+        RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
+        if (m_targetInfos.TryGetValue(targetReq, targetInfo))
+        {
+            return targetInfo->wholeTargetOutputPath;
+        }
+        return String();
+    }
 
-        IArtifact* artifact = targetProgram->getExistingWholeProgramResult();
-
-        // Skip the case with no output
-        if (artifact == nullptr)
-            return;
-
-        CodeGenContext::EntryPointIndices entryPointIndices;
-        for (Index i = 0; i < program->getEntryPointCount(); ++i)
-            entryPointIndices.add(i);
-        CodeGenContext::Shared sharedCodeGenContext(targetProgram, entryPointIndices, getSink(), this);
-        CodeGenContext codeGenContext(&sharedCodeGenContext);
-
+    String EndToEndCompileRequest::_getEntryPointPath(TargetRequest* targetReq, Index entryPointIndex)
+    {
         // It is possible that we are dynamically discovering entry
         // points (using `[shader(...)]` attributes), so that there
         // might be entry points added to the program that did not
@@ -1643,60 +1637,35 @@ namespace Slang
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
         if (m_targetInfos.TryGetValue(targetReq, targetInfo))
         {
-            String outputPath = targetInfo->wholeTargetOutputPath;
-            if (outputPath != "")
+            String outputPath;
+            if (targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
             {
-                ArtifactOutputUtil::writeToFile(artifact, codeGenContext.getSink(), outputPath);
-                return;
+                return outputPath;
             }
         }
 
-        if (m_containerFormat == ContainerFormat::None)
-        {
-            writeArtifactToStandardOutput(artifact, codeGenContext.getSink());
-        }
+        return String();
     }
 
-    void EndToEndCompileRequest::writeEntryPointResult(
-        TargetRequest*  targetReq,
-        Int             entryPointIndex)
+    SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
     {
-        auto program = getSpecializedGlobalAndEntryPointsComponentType();
-        auto targetProgram = program->getTargetProgram(targetReq);
-
-        IArtifact* artifact = targetProgram->getExistingEntryPointResult(entryPointIndex);
-
-        // Skip the case with no output
-        if (artifact == nullptr)
-            return;
-
-        CodeGenContext::EntryPointIndices entryPointIndices;
-        entryPointIndices.add(entryPointIndex);
-
-        CodeGenContext::Shared sharedCodeGenContext(targetProgram, entryPointIndices, getSink(), this);
-        CodeGenContext codeGenContext(&sharedCodeGenContext);
-
-        // It is possible that we are dynamically discovering entry
-        // points (using `[shader(...)]` attributes), so that there
-        // might be entry points added to the program that did not
-        // get paths specified via command-line options.
-        //
-        RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        auto entryPoint = program->getEntryPoint(entryPointIndex);
-        if(m_targetInfos.TryGetValue(targetReq, targetInfo))
+        // We don't have to do anything if there is no artifact
+        if (artifact)
         {
-            String outputPath;
-            if(targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
+            if (path.getLength())
             {
-                ArtifactOutputUtil::writeToFile(artifact, codeGenContext.getSink(), outputPath);
-                return;
+                SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
+                return SLANG_OK;
+            }
+
+            // If we aren't writing to a container and we didn't write to a file, we can output to 
+            if (m_containerFormat == ContainerFormat::None)
+            {
+                writeArtifactToStandardOutput(artifact, getSink());
             }
         }
 
-        if (m_containerFormat == ContainerFormat::None)
-        {
-            writeArtifactToStandardOutput(artifact, codeGenContext.getSink());
-        }
+        return SLANG_OK;
     }
 
     IArtifact* TargetProgram::_createWholeProgramResult(
@@ -1910,12 +1879,8 @@ namespace Slang
             }
         }
 
-        // TODO(JS):
-        // Using the container format doesn't seem right.
-        // Perhaps SlangIR is a target or it's an additional option.
-        // 
-        // Add the IR to the list of artifacts...
-        if (m_containerFormat == ContainerFormat::SlangModule)
+        // If IR emitting is enabled, add IR to the artifacts
+        if (m_emitIr)
         {
             OwnedMemoryStream stream(FileAccess::Write);
             SlangResult res = writeContainerToStream(&stream);
@@ -2155,32 +2120,40 @@ namespace Slang
         {
             auto linkage = getLinkage();
             auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
             for (auto targetReq : linkage->targets)
             {
+                auto targetProgram = program->getTargetProgram(targetReq);
+
                 if (targetReq->isWholeProgramRequest())
                 {
-                    writeWholeProgramResult(
-                        targetReq);
+                    const auto path = _getWholeProgramPath(targetReq);
+                    const auto artifact = targetProgram->getExistingWholeProgramResult();
+
+                    _maybeWriteArtifact(path, artifact);
                 }
                 else
                 {
                     Index entryPointCount = program->getEntryPointCount();
                     for (Index ee = 0; ee < entryPointCount; ++ee)
-                    {
-                        writeEntryPointResult(
-                            targetReq,
-                            ee);
+                    {        
+                        const auto path = _getEntryPointPath(targetReq, ee);
+                        const auto artifact = targetProgram->getExistingEntryPointResult(ee);
+                        
+                        _maybeWriteArtifact(path, artifact);
                     }
                 }
             }            
         }
 
-        // Create the output
+        // Maybe create the container 
         maybeCreateContainer();
 
+        // If it's a command line compile we may need to write the container to a file
         if (m_isCommandLineCompile)
         {
             maybeWriteContainer(m_containerOutputPath);
+
             _writeDependencyFile(this);
         }
     }

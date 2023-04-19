@@ -886,7 +886,7 @@ SlangResult ArtifactContainerUtil::readContainer(IArtifact* artifact, ComPtr<IAr
 
     // We only return the artifact if any of the following are true 
     // 1) It has a blob representation
-    // 2) It contains children or associcated attributes
+    // 2) It contains children or associated artifacts
 
     if (blob || 
         dstArtifact->getChildren().count ||

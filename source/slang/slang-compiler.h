@@ -2626,6 +2626,9 @@ namespace Slang
 
         ~EndToEndCompileRequest();
 
+            // If enabled will emit IR 
+        bool m_emitIr = false;
+
             // What container format are we being asked to generate?
             // If it's set to a format, the container blob will be calculated during compile
         ContainerFormat m_containerFormat = ContainerFormat::None;
@@ -2650,6 +2653,7 @@ namespace Slang
         // Are we being driven by the command-line `slangc`, and should act accordingly?
         bool m_isCommandLineCompile = false;
 
+        
         String m_diagnosticOutput;
 
 
@@ -2769,11 +2773,12 @@ namespace Slang
         String m_dumpIntermediatePrefix;
 
     private:
-        void writeWholeProgramResult(
-            TargetRequest* targetReq);
-        void writeEntryPointResult(
-            TargetRequest* targetReq,
-            Int             entryPointIndex);
+        
+        String _getWholeProgramPath(TargetRequest* targetReq);
+        String _getEntryPointPath(TargetRequest* targetReq, Index entryPointIndex);
+
+            /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
+        SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
 
         ISlangUnknown* getInterface(const Guid& guid);
 

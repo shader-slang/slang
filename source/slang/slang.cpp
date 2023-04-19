@@ -4887,8 +4887,16 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
                 auto sourceMap = asBoxValue<SourceMap>(castable);
                 SLANG_ASSERT(sourceMap);
                 
-                // I guess we add to all ir modules?
-
+                // TODO(JS):
+                // There is perhaps (?) a risk here that we might copy the obfuscated map
+                // into some output container. Currently that only happens for source maps
+                // that are from translation units.
+                //
+                // On the other hand using "import" is a way that such source maps *would* be
+                // copied into the output, and that is something that could be a vector 
+                // for leaking.
+                // 
+                // That isn't a risk from -r though because, it doesn't create a translation unit(s).
                 for (auto irModule : library->m_modules)
                 {
                     irModule->setObfuscatedSourceMap(sourceMap);

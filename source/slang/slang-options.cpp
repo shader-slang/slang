@@ -332,9 +332,24 @@ struct OptionsParser
         String path = String(inPath);
         String ext = Path::getPathExt(path);
 
-        if (ext == "slang-module" || ext == "slang-lib" || ext == "dir" || ext == "zip")
+        if (ext == toSlice("slang-module") || 
+            ext == toSlice("slang-lib") || 
+            ext == toSlice("dir") || 
+            ext == toSlice("zip"))
         {
-            compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
+            // These extensions don't indicate a artifact container, just that we want to emit IR
+            if (ext == toSlice("slang-module") ||
+                ext == toSlice("slang-lib"))
+            {
+                // We want to emit IR 
+                requestImpl->m_emitIr = true;
+            }
+            else
+            {
+                // We want to write out in an artfact "container", that can hold multiple artifacts.
+                compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
+            }
+
             requestImpl->m_containerOutputPath = path;
         }
         else
@@ -891,6 +906,11 @@ struct OptionsParser
                 if(argValue == "-no-mangle" )
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
+                }
+                if (argValue == toSlice("-emit-ir"))
+                {
+                    // Enable emitting IR
+                    requestImpl->m_emitIr = true;
                 }
                 else if (argValue == "-load-stdlib")
                 {
