@@ -1980,26 +1980,38 @@ struct OptionsParser
         //
         if(rawTargets.getCount() == 0)
         {
-            for(auto& rawOutput : rawOutputs)
+            // If there are no targets and no outputs
+            if (rawOutputs.getCount() == 0)
             {
-                // Some outputs don't imply a target format, and we shouldn't use those for inference.
-                auto impliedFormat = rawOutput.impliedFormat;
-                if( impliedFormat == CodeGenTarget::Unknown )
-                    continue;
-
-                int targetIndex = 0;
-                if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
+                // And we have a container for output, then enable emitting SlangIR module
+                if (requestImpl->m_containerFormat != ContainerFormat::None)
                 {
-                    targetIndex = (int) rawTargets.getCount();
-
-                    RawTarget rawTarget;
-                    rawTarget.format = impliedFormat;
-                    rawTargets.add(rawTarget);
-
-                    mapFormatToTargetIndex[impliedFormat] = targetIndex;
+                    requestImpl->m_emitIr = true;
                 }
+            }
+            else
+            {
+                for(auto& rawOutput : rawOutputs)
+                {
+                    // Some outputs don't imply a target format, and we shouldn't use those for inference.
+                    auto impliedFormat = rawOutput.impliedFormat;
+                    if( impliedFormat == CodeGenTarget::Unknown )
+                        continue;
 
-                rawOutput.targetIndex = targetIndex;
+                    int targetIndex = 0;
+                    if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
+                    {
+                        targetIndex = (int) rawTargets.getCount();
+
+                        RawTarget rawTarget;
+                        rawTarget.format = impliedFormat;
+                        rawTargets.add(rawTarget);
+
+                        mapFormatToTargetIndex[impliedFormat] = targetIndex;
+                    }
+
+                    rawOutput.targetIndex = targetIndex;
+                }
             }
         }
         else
