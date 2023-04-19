@@ -907,7 +907,7 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
-                if (argValue == toSlice("-emit-ir"))
+                else if (argValue == toSlice("-emit-ir"))
                 {
                     // Enable emitting IR
                     requestImpl->m_emitIr = true;
