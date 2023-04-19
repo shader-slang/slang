@@ -82,7 +82,7 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
 
-#include "../compiler-core/slang-json-source-map-util.h"
+#include "../core/slang-castable.h"
 
 #include <assert.h>
 
@@ -969,12 +969,12 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         lineDirectiveMode = LineDirectiveMode::GLSL;
     }
 
-    RefPtr<SourceMap> sourceMap;
+    ComPtr<IBoxValue<SourceMap>> sourceMap;
 
     // If SourceMap is enabled, we create one and associate it with the sourceWriter
     if (targetRequest->getLinkage()->m_generateSourceMap)
     {
-        sourceMap = new SourceMap;
+        sourceMap = new BoxValue<SourceMap>;
     }
 
     SourceWriter sourceWriter(sourceManager, lineDirectiveMode, sourceMap );
@@ -1152,28 +1152,9 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        SourceManager sourceMapSourceManager;
-        sourceMapSourceManager.initialize(nullptr, nullptr);
-
-        // Create a sink
-        DiagnosticSink sourceMapSink(&sourceMapSourceManager, nullptr);
-
-        // Turn into JSON
-        RefPtr<JSONContainer> jsonContainer(new JSONContainer(&sourceMapSourceManager));
-
-        JSONValue jsonValue;
-        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, &sourceMapSink, jsonValue));
-
-        // Okay now convert this into a text file and then a blob
-
-        // Convert into a string
-        JSONWriter writer(JSONWriter::IndentationStyle::KNR);
-        jsonContainer->traverseRecursively(jsonValue, &writer);
-
-        auto sourceMapBlob = StringBlob::moveCreate(writer.getBuilder());
-
         auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::None));
-        sourceMapArtifact->addRepresentationUnknown(sourceMapBlob);
+
+        sourceMapArtifact->addRepresentation(sourceMap);
 
         artifact->addAssociated(sourceMapArtifact);
     }

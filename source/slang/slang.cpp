@@ -15,8 +15,6 @@
 #include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../compiler-core/slang-artifact-container-util.h"
 
-#include "../compiler-core/slang-json-source-map-util.h"
-
 #include "../core/slang-memory-file-system.h"
 
 #include "slang-module-library.h"
@@ -2387,7 +2385,7 @@ void FrontEndCompileRequest::generateIR()
         if (useSerialIRBottleneck)
         {
             // Keep the obfuscated source map (if there is one)
-            RefPtr<SourceMap> obfuscatedSourceMap = irModule->getObfuscatedSourceMap();
+            ComPtr<IBoxValue<SourceMap>> obfuscatedSourceMap(irModule->getObfuscatedSourceMap());
 
             IRSerialData serialData;
             {
@@ -4884,11 +4882,10 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
                 isDerivedFrom(assocDesc.payload, ArtifactPayload::SourceMap) &&
                 isDerivedFrom(assocDesc.style, ArtifactStyle::Obfuscated))
             {
-                ComPtr<ISlangBlob> sourceMapBlob;
-                SLANG_RETURN_ON_FAIL(associated->loadBlob(ArtifactKeep::No, sourceMapBlob.writeRef()));
-
-                RefPtr<SourceMap> sourceMap;
-                SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::read(sourceMapBlob, nullptr, sourceMap));
+                ComPtr<ICastable> castable;
+                SLANG_RETURN_ON_FAIL(associated->getOrCreateRepresentation(SourceMap::getTypeGuid(), ArtifactKeep::Yes, castable.writeRef()));
+                auto sourceMap = asBoxValue<SourceMap>(castable);
+                SLANG_ASSERT(sourceMap);
                 
                 // I guess we add to all ir modules?
 

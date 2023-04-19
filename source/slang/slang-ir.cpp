@@ -3877,7 +3877,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair)
     {
-        SLANG_ASSERT(as<IRDifferentialPairType>(diffPair->getDataType()));
+        SLANG_ASSERT(as<IRDifferentialPairTypeBase>(diffPair->getDataType()));
         return emitIntrinsicInst(
             diffType,
             kIROp_DifferentialPairGetDifferential,
@@ -3887,9 +3887,18 @@ namespace Slang
 
     IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRInst* diffPair)
     {
-        auto valueType = cast<IRDifferentialPairType>(diffPair->getDataType())->getValueType();
+        auto valueType = cast<IRDifferentialPairTypeBase>(diffPair->getDataType())->getValueType();
         return emitIntrinsicInst(
             valueType,
+            kIROp_DifferentialPairGetPrimal,
+            1,
+            &diffPair);
+    }
+
+    IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRType* primalType, IRInst* diffPair)
+    {
+        return emitIntrinsicInst(
+            primalType,
             kIROp_DifferentialPairGetPrimal,
             1,
             &diffPair);
@@ -7256,6 +7265,7 @@ namespace Slang
         case kIROp_TorchGetCudaStream:
         case kIROp_MakeTensorView:
         case kIROp_TorchTensorGetView:
+        case kIROp_GetStringHash:
             return false;
 
         case kIROp_ForwardDifferentiate:

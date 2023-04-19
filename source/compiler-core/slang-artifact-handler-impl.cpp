@@ -17,6 +17,10 @@
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
 
+#include "slang-source-map.h"
+
+#include "slang-json-source-map-util.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DefaultArtifactHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -126,6 +130,22 @@ SlangResult DefaultArtifactHandler::expandChildren(IArtifact* container)
 	return SLANG_OK;
 }
 
+static SlangResult _loadSourceMap(IArtifact* artifact, ArtifactKeep intermediateKeep, SourceMap& outSourceMap)
+{
+	const auto desc = artifact->getDesc();
+	if (isDerivedFrom(desc.kind, ArtifactKind::Json) &&
+		isDerivedFrom(desc.payload, ArtifactPayload::SourceMap))
+	{
+		ComPtr<ISlangBlob> blob;
+		SLANG_RETURN_ON_FAIL(artifact->loadBlob(intermediateKeep, blob.writeRef()));
+
+		SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::read(blob, outSourceMap));
+		return SLANG_OK;
+	}
+
+	return SLANG_FAIL;
+}
+
 SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable)
 {
 	const auto reps = artifact->getRepresentations();
@@ -156,8 +176,15 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		}
 	}
 
-	// Special case shared library
-	if (guid == ISlangSharedLibrary::getTypeGuid())
+	// Special cases
+	if (guid == SourceMap::getTypeGuid())
+	{
+		// Blob -> SourceMap
+		ComPtr<IBoxValue<SourceMap>> sourceMap(new BoxValue<SourceMap>);
+		SLANG_RETURN_ON_FAIL(_loadSourceMap(artifact, getIntermediateKeep(keep), sourceMap->get()));
+		return _addRepresentation(artifact, keep, sourceMap, outCastable);
+	}
+	else if (guid == ISlangSharedLibrary::getTypeGuid())
 	{
 		ComPtr<ISlangSharedLibrary> sharedLib;
 		SLANG_RETURN_ON_FAIL(_loadSharedLibrary(artifact, sharedLib.writeRef()));
@@ -168,6 +195,19 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		ComPtr<IOSFileArtifactRepresentation> fileRep;
 		SLANG_RETURN_ON_FAIL(_createOSFile(artifact, getIntermediateKeep(keep), fileRep.writeRef()));
 		return _addRepresentation(artifact, keep, fileRep, outCastable);
+	}
+
+	// Handle known conversion to blobs 
+	if (guid == ISlangBlob::getTypeGuid())
+	{
+		if (auto sourceMap = findRepresentation<SourceMap>(artifact))
+		{	
+			// SourceMap -> Blob
+			ComPtr<ISlangBlob> blob;
+			SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(*sourceMap, blob));
+			// Add the rep
+			return _addRepresentation(artifact, keep, blob, outCastable);
+		}
 	}
 
 	return SLANG_E_NOT_AVAILABLE;

@@ -6,7 +6,7 @@
 
 #include "slang-compiler.h"
 #include "../compiler-core/slang-source-map.h"
-
+#include "../core/slang-castable.h"
 
 namespace Slang
 {
@@ -75,10 +75,10 @@ public:
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
         /// Get the associated source map. If source map tracking is not required, can return nullptr.
-    SourceMap* getSourceMap() const { return m_sourceMap; }
+    IBoxValue<SourceMap>* getSourceMap() const { return m_sourceMap; }
 
         /// Ctor
-    SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, SourceMap* sourceMap);
+    SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, IBoxValue<SourceMap>* sourceMap);
 
 protected:
     void _emitTextSpan(char const* textBegin, char const* textEnd);
@@ -140,7 +140,7 @@ protected:
     Dictionary<String, int> m_mapGLSLSourcePathToID;
     int m_glslSourceIDCount = 0;
 
-    RefPtr<SourceMap> m_sourceMap;
+    ComPtr<IBoxValue<SourceMap>> m_sourceMap;
 
     LineDirectiveMode m_lineDirectiveMode;
 };

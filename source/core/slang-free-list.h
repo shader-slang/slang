@@ -69,6 +69,9 @@ class FreeList
 		/// Initialize. If called on an already initialized heap, the heap will be deallocated.
 	void init(size_t elementSize, size_t alignment, size_t elemsPerBlock);
 	
+		/// Swap this with rhs
+	void swapWith(ThisType& rhs);
+
 		/// Default Ctor
 	FreeList() { _init(); }
 		/// Ctor

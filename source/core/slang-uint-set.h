@@ -15,6 +15,7 @@ namespace Slang
 class UIntSet
 {
 public:
+    typedef UIntSet ThisType;
     typedef uint32_t Element;                                   ///< Type that holds the bits to say if value is present
     
     UIntSet() {}
@@ -63,6 +64,9 @@ public:
 
         /// 
     bool isEmpty() const;
+
+        /// Swap this with rhs
+    void swapWith(ThisType& rhs) { m_buffer.swapWith(rhs.m_buffer); }
 
         /// Store the union of set1 and set2 in outRs
     static void calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2);
