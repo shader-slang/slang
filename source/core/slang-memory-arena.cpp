@@ -23,6 +23,7 @@ MemoryArena::~MemoryArena()
     reset();
 }
 
+
 MemoryArena::MemoryArena(size_t blockPayloadSize, size_t blockAlignment)
 {
     _initialize(blockPayloadSize, blockAlignment);
@@ -60,6 +61,22 @@ void MemoryArena::_initialize(size_t blockPayloadSize, size_t alignment)
     m_blockFreeList.init(sizeof(Block), sizeof(void*), 16);
 
     _resetCurrentBlock();
+}
+
+void MemoryArena::swapWith(ThisType& rhs)
+{
+    Swap(m_start, rhs.m_start);
+    Swap(m_end, rhs.m_end);
+    Swap(m_current, rhs.m_current);
+
+    Swap(m_blockPayloadSize, rhs.m_blockPayloadSize);
+    Swap(m_blockAllocSize, rhs.m_blockAllocSize);
+    Swap(m_blockAlignment, rhs.m_blockAlignment);
+
+    Swap(m_availableBlocks, rhs.m_availableBlocks);
+    Swap(m_usedBlocks, rhs.m_usedBlocks);
+
+    m_blockFreeList.swapWith(rhs.m_blockFreeList);
 }
 
 void MemoryArena::_resetCurrentBlock()

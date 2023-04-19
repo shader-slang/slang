@@ -18,7 +18,7 @@
 
 namespace Slang {
 
-SourceWriter::SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, SourceMap* sourceMap)
+SourceWriter::SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, IBoxValue<SourceMap>* sourceMap)
 {
     m_sourceMap = sourceMap;
     m_lineDirectiveMode = lineDirectiveMode;
@@ -360,23 +360,25 @@ void SourceWriter::_updateSourceMap(const HumaneSourceLoc& sourceLocation)
     if (sourceLocation.line <= 0)
         return;
 
+    auto sourceMap = m_sourceMap->getPtr();
+
     // We need to work out the current column in the generated (ie being written) output
     Index generatedLineIndex, generatedColumnIndex;
     _calcLocation(generatedLineIndex, generatedColumnIndex);
 
     // Advance to the current output line
-    m_sourceMap->advanceToLine(generatedLineIndex);
+    sourceMap->advanceToLine(generatedLineIndex);
 
     // Add the entry into the map, mapping back to the original source
     SourceMap::Entry entry;
     entry.init();
 
-    entry.sourceFileIndex = m_sourceMap->getSourceFileIndex(sourceLocation.pathInfo.getName().getUnownedSlice());
+    entry.sourceFileIndex = sourceMap->getSourceFileIndex(sourceLocation.pathInfo.getName().getUnownedSlice());
     entry.sourceLine = sourceLocation.line - 1;
     entry.sourceColumn = sourceLocation.column - 1;
     entry.generatedColumn = generatedColumnIndex;
     
-    m_sourceMap->addEntry(entry);
+    sourceMap->addEntry(entry);
 }
 
 void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocation)

@@ -4,7 +4,7 @@ namespace Slang {
 
 void SourceMap::clear()
 {
-    String empty;
+    const String empty;
 
     m_file = empty;
     m_sourceRoot = empty;
@@ -21,6 +21,18 @@ void SourceMap::clear()
     m_lineEntries.clear();
 
     m_slicePool.clear();
+}
+
+void SourceMap::swapWith(ThisType& rhs)
+{
+    m_file.swapWith(rhs.m_file);
+    m_sourceRoot.swapWith(rhs.m_sourceRoot);
+    m_sources.swapWith(rhs.m_sources);
+    m_names.swapWith(rhs.m_names);
+    m_sourcesContent.swapWith(rhs.m_sourcesContent);
+    m_lineStarts.swapWith(rhs.m_lineStarts);
+    m_lineEntries.swapWith(rhs.m_lineEntries);
+    m_slicePool.swapWith(rhs.m_slicePool);
 }
 
 void SourceMap::advanceToLine(Index nextLineIndex)

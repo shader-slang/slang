@@ -5,6 +5,7 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-string-slice-pool.h"
+#include "../core/slang-castable.h"
 
 #include "slang-source-map.h"
 
@@ -254,9 +255,9 @@ public:
 
         /// Get the source map associated with this file. If it's set when doing 
         /// lookup for source locations, the source map will be used
-    SourceMap* getSourceMap() const { return m_sourceMap; }
+    IBoxValue<SourceMap>* getSourceMap() const { return m_sourceMap; }
         /// Set a source map
-    void setSourceMap(SourceMap* sourceMap) { m_sourceMap = sourceMap; }
+    void setSourceMap(IBoxValue<SourceMap>* sourceMap) { m_sourceMap = sourceMap; }
 
         /// Ctor
     SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize);
@@ -279,7 +280,7 @@ public:
 
     // If set then the locations in this file are really from locations from elsewhere, 
     // where the SourceMap specifies that mapping
-    RefPtr<SourceMap> m_sourceMap;
+    ComPtr<IBoxValue<SourceMap>> m_sourceMap;
 };
 
 enum class SourceLocType

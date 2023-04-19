@@ -1913,11 +1913,10 @@ namespace Slang
                 auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
 
                 // Create the source map artifact
-                auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->m_file.getUnownedSlice());
+                auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->get().m_file.getUnownedSlice());
 
                 // Add the repesentation
-                ComPtr<IObjectCastableAdapter> castableAdapter(new ObjectCastableAdapter(sourceMap));
-                sourceMapArtifact->addRepresentation(castableAdapter);
+                sourceMapArtifact->addRepresentation(sourceMap);
 
                 // Associate with the container
                 m_containerArtifact->addAssociated(sourceMapArtifact);

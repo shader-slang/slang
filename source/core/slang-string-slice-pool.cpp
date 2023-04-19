@@ -41,6 +41,14 @@ void StringSlicePool::clear()
     }
 }
 
+void StringSlicePool::swapWith(ThisType& rhs)
+{
+    Swap(m_style, rhs.m_style);
+    m_slices.swapWith(rhs.m_slices);
+    m_map.swapWith(rhs.m_map);
+    m_arena.swapWith(rhs.m_arena);
+}
+
 StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
 {
     const Handle* handlePtr = m_map.TryGetValue(slice);

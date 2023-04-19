@@ -211,7 +211,7 @@ SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView
         auto sourceMap = sourceFile->getSourceMap();
         SLANG_ASSERT(sourceMap);
 
-        entryIndex = sourceMap->findEntry(lineIndex, colIndex);   
+        entryIndex = sourceMap->get().findEntry(lineIndex, colIndex);   
     }
 
     if (entryIndex < 0)
@@ -222,7 +222,7 @@ SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView
     // Keep searching through source maps 
     do 
     {
-        auto sourceMap = sourceFile->getSourceMap();
+        auto sourceMap = sourceFile->getSourceMap()->getPtr();
 
         // Find the entry
         const auto& entry = sourceMap->getEntryByIndex(entryIndex);
@@ -242,7 +242,7 @@ SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView
                     // If it has a source map, we try and look up the current location in it's source map
                     if (auto foundSourceMap = foundSourceFile->getSourceMap())
                     {
-                        const auto foundEntryIndex = foundSourceMap->findEntry(entry.sourceLine, entry.sourceColumn);
+                        const auto foundEntryIndex = foundSourceMap->get().findEntry(entry.sourceLine, entry.sourceColumn);
 
                         // If we found the entry repeat the lookup
                         if (foundEntryIndex >= 0)
@@ -258,7 +258,7 @@ SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView
     } while (false);
 
     // Generate the HandleSourceLoc
-    auto sourceMap = sourceFile->getSourceMap();
+    auto sourceMap = sourceFile->getSourceMap()->getPtr();
     const auto& entry = sourceMap->getEntryByIndex(entryIndex);
 
     // We need to add the pool of the originating source view/file

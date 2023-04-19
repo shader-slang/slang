@@ -969,12 +969,12 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         lineDirectiveMode = LineDirectiveMode::GLSL;
     }
 
-    RefPtr<SourceMap> sourceMap;
+    ComPtr<IBoxValue<SourceMap>> sourceMap;
 
     // If SourceMap is enabled, we create one and associate it with the sourceWriter
     if (targetRequest->getLinkage()->m_generateSourceMap)
     {
-        sourceMap = new SourceMap;
+        sourceMap = new BoxValue<SourceMap>;
     }
 
     SourceWriter sourceWriter(sourceManager, lineDirectiveMode, sourceMap );
@@ -1154,8 +1154,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     {
         auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::None));
 
-        ComPtr<IObjectCastableAdapter> castableAdapter(new ObjectCastableAdapter(sourceMap));
-        sourceMapArtifact->addRepresentation(castableAdapter);
+        sourceMapArtifact->addRepresentation(sourceMap);
 
         artifact->addAssociated(sourceMapArtifact);
     }

@@ -2034,8 +2034,8 @@ public:
     SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst;  }
     SLANG_FORCE_INLINE MemoryArena& getMemoryArena() { return m_memoryArena; }
 
-    SLANG_FORCE_INLINE SourceMap* getObfuscatedSourceMap() const { return m_obfuscatedSourceMap; }
-    SLANG_FORCE_INLINE void setObfuscatedSourceMap(SourceMap* sourceMap) { m_obfuscatedSourceMap = sourceMap; }
+    SLANG_FORCE_INLINE IBoxValue<SourceMap>* getObfuscatedSourceMap() const { return m_obfuscatedSourceMap; }
+    SLANG_FORCE_INLINE void setObfuscatedSourceMap(IBoxValue<SourceMap>* sourceMap) { m_obfuscatedSourceMap = sourceMap; }
 
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
@@ -2105,7 +2105,7 @@ private:
     mutable IRDeduplicationContext m_deduplicationContext;
 
         /// Holds the obfuscated source map for this module if applicable
-    RefPtr<SourceMap> m_obfuscatedSourceMap;
+    ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
 };
 
 struct IRSpecializationDictionaryItem : public IRInst

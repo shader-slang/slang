@@ -7,6 +7,8 @@
 #include "../core/slang-hash.h"
 #include "../core/slang-char-util.h"
 
+#include "../core/slang-castable.h"
+
 namespace Slang
 {
 
@@ -247,7 +249,10 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     // We can now create a map. The locs are in order in entries, so that should make lookup easier.
     // This doesn't "leak" anything as the obfuscated loc map is not distributed.
 
-    RefPtr<SourceMap> sourceMap = new SourceMap;
+    ComPtr<IBoxValue<SourceMap>> boxedSourceMap(new BoxValue<SourceMap>);
+
+    auto sourceMap = boxedSourceMap->getPtr();
+
     sourceMap->m_file = obfusctatedPathInfo.getName();
 
     // Set up entries one per line
@@ -349,10 +354,10 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     }
 
     // Associate the sourceMap with the obfuscated file
-    obfuscatedFile->setSourceMap(sourceMap);
+    obfuscatedFile->setSourceMap(boxedSourceMap);
 
     // Set the obfuscated map onto the module
-    module->setObfuscatedSourceMap(sourceMap);
+    module->setObfuscatedSourceMap(boxedSourceMap);
 
     return SLANG_OK;
 }
