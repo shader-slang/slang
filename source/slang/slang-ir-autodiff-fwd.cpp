@@ -663,7 +663,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         // Read back new value.
                         auto newVal = afterBuilder.emitLoad(srcVar);
                         afterBuilder.markInstAsMixedDifferential(newVal, pairValType->getValueType());
-                        auto newPrimalVal = afterBuilder.emitDifferentialPairGetPrimal(newVal);
+                        auto newPrimalVal = afterBuilder.emitDifferentialPairGetPrimal(pairValType->getValueType(), newVal);
                         afterBuilder.emitStore(primalArg, newPrimalVal);
 
                         if (diffArg)
@@ -1798,6 +1798,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_CastFloatToInt:
     case kIROp_DetachDerivative:
     case kIROp_GetSequentialID:
+    case kIROp_GetStringHash:
         return trascribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,

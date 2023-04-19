@@ -3090,6 +3090,7 @@ public:
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
+    IRInst* emitDifferentialPairGetPrimal(IRType* primalType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimalUserCode(IRInst* diffPair);
     IRInst* emitMakeVector(
