@@ -5316,9 +5316,15 @@ ISlangMutableFileSystem* EndToEndCompileRequest::getCompileRequestResultAsFileSy
         if (m_containerArtifact)
         {
             ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
-            if (SLANG_SUCCEEDED(ArtifactContainerUtil::writeContainer(m_containerArtifact, "", fileSystem)))
+
+            // Filter the containerArtifact into things that can be written
+            ComPtr<IArtifact> writeArtifact;
+            if (SLANG_SUCCEEDED(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact)))
             {
-                m_containerFileSystem.swap(fileSystem);
+                if (SLANG_SUCCEEDED(ArtifactContainerUtil::writeContainer(writeArtifact, "", fileSystem)))
+                {
+                    m_containerFileSystem.swap(fileSystem);
+                }
             }
         }
     }

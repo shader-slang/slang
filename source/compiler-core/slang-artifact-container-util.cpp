@@ -200,26 +200,15 @@ SlangResult ArtifactContainerWriter::writeInDirectory(IArtifact* artifact, const
     {
         // We can't write it without a blob
         ComPtr<ISlangBlob> blob;
-        const auto res = artifact->loadBlob(ArtifactKeep::No, blob.writeRef());
+        SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
 
-        if (SLANG_FAILED(res))
-        {
-            // If it failed and it's significant the whole write fails
-            if (ArtifactUtil::isSignificant(artifact))
-            {
-                return res;
-            }
-        }
-        else
-        {
-            // Get the name of the artifact
-            StringBuilder artifactName;
-            SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcNameForDesc(artifact->getDesc(), baseName.getUnownedSlice(), artifactName));
+        // Get the name of the artifact
+        StringBuilder artifactName;
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcNameForDesc(artifact->getDesc(), baseName.getUnownedSlice(), artifactName));
 
-            const auto combinedPath = Path::combine(m_entry.path, artifactName);
-            // Write out the blob
-            SLANG_RETURN_ON_FAIL(m_fileSystem->saveFileBlob(combinedPath.getBuffer(), blob));
-        }
+        const auto combinedPath = Path::combine(m_entry.path, artifactName);
+        // Write out the blob
+        SLANG_RETURN_ON_FAIL(m_fileSystem->saveFileBlob(combinedPath.getBuffer(), blob));
     }
 
     {
@@ -835,6 +824,78 @@ SlangResult ArtifactContainerUtil::readContainer(IArtifact* artifact, ComPtr<IAr
     ArtifactContainerReader reader;
     SLANG_RETURN_ON_FAIL(reader.read(fileSystem, outArtifact));
 
+    return SLANG_OK;
+}
+
+/* static */SlangResult ArtifactContainerUtil::filter(IArtifact* artifact, ComPtr<IArtifact>& outArtifact)
+{
+    outArtifact.setNull();
+
+    // Copy the artifact
+    auto dstArtifact = ArtifactUtil::createArtifact(artifact->getDesc(), artifact->getName());
+
+    ComPtr<ISlangBlob> blob;
+
+    if (artifact->getDesc().kind != ArtifactKind::Container)
+    {
+        // We can't write it without a blob
+        const auto res = artifact->loadBlob(ArtifactKeep::No, blob.writeRef());
+
+        if (SLANG_FAILED(res))
+        {
+            // If it failed and it's significant the whole write fails
+            if (ArtifactUtil::isSignificant(artifact))
+            {
+                return res;
+            }
+        }
+        else
+        {
+            // Add the blob to the destination
+            dstArtifact->addRepresentationUnknown(blob);
+        }
+    }
+
+    // Copy the children after filtering
+    {
+        for (IArtifact* child : artifact->getChildren())
+        {
+            ComPtr<IArtifact> dstChild;
+            SLANG_RETURN_ON_FAIL(filter(child, dstChild));
+
+            if (dstChild)
+            {
+                dstArtifact->addChild(dstChild);
+            }
+        }
+    }
+
+    // Copy the associated after filtering
+    {
+        for (IArtifact* assoc : artifact->getAssociated())
+        {
+            ComPtr<IArtifact> dstAssoc;
+            SLANG_RETURN_ON_FAIL(filter(assoc, dstAssoc));
+
+            if (dstAssoc)
+            {
+                dstArtifact->addAssociated(dstAssoc);
+            }
+        }
+    }
+
+    // We only return the artifact if any of the following are true 
+    // 1) It has a blob representation
+    // 2) It contains children or associcated attributes
+
+    if (blob || 
+        dstArtifact->getChildren().count ||
+        dstArtifact->getAssociated().count)
+    {
+        outArtifact = dstArtifact;
+    }
+        
+    // If we return an artifact or not, this was successful
     return SLANG_OK;
 }
 

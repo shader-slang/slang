@@ -1987,7 +1987,17 @@ namespace Slang
         {
             return SLANG_OK;
         }
-        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(m_containerArtifact, fileName));
+
+        // Filter the containerArtifact into things that can be written
+        ComPtr<IArtifact> writeArtifact;
+        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact));
+
+        // Only write if there is something to write
+        if (writeArtifact)
+        {
+            SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, fileName));
+        }
+        
         return SLANG_OK;
     }
 
