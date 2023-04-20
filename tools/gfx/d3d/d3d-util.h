@@ -76,10 +76,6 @@ class D3DUtil
         /// Returns number of bits used for color channel for format (for channels with multiple sizes, returns smallest ie RGB565 -> 5)
     static Int getNumColorChannelBits(DXGI_FORMAT fmt);
 
-        /// Append text in in, into wide char array
-    static void appendWideChars(const char* in, Slang::List<wchar_t>& out);
-
-
     static SlangResult createFactory(DeviceCheckFlags flags, Slang::ComPtr<IDXGIFactory>& outFactory);
 
         /// Get the dxgiModule

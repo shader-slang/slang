@@ -166,6 +166,30 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 #define SLANG_APPLE_FAMILY (SLANG_IOS || SLANG_OSX)                  /* equivalent to #if __APPLE__ */
 #define SLANG_UNIX_FAMILY (SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY) /* shortcut for unix/posix platforms */
 
+/* Macros concerning DirectX */
+#if SLANG_WINDOWS_FAMILY
+#    define SLANG_ENABLE_DIRECTX 1
+#    define SLANG_ENABLE_DXGI_DEBUG 1
+#    define SLANG_ENABLE_FXC 1
+#    define SLANG_ENABLE_PIX 1
+#    define SLANG_ENABLE_DXVK 0
+#    define SLANG_ENABLE_VKD3D_PROTON 0
+#elif SLANG_LINUX_FAMILY
+#    define SLANG_ENABLE_DIRECTX 0
+#    define SLANG_ENABLE_DXGI_DEBUG 0
+#    define SLANG_ENABLE_FXC 0
+#    define SLANG_ENABLE_PIX 0
+#    define SLANG_ENABLE_DXVK 1
+#    define SLANG_ENABLE_VKD3D_PROTON 1
+#else
+#    define SLANG_ENABLE_DIRECTX 0
+#    define SLANG_ENABLE_DXGI_DEBUG 0
+#    define SLANG_ENABLE_FXC 0
+#    define SLANG_ENABLE_PIX 0
+#    define SLANG_ENABLE_DXVK 0
+#    define SLANG_ENABLE_VKD3D_PROTON 0
+#endif
+
 /* Macro for declaring if a method is no throw. Should be set before the return parameter. */
 #ifndef SLANG_NO_THROW
 #   if SLANG_WINDOWS_FAMILY && !defined(SLANG_DISABLE_EXCEPTIONS)
