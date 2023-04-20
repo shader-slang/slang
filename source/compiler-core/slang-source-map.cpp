@@ -35,6 +35,105 @@ void SourceMap::swapWith(ThisType& rhs)
     m_slicePool.swapWith(rhs.m_slicePool);
 }
 
+static bool _areEqual(const List<StringSlicePool::Handle>& a, const List<StringSlicePool::Handle>& b, const List<Index>& bToAMap)
+{
+    const auto count = a.getCount();
+    if (count != b.getCount())
+    {
+        return false;
+    }
+
+    const auto* as = a.getBuffer();
+    const auto* bs = a.getBuffer();
+
+    for (Index i = 0; i < count; ++i)
+    {
+        if (StringSlicePool::asIndex(as[i]) != bToAMap[StringSlicePool::asIndex(bs[i])])
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool _areEqual(const SourceMap::Entry& a, const SourceMap::Entry& b, const List<Index>& bToAMap)
+{
+    return a.generatedColumn == b.generatedColumn &&
+        a.sourceLine == b.sourceLine &&
+        a.sourceColumn == b.sourceColumn &&
+        a.sourceFileIndex == bToAMap[b.sourceFileIndex] &&
+        a.nameIndex == bToAMap[b.nameIndex];
+}
+
+static bool _areEqual(const List<SourceMap::Entry>& a, const List<SourceMap::Entry>&b, const List<Index>& bToAMap)
+{
+    const auto count = a.getCount();
+    if (count != b.getCount())
+    {
+        return false;
+    }
+
+    for (Index i = 0; i < count; ++i)
+    {
+        if (!_areEqual(a[i], b[i], bToAMap))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool SourceMap::operator==(const ThisType& rhs) const
+{
+    if (this == &rhs)
+    {
+        return true;
+    }
+
+    if (m_file != rhs.m_file ||
+        m_sourceRoot != rhs.m_sourceRoot ||
+        m_lineStarts != rhs.m_lineStarts)
+    {
+        return false;
+    }
+
+    if (m_slicePool == rhs.m_slicePool)
+    {
+        // If the slice pools are the same we can just compare indices directly
+        return m_sources == rhs.m_sources &&
+            m_sourcesContent == rhs.m_sourcesContent &&
+            m_names == rhs.m_names &&
+            m_lineEntries == rhs.m_lineEntries;
+    }
+    else
+    {
+        // Otherwise we need to remap the indices
+        // Maps a pool handle from the rhs source map to the 
+        List<Index> rhsMap;
+
+        Count count = rhs.m_slicePool.getSlicesCount();
+
+        rhsMap.setCount(count);
+        
+        const auto startIndex = rhs.m_slicePool.getFirstAddedIndex();
+
+        // Work out the map
+        for (Index i = 0; i < startIndex; ++i)
+        {
+            const auto rhsSlice = rhs.m_slicePool.getSlice(StringSlicePool::Handle(i));
+            rhsMap[i] = (i < startIndex) ? i : m_slicePool.findIndex(rhsSlice);
+        }
+
+        // Do the comparison taking into account the mapping.
+        return _areEqual(m_sources, rhs.m_sources, rhsMap) &&
+            _areEqual(m_sourcesContent, rhs.m_sourcesContent, rhsMap) &&
+            _areEqual(m_names, rhs.m_names, rhsMap) &&
+            _areEqual(m_lineEntries, rhs.m_lineEntries, rhsMap);
+    }
+}
+
 void SourceMap::advanceToLine(Index nextLineIndex)
 {
     const Count currentLineIndex = getGeneratedLineCount() - 1;

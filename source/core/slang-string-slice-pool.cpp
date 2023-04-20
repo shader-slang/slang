@@ -14,11 +14,10 @@ StringSlicePool::StringSlicePool(Style style) :
     clear();
 }
 
-StringSlicePool::StringSlicePool(const ThisType& rhs)
+StringSlicePool::StringSlicePool(const ThisType& rhs):
+    m_style(rhs.m_style),
+    m_arena(1024)
 {
-    // Assume it's the empty style for now
-    m_style = Style::Empty;
-
     // Set with rhs
     _set(rhs);
 }
@@ -41,8 +40,11 @@ void StringSlicePool::_set(const ThisType& rhs)
     const Index startIndex = rhs.getFirstAddedIndex();
     const Count count = rhs.m_slices.getCount();
 
+    // We need the same amount of slices
     m_slices.setCount(count);
 
+    // Work out the total size to store all slices including terminating 0
+    // (which *isn't* part of the slice size)
     size_t totalSize = 0;
 
     for (Index i = startIndex; i < count; ++i)
@@ -70,7 +72,7 @@ void StringSlicePool::_set(const ThisType& rhs)
         // Add to the map
         m_map.Add(dstSlice, Handle(i));
 
-        // Skip to next allocation
+        // Skip to next slices storage
         dst += sliceSize + 1;
     }
 }

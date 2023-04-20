@@ -36,7 +36,7 @@ public:
                 sourceFileIndex == rhs.sourceFileIndex &&
                 sourceLine == rhs.sourceLine &&
                 sourceColumn == rhs.sourceColumn && 
-                nameIndex == rhs.sourceColumn;
+                nameIndex == rhs.nameIndex;
         }
         SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
@@ -82,6 +82,14 @@ public:
 
         /// Swap this with rhs
     void swapWith(ThisType& rhs);
+
+        /// ==
+        ///
+        /// Note that equality requires that entries for a line must be *in the same order*
+        /// even though strictly speaking with different orders could be considered equivalent.
+    bool operator==(const ThisType& rhs) const;
+        /// !=
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         /// Ctor
     SourceMap():
