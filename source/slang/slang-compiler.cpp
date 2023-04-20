@@ -1849,6 +1849,7 @@ namespace Slang
                 return irModule->getObfuscatedSourceMap();
             }
         }
+        return nullptr;
     }
 
     SlangResult EndToEndCompileRequest::maybeCreateContainer()
