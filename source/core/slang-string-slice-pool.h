@@ -102,13 +102,19 @@ public:
         /// Swap this with rhs
     void swapWith(ThisType& rhs);
 
+        /// True if the pools are identical. Same style, same slices in the same order.
+    bool operator==(const ThisType& rhs) const;
+
+        /// Copy ctor
+    StringSlicePool(const ThisType& rhs);
+        /// Assignment 
+    void operator=(const ThisType& rhs);
+
         /// Ctor
     explicit StringSlicePool(Style style);
 
 protected:
-    // Disable copy ctor and assignment
-    StringSlicePool(const ThisType& rhs) = delete;
-    void operator=(const ThisType& rhs) = delete;
+    void _set(const ThisType& rhs);
 
     Style m_style;
     List<UnownedStringSlice> m_slices;
