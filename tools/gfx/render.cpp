@@ -247,13 +247,15 @@ extern "C"
 
         switch (type)
         {
-#if SLANG_WINDOWS_FAMILY
+#if SLANG_ENABLE_DIRECTX
         case DeviceType::DirectX11:
             SLANG_RETURN_ON_FAIL(getD3D11Adapters(adapters));
             break;
         case DeviceType::DirectX12:
             SLANG_RETURN_ON_FAIL(getD3D12Adapters(adapters));
             break;
+#endif
+#if SLANG_WINDOWS_FAMILY
         case DeviceType::OpenGl:
             return SLANG_E_NOT_IMPLEMENTED;
 #endif
@@ -283,7 +285,7 @@ extern "C"
     {
         switch (desc->deviceType)
         {
-#if SLANG_WINDOWS_FAMILY
+#if SLANG_ENABLE_DIRECTX
         case DeviceType::DirectX11:
             {
                 return createD3D11Device(desc, outDevice);
@@ -292,6 +294,8 @@ extern "C"
             {
                 return createD3D12Device(desc, outDevice);
             }
+#endif
+#if SLANG_WINDOWS_FAMILY
         case DeviceType::OpenGl:
             {
                 return createGLDevice(desc, outDevice);
@@ -326,9 +330,9 @@ extern "C"
         }
 #endif
         case DeviceType::CUDA:
-        {
-            return createCUDADevice(desc, outDevice);
-        }
+            {
+                return createCUDADevice(desc, outDevice);
+            }
         case DeviceType::CPU:
             {
                 return createCPUDevice(desc, outDevice);
@@ -361,7 +365,7 @@ extern "C"
     SLANG_GFX_API SlangResult SLANG_MCALL
         gfxReportLiveObjects()
     {
-#if SLANG_WINDOWS_FAMILY
+#if SLANG_ENABLE_DIRECTX
         SLANG_RETURN_ON_FAIL(reportD3DLiveObjects());
 #endif
         return SLANG_OK;
