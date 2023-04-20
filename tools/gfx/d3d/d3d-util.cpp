@@ -2,9 +2,11 @@
 #include "d3d-util.h"
 
 #include <d3d12.h>
-#include <d3dcompiler.h>
 #include <dxgi1_4.h>
 #include <dxgidebug.h>
+#if SLANG_ENABLE_FXC
+#include <d3dcompiler.h>
+#endif
 
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
@@ -423,6 +425,9 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     // shader bytecode as part of an offline process, rather than doing it
     // on-the-fly like this
     //
+#if !SLANG_ENABLE_FXC
+    return SLANG_E_NOT_IMPLEMENTED;
+#else
     static pD3DCompile compileFunc = nullptr;
     if (!compileFunc)
     {
@@ -476,35 +481,15 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     SLANG_RETURN_ON_FAIL(hr);
     shaderBlobOut.swap(shaderBlob);
     return SLANG_OK;
-}
-
-/* static */void D3DUtil::appendWideChars(const char* in, List<wchar_t>& out)
-{
-    size_t len = ::strlen(in);
-
-    const DWORD dwFlags = 0;
-    int outSize = ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), nullptr, 0);
-
-    if (outSize > 0)
-    {
-        const Index prevSize = out.getCount();
-        out.setCount(prevSize + len + 1);
-
-        WCHAR* dst = out.getBuffer() + prevSize;
-        ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), dst, outSize);
-        // Make null terminated
-        dst[outSize] = 0;
-        // Remove terminating 0 from array
-        out.unsafeShrinkToCount(prevSize + outSize);
-    }
+#endif // SLANG_ENABLE_FXC
 }
 
 /* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
 {
-#if SLANG_WINDOWS_FAMILY
-    const char* const libPath = "dxgi";
-#else
+#if SLANG_ENABLE_DXVK
     const char* const libPath = "dxvk_dxgi";
+#else
+    const char* const libPath = "dxgi";
 #endif
     static SharedLibrary::Handle s_dxgiModule = [&](){
         SharedLibrary::Handle h = nullptr;
@@ -849,6 +834,7 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
 {
     static IDXGIDebug* dxgiDebug = nullptr;
 
+#if SLANG_ENABLE_DXGI_DEBUG
     if (!dxgiDebug)
     {
         HMODULE debugModule = LoadLibraryA("dxgidebug.dll");
@@ -861,6 +847,7 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
             }
         }
     }
+#endif
 
     if (dxgiDebug)
     {
