@@ -36,6 +36,14 @@ struct ArtifactContainerUtil
 
         /// Read an artifact that represents a container as an artifact hierarchy
     static SlangResult readContainer(IArtifact* artifact, ComPtr<IArtifact>& outArtifact);
+
+        /// Creates a copy of artifact where
+        /// * All artifacts are blobs
+        /// * Any generic containers that are empty are dropped
+        /// * Any sub artifact that can't be blobed and isn't significant is ignored
+        /// 
+        /// A future improvement would be to take a function to also control what makes it to the output
+    static SlangResult filter(IArtifact* artifact, ComPtr<IArtifact>& outArtifact);
 };
 
 } // namespace Slang

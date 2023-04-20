@@ -753,6 +753,16 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
         default: break;
     }
 
+    if (ArtifactDescUtil::isGpuUsable(desc))
+    {
+        auto ext = _getPayloadExtension(desc.payload);
+        if (ext.getLength())
+        {
+            out << ext;
+            return SLANG_OK;
+        }
+    }
+
     if (ArtifactDescUtil::isCpuLikeTarget(desc) && !isDerivedFrom(desc.payload, ArtifactPayload::Source))
     {
         return appendCpuExtensionForKind(desc.kind, out);
