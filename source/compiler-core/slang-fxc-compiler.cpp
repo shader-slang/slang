@@ -26,11 +26,7 @@
 // Enable calling through to `fxc` or `dxc` to
 // generate code on Windows.
 #ifdef _WIN32
-#   define WIN32_LEAN_AND_MEAN
-#   define NOMINMAX
-#   include <Windows.h>
-#   undef WIN32_LEAN_AND_MEAN
-#   undef NOMINMAX
+#   include <windows.h>
 #   include <d3dcompiler.h>
 
 #   ifndef SLANG_ENABLE_DXBC_SUPPORT
@@ -329,7 +325,8 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     }
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
-    artifact->addAssociated(diagnostics);
+
+    ArtifactUtil::addAssociated(artifact, diagnostics);
 
     if (codeBlob)
     {

@@ -7,6 +7,8 @@
 #include "../core/slang-hash.h"
 #include "../core/slang-char-util.h"
 
+#include "../core/slang-castable.h"
+
 namespace Slang
 {
 
@@ -46,6 +48,17 @@ static void _findInstsRec(IRInst* inst, List<InstWithLoc>& out)
     }
 }
 
+// We assume the root source manager is the stdlibs
+static SourceLoc _getStdLibLastLoc(SourceManager* sourceManager)
+{
+    auto rootManager = sourceManager;
+    while (rootManager->getParent())
+    {
+        rootManager = rootManager->getParent();
+    }
+    return rootManager->getNextRangeStart();
+}
+
 SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 {
     // There shouldn't be an obfuscated source map set
@@ -60,26 +73,28 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     instWithLocs.sort();
         
     // Lets produce a hash, so we can use as a key for random number generation.
-    // We could base it on time, or some other thing as there is no requirement for 
-    // stability or consistency.
-    // We use a hash because it avoids issues around clocks, and availability of a clock
-    // as a good source of entropy.
-    //
-    // An argument *could* be made to generate the name via some mechanism that uniquely identified the 
-    // combination of flags, options, files, names that identified the compilation, but that is 
-    // not easily achieved.
+    // 
+    // We could base it on time, or some other random seed. But it would be preferable
+    // if it was stable, and compilations of the same module on different machines
+    // produce the same hash. 
+    // 
+    // Doing so would mean that we could use the obfuscated location ouput to output 
+    // the origin.
+
     HashCode hash = 0;
 
     List<LocPair> locPairs;
 
     // We want the hash to be stable. One problem is the source locs depend on their order of inclusion.
-    // To work around this we are going 
+    // To work around this we are going to hash via offsets, not locs.
     {
         SourceView* sourceView = nullptr;
 
+        const SourceLoc endStdLibLoc = _getStdLibLastLoc(sourceManager);
+
         SourceLoc curLoc;
         for (const auto& instWithLoc : instWithLocs)
-        {
+        {            
             if (instWithLoc.loc != curLoc)
             {
                 LocPair locPair;
@@ -89,21 +104,36 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 // This is the current loc
                 curLoc = instWithLoc.loc;
             
+                // Ignore any stdlib locs in the hash
+                if (instWithLoc.loc.getRaw() < endStdLibLoc.getRaw())
+                {
+                    continue;
+                }
+
                 // If the loc isn't in the view, lookup the view it is in
                 if (sourceView == nullptr || 
                     !sourceView->getRange().contains(curLoc))
                 {
                     sourceView = sourceManager->findSourceViewRecursively(curLoc);
                     SLANG_ASSERT(sourceView);
+                    // If there is no source view we can't apply to the hash
+                    if (sourceView == nullptr)
+                    {
+                        continue;
+                    }
 
+                    const auto pathInfo = sourceView->getViewPathInfo();
+                    const auto name = pathInfo.getName();
+                    const auto nameHash = getHashCode(pathInfo.getName().getUnownedSlice());
+                    
                     // Combine the name
-                    hash = combineHash(hash, getHashCode(sourceView->getViewPathInfo().getName().getUnownedSlice()));
+                    hash = combineHash(hash, nameHash);
                 }
-                SLANG_ASSERT(sourceView);
 
                 // We combine the *offset* which is stable
-                hash = combineHash(hash, getHashCode(sourceView->getRange().getOffset(curLoc)));
-            }
+                const auto offset = sourceView->getRange().getOffset(curLoc);
+                hash = combineHash(hash, getHashCode(offset));
+            }    
         }
     }
 
@@ -138,16 +168,28 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 dst[i * 2 + 1] = CharUtil::getHexChar(data[i] >> 4);
             }
             buf.appendInPlace(dst, charsCount);
+
+            // Make it clear this "source" is actually just for obfuscation.
+            buf << toSlice("-obfuscated");
+
             obfusctatedPathInfo = PathInfo::makePath(buf);
         }
     }
 
     SourceFile* obfuscatedFile = sourceManager->createSourceFileWithSize(obfusctatedPathInfo, uniqueLocCount);
 
-    // We have only one line for all locs, just set up that way...
+    // We put each loc on it's own line. We do this rather than using a single line because
+    // it means the `#line` directives can still do something meaningful, since the best resolution
+    // they have is a single line.
     {
-        const uint32_t offsets[2] = { 0, uint32_t(uniqueLocCount) };
-        obfuscatedFile->setLineBreakOffsets(offsets, SLANG_COUNT_OF(offsets));
+        List<uint32_t> offsets;
+        offsets.setCount(uniqueLocCount + 1);
+        for (Index i = 0; i < uniqueLocCount + 1; ++i)
+        {
+            offsets[i] = uint32_t(i);
+        }
+
+        obfuscatedFile->setLineBreakOffsets(offsets.getBuffer(), offsets.getCount());
     }
     
     // Create the view we are going to use from the obfusctated "file".
@@ -207,13 +249,22 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     // We can now create a map. The locs are in order in entries, so that should make lookup easier.
     // This doesn't "leak" anything as the obfuscated loc map is not distributed.
 
-    RefPtr<SourceMap> sourceMap = new SourceMap;
+    ComPtr<IBoxValue<SourceMap>> boxedSourceMap(new BoxValue<SourceMap>);
+
+    auto sourceMap = boxedSourceMap->getPtr();
+
     sourceMap->m_file = obfusctatedPathInfo.getName();
 
-    // Make sure we have line 0.
-    // We only end up with one line in the obfuscated map.
-    sourceMap->advanceToLine(0);
-
+    // Set up entries one per line
+    List<SourceMap::Entry> entries;
+    {
+        entries.setCount(uniqueLocCount);
+        for (auto& entry : entries)
+        {
+            entry.init();
+        }
+    }
+    
     {        
         // Current view, with cached "View" based sourceFileIndex
         SourceView* curView = nullptr;
@@ -275,30 +326,38 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 sourceFileIndex = curPathSourceFileIndex;
             }
 
-            // Create the entry
-            SourceMap::Entry entry;
-            entry.init();
+            // Calculate the line index associated with this loc
+            const Index generatedLineIndex = Index(obfuscatedRange.getOffset(pair.obfuscatedLoc));
+
+            // Set it up
+            SourceMap::Entry& entry = entries[generatedLineIndex];
 
             entry.sourceFileIndex = sourceFileIndex;
   
-            // Calculate the column offset, from the pair obfuscated loc
-            entry.generatedColumn = Index(obfuscatedRange.getOffset(pair.obfuscatedLoc));
-
+            // The generated has a line per loc, so the generated column is always 0
+            entry.generatedColumn = 0;
+            
             // We need to subtract 1, because handleLoc locations are 1 indexed, but SourceMap
             // entry is 0 indexed.
             entry.sourceColumn = handleLoc.column - 1;
             entry.sourceLine = handleLoc.line - 1;
-
-            // Add it to the source map
-            sourceMap->addEntry(entry);
         }
     }
 
+    // Add all of the entries in line order to the source map
+    for (Index i = 0; i < uniqueLocCount; ++i)
+    {
+        // Advance to the current line.
+        sourceMap->advanceToLine(i);
+        // Add it to the source map
+        sourceMap->addEntry(entries[i]);
+    }
+
     // Associate the sourceMap with the obfuscated file
-    obfuscatedFile->setObfuscatedSourceMap(sourceMap);
+    obfuscatedFile->setSourceMap(boxedSourceMap);
 
     // Set the obfuscated map onto the module
-    module->setObfuscatedSourceMap(sourceMap);
+    module->setObfuscatedSourceMap(boxedSourceMap);
 
     return SLANG_OK;
 }

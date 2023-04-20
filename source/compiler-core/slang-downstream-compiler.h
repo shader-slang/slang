@@ -16,6 +16,8 @@
 #include "slang-artifact.h"
 #include "slang-artifact-associated.h"
 
+#include <type_traits>
+
 namespace Slang
 {
 
@@ -133,7 +135,7 @@ bool isVersionCompatible(const T& in)
 NOTE! This type is trafficed across shared library boundaries and *versioned*. 
 In particular
 
-* The struct can only contain types that can be trivially memcpyd.
+* The struct can only contain types that can be trivially memcpyd (checked by static_assert);
 * New fields can only be added to the end of the struct 
 * New fields must take into account alignment/padding such that they do not share bytes in previous version sizes
 */
@@ -256,6 +258,7 @@ struct DownstreamCompileOptions
     // The debug info format to use. 
     SlangDebugInfoFormat m_debugInfoFormat = SLANG_DEBUG_INFO_FORMAT_DEFAULT;
 };
+static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 
 #define SLANG_ALIAS_DEPRECIATED_VERSION(name, id, firstField, lastField) \
 struct name##_AliasDepreciated##id \

@@ -409,7 +409,8 @@ Following is a list of builtin methods and attributes for PyTorch interop.
 ### `TorchTensor` methods
 
 #### `static TorchTensor<T> TorchTensor<T>.alloc(uint x, uint y, ...)`
-Allocates a new PyTorch tensor with the given dimensions.
+Allocates a new PyTorch tensor with the given dimensions. If `T` is a vector type, the length of the vector is implicitly included as the last dimension.
+For example, `TorchTensor<float3>.alloc(4, 4)` allocates a 3D tensor of size `(4,4,3)`.
 
 #### `static TorchTensor<T> TorchTensor<T>.emptyLike(TorchTensor<T> other)`
 Allocates a new PyTorch tensor that has the same dimensions as `other` without initializing it.

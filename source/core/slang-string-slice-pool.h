@@ -64,6 +64,11 @@ public:
         /// Add a string
     Handle add(const String& string) { return add(string.getUnownedSlice()); }
 
+        /// Add and get the result as a slice
+    Slice addAndGetSlice(const Slice& slice) { return getSlice(add(slice)); }
+    Slice addAndGetSlice(const char* chars) { return getSlice(add(chars)); }
+    Slice addAndGetSlice(const String& string) { return getSlice(add(string)); }
+
         /// Returns true if found
     bool findOrAdd(const Slice& slice, Handle& outHandle);
 
@@ -93,6 +98,9 @@ public:
 
         /// Get the index of the first added handle
     Index getFirstAddedIndex() const { return m_style == Style::Default ? kDefaultHandlesCount : 0; }
+
+        /// Swap this with rhs
+    void swapWith(ThisType& rhs);
 
         /// Ctor
     explicit StringSlicePool(Style style);

@@ -11,6 +11,7 @@
 #include "slang-ir-addr-inst-elimination.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-inline.h"
 
 namespace Slang
 {
@@ -662,7 +663,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         // Read back new value.
                         auto newVal = afterBuilder.emitLoad(srcVar);
                         afterBuilder.markInstAsMixedDifferential(newVal, pairValType->getValueType());
-                        auto newPrimalVal = afterBuilder.emitDifferentialPairGetPrimal(newVal);
+                        auto newPrimalVal = afterBuilder.emitDifferentialPairGetPrimal(pairValType->getValueType(), newVal);
                         afterBuilder.emitStore(primalArg, newPrimalVal);
 
                         if (diffArg)
@@ -874,19 +875,6 @@ InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
         "attempting to differentiate unhandled const type");
 
     return InstPair(nullptr, nullptr);
-}
-
-IRInst* ForwardDiffTranscriber::findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
-{
-    for (UInt i = 0; i < type->getOperandCount(); i++)
-    {
-        if (auto req = as<IRInterfaceRequirementEntry>(type->getOperand(i)))
-        {
-            if (req->getRequirementKey() == key)
-                return req->getRequirementVal();
-        }
-    }
-    return nullptr;
 }
 
 InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
@@ -1566,6 +1554,8 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
     removeLinkageDecorations(func);
 
+    performForceInlining(func);
+
     AutoDiffAddressConversionPolicy cvtPolicty;
     cvtPolicty.diffTypeContext = &differentiableTypeConformanceContext;
     auto result = eliminateAddressInsts(&cvtPolicty, func, sink);
@@ -1807,6 +1797,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
     case kIROp_DetachDerivative:
+    case kIROp_GetSequentialID:
+    case kIROp_GetStringHash:
         return trascribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,

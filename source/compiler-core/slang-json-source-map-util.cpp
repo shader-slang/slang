@@ -3,6 +3,7 @@
 #include "../../slang-com-helper.h"
 
 #include "../core/slang-string-util.h"
+#include "../core/slang-blob.h"
 
 #include "slang-json-native.h"
 
@@ -105,34 +106,31 @@ static SlangResult _decode(UnownedStringSlice& ioEncoded, Index& out)
 {
     Index v = 0;
 
-    Index shift = 0;
     const char* cur = ioEncoded.begin();
     const char* end = ioEncoded.end();
 
-    // Must have some chars
-    if (cur >= end)
     {
-        return SLANG_FAIL;
-    }
-
-    for (; cur < end; ++cur)
-    {
-        const Index value = g_vlqDecodeTable[*cur];
-        if (value < 0)
+        Index shift = 0;
+        Index decodeValue = 0;
+        do
         {
-            return SLANG_FAIL;
-        }
+            // Must have a char to decode
+            if (cur >= end)
+            {
+                return SLANG_FAIL;
+            }
+
+            decodeValue = g_vlqDecodeTable[*cur++];
+            if (decodeValue < 0)
+            {
+                return SLANG_FAIL;
+            }
         
-        v += (value & 0x1f) << shift;
+            v += (decodeValue & 0x1f) << shift;
 
-        // If the continuation bit is not set we are done
-        if (( value & 0x20) == 0)
-        {
-            ++cur;
-            break;
+            shift += 5;
         }
-
-        shift += 5;
+        while (decodeValue & 0x20);
     }
 
     // Save out the remaining part
@@ -158,29 +156,25 @@ void _encode(Index v, StringBuilder& out)
 
     do 
     {
-        // Encode it
-        const auto nextV  = v >> 5;
+        const Index nextV = v >> 5;
+        const Index encodeValue = (v & 0x1f) + (nextV ? 0x20 : 0);
 
-        // Encode 5 bits
-        char c = g_vlqEncodeTable[(v & 0x1f)];
-
-        // See what bits are remaining
-        v = (v >> 5);
-
-        // Set the continuation bit's if there is more to encode
-        c |= v ? 0x20 : 0;
-
+        // Encode 5 bits, plus continuation bit
+        char c = g_vlqEncodeTable[encodeValue];
+        
         // Save the char
         *cur++ = c;
+    
+        v = nextV;
     }
     while (v);
 
     out.append(dst, cur);
 }
 
-/* static */SlangResult JSONSourceMapUtil::decode(JSONContainer* container, JSONValue root, DiagnosticSink* sink, RefPtr<SourceMap>& out)
+/* static */SlangResult JSONSourceMapUtil::decode(JSONContainer* container, JSONValue root, DiagnosticSink* sink, SourceMap& outSourceMap)
 {
-    RefPtr<SourceMap> sourceMap(new SourceMap);
+    outSourceMap.clear();
 
     // Let's try and decode the JSON into native types to make this easier...
     RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
@@ -194,23 +188,23 @@ void _encode(Index v, StringBuilder& out)
         SLANG_RETURN_ON_FAIL(converter.convert(root, GetRttiInfo<JSONSourceMap>::get(), &native));
     }
 
-    sourceMap->m_file = native.file;
-    sourceMap->m_sourceRoot = native.sourceRoot;
+    outSourceMap.m_file = native.file;
+    outSourceMap.m_sourceRoot = native.sourceRoot;
 
     const Count sourcesCount = native.sources.getCount();
     
     // These should all be unique, but for simplicity, we build a table
-    sourceMap->m_sources.setCount(sourcesCount);
+    outSourceMap.m_sources.setCount(sourcesCount);
     for (Index i = 0; i < sourcesCount; ++i)
     {
-        sourceMap->m_sources[i] = sourceMap->m_slicePool.add(native.sources[i]);
+        outSourceMap.m_sources[i] = outSourceMap.m_slicePool.add(native.sources[i]);
     }
 
     Count sourcesContentCount = native.sourcesContent.getCount();
     sourcesContentCount = std::min(sourcesContentCount, sourcesCount);
 
-    sourceMap->m_sourcesContent.setCount(sourcesContentCount);
-    for (auto& cur : sourceMap->m_sourcesContent)
+    outSourceMap.m_sourcesContent.setCount(sourcesContentCount);
+    for (auto& cur : outSourceMap.m_sourcesContent)
     {
         cur = StringSlicePool::kNullHandle;
     }
@@ -224,7 +218,7 @@ void _encode(Index v, StringBuilder& out)
             if (value.getKind() == JSONValue::Kind::String)
             {
                 auto stringValue = container->getString(value);
-                sourceMap->m_sourcesContent[i] = sourceMap->m_slicePool.add(stringValue);
+                outSourceMap.m_sourcesContent[i] = outSourceMap.m_slicePool.add(stringValue);
             }
         }
     }
@@ -243,13 +237,13 @@ void _encode(Index v, StringBuilder& out)
 
     const Count linesCount = lines.getCount();
 
-    sourceMap->m_lineStarts.setCount(linesCount + 1);
+    outSourceMap.m_lineStarts.setCount(linesCount + 1);
 
     for (Index generatedLine = 0; generatedLine < linesCount; ++generatedLine)
     {
         const auto line = lines[generatedLine];
 
-        sourceMap->m_lineStarts[generatedLine] = sourceMap->m_lineEntries.getCount();
+        outSourceMap.m_lineStarts[generatedLine] = outSourceMap.m_lineEntries.getCount();
 
         // If it's empty move to next line
         if (line.getLength() == 0)
@@ -318,47 +312,45 @@ void _encode(Index v, StringBuilder& out)
             entry.sourceFileIndex = sourceFileIndex;
             entry.nameIndex = nameIndex;
 
-            sourceMap->m_lineEntries.add(entry);
+            outSourceMap.m_lineEntries.add(entry);
         }
     }
 
     // Mark the end
-    sourceMap->m_lineStarts[linesCount] = sourceMap->m_lineEntries.getCount();
-
-    out.swapWith(sourceMap);
+    outSourceMap.m_lineStarts[linesCount] = outSourceMap.m_lineEntries.getCount();
 
     return SLANG_OK;
 }
 
-SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue)
+SlangResult JSONSourceMapUtil::encode(const SourceMap& sourceMap, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue)
 {
     // Convert to native
     JSONSourceMap native;
 
-    native.file = sourceMap->m_file;
-    native.sourceRoot = sourceMap->m_sourceRoot;
+    native.file = sourceMap.m_file;
+    native.sourceRoot = sourceMap.m_sourceRoot;
 
     // Copy over the sources
     {
-        const auto count = sourceMap->m_sources.getCount();
+        const auto count = sourceMap.m_sources.getCount();
         native.sources.setCount(count);
         for (Index i = 0; i < count; ++i)
         {
-            native.sources[i] = sourceMap->m_slicePool.getSlice(sourceMap->m_sources[i]);
+            native.sources[i] = sourceMap.m_slicePool.getSlice(sourceMap.m_sources[i]);
         }
     }
 
     // Copy out the sourcesContent, care is needed around handling null
     {
-        const auto count = sourceMap->m_sourcesContent.getCount();
+        const auto count = sourceMap.m_sourcesContent.getCount();
         native.sourcesContent.setCount(count);
         for (Index i = 0; i < count; ++i)
         {
-            const auto srcValue = sourceMap->m_sourcesContent[i];
+            const auto srcValue = sourceMap.m_sourcesContent[i];
             
             const JSONValue dstValue = (srcValue == StringSlicePool::kNullHandle) ?
                 native.sourcesContent[i] = JSONValue::makeNull() :
-                container->createString(sourceMap->m_slicePool.getSlice(srcValue));
+                container->createString(sourceMap.m_slicePool.getSlice(srcValue));
 
             native.sourcesContent[i] = dstValue;
         }
@@ -366,11 +358,11 @@ SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* conta
 
     // Copy out the names
     {
-        const auto count = sourceMap->m_names.getCount();
+        const auto count = sourceMap.m_names.getCount();
         native.names.setCount(count);
         for (Index i = 0; i < count; ++i)
         {
-            native.names[i] = sourceMap->m_slicePool.getSlice(sourceMap->m_names[i]);
+            native.names[i] = sourceMap.m_slicePool.getSlice(sourceMap.m_names[i]);
         }
     }
 
@@ -378,7 +370,7 @@ SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* conta
 
     // Do the encoding!
     {
-        const Count linesCount = sourceMap->getGeneratedLineCount();
+        const Count linesCount = sourceMap.getGeneratedLineCount();
 
         Index sourceFileIndex = 0;
 
@@ -394,7 +386,7 @@ SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* conta
                 mappings.appendChar(';');
             }
 
-            const auto entries = sourceMap->getEntriesForLine(i);
+            const auto entries = sourceMap.getEntriesForLine(i);
             const auto entriesCount = entries.getCount();
 
             if (entriesCount == 0)
@@ -458,6 +450,82 @@ SlangResult JSONSourceMapUtil::encode(SourceMap* sourceMap, JSONContainer* conta
         SLANG_RETURN_ON_FAIL(converter.convert(GetRttiInfo<JSONSourceMap>::get(), &native, outValue));
     }
 
+    return SLANG_OK;
+}
+
+/* static */SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, SourceMap& outSourceMap)
+{
+    return read(blob, nullptr, outSourceMap);
+}
+
+SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink, SourceMap& outSourceMap)
+{
+    outSourceMap.clear();
+
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
+    DiagnosticSink sink(&sourceManager, nullptr);
+
+    sink.setParentSink(parentSink);
+
+    RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+
+    JSONValue rootValue;
+    {
+        // Now need to parse as JSON
+        SourceFile* sourceFile = sourceManager.createSourceFileWithBlob(PathInfo::makeUnknown(), blob);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        rootValue = builder.getRootValue();
+    }
+
+    SLANG_RETURN_ON_FAIL(decode(container, rootValue, &sink, outSourceMap));
+
+    return SLANG_OK;
+}
+
+
+/* static */SlangResult JSONSourceMapUtil::write(const SourceMap& sourceMap, ComPtr<ISlangBlob>& outBlob)
+{
+    SourceManager sourceMapSourceManager;
+    sourceMapSourceManager.initialize(nullptr, nullptr);
+
+    // Create a sink
+    DiagnosticSink sourceMapSink(&sourceMapSourceManager, nullptr);
+
+    SLANG_RETURN_ON_FAIL(write(sourceMap, &sourceMapSink, outBlob));
+    return SLANG_OK;
+}
+
+/* static */ SlangResult JSONSourceMapUtil::write(const SourceMap& sourceMap, DiagnosticSink* sink, ComPtr<ISlangBlob>& outBlob)
+{
+    auto sourceManager = sink->getSourceManager();
+
+    // Write it out
+    String json;
+    {
+        RefPtr<JSONContainer> jsonContainer(new JSONContainer(sourceManager));
+
+        JSONValue jsonValue;
+
+        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, sink, jsonValue));
+
+        // Convert into a string
+        JSONWriter writer(JSONWriter::IndentationStyle::Allman);
+        jsonContainer->traverseRecursively(jsonValue, &writer);
+
+        json = writer.getBuilder();
+    }
+
+    outBlob = StringBlob::moveCreate(json);
     return SLANG_OK;
 }
 

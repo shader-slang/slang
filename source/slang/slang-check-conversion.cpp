@@ -23,6 +23,17 @@ namespace Slang
         return kConversionCost_Explicit;
     }
 
+    BuiltinConversionKind SemanticsVisitor::getImplicitConversionBuiltinKind(
+        Decl* decl)
+    {
+        if (auto modifier = decl->findModifier<ImplicitConversionModifier>())
+        {
+            return modifier->builtinConversionKind;
+        }
+
+        return kBuiltinConversion_Unknown;
+    }
+
     bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(
         Type*    type)
     {
@@ -121,6 +132,7 @@ namespace Slang
         {
             ioInitArgIndex++;
             return _coerce(
+                CoercionSite::Initializer,
                 toType,
                 outToExpr,
                 firstInitExpr->type,
@@ -211,6 +223,7 @@ namespace Slang
             {
                 auto arg = fromInitializerListExpr->args[ioArgIndex++];
                 return _coerce(
+                    CoercionSite::Initializer,
                     toType,
                     outToExpr,
                     arg->type,
@@ -616,6 +629,7 @@ namespace Slang
     }
 
     bool SemanticsVisitor::_coerce(
+        CoercionSite site,
         Type*    toType,
         Expr**   outToExpr,
         Type*    fromType,
@@ -852,6 +866,7 @@ namespace Slang
             }
 
             if(!_coerce(
+                site,
                 toType,
                 outToExpr,
                 fromElementType,
@@ -908,6 +923,7 @@ namespace Slang
             }
 
             if (!_coerce(
+                site,
                 toType,
                 outToExpr,
                 fromValueType,
@@ -1012,7 +1028,7 @@ namespace Slang
             // cost associated with the initializer we are invoking.
             //
             ConversionCost cost = getImplicitConversionCost(
-                    overloadContext.bestCandidate->item.declRef.getDecl());;
+                    overloadContext.bestCandidate->item.declRef.getDecl());
 
             // If the cost is too high to be usable as an
             // implicit conversion, then we will report the
@@ -1051,6 +1067,17 @@ namespace Slang
                     if (shouldEmitGeneralWarning)
                     {
                         getSink()->diagnose(fromExpr, Diagnostics::unrecommendedImplicitConversion, fromType, toType);
+                    }
+                }
+                
+                if (site == CoercionSite::Argument)
+                {
+                    auto builtinConversionKind = getImplicitConversionBuiltinKind(
+                        overloadContext.bestCandidate->item.declRef.getDecl());
+                    if (builtinConversionKind == kBuiltinConversion_FloatToDouble)
+                    {
+                        if (!as<FloatingPointLiteralExpr>(fromExpr))
+                            getSink()->diagnose(fromExpr, Diagnostics::implicitConversionToDouble);
                     }
                 }
             }
@@ -1146,6 +1173,7 @@ namespace Slang
         // during the coercion process.
         //
         bool rs = _coerce(
+            CoercionSite::General,
             toType,
             nullptr,
             fromType,
@@ -1215,11 +1243,13 @@ namespace Slang
 
 
     Expr* SemanticsVisitor::coerce(
+        CoercionSite site,
         Type*    toType,
         Expr*    fromExpr)
     {
         Expr* expr = nullptr;
         if (!_coerce(
+            site,
             toType,
             &expr,
             fromExpr->type,

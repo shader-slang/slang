@@ -8,11 +8,7 @@
 #include "slang-io.h"
 
 #ifdef _WIN32
-	#define WIN32_LEAN_AND_MEAN
-	#define NOMINMAX
-	#include <Windows.h>
-	#undef WIN32_LEAN_AND_MEAN
-	#undef NOMINMAX
+	#include <windows.h>
 #else
 	#include "slang-string.h"
 	#include <dlfcn.h>
@@ -177,9 +173,25 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 /* static */SlangResult SharedLibrary::loadWithPlatformPath(char const* platformFileName, Handle& handleOut)
 {
     handleOut = nullptr;
+    // Work around
+    // https://github.com/microsoft/DirectXShaderCompiler/issues/5119 and
+    // https://github.com/doitsujin/dxvk/issues/3330
+    // libdxcompiler.so invokes UB on dlclose, the dxvk libs break GDB when
+    // closed
+    const auto unclosableLibNames = {"libdxcompiler", "libdxvk_d3d11", "libdxvk_dxgi"};
+    bool isUnclosable = false;
+    for(auto n : unclosableLibNames)
+    {
+        if(strncmp(platformFileName, n, strlen(n)) == 0)
+        {
+            isUnclosable = true;
+            break;
+        }
+    }
     if (strlen(platformFileName) == 0)
         platformFileName = nullptr;
-    void *h = dlopen(platformFileName, RTLD_NOW | RTLD_GLOBAL);
+    const auto mode = RTLD_NOW | RTLD_GLOBAL | (isUnclosable ? RTLD_NODELETE : 0);
+    void *h = dlopen(platformFileName, mode);
     if (!h)
     {
 #if 0

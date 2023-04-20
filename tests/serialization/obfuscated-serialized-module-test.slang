@@ -3,7 +3,7 @@
 // A test to try out the basics of module
 // serialization, obfuscation and source maps.
 
-//TEST:COMPILE: tests/serialization/serialized-module.slang -o tests/serialization/obfuscated-serialized-module.slang-module -obfuscate -source-map
+//TEST:COMPILE: tests/serialization/serialized-module.slang -o tests/serialization/obfuscated-serialized-module.slang-module -g -obfuscate -source-map
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -Xslang... -r tests/serialization/obfuscated-serialized-module.slang-module -obfuscate -source-map -X. -shaderobj
 
 //import obfuscated_serialized_module;

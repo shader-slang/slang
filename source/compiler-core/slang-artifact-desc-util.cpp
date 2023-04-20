@@ -222,6 +222,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(DebugInfo, Metadata) \
                 x(PdbDebugInfo, DebugInfo) \
             x(Diagnostics, Metadata) \
+            x(PostEmitMetadata, Metadata) \
         x(Miscellaneous, Base) \
             x(Log, Miscellaneous) \
             x(Lock, Miscellaneous) \
@@ -459,7 +460,15 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactDescUtil::isLinkable(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
+    // If is a container with compile results *assume* that result is linkable
+    if (isDerivedFrom(desc.kind, ArtifactKind::Container) &&
+        isDerivedFrom(desc.payload, ArtifactPayload::CompileResults))
+    {
+        return true;
+    }
+
+    // if it's a compile binary or a container
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary)) 
     {
         if (isDerivedFrom(desc.payload, ArtifactPayload::KernelLike))
         {
@@ -730,6 +739,16 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             // Not really what kind of json, so just use 'generic' json extension
             out << "json";
             return SLANG_OK;
+        }
+        case ArtifactKind::CompileBinary:
+        {
+            if (isDerivedFrom(desc.payload, ArtifactPayload::SlangIR) ||
+                isDerivedFrom(desc.payload, ArtifactPayload::SlangAST))
+            {
+                out << "slang-module";
+                return SLANG_OK;
+            }
+            break;
         }
         default: break;
     }

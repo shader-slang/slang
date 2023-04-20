@@ -87,6 +87,9 @@ interface __BuiltinArithmeticType : __BuiltinType
 {
         /// Initialize from a 32-bit signed integer value.
     __init(int value);
+
+        /// Initialize from the same type.
+    __init(This value);
 }
 
 /// A type that can be used for logical/bitwise operations
@@ -382,7 +385,6 @@ ${{{{
     }
 }}}}
 {
-
 ${{{{
     // Declare initializers to convert from various other types
     for (int ss = 0; ss < kBaseTypeCount; ++ss)
@@ -403,10 +405,15 @@ ${{{{
         IROp intrinsicOpCode = getBaseTypeConversionOp(
             kBaseTypes[tt],
             kBaseTypes[ss]);
+
+        BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
+        if (kBaseTypes[tt].tag == BaseType::Double &&
+            kBaseTypes[ss].tag == BaseType::Float)
+            builtinConversionKind = kBuiltinConversion_FloatToDouble;
 }}}}
 
     __intrinsic_op($(intrinsicOpCode))
-    __implicit_conversion($(conversionCost))
+    __implicit_conversion($(conversionCost), $(builtinConversionKind))
     __init($(kBaseTypes[ss].name) value);
 
 ${{{{
@@ -3122,3 +3129,6 @@ attribute_syntax [noinline] : NoInlineAttribute;
 
 __attributeTarget(StructDecl)
 attribute_syntax [payload] : PayloadAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;

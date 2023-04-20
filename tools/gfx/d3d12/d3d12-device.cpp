@@ -405,8 +405,13 @@ Result DeviceImpl::initialize(const Desc& desc)
 
     // Rather than statically link against D3D, we load it dynamically.
 
-    HMODULE d3dModule = LoadLibraryA("d3d12.dll");
-    if (!d3dModule)
+    SharedLibrary::Handle d3dModule;
+#if SLANG_WINDOWS_FAMILY
+    const char* libName = "d3d12";
+#else
+    const char* libName = "vkd3d-proton-d3d12";
+#endif
+    if (SLANG_FAILED(SharedLibrary::load(libName, d3dModule)))
     {
         getDebugCallback()->handleMessage(
             DebugMessageType::Error, DebugMessageSource::Layer, "error: failed load 'd3d12.dll'\n");
@@ -458,6 +463,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
+#if SLANG_ENABLE_PIX
     HMODULE pixModule = LoadLibraryW(L"WinPixEventRuntime.dll");
     if (pixModule)
     {
@@ -466,6 +472,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         m_EndEventOnCommandList =
             (PFN_EndEventOnCommandList)GetProcAddress(pixModule, "PIXEndEventOnCommandList");
     }
+#endif
 
     if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled())
     {
@@ -1990,7 +1997,7 @@ void DeviceImpl::submitResourceCommandsAndWait(const DeviceImpl::ResourceCommand
     m_resourceCommandTransientHeap->synchronizeAndReset();
 }
 
-void DeviceImpl::processExperimentalFeaturesDesc(void* d3dModule, void* inDesc)
+void DeviceImpl::processExperimentalFeaturesDesc(SharedLibrary::Handle d3dModule, void* inDesc)
 {
     typedef HRESULT(WINAPI* PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)(
         UINT      NumFeatures,
@@ -2002,7 +2009,7 @@ void DeviceImpl::processExperimentalFeaturesDesc(void* d3dModule, void* inDesc)
     D3D12ExperimentalFeaturesDesc desc = {};
     memcpy(&desc, inDesc, sizeof(desc));
     auto enableExperimentalFeaturesFunc =
-        (PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)loadProc((HMODULE)d3dModule, "D3D12EnableExperimentalFeatures");
+        (PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)loadProc(d3dModule, "D3D12EnableExperimentalFeatures");
     if (!enableExperimentalFeaturesFunc)
     {
         getDebugCallback()->handleMessage(
@@ -2173,9 +2180,9 @@ Result DeviceImpl::createCommandQueueImpl(CommandQueueImpl** outQueue)
     return SLANG_OK;
 }
 
-PROC DeviceImpl::loadProc(HMODULE module, char const* name)
+void* DeviceImpl::loadProc(SharedLibrary::Handle module, char const* name)
 {
-    PROC proc = ::GetProcAddress(module, name);
+    void* proc = SharedLibrary::findSymbolAddressByName(module, name);
     if (!proc)
     {
         fprintf(stderr, "error: failed load symbol '%s'\n", name);

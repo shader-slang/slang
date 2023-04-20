@@ -157,7 +157,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
@@ -174,7 +174,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
@@ -191,7 +191,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
@@ -208,7 +208,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -228,7 +228,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -248,7 +248,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -272,9 +272,7 @@
     <ClInclude Include="..\..\..\source\core\slang-basic.h" />
     <ClInclude Include="..\..\..\source\core\slang-blob.h" />
     <ClInclude Include="..\..\..\source\core\slang-byte-encode-util.h" />
-    <ClInclude Include="..\..\..\source\core\slang-castable-list-impl.h" />
-    <ClInclude Include="..\..\..\source\core\slang-castable-list.h" />
-    <ClInclude Include="..\..\..\source\core\slang-castable-util.h" />
+    <ClInclude Include="..\..\..\source\core\slang-castable.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-encode.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-chunked-list.h" />
@@ -284,7 +282,6 @@
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-crypto.h" />
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />
-    <ClInclude Include="..\..\..\source\core\slang-destroyable.h" />
     <ClInclude Include="..\..\..\source\core\slang-dictionary.h" />
     <ClInclude Include="..\..\..\source\core\slang-exception.h" />
     <ClInclude Include="..\..\..\source\core\slang-file-system.h" />
@@ -295,7 +292,6 @@
     <ClInclude Include="..\..\..\source\core\slang-http.h" />
     <ClInclude Include="..\..\..\source\core\slang-implicit-directory-collector.h" />
     <ClInclude Include="..\..\..\source\core\slang-io.h" />
-    <ClInclude Include="..\..\..\source\core\slang-lazy-castable-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-linked-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-lz4-compression-system.h" />
@@ -342,8 +338,7 @@
     <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-blob.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-byte-encode-util.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-castable-list-impl.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-castable-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-castable.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-encode.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-command-line.cpp" />
@@ -355,7 +350,6 @@
     <ClCompile Include="..\..\..\source\core\slang-http.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-implicit-directory-collector.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-io.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-lazy-castable-list.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-file-system.cpp" />

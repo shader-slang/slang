@@ -166,6 +166,30 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 #define SLANG_APPLE_FAMILY (SLANG_IOS || SLANG_OSX)                  /* equivalent to #if __APPLE__ */
 #define SLANG_UNIX_FAMILY (SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY) /* shortcut for unix/posix platforms */
 
+/* Macros concerning DirectX */
+#if SLANG_WINDOWS_FAMILY
+#    define SLANG_ENABLE_DIRECTX 1
+#    define SLANG_ENABLE_DXGI_DEBUG 1
+#    define SLANG_ENABLE_FXC 1
+#    define SLANG_ENABLE_PIX 1
+#    define SLANG_ENABLE_DXVK 0
+#    define SLANG_ENABLE_VKD3D_PROTON 0
+#elif SLANG_LINUX_FAMILY
+#    define SLANG_ENABLE_DIRECTX 0
+#    define SLANG_ENABLE_DXGI_DEBUG 0
+#    define SLANG_ENABLE_FXC 0
+#    define SLANG_ENABLE_PIX 0
+#    define SLANG_ENABLE_DXVK 1
+#    define SLANG_ENABLE_VKD3D_PROTON 1
+#else
+#    define SLANG_ENABLE_DIRECTX 0
+#    define SLANG_ENABLE_DXGI_DEBUG 0
+#    define SLANG_ENABLE_FXC 0
+#    define SLANG_ENABLE_PIX 0
+#    define SLANG_ENABLE_DXVK 0
+#    define SLANG_ENABLE_VKD3D_PROTON 0
+#endif
+
 /* Macro for declaring if a method is no throw. Should be set before the return parameter. */
 #ifndef SLANG_NO_THROW
 #   if SLANG_WINDOWS_FAMILY && !defined(SLANG_DISABLE_EXCEPTIONS)
@@ -932,20 +956,32 @@ extern "C"
 // It is not necessary to use the multiple parameters (we can wrap in parens), but this is simple.
 #define SLANG_COM_INTERFACE(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7) \
     public: \
-    SLANG_FORCE_INLINE static const SlangUUID& getTypeGuid() \
+    SLANG_FORCE_INLINE constexpr static SlangUUID getTypeGuid() \
     { \
-        static const SlangUUID guid = { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
-        return guid; \
+        return { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
     }
 
 // Sometimes it's useful to associate a guid with a class to identify it. This macro can used for this,
 // and the guid extracted via the getTypeGuid() function defined in the type
 #define SLANG_CLASS_GUID(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7) \
-    SLANG_FORCE_INLINE static const SlangUUID& getTypeGuid() \
+    SLANG_FORCE_INLINE constexpr static SlangUUID getTypeGuid() \
     { \
-        static const SlangUUID guid = { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
-        return guid; \
+        return { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
     }
+
+// Helper to fill in pairs of GUIDs and return pointers. This ensures that the
+// type of the GUID passed matches the pointer type, and that it is derived
+// from ISlangUnknown,
+// TODO(c++20): would is_derived_from be more appropriate here for private inheritance of ISlangUnknown?
+//
+// with     : void createFoo(SlangUUID, void**);
+//            Slang::ComPtr<Bar> myBar;
+// call with: createFoo(SLANG_IID_PPV_ARGS(myBar.writeRef()))
+// to call  : createFoo(Bar::getTypeGuid(), (void**)(myBar.writeRef()))
+#define SLANG_IID_PPV_ARGS(ppType) \
+    std::decay_t<decltype(**(ppType))>::getTypeGuid(), \
+    ((void)[]{static_assert(std::is_base_of_v<ISlangUnknown, std::decay_t<decltype(**(ppType))>>);}, reinterpret_cast<void**>(ppType))
+
 
     /** Base interface for components exchanged through the API.
 
@@ -3920,6 +3956,12 @@ namespace slang
             */
         virtual SLANG_NO_THROW void const* SLANG_MCALL getCompileRequestCode(
             size_t*                 outSize) = 0;
+
+            /** Get the compilation result as a file system.
+            The result is not written to the actual OS file system, but is made avaiable as an 
+            in memory representation.
+            */
+        virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getCompileRequestResultAsFileSystem() = 0;
 
             /** Return the container code as a blob. The container blob is created as part of a compilation (with spCompile),
             and a container is produced with a suitable ContainerFormat. 

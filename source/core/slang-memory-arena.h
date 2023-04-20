@@ -149,6 +149,9 @@ public:
         /// Add a block such that it will be freed when everything else is freed.
     void addExternalBlock(void* data, size_t size);
 
+        // Swap this with rhs 
+    void swapWith(ThisType& rhs);
+
         /// Default Ctor
     MemoryArena();
         /// Construct with block size and alignment. Block alignment must be a power of 2.

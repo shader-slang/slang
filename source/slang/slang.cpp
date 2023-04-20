@@ -6,12 +6,16 @@
 #include "../core/slang-archive-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-castable.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
+#include "../compiler-core/slang-artifact-container-util.h"
+
+#include "../core/slang-memory-file-system.h"
 
 #include "slang-module-library.h"
 
@@ -2381,7 +2385,7 @@ void FrontEndCompileRequest::generateIR()
         if (useSerialIRBottleneck)
         {
             // Keep the obfuscated source map (if there is one)
-            RefPtr<SourceMap> obfuscatedSourceMap = irModule->getObfuscatedSourceMap();
+            ComPtr<IBoxValue<SourceMap>> obfuscatedSourceMap(irModule->getObfuscatedSourceMap());
 
             IRSerialData serialData;
             {
@@ -3393,7 +3397,7 @@ ComponentType* asInternal(slang::IComponentType* inComponentType)
     // (without even `addRef`-ing it).
     //
     ComPtr<slang::IComponentType> componentType;
-    inComponentType->queryInterface(slang::IComponentType::getTypeGuid(), (void**) componentType.writeRef());
+    inComponentType->queryInterface(SLANG_IID_PPV_ARGS(componentType.writeRef()));
     return static_cast<ComponentType*>(componentType.get());
 }
 
@@ -4454,7 +4458,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
             else
             {
                 // See if we have the full ISlangFileSystemExt interface, if we do just use it
-                inFileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
+                inFileSystem->queryInterface(SLANG_IID_PPV_ARGS(m_fileSystemExt.writeRef()));
 
                 // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
                 if (!m_fileSystemExt)
@@ -4829,9 +4833,83 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact, ModuleLibrary* moduleLibrary)
+{
+    FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
+    frontEndRequest->m_extraEntryPoints.addRange(moduleLibrary->m_entryPoints.getBuffer(), moduleLibrary->m_entryPoints.getCount());
+
+    // Add to the m_libModules
+    auto linkage = req->getLinkage();
+    linkage->m_libModules.add(ComPtr<IArtifact>(artifact));
+
+    return SLANG_OK;
+}
+
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact)
 {
     auto desc = artifact->getDesc();
+
+    // TODO(JS):
+    // This isn't perhaps the best way to handle this scenario, as IArtifact can 
+    // support lazy evaluation, with suitable hander.
+    // For now we just read in and strip out the bits we want.
+    if (isDerivedFrom(desc.kind, ArtifactKind::Container) && 
+        isDerivedFrom(desc.payload, ArtifactPayload::CompileResults))
+    {
+        // We want to read as a file system
+        ComPtr<IArtifact> container;
+
+        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::readContainer(artifact, container));
+
+        // Find the payload... It should be linkable
+        if (!ArtifactDescUtil::isLinkable(container->getDesc()))
+        {
+            return SLANG_FAIL;
+        }
+
+        ComPtr<IModuleLibrary> libraryIntf;
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, container, req, libraryIntf));
+
+        auto library = as<ModuleLibrary>(libraryIntf);
+        
+        // Look for source maps
+        for (auto associated : container->getAssociated())
+        {
+            auto assocDesc = associated->getDesc();
+
+            // If we find an obfuscated source map load it and associate
+            if (isDerivedFrom(assocDesc.kind, ArtifactKind::Json) && 
+                isDerivedFrom(assocDesc.payload, ArtifactPayload::SourceMap) &&
+                isDerivedFrom(assocDesc.style, ArtifactStyle::Obfuscated))
+            {
+                ComPtr<ICastable> castable;
+                SLANG_RETURN_ON_FAIL(associated->getOrCreateRepresentation(SourceMap::getTypeGuid(), ArtifactKeep::Yes, castable.writeRef()));
+                auto sourceMap = asBoxValue<SourceMap>(castable);
+                SLANG_ASSERT(sourceMap);
+                
+                // I guess we add to all ir modules?
+
+                for (auto irModule : library->m_modules)
+                {
+                    irModule->setObfuscatedSourceMap(sourceMap);
+                }
+
+                // Look up the source file
+                auto sourceManager = req->getSink()->getSourceManager();
+
+                auto name = Path::getFileNameWithoutExt(associated->getName());
+
+                if (name.getLength())
+                {
+                    auto sourceFile = sourceManager->findSourceFileByPathRecursively(name);
+                    sourceFile->setSourceMap(sourceMap);
+                }
+            }
+        }
+
+        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, container, library));
+        return SLANG_OK;
+    }
 
     if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::SlangIR)
     {
@@ -4845,14 +4923,12 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
             return SLANG_FAIL;
         }
 
-        FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
-        frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
+        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, artifact, library));
+        return SLANG_OK;
     }
-    else
-    {
-        // TODO(JS):
-        // Do we want to check the path exists?
-    }
+
+    // TODO(JS):
+    // Do we want to check the path exists?
 
     // Add to the m_libModules
     auto linkage = req->getLinkage();
@@ -5233,6 +5309,23 @@ char const* EndToEndCompileRequest::getEntryPointSource(int entryPointIndex)
     return (char const*)getEntryPointCode(entryPointIndex, nullptr);
 }
 
+ISlangMutableFileSystem* EndToEndCompileRequest::getCompileRequestResultAsFileSystem()
+{
+    if (!m_containerFileSystem)
+    {
+        if (m_containerArtifact)
+        {
+            ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+            if (SLANG_SUCCEEDED(ArtifactContainerUtil::writeContainer(m_containerArtifact, "", fileSystem)))
+            {
+                m_containerFileSystem.swap(fileSystem);
+            }
+        }
+    }
+
+    return m_containerFileSystem;
+}
+
 void const* EndToEndCompileRequest::getCompileRequestCode(size_t* outSize)
 {
     if (m_containerArtifact)
@@ -5378,7 +5471,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
         return SLANG_E_INVALID_ARG;
 
     // Find a rep
-    auto metadata = findAssociated<IArtifactPostEmitMetadata>(artifact);
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 

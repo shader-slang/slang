@@ -46,15 +46,20 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
     m_desc = desc;
 
     // Rather than statically link against D3D, we load it dynamically.
-    HMODULE d3dModule = LoadLibraryA("d3d11.dll");
-    if (!d3dModule)
+    SharedLibrary::Handle d3dModule;
+#if SLANG_ENABLE_DXVK
+    const char* libName = "dxvk_d3d11";
+#else
+    const char* libName = "d3d11";
+#endif
+    if (SLANG_FAILED(SharedLibrary::load(libName, d3dModule)))
     {
-        fprintf(stderr, "error: failed load 'd3d11.dll'\n");
+        fprintf(stderr, "error: failed to load '%s'\n", libName);
         return SLANG_FAIL;
     }
 
     PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN D3D11CreateDeviceAndSwapChain_ =
-        (PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)GetProcAddress(d3dModule, "D3D11CreateDeviceAndSwapChain");
+        (PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)SharedLibrary::findSymbolAddressByName(d3dModule, "D3D11CreateDeviceAndSwapChain");
     if (!D3D11CreateDeviceAndSwapChain_)
     {
         fprintf(stderr,
@@ -63,7 +68,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
     }
 
     PFN_D3D11_CREATE_DEVICE D3D11CreateDevice_ =
-        (PFN_D3D11_CREATE_DEVICE)GetProcAddress(d3dModule, "D3D11CreateDevice");
+        (PFN_D3D11_CREATE_DEVICE)SharedLibrary::findSymbolAddressByName(d3dModule, "D3D11CreateDevice");
     if (!D3D11CreateDevice_)
     {
         fprintf(stderr,
@@ -1423,6 +1428,8 @@ void DeviceImpl::bindRootShaderObject(IShaderObject* shaderObject)
 {
     RootShaderObjectImpl* rootShaderObjectImpl = static_cast<RootShaderObjectImpl*>(shaderObject);
     RefPtr<PipelineStateBase> specializedPipeline;
+    // TODO: Do something less crappy than just asserting on failure here
+    SLANG_ASSERT_VOID_ON_FAIL(maybeSpecializePipeline(m_currentPipelineState, rootShaderObjectImpl, specializedPipeline));
     maybeSpecializePipeline(m_currentPipelineState, rootShaderObjectImpl, specializedPipeline);
     PipelineStateImpl* specializedPipelineImpl = static_cast<PipelineStateImpl*>(specializedPipeline.Ptr());
     setPipelineState(specializedPipelineImpl);

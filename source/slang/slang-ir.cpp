@@ -2809,6 +2809,13 @@ namespace Slang
             operands);
     }
 
+    IRVectorType* IRBuilder::getVectorType(
+        IRType* elementType,
+        IRIntegerValue elementCount)
+    {
+        return getVectorType(elementType, getIntValue(getIntType(), elementCount));
+    }
+
     IRMatrixType* IRBuilder::getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
@@ -2837,9 +2844,9 @@ namespace Slang
             (IRInst**)&elementType);
     }
 
-    IRTorchTensorType* IRBuilder::getTorchTensorType()
+    IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
     {
-        return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 0, nullptr);
+        return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 1, (IRInst**)&elementType);
     }
 
     IRDifferentialPairType* IRBuilder::getDifferentialPairType(
@@ -3870,7 +3877,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair)
     {
-        SLANG_ASSERT(as<IRDifferentialPairType>(diffPair->getDataType()));
+        SLANG_ASSERT(as<IRDifferentialPairTypeBase>(diffPair->getDataType()));
         return emitIntrinsicInst(
             diffType,
             kIROp_DifferentialPairGetDifferential,
@@ -3880,9 +3887,18 @@ namespace Slang
 
     IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRInst* diffPair)
     {
-        auto valueType = cast<IRDifferentialPairType>(diffPair->getDataType())->getValueType();
+        auto valueType = cast<IRDifferentialPairTypeBase>(diffPair->getDataType())->getValueType();
         return emitIntrinsicInst(
             valueType,
+            kIROp_DifferentialPairGetPrimal,
+            1,
+            &diffPair);
+    }
+
+    IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRType* primalType, IRInst* diffPair)
+    {
+        return emitIntrinsicInst(
+            primalType,
             kIROp_DifferentialPairGetPrimal,
             1,
             &diffPair);
@@ -4607,6 +4623,13 @@ namespace Slang
 
     IRInst* IRBuilder::emitElementExtract(
         IRInst* base,
+        IRIntegerValue index)
+    {
+        return emitElementExtract(base, getIntValue(getIntType(), index));
+    }
+
+    IRInst* IRBuilder::emitElementExtract(
+        IRInst* base,
         const ArrayView<IRInst*>& accessChain)
     {
         for (auto access : accessChain)
@@ -4653,6 +4676,13 @@ namespace Slang
 
     IRInst* IRBuilder::emitElementAddress(
         IRInst* basePtr,
+        IRIntegerValue index)
+    {
+        return emitElementAddress(basePtr, getIntValue(getIntType(), index));
+    }
+
+    IRInst* IRBuilder::emitElementAddress(
+        IRInst* basePtr,
         IRInst* index)
     {
         IRType* type = nullptr;
@@ -4668,6 +4698,11 @@ namespace Slang
         else if (auto matrixType = as<IRMatrixType>(basePtrType->getValueType()))
         {
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+        }
+        else if (auto basicType = as<IRBasicType>(basePtrType->getValueType()))
+        {
+            // HLSL support things like float.x, in which case we just return the base pointer.
+            return basePtr;
         }
         SLANG_RELEASE_ASSERT(type);
         auto inst = createInst<IRGetElementPtr>(
@@ -4724,6 +4759,11 @@ namespace Slang
 
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement)
+    {
+        return emitUpdateElement(base, getIntValue(getIntType(), index), newElement);
     }
 
     IRInst* IRBuilder::emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement)
@@ -6858,6 +6898,8 @@ namespace Slang
         SLANG_ASSERT(other);
         if (other->getPrevInst() == this)
             return;
+        if (other == this)
+            return;
         _insertAt(other->getPrevInst(), other, other->getParent());
     }
 
@@ -7223,6 +7265,7 @@ namespace Slang
         case kIROp_TorchGetCudaStream:
         case kIROp_MakeTensorView:
         case kIROp_TorchTensorGetView:
+        case kIROp_GetStringHash:
             return false;
 
         case kIROp_ForwardDifferentiate:

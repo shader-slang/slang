@@ -94,9 +94,7 @@ void TorchCppSourceEmitter::emitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
 
             // shared mem
-            m_writer->emit("slangGetCudaKernelSharedMemSize((const void*)(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")), ");
+            m_writer->emit("0, ");
 
             // stream
             m_writer->emit("((cudaStream_t)");
@@ -164,6 +162,15 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
                     m_writer->emit(", ");
                 auto arg = inst->getOperand(i);
                 emitOperand(arg, getInfo(EmitOp::General));
+            }
+            if (as<IRTorchTensorType>(inst->getDataType()))
+            {
+                if (auto vectorType = as<IRVectorType>(inst->getDataType()->getOperand(0)))
+                {
+                    // If the element type of the tensor is a vector, we need to add the vector size to the shape.
+                    m_writer->emit(", ");
+                    emitOperand(vectorType->getElementCount(), getInfo(EmitOp::General));
+                }
             }
             m_writer->emit("}, torch::TensorOptions().device(torch::kCUDA).dtype(");
             emitTorchScalarTypeName(m_writer, inst->getDataType());

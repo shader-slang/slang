@@ -21,7 +21,7 @@ public:
 	SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
 	// IArtifactHandler
-	SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifactContainer* container) SLANG_OVERRIDE;
+	SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifact* container) SLANG_OVERRIDE;
 	SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable) SLANG_OVERRIDE;
 	
 	static IArtifactHandler* getSingleton() { return &g_singleton; }

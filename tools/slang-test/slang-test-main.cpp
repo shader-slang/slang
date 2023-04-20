@@ -6,6 +6,7 @@
 #include "../../source/core/slang-hex-dump-util.h"
 #include "../../source/core/slang-type-text-util.h"
 #include "../../source/core/slang-memory-arena.h"
+#include "../../source/core/slang-castable.h"
 
 #include "../../source/compiler-core/slang-artifact-desc-util.h"
 #include "../../source/compiler-core/slang-artifact-helper.h"
@@ -78,10 +79,22 @@ struct TestOptions
         }
     }
 
+    // Small helper to help consistently interrogating for filecheck usage
+    bool getFileCheckPrefix(String& prefix) const
+    {
+        return commandOptions.TryGetValue("filecheck", prefix);
+    }
+    bool getFileCheckBufferPrefix(String& prefix) const
+    {
+        return commandOptions.TryGetValue("filecheck-buffer", prefix);
+    }
+
     Type type = Type::Normal;
 
     String command;
     List<String> args;
+
+    Dictionary<String, String> commandOptions;
 
     // The categories that this test was assigned to
     List<TestCategory*> categories;
@@ -134,6 +147,24 @@ typedef TestResult(*TestCallback)(TestContext* context, TestInput& input);
 static void _addRenderTestOptions(const Options& options, CommandLine& cmdLine);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+// Tries to read in order
+// - The file specific to this test:      input.outputStem + suffix
+// - The general file for a set of tests: input.fileName + suffix;
+static SlangResult _readTestFile(const TestInput& input, const String& suffix, String& out)
+{
+    StringBuilder buf;
+    buf << input.outputStem << suffix;
+    if(auto r = Slang::File::readAllText(buf, out); SLANG_SUCCEEDED(r))
+    {
+        return r;
+    }
+
+    buf.Clear();
+    buf << input.filePath << suffix;
+    return Slang::File::readAllText(buf, out);
+}
+
 
 bool match(char const** ioCursor, char const* expected)
 {
@@ -218,7 +249,7 @@ String collectRestOfLine(char const** ioCursor)
     return getString(textBegin, textEnd);
 }
 
-static bool _isEndOfCategoryList(char c)
+static bool _isEndOfLineOrParens(char c)
 {
     switch (c)
     {
@@ -244,7 +275,7 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
         const char*const start = cursor;
 
         // Find the end
-        for (; !_isEndOfCategoryList(*cursor); ++cursor);
+        for (; !_isEndOfLineOrParens(*cursor); ++cursor);
         if (*cursor != ')')
         {
             *ioCursor = cursor;
@@ -270,6 +301,46 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
             }
 
             out.addCategory(category);
+        }
+    }
+
+    *ioCursor = cursor;
+    return SLANG_OK;
+}
+
+static SlangResult _parseCommandArguments(char const** ioCursor, TestOptions& out)
+{
+    char const* cursor = *ioCursor;
+
+    // If don't have ( we don't have any additional options
+    if (*cursor == '(')
+    {
+        cursor++;
+        const char*const start = cursor;
+
+        // Find the end
+        for (; !_isEndOfLineOrParens(*cursor); ++cursor);
+        if (*cursor != ')')
+        {
+            *ioCursor = cursor;
+            return SLANG_FAIL;
+        }
+        cursor++;
+
+        List<UnownedStringSlice> options;
+        StringUtil::split(UnownedStringSlice(start, cursor - 1), ',', options);
+
+        for (auto& option : options)
+        {
+            auto i = option.indexOf('=');
+            if(i == -1)
+            {
+                out.commandOptions.Add(option.trim(), "");
+            }
+            else
+            {
+                out.commandOptions.Add(option.head(i).trim(), option.tail(i+1).trim());
+            }
         }
     }
 
@@ -341,6 +412,7 @@ static SlangResult _gatherTestOptions(
             cursor++;
             continue;
 
+        case '(':
         case ':':
             break;
         
@@ -353,6 +425,13 @@ static SlangResult _gatherTestOptions(
     char const* commandEnd = cursor;
 
     outOptions.command = getString(commandStart, commandEnd);
+
+    // Allow parameterizing the test command separately from the arguments, this
+    // is because the arguments are often passed to the compiler verbatim, and
+    // it's messy to have the test runner rifling through and picking things
+    // out
+    // Format is: (foo=bar, baz = 2)
+    SLANG_RETURN_ON_FAIL(_parseCommandArguments(&cursor, outOptions));
 
     if(*cursor == ':')
         cursor++;
@@ -536,7 +615,117 @@ static SlangResult _gatherTestsForFile(
     return SLANG_OK;
 }
 
+static void SLANG_STDCALL _fileCheckDiagnosticCallback(void* data, const TestMessageType messageType, const char* message) noexcept
+{
+    auto& testReporter = *reinterpret_cast<TestReporter*>(data);
+    testReporter.message(messageType, message);
+}
 
+//
+// Check some generated output with FileCheck
+//
+static TestResult _fileCheckTest(
+    TestContext& context,
+    const String& fileCheckRules,
+    const String& fileCheckPrefix,
+    const String& outputToCheck)
+{
+    auto& testReporter = *context.getTestReporter();
+
+    IFileCheck* fc = context.getFileCheck();
+    if(!fc)
+    {
+        // TODO(JS):
+        // Do we want to fail or ignore if we don't find file check?
+        testReporter.message(TestMessageType::RunError, "FileCheck is not available");
+        return TestResult::Fail;
+    }
+
+    const bool coloredOutput = true;
+    return fc->performTest(
+        "slang-test",
+        fileCheckRules.begin(),
+        fileCheckPrefix.begin(),
+        outputToCheck.begin(),
+        "actual-output",
+        _fileCheckDiagnosticCallback,
+        &testReporter,
+        coloredOutput);
+}
+
+template<typename Compare>
+static TestResult _fileComparisonTest(
+    TestContext& context,
+    const TestInput& input,
+    const char* defaultExpectedContent,
+    const char* expectedFileSuffix,
+    const String& actualOutput,
+    Compare compare)
+{
+    String expectedOutput;
+
+    if (SLANG_FAILED(_readTestFile(input, expectedFileSuffix, expectedOutput)))
+    {
+        if(defaultExpectedContent)
+        {
+            expectedOutput = defaultExpectedContent;
+        }
+        else
+        {
+            context.getTestReporter()->messageFormat(TestMessageType::RunError,
+                "Unable to read %s output for '%s'\n",
+                expectedFileSuffix,
+                input.outputStem.getBuffer());
+            return TestResult::Fail;
+        }
+    }
+
+    // Otherwise we compare to the expected output
+    if (!compare(actualOutput, expectedOutput))
+    {
+        context.getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
+        return TestResult::Fail;
+    }
+    return TestResult::Pass;
+}
+
+static bool _areLinesEqual(const String& a, const String& e)
+{
+    return StringUtil::areLinesEqual(a.getUnownedSlice(), e.getUnownedSlice());
+}
+
+// Either run FileCheck over the result, or read and compare with a .expected file
+// On a comparison failure, dump the difference
+// On any failure, write a .actual file.
+template<typename Compare = decltype(_areLinesEqual)>
+static TestResult _validateOutput(
+    TestContext* const context,
+    const TestInput& input,
+    const String& actualOutput,
+    const bool forceFailure = false,
+    const char* defaultExpectedContent = nullptr,
+    const Compare compare = _areLinesEqual)
+{
+    String fileCheckPrefix;
+    const TestResult result =
+        input.testOptions->getFileCheckPrefix(fileCheckPrefix)
+            ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
+            : _fileComparisonTest(*context, input, defaultExpectedContent, ".expected", actualOutput, compare);
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == TestResult::Fail || forceFailure)
+    {
+        String actualOutputPath = input.outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
+        return TestResult::Fail;
+    }
+    else
+    {
+        return result;
+    }
+}
 
 Result spawnAndWaitExe(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
@@ -1169,7 +1358,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
     }
 
     // Couldn't find either 
-    printf("referenceOutput '%s' or '%s' not found.\n", defaultBuf.getBuffer(), specializedBuf.getBuffer());
+    fprintf(stderr, "referenceOutput '%s' or '%s' not found.\n", defaultBuf.getBuffer(), specializedBuf.getBuffer());
 
     return "";
 }
@@ -1266,9 +1455,6 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
     const auto fileName = fileRep->getPath();
-
-    // Make executable... (for linux/unix like targets)
-    SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
 
     // Execute it
     ExecutableLocation exe;
@@ -1476,8 +1662,6 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
         exe.setPath(moduleExePath);
 
         cmdLine.setExecutableLocation(exe);
-
-        File::makeExecutable(moduleExePath);
 
         ExecuteResult exeRes;
         if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
@@ -1862,72 +2046,13 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes);
 
-    String expectedOutputPath = outputStem + ".expected";
-    String expectedOutput;
-    
-    Slang::File::readAllText(expectedOutputPath, expectedOutput);
-    
-    // If no expected output file was found, then we
-    // expect everything to be empty
-    if (expectedOutput.getLength() == 0)
-    {
-        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
-    }
-
-    TestResult result = TestResult::Pass;
-
-    // Otherwise we compare to the expected output
-    if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
-    {
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-        result = TestResult::Fail;
-    }
-
-    // If the test failed, then we write the actual output to a file
-    // so that we can easily diff it from the command line and
-    // diagnose the problem.
-    if (result == TestResult::Fail)
-    {
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-    }
-
-    return result;
-}
-
-SlangResult _readText(const UnownedStringSlice& path, String& out)
-{
-    return Slang::File::readAllText(path, out);
-}
-
-static SlangResult _readExpected(const UnownedStringSlice& stem, String& out)
-{
-    StringBuilder buf;
-
-    // See if we have a trailing . index, and try *without* that first
-    const Index dotIndex = stem.lastIndexOf('.');
-    if (dotIndex >= 0)
-    {
-        const UnownedStringSlice postfix = stem.tail(dotIndex + 1);
-
-        Int value;
-        if (SLANG_SUCCEEDED(StringUtil::parseInt(postfix, value)))
-        {
-            UnownedStringSlice head = stem.head(dotIndex);
-
-            buf << head << ".expected";
-
-            if (SLANG_SUCCEEDED(_readText(buf.getUnownedSlice(), out)))
-            {
-                return SLANG_OK;
-            }
-        }
-    }
-
-    buf << stem << ".expected";
-    return _readText(buf.getUnownedSlice(), out);
+    return _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
+        [&input](auto e, auto a){return _areResultsEqual(input.testOptions->type, e, a);});
 }
 
 TestResult runSimpleLineTest(TestContext* context, TestInput& input)
@@ -1976,38 +2101,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
         actualOutput << "No output diagnostics\n";
     }
 
-    TestResult result = TestResult::Fail;
-
-    String expectedOutput;
-
-    if (SLANG_SUCCEEDED(_readExpected(outputStem.getUnownedSlice(), expectedOutput)))
-    {
-        if (StringUtil::areLinesEqual(expectedOutput.getUnownedSlice(), actualOutput.getUnownedSlice()))
-        {
-            result = TestResult::Pass;
-        }
-        else
-        {
-            context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-        }
-    }
-    else
-    {
-        StringBuilder buf;
-        buf << "Unable to find expected output for '" << outputStem << "'";
-        context->getTestReporter()->message(TestMessageType::TestFailure, buf);
-    }
-
-    // If the test failed, then we write the actual output to a file
-    // so that we can easily diff it from the command line and
-    // diagnose the problem.
-    if (result == TestResult::Fail)
-    {
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::writeAllText(actualOutputPath, actualOutput);
-    }
-
-    return result;
+    return _validateOutput(context, input, actualOutput, false);
 }
 
 TestResult runCompile(TestContext* context, TestInput& input)
@@ -2070,8 +2164,8 @@ TestResult runSimpleCompareCommandLineTest(TestContext* context, TestInput& inpu
 TestResult runReflectionTest(TestContext* context, TestInput& input)
 {
     const auto& options = context->options;
-    auto filePath = input.filePath;
-    auto outputStem = input.outputStem;
+    const auto& filePath = input.filePath;
+    auto& outputStem = input.outputStem;
 
     bool isCPUTest = input.testOptions->command.startsWith("CPU_");
 
@@ -2104,55 +2198,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 #endif
     }
 
-    String expectedOutputPath = outputStem + ".expected";
-    String expectedOutput;
-    
-    Slang::File::readAllText(expectedOutputPath, expectedOutput);
-
-    // If no expected output file was found, then we
-    // expect everything to be empty
-    if (expectedOutput.getLength() == 0)
-    {
-        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
-    }
-
-    TestResult result = TestResult::Pass;
-
-    // Otherwise we compare to the expected output
-    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
-    {
-        result = TestResult::Fail;
-    }
-
-    // If the test failed, then we write the actual output to a file
-    // so that we can easily diff it from the command line and
-    // diagnose the problem.
-    if (result == TestResult::Fail)
-    {
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-    }
-
-    return result;
-}
-
-String getExpectedOutput(String const& outputStem)
-{
-    String expectedOutputPath = outputStem + ".expected";
-    String expectedOutput;
-    
-    Slang::File::readAllText(expectedOutputPath, expectedOutput);
-    
-    // If no expected output file was found, then we
-    // expect everything to be empty
-    if (expectedOutput.getLength() == 0)
-    {
-        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
-    }
-
-    return expectedOutput;
+    return _validateOutput(context, input, actualOutput);
 }
 
 static String _calcSummary(IArtifactDiagnostics* inDiagnostics)
@@ -2286,7 +2332,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
         return TestResult::Fail;
     }
 
-    auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
     if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
     {
@@ -2412,7 +2458,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 
     String actualOutput;
 
-    auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
     // If the actual compilation failed, then the output will be the summary
     if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
@@ -2461,23 +2507,18 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
+// Returns TestResult::Ignored if we don't have the capability to run the passthrough compiler
+// Returns TestResult::Fail if we can't write the expected output debug file
+// Otherwise return TestResult::Pass and if we are not just collecting
+// requirements, writes the output into the `expectedOutput` parameter
+static TestResult generateExpectedOutput(TestContext* const context, const TestInput& input, String& expectedOutput)
 {
-    // need to execute the stand-alone Slang compiler on the file
-    // then on the same file + `.glsl` and compare output
-
     auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
-    CommandLine actualCmdLine;
     CommandLine expectedCmdLine;
 
-    _initSlangCompiler(context, actualCmdLine);
     _initSlangCompiler(context, expectedCmdLine);
-    
-    actualCmdLine.addArg(filePath);
-
-    // TODO(JS): This should no longer be needed with TestInfo accumulated for a test
 
     const auto& args = input.testOptions->args;
 
@@ -2519,44 +2560,60 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
             }
         }
     }
-   
-    for( auto arg : input.testOptions->args )
+
+    for (auto arg : args)
     {
-        actualCmdLine.addArg(arg);
         expectedCmdLine.addArg(arg);
     }
 
     ExecuteResult expectedExeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, expectedCmdLine, expectedExeRes));
 
-    String expectedOutput;
-    if (context->isExecuting())
-    {
-        expectedOutput = getOutput(expectedExeRes);
-        String expectedOutputPath = outputStem + ".expected";
-        
-        if (SLANG_FAILED(Slang::File::writeAllText(expectedOutputPath, expectedOutput)))
-        {
-            return TestResult::Fail;
-        }
-    }
-
-    ExecuteResult actualExeRes;
-    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, actualCmdLine, actualExeRes));
-
     if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
 
-    String actualOutput = getOutput(actualExeRes);
+    expectedOutput = getOutput(expectedExeRes);
+    String expectedOutputPath = outputStem + ".expected";
 
-    TestResult result = TestResult::Pass;
-
-    // Otherwise we compare to the expected output
-    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
+    if (SLANG_FAILED(Slang::File::writeAllText(expectedOutputPath, expectedOutput)))
     {
-        result = TestResult::Fail;
+        context->getTestReporter()->messageFormat(
+            TestMessageType::TestFailure,
+            "Failed to write test expected output to %s",
+            expectedOutputPath.getBuffer());
+        return TestResult::Fail;
+    }
+
+    return TestResult::Pass;
+}
+
+// Returns TestResult::Fail if compilation fails
+// Otherwise return TestResult::Pass and if we are not just collecting
+// requirements, writes the output into the `expectedOutput` parameter
+TestResult generateActualOutput(TestContext* const context, const TestInput& input, String& actualOutput)
+{
+    auto filePath = input.filePath;
+
+    CommandLine actualCmdLine;
+    _initSlangCompiler(context, actualCmdLine);
+    actualCmdLine.addArg(filePath);
+
+    const auto& args = input.testOptions->args;
+
+    for( auto arg : input.testOptions->args )
+    {
+        actualCmdLine.addArg(arg);
+    }
+
+    ExecuteResult actualExeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, input.outputStem, input.spawnType, actualCmdLine, actualExeRes));
+
+    // Early out if we're just collecting requirements
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
     }
 
     // Always fail if the compilation produced a failure, just
@@ -2565,18 +2622,74 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     //
     if(actualExeRes.resultCode != 0 )
     {
-        result = TestResult::Fail;
+        return TestResult::Fail;
+    }
+
+    actualOutput = getOutput(actualExeRes);
+    return TestResult::Pass;
+}
+
+TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
+{
+    // Need to execute the stand-alone Slang compiler on the file
+    // then on the same file + `.glsl` and compare output
+    //
+    // Or, in the case of a filecheck test, instead of comparing against the
+    // +".glsl" version, we run some filecheck rules on it
+
+    String fileCheckPrefix;
+    const bool isFileCheckTest = input.testOptions->getFileCheckPrefix(fileCheckPrefix);
+
+    String actualOutput;
+    if(TestResult r = generateActualOutput(context, input, actualOutput); r != TestResult::Pass)
+    {
+        return r;
+    }
+
+    // Only generate the expected output if this is a comparison against some
+    // known-good glsl/hlsl input
+    String expectedOutput;
+    if(!isFileCheckTest)
+    {
+        if(TestResult r = generateExpectedOutput(context, input, expectedOutput); r != TestResult::Pass)
+        {
+            return r;
+        }
+    }
+
+    // Early out if we're just collecting requirements
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    TestResult result = TestResult::Pass;
+
+    if(isFileCheckTest)
+    {
+        result = _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput);
+        // TODO: It might be a good idea to sanity check any expected output
+        // source files against the filecheck rules if they're applicable.
+        //
+        // Something like:
+        // fileCheckTest(context, prefix="HLSL", input, filePath + ".hlsl");
+    }
+    else
+    {
+        if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
+        {
+            result = TestResult::Fail;
+            context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
+        }
     }
 
     // If the test failed, then we write the actual output to a file
-    // so that we can easily diff it from the command line and
+    // so that we can easily inspect it from the command line and
     // diagnose the problem.
     if (result == TestResult::Fail)
     {
-        String actualOutputPath = outputStem + ".actual";
+        String actualOutputPath = input.outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
     return result;
@@ -2694,46 +2807,10 @@ static TestResult _runHLSLComparisonTest(
 
     String actualOutput = actualOutputBuilder.ProduceString();
 
-    String expectedOutput;
-    Slang::File::readAllText(expectedOutputPath, expectedOutput);
-    
-    TestResult result = TestResult::Pass;
-
-    // If no expected output file was found, then we
-    // expect everything to be empty
-    if (expectedOutput.getLength() == 0)
-    {
-        if (resultCode != 0)				result = TestResult::Fail;
-        if (standardError.getLength() != 0)	result = TestResult::Fail;
-        if (standardOutput.getLength() != 0)	result = TestResult::Fail;
-    }
-    // Otherwise we compare to the expected output
-    else if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
-    {
-        result = TestResult::Fail;
-    }
-
     // Always fail if the compilation produced a failure, just
     // to catch situations where, e.g., command-line options parsing
     // caused the same error in both the Slang and fxc cases.
-    //
-    if( resultCode != 0 )
-    {
-        result = TestResult::Fail;
-    }
-
-    // If the test failed, then we write the actual output to a file
-    // so that we can easily diff it from the command line and
-    // diagnose the problem.
-    if (result == TestResult::Fail)
-    {
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-    }
-
-    return result;
+    return _validateOutput(context, input, actualOutput, resultCode != 0);
 }
 
 static TestResult runDXBCComparisonTest(
@@ -3076,53 +3153,39 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
         return TestResult::Pass;
     }
 
-    const String referenceOutputFile = findExpectedPath(input, ".expected.txt");
-    if (referenceOutputFile.getLength() <= 0)
-    {
-        return TestResult::Fail;
-    }
-
+    // Check the stdout/stderr from the compiler process
     auto actualOutput = getOutput(exeRes);
-    auto expectedOutput = getExpectedOutput(outputStem);
+    auto compileResult = _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n");
     
-    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
-    {
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        return TestResult::Fail;
-    }
-
 	// check against reference output
-    if (!File::exists(actualOutputFile))
-    {
-        printf("render-test not producing expected outputs.\n");
-        printf("render-test output:\n%s\n", actualOutput.getBuffer());
-		return TestResult::Fail;
-    }
-    if (!File::exists(referenceOutputFile))
-    {
-        printf("referenceOutput %s not found.\n", referenceOutputFile.getBuffer());
-		return TestResult::Fail;
-    }
-    String actualOutputContent, referenceOutputContent;
-
-    File::readAllText(actualOutputFile, actualOutputContent);
-    File::readAllText(referenceOutputFile, referenceOutputContent);
-
-    if (SLANG_FAILED(_compareWithType(actualOutputContent.getUnownedSlice(), referenceOutputContent.getUnownedSlice())))
+    String actualOutputContent;
+    if (SLANG_FAILED(File::readAllText(actualOutputFile, actualOutputContent)))
     {
         context->getTestReporter()->messageFormat(
-            TestMessageType::TestFailure,
-            "output mismatch! actual output: {\n%s\n}, \n%s\n",
-            actualOutputContent.getBuffer(),
-            referenceOutputContent.getBuffer());
-        return TestResult::Fail;
+            TestMessageType::RunError,
+            "Unable to read render-test output: %s\n",
+            actualOutput.getBuffer());
+		return TestResult::Fail;
     }
 
-	return TestResult::Pass;
+    String fileCheckPrefix;
+    auto bufferResult = input.testOptions->getFileCheckBufferPrefix(fileCheckPrefix)
+        ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutputContent)
+        : _fileComparisonTest(
+            *context,
+            input,
+            nullptr,
+            ".expected.txt",
+            actualOutputContent,
+            [](const auto& a, const auto& e){
+                return SLANG_SUCCEEDED(_compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
+            });
+    return std::max(compileResult, bufferResult);
 }
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
@@ -3367,6 +3430,15 @@ TestResult runHLSLRenderComparisonTestImpl(
     char const* expectedArg,
     char const* actualArg)
 {
+    String _fileCheckPrefix;
+    if(input.testOptions->getFileCheckPrefix(_fileCheckPrefix))
+    {
+        context->getTestReporter()->message(
+            TestMessageType::RunError,
+            "FileCheck testing isn't supported for HLSL render tests");
+        return TestResult::Fail;
+    }
+
     auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
@@ -3627,6 +3699,12 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
 
         TestDetails synthTestDetails(srcTest.options);
         TestOptions& synthOptions = synthTestDetails.options;
+
+        // If there's a category associated with this render api, add it to the synthesized test
+        if(auto c = context->categorySet.find(RenderApiUtil::getApiName(synthRenderApiType)))
+        {
+            synthOptions.categories.add(c);
+        }
 
         // Mark as synthesized
         synthOptions.isSynthesized = true;

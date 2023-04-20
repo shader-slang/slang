@@ -20,6 +20,7 @@
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
 
+#include "../core/slang-castable.h"
 #include "../core/slang-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-hex-dump-util.h"
@@ -331,7 +332,7 @@ struct OptionsParser
         String path = String(inPath);
         String ext = Path::getPathExt(path);
 
-        if (ext == "slang-module" || ext == "slang-lib")
+        if (ext == "slang-module" || ext == "slang-lib" || ext == "dir" || ext == "zip")
         {
             compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
             requestImpl->m_containerOutputPath = path;
@@ -1622,6 +1623,12 @@ struct OptionsParser
                         desc.kind = ArtifactKind::Library;
                     }
 
+                    // If its a zip we'll *assume* its a zip holding compilation results
+                    if (desc.kind == ArtifactKind::Zip)
+                    {
+                        desc.payload = ArtifactPayload::CompileResults;
+                    }
+                    
                     if (!ArtifactDescUtil::isLinkable(desc))
                     {
                         sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));

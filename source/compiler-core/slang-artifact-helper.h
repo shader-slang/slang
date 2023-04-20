@@ -16,9 +16,7 @@ class IArtifactHelper : public ICastable
 
 		/// Create an artifact
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifact(const ArtifactDesc& desc, const char* name, IArtifact** outArtifact) = 0;
-		/// Create a container with desc, and specified name. name can be passed as nullptr for no name
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactContainer(const ArtifactDesc& desc, const char* name, IArtifactContainer** outArtifactContainer) = 0;
-
+	
 		/// Get the parent to a kind
 	virtual SLANG_NO_THROW ArtifactKind SLANG_MCALL getKindParent(ArtifactKind kind) = 0;
 		/// Get the name of a kind
@@ -61,10 +59,6 @@ class IArtifactHelper : public ICastable
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createExtFileArtifactRepresentation(const CharSlice& path, ISlangFileSystemExt* system, IExtFileArtifactRepresentation** outRep) = 0;
 
-		/// Create an empty ICastableList
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) = 0;
-
-
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createOSFileArtifact(const ArtifactDesc& desc, const CharSlice& slice, IArtifact** outArtifact) = 0;
 };
 
@@ -81,8 +75,7 @@ public:
 
 	// IArtifactHelper
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifact(const ArtifactDesc& desc, const char* name, IArtifact** outArtifact) SLANG_OVERRIDE;
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactContainer(const ArtifactDesc& desc, const char* name, IArtifactContainer** outArtifactContainer) SLANG_OVERRIDE;
-
+	
 	virtual SLANG_NO_THROW ArtifactKind SLANG_MCALL getKindParent(ArtifactKind kind) SLANG_OVERRIDE;
 	virtual SLANG_NO_THROW UnownedStringSlice SLANG_MCALL getKindName(ArtifactKind kind) SLANG_OVERRIDE;
 	virtual SLANG_NO_THROW bool SLANG_MCALL isKindDerivedFrom(ArtifactKind kind, ArtifactKind base) SLANG_OVERRIDE;
@@ -104,8 +97,6 @@ public:
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescForCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) SLANG_OVERRIDE;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createOSFileArtifactRepresentation(
 		IOSFileArtifactRepresentation::Kind kind, const CharSlice& path, IOSFileArtifactRepresentation* lockFile, IOSFileArtifactRepresentation** outRep) SLANG_OVERRIDE;

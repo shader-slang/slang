@@ -339,7 +339,7 @@ namespace Slang
         }
     }
 
-    List<IRWitnessTable*> SharedGenericsLoweringContext::getWitnessTablesFromInterfaceType(IRInst* interfaceType)
+    List<IRWitnessTable*> getWitnessTablesFromInterfaceType(IRModule* module, IRInst* interfaceType)
     {
         List<IRWitnessTable*> witnessTables;
         for (auto globalInst : module->getGlobalInsts())
@@ -352,6 +352,11 @@ namespace Slang
             }
         }
         return witnessTables;
+    }
+
+    List<IRWitnessTable*> SharedGenericsLoweringContext::getWitnessTablesFromInterfaceType(IRInst* interfaceType)
+    {
+        return Slang::getWitnessTablesFromInterfaceType(module, interfaceType);
     }
 
     IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)

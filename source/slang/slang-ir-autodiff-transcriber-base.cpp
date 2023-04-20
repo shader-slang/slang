@@ -645,19 +645,6 @@ IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* 
     return nullptr;
 }
 
-IRInst* AutoDiffTranscriberBase::findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
-{
-    for (UInt i = 0; i < type->getOperandCount(); i++)
-    {
-        if (auto req = as<IRInterfaceRequirementEntry>(type->getOperand(i)))
-        {
-            if (req->getRequirementKey() == key)
-                return req->getRequirementVal();
-        }
-    }
-    return nullptr;
-}
-
 InstPair AutoDiffTranscriberBase::transcribeParam(IRBuilder* builder, IRParam* origParam)
 {
     auto primalDataType = findOrTranscribePrimalInst(builder, origParam->getDataType());

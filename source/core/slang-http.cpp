@@ -170,7 +170,7 @@ void HTTPHeader::append(StringBuilder& out) const
         auto mimeType = m_mimeType.getLength() ? m_mimeType : UnownedStringSlice::fromLiteral("text/plain");
         auto encoding = m_encoding.getLength() ? m_encoding : UnownedStringSlice::fromLiteral("UTF-8");
 
-        out << "mimeType" << "; ";
+        out << mimeType << "; ";
         out << "charset=" << encoding;
 
         out << "\r\n";

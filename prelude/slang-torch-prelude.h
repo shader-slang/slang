@@ -38,6 +38,9 @@
 #   include <stdint.h>
 #endif // SLANG_LLVM
 
+
+#define SLANG_PRELUDE_NAMESPACE
+
 #include "slang-cpp-types-core.h"
 #include "slang-cpp-scalar-intrinsics.h"
 
@@ -109,14 +112,6 @@ TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarTy
     if (!res.data)
         throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
     return res;
-}
-
-size_t slangGetCudaKernelSharedMemSize(const void* func)
-{
-    cudaFuncAttributes attr = {};
-    cudaFuncGetAttributes(&attr, func);
-    AT_CUDA_CHECK(cudaGetLastError());
-    return attr.sharedSizeBytes;
 }
 
 #define SLANG_PRELUDE_EXPORT

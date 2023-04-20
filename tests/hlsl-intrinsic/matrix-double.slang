@@ -101,7 +101,7 @@ void test1(inout FloatMatrix ft, inout FloatMatrix f, int idx)
 
     {
         float scalarVs[] = { 1, 10, 100, 1000 };
-        ft += FloatMatrix(IntMatrix(log10(makeFloatMatrix(scalarVs[idx])) + makeFloatMatrix(0.5f)));
+        ft += FloatMatrix(IntMatrix(log10(makeFloatMatrix(Float(scalarVs[idx]))) + makeFloatMatrix(0.5f)));
     }
 
     ft += abs(f * makeFloatMatrix(4) - makeFloatMatrix(2.0f));

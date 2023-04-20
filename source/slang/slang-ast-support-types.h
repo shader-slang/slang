@@ -128,6 +128,13 @@ namespace Slang
         kConversionCost_Impossible = 0xFFFFFFFF,
     };
 
+    typedef unsigned int BuiltinConversionKind;
+    enum : BuiltinConversionKind
+    {
+        kBuiltinConversion_Unknown = 0,
+        kBuiltinConversion_FloatToDouble = 1,
+    };
+
     enum class ImageFormat
     {
 #define FORMAT(NAME, OTHER) NAME,

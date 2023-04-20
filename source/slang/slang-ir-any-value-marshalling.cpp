@@ -666,6 +666,7 @@ namespace Slang
         case kIROp_IntType:
         case kIROp_FloatType:
         case kIROp_UIntType:
+        case kIROp_BoolType:
             return alignUp(offset, 4) + 4;
         case kIROp_UInt64Type:
         case kIROp_Int64Type:
@@ -753,6 +754,21 @@ namespace Slang
             auto interfaceType = cast<IRInterfaceType>(type);
             auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
             size += kRTTIHeaderSize;
+            return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
+        }
+        case kIROp_AssociatedType:
+        {
+            auto associatedType = cast<IRAssociatedType>(type);
+            SlangInt maxSize = 0;
+            for (UInt i = 0; i < associatedType->getOperandCount(); i++)
+                maxSize = Math::Max(maxSize, _getAnyValueSizeRaw((IRType*)associatedType->getOperand(i), offset));
+            return maxSize;
+        }
+        case kIROp_ThisType:
+        {
+            auto thisType = cast<IRThisType>(type);
+            auto interfaceType = thisType->getConstraintType();
+            auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
             return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
         }
         case kIROp_ExtractExistentialType:

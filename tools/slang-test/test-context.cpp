@@ -59,6 +59,26 @@ TestReporter* TestContext::getTestReporter()
     return m_reporters[slangTestThreadIndex];
 }
 
+SlangResult TestContext::locateFileCheck()
+{
+    DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
+    
+    SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("slang-llvm", m_fileCheckLibrary.writeRef()));
+
+    if (!m_fileCheckLibrary)
+    {
+        return SLANG_FAIL;
+    }
+
+    using CreateFileCheckFunc = SlangResult (*)(const SlangUUID&, void**);
+    auto fn = reinterpret_cast<CreateFileCheckFunc>(m_fileCheckLibrary->findFuncByName("createLLVMFileCheck_V1"));
+    if(!fn)
+    {
+        return SLANG_FAIL;
+    }
+    return fn(SLANG_IID_PPV_ARGS(m_fileCheck.writeRef()));
+}
+
 Result TestContext::init(const char* inExePath)
 {
     m_session = spCreateSession(nullptr);
@@ -68,6 +88,9 @@ Result TestContext::init(const char* inExePath)
     }
     exePath = inExePath;
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
+
+    SLANG_RETURN_ON_FAIL(locateFileCheck());
+
     return SLANG_OK;
 }
 

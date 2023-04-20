@@ -53,7 +53,7 @@ static SlangResult _check()
         rootValue = builder.getRootValue();
     }
 
-    RefPtr<SourceMap> sourceMap;
+    SourceMap sourceMap;
         
     SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::decode(container, rootValue, &sink, sourceMap));
     

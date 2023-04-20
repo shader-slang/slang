@@ -3,7 +3,7 @@
 #include "../core/slang-shared-library.h"
 
 #if SLANG_WINDOWS_FAMILY
-#    include <Windows.h>
+#    include <windows.h>
 #endif
 
 using namespace Slang;

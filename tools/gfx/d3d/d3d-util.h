@@ -7,13 +7,14 @@
 
 #include "slang-com-ptr.h"
 #include "core/slang-basic.h"
+#include "core/slang-platform.h"
 
 #include "../flag-combiner.h"
 
 #include "slang-gfx.h"
 
-#include <D3Dcommon.h>
-#include <DXGIFormat.h>
+#include <d3dcommon.h>
+#include <dxgiformat.h>
 #include <dxgi.h>
 #include <d3d12.h>
 
@@ -75,14 +76,10 @@ class D3DUtil
         /// Returns number of bits used for color channel for format (for channels with multiple sizes, returns smallest ie RGB565 -> 5)
     static Int getNumColorChannelBits(DXGI_FORMAT fmt);
 
-        /// Append text in in, into wide char array
-    static void appendWideChars(const char* in, Slang::List<wchar_t>& out);
-
-
     static SlangResult createFactory(DeviceCheckFlags flags, Slang::ComPtr<IDXGIFactory>& outFactory);
 
         /// Get the dxgiModule
-    static HMODULE getDxgiModule();
+    static Slang::SharedLibrary::Handle getDxgiModule();
 
         /// Find adapters
     static SlangResult findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, IDXGIFactory* dxgiFactory, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);

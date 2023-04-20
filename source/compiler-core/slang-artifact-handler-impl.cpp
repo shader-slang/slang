@@ -9,13 +9,17 @@
 #include "slang-artifact-helper.h"
 #include "slang-artifact-util.h"
 
-#include "../core/slang-castable-util.h"
+#include "../core/slang-castable.h"
 
 #include "slang-slice-allocator.h"
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
+
+#include "slang-source-map.h"
+
+#include "slang-json-source-map-util.h"
 
 namespace Slang {
 
@@ -68,7 +72,7 @@ SlangResult DefaultArtifactHandler::_addRepresentation(IArtifact* artifact, Arti
 	// See if it implements ICastable
 	{
 		ComPtr<ICastable> castable;
-		if (SLANG_SUCCEEDED(rep->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+		if (SLANG_SUCCEEDED(rep->queryInterface(SLANG_IID_PPV_ARGS(castable.writeRef()))) && castable)
 		{
 			return _addRepresentation(artifact, keep, castable, outCastable);
 		}
@@ -93,8 +97,9 @@ SlangResult DefaultArtifactHandler::_addRepresentation(IArtifact* artifact, Arti
 	return SLANG_OK;
 }
 
-SlangResult DefaultArtifactHandler::expandChildren(IArtifactContainer* container)
+SlangResult DefaultArtifactHandler::expandChildren(IArtifact* container)
 {
+	// First check if it has already been expanded
 	SlangResult res = container->getExpandChildrenResult();
 	if (res != SLANG_E_UNINITIALIZED)
 	{
@@ -104,14 +109,41 @@ SlangResult DefaultArtifactHandler::expandChildren(IArtifactContainer* container
 
 	// For the generic container type, we just expand as empty
 	const auto desc = container->getDesc();
-	if (desc.kind == ArtifactKind::Container)
+    if (desc.kind == ArtifactKind::Container)
+    {
+        // If it's just a generic container, we can assume it's expanded, and be done
+        return SLANG_OK;
+    }
+
+	if (isDerivedFrom(desc.kind, ArtifactKind::Container))
 	{
+        // TODO(JS):
+        // Proper implementation should (for example) be able to expand a Zip file etc.
+
+        // For now we just set that there are no children, and be done
 		container->setChildren(nullptr, 0);
+		return SLANG_E_NOT_IMPLEMENTED;
+	}
+
+    // We can't expand non container like types, so we just make sure it's empty
+    container->setChildren(nullptr, 0);
+	return SLANG_OK;
+}
+
+static SlangResult _loadSourceMap(IArtifact* artifact, ArtifactKeep intermediateKeep, SourceMap& outSourceMap)
+{
+	const auto desc = artifact->getDesc();
+	if (isDerivedFrom(desc.kind, ArtifactKind::Json) &&
+		isDerivedFrom(desc.payload, ArtifactPayload::SourceMap))
+	{
+		ComPtr<ISlangBlob> blob;
+		SLANG_RETURN_ON_FAIL(artifact->loadBlob(intermediateKeep, blob.writeRef()));
+
+		SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::read(blob, outSourceMap));
 		return SLANG_OK;
 	}
-	// TODO(JS):
-	// Proper implementation should (for example) be able to expand a Zip file etc.
-	return SLANG_E_NOT_IMPLEMENTED;
+
+	return SLANG_FAIL;
 }
 
 SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable)
@@ -144,8 +176,15 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		}
 	}
 
-	// Special case shared library
-	if (guid == ISlangSharedLibrary::getTypeGuid())
+	// Special cases
+	if (guid == SourceMap::getTypeGuid())
+	{
+		// Blob -> SourceMap
+		ComPtr<IBoxValue<SourceMap>> sourceMap(new BoxValue<SourceMap>);
+		SLANG_RETURN_ON_FAIL(_loadSourceMap(artifact, getIntermediateKeep(keep), sourceMap->get()));
+		return _addRepresentation(artifact, keep, sourceMap, outCastable);
+	}
+	else if (guid == ISlangSharedLibrary::getTypeGuid())
 	{
 		ComPtr<ISlangSharedLibrary> sharedLib;
 		SLANG_RETURN_ON_FAIL(_loadSharedLibrary(artifact, sharedLib.writeRef()));
@@ -156,6 +195,19 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		ComPtr<IOSFileArtifactRepresentation> fileRep;
 		SLANG_RETURN_ON_FAIL(_createOSFile(artifact, getIntermediateKeep(keep), fileRep.writeRef()));
 		return _addRepresentation(artifact, keep, fileRep, outCastable);
+	}
+
+	// Handle known conversion to blobs 
+	if (guid == ISlangBlob::getTypeGuid())
+	{
+		if (auto sourceMap = findRepresentation<SourceMap>(artifact))
+		{	
+			// SourceMap -> Blob
+			ComPtr<ISlangBlob> blob;
+			SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::write(*sourceMap, blob));
+			// Add the rep
+			return _addRepresentation(artifact, keep, blob, outCastable);
+		}
 	}
 
 	return SLANG_E_NOT_AVAILABLE;
@@ -226,6 +278,10 @@ SlangResult DefaultArtifactHandler::_createOSFile(IArtifact* artifact, ArtifactK
 
 	// Write the contents
 	SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
+    if(artifact->getDesc().kind == ArtifactKind::Executable)
+    {
+        SLANG_RETURN_ON_FAIL(File::makeExecutable(path));
+    }
 
 	ComPtr<IOSFileArtifactRepresentation> fileRep;
 

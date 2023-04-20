@@ -28,14 +28,18 @@ namespace Slang
             auto genericParent = as<IRGeneric>(genericValue);
             SLANG_ASSERT(genericParent);
             SLANG_ASSERT(genericParent->getDataType());
-            auto func = as<IRFunc>(findGenericReturnVal(genericParent));
+            auto genericRetVal = findGenericReturnVal(genericParent);
+            auto func = as<IRFunc>(genericRetVal);
             if (!func)
             {
                 // Nested generic functions are supposed to be flattened before entering
                 // this pass. The reason we are still seeing them must be that they are
                 // intrinsic functions. In this case we ignore the function.
-                SLANG_ASSERT(findInnerMostGenericReturnVal(genericParent)
-                                 ->findDecoration<IRTargetIntrinsicDecoration>() != nullptr);
+                if (as<IRGeneric>(genericRetVal))
+                {
+                    SLANG_ASSERT(findInnerMostGenericReturnVal(genericParent)
+                                     ->findDecoration<IRTargetIntrinsicDecoration>() != nullptr);
+                }
                 return genericValue;
             }
             SLANG_ASSERT(func);

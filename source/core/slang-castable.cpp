@@ -1,5 +1,5 @@
-// slang-castable-util.cpp
-#include "slang-castable-util.h"
+// slang-castable.cpp
+#include "slang-castable.h"
 
 namespace Slang {
 
@@ -9,7 +9,7 @@ namespace Slang {
 {
     SLANG_ASSERT(unk);
     ComPtr<ICastable> castable;
-    if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())))
+    if (SLANG_SUCCEEDED(unk->queryInterface(SLANG_IID_PPV_ARGS(castable.writeRef()))))
     {
         SLANG_ASSERT(castable);
     }

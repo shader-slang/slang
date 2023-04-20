@@ -270,6 +270,11 @@ struct SynthesizeActiveMaskForModuleContext
 
     void markAndModifyFuncsIndirectlyUsingActiveMask(IRFunc* callee)
     {
+        // This transform does not apply to host or kernel callees.
+        if (callee->findDecoration<IRCudaHostDecoration>() ||
+            callee->findDecoration<IRCudaKernelDecoration>())
+            return;
+
         // In order to detect functions that indirectly use the active
         // mask through `callee`, we need to identify call sites.
         //
@@ -699,7 +704,8 @@ struct SynthesizeActiveMaskForFunctionContext
         // The easy case is ordinary functions (ones that aren't entry
         // points).
         //
-        if( !m_func->findDecoration<IREntryPointDecoration>() )
+        if (!m_func->findDecoration<IREntryPointDecoration>() &&
+            !m_func->findDecoration<IRCudaKernelDecoration>())
         {
             // We simplyu need to add a new parameter to the entry block
             // (which holds the parameters for the function itself).

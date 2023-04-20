@@ -157,7 +157,7 @@ namespace Slang
         }
         Expr* e = expr;
         e = CheckTerm(e);
-        e = coerce(m_astBuilder->getBoolType(), e);
+        e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e);
         return e;
     }
 
@@ -313,7 +313,7 @@ namespace Slang
             {
                 if (function)
                 {
-                    stmt->expression = coerce(function->returnType.Ptr(), stmt->expression);
+                    stmt->expression = coerce(CoercionSite::Return, function->returnType.Ptr(), stmt->expression);
                 }
                 else
                 {
@@ -339,6 +339,16 @@ namespace Slang
     void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt *stmt)
     {
         stmt->expression = CheckExpr(stmt->expression);
+        if (auto operatorExpr = as<OperatorExpr>(stmt->expression))
+        {
+            if (auto func = as<VarExpr>(operatorExpr->functionExpr))
+            {
+                if (func->name && func->name->text == "==")
+                {
+                    getSink()->diagnose(operatorExpr, Diagnostics::danglingEqualityExpr);
+                }
+            }
+        }
     }
 
     void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)

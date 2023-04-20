@@ -1191,7 +1191,7 @@ namespace Slang
                 if (auto initExpr = varDecl->initExpr)
                 {
                     initExpr = CheckTerm(initExpr);
-                    initExpr = coerce(varDecl->type.Ptr(), initExpr);
+                    initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
                     varDecl->initExpr = initExpr;
 
                     maybeInferArraySizeForVariable(varDecl);
@@ -1355,7 +1355,7 @@ namespace Slang
             // it to the type of the variable.
             //
             initExpr = CheckTerm(initExpr);
-            initExpr = coerce(varDecl->type.Ptr(), initExpr);
+            initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;
 
             // We need to ensure that any variable doesn't introduce
@@ -2860,7 +2860,7 @@ namespace Slang
         // so we also need to coerce the result of the call to
         // the expected type.
         //
-        auto coercedCall = subVisitor.coerce(resultType, checkedCall);
+        auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall);
 
         // If our overload resolution or type coercion failed,
         // then we have not been able to synthesize a witness
@@ -3182,7 +3182,7 @@ namespace Slang
                 // which involves coercing the member access `this.name` to
                 // the expected type of the property.
                 //
-                auto coercedMemberRef = subVisitor.coerce(propertyType, synMemberRef);
+                auto coercedMemberRef = subVisitor.coerce(CoercionSite::Return, propertyType, synMemberRef);
                 auto synReturn = m_astBuilder->create<ReturnStmt>();
                 synReturn->expression = coercedMemberRef;
 
@@ -4684,7 +4684,7 @@ namespace Slang
         if(auto initExpr = decl->tagExpr)
         {
             initExpr = CheckTerm(initExpr);
-            initExpr = coerce(tagType, initExpr);
+            initExpr = coerce(CoercionSite::General, tagType, initExpr);
 
             // We want to enforce that this is an integer constant
             // expression, but we don't actually care to retain
@@ -5551,7 +5551,7 @@ namespace Slang
             // actual type of the parameter.
             //
             initExpr = CheckTerm(initExpr);
-            initExpr = coerce(typeExpr.type, initExpr);
+            initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr);
             paramDecl->initExpr = initExpr;
 
             // TODO: a default argument expression needs to
@@ -6923,20 +6923,34 @@ namespace Slang
         auto ctx = visitor->withExprLocalScope(&scope);
         auto subVisitor = SemanticsVisitor(ctx);
         auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
-        if (auto derivFuncDeclRef = as<DeclRefExpr>(checkedFuncExpr)->declRef)
+        if (auto declRefExpr = as<DeclRefExpr>(checkedFuncExpr))
         {
-            visitor->ensureDecl(derivFuncDeclRef, DeclCheckState::TypesFullyResolved);
-            auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
-            auto resolved = subVisitor.ResolveInvoke(invokeExpr);
-            if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+            visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+        }
+        else if (auto overloadedExpr = as<OverloadedExpr>(checkedFuncExpr))
+        {
+            for (auto candidate : overloadedExpr->lookupResult2.items)
             {
-                if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
-                {
-                    attr->funcExpr = calleeDeclRef;
-                    return;
-                }
+                visitor->ensureDecl(candidate.declRef, DeclCheckState::TypesFullyResolved);
             }
         }
+        else
+        {   
+            visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
+            return;
+        }
+        
+        auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
+        auto resolved = subVisitor.ResolveInvoke(invokeExpr);
+        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+        {
+            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+            {
+                attr->funcExpr = calleeDeclRef;
+                return;
+            }
+        }
+        
         visitor->getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
     }
 

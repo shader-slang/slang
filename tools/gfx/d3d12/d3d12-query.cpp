@@ -73,7 +73,7 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
     m_commandQueue = device->m_resourceCommandQueue->m_d3dQueue;
 
     // Create wait event.
-    m_waitEvent = CreateEventEx(nullptr, false, 0, EVENT_ALL_ACCESS);
+    m_waitEvent = CreateEventEx(nullptr, FALSE, 0, EVENT_ALL_ACCESS);
 
     return SLANG_OK;
 }

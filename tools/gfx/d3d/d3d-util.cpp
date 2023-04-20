@@ -2,14 +2,17 @@
 #include "d3d-util.h"
 
 #include <d3d12.h>
-#include <d3dcompiler.h>
 #include <dxgi1_4.h>
 #include <dxgidebug.h>
+#if SLANG_ENABLE_FXC
+#include <d3dcompiler.h>
+#endif
 
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
 #include "core/slang-basic.h"
+#include "core/slang-platform.h"
 
 namespace gfx {
 using namespace Slang;
@@ -422,6 +425,9 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     // shader bytecode as part of an offline process, rather than doing it
     // on-the-fly like this
     //
+#if !SLANG_ENABLE_FXC
+    return SLANG_E_NOT_IMPLEMENTED;
+#else
     static pD3DCompile compileFunc = nullptr;
     if (!compileFunc)
     {
@@ -475,38 +481,25 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     SLANG_RETURN_ON_FAIL(hr);
     shaderBlobOut.swap(shaderBlob);
     return SLANG_OK;
+#endif // SLANG_ENABLE_FXC
 }
 
-/* static */void D3DUtil::appendWideChars(const char* in, List<wchar_t>& out)
+/* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
 {
-    size_t len = ::strlen(in);
-
-    const DWORD dwFlags = 0;
-    int outSize = ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), nullptr, 0);
-
-    if (outSize > 0)
-    {
-        const Index prevSize = out.getCount();
-        out.setCount(prevSize + len + 1);
-
-        WCHAR* dst = out.getBuffer() + prevSize;
-        ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), dst, outSize);
-        // Make null terminated
-        dst[outSize] = 0;
-        // Remove terminating 0 from array
-        out.unsafeShrinkToCount(prevSize + outSize);
-    }
-}
-
-/* static */HMODULE D3DUtil::getDxgiModule()
-{
-    static HMODULE s_dxgiModule = LoadLibraryA("dxgi.dll");
-    if (!s_dxgiModule)
-    {
-        fprintf(stderr, "error: failed load 'dxgi.dll'\n");
-        return nullptr;
-    }
-
+#if SLANG_ENABLE_DXVK
+    const char* const libPath = "dxvk_dxgi";
+#else
+    const char* const libPath = "dxgi";
+#endif
+    static SharedLibrary::Handle s_dxgiModule = [&](){
+        SharedLibrary::Handle h = nullptr;
+        SharedLibrary::load(libPath, h);
+        if (!h)
+        {
+            fprintf(stderr, "error: failed to load dll '%s'\n", libPath);
+        }
+        return h;
+    }();
     return s_dxgiModule;
 }
 
@@ -522,7 +515,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
 
     {
-        auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)::GetProcAddress(dxgiModule, "CreateDXGIFactory2");
+        auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory2");
         if (createFactory2)
         {
             UINT dxgiFlags = 0;
@@ -541,7 +534,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 
     {
-        auto createFactory = (PFN_DXGI_CREATE_FACTORY)::GetProcAddress(dxgiModule, "CreateDXGIFactory");
+        auto createFactory = (PFN_DXGI_CREATE_FACTORY)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory");
         if (!createFactory)
         {
             fprintf(stderr, "error: failed load symbol '%s'\n", "CreateDXGIFactory");
@@ -841,6 +834,7 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
 {
     static IDXGIDebug* dxgiDebug = nullptr;
 
+#if SLANG_ENABLE_DXGI_DEBUG
     if (!dxgiDebug)
     {
         HMODULE debugModule = LoadLibraryA("dxgidebug.dll");
@@ -853,6 +847,7 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
             }
         }
     }
+#endif
 
     if (dxgiDebug)
     {

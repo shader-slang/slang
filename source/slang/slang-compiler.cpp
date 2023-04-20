@@ -8,13 +8,12 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-castable.h"
 
 #include "slang-check.h"
 #include "slang-compiler.h"
 
 #include "../compiler-core/slang-lexer.h"
-
-#include "../compiler-core/slang-json-source-map-util.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -23,6 +22,7 @@
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-associated.h"
 #include "../compiler-core/slang-artifact-diagnostic-util.h"
+#include "../compiler-core/slang-artifact-container-util.h"
 
 // Artifact output
 #include "slang-artifact-output-util.h"
@@ -1119,7 +1119,7 @@ namespace Slang
         ComPtr<IArtifactPostEmitMetadata> metadata;
         if (sourceArtifact)
         {
-            metadata = findAssociated<IArtifactPostEmitMetadata>(sourceArtifact);
+            metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(sourceArtifact);
 
             // Set the source artifacts
             options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
@@ -1411,7 +1411,7 @@ namespace Slang
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
+        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
         if (diagnostics->getCount())
         {
@@ -1468,10 +1468,7 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        if (metadata)
-        {
-            artifact->addAssociated(metadata);
-        }
+        ArtifactUtil::addAssociated(artifact, metadata);
 
         // Set the artifact
         outArtifact.swap(artifact);
@@ -1813,6 +1810,19 @@ namespace Slang
     }
 
     
+    bool _shouldWriteSourceLocs(Linkage* linkage)
+    {
+        // If debug information or source manager are not avaiable we can't/shouldn't write out locs
+        if (linkage->debugInfoLevel == DebugInfoLevel::None || 
+            linkage->getSourceManager() == nullptr)
+        {
+            return false;
+        }
+        
+        // Otherwise we do want to write out the locs
+        return true;
+    }
+
     SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     {
         auto linkage = getLinkage();
@@ -1828,7 +1838,9 @@ namespace Slang
             // Also currently only IR is needed.
             options.optionFlags &= ~SerialOptionFlag::ASTModule;
         }
-        else if (linkage->debugInfoLevel != DebugInfoLevel::None && linkage->getSourceManager())
+        
+        // If debug information is enabled, enable writing out source locs
+        if (_shouldWriteSourceLocs(linkage))
         {
             options.optionFlags |= SerialOptionFlag::SourceLocation;
             options.sourceManager = linkage->getSourceManager();
@@ -1854,7 +1866,6 @@ namespace Slang
         {
         case ContainerFormat::SlangModule:
         {
-
             OwnedMemoryStream stream(FileAccess::Write);
             SlangResult res = writeContainerToStream(&stream);
             if (SLANG_FAILED(res))
@@ -1870,7 +1881,6 @@ namespace Slang
             auto containerBlob = ListBlob::moveCreate(blobData);
 
             m_containerArtifact = Artifact::create(ArtifactDesc::make(Artifact::Kind::CompileBinary, ArtifactPayload::SlangIR, ArtifactStyle::Unknown));
-
             m_containerArtifact->addRepresentationUnknown(containerBlob);
 
             return res;
@@ -1890,9 +1900,6 @@ namespace Slang
 
         auto frontEndReq = getFrontEndReq();
 
-        auto sourceManager = frontEndReq->getSourceManager();
-        auto sink = getSink();
-
         for (auto translationUnit : frontEndReq->translationUnits)
         {
             // Hmmm do I have to therefore add a map for all translation units(!)
@@ -1900,31 +1907,16 @@ namespace Slang
 
             auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap();
 
-            if (sourceMap)
+            // If we have a source map *and* we want to generate them for output add to the container
+            if (sourceMap && getLinkage()->m_generateSourceMap)
             {
-                // Write it out
-                String json;
-                {
-                    RefPtr<JSONContainer> jsonContainer(new JSONContainer(sourceManager));
-
-                    JSONValue jsonValue;
-
-                    SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, jsonContainer, sink, jsonValue));
-
-                    // Convert into a string
-                    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-                    jsonContainer->traverseRecursively(jsonValue, &writer);
-
-                    json = writer.getBuilder();
-                }
-
-                auto jsonSourceMapBlob = StringBlob::moveCreate(json);
-
                 auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
 
                 // Create the source map artifact
-                auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->m_file.getUnownedSlice());
-                sourceMapArtifact->addRepresentationUnknown(jsonSourceMapBlob);
+                auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->get().m_file.getUnownedSlice());
+
+                // Add the repesentation
+                sourceMapArtifact->addRepresentation(sourceMap);
 
                 // Associate with the container
                 m_containerArtifact->addAssociated(sourceMapArtifact);
@@ -1959,74 +1951,7 @@ namespace Slang
         {
             return SLANG_OK;
         }
-
-        ComPtr<ISlangBlob> containerBlob;
-        SLANG_RETURN_ON_FAIL(m_containerArtifact->loadBlob(ArtifactKeep::Yes, containerBlob.writeRef()));
-
-        {
-            FileStream stream;
-            SLANG_RETURN_ON_FAIL(stream.init(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
-            SLANG_RETURN_ON_FAIL(stream.write(containerBlob->getBufferPointer(), containerBlob->getBufferSize()));
-        }
-
-        auto parentPath = Path::getParentDirectory(fileName);
-
-        // Lets look to see if we have any maps
-        {
-            Index nameCount = 0;
-
-            auto associated = m_containerArtifact->getAssociated();
-            const Count count = associated->getCount();
-            for (Index i = 0; i < count; ++i)
-            {
-                IArtifact* artifact = as<IArtifact>(associated->getAt(i));
-                auto desc = artifact->getDesc();
-
-                if (isDerivedFrom(desc.payload, ArtifactPayload::SourceMap))
-                {
-                    StringBuilder artifactFilename;
-
-                    // Dump out
-                    const char* artifactName = artifact->getName();
-                    if (artifactName && artifactName[0] != 0)
-                    {
-                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(artifact, UnownedStringSlice(artifactName), artifactFilename));
-                    }
-                    else
-                    {
-                        // Perhaps we can generate the name from the output basename
-                        StringBuilder baseName;
-
-                        baseName << Path::getFileNameWithoutExt(m_containerOutputPath);
-
-                        if (nameCount != 0)
-                        {
-                            baseName.appendChar('-');
-                            baseName.append(nameCount);
-                        }
-
-                        SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(artifact, baseName.getUnownedSlice(), artifactFilename));
-
-                        nameCount ++;
-                    }
-
-                    ComPtr<ISlangBlob> blob;
-                    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
-
-                    // Try to write it out
-                    {
-                        // Work out the path to the artifact
-                        auto artifactPath = Path::combine(parentPath, artifactFilename);
-
-                        // Write out the map
-                        FileStream stream;
-                        SLANG_RETURN_ON_FAIL(stream.init(artifactPath, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
-                        SLANG_RETURN_ON_FAIL(stream.write(blob->getBufferPointer(), blob->getBufferSize()));
-                    }
-                }
-            }
-        }
-
+        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(m_containerArtifact, fileName));
         return SLANG_OK;
     }
 

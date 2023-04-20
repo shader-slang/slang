@@ -346,7 +346,7 @@ protected:
         m_scope(scope)
     {
         // Cache the ICastable interface if there is one.
-        blob->queryInterface(ICastable::getTypeGuid(), (void**)m_castable.writeRef());
+        blob->queryInterface(SLANG_IID_PPV_ARGS(m_castable.writeRef()));
     }
 
     ComPtr<ISlangUnknown> m_scope;

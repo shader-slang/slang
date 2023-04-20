@@ -26,7 +26,7 @@ Result SwapchainImpl::init(
     {
         m_frameEvents.add(CreateEventEx(
             nullptr,
-            false,
+            FALSE,
             CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET,
             EVENT_ALL_ACCESS));
     }

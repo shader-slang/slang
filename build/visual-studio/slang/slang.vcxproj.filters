@@ -321,6 +321,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-witness-lookup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-marshal-native-call.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -343,6 +346,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-pytorch-cpp-binding.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-reachability.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-redundancy-removal.h">
@@ -421,6 +427,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-union.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-util.h">
@@ -890,6 +899,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-witness-lookup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-marshal-native-call.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -912,6 +924,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-pytorch-cpp-binding.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-reachability.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-redundancy-removal.cpp">
@@ -990,6 +1005,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-union.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-util.cpp">

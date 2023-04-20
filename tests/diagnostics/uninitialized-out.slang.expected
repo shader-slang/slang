@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/uninitialized-out.slang(5): error 41015: use of uninitialized value.
+    float r = v.x + 1.0;
+                ^
+}
+standard output = {
+}
