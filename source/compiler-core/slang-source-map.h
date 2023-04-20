@@ -19,6 +19,8 @@ public:
 
     struct Entry
     {
+        typedef Entry ThisType;
+
         void init()
         {
             generatedColumn = 0;
@@ -27,6 +29,16 @@ public:
             sourceColumn = 0;
             nameIndex = 0;
         }
+
+        bool operator==(const ThisType& rhs) const
+        {
+            return generatedColumn == rhs.generatedColumn &&
+                sourceFileIndex == rhs.sourceFileIndex &&
+                sourceLine == rhs.sourceLine &&
+                sourceColumn == rhs.sourceColumn && 
+                nameIndex == rhs.sourceColumn;
+        }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         // Note! All column/line are zero indexed
         Index generatedColumn;          ///< The generated column
@@ -78,9 +90,9 @@ public:
         clear();
     }
         /// Copy Ctor
-    SourceMap(const ThisType& rhs);
+    SourceMap(const ThisType& rhs) = default;
         /// Assignment
-    ThisType& operator=(const ThisType& rhs);
+    ThisType& operator=(const ThisType& rhs) = default;
 
     String m_file;
     String m_sourceRoot;
