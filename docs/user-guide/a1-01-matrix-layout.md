@@ -49,9 +49,9 @@ Discussion
 
 There are four variables in play here:
 
-* Host vector interpretation (row or column) - and therefore effective tranform order (column) `m * v` or (row) `v * m`
+* Host vector interpretation (row or column) - and therefore effective transform order (column) `m * v` or (row) `v * m`
 * Host matrix memory layout
-* Shader vector interpretation (as determined via `mul(v, m)` or `mul(m, v)`
+* Shader vector interpretation (as determined via `mul(v, m)` or `mul(m, v)` )
 * Shader matrix memory layout 
 
 Since each item can be either `row` or `column` there are 16 possible combinations. For simplicity let's reduce the variable space by making some assumptions.
@@ -66,7 +66,7 @@ This is simple, but is perhaps not the end of the story. First lets assume that 
 
 Second lets consider performance. The matrix layout in a host maths libray is not arbitrary from a performance point of view. A performant host maths library will want to use SIMD instructions. With both x86/x64 SSE and ARM NEON SIMD it makes a performance difference which layout is used, depending on if `column` or `row` is the *prefered* vector interpretation. If the `row` vector interpretation is prefered, it is most performant to have `row-major` matrix layout. Conversely if `column` vector interpretation is prefered `column-major` matrix will be the most performant.
 
-The performance difference comes down to a SIMD implementation having to do a transpose if the layout doesn't match the prefered vector interpretation. 
+The performance difference comes down to a SIMD implementation having to do a transpose if the layout doesn't match the preferred vector interpretation. 
 
 If we put this all together - best performance, consistency between vector interpretation and platform independence we get:
 
@@ -76,7 +76,7 @@ If we put this all together - best performance, consistency between vector inter
 
 The only combination that forfils all aspects is `row-major` matrix layout and `row` vector interpretation for both host and kernel.
 
-It's worth noting that for targets that honor the default matrix layout - that setting can acts like a toggle transposing a matrix layout. That if for some reason the combination of choices leads to inconsistent vector transforms, an implementation can perform this transform in *host* code at the boundary between host and the kernel. This is not the most performant or convenient scenario, but if supported in an implementation it could be used for targets that do not support kernel matrix layout settings. 
+It's worth noting that for targets that honor the default matrix layout - that setting can act like a toggle transposing a matrix layout. If for some reason the combination of choices leads to inconsistent vector transforms, an implementation can perform this transform in *host* code at the boundary between host and the kernel. This is not the most performant or convenient scenario, but if supported in an implementation it could be used for targets that do not support kernel matrix layout settings. 
 
 If only targetting platforms that honor matrix layout, there is more flexibility, our constraints are 
 
@@ -110,7 +110,7 @@ Matrix Layout
 
 The above discussion is largely around 4x4 32-bit element matrices. For graphics APIs such as Vulkan, GL, and D3D there are typically additional restrictions for matrix layout. One restriction is for 16 byte alignment between rows (for `row-major` layout) and columns (for `column-major` layout). 
 
-More CPU-like targets such as CUDA and C++/CPU do not have this restriction, and have all elements are consecutive. 
+More CPU-like targets such as CUDA and C++/CPU do not have this restriction, and all elements are consecutive. 
 
 This being the case only the following matrix types/matrix layouts will work across all targets. (Listed in the HLSL convention of RxC). 
  
@@ -125,11 +125,11 @@ NOTE! This only applies to matrices that are trafficed between host and kernel -
 
 The hosts maths library also plays a part here. The library may hold all elements consecutively in memory. If that's the case it will match the CPU/CUDA kernels, but will only work on 'graphics'-like targets that match that layout for the size. 
 
-For SIMD based host maths libraries it can be even more convoluted. If a SIMD library is being used that prefers `row` vector interpretation and therefore will have `row-majow` layout it may for many sizes *not* match the CPU-like consecutive layout. For example a 4x3 - it will likely be packed with 16 byte row alignment. Additionally even if a matrix is packed in the same way it may not be the same size. For example a 3x2 matrix *may* hold the rows consecutively *but* be 16 bytes in size, as opposed to the 12 bytes that a CPU-like kernel will expect. 
+For SIMD based host maths libraries it can be even more convoluted. If a SIMD library is being used that prefers `row` vector interpretation and therefore will have `row-major` layout it may for many sizes *not* match the CPU-like consecutive layout. For example a 4x3 - it will likely be packed with 16 byte row alignment. Additionally even if a matrix is packed in the same way it may not be the same size. For example a 3x2 matrix *may* hold the rows consecutively *but* be 16 bytes in size, as opposed to the 12 bytes that a CPU-like kernel will expect. 
 
-If a SIMD based host maths library with graphics-like APIs are being used, there is a good chance (but certainly *not* guarenteed) that layout across non 4x4 sizes will match because SIMD typically implies 16 byte alignment. 
+If a SIMD based host maths library with graphics-like APIs are being used, there is a good chance (but certainly *not* guaranteed) that layout across non 4x4 sizes will match because SIMD typically implies 16 byte alignment. 
 
-If your application uses matrix sizes that are not 4x4 across the host/kernel boundary and it wants to work across all targets, it is *likely* that *some* matrices will have to be converted across the boundary. This being the case, having to handle transposing matrices at the boundary is a less significant issue. 
+If your application uses matrix sizes that are not 4x4 across the host/kernel boundary and it wants to work across all targets, it is *likely* that *some* matrices will have to be converted at the boundary. This being the case, having to handle transposing matrices at the boundary is a less significant issue. 
 
 In conclusion if your application has to perform matrix conversion work at the host/kernel boundary the previous observation about "best performance" implies `row-major` layout and `row` vector interpretation becomes somewhat mute.
 
