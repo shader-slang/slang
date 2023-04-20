@@ -1840,6 +1840,17 @@ namespace Slang
         return SLANG_OK;
     }
 
+    static IBoxValue<SourceMap>* _getObfuscatedSourceMap(TranslationUnitRequest* translationUnit)
+    {
+        if (auto module = translationUnit->getModule())
+        {
+            if (auto irModule = module->getIRModule())
+            {
+                return irModule->getObfuscatedSourceMap();
+            }
+        }
+    }
+
     SlangResult EndToEndCompileRequest::maybeCreateContainer()
     {
         m_containerArtifact.setNull();
@@ -1922,7 +1933,7 @@ namespace Slang
             {
                 // Hmmm do I have to therefore add a map for all translation units(!)
                 // I guess this is okay in so far as an association can always be looked up by name
-                if (auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap())
+                if (auto sourceMap = _getObfuscatedSourceMap(translationUnit))
                 {
                     auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
 
