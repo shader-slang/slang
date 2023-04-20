@@ -83,6 +83,12 @@ static bool _checkRecursive(ArtifactUtil::FindStyle findStyle)
         return false;
     }
 
+    /* We currently can't write out diagnostics, so for now we'll say they are insignificant */
+    if (isDerivedFrom(desc.payload, ArtifactPayload::Diagnostics))
+    {
+        return false;
+    }
+
     return true;
 }
 
