@@ -896,6 +896,7 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_DifferentialPairType:
     case kIROp_DifferentialPairUserCodeType:
     case kIROp_InterfaceType:
+    case kIROp_AssociatedType:
     case kIROp_AnyValueType:
     case kIROp_ClassType:
     case kIROp_FloatType:
