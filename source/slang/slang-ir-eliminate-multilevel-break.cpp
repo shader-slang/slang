@@ -293,19 +293,31 @@ struct EliminateMultiLevelBreakContext
             // branch. We need this separation to avoid introducing critical edge to the CFG (blocks
             // cannot have more than 1 predecessors and more than 1 successors at the same time).
             auto jumpToOuterBlock = builder.createBlock();
-            auto newBreakBodyBlock = builder.createBlock();
+            
             auto newBreakBlock = builder.createBlock();
             newBreakBlock->insertBefore(breakBlock);
-            newBreakBodyBlock->insertAfter(breakBlock);
             jumpToOuterBlock->insertAfter(newBreakBlock);
             mapNewBreakBlockToRegionLevel[newBreakBlock] = skippedRegion->level;
             breakBlock->replaceUsesWith(newBreakBlock);
+
             builder.setInsertInto(newBreakBlock);
             auto targetLevelParam = builder.emitParam(builder.getIntType());
-            builder.emitBranch(newBreakBodyBlock);
-            builder.setInsertInto(newBreakBodyBlock);
-            auto levelNeq = builder.emitNeq(targetLevelParam, builder.getIntValue(builder.getIntType(), skippedRegion->level));
-            builder.emitIfElse(levelNeq, jumpToOuterBlock, breakBlock, breakBlock);
+
+            if (as<IRUnreachable>(breakBlock->getTerminator()))
+            {
+                builder.setInsertInto(newBreakBlock);
+                builder.emitBranch(jumpToOuterBlock);
+            }
+            else
+            {
+                auto newBreakBodyBlock = builder.createBlock();
+                newBreakBodyBlock->insertAfter(breakBlock);
+                builder.emitBranch(newBreakBodyBlock);
+                builder.setInsertInto(newBreakBodyBlock);
+                auto levelNeq = builder.emitNeq(targetLevelParam, builder.getIntValue(builder.getIntType(), skippedRegion->level));
+                builder.emitIfElse(levelNeq, jumpToOuterBlock, breakBlock, breakBlock);
+            }
+            
             builder.setInsertInto(jumpToOuterBlock);
             if (skippedOverRegions.Contains(skippedRegion->parent))
             {
