@@ -810,7 +810,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(BackwardDerivativePrimalReturnDecoration, BackwardDerivativePrimalReturnDecoration, 1, 0)
 
     INST(LoopCounterDecoration, loopCounterDecoration, 0, 0)
-    INST(PrimalValueAccessDecoration, primalValueAccessDecoration, 0, 0)
+    INST(LoopCounterUpdateDecoration, loopCounterUpdateDecoration, 0, 0)
 
     /* Auto-diff inst decorations */
         /// Used by the auto-diff pass to mark insts that compute
@@ -824,7 +824,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Used by the auto-diff pass to mark insts that compute
         /// BOTH a differential and a primal value.
         INST(MixedDifferentialInstDecoration, mixedDiffInstDecoration, 1, 0)
-    INST_RANGE(AutodiffInstDecoration, PrimalInstDecoration, MixedDifferentialInstDecoration)
+
+        INST(RecomputeBlockDecoration, RecomputeBlockDecoration, 0, 0)
+    INST_RANGE(AutodiffInstDecoration, PrimalInstDecoration, RecomputeBlockDecoration)
 
         /// Used by the auto-diff pass to mark insts whose result is stored
         /// in an intermediary struct for reuse in backward propagation phase.

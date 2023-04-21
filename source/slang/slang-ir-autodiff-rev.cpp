@@ -679,10 +679,7 @@ namespace Slang
         // 
         // diffPropagationPass->propagateDiffInstDecoration(builder, fwdDiffFunc);
 
-        // Copy primal insts to the first block of the unzipped function, copy diff insts to the
-        // second block of the unzipped function.
-        // 
-        RefPtr<HoistedPrimalsInfo> primalsInfo = diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
+        diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
         IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
 
         // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
@@ -709,10 +706,17 @@ namespace Slang
 
         // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter) representing the
         // derivative of the return value.
-        DiffTransposePass::FuncTranspositionInfo transposeInfo = { paramTransposeInfo.dOutParam, primalsInfo };
+        DiffTransposePass::FuncTranspositionInfo transposeInfo = { paramTransposeInfo.dOutParam };
         diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, transposeInfo);
 
+        // Apply checkpointing policy to legalize cross-scope uses of primal values
+        // using either recompute or store strategies.
+        auto primalsInfo = applyCheckpointPolicy(
+            diffPropagateFunc, paramTransposeInfo.propagateFuncSpecificPrimalInsts);
+
+
         eliminateDeadCode(diffPropagateFunc);
+        
 
         // Extracts the primal computations into its own func, and replace the primal insts
         // with the intermediate results computed from the extracted func.
@@ -907,6 +911,7 @@ namespace Slang
                     // after transposition.
                     auto tempVar = nextBlockBuilder.emitVar(diffType);
                     copyNameHintDecoration(tempVar, fwdParam);
+                    result.propagateFuncSpecificPrimalInsts.add(tempVar);
 
                     // Initialize the var with input diff param at start.
                     // Note that we insert the store in the primal block so it won't get transposed.
@@ -993,9 +998,11 @@ namespace Slang
                 // of the differential component of the pair.
                 auto newParamLoad = diffBuilder.emitLoad(propParam);
                 diffBuilder.markInstAsDifferential(newParamLoad, primalType);
+                result.propagateFuncSpecificPrimalInsts.add(newParamLoad);
 
                 diffRefReplacement = diffBuilder.emitDifferentialPairGetDifferential(diffType, newParamLoad);
                 diffBuilder.markInstAsDifferential(diffRefReplacement, primalType);
+                result.propagateFuncSpecificPrimalInsts.add(diffRefReplacement);
 
                 // Load the primal component from the prop param and use it as replacement for the
                 // primal param in the primal part of the prop func.
@@ -1031,7 +1038,10 @@ namespace Slang
 
                 // Load the inital diff value.
                 auto loadedParam = nextBlockBuilder.emitLoad(diffParam);
+                result.propagateFuncSpecificPrimalInsts.add(loadedParam);
+
                 auto initDiff = nextBlockBuilder.emitDifferentialPairGetDifferential(diffType, loadedParam);
+                result.propagateFuncSpecificPrimalInsts.add(initDiff);
 
                 // Create a local var for diff read access.
                 auto diffVar = nextBlockBuilder.emitVar(diffType);
@@ -1047,6 +1057,7 @@ namespace Slang
 
                 // Create a local var for diff write access.
                 auto diffWriteVar = nextBlockBuilder.emitVar(diffType);
+                result.propagateFuncSpecificPrimalInsts.add(diffWriteVar);
                 copyNameHintDecoration(diffWriteVar, fwdParam);
 
                 // Initialize write var to 0.

@@ -7,7 +7,6 @@
 #include "slang-ir-autodiff-region.h"
 #include "slang-ir-dominators.h"
 
-
 namespace Slang
 {
     struct IROutOfOrderCloneContext : public RefObject
@@ -84,11 +83,11 @@ namespace Slang
 
     struct HoistedPrimalsInfo : public RefObject
     {
-        HashSet<IRInst*> storeSet;
-        HashSet<IRInst*> recomputeSet;
-        HashSet<IRInst*> invertSet;
-
-        HashSet<IRInst*> instsToInvert;
+        OrderedHashSet<IRInst*> storeSet;
+        OrderedHashSet<IRInst*> recomputeSet;
+        OrderedHashSet<IRInst*> invertSet;
+        OrderedHashSet<IRInst*> ignoreSet;
+        OrderedHashSet<IRInst*> instsToInvert;
 
         Dictionary<IRInst*, InversionInfo> invertInfoMap;
 
@@ -129,6 +128,9 @@ namespace Slang
 
             for (auto inst : info->invertSet)
                 invertSet.Add(inst);
+
+            for (auto inst : info->ignoreSet)
+                ignoreSet.add(inst);
 
             for (auto inst : info->instsToInvert)
                 instsToInvert.Add(inst);
@@ -195,6 +197,31 @@ namespace Slang
         }
     };
 
+    struct IndexTrackingInfo : public RefObject
+    {
+        // After lowering, store references to the count
+        // variables associated with this region
+        //
+        IRInst* primalCountParam = nullptr;
+        IRInst* diffCountParam = nullptr;
+
+        enum CountStatus
+        {
+            Unresolved,
+            Dynamic,
+            Static
+        };
+
+        CountStatus    status = CountStatus::Unresolved;
+
+        // Inferred maximum number of iterations.
+        Count          maxIters = -1;
+
+        bool operator==(const IndexTrackingInfo& other) const
+        {
+            return primalCountParam == other.primalCountParam;
+        }
+    };
     
     // Information on which insts are to be stored, recomputed
     // and inverted within a single function.
@@ -210,6 +237,15 @@ namespace Slang
         Dictionary<IRInst*, InversionInfo> invInfoMap;
     };
 
+    // Information on a block after it has been split in the unzip step.
+    // After unzipping, every block in the original function will have
+    // two corresponding blocks in the new function:
+    // - A 'primal-recompute' block, which contains the original instructions
+    //   from the original block, but located in the corresponding the reverse
+    //   diff region so their results are accessible in the diff block for
+    //   derivative computation.
+    // - A 'diff' block, which contains the transcribed instructions from the
+    //   original block.
     struct BlockSplitInfo : public RefObject
     {
         // Maps primal to differential blocks from the unzip step.
@@ -223,7 +259,9 @@ namespace Slang
         AutodiffCheckpointPolicyBase(IRModule* module) : module(module)
         { }
 
-        RefPtr<HoistedPrimalsInfo> processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* info);
+        RefPtr<HoistedPrimalsInfo> processFunc(
+            IRGlobalValueWithCode* func,
+            Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock);
 
         // Do pre-processing on the function (mainly for 
         // 'global' checkpointing methods that consider the entire
@@ -252,15 +290,9 @@ namespace Slang
         RefPtr<IRDominatorTree> domTree;
     };
 
-    RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
-        CheckpointSetInfo* checkpointInfo,
+    RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(
         IRGlobalValueWithCode* func,
-        BlockSplitInfo* splitInfo,
-        HashSet<IRUse*> pendingUses);
+        const List<IRInst*>& instsToIgnore);
 
-    RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
-        HoistedPrimalsInfo* hoistInfo,
-        IRGlobalValueWithCode* func,
-        Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlockInfo);
 
 };

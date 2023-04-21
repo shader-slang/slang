@@ -198,6 +198,8 @@ void removeLinkageDecorations(IRGlobalValueWithCode* func);
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
+
+void moveParams(IRBlock* dest, IRBlock* src);
 }
 
 #endif

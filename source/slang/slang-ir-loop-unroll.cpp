@@ -529,23 +529,6 @@ bool unrollLoopsInModule(IRModule* module, DiagnosticSink* sink)
     return true;
 }
 
-static void _moveParams(IRBlock* dest, IRBlock* src)
-{
-    for (auto param = src->getFirstChild(); param;)
-    {
-        auto nextInst = param->getNextInst();
-        if (as<IRDecoration>(param) || as<IRParam>(param))
-        {
-            param->insertAtEnd(dest);
-        }
-        else
-        {
-            break;
-        }
-        param = nextInst;
-    }
-}
-
 void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
 {
     // Eliminate the continue jumps by turning a loop in the form of:
@@ -599,7 +582,7 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     targetBlock->replaceUsesWith(innerBreakableRegionHeader);
 
     // Move decorations and params from original targetBlock to innerBreakableRegionHeader.
-    _moveParams(innerBreakableRegionHeader, targetBlock);
+    moveParams(innerBreakableRegionHeader, targetBlock);
 
     builder.setInsertInto(innerBreakableRegionHeader);
     builder.emitLoop(targetBlock, innerBreakableRegionBreakBlock, targetBlock);
@@ -607,7 +590,7 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     continueBlock->replaceUsesWith(innerBreakableRegionBreakBlock);
     
     builder.setInsertInto(innerBreakableRegionBreakBlock);
-    _moveParams(innerBreakableRegionBreakBlock, continueBlock);
+    moveParams(innerBreakableRegionBreakBlock, continueBlock);
     builder.emitBranch(continueBlock);
 
     // If the original loop can be executed up to N times, the new loop may be executed

@@ -50,29 +50,6 @@ struct IndexedRegion : public RefObject
     }
 };
 
-struct IndexTrackingInfo : public RefObject
-{
-    // After lowering, store references to the count
-    // variables associated with this region
-    //
-    IRInst*         primalCountParam   = nullptr;
-    IRInst*         diffCountParam     = nullptr;
-
-    IRVar*          primalCountLastVar   = nullptr;
-
-    enum CountStatus
-    {
-        Unresolved,
-        Dynamic,
-        Static
-    };
-
-    CountStatus    status           = CountStatus::Unresolved;
-
-    // Inferred maximum number of iterations.
-    Count          maxIters         = -1;
-};
-
 struct IndexedRegionMap : public RefObject
 {
     Dictionary<IRBlock*, IndexedRegion*> map;
