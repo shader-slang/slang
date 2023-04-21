@@ -2238,6 +2238,9 @@ struct DiffTransposePass
             case kIROp_UpdateElement:
                 return transposeUpdateElement(builder, fwdInst, revValue);
 
+            case kIROp_FloatCast:
+                return transposeFloatCast(builder, fwdInst, revValue);
+
             case kIROp_LoadReverseGradient:
             case kIROp_ReverseGradientDiffPairRef:
             case kIROp_DefaultConstruct:
@@ -2720,6 +2723,22 @@ struct DiffTransposePass
             fwdUpdate));
         // (A = UpdateElement(arr, index, V)) -> [(dV += dA[index], d_arr += UpdateElement(revValue, index, 0)]
         return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeFloatCast(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
+    {
+        // (A = cast<T, U>(B)) -> (dB += cast<U, T>(dA))
+        return TranspositionResult(
+            List<RevGradient>(
+                RevGradient(
+                    RevGradient::Flavor::Simple,
+                    fwdInst->getOperand(0),
+                    builder->emitIntrinsicInst(
+                        fwdInst->getOperand(0)->getDataType(),
+                        kIROp_FloatCast,
+                        1,
+                        &revValue),
+                    fwdInst)));
     }
 
     // Gather all reverse-mode gradients for a Load inst, aggregate them and store them in the ptr.
