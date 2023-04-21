@@ -169,10 +169,10 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 /* Macros concerning DirectX */
 #if !defined(SLANG_CONFIG_DX_ON_VK) || !SLANG_CONFIG_DX_ON_VK
 #    define SLANG_ENABLE_DXVK 0
-#    define SLANG_ENABLE_VKD3D_PROTON 0
+#    define SLANG_ENABLE_VKD3D 0
 #else
 #    define SLANG_ENABLE_DXVK 1
-#    define SLANG_ENABLE_VKD3D_PROTON 1
+#    define SLANG_ENABLE_VKD3D 1
 #endif
 
 #if SLANG_WINDOWS_FAMILY
@@ -181,7 +181,7 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 #    define SLANG_ENABLE_DXBC_SUPPORT 1
 #    define SLANG_ENABLE_PIX 1
 #elif SLANG_LINUX_FAMILY
-#    define SLANG_ENABLE_DIRECTX (SLANG_ENABLE_DXVK || SLANG_ENABLE_VKD3D_PROTON)
+#    define SLANG_ENABLE_DIRECTX (SLANG_ENABLE_DXVK || SLANG_ENABLE_VKD3D)
 #    define SLANG_ENABLE_DXGI_DEBUG 0
 #    define SLANG_ENABLE_DXBC_SUPPORT 0
 #    define SLANG_ENABLE_PIX 0

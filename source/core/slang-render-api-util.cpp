@@ -261,7 +261,7 @@ static bool _canLoadSharedLibrary(const char* libName)
 
 /* static */bool RenderApiUtil::calcHasApi(RenderApiType type)
 {
-    const char* d3d12LibName = SLANG_ENABLE_VKD3D_PROTON ? "vkd3d-proton-d3d12" : "d3d12";
+    const char* d3d12LibName = SLANG_ENABLE_VKD3D ? "vkd3d-proton-d3d12" : "d3d12";
     const char* d3d11LibName = SLANG_ENABLE_DXVK ? "dxvk_d3d11" : "d3d11";
 
     switch (type)
