@@ -212,6 +212,14 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+    trigger     = "dx-on-vk",
+    description = "(Optional) If true will use dxvk and vkd3d-proton for DirectX support",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -227,6 +235,7 @@ deployLLVM = (_OPTIONS["deploy-slang-llvm"] == "true")
 deployGLSLang = (_OPTIONS["deploy-slang-glslang"] == "true")
 fullDebugValidation = (_OPTIONS["full-debug-validation"] == "true")
 enableAsan = (_OPTIONS["enable-asan"] == "true")
+dxOnVk = (_OPTIONS["dx-on-vk"] == "true")
 
 -- If stdlib embedding is enabled, disable stdlib source embedding by default
 disableStdlibSource = enableEmbedStdLib
@@ -395,6 +404,10 @@ workspace "slang"
         -- Although we define these here, we still set them manually in any header
         -- files which may be included by another project
         defines { "WIN32_LEAN_AND_MEAN", "VC_EXTRALEAN", "NOMINMAX" }
+
+        if dxOnVk then
+            defines { "SLANG_CONFIG_DX_ON_VK" }
+        end
 
 function dump(o)
     if type(o) == 'table' then
@@ -1028,9 +1041,11 @@ tool "gfx"
     else
         -- Linux like
         addSourceDir "tools/gfx/vulkan"
-        addSourceDir "tools/gfx/d3d"
-        addSourceDir "tools/gfx/d3d11"
-        addSourceDir "tools/gfx/d3d12"
+        if dxOnVk then
+            addSourceDir "tools/gfx/d3d"
+            addSourceDir "tools/gfx/d3d11"
+            addSourceDir "tools/gfx/d3d12"
+        end
         --addSourceDir "tools/gfx/open-gl"
     end
 
