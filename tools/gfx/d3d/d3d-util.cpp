@@ -475,7 +475,9 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     {
         ::fputs((const char*)errorBlob->GetBufferPointer(), stderr);
         ::fflush(stderr);
+#if SLANG_WINDOWS_FAMILY
         ::OutputDebugStringA((const char*)errorBlob->GetBufferPointer());
+#endif
     }
 
     SLANG_RETURN_ON_FAIL(hr);
