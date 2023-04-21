@@ -4,6 +4,7 @@
 #include "slang-ir-ssa.h"
 
 #include "slang-ir-validate.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -17,31 +18,26 @@ struct RegionEndpoint
 
     bool isRegionEmpty = false;
 
-    RegionEndpoint(IRBlock* exitBlock, bool inBreakRegion, bool inBaseRegion) :
-        exitBlock(exitBlock),
-        inBreakRegion(inBreakRegion),
-        inBaseRegion(inBaseRegion),
-        isRegionEmpty(false)
-    { }
+    RegionEndpoint(IRBlock* exitBlock, bool inBreakRegion, bool inBaseRegion)
+        : exitBlock(exitBlock)
+        , inBreakRegion(inBreakRegion)
+        , inBaseRegion(inBaseRegion)
+        , isRegionEmpty(false)
+    {}
 
-    RegionEndpoint(
-        IRBlock* exitBlock,
-        bool inBreakRegion,
-        bool inBaseRegion,
-        bool isRegionEmpty) :
-        exitBlock(exitBlock),
-        inBreakRegion(inBreakRegion),
-        inBaseRegion(inBaseRegion),
-        isRegionEmpty(isRegionEmpty)
-    { }
+    RegionEndpoint(IRBlock* exitBlock, bool inBreakRegion, bool inBaseRegion, bool isRegionEmpty)
+        : exitBlock(exitBlock)
+        , inBreakRegion(inBreakRegion)
+        , inBaseRegion(inBaseRegion)
+        , isRegionEmpty(isRegionEmpty)
+    {}
 
-    RegionEndpoint()
-    { }
+    RegionEndpoint() {}
 };
 
 struct BreakableRegionInfo
 {
-    IRVar*   breakVar;
+    IRVar* breakVar;
     IRBlock* breakBlock;
     IRBlock* headerBlock;
 };
@@ -49,16 +45,15 @@ struct BreakableRegionInfo
 struct CFGNormalizationContext
 {
     IRModule* module;
-    DiagnosticSink*  sink;
+    DiagnosticSink* sink;
 };
-
 
 IRBlock* getOrCreateTopLevelCondition(IRLoop* loopInst)
 {
     // For now, we're going to naively assume the next block is the condition block.
     // Add in more support for more cases as necessary.
-    // 
-    
+    //
+
     auto firstBlock = loopInst->getTargetBlock();
 
     if (as<IRIfElse>(firstBlock->getTerminator()))
@@ -72,7 +67,7 @@ IRBlock* getOrCreateTopLevelCondition(IRLoop* loopInst)
         //
 
         IRBuilder condBuilder(loopInst->getModule());
-        
+
         auto condBlock = condBuilder.emitBlock();
         condBlock->insertAfter(as<IRBlock>(loopInst->getParent()));
 
@@ -81,22 +76,17 @@ IRBlock* getOrCreateTopLevelCondition(IRLoop* loopInst)
 
         // Emit a condition: true side goes to the loop body, and
         // false side goes into the break block.
-        // 
+        //
         condBuilder.setInsertInto(condBlock);
         auto ifElse = as<IRIfElse>(condBuilder.emitIfElse(
-            condBuilder.getBoolValue(true),
-            firstBlock,
-            loopInst->getBreakBlock(),
-            firstBlock));
-        
+            condBuilder.getBoolValue(true), firstBlock, loopInst->getBreakBlock(), firstBlock));
+
         // We'll insert a blank block between the condition and the
         // break block, since otherwise, we might trip up the later
         // parts of this pass.
         //
-        condBuilder.insertBlockAlongEdge(
-            loopInst->getModule(),
-            IREdge(&ifElse->falseBlock));
-        
+        condBuilder.insertBlockAlongEdge(loopInst->getModule(), IREdge(&ifElse->falseBlock));
+
         return condBlock;
     }
 }
@@ -105,9 +95,9 @@ struct CFGNormalizationPass
 {
     CFGNormalizationContext cfgContext;
 
-    CFGNormalizationPass(CFGNormalizationContext ctx) : 
-        cfgContext(ctx)
-    { }
+    CFGNormalizationPass(CFGNormalizationContext ctx)
+        : cfgContext(ctx)
+    {}
 
     void replaceBreakWithAfterBlock(
         IRBuilder* builder,
@@ -158,13 +148,12 @@ struct CFGNormalizationPass
         return branchInst ? branchInst->getTargetBlock() : nullptr;
     }
 
-
     bool isSuccessorBlock(IRBlock* baseBlock, IRBlock* succBlock)
     {
         for (auto successor : baseBlock->getSuccessors())
             if (successor == succBlock)
                 return true;
-        
+
         return false;
     }
 
@@ -184,9 +173,7 @@ struct CFGNormalizationPass
     }
 
     RegionEndpoint getNormalizedRegionEndpoint(
-        BreakableRegionInfo* parentRegion,
-        IRBlock* entryBlock,
-        List<IRBlock*> afterBlocks)
+        BreakableRegionInfo* parentRegion, IRBlock* entryBlock, List<IRBlock*> afterBlocks)
     {
         IRBlock* currentBlock = entryBlock;
         _moveVarsToRegionHeader(parentRegion, currentBlock);
@@ -195,7 +182,7 @@ struct CFGNormalizationPass
         // and not in the 'break' control flow
         // It is the job of the *caller* to make sure the break flow
         // does not reach this point.
-        // 
+        //
         bool currBreakRegion = false;
         bool currBaseRegion = true;
 
@@ -204,7 +191,7 @@ struct CFGNormalizationPass
         //
         if (afterBlocks.contains(currentBlock))
             return RegionEndpoint(currentBlock, currBreakRegion, currBaseRegion, true);
-        
+
         IRBuilder builder(cfgContext.module);
 
         List<IRBlock*> pendingAfterBlocks;
@@ -216,7 +203,7 @@ struct CFGNormalizationPass
             // We could arrive at the after-block before or
             // after encountering a break statement.
             // To handle this, we'll split the flow by checking the break flag
-            // 
+            //
             builder.setInsertAfter(block);
 
             auto preAfterSplitBlock = builder.emitBlock();
@@ -229,28 +216,24 @@ struct CFGNormalizationPass
 
             builder.setInsertInto(preAfterSplitBlock);
             builder.emitBranch(afterSplitBlock);
-            
+
             // Converging block for the split that we're making.
             auto afterSplitAfterBlock = builder.emitBlock();
 
             builder.setInsertInto(afterSplitBlock);
             auto breakFlagValue = builder.emitLoad(parentRegion->breakVar);
 
-            builder.emitIfElse(
-                breakFlagValue,
-                block,
-                afterSplitAfterBlock,
-                afterSplitAfterBlock); 
+            builder.emitIfElse(breakFlagValue, block, afterSplitAfterBlock, afterSplitAfterBlock);
 
             // At this point, we need to place afterSplitAfterBlock between
-            // at the _end_ of this region, but we aren't there yet (and 
+            // at the _end_ of this region, but we aren't there yet (and
             // don't know which block is the end of this region)
             // Therefore, we'll defer this step and add it to a list for later.
-            // 
+            //
             pendingAfterBlocks.add(afterSplitAfterBlock);
         };
 
-        // Follow this thread of execution till we hit an 
+        // Follow this thread of execution till we hit an
         // acceptable after block.
         //
         while (!afterBlocks.contains(maybeGetUnconditionalTarget(currentBlock)))
@@ -259,14 +242,14 @@ struct CFGNormalizationPass
             auto terminator = currentBlock->getTerminator();
             switch (terminator->getOp())
             {
-                case kIROp_unconditionalBranch:
+            case kIROp_unconditionalBranch:
                 {
                     auto targetBlock = as<IRUnconditionalBranch>(terminator)->getTargetBlock();
                     currentBlock = targetBlock;
                     break;
                 }
-                
-                case kIROp_ifElse:
+
+            case kIROp_ifElse:
                 {
                     auto ifElse = as<IRIfElse>(terminator);
 
@@ -274,24 +257,24 @@ struct CFGNormalizationPass
                     // lead back to the condition.
                     //
                     SLANG_ASSERT(ifElse->getAfterBlock() != parentRegion->breakBlock);
-                    
+
                     auto trueEndPoint = getNormalizedRegionEndpoint(
                         parentRegion,
                         ifElse->getTrueBlock(),
                         List<IRBlock*>(ifElse->getAfterBlock(), parentRegion->breakBlock));
-                    
+
                     auto falseEndPoint = getNormalizedRegionEndpoint(
                         parentRegion,
                         ifElse->getFalseBlock(),
                         List<IRBlock*>(ifElse->getAfterBlock(), parentRegion->breakBlock));
-                    
+
                     auto trueTargetBlock = getUnconditionalTarget(trueEndPoint);
                     auto falseTargetBlock = getUnconditionalTarget(falseEndPoint);
-                    
+
                     auto afterBlock = ifElse->getAfterBlock();
 
                     // Trivial case, both end-points branch into the after block
-                    /*if (trueTargetBlock == afterBlock && 
+                    /*if (trueTargetBlock == afterBlock &&
                         falseTargetBlock == afterBlock)
                     {
                         if ()
@@ -308,7 +291,7 @@ struct CFGNormalizationPass
                     {
                         // Branch into after block (and set break variable)
                         replaceBreakWithAfterBlock(
-                            &builder, 
+                            &builder,
                             parentRegion,
                             trueEndPoint.exitBlock,
                             afterBlock,
@@ -321,10 +304,10 @@ struct CFGNormalizationPass
                     }
                     else
                     {
-                        // If this branch naturally branches into our 
+                        // If this branch naturally branches into our
                         // after-block, copy whatever flags the endpoints
                         // have.
-                        // 
+                        //
                         afterBreakRegion = afterBreakRegion || trueEndPoint.inBreakRegion;
                         afterBaseRegion = afterBaseRegion || trueEndPoint.inBaseRegion;
                     }
@@ -346,10 +329,10 @@ struct CFGNormalizationPass
                     }
                     else
                     {
-                        // If this branch naturally branches into our 
+                        // If this branch naturally branches into our
                         // after-block, copy whatever flags the endpoints
                         // have.
-                        // 
+                        //
                         afterBreakRegion = afterBreakRegion || falseEndPoint.inBreakRegion;
                         afterBaseRegion = afterBaseRegion || falseEndPoint.inBaseRegion;
                     }
@@ -365,12 +348,12 @@ struct CFGNormalizationPass
                     // Do we need to split the after region?
                     if (afterBaseRegion && afterBreakRegion)
                     {
-                        // Before we split the afterBlock, we 
+                        // Before we split the afterBlock, we
                         // want to make sure the afterBlock is
                         // firmly _inside_ the current region.
-                        // If it's part of the parent, add a 
+                        // If it's part of the parent, add a
                         // dummy block.
-                        // 
+                        //
                         if (afterBlocks.contains(afterBlock))
                         {
                             auto newAfterBlock = builder.emitBlock();
@@ -382,15 +365,17 @@ struct CFGNormalizationPass
                             // condition block. (This eventually causes cloneInst to fail,
                             // since it is currently order-dependent)
                             // Remove this once cloneInst is order-independent.
-                            // 
+                            //
                             // newAfterBlock->insertBefore(afterBlock);
                             newAfterBlock->insertAfter(falseEndPoint.exitBlock);
 
                             builder.emitBranch(afterBlock);
-                            
+
                             ifElse->afterBlock.set(newAfterBlock);
-                            as<IRUnconditionalBranch>(trueEndPoint.exitBlock->getTerminator())->block.set(newAfterBlock);
-                            as<IRUnconditionalBranch>(falseEndPoint.exitBlock->getTerminator())->block.set(newAfterBlock);
+                            as<IRUnconditionalBranch>(trueEndPoint.exitBlock->getTerminator())
+                                ->block.set(newAfterBlock);
+                            as<IRUnconditionalBranch>(falseEndPoint.exitBlock->getTerminator())
+                                ->block.set(newAfterBlock);
 
                             afterBlock = newAfterBlock;
                         }
@@ -402,15 +387,15 @@ struct CFGNormalizationPass
                         afterBreakRegion = false;
                         afterBaseRegion = true;
                     }
-                    
+
                     currentBlock = afterBlock;
                     currBreakRegion = afterBreakRegion;
                     currBaseRegion = afterBaseRegion;
                     break;
                 }
 
-                case kIROp_loop:
-                case kIROp_Switch:
+            case kIROp_loop:
+            case kIROp_Switch:
                 {
                     auto breakBlock = normalizeBreakableRegion(terminator);
 
@@ -419,10 +404,10 @@ struct CFGNormalizationPass
                     break;
                 }
 
-                default:
-                    // Do proper diagnosing
-                    SLANG_UNEXPECTED("Unhandled control flow inst");
-                    break;
+            default:
+                // Do proper diagnosing
+                SLANG_UNEXPECTED("Unhandled control flow inst");
+                break;
             }
 
             _moveVarsToRegionHeader(parentRegion, currentBlock);
@@ -438,7 +423,7 @@ struct CFGNormalizationPass
             SLANG_ASSERT(nextRegionBlock);
 
             builder.emitBranch(nextRegionBlock);
-            
+
             builder.setInsertInto(currentBlock);
             currentBlock->getTerminator()->removeAndDeallocate();
             builder.emitBranch(block);
@@ -458,7 +443,7 @@ struct CFGNormalizationPass
         HashSet<IRBlock*> predecessorSet;
         for (auto predecessor : block->getPredecessors())
             predecessorSet.Add(predecessor);
-        
+
         return predecessorSet;
     }
 
@@ -466,29 +451,27 @@ struct CFGNormalizationPass
     {
         // Get 'looping' block (first block in loop)
         auto firstLoopBlock = loop->getTargetBlock();
-        
+
         // If we only have one predecessor, the loop is trivial.
         return (getPredecessorSet(firstLoopBlock).Count() == 1);
     }
 
-    IRBlock* normalizeBreakableRegion(
-        IRInst* branchInst)
+    IRBlock* normalizeBreakableRegion(IRInst* branchInst)
     {
         IRBuilder builder(cfgContext.module);
 
         switch (branchInst->getOp())
         {
-            case kIROp_loop:
+        case kIROp_loop:
             {
                 BreakableRegionInfo info;
                 info.breakBlock = as<IRLoop>(branchInst)->getBreakBlock();
                 info.headerBlock = as<IRBlock>(branchInst->getParent());
 
                 // Emit var into parent block.
-                builder.setInsertBefore(
-                    as<IRBlock>(branchInst->getParent())->getTerminator());
-                
-                // Create and initialize break var to true 
+                builder.setInsertBefore(as<IRBlock>(branchInst->getParent())->getTerminator());
+
+                // Create and initialize break var to true
                 // true -> no break yet.
                 // false -> atleast one break statement hit.
                 //
@@ -500,24 +483,23 @@ struct CFGNormalizationPass
                 // edges actually in a loop), we're just going to remove
                 // it.. (we can do this, because the normalization pass
                 // will transform any break and continue statements)
-                // 
+                //
                 if (isLoopTrivial(as<IRLoop>(branchInst)))
                 {
                     auto firstLoopBlock = as<IRLoop>(branchInst)->getTargetBlock();
-                    
+
                     // Normalize the region from the first loop block till break.
                     auto preBreakEndPoint = getNormalizedRegionEndpoint(
-                        &info,
-                        firstLoopBlock,
-                        List<IRBlock*>(info.breakBlock));
-                     
+                        &info, firstLoopBlock, List<IRBlock*>(info.breakBlock));
+
                     // Should not be empty.. but check anyway
                     SLANG_RELEASE_ASSERT(!preBreakEndPoint.isRegionEmpty);
 
-                    // Quick consistency check.. preBreakEndPoint should be 
+                    // Quick consistency check.. preBreakEndPoint should be
                     // branching into break block.
-                    SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(
-                        preBreakEndPoint.exitBlock->getTerminator())->getTargetBlock() == info.breakBlock);
+                    SLANG_RELEASE_ASSERT(
+                        as<IRUnconditionalBranch>(preBreakEndPoint.exitBlock->getTerminator())
+                            ->getTargetBlock() == info.breakBlock);
 
                     auto currentBlock = branchInst->getParent();
 
@@ -529,30 +511,27 @@ struct CFGNormalizationPass
                     return info.breakBlock;
                 }
 
-                auto condBlock = getOrCreateTopLevelCondition(as<IRLoop>(branchInst));
+                auto condBlock =
+                    getOrCreateTopLevelCondition(as<IRLoop>(branchInst));
 
                 auto ifElse = as<IRIfElse>(condBlock->getTerminator());
 
                 auto trueEndPoint = getNormalizedRegionEndpoint(
-                    &info,
-                    ifElse->getTrueBlock(),
-                    List<IRBlock*>(condBlock, info.breakBlock));
-                    
+                    &info, ifElse->getTrueBlock(), List<IRBlock*>(condBlock, info.breakBlock));
+
                 auto falseEndPoint = getNormalizedRegionEndpoint(
-                    &info,
-                    ifElse->getFalseBlock(),
-                    List<IRBlock*>(condBlock, info.breakBlock));
-                
+                    &info, ifElse->getFalseBlock(), List<IRBlock*>(condBlock, info.breakBlock));
+
                 RegionEndpoint loopEndPoint;
                 bool isLoopOnTrueSide = true;
-                
+
                 // First figure out which side belongs to the loop body.
                 if (isSuccessorBlock(trueEndPoint.exitBlock, condBlock))
                 {
                     loopEndPoint = trueEndPoint;
                     isLoopOnTrueSide = true;
                 }
-                
+
                 if (isSuccessorBlock(falseEndPoint.exitBlock, condBlock))
                 {
                     loopEndPoint = falseEndPoint;
@@ -560,11 +539,11 @@ struct CFGNormalizationPass
                 }
 
                 // Right now, we only support loops where the loop is on the true side of
-                // the condition. If we ever encounter the other case, fill in logic to 
+                // the condition. If we ever encounter the other case, fill in logic to
                 // flip the condition.
                 //
                 SLANG_RELEASE_ASSERT(isLoopOnTrueSide);
-                
+
                 // Expect atleast one basic block (other than the condition block), in
                 // the loop.
                 //
@@ -573,7 +552,7 @@ struct CFGNormalizationPass
 
                 // Does the loop endpoint have both 'break' and 'base'
                 // control flows?
-                // 
+                //
                 if (loopEndPoint.inBaseRegion && loopEndPoint.inBreakRegion)
                 {
                     // Add a test for the break variable into the condition.
@@ -582,36 +561,30 @@ struct CFGNormalizationPass
                     builder.setInsertBefore(ifElse);
                     auto breakFlagVal = builder.emitLoad(info.breakVar);
 
-                    // Need to invert the break flag if the loop is 
+                    // Need to invert the break flag if the loop is
                     // on the false side.
-                    // 
+                    //
                     if (!isLoopOnTrueSide)
                     {
                         IRInst* args[1] = {breakFlagVal};
-                        breakFlagVal = builder.emitIntrinsicInst(
-                            builder.getBoolType(),
-                            kIROp_Not,
-                            1,
-                            args);
+                        breakFlagVal =
+                            builder.emitIntrinsicInst(builder.getBoolType(), kIROp_Not, 1, args);
                     }
 
                     IRInst* args[2] = {cond, breakFlagVal};
 
                     // If break-var = true, direct flow to the loop
                     // otherwise, direct flow to break
-                    // 
-                    auto complexCond = builder.emitIntrinsicInst(
-                        builder.getBoolType(),
-                        kIROp_And,
-                        2,
-                        args);
-                    
+                    //
+                    auto complexCond =
+                        builder.emitIntrinsicInst(builder.getBoolType(), kIROp_And, 2, args);
+
                     ifElse->condition.set(complexCond);
                 }
-                
+
                 return info.breakBlock;
             }
-            case kIROp_Switch:
+        case kIROp_Switch:
             {
                 auto switchInst = as<IRSwitch>(branchInst);
 
@@ -620,10 +593,9 @@ struct CFGNormalizationPass
                 info.breakBlock = as<IRSwitch>(branchInst)->getBreakLabel();
 
                 // Emit var into parent block.
-                builder.setInsertBefore(
-                    as<IRBlock>(branchInst->getParent())->getTerminator());
-                
-                // Create and initialize break var to true 
+                builder.setInsertBefore(as<IRBlock>(branchInst->getParent())->getTerminator());
+
+                // Create and initialize break var to true
                 // true -> no break yet.
                 // false -> atleast one break statement hit.
                 //
@@ -635,30 +607,31 @@ struct CFGNormalizationPass
                 {
                     auto caseBlock = switchInst->getCaseLabel(ii);
                     auto caseEndPoint = getNormalizedRegionEndpoint(
-                        &info,
-                        caseBlock,
-                        List<IRBlock*>(info.breakBlock)).exitBlock;
+                                            &info, caseBlock, List<IRBlock*>(info.breakBlock))
+                                            .exitBlock;
 
                     // Consistency check (if this case hits, it's probably
                     // because the switch has fall-through, which we don't support)
-                    SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(
-                        caseEndPoint->getTerminator())->getTargetBlock() == info.breakBlock);
+                    SLANG_RELEASE_ASSERT(
+                        as<IRUnconditionalBranch>(caseEndPoint->getTerminator())
+                            ->getTargetBlock() == info.breakBlock);
                 }
 
-                auto defaultEndPoint = getNormalizedRegionEndpoint(
-                        &info,
-                        switchInst->getDefaultLabel(),
-                        List<IRBlock*>(info.breakBlock)).exitBlock;
+                auto defaultEndPoint =
+                    getNormalizedRegionEndpoint(
+                        &info, switchInst->getDefaultLabel(), List<IRBlock*>(info.breakBlock))
+                        .exitBlock;
 
                 // Consistency check (if this case hits, it's probably
                 // because the switch has fall-through, which we don't support)
-                SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(
-                    defaultEndPoint->getTerminator())->getTargetBlock() == info.breakBlock);
+                SLANG_RELEASE_ASSERT(
+                    as<IRUnconditionalBranch>(defaultEndPoint->getTerminator())->getTargetBlock() ==
+                    info.breakBlock);
 
                 return info.breakBlock;
             }
-            default:
-                break;
+        default:
+            break;
         }
 
         SLANG_UNEXPECTED("Unhandled control-flow inst");
@@ -666,18 +639,16 @@ struct CFGNormalizationPass
 };
 
 void normalizeCFG(
-    IRModule*                         module,
-    IRGlobalValueWithCode*            func,
-    IRCFGNormalizationPass const&     options)
+    IRModule* module, IRGlobalValueWithCode* func, IRCFGNormalizationPass const& options)
 {
     // Remove phis to simplify our pass. We'll add them back in later
     // with constructSSA.
-    // 
+    //
     eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func);
 
-    CFGNormalizationContext context = {module, options.sink};   
+    CFGNormalizationContext context = {module, options.sink};
     CFGNormalizationPass cfgPass(context);
-    
+
     List<IRBlock*> workList;
     workList.add(func->getFirstBlock());
 
@@ -703,9 +674,83 @@ void normalizeCFG(
         }
     }
 
+    // If we created a new condition block for a loop, the local vars defined in
+    // the original loop body will no longer dominate the exit block of the
+    // loop. If there are any uses of these variables outside the loop, they
+    // will become invalid. Therefore we need to hoist the local variables to
+    // the loop header block.
+    HashSet<IRBlock*> workListSet;
+    for (auto block : func->getBlocks())
+    {
+        if (auto loop = as<IRLoop>(block->getTerminator()))
+        {
+            auto condBlock = loop->getTargetBlock();
+            auto ifElse = as<IRIfElse>(condBlock->getTerminator());
+            auto bodyBlock = ifElse->getTrueBlock();
+
+            // Collect loop body blocks.
+            workList.clear();
+            workListSet.Clear();
+            workList.add(bodyBlock);
+            workListSet.add(bodyBlock);
+            for (Index i = 0; i < workList.getCount(); i++)
+            {
+                auto b = workList[i];
+                for (auto succ : b->getSuccessors())
+                {
+                    if (succ != loop->getTargetBlock() && succ != loop->getBreakBlock())
+                    {
+                        if (workListSet.add(succ))
+                            workList.add(succ);
+                    }
+                }
+            }
+            auto insertionPoint = loop;
+            IRBuilder builder(func);
+            for (auto b : workList)
+            {
+                for (auto inst : b->getChildren())
+                {
+                    // If inst has uses outside the loop body, we need to hoist it.
+                    IRVar* tempVar = nullptr;
+                    for (auto use = inst->firstUse; use; use = use->nextUse)
+                    {
+                        auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                        if (userBlock && !workListSet.Contains(userBlock))
+                        {
+                            // Hoist the inst.
+                            if (auto var = as<IRVar>(inst))
+                            {
+                                // If inst is an var, this is easy, we just move it to the
+                                // loop header.
+                                var->insertBefore(insertionPoint);
+                                break;
+                            }
+                            else
+                            {
+                                // For all other insts, we need to create a local var for it.
+                                if (!tempVar)
+                                {
+                                    builder.setInsertBefore(insertionPoint);
+                                    tempVar = builder.emitVar(inst->getFullType());
+                                    builder.setInsertAfter(inst);
+                                    builder.emitStore(tempVar, inst);
+                                }
+                                // Replace the use with a load of tempVar.
+                                builder.setInsertBefore(use->getUser());
+                                auto load = builder.emitLoad(tempVar);
+                                builder.replaceOperand(use, load);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
     disableIRValidationAtInsert();
     constructSSA(module, func);
     enableIRValidationAtInsert();
 }
 
-}
+} // namespace Slang

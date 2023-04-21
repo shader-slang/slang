@@ -66,6 +66,14 @@ struct RedundancyRemovalContext
         case kIROp_Leq:
         case kIROp_Neq:
         case kIROp_Eql:
+        case kIROp_ExtractExistentialType:
+        case kIROp_ExtractExistentialValue:
+        case kIROp_ExtractExistentialWitnessTable:
+        case kIROp_PtrType:
+        case kIROp_ArrayType:
+        case kIROp_FuncType:
+        case kIROp_InOutType:
+        case kIROp_OutType:
             return true;
         case kIROp_Call:
             return isPureFunctionalCall(as<IRCall>(inst));

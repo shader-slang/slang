@@ -774,7 +774,9 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_PrimalInstDecoration:
             case kIROp_DifferentialInstDecoration:
             case kIROp_MixedDifferentialInstDecoration:
-            case kIROp_PrimalValueAccessDecoration:
+            case kIROp_RecomputeBlockDecoration:
+            case kIROp_LoopCounterDecoration:
+            case kIROp_LoopCounterUpdateDecoration:
             case kIROp_BackwardDerivativeDecoration:
             case kIROp_BackwardDerivativeIntermediateTypeDecoration:
             case kIROp_BackwardDerivativePropagateDecoration:
@@ -814,6 +816,7 @@ void stripTempDecorations(IRInst* inst)
         {
         case kIROp_DifferentialInstDecoration:
         case kIROp_MixedDifferentialInstDecoration:
+        case kIROp_RecomputeBlockDecoration:
         case kIROp_AutoDiffOriginalValueDecoration:
         case kIROp_BackwardDerivativePrimalReturnDecoration:
         case kIROp_PrimalValueStructKeyDecoration:
@@ -902,8 +905,9 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_FloatType:
     case kIROp_VectorType:
     case kIROp_MatrixType:
-    case kIROp_AttributedType:
         return true;
+    case kIROp_AttributedType:
+        return canTypeBeStored(type->getOperand(0));
     default:
         return false;
     }
@@ -1770,7 +1774,7 @@ IRInst* getInstInBlock(IRInst* inst)
     return getInstInBlock(inst->getParent());
 }
 
-UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
+UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst*& inoutTerminatorInst, IRInst* arg)
 {
     SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(block->getTerminator()));
     
@@ -1786,16 +1790,22 @@ UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
     switch (branchInst->getOp())
     {
         case kIROp_unconditionalBranch:
-            builder->emitBranch(branchInst->getTargetBlock(), phiArgs.getCount(), phiArgs.getBuffer());
+            inoutTerminatorInst = builder->emitBranch(
+                branchInst->getTargetBlock(), phiArgs.getCount(), phiArgs.getBuffer());
             break;
         
         case kIROp_loop:
-            builder->emitLoop(
-                as<IRLoop>(branchInst)->getTargetBlock(),
-                as<IRLoop>(branchInst)->getBreakBlock(),
-                as<IRLoop>(branchInst)->getContinueBlock(),
-                phiArgs.getCount(),
-                phiArgs.getBuffer());
+            {
+                auto newLoop = builder->emitLoop(
+                    as<IRLoop>(branchInst)->getTargetBlock(),
+                    as<IRLoop>(branchInst)->getBreakBlock(),
+                    as<IRLoop>(branchInst)->getContinueBlock(),
+                    phiArgs.getCount(),
+                    phiArgs.getBuffer());
+                branchInst->transferDecorationsTo(newLoop);
+                branchInst->replaceUsesWith(newLoop);
+                inoutTerminatorInst = newLoop;
+            }
             break;
         
         default:
@@ -1804,6 +1814,24 @@ UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg)
 
     branchInst->removeAndDeallocate();
     return phiArgs.getCount() - 1;
+}
+
+bool isDifferentialOrRecomputeBlock(IRBlock* block)
+{
+    if (!block)
+        return false;
+    for (auto decor : block->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_DifferentialInstDecoration:
+        case kIROp_RecomputeBlockDecoration:
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
 }
 
 IRUse* findUniqueStoredVal(IRVar* var)

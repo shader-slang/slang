@@ -5405,6 +5405,13 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitGeq(IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(this, kIROp_Geq, getBoolType(), left, right);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitMul(IRType* type, IRInst* left, IRInst* right)
     {
         auto inst = createInst<IRInst>(

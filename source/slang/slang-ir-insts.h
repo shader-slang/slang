@@ -721,6 +721,16 @@ struct IRLoopCounterDecoration : IRDecoration
     IR_LEAF_ISA(LoopCounterDecoration)
 };
 
+struct IRLoopCounterUpdateDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_LoopCounterUpdateDecoration
+    };
+    IR_LEAF_ISA(LoopCounterUpdateDecoration)
+};
+
+
 struct IRLoopExitPrimalValueDecoration : IRDecoration
 {
     enum
@@ -777,14 +787,14 @@ struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
     IRType* getPairType() { return as<IRType>(getOperand(0)); }
 };
 
-struct IRPrimalValueAccessDecoration : IRAutodiffInstDecoration
+struct IRRecomputeBlockDecoration : IRAutodiffInstDecoration
 {
     enum
     {
-        kOp = kIROp_PrimalValueAccessDecoration
+        kOp = kIROp_RecomputeBlockDecoration
     };
 
-    IR_LEAF_ISA(PrimalValueAccessDecoration)
+    IR_LEAF_ISA(RecomputeBlockDecoration)
 };
 
 struct IRPrimalValueStructKeyDecoration : IRDecoration
@@ -3532,6 +3542,7 @@ public:
     IRInst* emitEql(IRInst* left, IRInst* right);
     IRInst* emitNeq(IRInst* left, IRInst* right);
     IRInst* emitLess(IRInst* left, IRInst* right);
+    IRInst* emitGeq(IRInst* left, IRInst* right);
 
     IRInst* emitShr(IRType* type, IRInst* op0, IRInst* op1);
     IRInst* emitShl(IRType* type, IRInst* op0, IRInst* op1);
@@ -3807,9 +3818,9 @@ public:
         addDecoration(value, kIROp_LoopExitPrimalValueDecoration, primalInst, exitValue);
     }
 
-    void addPrimalValueAccessDecoration(IRInst* value)
+    void addLoopCounterUpdateDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_PrimalValueAccessDecoration);
+        addDecoration(value, kIROp_LoopCounterUpdateDecoration);
     }
 
     void markInstAsPrimal(IRInst* value)
