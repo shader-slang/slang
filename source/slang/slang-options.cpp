@@ -332,9 +332,24 @@ struct OptionsParser
         String path = String(inPath);
         String ext = Path::getPathExt(path);
 
-        if (ext == "slang-module" || ext == "slang-lib" || ext == "dir" || ext == "zip")
+        if (ext == toSlice("slang-module") || 
+            ext == toSlice("slang-lib") || 
+            ext == toSlice("dir") || 
+            ext == toSlice("zip"))
         {
-            compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
+            // These extensions don't indicate a artifact container, just that we want to emit IR
+            if (ext == toSlice("slang-module") ||
+                ext == toSlice("slang-lib"))
+            {
+                // We want to emit IR 
+                requestImpl->m_emitIr = true;
+            }
+            else
+            {
+                // We want to write out in an artfact "container", that can hold multiple artifacts.
+                compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
+            }
+
             requestImpl->m_containerOutputPath = path;
         }
         else
@@ -591,6 +606,8 @@ struct OptionsParser
             "  -line-directive-mode <mode>: Sets how the `#line` directives should be\n"
             "      produced. Available options are:\n"
             "        none : Don't emit `#line` directives at all\n"
+            "        source-map : Use source map to track line associations (doen't emit #line)\n"
+            "        default : Default behavior\n"
             "      If not specified, default behavior is to use C-style `#line` directives\n"
             "      for HLSL and C/C++ output, and traditional GLSL-style `#line` directives\n"
             "      for GLSL output.\n"
@@ -890,6 +907,11 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
+                else if (argValue == toSlice("-emit-ir"))
+                {
+                    // Enable emitting IR
+                    requestImpl->m_emitIr = true;
+                }
                 else if (argValue == "-load-stdlib")
                 {
                     CommandLineArg fileName;
@@ -1178,10 +1200,6 @@ struct OptionsParser
                 {
                     getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
                 }
-                else if(argValue == "-source-map")
-                {
-                    requestImpl->getLinkage()->m_generateSourceMap = true;
-                }
                 else if (argValue == "-ir-compression")
                 {
                     CommandLineArg name;
@@ -1448,9 +1466,18 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
                     SlangLineDirectiveMode mode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
-                    if(name.value == "none")
+
+                    if(name.value == toSlice("none"))
                     {
                         mode = SLANG_LINE_DIRECTIVE_MODE_NONE;
+                    }
+                    else if (name.value == toSlice("source-map"))
+                    {
+                        mode = SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP;
+                    }
+                    else if (name.value == toSlice("default"))
+                    {
+                        mode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
                     }
                     else
                     {
@@ -1459,7 +1486,6 @@ struct OptionsParser
                     }
 
                     compileRequest->setLineDirectiveMode(mode);
-
                 }
                 else if( argValue == "-fp-mode" || argValue == "-floating-point-mode" )
                 {
@@ -1954,26 +1980,38 @@ struct OptionsParser
         //
         if(rawTargets.getCount() == 0)
         {
-            for(auto& rawOutput : rawOutputs)
+            // If there are no targets and no outputs
+            if (rawOutputs.getCount() == 0)
             {
-                // Some outputs don't imply a target format, and we shouldn't use those for inference.
-                auto impliedFormat = rawOutput.impliedFormat;
-                if( impliedFormat == CodeGenTarget::Unknown )
-                    continue;
-
-                int targetIndex = 0;
-                if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
+                // And we have a container for output, then enable emitting SlangIR module
+                if (requestImpl->m_containerFormat != ContainerFormat::None)
                 {
-                    targetIndex = (int) rawTargets.getCount();
-
-                    RawTarget rawTarget;
-                    rawTarget.format = impliedFormat;
-                    rawTargets.add(rawTarget);
-
-                    mapFormatToTargetIndex[impliedFormat] = targetIndex;
+                    requestImpl->m_emitIr = true;
                 }
+            }
+            else
+            {
+                for(auto& rawOutput : rawOutputs)
+                {
+                    // Some outputs don't imply a target format, and we shouldn't use those for inference.
+                    auto impliedFormat = rawOutput.impliedFormat;
+                    if( impliedFormat == CodeGenTarget::Unknown )
+                        continue;
 
-                rawOutput.targetIndex = targetIndex;
+                    int targetIndex = 0;
+                    if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
+                    {
+                        targetIndex = (int) rawTargets.getCount();
+
+                        RawTarget rawTarget;
+                        rawTarget.format = impliedFormat;
+                        rawTargets.add(rawTarget);
+
+                        mapFormatToTargetIndex[impliedFormat] = targetIndex;
+                    }
+
+                    rawOutput.targetIndex = targetIndex;
+                }
             }
         }
         else

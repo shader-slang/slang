@@ -85,7 +85,7 @@ struct ExtractPrimalFuncContext
         List<IRType*> paramTypes;
         for (Index i = 0; i < ((Count) originalFuncType->getParamCount()) - 1; i++)
             paramTypes.add((IRType*)migrationContext.cloneInst(&builder, originalFuncType->getParamType(i)));
-        paramTypes.add(builder.getInOutType((IRType*)outIntermediateType));
+        paramTypes.add(builder.getOutType((IRType*)outIntermediateType));
         auto resultType = (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getResultType());
         auto newFuncType = builder.getFuncType(paramTypes, resultType);
         return newFuncType;
@@ -183,7 +183,7 @@ struct ExtractPrimalFuncContext
         builder.setInsertInto(paramBlock);
         auto oldIntermediateParam = func->getLastParam();
         auto outIntermediary =
-            builder.emitParam(builder.getInOutType((IRType*)intermediateType));
+            builder.emitParam(builder.getOutType((IRType*)intermediateType));
         oldIntermediateParam->transferDecorationsTo(outIntermediary);
         primalParams.Add(outIntermediary);
         oldIntermediateParam->replaceUsesWith(outIntermediary);

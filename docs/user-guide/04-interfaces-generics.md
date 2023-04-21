@@ -461,7 +461,8 @@ Note that the builtin `vector<float, N>` type also has an generic value paramete
 > #### Note ####
 > The only type of generic value parameters are integer values. `bool`, `float` and
 > other types cannot be used in a generic value parameter. Computations in a type
-> expression are not supported, for example, `vector<float, 1+1>` is not allowed.
+> expression are supported as long as they can be folded at compile time. For example,
+`vector<float, 1+1>` is equivalent to `vector<float, 2>`.
 
 
 Interface-typed Values

@@ -1,4 +1,4 @@
-//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate -source-map 
+//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate 
 //TEST:SIMPLE:-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.zip 
 //TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate 
 // Disable for now as it breaks on gcc/release as different hash seems to be produced

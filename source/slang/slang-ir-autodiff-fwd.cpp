@@ -628,7 +628,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 while (auto attrType = as<IRAttributedType>(origType))
                     origType = attrType->getBaseType();
             }
-            if (auto pairType = tryGetDiffPairType(&argBuilder, origType))
+            if (auto pairType = tryGetDiffPairType(&argBuilder, primalType))
             {
                 auto pairPtrType = as<IRPtrTypeBase>(pairType);
                 auto pairValType = as<IRDifferentialPairType>(
@@ -637,7 +637,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 if (auto ptrParamType = as<IRPtrTypeBase>(diffParamType))
                 {
                     // Create temp var to pass in/out arguments.
-                    auto srcVar = argBuilder.emitVar(ptrParamType->getValueType());
+                    auto srcVar = argBuilder.emitVar(pairValType);
                     argBuilder.markInstAsMixedDifferential(srcVar, pairValType->getValueType());
 
                     auto diffArg = findOrTranscribeDiffInst(&argBuilder, origArg);

@@ -75,27 +75,33 @@ namespace Slang
                 }
             }
             // Check all address loads.
-            List<IRLoad*> loads;
+            List<IRInst*> loadsAndReturns;
             for (auto addr : addresses)
             {
                 for (auto use = addr->firstUse; use; use = use->nextUse)
                 {
                     if (auto load = as<IRLoad>(use->getUser()))
-                        loads.add(load);
+                        loadsAndReturns.add(load);
                 }
+            }
+            for(const auto& b : func->getBlocks())
+            {
+                auto t = b->getTerminator();
+                if (t->m_op == kIROp_Return)
+                    loadsAndReturns.add(t);
             }
 
             for (auto store : stores)
             {
                 // Remove insts from `loads` that is reachable from the store.
-                for (Index i = 0; i < loads.getCount();)
+                for (Index i = 0; i < loadsAndReturns.getCount();)
                 {
-                    auto load = loads[i];
-                    if (!canAddressesPotentiallyAlias(func, store.address, loads[i]->getPtr()))
+                    auto load = as<IRLoad>(loadsAndReturns[i]);
+                    if (load && !canAddressesPotentiallyAlias(func, store.address, load->getPtr()))
                         continue;
-                    if (reachability.isInstReachable(store.storeInst, load))
+                    if (reachability.isInstReachable(store.storeInst, loadsAndReturns[i]))
                     {
-                        loads.fastRemoveAt(i);
+                        loadsAndReturns.fastRemoveAt(i);
                     }
                     else
                     {
@@ -104,9 +110,14 @@ namespace Slang
                 }
             }
             // If there are any loads left, it means they are using uninitialized out params.
-            for (auto load : loads)
+            for (auto load : loadsAndReturns)
             {
-                sink->diagnose(load, Diagnostics::usingUninitializedValue);
+                sink->diagnose(
+                    load,
+                    load->m_op == kIROp_Return
+                        ? Diagnostics::returningWithUninitializedOut
+                        : Diagnostics::usingUninitializedValue,
+                    param);
             }
         }
     }

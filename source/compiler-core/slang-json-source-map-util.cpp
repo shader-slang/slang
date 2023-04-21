@@ -209,6 +209,7 @@ void _encode(Index v, StringBuilder& out)
         cur = StringSlicePool::kNullHandle;
     }
 
+    // Special case sourcesContent, because needs to be able to handle null or string
     for (Index i = 0; i < sourcesContentCount; ++i)
     {
         auto value = native.sourcesContent[i];
@@ -220,6 +221,17 @@ void _encode(Index v, StringBuilder& out)
                 auto stringValue = container->getString(value);
                 outSourceMap.m_sourcesContent[i] = outSourceMap.m_slicePool.add(stringValue);
             }
+        }
+    }
+
+    // Copy over the names
+    {
+        const auto namesCount = native.names.getCount();
+        outSourceMap.m_names.setCount(namesCount);
+
+        for (Index i = 0; i < namesCount; ++i)
+        {
+            outSourceMap.m_names[i] = outSourceMap.m_slicePool.add(native.names[i]);
         }
     }
 
