@@ -681,6 +681,9 @@ bool isPureFunctionalCall(IRCall* call)
                         // are not dependent on whatever we do in the call here.
                         continue;
                     default:
+                        // Skip the call itself, since we are checking if the call has side effect.
+                        if (use->getUser() == call)
+                            continue;
                         // We have some other unknown use of the variable address, they can
                         // be loads, or calls using addresses derived from the variable,
                         // we will treat the call as having side effect to be safe.
@@ -719,6 +722,23 @@ IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
             return entry->getSatisfyingVal();
     }
     return nullptr;
+}
+
+void moveParams(IRBlock* dest, IRBlock* src)
+{
+    for (auto param = src->getFirstChild(); param;)
+    {
+        auto nextInst = param->getNextInst();
+        if (as<IRDecoration>(param) || as<IRParam>(param))
+        {
+            param->insertAtEnd(dest);
+        }
+        else
+        {
+            break;
+        }
+        param = nextInst;
+    }
 }
 
 struct GenericChildrenMigrationContextImpl
