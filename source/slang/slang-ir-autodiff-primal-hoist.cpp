@@ -1,19 +1,277 @@
 #include "slang-ir-autodiff-primal-hoist.h"
 #include "slang-ir-autodiff-region.h"
 
-namespace Slang 
+namespace Slang
 {
+
+void applyCheckpointSet(
+    CheckpointSetInfo* checkpointInfo,
+    IRGlobalValueWithCode* func,
+    HoistedPrimalsInfo* hoistInfo,
+    HashSet<IRUse*> pendingUses,
+    Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock);
 
 bool containsOperand(IRInst* inst, IRInst* operand)
 {
     for (UIndex ii = 0; ii < inst->getOperandCount(); ii++)
         if (inst->getOperand(ii) == operand)
             return true;
-    
+
     return false;
 }
 
-RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalValueWithCode* func, BlockSplitInfo* splitInfo)
+static bool isDifferentialInst(IRInst* inst)
+{
+    auto parent = inst->getParent();
+    if (parent->findDecoration<IRDifferentialInstDecoration>())
+        return true;
+    return inst->findDecoration<IRDifferentialInstDecoration>() != nullptr;
+}
+
+static bool isDifferentialBlock(IRBlock* block)
+{
+    return block->findDecoration<IRDifferentialInstDecoration>();
+}
+
+static Dictionary<IRBlock*, IRBlock*> reconstructDiffBlockMap(IRGlobalValueWithCode* func)
+{
+    Dictionary<IRBlock*, IRBlock*> diffBlockMap;
+    for (auto block : func->getBlocks())
+    {
+        if (auto diffDecor = block->findDecoration<IRDifferentialInstDecoration>())
+        {
+            if (diffDecor->getPrimalType())
+                diffBlockMap[as<IRBlock>(diffDecor->getPrimalInst())] = block;
+        }
+    }
+    return diffBlockMap;
+}
+
+static IRBlock* getLoopRegionBodyBlock(IRLoop* loop)
+{
+    auto condBlock = as<IRBlock>(loop->getTargetBlock());
+    // We assume the loop body always sit at the true side of the if-else.
+    if (auto ifElse = as<IRIfElse>(condBlock->getTerminator()))
+    {
+        return ifElse->getTrueBlock();
+    }
+    return nullptr;
+}
+
+static IRBlock* tryGetSubRegionEndBlock(IRInst* terminator)
+{
+    auto loop = as<IRLoop>(terminator);
+    if (!loop)
+        return nullptr;
+    return loop->getBreakBlock();
+}
+
+static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
+    IRGlobalValueWithCode* func,
+    Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo)
+{
+    IRBlock* firstDiffBlock = nullptr;
+    for (auto block : func->getBlocks())
+    {
+        if (isDifferentialBlock(block))
+        {
+            firstDiffBlock = block;
+            break;
+        }
+    }
+    if (!firstDiffBlock)
+        return Dictionary<IRBlock*, IRBlock*>();
+
+    Dictionary<IRLoop*, IRLoop*> mapPrimalLoopToDiffLoop;
+    for (auto block : func->getBlocks())
+    {
+        if (isDifferentialBlock(block))
+        {
+            if (auto diffLoop = as<IRLoop>(block->getTerminator()))
+            {
+                if (auto diffDecor = diffLoop->findDecoration<IRDifferentialInstDecoration>())
+                {
+                    mapPrimalLoopToDiffLoop[as<IRLoop>(diffDecor->getPrimalInst())] = diffLoop;
+                }
+            }
+        }
+    }
+
+    IRBuilder builder(func);
+    Dictionary<IRBlock*, IRBlock*> recomputeBlockMap;
+
+    // Create the first recompute block right before the first diff block,
+    // and change all jumps into the diff block to the recompute block instead.
+    auto createRecomputeBlock = [&](IRBlock* primalBlock)
+    {
+        auto recomputeBlock = builder.createBlock();
+        recomputeBlock->insertAtEnd(func);
+        builder.addDecoration(recomputeBlock, kIROp_RecomputeBlockDecoration);
+        recomputeBlockMap.Add(primalBlock, recomputeBlock);
+        indexedBlockInfo[recomputeBlock] = indexedBlockInfo[primalBlock].GetValue();
+        return recomputeBlock;
+    };
+    
+    auto firstRecomputeBlock = createRecomputeBlock(func->getFirstBlock());
+    firstRecomputeBlock->insertBefore(firstDiffBlock);
+    moveParams(firstRecomputeBlock, firstDiffBlock);
+    firstDiffBlock->replaceUsesWith(firstRecomputeBlock);
+
+    struct WorkItem
+    {
+        // The first primal block in this region.
+        IRBlock* primalBlock;
+
+        // The recompute block created for the first primal block in this region.
+        IRBlock* recomptueBlock;
+
+        // The end of primal block in tihs region.
+        IRBlock* regionEndBlock; 
+
+        // The first diff block in this region.
+        IRBlock* firstDiffBlock;
+    };
+
+    List<WorkItem> workList;
+    WorkItem firstWorkItem = { func->getFirstBlock(), firstRecomputeBlock, firstRecomputeBlock, firstDiffBlock };
+    workList.add(firstWorkItem);
+
+    IRCloneEnv recomputeCloneEnv;
+    recomputeBlockMap[func->getFirstBlock()] = firstRecomputeBlock;
+
+    for (Index i = 0; i < workList.getCount(); i++)
+    {
+        auto workItem = workList[i];
+        auto primalBlock = workItem.primalBlock;
+        auto recomputeBlock = workItem.recomptueBlock;
+
+        List<IndexTrackingInfo>* thisBlockIndexInfo = indexedBlockInfo.TryGetValue(primalBlock);
+        if (!thisBlockIndexInfo)
+            continue;
+
+        builder.setInsertInto(recomputeBlock);
+        if (auto subRegionEndBlock = tryGetSubRegionEndBlock(primalBlock->getTerminator()))
+        {
+            // The terminal inst of primalBlock marks the start of a sub loop region?
+            // We need to queue work for both the next region after the loop at the current level,
+            // and for the sub region for the next level.
+            if (subRegionEndBlock == workItem.regionEndBlock)
+            {
+                // We have reached the end of top-level region, jump to first diff block.
+                builder.emitBranch(workItem.firstDiffBlock);
+            }
+            else
+            {
+                // Have we already created a recompute block for this target?
+                // If so, use it.
+                IRBlock* existingRecomputeBlock = nullptr;
+                if (recomputeBlockMap.TryGetValue(subRegionEndBlock, existingRecomputeBlock))
+                {
+                    builder.emitBranch(existingRecomputeBlock);
+                }
+                else
+                {
+                    // Queue work for the next region after the subregion at this level.
+                    auto nextRegionRecomputeBlock = createRecomputeBlock(subRegionEndBlock);
+                    nextRegionRecomputeBlock->insertAfter(recomputeBlock);
+                    builder.emitBranch(nextRegionRecomputeBlock);
+
+                    {
+                        WorkItem newWorkItem = {
+                            subRegionEndBlock,
+                            nextRegionRecomputeBlock,
+                            workItem.regionEndBlock,
+                            workItem.firstDiffBlock };
+                        workList.add(newWorkItem);
+                    }
+                }
+            }
+            // Queue work for the subregion.
+            auto loop = as<IRLoop>(primalBlock->getTerminator());
+            auto bodyBlock = getLoopRegionBodyBlock(loop);
+            auto diffLoop = mapPrimalLoopToDiffLoop[loop].GetValue();
+            auto diffBodyBlock = getLoopRegionBodyBlock(diffLoop);
+            auto bodyRecomputeBlock = createRecomputeBlock(bodyBlock);
+            bodyRecomputeBlock->insertBefore(diffBodyBlock);
+            diffBodyBlock->replaceUsesWith(bodyRecomputeBlock);
+            moveParams(bodyRecomputeBlock, diffBodyBlock);
+            {
+                // After CFG normalization, the loop body will contain only jumps to the
+                // beginning of the loop.
+                // If we see such a jump, it means we have reached the end of current
+                // region in the loop.
+                // Therefore, we set the regionEndBlock for the sub-region as loop's target
+                // block.
+                WorkItem newWorkItem = {
+                    bodyBlock, bodyRecomputeBlock, loop->getTargetBlock(), diffBodyBlock};
+                workList.add(newWorkItem);
+            }
+        }
+        else
+        {
+            // This is a normal control flow, just copy the CFG structure.
+            auto terminator = primalBlock->getTerminator();
+            IRInst* newTerminator = nullptr;
+            switch (terminator->getOp())
+            {
+            case kIROp_Switch:
+            case kIROp_ifElse:
+                newTerminator = cloneInst(&recomputeCloneEnv, &builder, primalBlock->getTerminator());
+                break;
+            case kIROp_unconditionalBranch:
+                newTerminator = builder.emitBranch(as<IRUnconditionalBranch>(terminator)->getTargetBlock());
+                break;
+            default:
+                SLANG_UNREACHABLE("terminator type");
+            }
+
+            // Modify jump targets in newTerminator to point to the right recompute block or firstDiffBlock.
+            for (UInt op = 0; op < newTerminator->getOperandCount(); op++)
+            {
+                auto target = as<IRBlock>(newTerminator->getOperand(op));
+                if (!target)
+                    continue;
+                if (target == workItem.regionEndBlock)
+                {
+                    // This jump target is the end of the current region, we will jump to
+                    // firstDiffBlock instead.
+                    newTerminator->setOperand(op, workItem.firstDiffBlock);
+                    continue;
+                }
+
+                // Have we already created a recompute block for this target?
+                // If so, use it.
+                IRBlock* existingRecomputeBlock = nullptr;
+                if (recomputeBlockMap.TryGetValue(target, existingRecomputeBlock))
+                {
+                    newTerminator->setOperand(op, existingRecomputeBlock);
+                    continue;
+                }
+
+                // This jump target is a normal part of control flow, clone the next block.
+                auto targetRecomputeBlock = createRecomputeBlock(target);
+                targetRecomputeBlock->insertBefore(workItem.firstDiffBlock);
+
+                newTerminator->setOperand(op, targetRecomputeBlock);
+
+                // Queue work for the successor.
+                WorkItem newWorkItem = {
+                    target,
+                    targetRecomputeBlock,
+                    workItem.regionEndBlock,
+                    workItem.firstDiffBlock};
+                workList.add(newWorkItem);
+            }
+        }
+    }
+    // After this pass, all primal blocks except the condition block and the false block of a loop
+    // will have a corresponding recomputeBlock.
+    return recomputeBlockMap;
+}
+
+RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
+    IRGlobalValueWithCode* func,
+    Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock)
 {
     RefPtr<CheckpointSetInfo> checkpointInfo = new CheckpointSetInfo();
 
@@ -29,11 +287,11 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
         UIndex opIndex = 0;
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
         {   
-            if (!operand->get()->findDecoration<IRDifferentialInstDecoration>() &&
+            if (!isDifferentialInst(operand->get()) &&
                 !as<IRFunc>(operand->get()) &&
                 !as<IRBlock>(operand->get()) &&
                 !(as<IRModuleInst>(operand->get()->getParent())) &&
-                !getBlock(operand->get())->findDecoration<IRDifferentialInstDecoration>())
+                !isDifferentialBlock(getBlock(operand->get())))
                 workList.add(operand);
         }
 
@@ -44,7 +302,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
         //
         if (inst->getDataType() && (getParentFunc(inst->getDataType()) == func))
         {
-            if (!getBlock(inst->getDataType())->findDecoration<IRDifferentialInstDecoration>())
+            if (!isDifferentialBlock(getBlock(inst->getDataType())))
                 workList.add(&inst->typeUse);
         }
     };
@@ -58,7 +316,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
         if (block == func->getFirstBlock())
             continue;
 
-        if (!block->findDecoration<IRDifferentialInstDecoration>())
+        if (!isDifferentialBlock(block))
             continue;
 
         for (auto child : block->getChildren())
@@ -111,7 +369,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             SLANG_ASSERT(!checkpointInfo->storeSet.Contains(result.instToRecompute));
             checkpointInfo->recomputeSet.Add(result.instToRecompute);
 
-            if (use->getUser()->findDecoration<IRDifferentialInstDecoration>())
+            if (isDifferentialInst(use->getUser()))
                 usesToReplace.Add(use);
 
             if (auto param = as<IRParam>(result.instToRecompute))
@@ -160,7 +418,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
             SLANG_RELEASE_ASSERT(containsOperand(instToInvert, use->getUser()));
             SLANG_RELEASE_ASSERT(result.inversionInfo.targetInsts.contains(use->getUser()));
 
-            if (use->getUser()->findDecoration<IRDifferentialInstDecoration>())
+            if (isDifferentialInst(use->getUser()))
                 usesToReplace.Add(use);
 
             checkpointInfo->invertSet.Add(instToInvert);
@@ -178,7 +436,55 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(IRGlobalVal
         }
     }
 
-    return applyCheckpointSet(checkpointInfo, func, splitInfo, usesToReplace);
+    // If a var or call is in recomputeSet, move any var/calls associated with the same call to
+    // recomputeSet.
+    List<IRInst*> instWorkList;
+    HashSet<IRInst*> instWorkListSet;
+    for (auto inst : checkpointInfo->recomputeSet)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Call:
+        case kIROp_Var:
+            instWorkList.add(inst);
+            instWorkListSet.add(inst);
+            break;
+        }
+    }
+    for (Index i = 0; i < instWorkList.getCount(); i++)
+    {
+        auto inst = instWorkList[i];
+        if (auto var = as<IRVar>(inst))
+        {
+            for (auto use = var->firstUse; use; use = use->nextUse)
+            {
+                auto callUser = as<IRCall>(use->getUser());
+                if (!callUser)
+                    continue;
+                checkpointInfo->recomputeSet.add(callUser);
+                checkpointInfo->storeSet.Remove(callUser);
+                if (instWorkListSet.add(callUser))
+                    instWorkList.add(callUser);
+            }
+        }
+        else if (auto call = as<IRCall>(inst))
+        {
+            for (UInt j = 0; j < call->getArgCount(); j++)
+            {
+                if (auto varArg = as<IRVar>(call->getArg(j)))
+                {
+                    checkpointInfo->recomputeSet.add(varArg);
+                    checkpointInfo->storeSet.Remove(varArg);
+                    if (instWorkListSet.add(varArg))
+                        instWorkList.add(varArg);
+                }
+            }
+        }
+    }
+
+    RefPtr<HoistedPrimalsInfo> hoistInfo = new HoistedPrimalsInfo();
+    applyCheckpointSet(checkpointInfo, func, hoistInfo, usesToReplace, mapDiffBlockToRecomputeBlock);
+    return hoistInfo;
 }
 
 void applyToInst(
@@ -192,6 +498,11 @@ void applyToInst(
     if (checkpointInfo->storeSet.Contains(inst))
     {
         hoistInfo->storeSet.Add(inst);
+        return;
+    }
+
+    if (hoistInfo->ignoreSet.Contains(inst))
+    {
         return;
     }
 
@@ -242,13 +553,15 @@ void applyToInst(
     }
 }
 
-RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
+void applyCheckpointSet(
     CheckpointSetInfo* checkpointInfo,
     IRGlobalValueWithCode* func,
-    BlockSplitInfo* splitInfo,
-    HashSet<IRUse*> pendingUses)
+    HoistedPrimalsInfo* hoistInfo,
+    HashSet<IRUse*> pendingUses,
+    Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock)
 {
-    RefPtr<HoistedPrimalsInfo> hoistInfo = new HoistedPrimalsInfo();
+    // Reconstruct diff block map.
+    Dictionary<IRBlock*, IRBlock*> diffBlockMap = reconstructDiffBlockMap(func);
 
     RefPtr<IROutOfOrderCloneContext> cloneCtx = new IROutOfOrderCloneContext();
 
@@ -264,7 +577,7 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
         UIndex opIndex = 0;
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
         {   
-            if (!operand->get()->findDecoration<IRDifferentialInstDecoration>())
+            if (!isDifferentialInst(operand->get()))
                 cloneCtx->pendingUses.Add(operand);
         }
     };
@@ -276,15 +589,15 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
         if (block == func->getFirstBlock())
             continue;
 
-        if (block->findDecoration<IRDifferentialInstDecoration>())
+        if (isDifferentialBlock(block))
+            continue;
+        
+        if (block->findDecoration<IRRecomputeBlockDecoration>())
             continue;
 
-        auto diffBlock = as<IRBlock>(splitInfo->diffBlockMap[block]);
-
-        auto firstDiffInst = as<IRBlock>(splitInfo->diffBlockMap[block])->getFirstOrdinaryInst();
+        auto diffBlock = as<IRBlock>(diffBlockMap[block]);
 
         IRBuilder builder(func->getModule());
-
         UIndex ii = 0;
         for (auto param : block->getParams())
         {
@@ -302,48 +615,58 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointSet(
 
                 predecessorSet.Add(predecessor);
 
-                auto diffPredecessor = as<IRBlock>(splitInfo->diffBlockMap[block]);
+                auto diffPredecessor = as<IRBlock>(diffBlockMap[block]);
  
                 if (checkpointInfo->recomputeSet.Contains(param))
+                {
+                    IRInst* terminator = diffPredecessor->getTerminator();
                     addPhiOutputArg(&builder,
                         diffPredecessor,
+                        terminator,
                         as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii));
+                }
                 
                 if (checkpointInfo->invertSet.Contains(param))
+                {
+                    IRInst* terminator = diffPredecessor->getTerminator();
+
                     addPhiOutputArg(&builder,
                         diffPredecessor,
+                        terminator,
                         as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii));
+                }
             }
 
             ii++;
         }
 
+        IRBlock* recomputeBlock = block;
+        mapPrimalBlockToRecomputeBlock.TryGetValue(block, recomputeBlock);
+        auto recomputeInsertBeforeInst = recomputeBlock->getFirstOrdinaryInst();
+
         for (auto child : block->getChildren())
         {
-            builder.setInsertBefore(firstDiffInst);
-            
+            builder.setInsertBefore(recomputeInsertBeforeInst);    
             applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, child);
         }
     }
-
-    return hoistInfo;
 }
 
 IRType* getTypeForLocalStorage(
     IRBuilder* builder,
     IRType* storageType,
-    List<IndexTrackingInfo*> defBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices)
 {
-    for (auto index : defBlockIndices)
+    for (auto& index : defBlockIndices)
     {
-        SLANG_ASSERT(index->status == IndexTrackingInfo::CountStatus::Static);
-        SLANG_ASSERT(index->maxIters >= 0);
+        SLANG_ASSERT(index.status == IndexTrackingInfo::CountStatus::Static);
+        SLANG_ASSERT(index.maxIters >= 0);
 
         storageType = builder->getArrayType(
             storageType,
             builder->getIntValue(
                 builder->getUIntType(),
-                index->maxIters + 1));
+                index.maxIters + 1));
     }
 
     return storageType;
@@ -352,7 +675,7 @@ IRType* getTypeForLocalStorage(
 IRVar* emitIndexedLocalVar(
     IRBlock* varBlock,
     IRType* baseType,
-    List<IndexTrackingInfo*> defBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices)
 {
     SLANG_RELEASE_ASSERT(!as<IRPtrTypeBase>(baseType));
 
@@ -370,19 +693,19 @@ IRVar* emitIndexedLocalVar(
 IRInst* emitIndexedStoreAddressForVar(
     IRBuilder* builder,
     IRVar* localVar,
-    List<IndexTrackingInfo*> defBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices)
 {
     IRInst* storeAddr = localVar;
     IRType* currType = as<IRPtrTypeBase>(localVar->getDataType())->getValueType();
 
-    for (auto index : defBlockIndices)
+    for (auto& index : defBlockIndices)
     {
         currType = as<IRArrayType>(currType)->getElementType();
 
         storeAddr = builder->emitElementAddress(
             builder->getPtrType(currType),
             storeAddr, 
-            index->primalCountParam);
+            index.primalCountParam);
     }
 
     return storeAddr;
@@ -392,8 +715,8 @@ IRInst* emitIndexedStoreAddressForVar(
 IRInst* emitIndexedLoadAddressForVar(
     IRBuilder* builder,
     IRVar* localVar,
-    List<IndexTrackingInfo*> defBlockIndices,
-    List<IndexTrackingInfo*> useBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices,
+    const List<IndexTrackingInfo>& useBlockIndices)
 {
     IRInst* loadAddr = localVar;
     IRType* currType = as<IRPtrTypeBase>(localVar->getDataType())->getValueType();
@@ -406,7 +729,7 @@ IRInst* emitIndexedLoadAddressForVar(
             // If the use-block is under the same region, use the 
             // differential counter variable
             //
-            auto diffCounterCurrValue = index->diffCountParam;
+            auto diffCounterCurrValue = index.diffCountParam;
 
             loadAddr = builder->emitElementAddress(
                 builder->getPtrType(currType),
@@ -418,7 +741,7 @@ IRInst* emitIndexedLoadAddressForVar(
             // If the use-block is outside this region, use the
             // last available value (by indexing with primal counter minus 1)
             // 
-            auto primalCounterCurrValue = builder->emitLoad(index->primalCountLastVar);
+            auto primalCounterCurrValue = index.primalCountParam;
             auto primalCounterLastValue = builder->emitSub(
                 primalCounterCurrValue->getDataType(),
                 primalCounterCurrValue,
@@ -438,7 +761,7 @@ IRVar* storeIndexedValue(
     IRBuilder* builder,
     IRBlock* defaultVarBlock,
     IRInst* instToStore,
-    List<IndexTrackingInfo*> defBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices)
 {
     IRVar* localVar = emitIndexedLocalVar(defaultVarBlock, instToStore->getDataType(), defBlockIndices);
 
@@ -452,8 +775,8 @@ IRVar* storeIndexedValue(
 IRInst* loadIndexedValue(
     IRBuilder* builder,
     IRVar* localVar,
-    List<IndexTrackingInfo*> defBlockIndices,
-    List<IndexTrackingInfo*> useBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices,
+    const List<IndexTrackingInfo>& useBlockIndices)
 {
     IRInst* addr = emitIndexedLoadAddressForVar(builder, localVar, defBlockIndices, useBlockIndices);
 
@@ -461,15 +784,15 @@ IRInst* loadIndexedValue(
 }
 
 bool areIndicesEqual(
-    List<IndexTrackingInfo*> indicesA, 
-    List<IndexTrackingInfo*> indicesB)
+    const List<IndexTrackingInfo>& indicesA, 
+    const List<IndexTrackingInfo>& indicesB)
 {
     if (indicesA.getCount() != indicesB.getCount())
         return false;
     
     for (Index ii = 0; ii < indicesA.getCount(); ii++)
     {
-        if (indicesA[ii] != indicesB[ii])
+        if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
             return false;
     }
 
@@ -477,31 +800,37 @@ bool areIndicesEqual(
 }
 
 bool areIndicesSubsetOf(
-    List<IndexTrackingInfo*> indicesA, 
-    List<IndexTrackingInfo*> indicesB)
+    List<IndexTrackingInfo>& indicesA, 
+    List<IndexTrackingInfo>& indicesB)
 {
     if (indicesA.getCount() > indicesB.getCount())
         return false;
     
     for (Index ii = 0; ii < indicesA.getCount(); ii++)
     {
-        if (indicesA[ii] != indicesB[ii])
+        if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
             return false;
     }
 
     return true;
 }
 
-
-bool isDifferentialBlock(IRBlock* block)
+static int getInstRegionNestLevel(
+    Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo,
+    IRBlock* defBlock,
+    IRInst* inst)
 {
-    return block->findDecoration<IRDifferentialInstDecoration>();
+    auto result = indexedBlockInfo[defBlock].GetValue().getCount();
+    // Loop counters are considered to not belong to the region started by the its loop.
+    if (result > 0 && inst->findDecoration<IRLoopCounterDecoration>())
+        result--;
+    return (int)result;
 }
 
 RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     HoistedPrimalsInfo* hoistInfo,
     IRGlobalValueWithCode* func,
-    Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlockInfo)
+    Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo)
 {
     RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
 
@@ -510,129 +839,369 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
     SLANG_ASSERT(!isDifferentialBlock(defaultVarBlock));
 
-    HashSet<IRInst*> processedStoreSet;
+    OrderedHashSet<IRInst*> processedStoreSet;
 
-    // TODO: Also ensure availability of everything in the recompute set (for proper recompute support)
-    for (auto instToStore : hoistInfo->storeSet)
+    auto ensureInstAvailable = [&](OrderedHashSet<IRInst*>& instSet)
     {
-        IRBlock* defBlock = nullptr;
-        if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+        for (auto instToStore : instSet)
         {
-            auto varInst = as<IRVar>(instToStore);
-            auto storeUse = findUniqueStoredVal(varInst);
+            if (!instSet.Contains(instToStore))
+                continue;
 
-            defBlock = getBlock(storeUse->getUser());
-        }
-        else
-            defBlock = getBlock(instToStore);
-
-        SLANG_RELEASE_ASSERT(defBlock);
-
-        List<IRUse*> outOfScopeUses;
-        for (auto use = instToStore->firstUse; use;)
-        {
-            auto nextUse = use->nextUse;
-            
-            // Only consider uses in differential blocks. 
-            // This method is not responsible for other blocks.
-            //
-            IRBlock* userBlock = getBlock(use->getUser());
-            if (userBlock->findDecoration<IRDifferentialInstDecoration>())
+            if (hoistInfo->ignoreSet.Contains(instToStore))
+                continue;
+            IRBlock* defBlock = nullptr;
+            if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
-                if (!domTree->dominates(defBlock, userBlock))
+                auto varInst = as<IRVar>(instToStore);
+                auto storeUse = findUniqueStoredVal(varInst);
+
+                defBlock = getBlock(storeUse->getUser());
+            }
+            else
+                defBlock = getBlock(instToStore);
+
+            SLANG_RELEASE_ASSERT(defBlock);
+
+            List<IRUse*> outOfScopeUses;
+            for (auto use = instToStore->firstUse; use;)
+            {
+                auto nextUse = use->nextUse;
+
+                // Only consider uses in differential blocks. 
+                // This method is not responsible for other blocks.
+                //
+                IRBlock* userBlock = getBlock(use->getUser());
+                if (isDifferentialOrRecomputeBlock(userBlock))
                 {
-                    outOfScopeUses.add(use);
+                    if (!domTree->dominates(defBlock, userBlock))
+                    {
+                        outOfScopeUses.add(use);
+                    }
+                    else if (!areIndicesSubsetOf(indexedBlockInfo[defBlock], indexedBlockInfo[userBlock]))
+                    {
+                        outOfScopeUses.add(use);
+                    }
+                    else if (getInstRegionNestLevel(indexedBlockInfo, defBlock, instToStore) > 0 &&
+                        !isDifferentialOrRecomputeBlock(defBlock))
+                    {
+                        outOfScopeUses.add(use);
+                    }
+                    else if (as<IRPtrTypeBase>(instToStore->getDataType()) &&
+                        !isDifferentialOrRecomputeBlock(defBlock))
+                    {
+                        outOfScopeUses.add(use);
+                    }
                 }
-                else if (!areIndicesSubsetOf(indexedBlockInfo[defBlock], indexedBlockInfo[userBlock]))
-                {
-                    outOfScopeUses.add(use);
-                }
-                else if (indexedBlockInfo[defBlock].GetValue().getCount() > 0 && 
-                         !isDifferentialBlock(defBlock))
-                {
-                    outOfScopeUses.add(use);
-                }
-                else if (as<IRPtrTypeBase>(instToStore->getDataType()) &&
-                         !isDifferentialBlock(defBlock))
-                {
-                    outOfScopeUses.add(use);
-                }
+
+                use = nextUse;
             }
 
-            use = nextUse;
-        }
-
-        if (outOfScopeUses.getCount() == 0)
-        {
-            processedStoreSet.Add(instToStore);
-            continue;
-        }
-
-        if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
-        {
-
-            IRVar* varToStore = as<IRVar>(instToStore);
-            SLANG_RELEASE_ASSERT(varToStore);
-            
-            auto storeUse = findUniqueStoredVal(varToStore);
-            
-            List<IndexTrackingInfo*> defBlockIndices = indexedBlockInfo[defBlock];
-
-            bool isIndexedStore = (storeUse && defBlockIndices.getCount() > 0);
-
-            // TODO: There's a slight hackiness here. (Ideally we might just want to emit
-            // additional vars when splitting a call)
-            //
-            if (!isIndexedStore && isDerivativeContextVar(varToStore))
+            if (outOfScopeUses.getCount() == 0)
             {
-                varToStore->insertBefore(defaultVarBlock->getFirstOrdinaryInst());
-                processedStoreSet.Add(varToStore);
+                processedStoreSet.Add(instToStore);
                 continue;
             }
 
-            setInsertAfterOrdinaryInst(&builder, getInstInBlock(storeUse->getUser()));
-
-            IRVar* localVar = storeIndexedValue(
-                &builder, 
-                defaultVarBlock, 
-                builder.emitLoad(varToStore),
-                defBlockIndices);
-
-            for (auto use : outOfScopeUses)
+            if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
-                setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
-                
-                List<IndexTrackingInfo*> useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
 
-                IRInst* loadAddr = emitIndexedLoadAddressForVar(&builder, localVar, defBlockIndices, useBlockIndices);
-                builder.replaceOperand(use, loadAddr);
+                IRVar* varToStore = as<IRVar>(instToStore);
+                SLANG_RELEASE_ASSERT(varToStore);
+
+                auto storeUse = findUniqueStoredVal(varToStore);
+
+                List<IndexTrackingInfo>& defBlockIndices = indexedBlockInfo[defBlock];
+
+                bool isIndexedStore = (storeUse && defBlockIndices.getCount() > 0);
+
+                // TODO: There's a slight hackiness here. (Ideally we might just want to emit
+                // additional vars when splitting a call)
+                //
+                if (!isIndexedStore && isDerivativeContextVar(varToStore))
+                {
+                    varToStore->insertBefore(defaultVarBlock->getFirstOrdinaryInst());
+                    processedStoreSet.Add(varToStore);
+                    continue;
+                }
+
+                setInsertAfterOrdinaryInst(&builder, getInstInBlock(storeUse->getUser()));
+
+                IRVar* localVar = storeIndexedValue(
+                    &builder,
+                    defaultVarBlock,
+                    builder.emitLoad(varToStore),
+                    defBlockIndices);
+
+                for (auto use : outOfScopeUses)
+                {
+                    setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
+
+                    List<IndexTrackingInfo>& useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
+
+                    IRInst* loadAddr = emitIndexedLoadAddressForVar(&builder, localVar, defBlockIndices, useBlockIndices);
+                    builder.replaceOperand(use, loadAddr);
+                }
+
+                processedStoreSet.Add(localVar);
             }
-
-            processedStoreSet.Add(localVar);
-        }
-        else
-        {  
-            setInsertAfterOrdinaryInst(&builder, instToStore);
-
-            List<IndexTrackingInfo*> defBlockIndices = indexedBlockInfo[defBlock];
-            auto localVar = storeIndexedValue(&builder, defaultVarBlock, instToStore, defBlockIndices);
-            
-            for (auto use : outOfScopeUses)
+            else
             {
-                setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
+                // Handle the special case of loop counters.
+                // The only case where there will be a reference of primal loop counter from rev blocks
+                // is the start of a loop in the reverse code. Since loop counters are not considered a
+                // part of their loop region, so we remove the first index info.
+                List<IndexTrackingInfo> defBlockIndices = indexedBlockInfo[defBlock];
+                bool isLoopCounter = (instToStore->findDecoration<IRLoopCounterDecoration>() != nullptr);
+                if (isLoopCounter)
+                {
+                    defBlockIndices.removeAt(0);
+                }
 
-                List<IndexTrackingInfo*> useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
-                builder.replaceOperand(use, loadIndexedValue(&builder, localVar, defBlockIndices, useBlockIndices));
+                setInsertAfterOrdinaryInst(&builder, instToStore);
+                auto localVar = storeIndexedValue(&builder, defaultVarBlock, instToStore, defBlockIndices);
+
+                for (auto use : outOfScopeUses)
+                {
+                    List<IndexTrackingInfo> useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
+                    if (isLoopCounter)
+                    {
+                        // The use site of a primal loop counter should be right before we enter the
+                        // loop, and therefore its index count should equal to defBlockIndices.getCount()
+                        // after we remove the first index from defBlockIndices.
+                        SLANG_RELEASE_ASSERT(useBlockIndices.getCount() == defBlockIndices.getCount());
+                    }
+                    setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
+                    builder.replaceOperand(use, loadIndexedValue(&builder, localVar, defBlockIndices, useBlockIndices));
+                }
+
+                processedStoreSet.Add(localVar);
             }
-
-            processedStoreSet.Add(localVar);
         }
-    }
+    };
+
+    ensureInstAvailable(hoistInfo->storeSet);
     
-    // Replace the old store set with the processed onne one.
+    // Replace the old store set with the processed one.
     hoistInfo->storeSet = processedStoreSet;
 
     return hoistInfo;
+}
+
+
+void tryInferMaxIndex(IndexedRegion* region, IndexTrackingInfo* info)
+{
+    if (info->status != IndexTrackingInfo::CountStatus::Unresolved)
+        return;
+
+    auto loop = as<IRLoop>(region->getInitializerBlock()->getTerminator());
+
+    if (auto maxItersDecoration = loop->findDecoration<IRLoopMaxItersDecoration>())
+    {
+        info->maxIters = (Count)maxItersDecoration->getMaxIters();
+        info->status = IndexTrackingInfo::CountStatus::Static;
+    }
+}
+
+
+IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type)
+{
+    builder->setInsertInto(block);
+    return builder->emitParam(type);
+}
+
+IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type, UIndex index)
+{
+    List<IRParam*> params;
+    for (auto param : block->getParams())
+        params.add(param);
+
+    SLANG_RELEASE_ASSERT(index == (UCount)params.getCount());
+
+    return addPhiInputParam(builder, block, type);
+}
+
+static IRBlock* getUpdateBlock(IRLoop* loop)
+{
+    auto initBlock = cast<IRBlock>(loop->getParent());
+
+    auto condBlock = loop->getTargetBlock();
+
+    IRBlock* lastLoopBlock = nullptr;
+
+    for (auto predecessor : condBlock->getPredecessors())
+    {
+        if (predecessor != initBlock)
+            lastLoopBlock = predecessor;
+    }
+
+    // Should find atleast one predecessor that is _not_ the 
+    // init block (that contains the loop info). This 
+    // predecessor would be the last block in the loop
+    // before looping back to the condition.
+    // 
+    SLANG_RELEASE_ASSERT(lastLoopBlock);
+
+    return lastLoopBlock;
+}
+
+void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalCountParam, IRInst*& diffCountParam)
+{
+    IRBuilder builder(primalLoop);
+    primalCountParam = nullptr;
+
+    // Grab first primal block.
+    IRBlock* primalInitBlock = as<IRBlock>(primalLoop->getParent());
+    builder.setInsertBefore(primalInitBlock->getTerminator());
+    {
+        auto primalCondBlock = as<IRUnconditionalBranch>(
+            primalInitBlock->getTerminator())->getTargetBlock();
+        builder.setInsertBefore(primalInitBlock->getTerminator());
+
+        auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
+            &builder,
+            primalInitBlock,
+            *(IRInst**)&primalLoop,
+            builder.getIntValue(builder.getIntType(), 0));
+
+        builder.setInsertBefore(primalCondBlock->getTerminator());
+        primalCountParam = addPhiInputParam(
+            &builder,
+            primalCondBlock,
+            builder.getIntType(),
+            phiCounterArgLoopEntryIndex);
+        builder.addLoopCounterDecoration(primalCountParam);
+        builder.addNameHintDecoration(primalCountParam, UnownedStringSlice("_pc"));
+        builder.markInstAsPrimal(primalCountParam);
+
+        IRBlock* primalUpdateBlock = getUpdateBlock(primalLoop);
+        IRInst* terminator = primalUpdateBlock->getTerminator();
+        builder.setInsertBefore(primalUpdateBlock->getTerminator());
+
+        auto incCounterVal = builder.emitAdd(
+            builder.getIntType(),
+            primalCountParam,
+            builder.getIntValue(builder.getIntType(), 1));
+        builder.markInstAsPrimal(incCounterVal);
+
+        auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, primalUpdateBlock, terminator, incCounterVal);
+
+        SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
+    }
+
+    {
+        IRBlock* diffInitBlock = as<IRBlock>(diffLoop->getParent());
+
+        auto diffCondBlock = as<IRUnconditionalBranch>(
+            diffInitBlock->getTerminator())->getTargetBlock();
+        builder.setInsertBefore(diffInitBlock->getTerminator());
+        auto revCounterInitVal = builder.emitSub(
+            builder.getIntType(),
+            primalCountParam,
+            builder.getIntValue(builder.getIntType(), 1));
+        auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
+            &builder,
+            diffInitBlock,
+            *(IRInst**)&diffLoop,
+            revCounterInitVal);
+
+        builder.setInsertBefore(diffCondBlock->getTerminator());
+
+        diffCountParam = addPhiInputParam(
+            &builder,
+            diffCondBlock,
+            builder.getIntType(),
+            phiCounterArgLoopEntryIndex);
+        builder.addNameHintDecoration(diffCountParam, UnownedStringSlice("_dc"));
+        builder.markInstAsPrimal(diffCountParam);
+
+        IRBlock* diffUpdateBlock = getUpdateBlock(diffLoop);
+        builder.setInsertBefore(diffUpdateBlock->getTerminator());
+        IRInst* terminator = diffUpdateBlock->getTerminator();
+
+        auto decCounterVal = builder.emitSub(
+            builder.getIntType(),
+            diffCountParam,
+            builder.getIntValue(builder.getIntType(), 1));
+        builder.markInstAsPrimal(decCounterVal);
+
+        auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, diffUpdateBlock, terminator, decCounterVal);
+
+        auto ifElse = as<IRIfElse>(diffCondBlock->getTerminator());
+        builder.setInsertBefore(ifElse);
+        auto exitCondition = builder.emitGeq(diffCountParam, builder.getIntValue(builder.getIntType(), 0));
+        ifElse->condition.set(exitCondition);
+
+        SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
+    }
+}
+
+void buildIndexedBlocks(
+    Dictionary<IRBlock*, List<IndexTrackingInfo>>& info,
+    IRGlobalValueWithCode* func)
+{
+    Dictionary<IRLoop*, IndexTrackingInfo> mapLoopToTrackingInfo;
+
+    for (auto block : func->getBlocks())
+    {
+        auto loop = as<IRLoop>(block->getTerminator());
+        if (!loop) continue;
+        auto diffDecor = loop->findDecoration<IRDifferentialInstDecoration>();
+        if (!diffDecor) continue;
+        auto primalLoop = as<IRLoop>(diffDecor->getPrimalInst());
+        if (!primalLoop) continue;
+
+        IndexTrackingInfo indexInfo = {};
+        lowerIndexedRegion(primalLoop, loop, indexInfo.primalCountParam, indexInfo.diffCountParam);
+
+        SLANG_RELEASE_ASSERT(indexInfo.primalCountParam);
+        SLANG_RELEASE_ASSERT(indexInfo.diffCountParam);
+
+        mapLoopToTrackingInfo[loop] = indexInfo;
+        mapLoopToTrackingInfo[primalLoop] = indexInfo;
+    }
+
+    auto regionMap = buildIndexedRegionMap(func);
+
+    for (auto block : func->getBlocks())
+    {
+        List<IndexTrackingInfo> trackingInfos;
+        for (auto region : regionMap->getAllAncestorRegions(block))
+        {
+            IndexTrackingInfo trackingInfo;
+            if (mapLoopToTrackingInfo.TryGetValue(region->loop, trackingInfo))
+            {
+                tryInferMaxIndex(region, &trackingInfo);
+                trackingInfos.add(trackingInfo);
+            }
+        }
+        info[block] = trackingInfos;
+    }
+}
+
+RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(
+    IRGlobalValueWithCode* func, const List<IRInst*>& instsToIgnore)
+{
+    sortBlocksInFunc(func);
+
+    Dictionary<IRBlock*, List<IndexTrackingInfo>> indexedBlockInfo;
+    buildIndexedBlocks(indexedBlockInfo, func);
+
+    auto recomputeBlockMap = createPrimalRecomputeBlocks(func, indexedBlockInfo);
+
+    sortBlocksInFunc(func);
+
+    RefPtr<AutodiffCheckpointPolicyBase> chkPolicy = new DefaultCheckpointPolicy(func->getModule());
+    chkPolicy->preparePolicy(func);
+
+    auto primalsInfo = chkPolicy->processFunc(func, recomputeBlockMap);
+
+    for (auto propagateFuncSpecificInst : instsToIgnore)
+    {
+        primalsInfo->ignoreSet.add(propagateFuncSpecificInst);
+    }
+    primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
+    return primalsInfo;
 }
 
 void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)
@@ -716,7 +1285,7 @@ static bool shouldStoreVar(IRVar* var)
         {
             for (UInt i = 0; i < spec->getArgCount(); i++)
             {
-                if (!canTypeBeStored(spec->getArg(i)->getDataType()))
+                if (!canTypeBeStored(spec->getArg(i)))
                     return false;
             }
         }
@@ -772,6 +1341,30 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_undefined:
     case kIROp_GetSequentialID:
+    case kIROp_Specialize:
+    case kIROp_LookupWitness:
+#if 0
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_Neg:
+    case kIROp_Geq:
+    case kIROp_Leq:
+    case kIROp_Neq:
+    case kIROp_Eql:
+    case kIROp_Greater:
+    case kIROp_Less:
+    case kIROp_And:
+    case kIROp_Or:
+    case kIROp_Not:
+    case kIROp_BitNot:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+#endif
         return false;
     case kIROp_GetElement:
     case kIROp_FieldExtract:
@@ -791,6 +1384,9 @@ static bool shouldStoreInst(IRInst* inst)
         break;
     }
 
+    if (as<IRType>(inst))
+        return false;
+
     // Only store if the inst has differential inst user.
     bool hasDiffUser = doesInstHaveDiffUse(inst);
     if (!hasDiffUser)
@@ -801,22 +1397,11 @@ static bool shouldStoreInst(IRInst* inst)
 
 bool canRecompute(IRDominatorTree* domTree, IRUse* use)
 {
+    SLANG_UNUSED(domTree);
     auto param = as<IRParam>(use->get());
     if (!param)
         return true;
-    auto paramBlock = as<IRBlock>(param->getParent());
-    for (auto predecessor : paramBlock->getPredecessors())
-    {
-        // If we hit this, the checkpoint policy is trying to recompute 
-        // values across a loop region boundary (we don't currently support this,
-        // and in general this is quite inefficient in both compute & memory)
-        // 
-        if (domTree->dominates(paramBlock, predecessor))
-        {
-            return false;
-        }
-    }
-    return true;
+    return false;
 }
 
 HoistResult DefaultCheckpointPolicy::classify(IRUse* use)

@@ -32,6 +32,7 @@ struct DiffUnzipPass
     // 
     Dictionary<IRInst*, IRInst*>            primalMap;
     Dictionary<IRInst*, IRInst*>            diffMap;
+    Dictionary<IRBlock*, IRBlock*>          recomputeBlockMap;
 
     // First diff block.
     // TODO: Can the same pass object can be used for multiple functions?
@@ -39,8 +40,6 @@ struct DiffUnzipPass
     IRBlock*                                firstDiffBlock;
 
     RefPtr<IndexedRegionMap>                      indexRegionMap;
-
-    Dictionary<IndexedRegion*, RefPtr<IndexTrackingInfo>> indexInfoMap;
 
     DiffUnzipPass(
         AutoDiffSharedContext* autodiffContext)
@@ -58,7 +57,7 @@ struct DiffUnzipPass
         return diffMap[inst];
     }
 
-    RefPtr<HoistedPrimalsInfo> unzipDiffInsts(IRFunc* func)
+    void unzipDiffInsts(IRFunc* func)
     {
         diffTypeContext.setFunc(func);
         
@@ -138,7 +137,8 @@ struct DiffUnzipPass
 
             // Mark the differential block as a differential inst 
             // (and add a reference to the primal block)
-            builder->markInstAsDifferential(diffBlock, nullptr, primalMap[block]);
+            builder->markInstAsDifferential(
+                diffBlock, builder->getBasicBlockType(), primalMap[block]);
 
             // Record the first differential (code) block,
             // since we want all 'return' insts in primal blocks
@@ -153,16 +153,6 @@ struct DiffUnzipPass
         {
             splitBlock(block, as<IRBlock>(primalMap[block]), as<IRBlock>(diffMap[block]));
         }
-
-        // Emit counter variables and other supporting
-        // instructions for all regions.
-        // 
-        // TODO: Need to have maxIndex in _both_ IndexTrackingInfo & IndexedRegionInfo.
-        // That way, we can do the various passes _before_ lowerIndexedRegions()
-        // TODO: Remove the call to lowerIndexedRegions() once checkpointing works properly.
-        // 
-        RefPtr<HoistedPrimalsInfo> primalsInfo = new HoistedPrimalsInfo();
-        lowerIndexedRegions(primalsInfo);
 
         // Copy regions from fwd-block to their split blocks
         // to make it easier to do lookups.
@@ -189,217 +179,13 @@ struct DiffUnzipPass
         firstBlock->replaceUsesWith(firstPrimalBlock);
 
         RefPtr<BlockSplitInfo> splitInfo = new BlockSplitInfo();
+
         for (auto block : mixedBlocks)
             if (primalMap.ContainsKey(block))
                 splitInfo->diffBlockMap[as<IRBlock>(primalMap[block])] = as<IRBlock>(diffMap[block]);
-        
-        Dictionary<IRBlock*, List<IndexTrackingInfo*>> indexedBlocksInfo;
-        for (auto block : mixedBlocks)
-        {
-            indexedBlocksInfo[as<IRBlock>(diffMap[block])] = getIndexInfoList(as<IRBlock>(diffMap[block]));
-            indexedBlocksInfo[as<IRBlock>(primalMap[block])] = getIndexInfoList(as<IRBlock>(primalMap[block]));
-        }
 
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
-
-        // Run the three checkpointing passes to hoist/clone primal insts
-        // to the right spots.
-        // 
-        {
-            RefPtr<AutodiffCheckpointPolicyBase> chkPolicy = new DefaultCheckpointPolicy(unzippedFunc->getModule());
-            chkPolicy->preparePolicy(func);
-
-            auto chkPrimalsInfo = chkPolicy->processFunc(func, splitInfo);
-            primalsInfo->merge(chkPrimalsInfo);
-            
-            primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlocksInfo);
-        }
-
-        return primalsInfo;
-    }
-
-    void tryInferMaxIndex(IndexedRegion* region, IndexTrackingInfo* info)
-    {
-        if (info->status != IndexTrackingInfo::CountStatus::Unresolved)
-            return;
-
-        auto loop = as<IRLoop>(region->getInitializerBlock()->getTerminator());
-        
-        if (auto maxItersDecoration = loop->findDecoration<IRLoopMaxItersDecoration>())
-        {
-            info->maxIters = (Count) maxItersDecoration->getMaxIters();
-            info->status = IndexTrackingInfo::CountStatus::Static;
-        }
-        
-        if (info->status == IndexTrackingInfo::CountStatus::Unresolved)
-        {
-            SLANG_UNEXPECTED("Could not resolve max iters \
-                for loop appearing in reverse-mode");
-        }
-    }
-
-    IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type)
-    {
-        builder->setInsertInto(block);
-        return builder->emitParam(type);
-    }
-
-    IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type, UIndex index)
-    {
-        List<IRParam*> params;
-        for (auto param : block->getParams())
-            params.add(param);
-
-        SLANG_RELEASE_ASSERT(index == (UCount)params.getCount());
-
-        return addPhiInputParam(builder, block, type);
-    }
-
-    void lowerIndexedRegions(HoistedPrimalsInfo* primalsInfo)
-    {
-        IRBuilder builder(autodiffContext->moduleInst->getModule());
-
-        for (auto region : indexRegionMap->regions)
-        {
-            RefPtr<IndexTrackingInfo> info = new IndexTrackingInfo();
-            indexInfoMap[region] = info;
-            
-            // Grab first primal block.
-            IRBlock* primalInitBlock = as<IRBlock>(primalMap[region->getInitializerBlock()]);
-            builder.setInsertBefore(primalInitBlock->getTerminator());
-
-            // Make variable in the top-most block (so it's visible to diff blocks)
-            info->primalCountLastVar = builder.emitVar(builder.getIntType());
-            builder.addNameHintDecoration(info->primalCountLastVar, UnownedStringSlice("_pc_last_var"));
-            primalsInfo->storeSet.Add(info->primalCountLastVar);
-            
-            {   
-                auto primalCondBlock = as<IRUnconditionalBranch>(
-                    primalInitBlock->getTerminator())->getTargetBlock();
-                builder.setInsertBefore(primalCondBlock->getTerminator());
-
-                auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
-                    &builder,
-                    primalInitBlock, 
-                    builder.getIntValue(builder.getIntType(), 0));
-
-                info->primalCountParam = addPhiInputParam(
-                    &builder,
-                    primalCondBlock,
-                    builder.getIntType(),
-                    phiCounterArgLoopEntryIndex);
-                builder.addNameHintDecoration(info->primalCountParam, UnownedStringSlice("_pc"));
-                builder.addLoopCounterDecoration(info->primalCountParam);
-                builder.markInstAsPrimal(info->primalCountParam);
-                
-                IRBlock* primalUpdateBlock = as<IRBlock>(primalMap[region->getUpdateBlock()]);
-                builder.setInsertBefore(primalUpdateBlock->getTerminator());
-
-                auto incCounterVal = builder.emitAdd(
-                    builder.getIntType(), 
-                    info->primalCountParam,
-                    builder.getIntValue(builder.getIntType(), 1));
-                builder.markInstAsPrimal(incCounterVal);
-
-                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, primalUpdateBlock, incCounterVal);
-
-                SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
-
-                IRBlock* primalBreakBlock = as<IRBlock>(primalMap[region->getBreakBlock()]);
-                builder.setInsertBefore(primalBreakBlock->getTerminator());
-                
-                builder.emitStore(info->primalCountLastVar, info->primalCountParam);
-            }
-
-            {
-                IRBlock* diffInitBlock = as<IRBlock>(diffMap[region->getInitializerBlock()]);
-                
-                auto diffCondBlock = as<IRUnconditionalBranch>(
-                    diffInitBlock->getTerminator())->getTargetBlock();
-                builder.setInsertBefore(diffCondBlock->getTerminator());
-
-                auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
-                    &builder,
-                    diffInitBlock, 
-                    builder.getIntValue(builder.getIntType(), 0));
-
-                info->diffCountParam = addPhiInputParam(
-                    &builder,
-                    diffCondBlock,
-                    builder.getIntType(),
-                    phiCounterArgLoopEntryIndex);
-                builder.addNameHintDecoration(info->diffCountParam, UnownedStringSlice("_dc"));
-                builder.addLoopCounterDecoration(info->diffCountParam);
-                builder.markInstAsPrimal(info->diffCountParam);
-                
-                IRBlock* diffUpdateBlock = as<IRBlock>(diffMap[region->getUpdateBlock()]);
-                builder.setInsertBefore(diffUpdateBlock->getTerminator());
-
-                auto incCounterVal = builder.emitAdd(
-                    builder.getIntType(), 
-                    info->diffCountParam,
-                    builder.getIntValue(builder.getIntType(), 1));
-                builder.markInstAsPrimal(incCounterVal);
-
-                auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, diffUpdateBlock, incCounterVal);
-
-                SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
-
-                auto loopInst = as<IRLoop>(diffInitBlock->getTerminator());
-
-                builder.setInsertBefore(loopInst);
-
-                auto primalCounterLastVal = builder.emitLoad(info->primalCountLastVar);
-                builder.markInstAsPrimal(primalCounterLastVal);
-                builder.addPrimalValueAccessDecoration(primalCounterLastVal);
-
-                builder.addLoopExitPrimalValueDecoration(loopInst, info->diffCountParam, primalCounterLastVal);
-
-                // We'll be manually creating the inversion entries for the counters
-                // TODO: This logic can be moved to the checkpointing alg.
-                // 
-                primalsInfo->invertSet.Add(info->diffCountParam);
-                primalsInfo->instsToInvert.Add(incCounterVal);
-                primalsInfo->invertInfoMap[incCounterVal] = InversionInfo(
-                    incCounterVal, 
-                    List<IRInst*>(incCounterVal), 
-                    List<IRInst*>(info->diffCountParam)); 
-                
-                primalsInfo->invertSet.Add(incCounterVal);
-                primalsInfo->instsToInvert.Add(diffUpdateBlock->getTerminator());
-                primalsInfo->invertInfoMap[diffUpdateBlock->getTerminator()] = InversionInfo(
-                    diffUpdateBlock->getTerminator(), 
-                    List<IRInst*>(diffUpdateBlock->getTerminator()), 
-                    List<IRInst*>(incCounterVal)); 
-            }
-
-            // Try to infer maximum possible number of iterations.
-            // (only regions whose intermediates are used outside their region
-            // require a maximum count, so we may see some unresolved regions
-            // without any issues)
-            // 
-            tryInferMaxIndex(region, info);
-        }
-    }
-
-    void tagNewParams(IRBuilder* builder, IRFunc* func)
-    {
-        for (auto block : func->getBlocks())
-        {
-            for (auto param = block->getFirstParam(); param; param = param->getNextParam())
-                if (!param->findDecoration<IRAutodiffInstDecoration>())
-                    builder->markInstAsPrimal(param);
-        }
-    }
-
-    List<IndexTrackingInfo*> getIndexInfoList(IRBlock* block)
-    {
-        List<IndexTrackingInfo*> indices;
-        for (auto region : indexRegionMap->getAllAncestorRegions(block))
-            indices.add((IndexTrackingInfo*) indexInfoMap[region].GetValue());
-        
-        return indices;
     }
 
     IRFunc* extractPrimalFunc(
