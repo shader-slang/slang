@@ -25,12 +25,14 @@ Obfuscation in Slang
 Slang provides an obfuscation feature that addresses these issues. The major parts being
 
 * The ability to compile a module with obfuscation enabled
-  * The module is a binary format, that doesn't contain the original names 
+  * The module is a binary format, that doesn't contain the original names or locations
 * The ability to compile regular slang code that can *link* against an obfuscated module
-* Code emitted to downstream compilers contain none of the symbols from the original source
+* Code emitted to downstream compilers contain none of the symbols or locations from the original source
 * Source map(s) to provide mappings between originating source and obfuscated source produced on the client
 
-Enabling obfuscation can be achieved via the `-obfuscate` option. When enabled a few things will happen
+Enabling obfuscation can be achieved via the `-obfuscate` option. When using the Slang API the `-obfuscate` option can be passed via `spProcessCommandLineArguments` function or `processCommandLineArguments` method. 
+
+When enabled a few things will happen
 
 * Source locations are scrambled to (blank) lines in an "empty" obfuscation source file.
 * A source map is produced mapping from the (blank) lines, to the originating source locations 
@@ -60,6 +62,7 @@ A developer could use the source map
 To use a `slang-module` with obfuscation requires
 
 * Specifying one or more obfuscated modules via `-r` option
+  * Currently there is only support for referencing modules stored in files
 * Specifying the `-obfuscate` option
 
 In a non obfuscated module, parts of the AST are serialized. This AST information could be through as broadly analogous to a header in C++. It is enough such that functionality in the module can be semantically checked, and linked with, however it does not, for example, contain the implementations of functions. This means doing a `-r` is roughly equivalent to doing an `import` of the source, without having the source. Any of the types, functions and so forth are available.
@@ -153,7 +156,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 That this works might seem surprising to users of languages such as C/C++, because in these languages it is necessary to know the layout of `Thing` to be able to create the `thing` variable.  This isn't necessary here though, and this can be very useful for some scenarios.
 
 A future iteration of the feature may include parts of the AST such that an obfuscated slang-module can be used like a regular module. It would be important that what is exposed is clear and under programmer control. By default most of the definitions within a module would typically not be exposed. 
-
 ## Accessing Source Maps
 
 During a compilation Slang can produce many different "artifacts". When using the obfuscated source map option to produce a `slang-module` Slang will associate an obfuscated source map providing the mapping to the original source. 
@@ -215,7 +217,23 @@ At the moment the types of files need to be determined by their extensions. A fu
 
 So far we have been mainly discussing "obfuscation" source maps. These maps provide a mapping from output locations to hidden original locations.
 
-It is also possible to generate a source map as part of emitting source to be passed to downstream compilers such as DXC, FXC, GLSLANG, NVRTCC or C++ compilers. This can be achieved via `-line-directive-mode source-map` option. The line directive mode controls how information about the original source is handled when emitting the source. The default mechanism, will add `#line` declarations into the original source.
+It is also possible to generate a source map as part of emitting source to be passed to downstream compilers such as DXC, FXC, GLSLANG, NVRTCC or C++ compilers. This can be achieved via `-line-directive-mode source-map` option. The line directive mode controls how information about the original source is handled when emitting the source. The default mechanism, will add `#line` declarations into the original source. 
+
+Via the API there are a few options to enable emit source maps
+
+```
+const char* args[2] = {"-line-directive-mode", "source-map" };
+request->processCommandLineArguments(args, 2);
+
+// Or
+spProcessCommandLineArguments(requst, args, 2);
+
+// Or just setting directly
+request->setLineDirectiveMode(SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP);
+ 
+// Or 
+spSetLineDirectiveMode(request, SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP);
+```
 
 The `#line` mechanism is fairly straight forward in that all of the information is including the mapping information is in a single file. A downstream compiler will then embed that information into its debug information. If obfuscation is being used, this will work and the `#line` will actually reference the "made up" "xxx-obfuscated" files.
 
@@ -246,17 +264,17 @@ Why you might not want to use an emit source map
 Issues/Future Work
 ==================
 
-* We use -g to indicate debug information
-  * On DXC the debug information is embedded in the DXIL, we allow for pdb to separate, but we currently *don't* strip the PDB from the DXIL
-  * If we do strip the PDB, we may need to resign the DXIL
 * Support AST emitting in obfuscated modules
 * Potentially support API support for source maps
 * Add manifest support for artifacts
 * Potentially provide a way to interact with artifacts more directly 
 * Potentially support for name mapping
 * May want to improve the file hierarchy representation
-* Provide other ways to ingest modules, such as through memory
+* Provide other ways to ingest modules, such as through memory (currently -r just supports files)
 * Provide more support for other kinds of artifacts
   * Diagnostics
   * Meta data (such as bindings used)
-
+  * Reflection
+* We use -g to indicate debug information
+  * On DXC the debug information is embedded in the DXIL, we allow for pdb to separate, but we currently *don't* strip the PDB from the DXIL
+  * If we do strip the PDB, we may need to resign the DXIL
