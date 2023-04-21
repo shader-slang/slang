@@ -13,6 +13,7 @@
 #include "core/slang-chunked-list.h"
 #include "d3d12-descriptor-heap.h"
 #include "d3d12-resource.h"
+#include "d3d12-posix-synchapi.h"
 
 #pragma push_macro("WIN32_LEAN_AND_MEAN")
 #pragma push_macro("NOMINMAX")

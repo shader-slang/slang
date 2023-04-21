@@ -1,8 +1,9 @@
 #include "d3d12-posix-synchapi.h"
 
-#if !SLANG_WINDOWS_FAMILY
-
 #include "slang.h"
+
+#if SLANG_LINUX_FAMILY
+
 #include "core/slang-common.h"
 
 #include <fcntl.h>
@@ -67,7 +68,7 @@ BOOL CloseHandle(HANDLE h)
         return 1;
     }
     // TODO: Windows does reference counting, how to, dupfd?
-    // return ::close(_handleToFD(h)) == 0;
+    return ::close(_handleToFD(h)) == 0;
     return 1;
 }
 
@@ -448,4 +449,4 @@ end:
     return res;
 }
 
-#endif // !SLANG_WINDOWS_FAMILY
+#endif // SLANG_LINUX_FAMILY

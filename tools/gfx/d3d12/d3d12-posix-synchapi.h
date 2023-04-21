@@ -1,18 +1,18 @@
 #pragma once
 
+#include "slang.h"
+
+#if SLANG_LINUX_FAMILY
+
 #pragma push_macro("WIN32_LEAN_AND_MEAN")
 #pragma push_macro("NOMINMAX")
 #undef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #undef NOMINMAX
 #define NOMINMAX
-#undef _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #pragma pop_macro("NOMINMAX")
 #pragma pop_macro("WIN32_LEAN_AND_MEAN")
-
-#if !SLANG_WINDOWS_FAMILY
 
 ////////////////////////////////////////////////////////////////
 //
@@ -26,7 +26,7 @@
 ////////////////////////////////////////////////////////////////
 
 //
-// The synchapi types macros used in gfx
+// The synchapi types and macros used in gfx
 //
 #define INFINITE 0xffffffff
 
@@ -59,8 +59,8 @@ DWORD WaitForSingleObject(HANDLE h, DWORD ms);
 
 DWORD WaitForMultipleObjects(
     DWORD        nHandles,
-    const HANDLE *hs,
+    const HANDLE *handles,
     BOOL         bWaitAll,
     DWORD        dwMilliseconds);
 
-#endif // !SLANG_WINDOWS_FAMILY
+#endif // SLANG_LINUX_FAMILY
