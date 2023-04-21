@@ -567,7 +567,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         {
             extendedFeatures.inlineUniformBlockFeatures.pNext = (void*)deviceCreateInfo.pNext;
             deviceCreateInfo.pNext = &extendedFeatures.inlineUniformBlockFeatures;
-            deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+            deviceExtensions.add(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
             m_features.add("inline-uniform-block");
         }
 
