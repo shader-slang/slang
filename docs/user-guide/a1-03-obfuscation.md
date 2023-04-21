@@ -226,7 +226,7 @@ const char* args[2] = {"-line-directive-mode", "source-map" };
 request->processCommandLineArguments(args, 2);
 
 // Or
-spProcessCommandLineArguments(requst, args, 2);
+spProcessCommandLineArguments(request, args, 2);
 
 // Or just setting directly
 request->setLineDirectiveMode(SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP);
