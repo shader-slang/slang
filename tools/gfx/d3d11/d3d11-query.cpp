@@ -1,6 +1,8 @@
 // d3d11-query.cpp
 #include "d3d11-query.h"
 
+#include "core/slang-process.h"
+
 namespace gfx
 {
 
@@ -39,7 +41,7 @@ SLANG_NO_THROW Result SLANG_MCALL QueryPoolImpl::getResult(
     while (S_OK != m_device->m_immediateContext->GetData(
         m_device->m_disjointQuery, &disjointData, sizeof(D3D11_QUERY_DATA_TIMESTAMP_DISJOINT), 0))
     {
-        Sleep(1);
+        Process::sleepCurrentThread(1);
     }
     m_device->m_info.timestampFrequency = disjointData.Frequency;
 

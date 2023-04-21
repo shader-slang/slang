@@ -19,6 +19,8 @@ public:
 
     struct Entry
     {
+        typedef Entry ThisType;
+
         void init()
         {
             generatedColumn = 0;
@@ -27,6 +29,16 @@ public:
             sourceColumn = 0;
             nameIndex = 0;
         }
+
+        bool operator==(const ThisType& rhs) const
+        {
+            return generatedColumn == rhs.generatedColumn &&
+                sourceFileIndex == rhs.sourceFileIndex &&
+                sourceLine == rhs.sourceLine &&
+                sourceColumn == rhs.sourceColumn && 
+                nameIndex == rhs.nameIndex;
+        }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         // Note! All column/line are zero indexed
         Index generatedColumn;          ///< The generated column
@@ -71,12 +83,24 @@ public:
         /// Swap this with rhs
     void swapWith(ThisType& rhs);
 
+        /// ==
+        ///
+        /// Note that equality requires that entries for a line must be *in the same order*
+        /// even though strictly speaking with different orders could be considered equivalent.
+    bool operator==(const ThisType& rhs) const;
+        /// !=
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
         /// Ctor
     SourceMap():
         m_slicePool(StringSlicePool::Style::Default)
     {
         clear();
     }
+        /// Copy Ctor
+    SourceMap(const ThisType& rhs) = default;
+        /// Assignment
+    ThisType& operator=(const ThisType& rhs) = default;
 
     String m_file;
     String m_sourceRoot;

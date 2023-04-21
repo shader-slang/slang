@@ -463,6 +463,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
+#if SLANG_ENABLE_PIX
     HMODULE pixModule = LoadLibraryW(L"WinPixEventRuntime.dll");
     if (pixModule)
     {
@@ -471,6 +472,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         m_EndEventOnCommandList =
             (PFN_EndEventOnCommandList)GetProcAddress(pixModule, "PIXEndEventOnCommandList");
     }
+#endif
 
     if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled())
     {

@@ -1116,11 +1116,8 @@ namespace Slang
             sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
         }
 
-        ComPtr<IArtifactPostEmitMetadata> metadata;
         if (sourceArtifact)
         {
-            metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(sourceArtifact);
-
             // Set the source artifacts
             options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
         }
@@ -1468,7 +1465,14 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        ArtifactUtil::addAssociated(artifact, metadata);
+        // Copy over all of the information associated with the source into the output
+        if (sourceArtifact)
+        {
+            for (auto associatedArtifact : sourceArtifact->getAssociated())
+            {
+                artifact->addAssociated(associatedArtifact);
+            }
+        }
 
         // Set the artifact
         outArtifact.swap(artifact);
@@ -1613,24 +1617,18 @@ namespace Slang
         ArtifactOutputUtil::maybeConvertAndWrite(session, artifact, sink, toSlice("stdout"), getWriter(WriterChannel::StdOutput));
     }
 
-    void EndToEndCompileRequest::writeWholeProgramResult(
-        TargetRequest* targetReq)
+    String EndToEndCompileRequest::_getWholeProgramPath(TargetRequest* targetReq)
     {
-        auto program = getSpecializedGlobalAndEntryPointsComponentType();
-        auto targetProgram = program->getTargetProgram(targetReq);
+        RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
+        if (m_targetInfos.TryGetValue(targetReq, targetInfo))
+        {
+            return targetInfo->wholeTargetOutputPath;
+        }
+        return String();
+    }
 
-        IArtifact* artifact = targetProgram->getExistingWholeProgramResult();
-
-        // Skip the case with no output
-        if (artifact == nullptr)
-            return;
-
-        CodeGenContext::EntryPointIndices entryPointIndices;
-        for (Index i = 0; i < program->getEntryPointCount(); ++i)
-            entryPointIndices.add(i);
-        CodeGenContext::Shared sharedCodeGenContext(targetProgram, entryPointIndices, getSink(), this);
-        CodeGenContext codeGenContext(&sharedCodeGenContext);
-
+    String EndToEndCompileRequest::_getEntryPointPath(TargetRequest* targetReq, Index entryPointIndex)
+    {
         // It is possible that we are dynamically discovering entry
         // points (using `[shader(...)]` attributes), so that there
         // might be entry points added to the program that did not
@@ -1639,53 +1637,35 @@ namespace Slang
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
         if (m_targetInfos.TryGetValue(targetReq, targetInfo))
         {
-            String outputPath = targetInfo->wholeTargetOutputPath;
-            if (outputPath != "")
+            String outputPath;
+            if (targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
             {
-                ArtifactOutputUtil::writeToFile(artifact, codeGenContext.getSink(), outputPath);
-                return;
+                return outputPath;
             }
         }
-        writeArtifactToStandardOutput(artifact, codeGenContext.getSink());
+
+        return String();
     }
 
-    void EndToEndCompileRequest::writeEntryPointResult(
-        TargetRequest*  targetReq,
-        Int             entryPointIndex)
+    SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
     {
-        auto program = getSpecializedGlobalAndEntryPointsComponentType();
-        auto targetProgram = program->getTargetProgram(targetReq);
-
-        IArtifact* artifact = targetProgram->getExistingEntryPointResult(entryPointIndex);
-
-        // Skip the case with no output
-        if (artifact == nullptr)
-            return;
-
-        CodeGenContext::EntryPointIndices entryPointIndices;
-        entryPointIndices.add(entryPointIndex);
-
-        CodeGenContext::Shared sharedCodeGenContext(targetProgram, entryPointIndices, getSink(), this);
-        CodeGenContext codeGenContext(&sharedCodeGenContext);
-
-        // It is possible that we are dynamically discovering entry
-        // points (using `[shader(...)]` attributes), so that there
-        // might be entry points added to the program that did not
-        // get paths specified via command-line options.
-        //
-        RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        auto entryPoint = program->getEntryPoint(entryPointIndex);
-        if(m_targetInfos.TryGetValue(targetReq, targetInfo))
+        // We don't have to do anything if there is no artifact
+        if (artifact)
         {
-            String outputPath;
-            if(targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
+            if (path.getLength())
             {
-                ArtifactOutputUtil::writeToFile(artifact, codeGenContext.getSink(), outputPath);
-                return;
+                SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
+                return SLANG_OK;
+            }
+
+            // If we aren't writing to a container and we didn't write to a file, we can output to 
+            if (m_containerFormat == ContainerFormat::None)
+            {
+                writeArtifactToStandardOutput(artifact, getSink());
             }
         }
 
-        writeArtifactToStandardOutput(artifact, codeGenContext.getSink());
+        return SLANG_OK;
     }
 
     IArtifact* TargetProgram::_createWholeProgramResult(
@@ -1860,11 +1840,54 @@ namespace Slang
         return SLANG_OK;
     }
 
-    SlangResult EndToEndCompileRequest::_createContainer()
+    static IBoxValue<SourceMap>* _getObfuscatedSourceMap(TranslationUnitRequest* translationUnit)
     {
-        switch (m_containerFormat)
+        if (auto module = translationUnit->getModule())
         {
-        case ContainerFormat::SlangModule:
+            if (auto irModule = module->getIRModule())
+            {
+                return irModule->getObfuscatedSourceMap();
+            }
+        }
+        return nullptr;
+    }
+
+    SlangResult EndToEndCompileRequest::maybeCreateContainer()
+    {
+        m_containerArtifact.setNull();
+
+        List<ComPtr<IArtifact>> artifacts;
+
+        auto linkage = getLinkage();
+        
+        auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+        for (auto targetReq : linkage->targets)
+        {
+            auto targetProgram = program->getTargetProgram(targetReq);
+
+            if (targetReq->isWholeProgramRequest())
+            {                
+                if (auto artifact = targetProgram->getExistingWholeProgramResult())
+                {
+                    artifacts.add(ComPtr<IArtifact>(artifact));
+                }
+            }
+            else
+            {
+                Index entryPointCount = program->getEntryPointCount();
+                for (Index ee = 0; ee < entryPointCount; ++ee)
+                {
+                    if (auto artifact = targetProgram->getExistingEntryPointResult(ee))
+                    {
+                        artifacts.add(ComPtr<IArtifact>(artifact));
+                    }
+                }
+            }
+        }
+
+        // If IR emitting is enabled, add IR to the artifacts
+        if (m_emitIr)
         {
             OwnedMemoryStream stream(FileAccess::Write);
             SlangResult res = writeContainerToStream(&stream);
@@ -1880,67 +1903,53 @@ namespace Slang
 
             auto containerBlob = ListBlob::moveCreate(blobData);
 
-            m_containerArtifact = Artifact::create(ArtifactDesc::make(Artifact::Kind::CompileBinary, ArtifactPayload::SlangIR, ArtifactStyle::Unknown));
-            m_containerArtifact->addRepresentationUnknown(containerBlob);
-
-            return res;
+            auto irArtifact = Artifact::create(ArtifactDesc::make(Artifact::Kind::CompileBinary, ArtifactPayload::SlangIR, ArtifactStyle::Unknown));
+            irArtifact->addRepresentationUnknown(containerBlob);
+            
+            // Add the IR artifact
+            artifacts.add(irArtifact);
         }
-        default: break;
-        }
-        return SLANG_OK;
-    }
 
-    SlangResult EndToEndCompileRequest::_completeContainer()
-    {
-        SLANG_ASSERT(m_containerArtifact);
-        if (!m_containerArtifact)
+        // If there is only one artifact we can use that as the container
+        if (artifacts.getCount() == 1)
         {
-            return SLANG_FAIL;
+            m_containerArtifact = artifacts[0];
         }
-
-        auto frontEndReq = getFrontEndReq();
-
-        for (auto translationUnit : frontEndReq->translationUnits)
+        else
         {
-            // Hmmm do I have to therefore add a map for all translation units(!)
-            // I guess this is okay in so far as an association can always be looked up by name
+            m_containerArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults));
 
-            auto sourceMap = translationUnit->getModule()->getIRModule()->getObfuscatedSourceMap();
-
-            // If we have a source map *and* we want to generate them for output add to the container
-            if (sourceMap && getLinkage()->m_generateSourceMap)
+            for (IArtifact* childArtifact : artifacts)
             {
-                auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
-
-                // Create the source map artifact
-                auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->get().m_file.getUnownedSlice());
-
-                // Add the repesentation
-                sourceMapArtifact->addRepresentation(sourceMap);
-
-                // Associate with the container
-                m_containerArtifact->addAssociated(sourceMapArtifact);
+                m_containerArtifact->addChild(childArtifact);
             }
         }
 
-        return SLANG_OK;
-    }
-
-    SlangResult EndToEndCompileRequest::maybeCreateContainer()
-    {
-        m_containerArtifact.setNull();
-
-        if (m_containerFormat == ContainerFormat::None)
+        // Get all of the source obfuscated source maps and add those 
+        if (m_containerArtifact)
         {
-            return SLANG_OK;
+            auto frontEndReq = getFrontEndReq();
+
+            for (auto translationUnit : frontEndReq->translationUnits)
+            {
+                // Hmmm do I have to therefore add a map for all translation units(!)
+                // I guess this is okay in so far as an association can always be looked up by name
+                if (auto sourceMap = _getObfuscatedSourceMap(translationUnit))
+                {
+                    auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
+
+                    // Create the source map artifact
+                    auto sourceMapArtifact = Artifact::create(artifactDesc, sourceMap->get().m_file.getUnownedSlice());
+
+                    // Add the repesentation
+                    sourceMapArtifact->addRepresentation(sourceMap);
+
+                    // Associate with the container
+                    m_containerArtifact->addAssociated(sourceMapArtifact);
+                }
+            }
         }
 
-        // Create the container
-        SLANG_RETURN_ON_FAIL(_createContainer());
-
-        // Associate any other stuff with the container artifact
-        SLANG_RETURN_ON_FAIL(_completeContainer());
-        
         return SLANG_OK;
     }
 
@@ -1951,7 +1960,17 @@ namespace Slang
         {
             return SLANG_OK;
         }
-        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(m_containerArtifact, fileName));
+
+        // Filter the containerArtifact into things that can be written
+        ComPtr<IArtifact> writeArtifact;
+        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::filter(m_containerArtifact, writeArtifact));
+
+        // Only write if there is something to write
+        if (writeArtifact)
+        {
+            SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, fileName));
+        }
+        
         return SLANG_OK;
     }
 
@@ -2109,26 +2128,38 @@ namespace Slang
         {
             auto linkage = getLinkage();
             auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
             for (auto targetReq : linkage->targets)
             {
+                auto targetProgram = program->getTargetProgram(targetReq);
+
                 if (targetReq->isWholeProgramRequest())
                 {
-                    writeWholeProgramResult(
-                        targetReq);
+                    const auto path = _getWholeProgramPath(targetReq);
+                    const auto artifact = targetProgram->getExistingWholeProgramResult();
+
+                    _maybeWriteArtifact(path, artifact);
                 }
                 else
                 {
                     Index entryPointCount = program->getEntryPointCount();
                     for (Index ee = 0; ee < entryPointCount; ++ee)
-                    {
-                        writeEntryPointResult(
-                            targetReq,
-                            ee);
+                    {        
+                        const auto path = _getEntryPointPath(targetReq, ee);
+                        const auto artifact = targetProgram->getExistingEntryPointResult(ee);
+                        
+                        _maybeWriteArtifact(path, artifact);
                     }
                 }
-            }
+            }            
+        }
 
-            maybeCreateContainer();
+        // Maybe create the container 
+        maybeCreateContainer();
+
+        // If it's a command line compile we may need to write the container to a file
+        if (m_isCommandLineCompile)
+        {
             maybeWriteContainer(m_containerOutputPath);
 
             _writeDependencyFile(this);

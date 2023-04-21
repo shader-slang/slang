@@ -15,6 +15,47 @@
 
 using namespace Slang;
 
+static SlangResult _read(JSONContainer* container, const String& json, DiagnosticSink* sink, SourceMap& outSourceMap)
+{
+    auto sourceManager = sink->getSourceManager();
+
+    JSONValue rootValue;
+    {
+        // Now need to parse as JSON
+        SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), json);
+        SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, sink);
+
+        JSONBuilder builder(container);
+
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, sink));
+
+        rootValue = builder.getRootValue();
+    }
+
+    SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::decode(container, rootValue, sink, outSourceMap));
+
+    return SLANG_OK;
+}
+
+static SlangResult _write(JSONContainer* container, const SourceMap& sourceMap, DiagnosticSink* sink, String& out)
+{
+    // Write it out
+    JSONValue jsonValue;
+
+    SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, container, sink, jsonValue));
+
+    // Convert into a string
+    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
+    container->traverseRecursively(jsonValue, &writer);
+
+    out = writer.getBuilder();
+    return SLANG_OK;
+}
+
 static SlangResult _check()
 {
     SourceManager sourceManager;
@@ -35,40 +76,38 @@ static SlangResult _check()
 
     RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
 
-    JSONValue rootValue;
+    SourceMap sourceMap;
+    SLANG_RETURN_ON_FAIL(_read(container, jsonSource, &sink, sourceMap));
+    
+    String json;
+    SLANG_RETURN_ON_FAIL(_write(container, sourceMap, &sink, json));
+    
+    SourceMap readSourceMap;
+    SLANG_RETURN_ON_FAIL(_read(container, json, &sink, readSourceMap));
+
+    if (readSourceMap != sourceMap)
     {
-        // Now need to parse as JSON
-        String contents(jsonSource);
-        SourceFile* sourceFile = sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
-        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+        return SLANG_FAIL;
+    }
+  
+    // Lets try copy construction
+    {
+        SourceMap copy(sourceMap);
 
-        JSONLexer lexer;
-        lexer.init(sourceView, &sink);
-
-        JSONBuilder builder(container);
-
-        JSONParser parser;
-        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
-
-        rootValue = builder.getRootValue();
+        if (copy != sourceMap)
+        {
+            return SLANG_FAIL;
+        }
     }
 
-    SourceMap sourceMap;
-        
-    SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::decode(container, rootValue, &sink, sourceMap));
-    
-    // Write it out
-    String json;
+    // Lets try assignment
     {
-        JSONValue jsonValue;
-
-        SLANG_RETURN_ON_FAIL(JSONSourceMapUtil::encode(sourceMap, container, &sink, jsonValue));
-        
-        // Convert into a string
-        JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-        container->traverseRecursively(jsonValue, &writer);
-
-        json = writer.getBuilder();
+        SourceMap assign;
+        assign = sourceMap;
+        if (assign != sourceMap)
+        {
+            return SLANG_FAIL;
+        }
     }
 
     return SLANG_OK;
