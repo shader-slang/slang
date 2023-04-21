@@ -2649,6 +2649,15 @@ __generic<T, U>
 __intrinsic_op($(kIROp_Reinterpret))
 T reinterpret(U value);
 
+// Use an otherwise unused value
+//
+// This can be used to silence the warning about returning before initializing
+// an out paramter.
+__generic<T>
+[__readNone]
+[ForceInline]
+void unused(inout T){}
+
 // Specialized function
 
 /// Given a string returns an integer hash of that string.
