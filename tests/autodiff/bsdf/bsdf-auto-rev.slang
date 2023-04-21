@@ -39,6 +39,7 @@ bool bsdfGGXSample(in ShadingData sd, in Auto_Bwd_BSDFParameters params, out Aut
 
     if (wiLocal.z < 1e-6)
     {
+        unused(result);
         return false;
     }
 
