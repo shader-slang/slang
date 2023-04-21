@@ -431,15 +431,20 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     static pD3DCompile compileFunc = nullptr;
     if (!compileFunc)
     {
+        // On Linux, vkd3d-utils isn't suitable as a unix replacement for fxc
+        // due to at least the following missing feature:
+        // https://bugs.winehq.org/show_bug.cgi?id=54872
+
         // TODO(tfoley): maybe want to search for one of a few versions of the DLL
-        HMODULE compilerModule = LoadLibraryA("d3dcompiler_47.dll");
-        if (!compilerModule)
+        const char* const libName = "d3dcompiler_47";
+        SharedLibrary::Handle compilerModule;
+        if (SLANG_FAILED(SharedLibrary::load(libName, compilerModule)))
         {
-            fprintf(stderr, "error: failed load 'd3dcompiler_47.dll'\n");
+            fprintf(stderr, "error: failed to load '%s'\n", libName);
             return SLANG_FAIL;
         }
 
-        compileFunc = (pD3DCompile)GetProcAddress(compilerModule, "D3DCompile");
+        compileFunc = (pD3DCompile)SharedLibrary::findSymbolAddressByName(compilerModule, "D3DCompile");
         if (!compileFunc)
         {
             fprintf(stderr, "error: failed load symbol 'D3DCompile'\n");
@@ -488,17 +493,14 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 
 /* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
 {
-#if SLANG_ENABLE_DXVK
-    const char* const libPath = "dxvk_dxgi";
-#else
-    const char* const libPath = "dxgi";
-#endif
+    const char* const libName = SLANG_ENABLE_DXVK ? "dxvk_dxgi" : "dxgi";
+
     static SharedLibrary::Handle s_dxgiModule = [&](){
         SharedLibrary::Handle h = nullptr;
-        SharedLibrary::load(libPath, h);
+        SharedLibrary::load(libName, h);
         if (!h)
         {
-            fprintf(stderr, "error: failed to load dll '%s'\n", libPath);
+            fprintf(stderr, "error: failed to load dll '%s'\n", libName);
         }
         return h;
     }();

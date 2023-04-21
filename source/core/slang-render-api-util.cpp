@@ -261,31 +261,24 @@ static bool _canLoadSharedLibrary(const char* libName)
 
 /* static */bool RenderApiUtil::calcHasApi(RenderApiType type)
 {
+    const char* d3d12LibName = SLANG_ENABLE_VKD3D_PROTON ? "vkd3d-proton-d3d12" : "d3d12";
+    const char* d3d11LibName = SLANG_ENABLE_DXVK ? "dxvk_d3d11" : "d3d11";
+
     switch (type)
     {
 #if SLANG_WINDOWS_FAMILY
         case RenderApiType::OpenGl: return _canLoadSharedLibrary("opengl32");
         case RenderApiType::Vulkan: return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
 #elif SLANG_UNIX_FAMILY
-
         case RenderApiType::OpenGl: return true;
         case RenderApiType::Vulkan: return true;
 #endif
+
 #if SLANG_ENABLE_DIRECTX
-#if SLANG_ENABLE_DXVK
-        // Strictly speaking, the d3d11 lib would be sufficient, however slang
-        // can't really do much without d3dcompiler_47 on dx11 and it trips a
-        // bunch of corner cases
-        case RenderApiType::D3D11:  return _canLoadSharedLibrary("dxvk_d3d11") && _canLoadSharedLibrary("d3dcompiler_47");
-#else
-        case RenderApiType::D3D11:  return _canLoadSharedLibrary("d3d11");
+        case RenderApiType::D3D11:  return _canLoadSharedLibrary(d3d11LibName);
+        case RenderApiType::D3D12:  return _canLoadSharedLibrary(d3d12LibName);
 #endif
-#if SLANG_ENABLE_VKD3D_PROTON
-        case RenderApiType::D3D12:  return _canLoadSharedLibrary("vkd3d-proton-d3d12");
-#else
-        case RenderApiType::D3D12:  return _canLoadSharedLibrary("d3d12");
-#endif
-#endif
+
         case RenderApiType::CPU:    return true;
         // We'll assume CUDA is available, and if not, trying to create it will detect it
         case RenderApiType::CUDA:   return true;
