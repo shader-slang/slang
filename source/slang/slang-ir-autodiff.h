@@ -343,6 +343,8 @@ IRInst* getInstInBlock(IRInst* inst);
 UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst*& inoutTerminatorInst, IRInst* arg);
 
 IRUse* findUniqueStoredVal(IRVar* var);
+IRUse* findLatestUniqueWriteUse(IRVar* var);
+IRUse* findEarliestUniqueWriteUse(IRVar* var);
 
 bool isDerivativeContextVar(IRVar* var);
 
