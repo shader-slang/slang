@@ -1341,6 +1341,44 @@ InstPair ForwardDiffTranscriber::transcribeSingleOperandInst(IRBuilder* builder,
     return InstPair(primalResult, diffResult);
 }
 
+InstPair ForwardDiffTranscriber::transcribeMakeExistential(IRBuilder* builder, IRMakeExistential* origMakeExistential)
+{
+    auto origBase = origMakeExistential->getWrappedValue();
+    auto origWitnessTable = origMakeExistential->getWitnessTable();
+
+    auto primalBase = findOrTranscribePrimalInst(builder, origBase);
+    auto primalWitnessTable = findOrTranscribePrimalInst(builder, origWitnessTable);
+    auto primalType = (IRType*)findOrTranscribePrimalInst(builder, origMakeExistential->getDataType());
+
+    IRInst* primalResult = builder->emitMakeExistential(
+        primalType,
+        primalBase,
+        primalWitnessTable);
+
+    IRInst* diffResult = nullptr;
+
+    auto primalInterfaceType = as<IRInterfaceType>(unwrapAttributedType(origMakeExistential->getDataType()));
+    SLANG_RELEASE_ASSERT(primalInterfaceType);
+
+    // If the interface type of the existential is differentiable, we emit a make existential
+    // of IDifferentiable interface type and the witness table of the original type's conformance
+    // to IDifferentiable.
+    //
+    if (auto differentialWitnessTable = tryExtractConformanceFromInterfaceType(
+        builder, primalInterfaceType, (IRWitnessTable*)primalWitnessTable))
+    {
+        if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
+        {
+            diffResult = builder->emitMakeExistential(
+                autoDiffSharedContext->differentiableInterfaceType,
+                diffBase,
+                differentialWitnessTable);
+        }
+    }
+
+    return InstPair(primalResult, diffResult);
+}
+
 InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, IRInst* origInst)
 {
     auto primalType = (IRType*)findOrTranscribePrimalInst(builder, origInst->getDataType());
@@ -1753,8 +1791,10 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         return transcribeDifferentialPairGetElement(builder, origInst);
 
     case kIROp_ExtractExistentialValue:
-    case kIROp_MakeExistential:
         return transcribeSingleOperandInst(builder, origInst);
+        
+    case kIROp_MakeExistential:
+        return transcribeMakeExistential(builder, as<IRMakeExistential>(origInst));
 
     case kIROp_ExtractExistentialType:
     {
