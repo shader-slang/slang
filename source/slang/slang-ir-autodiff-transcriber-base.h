@@ -79,7 +79,6 @@ struct AutoDiffTranscriberBase
         return lookupPrimalInst(builder->getInsertLoc().getParent(), origInst, defaultInst);
     }
 
-
     bool hasPrimalInst(IRInst* currentParent, IRInst* origInst);
 
     IRInst* findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst);
@@ -92,6 +91,8 @@ struct AutoDiffTranscriberBase
         IRInterfaceType* idiffType, IRInterfaceType* type);
 
     InstPair transcribeExtractExistentialWitnessTable(IRBuilder* builder, IRInst* origInst);
+
+    IRInst* tryExtractConformanceFromInterfaceType(IRBuilder* builder, IRInterfaceType* type, IRWitnessTable* WitnessTable);
 
     void maybeMigrateDifferentiableDictionaryFromDerivativeFunc(IRBuilder* builder, IRInst* origFunc);
 
