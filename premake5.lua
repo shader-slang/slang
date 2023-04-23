@@ -349,7 +349,7 @@ workspace "slang"
     -- and configuration options, e.g. `bin/windows-x64/debug/`
     targetdir("bin/" .. targetName .. "/%{cfg.buildcfg:lower()}")
 
-    cppdialect "C++17"
+    cppdialect "C++20"
     -- Statically link to the C/C++ runtime rather than create a DLL dependency.
     staticruntime "On"
     -- Turn off edit and continue for all projects. This is needed to avoid
