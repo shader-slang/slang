@@ -12,13 +12,13 @@ namespace Slang {
 
 static bool _isTextureTypeBase(IROp opIn)
 {
-    const int op = (kIROpMeta_OpMask & opIn);
+    const int op = (kIROpMask_OpMask & opIn);
     return op >= kIROp_FirstTextureTypeBase && op <= kIROp_LastTextureTypeBase;
 }
 
 static bool _isConstant(IROp opIn)
 {
-    const int op = (kIROpMeta_OpMask & opIn);
+    const int op = (kIROpMask_OpMask & opIn);
     return op >= kIROp_FirstConstant && op <= kIROp_LastConstant;
 }
 
@@ -190,7 +190,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
             IRInst* srcInst = m_insts[i];
             Ser::Inst& dstInst = m_serialData->m_insts[i];
 
-            dstInst.m_op = uint16_t(srcInst->getOp() & kIROpMeta_OpMask);
+            dstInst.m_op = uint16_t(srcInst->getOp() & kIROpMask_OpMask);
             dstInst.m_payloadType = PayloadType::Empty;
             
             dstInst.m_resultTypeIndex = getInstIndex(srcInst->getFullType());

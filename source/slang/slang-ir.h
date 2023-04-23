@@ -7,6 +7,9 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
+#if defined(__cpp_lib_bit_cast)
+#include <bit>
+#endif
 #include <functional>
 
 #include "../core/slang-basic.h"
@@ -47,7 +50,7 @@ enum : IROpFlags
           MainOp | Other
 Bit range: 0-10   | Remaining bits
 
-For doing range checks (for example for doing isa tests), the value is masked by kIROpMeta_OpMask, such that the Other bits don't interfere.
+For doing range checks (for example for doing isa tests), the value is masked by kIROpMask_OpMask, such that the Other bits don't interfere.
 The other bits can be used for storage for anything that needs to identify as a different 'op' or 'type'. It is currently 
 used currently for storing the TextureFlavor of a IRResourceTypeBase derived types for example. 
 
@@ -74,12 +77,31 @@ enum IROp : int32_t
 #include "slang-ir-inst-defs.h"
 };
 
-/* IROpMeta describe values for layout of IROp, as well as values for accessing aspects of IROp bits. */
+/* IROpMeta describes values for the layout of IROps */
 enum IROpMeta
 {
-    kIROpMeta_OtherShift = 10,   ///< Number of bits for op (shift right by this to get the other bits)
-    kIROpMeta_OpMask = 0x3ff,    ///< Mask for just opcode
+    kIROpMeta_OtherShift = 10, ///< Number of bits for op (shift right by this to get the other bits)
 };
+
+/* IROpMask contains bitmasks for accessing aspects of IROps */
+enum IROpMask : std::underlying_type_t<IROp>
+{
+    kIROpMask_OpMask = 0x3ff, ///< Mask for just opcode
+};
+
+inline int32_t operator&(const IROpMask m, const IROp o)
+{
+#if defined(__cpp_lib_bit_cast)
+    return std::bit_cast<int32_t>(m) & std::bit_cast<int32_t>(o);
+#else
+    return (int32_t)m & (int32_t)o;
+#endif
+}
+
+inline int32_t operator&(const IROp o, const IROpMask m)
+{
+    return m & o;
+}
 
 IROp findIROp(const UnownedStringSlice& name);
 
@@ -911,8 +933,8 @@ typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::end()
 
 // Types
 
-#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return (kIROpMeta_OpMask & op) == kIROp_##NAME; }
-#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp opIn) { const int op = (kIROpMeta_OpMask & opIn); return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
+#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return (kIROpMask_OpMask & op) == kIROp_##NAME; }
+#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp opIn) { const int op = (kIROpMask_OpMask & opIn); return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
 
 #define SIMPLE_IR_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_LEAF_ISA(NAME) };
 #define SIMPLE_IR_PARENT_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_PARENT_ISA(NAME) };
@@ -929,7 +951,7 @@ struct IRType : IRInst
     // `IR_PARENT_ISA` macro here.
     static bool isaImpl(IROp opIn)
     {
-        const int op = (kIROpMeta_OpMask & opIn);
+        const int op = (kIROpMask_OpMask & opIn);
         return (op >= kIROp_FirstType && op <= kIROp_LastType) || op == kIROp_Specialize;
     }
 };
