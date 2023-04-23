@@ -1792,6 +1792,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_ExtractExistentialValue:
         return transcribeSingleOperandInst(builder, origInst);
+        
     case kIROp_MakeExistential:
         return transcribeMakeExistential(builder, as<IRMakeExistential>(origInst));
 
