@@ -462,75 +462,6 @@ SlangResult FileSystemContents::find(ISlangFileSystemExt* fileSystem, const Unow
     return SLANG_OK;
 }
 
-/* static */SlangResult ArtifactContainerUtil::writeLegacy(IArtifact* artifact, const String& fileName)
-{
-    ComPtr<ISlangBlob> containerBlob;
-    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, containerBlob.writeRef()));
-
-    {
-        FileStream stream;
-        SLANG_RETURN_ON_FAIL(stream.init(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
-        SLANG_RETURN_ON_FAIL(stream.write(containerBlob->getBufferPointer(), containerBlob->getBufferSize()));
-    }
-
-    auto parentPath = Path::getParentDirectory(fileName);
-
-    // Lets look to see if we have any maps
-    {
-        Index nameCount = 0;
-
-        for (auto associatedArtifact : artifact->getAssociated())
-        {
-            auto desc = associatedArtifact->getDesc();
-
-            if (isDerivedFrom(desc.payload, ArtifactPayload::SourceMap))
-            {
-                StringBuilder artifactFilename;
-
-                // Dump out
-                const char* artifactName = associatedArtifact->getName();
-                if (artifactName && artifactName[0] != 0)
-                {
-                    SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(associatedArtifact, UnownedStringSlice(artifactName), artifactFilename));
-                }
-                else
-                {
-                    // Perhaps we can generate the name from the output basename
-                    StringBuilder baseName;
-
-                    baseName << Path::getFileNameWithoutExt(fileName);
-
-                    if (nameCount != 0)
-                    {
-                        baseName.appendChar('-');
-                        baseName.append(nameCount);
-                    }
-
-                    SLANG_RETURN_ON_FAIL(ArtifactUtil::calcName(associatedArtifact, baseName.getUnownedSlice(), artifactFilename));
-
-                    nameCount ++;
-                }
-
-                ComPtr<ISlangBlob> blob;
-                SLANG_RETURN_ON_FAIL(associatedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
-
-                // Try to write it out
-                {
-                    // Work out the path to the artifact
-                    auto artifactPath = Path::combine(parentPath, artifactFilename);
-
-                    // Write out the map
-                    FileStream stream;
-                    SLANG_RETURN_ON_FAIL(stream.init(artifactPath, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
-                    SLANG_RETURN_ON_FAIL(stream.write(blob->getBufferPointer(), blob->getBufferSize()));
-                }
-            }
-        }
-    }
-
-    return SLANG_OK;
-}
-
 static SlangResult _remove(ISlangMutableFileSystem* fileSystem, const String& path)
 {
     SlangPathType pathType;
@@ -547,11 +478,11 @@ static SlangResult _remove(ISlangMutableFileSystem* fileSystem, const String& pa
 
     const auto ext = Path::getPathExt(fileName);
 
-    if (ext == "zip")
+    if (ext == toSlice("zip"))
     {
         SLANG_RETURN_ON_FAIL(_remove(osFileSystem, fileName));
-        // Create the zip
 
+        // Create the zip
         ComPtr<ISlangMutableFileSystem> fileSystem;
         SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
 
@@ -567,13 +498,12 @@ static SlangResult _remove(ISlangMutableFileSystem* fileSystem, const String& pa
 
         // Okay we can now write out the zip
         SLANG_RETURN_ON_FAIL(osFileSystem->saveFileBlob(fileName.getBuffer(), blob));
-        
         return SLANG_OK;
     }
     else if (ext == toSlice("dir"))
     {
         // We use the special extension "dir" to write out to a directory. 
-        // This is a little hokey, but at list is consistent
+        // This is a little hokey arguably...
         auto path = Path::getPathWithoutExt(fileName);
 
         SLANG_RETURN_ON_FAIL(_remove(osFileSystem, path));
@@ -583,11 +513,18 @@ static SlangResult _remove(ISlangMutableFileSystem* fileSystem, const String& pa
         ComPtr<ISlangMutableFileSystem> fileSystem(new RelativeFileSystem(osFileSystem, path));
 
         SLANG_RETURN_ON_FAIL(writeContainer(artifact, fileName, fileSystem));
+        return SLANG_OK;
     }
-    else
+
+    // In order to write out as a artifact hierarchy we need a file system. If we don't have that
+    // we only write out the "main" (or root) artifact. All associated/children are typically ignored.
     {
-        // This is the legacy way to write out the container artifact
-        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeLegacy(artifact, fileName));
+        // Get the artifact as a blob
+        ComPtr<ISlangBlob> containerBlob;
+        SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, containerBlob.writeRef()));
+
+        // Write out the blob
+        SLANG_RETURN_ON_FAIL(osFileSystem->saveFileBlob(fileName.getBuffer(), containerBlob));
     }
 
     return SLANG_OK;
