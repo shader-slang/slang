@@ -1170,7 +1170,7 @@ struct AutoDiffPass : public InstPassBase
                 // We currently don't support the `LookupInterfaceMethod` case, since it can't
                 // appear in a derivative function because we will only call the backward diff function without a intermediate-type
                 // via an interface.
-                SLANG_RELEASE_ASSERT(diffTypes.ContainsKey(t));
+                SLANG_RELEASE_ASSERT(diffTypes.containsKey(t));
             }
         }
 

@@ -88,7 +88,7 @@ namespace Slang
     IRInst* SharedGenericsLoweringContext::findInterfaceRequirementVal(IRInterfaceType* interfaceType, IRInst* requirementKey)
     {
         if (auto dict = mapInterfaceRequirementKeyValue.tryGetValue(interfaceType))
-            return (*dict)[requirementKey].GetValue();
+            return (*dict)[requirementKey].getValue();
         _builldInterfaceRequirementMap(interfaceType);
         return findInterfaceRequirementVal(interfaceType, requirementKey);
     }

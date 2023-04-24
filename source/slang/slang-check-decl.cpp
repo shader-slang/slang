@@ -3534,7 +3534,7 @@ namespace Slang
         // witness in the table for the requirement, so
         // that we can bail out early.
         //
-        if(witnessTable->requirementDictionary.ContainsKey(requiredMemberDeclRef.getDecl()))
+        if(witnessTable->requirementDictionary.containsKey(requiredMemberDeclRef.getDecl()))
         {
             return true;
         }

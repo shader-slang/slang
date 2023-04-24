@@ -372,7 +372,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     void WitnessTable::add(Decl* decl, RequirementWitness const& witness)
     {
-        SLANG_ASSERT(!requirementDictionary.ContainsKey(decl));
+        SLANG_ASSERT(!requirementDictionary.containsKey(decl));
 
         requirementDictionary.Add(decl, witness);
     }

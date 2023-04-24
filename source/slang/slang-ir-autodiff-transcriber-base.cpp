@@ -33,7 +33,7 @@ void AutoDiffTranscriberBase::mapDifferentialInst(IRInst* origInst, IRInst* diff
 
 void AutoDiffTranscriberBase::mapPrimalInst(IRInst* origInst, IRInst* primalInst)
 {
-    if (cloneEnv.mapOldValToNew.ContainsKey(origInst) && cloneEnv.mapOldValToNew[origInst] != primalInst)
+    if (cloneEnv.mapOldValToNew.containsKey(origInst) && cloneEnv.mapOldValToNew[origInst] != primalInst)
     {
         getSink()->diagnose(origInst->sourceLoc,
             Diagnostics::internalCompilerError,
@@ -61,7 +61,7 @@ bool AutoDiffTranscriberBase::hasDifferentialInst(IRInst* origInst)
 {
     if (!origInst)
         return false;
-    return instMapD.ContainsKey(origInst);
+    return instMapD.containsKey(origInst);
 }
 
 bool AutoDiffTranscriberBase::shouldUseOriginalAsPrimal(IRInst* currentParent, IRInst* origInst)
@@ -105,7 +105,7 @@ bool AutoDiffTranscriberBase::hasPrimalInst(IRInst* currentParent, IRInst* origI
         return false;
     if (shouldUseOriginalAsPrimal(currentParent, origInst))
         return true;
-    return cloneEnv.mapOldValToNew.ContainsKey(origInst);
+    return cloneEnv.mapOldValToNew.containsKey(origInst);
 }
 
 IRInst* AutoDiffTranscriberBase::findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst)

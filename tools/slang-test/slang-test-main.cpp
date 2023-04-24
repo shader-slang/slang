@@ -4387,7 +4387,7 @@ SlangResult innerMain(int argc, char** argv)
     }
 
     // Don't include OptiX tests unless the client has explicit opted into them.
-    if( !options.includeCategories.ContainsKey(optixTestCategory) )
+    if( !options.includeCategories.containsKey(optixTestCategory) )
     {
         options.excludeCategories.Add(optixTestCategory, optixTestCategory);
     }

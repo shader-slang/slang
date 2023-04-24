@@ -3298,7 +3298,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
                 macro->params.add(param);
 
                 auto paramName = param.nameLoc.name;
-                if(mapParamNameToIndex.ContainsKey(paramName))
+                if(mapParamNameToIndex.containsKey(paramName))
                 {
                     GetSink(context)->diagnose(param.nameLoc.loc, Diagnostics::duplicateMacroParameterName, name);
                 }

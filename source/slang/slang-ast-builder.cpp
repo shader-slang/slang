@@ -191,14 +191,14 @@ void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier
 
 Decl* SharedASTBuilder::findMagicDecl(const String& name)
 {
-    return m_magicDecls[name].GetValue();
+    return m_magicDecls[name].getValue();
 }
 
 Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 {
-    if (m_magicDecls.ContainsKey(name))
+    if (m_magicDecls.containsKey(name))
     {
-        return m_magicDecls[name].GetValue();
+        return m_magicDecls[name].getValue();
     }
     else
     {

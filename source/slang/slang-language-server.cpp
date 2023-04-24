@@ -1398,7 +1398,7 @@ void LanguageServer::publishDiagnostics()
     List<String> filesToRemove;
     for (auto& file : m_lastPublishedDiagnostics)
     {
-        if (!version->diagnostics.ContainsKey(file.Key))
+        if (!version->diagnostics.containsKey(file.Key))
         {
             PublishDiagnosticsParams args;
             args.uri = URI::fromLocalFilePath(file.Key.getUnownedSlice()).uri;

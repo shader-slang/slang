@@ -188,7 +188,7 @@ Int IRDominatorTree::getBlockIndex(IRBlock* block)
 
 bool IRDominatorTree::isUnreachable(IRBlock* block)
 {
-    return !mapBlockToIndex.ContainsKey(block);
+    return !mapBlockToIndex.containsKey(block);
 }
 
 

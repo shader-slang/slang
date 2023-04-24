@@ -2362,7 +2362,7 @@ struct SPIRVEmitContext
                     if (operand.content != -1)
                     {
                         emitOperand(context.qualifiedResultTypes[(SpvStorageClass)operand.content]
-                                        .GetValue());
+                                        .getValue());
                     }
                     else
                     {

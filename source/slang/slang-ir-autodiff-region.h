@@ -70,7 +70,7 @@ struct IndexedRegionMap : public RefObject
 
     bool hasMapping(IRBlock* block)
     {
-        return map.ContainsKey(block);
+        return map.containsKey(block);
     }
 
     IndexedRegion* getRegion(IRBlock* block)

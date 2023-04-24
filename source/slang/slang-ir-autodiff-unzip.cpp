@@ -328,7 +328,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     for (auto param : func->getParams())
     {
         if (paramInfo.primalFuncParams.Contains(param))
-            newPrimalParams.Add(subEnv.mapOldValToNew[param].GetValue());
+            newPrimalParams.Add(subEnv.mapOldValToNew[param].getValue());
     }
 
     ExtractPrimalFuncContext context;

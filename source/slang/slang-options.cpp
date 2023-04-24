@@ -2026,7 +2026,7 @@ struct OptionsParser
             {
                 auto format = rawTargets[targetIndex].format;
 
-                if( mapFormatToTargetIndex.ContainsKey(format) )
+                if( mapFormatToTargetIndex.containsKey(format) )
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::duplicateTargets, format);
                 }
@@ -2356,7 +2356,7 @@ struct OptionsParser
                 auto entryPointReq = requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
 
                 //String outputPath;
-                if (targetInfo->entryPointOutputPaths.ContainsKey(entryPointID))
+                if (targetInfo->entryPointOutputPaths.containsKey(entryPointID))
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::duplicateOutputPathsForEntryPointAndTarget, entryPointReq->getName(), target->getTarget());
                 }

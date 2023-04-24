@@ -114,7 +114,7 @@ struct DiffTransposePass
 
     List<IRInst*> getPhiGrads(IRBlock* block)
     {
-        if (!phiGradsMap.ContainsKey(block))
+        if (!phiGradsMap.containsKey(block))
             return List<IRInst*>();
         
         return phiGradsMap[block];
@@ -420,7 +420,7 @@ struct DiffTransposePass
                         reverseSwitchArgs.add(switchInst->getCaseValue(ii));
 
                         auto caseLabel = switchInst->getCaseLabel(ii);
-                        if (!reverseLabelEntryBlocks.ContainsKey(caseLabel))
+                        if (!reverseLabelEntryBlocks.containsKey(caseLabel))
                         {
                             auto labelRegionInfo = reverseCFGRegion(
                                 caseLabel,
@@ -572,7 +572,7 @@ struct DiffTransposePass
         // Keep track of first diff block, since this is where 
         // we'll emit temporary vars to hold per-block derivatives.
         // 
-        auto firstRevDiffBlock = revBlockMap[terminalDiffBlocks[0]].GetValue();
+        auto firstRevDiffBlock = revBlockMap[terminalDiffBlocks[0]].getValue();
         firstRevDiffBlockMap[revDiffFunc] = firstRevDiffBlock;
 
         // Move all diff vars to first block, and initialize them with zero.
@@ -708,7 +708,7 @@ struct DiffTransposePass
     IRVar* getOrCreateAccumulatorVar(IRInst* fwdInst)
     {
         // Check if we have a var already.
-        if (revAccumulatorVarMap.ContainsKey(fwdInst))
+        if (revAccumulatorVarMap.containsKey(fwdInst))
             return revAccumulatorVarMap[fwdInst];
         
         IRBuilder tempVarBuilder(autodiffContext->moduleInst->getModule());
@@ -1620,7 +1620,7 @@ struct DiffTransposePass
             {
                 // No block can by the after block for multiple control flow insts.
                 //
-                SLANG_ASSERT(!(afterBlockMap.ContainsKey(afterBlock) && \
+                SLANG_ASSERT(!(afterBlockMap.containsKey(afterBlock) && \
                     afterBlockMap[afterBlock] != block->getTerminator()));
 
                 afterBlockMap[afterBlock] = block->getTerminator();
@@ -2665,7 +2665,7 @@ struct DiffTransposePass
             auto index = getElementInst->getIndex();
             SLANG_ASSERT(index);
 
-            if (!bucketedGradients.ContainsKey(index))
+            if (!bucketedGradients.containsKey(index))
             {
                 bucketedGradients[index] = List<RevGradient>();
             }
@@ -2731,7 +2731,7 @@ struct DiffTransposePass
             auto structKey = as<IRStructKey>(fieldExtractInst->getField());
             SLANG_ASSERT(structKey);
 
-            if (!bucketedGradients.ContainsKey(structKey))
+            if (!bucketedGradients.containsKey(structKey))
             {
                 bucketedGradients[structKey] = List<RevGradient>();
             }
@@ -2976,7 +2976,7 @@ struct DiffTransposePass
         {
             gradientsMap[fwdInst] = List<RevGradient>();
         }
-        gradientsMap[fwdInst].GetValue().add(assignment);
+        gradientsMap[fwdInst].getValue().add(assignment);
     }
 
     List<RevGradient> getRevGradients(IRInst* fwdInst)
@@ -2986,14 +2986,14 @@ struct DiffTransposePass
 
     List<RevGradient> popRevGradients(IRInst* fwdInst)
     {
-        List<RevGradient> val = gradientsMap[fwdInst].GetValue();
+        List<RevGradient> val = gradientsMap[fwdInst].getValue();
         gradientsMap.Remove(fwdInst);
         return val;
     }
 
     bool hasRevGradients(IRInst* fwdInst)
     {
-        return gradientsMap.ContainsKey(fwdInst);
+        return gradientsMap.containsKey(fwdInst);
     }
 
     AutoDiffSharedContext*                               autodiffContext;

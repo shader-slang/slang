@@ -108,7 +108,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         recomputeBlock->insertAtEnd(func);
         builder.addDecoration(recomputeBlock, kIROp_RecomputeBlockDecoration);
         recomputeBlockMap.Add(primalBlock, recomputeBlock);
-        indexedBlockInfo[recomputeBlock] = indexedBlockInfo[primalBlock].GetValue();
+        indexedBlockInfo[recomputeBlock] = indexedBlockInfo[primalBlock].getValue();
         return recomputeBlock;
     };
     
@@ -189,7 +189,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             // Queue work for the subregion.
             auto loop = as<IRLoop>(primalBlock->getTerminator());
             auto bodyBlock = getLoopRegionBodyBlock(loop);
-            auto diffLoop = mapPrimalLoopToDiffLoop[loop].GetValue();
+            auto diffLoop = mapPrimalLoopToDiffLoop[loop].getValue();
             auto diffBodyBlock = getLoopRegionBodyBlock(diffLoop);
             auto bodyRecomputeBlock = createRecomputeBlock(bodyBlock);
             bodyRecomputeBlock->insertBefore(diffBodyBlock);
@@ -423,9 +423,9 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
             checkpointInfo->invertSet.Add(instToInvert);
 
-            if (checkpointInfo->invInfoMap.ContainsKey(instToInvert))
+            if (checkpointInfo->invInfoMap.containsKey(instToInvert))
             {
-                List<IRInst*> currOperands = checkpointInfo->invInfoMap[instToInvert].GetValue().requiredOperands;
+                List<IRInst*> currOperands = checkpointInfo->invInfoMap[instToInvert].getValue().requiredOperands;
                 for (Index ii = 0; ii < result.inversionInfo.requiredOperands.getCount(); ii++)
                 {
                     SLANG_RELEASE_ASSERT(result.inversionInfo.requiredOperands[ii] == currOperands[ii]);
@@ -539,7 +539,7 @@ void applyToInst(
         List<IRInst*> newOperands;
         for (auto operand : info.requiredOperands)
         {
-            if (cloneCtx->cloneEnv.mapOldValToNew.ContainsKey(operand))
+            if (cloneCtx->cloneEnv.mapOldValToNew.containsKey(operand))
                 newOperands.add(cloneCtx->cloneEnv.mapOldValToNew[operand]);
             else
                 newOperands.add(operand);
@@ -820,7 +820,7 @@ static int getInstRegionNestLevel(
     IRBlock* defBlock,
     IRInst* inst)
 {
-    auto result = indexedBlockInfo[defBlock].GetValue().getCount();
+    auto result = indexedBlockInfo[defBlock].getValue().getCount();
     // Loop counters are considered to not belong to the region started by the its loop.
     if (result > 0 && inst->findDecoration<IRLoopCounterDecoration>())
         result--;

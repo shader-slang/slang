@@ -199,7 +199,7 @@ namespace Slang
             IRInterfaceType* loweredType = nullptr;
             if (sharedContext->loweredInterfaceTypes.tryGetValue(interfaceType, loweredType))
                 return loweredType;
-            if (sharedContext->mapLoweredInterfaceToOriginal.ContainsKey(interfaceType))
+            if (sharedContext->mapLoweredInterfaceToOriginal.containsKey(interfaceType))
                 return interfaceType;
             // Do not lower intrinsic interfaces.
             if (isBuiltin(interfaceType))

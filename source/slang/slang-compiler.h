@@ -2865,7 +2865,7 @@ namespace Slang
         }
         bool hasTransition(CodeGenTarget source, CodeGenTarget target) const
         {
-            return m_map.ContainsKey(Pair{ source, target });
+            return m_map.containsKey(Pair{ source, target });
         }
         PassThroughMode getTransition(CodeGenTarget source, CodeGenTarget target) const
         {

@@ -66,15 +66,15 @@ namespace Slang
         InversionInfo applyMap(IRCloneEnv* env)
         {
             InversionInfo newInfo;
-            if (env->mapOldValToNew.ContainsKey(instToInvert))
+            if (env->mapOldValToNew.containsKey(instToInvert))
                 newInfo.instToInvert = env->mapOldValToNew[instToInvert];
             
             for (auto inst : requiredOperands)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newInfo.requiredOperands.add(env->mapOldValToNew[inst]);
                 
             for (auto inst : targetInsts)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newInfo.targetInsts.add(env->mapOldValToNew[inst]);
             
             return newInfo;
@@ -96,23 +96,23 @@ namespace Slang
             RefPtr<HoistedPrimalsInfo> newPrimalsInfo = new HoistedPrimalsInfo();
             
             for (auto inst : this->storeSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newPrimalsInfo->storeSet.Add(env->mapOldValToNew[inst]);
             
             for (auto inst : this->recomputeSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newPrimalsInfo->recomputeSet.Add(env->mapOldValToNew[inst]);
                 
             for (auto inst : this->invertSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newPrimalsInfo->invertSet.Add(env->mapOldValToNew[inst]);
             
             for (auto inst : this->instsToInvert)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newPrimalsInfo->instsToInvert.Add(env->mapOldValToNew[inst]);
 
             for (auto kvpair : this->invertInfoMap)
-                if (env->mapOldValToNew.ContainsKey(kvpair.Key))
+                if (env->mapOldValToNew.containsKey(kvpair.Key))
                     newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.Key]] = kvpair.Value.applyMap(env);
             
             return newPrimalsInfo;

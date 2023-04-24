@@ -394,7 +394,7 @@ namespace Slang
 		}
 
         template<typename KeyType>
-		bool ContainsKey(const KeyType& key) const
+		bool containsKey(const KeyType& key) const
 		{
 			if (bucketSizeMinusOne == -1)
 				return false;
@@ -430,7 +430,7 @@ namespace Slang
 		class ItemProxy
 		{
 		private:
-			const Dictionary<TKey, TValue> * dict;
+			const Dictionary<TKey, TValue>* dict;
 			TKey key;
 		public:
 			ItemProxy(const TKey& _key, const Dictionary<TKey, TValue>* _dict)
@@ -443,7 +443,7 @@ namespace Slang
 				this->dict = _dict;
 				this->key = _Move(_key);
 			}
-			TValue & GetValue() const
+			TValue& getValue() const
 			{
 				auto pos = dict->findPosition(key);
 				if (pos.ObjectPosition != -1)
@@ -455,26 +455,26 @@ namespace Slang
 			}
 			inline TValue & operator()() const
 			{
-				return GetValue();
+				return getValue();
 			}
 			operator TValue&() const
 			{
-				return GetValue();
+				return getValue();
 			}
-			TValue & operator = (const TValue & val) const
+			TValue & operator = (const TValue& val) const
 			{
 				return ((Dictionary<TKey, TValue>*)dict)->Set(KeyValuePair<TKey, TValue>(_Move(key), val));
 			}
-			TValue & operator = (TValue && val) const
+			TValue & operator = (TValue&& val) const
 			{
 				return ((Dictionary<TKey, TValue>*)dict)->Set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
 			}
 		};
-		ItemProxy operator [](const TKey & key) const
+		ItemProxy operator [](const TKey& key) const
 		{
 			return ItemProxy(key, this);
 		}
-		ItemProxy operator [](TKey && key) const
+		ItemProxy operator [](TKey&& key) const
 		{
 			return ItemProxy(_Move(key), this);
 		}
@@ -677,7 +677,7 @@ namespace Slang
 		}
 		bool Contains(const T & obj) const
 		{
-			return dict.ContainsKey(obj);
+			return dict.containsKey(obj);
 		}
 	};
 	template <typename T>
@@ -897,7 +897,7 @@ namespace Slang
             kvPairs.Clear();
             marks.clear();
         }
-        template <typename T> bool ContainsKey(const T& key) const
+        template <typename T> bool containsKey(const T& key) const
         {
             if (bucketSizeMinusOne == -1)
                 return false;
