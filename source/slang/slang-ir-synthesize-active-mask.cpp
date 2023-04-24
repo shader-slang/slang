@@ -150,7 +150,7 @@ struct SynthesizeActiveMaskForModuleContext
     //
     void markFuncUsingActiveMask(IRFunc* func)
     {
-        if(m_funcsUsingActiveMaskSet.Contains(func))
+        if(m_funcsUsingActiveMaskSet.contains(func))
             return;
 
         m_funcsUsingActiveMask.add(func);
@@ -459,7 +459,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // active mask, or else that would imply nothing else in the function
         // did, and we shouldn't be processing this function at all.
         //
-        SLANG_ASSERT(m_blocksNeedingActiveMask.Contains(funcEntryBlock));
+        SLANG_ASSERT(m_blocksNeedingActiveMask.contains(funcEntryBlock));
 
         // Our basic approach will be to associate an `IRInst*` that represents
         // the active mask value to use with each basic block of the function.
@@ -610,7 +610,7 @@ struct SynthesizeActiveMaskForFunctionContext
     //
     bool doesBlockNeedActiveMask(IRBlock* block)
     {
-        return m_blocksNeedingActiveMask.Contains(block);
+        return m_blocksNeedingActiveMask.contains(block);
     }
 
     void markBlocksNeedingActiveMask()
@@ -665,12 +665,12 @@ struct SynthesizeActiveMaskForFunctionContext
                 //
                 for(auto block = m_func->getLastBlock(); block; block = block->getPrevBlock())
                 {
-                    if(m_blocksNeedingActiveMask.Contains(block))
+                    if(m_blocksNeedingActiveMask.contains(block))
                         continue;
 
                     for( auto successor : block->getSuccessors() )
                     {
-                        if( !m_blocksNeedingActiveMask.Contains(successor) )
+                        if( !m_blocksNeedingActiveMask.contains(successor) )
                             continue;
 
                         // If we get here then `block` has *not* been marked

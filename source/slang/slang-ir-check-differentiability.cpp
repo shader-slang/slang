@@ -283,7 +283,7 @@ public:
                     return false;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
-                    if (produceDiffSet.Contains(inst->getOperand(i)))
+                    if (produceDiffSet.contains(inst->getOperand(i)))
                     {
                         return true;
                     }
@@ -315,7 +315,7 @@ public:
                     return false;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
-                    if (carryNonTrivialDiffSet.Contains(inst->getOperand(i)))
+                    if (carryNonTrivialDiffSet.contains(inst->getOperand(i)))
                     {
                         return true;
                     }
@@ -357,9 +357,9 @@ public:
                                 if (branch->getArgCount() > paramIndex)
                                 {
                                     auto arg = branch->getArg(paramIndex);
-                                    if (produceDiffSet.Contains(arg))
+                                    if (produceDiffSet.contains(arg))
                                         produceDiffSet.add(param);
-                                    if (carryNonTrivialDiffSet.Contains(arg))
+                                    if (carryNonTrivialDiffSet.contains(arg))
                                         carryNonTrivialDiffSet.add(param);
                                 }
                             }
@@ -413,7 +413,7 @@ public:
         {
             auto inst = expectDiffInstWorkList[i];
             // Is inst in produceDiffSet?
-            if (!produceDiffSet.Contains(inst))
+            if (!produceDiffSet.contains(inst))
             {
                 if (auto call = as<IRCall>(inst))
                 {
@@ -526,7 +526,7 @@ public:
             {
                 if (auto storeInst = as<IRStore>(inst))
                 {
-                    if (carryNonTrivialDiffSet.Contains(storeInst->getVal()) &&
+                    if (carryNonTrivialDiffSet.contains(storeInst->getVal()) &&
                         !canAddressHoldDerivative(diffTypeContext, storeInst->getPtr()))
                     {
                         sink->diagnose(storeInst->sourceLoc, Diagnostics::lossOfDerivativeAssigningToNonDifferentiableLocation);
@@ -583,9 +583,9 @@ public:
         {
             if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
             {
-                if (bwdDifferentiableSymbolNames.Contains(linkageDecor->getMangledName()))
+                if (bwdDifferentiableSymbolNames.contains(linkageDecor->getMangledName()))
                     differentiableFunctions[inst] = DifferentiableLevel::Backward;
-                else if (fwdDifferentiableSymbolNames.Contains(linkageDecor->getMangledName()))
+                else if (fwdDifferentiableSymbolNames.contains(linkageDecor->getMangledName()))
                     differentiableFunctions.addIfNotExists(inst, DifferentiableLevel::Forward);
             }
         }

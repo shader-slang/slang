@@ -52,7 +52,7 @@ struct DeadCodeEliminationContext
         //
         if(!inst) return false;
 
-        return liveInsts.Contains(inst);
+        return liveInsts.contains(inst);
     }
 
     // We are going to do an iterative analysis
@@ -81,7 +81,7 @@ struct DeadCodeEliminationContext
         //
         if(!inst) return;
 
-        if(liveInsts.Contains(inst))
+        if(liveInsts.contains(inst))
             return;
         liveInsts.add(inst);
         workList.add(inst);

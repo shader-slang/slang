@@ -109,7 +109,7 @@ struct SpecializationContext
             }
         }
 
-        return fullySpecializedInsts.Contains(inst);
+        return fullySpecializedInsts.contains(inst);
     }
 
     // When an instruction isn't fully specialized, but its operands *are*
@@ -192,7 +192,7 @@ struct SpecializationContext
     void markInstAsFullySpecialized(
         IRInst* inst)
     {
-        if(fullySpecializedInsts.Contains(inst))
+        if(fullySpecializedInsts.contains(inst))
             return;
         fullySpecializedInsts.add(inst);
 
@@ -957,7 +957,7 @@ struct SpecializationContext
 
     void addDirtyInstsToWorkListRec(IRInst* inst)
     {
-        if( !cleanInsts.Contains(inst) )
+        if( !cleanInsts.contains(inst) )
         {
             addToWorkList(inst);
         }

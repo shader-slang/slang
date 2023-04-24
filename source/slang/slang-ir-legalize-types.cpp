@@ -3480,7 +3480,7 @@ struct IRTypeLegalizationPass
     bool hasBeenAddedToWorkListOrProcessed(IRInst* inst)
     {
         if (hasBeenAddedToWorkList(inst)) return true;
-        return hasBeenAddedOrProcessedSet.Contains(inst);
+        return hasBeenAddedOrProcessedSet.contains(inst);
     }
 
     // We will add a simple query to check whether an instruciton
@@ -3520,7 +3520,7 @@ struct IRTypeLegalizationPass
         //
         if(inst->getOp() == kIROp_InterfaceRequirementEntry) return true;
 
-        return addedToWorkListSet.Contains(inst);
+        return addedToWorkListSet.contains(inst);
     }
 
     // Next we define a convenience routine for adding something to the work list.
@@ -3529,7 +3529,7 @@ struct IRTypeLegalizationPass
     {
         // We want to avoid adding anything we've already added or processed.
         //
-        if(addedToWorkListSet.Contains(inst))
+        if(addedToWorkListSet.contains(inst))
             return;
         workList.add(inst);
         addedToWorkListSet.add(inst);
@@ -3594,7 +3594,7 @@ struct IRTypeLegalizationPass
                     continue;
                 if (as<IRType>(user))
                     continue;
-                if (!context->replacedInstructions.Contains(user))
+                if (!context->replacedInstructions.contains(user))
                     SLANG_UNEXPECTED("replaced inst still has use.");
                 if (lv->getParent())
                     SLANG_UNEXPECTED("replaced inst still in a parent.");

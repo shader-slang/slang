@@ -33,7 +33,7 @@ static bool _eliminateDeadBlocks(List<IRBlock*>& blocks, IRBlock* unreachableBlo
     }
     for (auto& b : blocks)
     {
-        if (!aliveBlocks.Contains(b))
+        if (!aliveBlocks.contains(b))
         {
             if (b->hasUses())
             {
@@ -420,7 +420,7 @@ static bool _unrollLoop(
                     for (auto use = inst->firstUse; use;)
                     {
                         auto nextUse = use->nextUse;
-                        if (!blockSet.Contains(as<IRBlock>(use->getUser()->getParent())))
+                        if (!blockSet.contains(as<IRBlock>(use->getUser()->getParent())))
                         {
                             use->set(newInst);
                         }

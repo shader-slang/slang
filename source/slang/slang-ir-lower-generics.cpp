@@ -166,7 +166,7 @@ namespace Slang
                     auto interfaceType = cast<IRWitnessTableType>(witnessTableType)->getConformanceType();
                     if (isComInterfaceType((IRType*)interfaceType))
                         return;
-                    if (!implementedInterfaces.Contains(interfaceType))
+                    if (!implementedInterfaces.contains(interfaceType))
                     {
                         context->sink->diagnose(interfaceType->sourceLoc, Diagnostics::noTypeConformancesFoundForInterface, interfaceType);
                         // Add to set to prevent duplicate diagnostic messages.

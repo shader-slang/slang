@@ -209,7 +209,7 @@ void maybeAddToWorkList(
     PropagateConstExprContext*  context,
     IRInst*                     gv)
 {
-    if( !context->onWorkList.Contains(gv) )
+    if( !context->onWorkList.contains(gv) )
     {
         context->workList.add(gv);
         context->onWorkList.add(gv);

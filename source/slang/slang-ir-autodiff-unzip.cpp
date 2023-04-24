@@ -212,7 +212,7 @@ struct ExtractPrimalFuncContext
             // output intermediary struct.
             for (auto inst : block->getChildren())
             {
-                if (primalsInfo->storeSet.Contains(inst))
+                if (primalsInfo->storeSet.contains(inst))
                 {
                     if (as<IRVar>(inst))
                     {
@@ -264,7 +264,7 @@ struct ExtractPrimalFuncContext
         for (auto param = func->getFirstParam(); param;)
         {
             auto nextParam = param->getNextParam();
-            if (!primalParams.Contains(param))
+            if (!primalParams.contains(param))
             {
                 param->replaceUsesWith(builder.getVoidValue());
                 param->removeAndDeallocate();
@@ -327,7 +327,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     HashSet<IRInst*> newPrimalParams;
     for (auto param : func->getParams())
     {
-        if (paramInfo.primalFuncParams.Contains(param))
+        if (paramInfo.primalFuncParams.contains(param))
             newPrimalParams.add(subEnv.mapOldValToNew[param].getValue());
     }
 

@@ -2670,7 +2670,7 @@ struct DiffTransposePass
                 bucketedGradients[index] = List<RevGradient>();
             }
 
-            bucketedGradients[index].GetValue().add(RevGradient(
+            bucketedGradients[index].getValue().add(RevGradient(
                 RevGradient::Flavor::Simple,
                 gradient.targetInst,
                 gradient.revGradInst,
@@ -2736,7 +2736,7 @@ struct DiffTransposePass
                 bucketedGradients[structKey] = List<RevGradient>();
             }
             
-            bucketedGradients[structKey].GetValue().add(RevGradient(
+            bucketedGradients[structKey].getValue().add(RevGradient(
                 RevGradient::Flavor::Simple,
                 gradient.targetInst,
                 gradient.revGradInst,

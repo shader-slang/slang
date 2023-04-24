@@ -735,7 +735,7 @@ namespace Slang
         List<IRInst*> paramsToRemove;
         for (auto param : diffPropagateFunc->getParams())
         {
-            if (!paramTransposeInfo.propagateFuncParams.Contains(param))
+            if (!paramTransposeInfo.propagateFuncParams.contains(param))
                 paramsToRemove.add(param);
         }
         for (auto param : paramsToRemove)

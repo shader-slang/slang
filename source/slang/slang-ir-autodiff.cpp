@@ -1034,7 +1034,7 @@ struct AutoDiffPass : public InstPassBase
     // Utility function for topology sorting the intermediate context types.
     bool isIntermediateContextTypeReadyForProcess(OrderedHashSet<IRInst*>& contextTypes, OrderedHashSet<IRInst*>& sortedSet, IRInst* t)
     {
-        if (!contextTypes.Contains(t))
+        if (!contextTypes.contains(t))
             return true;
 
         switch (t->getOp())
@@ -1118,7 +1118,7 @@ struct AutoDiffPass : public InstPassBase
             auto lastCount = sortedContextTypes.Count();
             for (auto t : contextTypes)
             {
-                if (sortedContextTypes.Contains(t))
+                if (sortedContextTypes.contains(t))
                     continue;
                 // Have all dependent types been added yet?
                 if (isIntermediateContextTypeReadyForProcess(contextTypes, sortedContextTypes, t))
@@ -1370,7 +1370,7 @@ struct AutoDiffPass : public InstPassBase
     // any unmaterialized intermediate context types.
     bool isTypeFullyDifferentiated(IRInst* type)
     {
-        if (fullyDifferentiatedInsts.Contains(type))
+        if (fullyDifferentiatedInsts.contains(type))
             return true;
         if (type->getOp() == kIROp_BackwardDiffIntermediateContextType)
             return false;
@@ -1410,7 +1410,7 @@ struct AutoDiffPass : public InstPassBase
     // any differentiate insts.
     bool isFullyDifferentiated(IRFunc* func)
     {
-        if (fullyDifferentiatedInsts.Contains(func))
+        if (fullyDifferentiatedInsts.contains(func))
             return true;
 
         for (auto block : func->getBlocks())

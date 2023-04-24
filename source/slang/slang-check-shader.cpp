@@ -671,7 +671,7 @@ namespace Slang
                 // from this module to another module.
                 //
                 auto importedModule = getModule(importDecl->importedModuleDecl);
-                if(!requiredModuleSet.Contains(importedModule))
+                if(!requiredModuleSet.contains(importedModule))
                 {
                     requiredModuleSet.add(importedModule);
                     m_requirements.add(importedModule);

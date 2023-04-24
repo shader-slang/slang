@@ -6326,7 +6326,7 @@ namespace Slang
         // skip the step where we modify the current scope.
         auto& importedModulesList = getShared()->importedModulesList;
         auto& importedModulesSet = getShared()->importedModulesSet;
-        if (importedModulesSet.Contains(moduleDecl))
+        if (importedModulesSet.contains(moduleDecl))
         {
             return;
         }

@@ -95,11 +95,11 @@ namespace Slang
                 default:
                     {
                         bool shouldDemote = false;
-                        if (childrenToDemote.Contains(clonedChild->getFullType()))
+                        if (childrenToDemote.contains(clonedChild->getFullType()))
                             shouldDemote = true;
                         for (UInt i = 0; i < clonedChild->getOperandCount(); i++)
                         {
-                            if (childrenToDemote.Contains(clonedChild->getOperand(i)))
+                            if (childrenToDemote.contains(clonedChild->getOperand(i)))
                             {
                                 shouldDemote = true;
                                 break;

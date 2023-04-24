@@ -58,7 +58,7 @@ namespace Slang
                     return;
             }
 
-            if (workListSet.Contains(inst))
+            if (workListSet.contains(inst))
                 return;
 
             workList.add(inst);

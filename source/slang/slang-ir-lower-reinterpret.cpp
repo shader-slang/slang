@@ -16,7 +16,7 @@ struct ReinterpretLoweringContext
 
     void addToWorkList(IRInst* inst)
     {
-        if (workList.Contains(inst))
+        if (workList.contains(inst))
             return;
 
         workList.add(inst);

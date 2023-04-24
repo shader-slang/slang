@@ -302,7 +302,7 @@ void CapabilitySet::calcCompactedAtoms(List<CapabilityAtom>& outAtoms) const
     outAtoms.clear();
     for( auto atom : m_expandedAtoms )
     {
-        if(!redundantAtomsSet.Contains(atom))
+        if(!redundantAtomsSet.contains(atom))
         {
             outAtoms.add(atom);
         }

@@ -3734,7 +3734,7 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
 
     if(requiredLevel == EmitAction::Level::Definition)
     {
-        if(ctx->openInsts.Contains(inst))
+        if(ctx->openInsts.contains(inst))
         {
             SLANG_UNEXPECTED("circularity during codegen");
             return;

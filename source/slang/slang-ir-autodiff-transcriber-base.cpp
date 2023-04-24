@@ -487,7 +487,7 @@ static bool _findDifferentiableInterfaceLookupPathImpl(
     IRInterfaceType* type,
     List<IRInterfaceRequirementEntry*>& currentPath)
 {
-    if (processedTypes.Contains(type))
+    if (processedTypes.contains(type))
         return false;
     processedTypes.add(type);
 
@@ -859,7 +859,7 @@ InstPair AutoDiffTranscriberBase::transcribeBlockImpl(IRBuilder* builder, IRBloc
     //
     for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
     {
-        if (instsToSkip.Contains(child))
+        if (instsToSkip.contains(child))
         {
             continue;
         }
@@ -959,7 +959,7 @@ static void _markGenericChildrenWithoutRelaventUse(IRGeneric* origGeneric, HashS
                 case kIROp_PrimalSubstituteDecoration:
                     break;
                 default:
-                    if (!outInstsToSkip.Contains(use->getUser()))
+                    if (!outInstsToSkip.contains(use->getUser()))
                     {
                         hasRelaventUse = true;
                     }
@@ -1176,7 +1176,7 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
             // 
             if (as<IRGeneric>(origType->getParent()->getParent()) &&
                 findInnerMostGenericReturnVal(as<IRGeneric>(origType->getParent()->getParent())) == origType &&
-                !instsInProgress.Contains(origType->getParent()->getParent()))
+                !instsInProgress.contains(origType->getParent()->getParent()))
             {
                 auto origGenericType = origType->getParent()->getParent();
                 auto diffGenericType = findOrTranscribeDiffInst(builder, origGenericType);

@@ -113,7 +113,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
                 return true;
             for (auto use = chainNode->firstUse; use; use = use->nextUse)
             {
-                if (!loopBlocks.Contains(as<IRBlock>(use->getUser()->getParent())))
+                if (!loopBlocks.contains(as<IRBlock>(use->getUser()->getParent())))
                     return true;
             }
             switch (chainNode->getOp())
@@ -144,7 +144,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
             // Is this inst used anywhere outside the loop? If so the loop has side effect.
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {
-                if (!loopBlocks.Contains(as<IRBlock>(use->getUser()->getParent())))
+                if (!loopBlocks.contains(as<IRBlock>(use->getUser()->getParent())))
                     return true;
             }
 
@@ -174,7 +174,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
             }
             else if (auto branch = as<IRUnconditionalBranch>(inst))
             {
-                if (loopBlocks.Contains(branch->getTargetBlock()))
+                if (loopBlocks.contains(branch->getTargetBlock()))
                     continue;
                 // Branching out of the loop with some argument is considered
                 // having a side effect.

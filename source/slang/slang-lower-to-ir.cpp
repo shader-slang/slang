@@ -8071,7 +8071,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     
                     for (auto child : parentGeneric->getFirstBlock()->getChildren())
                     {
-                        if (valuesToClone.Contains(child))
+                        if (valuesToClone.contains(child))
                         {
                             cloneInst(&cloneEnv, &typeBuilder, child);
                         }

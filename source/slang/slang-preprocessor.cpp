@@ -3022,7 +3022,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     expectEndOfDirective(context);
 
     // Check whether we've previously included this file and seen a `#pragma once` directive
-    if(context->m_preprocessor->pragmaOnceUniqueIdentities.Contains(filePathInfo.uniqueIdentity))
+    if(context->m_preprocessor->pragmaOnceUniqueIdentities.contains(filePathInfo.uniqueIdentity))
     {
         return;
     }

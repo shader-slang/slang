@@ -155,7 +155,7 @@ namespace Slang
                     // in order.
                     if (context)
                     {
-                        validate(context, context->seenInsts.Contains(operandValue),    inst, "def must come before use in same block");
+                        validate(context, context->seenInsts.contains(operandValue),    inst, "def must come before use in same block");
                     }
                     return;
                 }
@@ -286,7 +286,7 @@ namespace Slang
         {
             validate(
                 context,
-                blocks.Contains(target),
+                blocks.contains(target),
                 inst,
                 "branch inst must have a valid target block that is defined within the same "
                 "scope.");

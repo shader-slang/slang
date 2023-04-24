@@ -17,7 +17,7 @@ namespace Slang
         HashSet<IRInst*> workListSet;
         void addToWorkList(IRInst* inst)
         {
-            if (workListSet.Contains(inst))
+            if (workListSet.contains(inst))
                 return;
 
             workList.add(inst);

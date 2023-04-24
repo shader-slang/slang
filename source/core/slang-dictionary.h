@@ -569,7 +569,7 @@ namespace Slang
 		DictionaryType dict;
 	private:
 		template<typename... Args>
-		void init(const T & v, Args... args)
+		void init(const T& v, Args... args)
 		{
 			add(v);
 			init(args...);
@@ -582,20 +582,20 @@ namespace Slang
 		{
 			init(arg, args...);
 		}
-		HashSetBase(const HashSetBase & set)
+		HashSetBase(const HashSetBase& set)
 		{
 			operator=(set);
 		}
-		HashSetBase(HashSetBase && set)
+		HashSetBase(HashSetBase&& set)
 		{
 			operator=(_Move(set));
 		}
-		HashSetBase & operator = (const HashSetBase & set)
+		HashSetBase& operator=(const HashSetBase& set)
 		{
 			dict = set.dict;
 			return *this;
 		}
-		HashSetBase & operator = (HashSetBase && set)
+		HashSetBase& operator=(HashSetBase&& set)
 		{
 			dict = _Move(set.dict);
 			return *this;
@@ -607,30 +607,30 @@ namespace Slang
 			typename DictionaryType::Iterator iter;
 		public:
 			Iterator() = default;
-			T & operator *() const
+			T& operator*() const
 			{
 				return (*iter).Key;
 			}
-			T * operator ->() const
+			T* operator->() const
 			{
 				return &(*iter).Key;
 			}
-			Iterator & operator ++()
+			Iterator& operator++()
 			{
 				++iter;
 				return *this;
 			}
-			Iterator operator ++(int)
+			Iterator operator++(int)
 			{
 				Iterator rs = *this;
 				operator++();
 				return rs;
 			}
-			bool operator != (const Iterator & _that) const
+			bool operator!=(const Iterator& _that) const
 			{
 				return iter != _that.iter;
 			}
-			bool operator == (const Iterator & _that) const
+			bool operator==(const Iterator& _that) const
 			{
 				return iter == _that.iter;
 			}
@@ -668,7 +668,7 @@ namespace Slang
 		{
 			dict.remove(obj);
 		}
-		bool Contains(const T& obj) const
+		bool contains(const T& obj) const
 		{
 			return dict.containsKey(obj);
 		}
@@ -823,7 +823,7 @@ namespace Slang
             if (!addIfNotExists(_Move(kvPair)))
                 SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
         }
-        TValue& Set(KeyValuePair<TKey, TValue>&& kvPair)
+        TValue& set(KeyValuePair<TKey, TValue>&& kvPair)
         {
             rehash();
             auto pos = findPosition(kvPair.Key);
@@ -937,7 +937,7 @@ namespace Slang
                 this->dict = _dict;
                 this->key = _Move(_key);
             }
-            TValue& GetValue() const
+            TValue& getValue() const
             {
                 auto pos = dict->findPosition(key);
                 if (pos.ObjectPosition != -1)
@@ -949,21 +949,22 @@ namespace Slang
                     SLANG_ASSERT_FAILURE("The key does not exists in dictionary.");
                 }
             }
-            inline TValue& operator()() const { return GetValue(); }
-            operator TValue&() const { return GetValue(); }
+            inline TValue& operator()() const { return getValue(); }
+            operator TValue&() const { return getValue(); }
             TValue& operator=(const TValue& val)
             {
                 return ((OrderedDictionary<TKey, TValue>*)dict)
-                    ->Set(KeyValuePair<TKey, TValue>(_Move(key), val));
+                    ->set(KeyValuePair<TKey, TValue>(_Move(key), val));
             }
             TValue& operator=(TValue&& val)
             {
                 return ((OrderedDictionary<TKey, TValue>*)dict)
-                    ->Set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
+                    ->set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
             }
         };
         ItemProxy operator[](const TKey& key) const { return ItemProxy(key, this); }
         ItemProxy operator[](TKey&& key) const { return ItemProxy(_Move(key), this); }
+
         int Count() const { return _count; }
         KeyValuePair<TKey, TValue>& First() const { return kvPairs.First(); }
         KeyValuePair<TKey, TValue>& Last() const { return kvPairs.Last(); }

@@ -283,7 +283,7 @@ struct DepthFirstSearchContext
         preVisit(block);
         for(auto succ : getSuccessors(block))
         {
-            if(!visited.Contains(succ))
+            if(!visited.contains(succ))
             {
                 walk(succ, getSuccessors);
             }
@@ -328,7 +328,7 @@ void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
     List<IRBlock*> prefix;
     for (auto block : code->getBlocks())
     {
-        if (!context.visited.Contains(block))
+        if (!context.visited.contains(block))
         {
             prefix.add(block);
         }

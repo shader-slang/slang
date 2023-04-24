@@ -26,7 +26,7 @@ void DebugShaderObject::checkCompleteness()
     {
         if (layout->getBindingRangeBindingCount(i) != 0)
         {
-            if (!m_initializedBindingRanges.Contains(i))
+            if (!m_initializedBindingRanges.contains(i))
             {
                 auto var = layout->getBindingRangeLeafVariable(i);
                 GFX_DIAGNOSE_ERROR_FORMAT(

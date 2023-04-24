@@ -32,7 +32,7 @@ namespace Slang
             {
                 auto nextUse = use->nextUse;
                 
-                if (pendingUses.Contains(use))
+                if (pendingUses.contains(use))
                 {
                     pendingUses.remove(use);
                     builder->replaceOperand(use, clonedInst);

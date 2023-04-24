@@ -716,7 +716,7 @@ void normalizeCFG(
                     for (auto use = inst->firstUse; use; use = use->nextUse)
                     {
                         auto userBlock = as<IRBlock>(use->getUser()->getParent());
-                        if (userBlock && !workListSet.Contains(userBlock))
+                        if (userBlock && !workListSet.contains(userBlock))
                         {
                             // Hoist the inst.
                             if (auto var = as<IRVar>(inst))

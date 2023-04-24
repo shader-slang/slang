@@ -20,7 +20,7 @@ struct RegisterAllocateContext
             return *list;
         }
         mapTypeToRegisterList[type] = List<RefPtr<RegisterInfo>>();
-        return mapTypeToRegisterList[type].GetValue();
+        return mapTypeToRegisterList[type].getValue();
     }
 
     void assignInstToNewRegister(List<RefPtr<RegisterInfo>>& regList, IRInst* inst)
@@ -164,7 +164,7 @@ struct RegisterAllocateContext
                         // If `existingInst` does not dominate `inst`, it
                         // can't be alive here and during the entire life-time of the `inst`.
                         // This means that `inst` and `existingInst` won't interfere.
-                        if (!dominatingInstSet.Contains(existingInst))
+                        if (!dominatingInstSet.contains(existingInst))
                             continue;
 
                         // If `existingInst` does dominate `inst`, we need to check all

@@ -973,7 +973,7 @@ struct SCCPContext
 
     bool isMarkedAsExecuted(IRBlock* block)
     {
-        return executedBlocks.Contains(block);
+        return executedBlocks.contains(block);
     }
 
     void markAsExecuted(IRBlock* block)

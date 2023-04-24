@@ -103,7 +103,7 @@ struct EliminateMultiLevelBreakContext
                 }
                 for (auto succ : block->getSuccessors())
                 {
-                    if (!breakBlocks.Contains(succ))
+                    if (!breakBlocks.contains(succ))
                     {
                         if (info.blockSet.add(succ))
                             info.blocks.add(succ);
@@ -119,7 +119,7 @@ struct EliminateMultiLevelBreakContext
         {
             for (auto block : func->getBlocks())
             {
-                if (processedBlocks.Contains(block))
+                if (processedBlocks.contains(block))
                     continue;
                 auto terminator = block->getTerminator();
                 switch (terminator->getOp())
@@ -319,7 +319,7 @@ struct EliminateMultiLevelBreakContext
             }
             
             builder.setInsertInto(jumpToOuterBlock);
-            if (skippedOverRegions.Contains(skippedRegion->parent))
+            if (skippedOverRegions.contains(skippedRegion->parent))
             {
                 builder.emitBranch(skippedRegion->parent->getBreakBlock(), 1, (IRInst**)&targetLevelParam);
             }

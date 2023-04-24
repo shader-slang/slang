@@ -3199,7 +3199,7 @@ void ModuleDependencyList::addLeafDependency(Module* module)
 
 void ModuleDependencyList::_addDependency(Module* module)
 {
-    if(m_moduleSet.Contains(module))
+    if(m_moduleSet.contains(module))
         return;
 
     m_moduleList.add(module);
@@ -3212,7 +3212,7 @@ void ModuleDependencyList::_addDependency(Module* module)
 
 void FileDependencyList::addDependency(SourceFile* sourceFile)
 {
-    if(m_fileSet.Contains(sourceFile))
+    if(m_fileSet.contains(sourceFile))
         return;
 
     m_fileList.add(sourceFile);
@@ -3817,7 +3817,7 @@ CompositeComponentType::CompositeComponentType(
         for(Index rr = 0; rr < childRequirementCount; ++rr)
         {
             auto childRequirement = child->getRequirement(rr);
-            if(!requirementsSet.Contains(childRequirement))
+            if(!requirementsSet.contains(childRequirement))
             {
                 requirementsSet.add(childRequirement);
                 m_requirements.add(childRequirement);
@@ -3948,7 +3948,7 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
     {
         if(!module)
             return;
-        if(m_modulesSet.Contains(module))
+        if(m_modulesSet.contains(module))
             return;
 
         addModule(module);
@@ -4202,7 +4202,7 @@ SpecializedComponentType::SpecializedComponentType(
         //
         for(SourceFile* sourceFile : module->getFileDependencies())
         {
-            if(fileDependencySet.Contains(sourceFile))
+            if(fileDependencySet.contains(sourceFile))
                 continue;
             fileDependencySet.add(sourceFile);
             m_fileDependencies.add(sourceFile);

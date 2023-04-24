@@ -58,7 +58,7 @@ namespace Slang
         IRInst* latestOperand = nullptr;
         for (auto childInst : earliestBlock->getChildren())
         {
-            if (operandInsts.Contains(childInst))
+            if (operandInsts.contains(childInst))
             {
                 latestOperand = childInst;
             }

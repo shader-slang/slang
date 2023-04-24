@@ -1913,7 +1913,7 @@ void LanguageServer::processCommands()
     const int kErrorRequestCanceled = -32800;
     for (auto& cmd : commands)
     {
-        if (cmd.id.getKind() == JSONValue::Kind::Integer && canceledIDs.Contains(cmd.id.asInteger()))
+        if (cmd.id.getKind() == JSONValue::Kind::Integer && canceledIDs.contains(cmd.id.asInteger()))
         {
             m_connection->sendError((JSONRPC::ErrorCode)kErrorRequestCanceled, cmd.id);
         }

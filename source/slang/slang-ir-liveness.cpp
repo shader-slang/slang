@@ -768,7 +768,7 @@ void LivenessContext::_addInst(IRInst* inst)
 void LivenessContext::_addAccessInst(IRInst* inst)
 {
     // If we already have it don't need to add again
-    if (m_accessSet.Contains(inst))
+    if (m_accessSet.contains(inst))
     {
         return;
     }
@@ -997,7 +997,7 @@ bool LivenessContext::_isNormalRunInst(IRInst* inst)
     {
         // Just because it's the right type *doesn't* mean it's an access, it has to also 
         // be in the access set
-        return m_accessSet.Contains(inst);
+        return m_accessSet.contains(inst);
     }
 
     return false;

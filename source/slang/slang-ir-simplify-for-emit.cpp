@@ -202,7 +202,7 @@ struct SimplifyForEmitContext : public InstPassBase
         IRInst* firstUser = nullptr;
         for (auto inst = var->getNextInst(); inst; inst = inst->getNextInst())
         {
-            if (userInSameBlock.Contains(inst))
+            if (userInSameBlock.contains(inst))
             {
                 firstUser = inst;
                 break;

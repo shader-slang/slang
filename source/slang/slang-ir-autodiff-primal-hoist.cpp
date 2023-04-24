@@ -352,7 +352,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         auto use = workList.getLast();
         workList.removeLast();
 
-        if (processedUses.Contains(use))
+        if (processedUses.contains(use))
             continue;
 
         processedUses.add(use);
@@ -361,12 +361,12 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
         if (result.mode == HoistResult::Mode::Store)
         {
-            SLANG_ASSERT(!checkpointInfo->recomputeSet.Contains(result.instToStore));
+            SLANG_ASSERT(!checkpointInfo->recomputeSet.contains(result.instToStore));
             checkpointInfo->storeSet.add(result.instToStore);
         }
         else if (result.mode == HoistResult::Mode::Recompute)
         {
-            SLANG_ASSERT(!checkpointInfo->storeSet.Contains(result.instToRecompute));
+            SLANG_ASSERT(!checkpointInfo->storeSet.contains(result.instToRecompute));
             checkpointInfo->recomputeSet.add(result.instToRecompute);
 
             if (isDifferentialInst(use->getUser()))
@@ -495,18 +495,18 @@ void applyToInst(
     IRInst* inst)
 {
     // Early-out..
-    if (checkpointInfo->storeSet.Contains(inst))
+    if (checkpointInfo->storeSet.contains(inst))
     {
         hoistInfo->storeSet.add(inst);
         return;
     }
 
-    if (hoistInfo->ignoreSet.Contains(inst))
+    if (hoistInfo->ignoreSet.contains(inst))
     {
         return;
     }
 
-    bool isInstRecomputed = checkpointInfo->recomputeSet.Contains(inst);
+    bool isInstRecomputed = checkpointInfo->recomputeSet.contains(inst);
     if (isInstRecomputed)
     {
         if (as<IRParam>(inst))
@@ -529,7 +529,7 @@ void applyToInst(
         }
     }
 
-    bool isInstInverted = checkpointInfo->invertSet.Contains(inst);
+    bool isInstInverted = checkpointInfo->invertSet.contains(inst);
     if (isInstInverted)
     {
         InversionInfo info = checkpointInfo->invInfoMap[inst];
@@ -610,14 +610,14 @@ void applyCheckpointSet(
             HashSet<IRBlock*> predecessorSet;
             for (auto predecessor : block->getPredecessors())
             {
-                if (predecessorSet.Contains(predecessor))
+                if (predecessorSet.contains(predecessor))
                     continue;
 
                 predecessorSet.add(predecessor);
 
                 auto diffPredecessor = as<IRBlock>(diffBlockMap[block]);
  
-                if (checkpointInfo->recomputeSet.Contains(param))
+                if (checkpointInfo->recomputeSet.contains(param))
                 {
                     IRInst* terminator = diffPredecessor->getTerminator();
                     addPhiOutputArg(&builder,
@@ -626,7 +626,7 @@ void applyCheckpointSet(
                         as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii));
                 }
                 
-                if (checkpointInfo->invertSet.Contains(param))
+                if (checkpointInfo->invertSet.contains(param))
                 {
                     IRInst* terminator = diffPredecessor->getTerminator();
 
@@ -845,10 +845,10 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     {
         for (auto instToStore : instSet)
         {
-            if (!instSet.Contains(instToStore))
+            if (!instSet.contains(instToStore))
                 continue;
 
-            if (hoistInfo->ignoreSet.Contains(instToStore))
+            if (hoistInfo->ignoreSet.contains(instToStore))
                 continue;
             IRBlock* defBlock = nullptr;
             if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))

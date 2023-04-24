@@ -13,7 +13,7 @@ struct AugmentMakeExistentialContext
 
     void addToWorkList(IRInst* inst)
     {
-        if (workListSet.Contains(inst))
+        if (workListSet.contains(inst))
             return;
 
         workList.add(inst);

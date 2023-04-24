@@ -180,7 +180,7 @@ struct ValSet
     }
     bool contains(Val* val)
     {
-        return set.Contains(ValItem(val));
+        return set.contains(ValItem(val));
     }
 };
 
