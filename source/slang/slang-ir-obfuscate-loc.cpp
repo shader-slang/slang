@@ -130,9 +130,18 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                     hash = combineHash(hash, nameHash);
                 }
 
-                // We combine the *offset* which is stable
+                // We *can't* just use the offset to produce the hash, because the source might have
+                // different line endings on different platforms (in particular linux/unix-like and windows).
+                // So we hash the line number/line offset to work around
+
                 const auto offset = sourceView->getRange().getOffset(curLoc);
-                hash = combineHash(hash, getHashCode(offset));
+
+                const auto sourceFile = sourceView->getSourceFile();
+                const auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
+                const auto lineOffset = sourceFile->calcColumnOffset(lineIndex, offset);
+
+                hash = combineHash(hash, getHashCode(lineIndex));
+                hash = combineHash(hash, getHashCode(lineOffset));
             }    
         }
     }

@@ -21,9 +21,6 @@ or other file like representations
 */
 struct ArtifactContainerUtil 
 {
-        /// Writes using the legacy mechanism
-    static SlangResult writeLegacy(IArtifact* artifact, const String& filename);
-
         /// Write the container using the specified path.
         /// Uses the extension of the path to determine how to write
     static SlangResult writeContainer(IArtifact* artifact, const String& path);

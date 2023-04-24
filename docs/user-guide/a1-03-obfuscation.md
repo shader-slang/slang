@@ -265,7 +265,7 @@ Issues/Future Work
 ==================
 
 * Support AST emitting in obfuscated modules
-* Potentially support API support for source maps
+* Potentially add API support for source maps
 * Add manifest support for artifacts
 * Potentially provide a way to interact with artifacts more directly 
 * Potentially support for name mapping
