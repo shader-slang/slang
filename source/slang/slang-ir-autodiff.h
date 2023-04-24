@@ -340,12 +340,14 @@ IRBlock* getBlock(IRInst* inst);
 
 IRInst* getInstInBlock(IRInst* inst);
 
-UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst* arg);
+UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst*& inoutTerminatorInst, IRInst* arg);
 
 IRUse* findUniqueStoredVal(IRVar* var);
 
 bool isDerivativeContextVar(IRVar* var);
 
 bool isDiffInst(IRInst* inst);
+
+bool isDifferentialOrRecomputeBlock(IRBlock* block);
 
 };

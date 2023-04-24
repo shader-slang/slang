@@ -78,6 +78,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeMakeDifferentialPair(IRBuilder* builder, IRMakeDifferentialPairUserCode* origInst);
 
+    InstPair transcribeMakeExistential(IRBuilder* builder, IRMakeExistential* origMakeExistential);
+
     InstPair transcribeDifferentialPairGetElement(IRBuilder* builder, IRInst* origInst);
 
     InstPair transcribeSingleOperandInst(IRBuilder* builder, IRInst* origInst);

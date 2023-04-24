@@ -524,10 +524,32 @@ List<IRInterfaceRequirementEntry*> AutoDiffTranscriberBase::findDifferentiableIn
     return currentPath;
 }
 
+IRInst* AutoDiffTranscriberBase::tryExtractConformanceFromInterfaceType(
+    IRBuilder* builder,
+    IRInterfaceType* interfaceType,
+    IRWitnessTable* witnessTable)
+{
+    SLANG_RELEASE_ASSERT(interfaceType);
+
+    List<IRInterfaceRequirementEntry*> lookupKeyPath = findDifferentiableInterfaceLookupPath(
+        autoDiffSharedContext->differentiableInterfaceType, interfaceType);
+
+    IRInst* differentialTypeWitness = witnessTable;
+    if (lookupKeyPath.getCount())
+    {
+        // `interfaceType` does conform to `IDifferentiable`.
+        for (auto node : lookupKeyPath)
+        {
+            differentialTypeWitness = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), differentialTypeWitness, node->getRequirementKey());
+        }
+        return differentialTypeWitness;
+    }
+
+    return nullptr;
+}
+
 InstPair AutoDiffTranscriberBase::transcribeExtractExistentialWitnessTable(IRBuilder* builder, IRInst* origInst)
 {
-    IRInst* witnessTable = nullptr;
-
     IRInst* origBase = origInst->getOperand(0);
     auto primalBase = findOrTranscribePrimalInst(builder, origBase);
     auto primalType = (IRType*)findOrTranscribePrimalInst(builder, origInst->getDataType());
@@ -541,21 +563,17 @@ InstPair AutoDiffTranscriberBase::transcribeExtractExistentialWitnessTable(IRBui
     // Search for IDifferentiable conformance.
     auto interfaceType = as<IRInterfaceType>(
         unwrapAttributedType(cast<IRWitnessTableType>(origInst->getDataType())->getConformanceType()));
+    
     if (!interfaceType)
         return InstPair(primalResult, nullptr);
-    List<IRInterfaceRequirementEntry*> lookupKeyPath = findDifferentiableInterfaceLookupPath(
-        autoDiffSharedContext->differentiableInterfaceType, interfaceType);
-
-    if (lookupKeyPath.getCount())
+    
+    if (auto differentialWitnessTable = tryExtractConformanceFromInterfaceType(
+            builder, interfaceType, (IRWitnessTable*)primalResult))
     {
         // `interfaceType` does conform to `IDifferentiable`.
-        witnessTable = primalResult;
-        for (auto node : lookupKeyPath)
-        {
-            witnessTable = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), witnessTable, node->getRequirementKey());
-        }
-        return InstPair(primalResult, witnessTable);
+        return InstPair(primalResult, differentialWitnessTable);
     }
+
     return InstPair(primalResult, nullptr);
 }
 

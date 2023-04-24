@@ -249,7 +249,7 @@ struct ExtractPrimalFuncContext
         List<IRBlock*> unusedBlocks;
         for (auto block : func->getBlocks())
         {
-            if (isDiffInst(block))
+            if (isDiffInst(block) || block->findDecoration<IRRecomputeBlockDecoration>())
                 unusedBlocks.add(block);
         }
         for (auto block : unusedBlocks)
@@ -317,8 +317,11 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     // Remove propagate func specific primal insts from cloned func.
     for (auto inst : paramInfo.propagateFuncSpecificPrimalInsts)
     {
-        auto newInst = subEnv.mapOldValToNew[inst].GetValue();
-        newInst->removeAndDeallocate();
+        IRInst* newInst = nullptr;
+        if (subEnv.mapOldValToNew.TryGetValue(inst, newInst))
+        {
+            newInst->removeAndDeallocate();
+        }
     }
 
     HashSet<IRInst*> newPrimalParams;
