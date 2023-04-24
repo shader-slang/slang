@@ -52,7 +52,7 @@ IRInst* AutoDiffTranscriberBase::lookupDiffInst(IRInst* origInst)
 
 IRInst* AutoDiffTranscriberBase::lookupDiffInst(IRInst* origInst, IRInst* defaultInst)
 {
-    if (auto lookupResult = instMapD.TryGetValue(origInst))
+    if (auto lookupResult = instMapD.tryGetValue(origInst))
         return *lookupResult;
     return defaultInst;
 }

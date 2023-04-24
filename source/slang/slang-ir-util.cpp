@@ -773,7 +773,7 @@ struct GenericChildrenMigrationContextImpl
                 inst = inst->getNextInst())
             {
                 IRInstKey key = { inst };
-                deduplicateContext.deduplicateMap.AddIfNotExists(key, inst);
+                deduplicateContext.deduplicateMap.addIfNotExists(key, inst);
             }
         }
     }

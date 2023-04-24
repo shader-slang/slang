@@ -82,7 +82,7 @@ Index LocationTracker::getValue(Kind kind, IRInst* inst, IRDecoration* decoratio
     auto& nextValue = m_nextValueForKind[Index(kind)];
 
     const Location defaultLocation{kind, nextValue};
-    const Location foundLocation = m_mapIRToLocations.GetOrAddValue(inst, defaultLocation);
+    const Location foundLocation = m_mapIRToLocations.getOrAddValue(inst, defaultLocation);
 
     // Increase if it was the default
     nextValue += Index(defaultLocation == foundLocation);
@@ -314,7 +314,7 @@ List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWi
     {
         auto reqEntry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
         IRWitnessTableEntry* entry = nullptr;
-        if (witnessTableEntryDictionary.TryGetValue(reqEntry->getRequirementKey(), entry))
+        if (witnessTableEntryDictionary.tryGetValue(reqEntry->getRequirementKey(), entry))
         {
             sortedWitnessTableEntries.add(entry);
         }
@@ -648,7 +648,7 @@ UInt CLikeSourceEmitter::getID(IRInst* value)
     auto& mapIRValueToID = m_mapIRValueToID;
 
     UInt id = 0;
-    if (mapIRValueToID.TryGetValue(value, id))
+    if (mapIRValueToID.tryGetValue(value, id))
         return id;
 
     id = allocateUniqueID();
@@ -855,7 +855,7 @@ String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)
 
     String key = sb.ProduceString();
     
-    UInt& countRef = m_uniqueNameCounters.GetOrAddValue(key, 0);
+    UInt& countRef = m_uniqueNameCounters.getOrAddValue(key, 0);
     const UInt count = countRef;
     countRef = count + 1;
 
@@ -937,7 +937,7 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
 String CLikeSourceEmitter::getName(IRInst* inst)
 {
     String name;
-    if(!m_mapInstToName.TryGetValue(inst, name))
+    if(!m_mapInstToName.tryGetValue(inst, name))
     {
         name = generateName(inst);
         m_mapInstToName.Add(inst, name);
@@ -3720,7 +3720,7 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
 
     // Have we already processed this instruction?
     EmitAction::Level existingLevel;
-    if(ctx->mapInstToLevel.TryGetValue(inst, existingLevel))
+    if(ctx->mapInstToLevel.tryGetValue(inst, existingLevel))
     {
         // If we've already emitted it suitably,
         // then don't worry about it.

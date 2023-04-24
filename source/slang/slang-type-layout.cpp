@@ -1828,7 +1828,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
         for (auto entry : oldStructTypeLayout->mapVarToLayout)
         {
             VarLayout* newFieldLayout = nullptr;
-            if (mapOldFieldToNew.TryGetValue(entry.Value.Ptr(), newFieldLayout))
+            if (mapOldFieldToNew.tryGetValue(entry.Value.Ptr(), newFieldLayout))
             {
                 newStructTypeLayout->mapVarToLayout.Add(entry.Key, newFieldLayout);
             }
@@ -2734,7 +2734,7 @@ Type* findGlobalGenericSpecializationArg(
     GlobalGenericParamDecl*     decl)
 {
     Val* arg = nullptr;
-    context.programLayout->globalGenericArgs.TryGetValue(decl, arg);
+    context.programLayout->globalGenericArgs.tryGetValue(decl, arg);
     return as<Type>(arg);
 }
 
@@ -2992,7 +2992,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
             VarDeclBase* key = p.Key;
             RefPtr<VarLayout> originalVal = p.Value;
             RefPtr<VarLayout> adjustedVal;
-            if( mapOriginalFieldToAdjusted.TryGetValue(originalVal, adjustedVal) )
+            if( mapOriginalFieldToAdjusted.tryGetValue(originalVal, adjustedVal) )
             {
                 adjustedStructTypeLayout->mapVarToLayout.Add(key, adjustedVal);
             }

@@ -971,7 +971,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // we run this code.
         //
         IRInst* activeMaskOnFuncEntry = nullptr;
-        m_activeMaskForBlock.TryGetValue(funcEntryBlock, activeMaskOnFuncEntry);
+        m_activeMaskForBlock.tryGetValue(funcEntryBlock, activeMaskOnFuncEntry);
         SLANG_ASSERT(activeMaskOnFuncEntry);
 
         // The root region of our tree of regions will
@@ -2045,7 +2045,7 @@ struct SynthesizeActiveMaskForFunctionContext
         //   to each of its successors.
         //
         IRInst* activeMaskOnRegionEntry = nullptr;
-        if( !m_activeMaskForBlock.TryGetValue(regionEntry, activeMaskOnRegionEntry) )
+        if( !m_activeMaskForBlock.tryGetValue(regionEntry, activeMaskOnRegionEntry) )
         {
             SLANG_UNEXPECTED("no active mask registered for block");
         }

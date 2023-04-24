@@ -257,7 +257,7 @@ struct SpecializationContext
             // If one is found, our work is done.
             //
             IRInst* specializedVal = nullptr;
-            if(genericSpecializations.TryGetValue(key, specializedVal))
+            if(genericSpecializations.tryGetValue(key, specializedVal))
                 return specializedVal;
         }
 
@@ -1211,7 +1211,7 @@ struct SpecializationContext
         // existing specialization of the callee that we can use.
         //
         IRFunc* specializedCallee = nullptr;
-        if( !existentialSpecializedFuncs.TryGetValue(key, specializedCallee) )
+        if( !existentialSpecializedFuncs.tryGetValue(key, specializedCallee) )
         {
             // If we didn't find a specialized callee already made, then we
             // will go ahead and create one, and then register it in our cache.
@@ -2223,7 +2223,7 @@ struct SpecializationContext
             IRStructType* newStructType = nullptr;
             addUsersToWorkList(type);
 
-            if( !existentialSpecializedStructs.TryGetValue(key, newStructType) )
+            if( !existentialSpecializedStructs.tryGetValue(key, newStructType) )
             {
                 builder.setInsertBefore(baseStructType);
                 newStructType = builder.createStructType();

@@ -85,7 +85,7 @@ namespace Slang
         typedef TKey KeyType;
 		typedef Dictionary ThisType;
 	private:
-		inline int GetProbeOffset(int /*probeId*/) const
+		inline int getProbeOffset(int /*probeId*/) const
 		{
 			// linear probing
 			return 1;
@@ -101,22 +101,22 @@ namespace Slang
 				delete[] hashMap;
 			hashMap = 0;
 		}
-		inline bool IsDeleted(int pos) const
+		inline bool isDeleted(int pos) const
 		{
 			return marks.contains((pos << 1) + 1);
 		}
-		inline bool IsEmpty(int pos) const
+		inline bool isEmpty(int pos) const
 		{
 			return !marks.contains((pos << 1));
 		}
-		inline void SetDeleted(int pos, bool val)
+		inline void setDeleted(int pos, bool val)
 		{
 			if (val)
 				marks.add((pos << 1) + 1);
 			else
 				marks.remove((pos << 1) + 1);
 		}
-		inline void SetEmpty(int pos, bool val)
+		inline void setEmpty(int pos, bool val)
 		{
 			if (val)
 				marks.remove((pos << 1));
@@ -140,28 +140,28 @@ namespace Slang
 
 		};
         template<typename KeyType>
-		inline int GetHashPos(KeyType& key) const
+		inline int getHashPos(KeyType& key) const
         {
             SLANG_ASSERT(bucketSizeMinusOne > 0);
             const unsigned int hash = (unsigned int)getHashCode(key);
             return (hash * 2654435761u) % (unsigned int)(bucketSizeMinusOne);
 		}
         template<typename KeyType>
-		FindPositionResult FindPosition(const KeyType& key) const
+		FindPositionResult findPosition(const KeyType& key) const
 		{
-			int hashPos = GetHashPos(const_cast<KeyType&>(key));
+			int hashPos = getHashPos(const_cast<KeyType&>(key));
 			int insertPos = -1;
 			int numProbes = 0;
 			while (numProbes <= bucketSizeMinusOne)
 			{
-				if (IsEmpty(hashPos))
+				if (isEmpty(hashPos))
 				{
 					if (insertPos == -1)
 						return FindPositionResult(-1, hashPos);
 					else
 						return FindPositionResult(-1, insertPos);
 				}
-				else if (IsDeleted(hashPos))
+				else if (isDeleted(hashPos))
 				{
 					if (insertPos == -1)
 						insertPos = hashPos;
@@ -171,17 +171,17 @@ namespace Slang
 					return FindPositionResult(hashPos, -1);
 				}
 				numProbes++;
-				hashPos = (hashPos + GetProbeOffset(numProbes)) & bucketSizeMinusOne;
+				hashPos = (hashPos + getProbeOffset(numProbes)) & bucketSizeMinusOne;
 			}
 			if (insertPos != -1)
 				return FindPositionResult(-1, insertPos);
 			SLANG_ASSERT_FAILURE("Hash map is full. This indicates an error in Key::Equal or Key::getHashCode.");
 		}
-		TValue & _Insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
+		TValue & _insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
 		{
 			hashMap[pos] = _Move(kvPair);
-			SetEmpty(pos, false);
-			SetDeleted(pos, false);
+			setEmpty(pos, false);
+			setDeleted(pos, false);
 			return hashMap[pos].Value;
 		}
 		void Rehash()
@@ -208,16 +208,16 @@ namespace Slang
 			}
 		}
 
-		bool AddIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
+		bool addIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
 		{
 			Rehash();
-			auto pos = FindPosition(kvPair.Key);
+			auto pos = findPosition(kvPair.Key);
 			if (pos.ObjectPosition != -1)
 				return false;
 			else if (pos.InsertionPosition != -1)
 			{
 				_count++;
-				_Insert(_Move(kvPair), pos.InsertionPosition);
+				_insert(_Move(kvPair), pos.InsertionPosition);
 				return true;
 			}
 			else
@@ -225,19 +225,19 @@ namespace Slang
 		}
 		void Add(KeyValuePair<TKey, TValue>&& kvPair)
 		{
-			if (!AddIfNotExists(_Move(kvPair)))
+			if (!addIfNotExists(_Move(kvPair)))
                 SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
 		}
 		TValue& Set(KeyValuePair<TKey, TValue>&& kvPair)
 		{
 			Rehash();
-			auto pos = FindPosition(kvPair.Key);
+			auto pos = findPosition(kvPair.Key);
 			if (pos.ObjectPosition != -1)
-				return _Insert(_Move(kvPair), pos.ObjectPosition);
+				return _insert(_Move(kvPair), pos.ObjectPosition);
 			else if (pos.InsertionPosition != -1)
 			{
 				_count++;
-				return _Insert(_Move(kvPair), pos.InsertionPosition);
+				return _insert(_Move(kvPair), pos.InsertionPosition);
 			}
 			else
                 SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
@@ -262,7 +262,7 @@ namespace Slang
 				if (pos > dict->bucketSizeMinusOne)
 					return *this;
 				pos++;
-				while (pos <= dict->bucketSizeMinusOne && (dict->IsDeleted(pos) || dict->IsEmpty(pos)))
+				while (pos <= dict->bucketSizeMinusOne && (dict->isDeleted(pos) || dict->isEmpty(pos)))
 				{
 					pos++;
 				}
@@ -299,7 +299,7 @@ namespace Slang
 			int pos = 0;
 			while (pos < bucketSizeMinusOne + 1)
 			{
-				if (IsEmpty(pos) || IsDeleted(pos))
+				if (isEmpty(pos) || isDeleted(pos))
 					pos++;
 				else
 					break;
@@ -319,22 +319,22 @@ namespace Slang
 		{
 			Add(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
 		}
-		bool AddIfNotExists(const TKey & key, const TValue & value)
+		bool addIfNotExists(const TKey & key, const TValue & value)
 		{
-			return AddIfNotExists(KeyValuePair<TKey, TValue>(key, value));
+			return addIfNotExists(KeyValuePair<TKey, TValue>(key, value));
 		}
-		bool AddIfNotExists(TKey && key, TValue && value)
+		bool addIfNotExists(TKey && key, TValue && value)
 		{
-			return AddIfNotExists(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
+			return addIfNotExists(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
 		}
 		void Remove(const TKey & key)
 		{
 			if (_count == 0)
 				return;
-			auto pos = FindPosition(key);
+			auto pos = findPosition(key);
 			if (pos.ObjectPosition != -1)
 			{
-				SetDeleted(pos.ObjectPosition, true);
+				setDeleted(pos.ObjectPosition, true);
 				_count--;
 			}
 		}
@@ -345,10 +345,10 @@ namespace Slang
 			marks.clear();
 		}
 
-        TValue* TryGetValueOrAdd(const TKey& key, const TValue& value)
+        TValue* tryGetValueOrAdd(const TKey& key, const TValue& value)
         {
             Rehash();
-            auto pos = FindPosition(key);
+            auto pos = findPosition(key);
             if (pos.ObjectPosition != -1)
             {
                 return &hashMap[pos.ObjectPosition].Value;
@@ -358,7 +358,7 @@ namespace Slang
                 // Make pair
                 KeyValuePair<TKey, TValue> kvPair(_Move(key), _Move(value));
                 _count++;
-                _Insert(_Move(kvPair), pos.InsertionPosition);
+                _insert(_Move(kvPair), pos.InsertionPosition);
                 return nullptr;
             }
             else
@@ -367,10 +367,10 @@ namespace Slang
 
             /// This differs from TryGetValueOrAdd, in that it always returns the Value held in the Dictionary.
             /// If there isn't already an entry for 'key', a value is added with defaultValue. 
-        TValue& GetOrAddValue(const TKey& key, const TValue& defaultValue)
+        TValue& getOrAddValue(const TKey& key, const TValue& defaultValue)
         {
             Rehash();
-            auto pos = FindPosition(key);
+            auto pos = findPosition(key);
             if (pos.ObjectPosition != -1)
             {
                 return hashMap[pos.ObjectPosition].Value;
@@ -380,14 +380,14 @@ namespace Slang
                 // Make pair
                 KeyValuePair<TKey, TValue> kvPair(_Move(key), _Move(defaultValue));
                 _count++;
-                return _Insert(_Move(kvPair), pos.InsertionPosition);
+                return _insert(_Move(kvPair), pos.InsertionPosition);
             }
             else
                 SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
         void Set(const TKey& key, const TValue& value)
 		{
-			if (auto ptr = TryGetValueOrAdd(key, value))
+			if (auto ptr = tryGetValueOrAdd(key, value))
 			{
 				*ptr = value;
 			}
@@ -398,15 +398,15 @@ namespace Slang
 		{
 			if (bucketSizeMinusOne == -1)
 				return false;
-			auto pos = FindPosition(key);
+			auto pos = findPosition(key);
 			return pos.ObjectPosition != -1;
 		}
         template<typename KeyType>
-		bool TryGetValue(const KeyType& key, TValue& value) const
+		bool tryGetValue(const KeyType& key, TValue& value) const
 		{
 			if (bucketSizeMinusOne == -1)
 				return false;
-			auto pos = FindPosition(key);
+			auto pos = findPosition(key);
 			if (pos.ObjectPosition != -1)
 			{
 				value = hashMap[pos.ObjectPosition].Value;
@@ -415,11 +415,11 @@ namespace Slang
 			return false;
 		}
         template<typename KeyType>
-		TValue* TryGetValue(const KeyType& key) const
+		TValue* tryGetValue(const KeyType& key) const
 		{
 			if (bucketSizeMinusOne == -1)
 				return nullptr;
-			auto pos = FindPosition(key);
+			auto pos = findPosition(key);
 			if (pos.ObjectPosition != -1)
 			{
 				return &hashMap[pos.ObjectPosition].Value;
@@ -445,7 +445,7 @@ namespace Slang
 			}
 			TValue & GetValue() const
 			{
-				auto pos = dict->FindPosition(key);
+				auto pos = dict->findPosition(key);
 				if (pos.ObjectPosition != -1)
 				{
 					return dict->hashMap[pos.ObjectPosition].Value;
@@ -657,19 +657,19 @@ namespace Slang
 		}
 		bool Add(const T& obj)
 		{
-			return dict.AddIfNotExists(obj, _DummyClass());
+			return dict.addIfNotExists(obj, _DummyClass());
 		}
 		bool Add(T && obj)
 		{
-			return dict.AddIfNotExists(_Move(obj), _DummyClass());
+			return dict.addIfNotExists(_Move(obj), _DummyClass());
 		}
         bool add(const T& obj)
         {
-            return dict.AddIfNotExists(obj, _DummyClass());
+            return dict.addIfNotExists(obj, _DummyClass());
         }
         bool add(T&& obj)
         {
-            return dict.AddIfNotExists(_Move(obj), _DummyClass());
+            return dict.addIfNotExists(_Move(obj), _DummyClass());
         }
 		void Remove(const T & obj)
 		{
@@ -691,7 +691,7 @@ namespace Slang
         friend class ItemProxy;
 
     private:
-        inline int GetProbeOffset(int /*probeIdx*/) const
+        inline int getProbeOffset(int /*probeIdx*/) const
         {
             // quadratic probing
             return 1;
@@ -711,16 +711,16 @@ namespace Slang
             hashMap = 0;
             kvPairs.Clear();
         }
-        inline bool IsDeleted(int pos) const { return marks.contains((pos << 1) + 1); }
-        inline bool IsEmpty(int pos) const { return !marks.contains((pos << 1)); }
-        inline void SetDeleted(int pos, bool val)
+        inline bool isDeleted(int pos) const { return marks.contains((pos << 1) + 1); }
+        inline bool isEmpty(int pos) const { return !marks.contains((pos << 1)); }
+        inline void setDeleted(int pos, bool val)
         {
             if (val)
                 marks.add((pos << 1) + 1);
             else
                 marks.remove((pos << 1) + 1);
         }
-        inline void SetEmpty(int pos, bool val)
+        inline void setEmpty(int pos, bool val)
         {
             if (val)
                 marks.remove((pos << 1));
@@ -742,26 +742,26 @@ namespace Slang
                 InsertionPosition = insertPos;
             }
         };
-        template <typename T> inline int GetHashPos(T& key) const
+        template <typename T> inline int getHashPos(T& key) const
         {
             const unsigned int hash = (unsigned int)getHashCode(key);
             return ((unsigned int)(hash * 2654435761)) % bucketSizeMinusOne;
         }
-        template <typename T> FindPositionResult FindPosition(const T& key) const
+        template <typename T> FindPositionResult findPosition(const T& key) const
         {
-            int hashPos = GetHashPos((T&)key);
+            int hashPos = getHashPos((T&)key);
             int insertPos = -1;
             int numProbes = 0;
             while (numProbes <= bucketSizeMinusOne)
             {
-                if (IsEmpty(hashPos))
+                if (isEmpty(hashPos))
                 {
                     if (insertPos == -1)
                         return FindPositionResult(-1, hashPos);
                     else
                         return FindPositionResult(-1, insertPos);
                 }
-                else if (IsDeleted(hashPos))
+                else if (isDeleted(hashPos))
                 {
                     if (insertPos == -1)
                         insertPos = hashPos;
@@ -771,19 +771,19 @@ namespace Slang
                     return FindPositionResult(hashPos, -1);
                 }
                 numProbes++;
-                hashPos = (hashPos + GetProbeOffset(numProbes)) & bucketSizeMinusOne;
+                hashPos = (hashPos + getProbeOffset(numProbes)) & bucketSizeMinusOne;
             }
             if (insertPos != -1)
                 return FindPositionResult(-1, insertPos);
             SLANG_ASSERT_FAILURE("Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
         }
-        TValue& _Insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
+        TValue& _insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
         {
             auto node = kvPairs.AddLast();
             node->Value = _Move(kvPair);
             hashMap[pos] = node;
-            SetEmpty(pos, false);
-            SetDeleted(pos, false);
+            setEmpty(pos, false);
+            setDeleted(pos, false);
             return node->Value.Value;
         }
         void Rehash()
@@ -810,16 +810,16 @@ namespace Slang
             }
         }
 
-        bool AddIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
+        bool addIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
         {
             Rehash();
-            auto pos = FindPosition(kvPair.Key);
+            auto pos = findPosition(kvPair.Key);
             if (pos.ObjectPosition != -1)
                 return false;
             else if (pos.InsertionPosition != -1)
             {
                 _count++;
-                _Insert(_Move(kvPair), pos.InsertionPosition);
+                _insert(_Move(kvPair), pos.InsertionPosition);
                 return true;
             }
             else
@@ -827,22 +827,22 @@ namespace Slang
         }
         void Add(KeyValuePair<TKey, TValue>&& kvPair)
         {
-            if (!AddIfNotExists(_Move(kvPair)))
+            if (!addIfNotExists(_Move(kvPair)))
                 SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
         }
         TValue& Set(KeyValuePair<TKey, TValue>&& kvPair)
         {
             Rehash();
-            auto pos = FindPosition(kvPair.Key);
+            auto pos = findPosition(kvPair.Key);
             if (pos.ObjectPosition != -1)
             {
                 hashMap[pos.ObjectPosition]->Delete();
-                return _Insert(_Move(kvPair), pos.ObjectPosition);
+                return _insert(_Move(kvPair), pos.ObjectPosition);
             }
             else if (pos.InsertionPosition != -1)
             {
                 _count++;
-                return _Insert(_Move(kvPair), pos.InsertionPosition);
+                return _insert(_Move(kvPair), pos.InsertionPosition);
             }
             else
                 SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
@@ -869,24 +869,24 @@ namespace Slang
         {
             Add(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
         }
-        bool AddIfNotExists(const TKey& key, const TValue& value)
+        bool addIfNotExists(const TKey& key, const TValue& value)
         {
-            return AddIfNotExists(KeyValuePair<TKey, TValue>(key, value));
+            return addIfNotExists(KeyValuePair<TKey, TValue>(key, value));
         }
-        bool AddIfNotExists(TKey&& key, TValue&& value)
+        bool addIfNotExists(TKey&& key, TValue&& value)
         {
-            return AddIfNotExists(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
+            return addIfNotExists(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
         }
         void Remove(const TKey& key)
         {
             if (_count > 0)
             {
-                auto pos = FindPosition(key);
+                auto pos = findPosition(key);
                 if (pos.ObjectPosition != -1)
                 {
                     kvPairs.Delete(hashMap[pos.ObjectPosition]);
                     hashMap[pos.ObjectPosition] = 0;
-                    SetDeleted(pos.ObjectPosition, true);
+                    setDeleted(pos.ObjectPosition, true);
                     _count--;
                 }
             }
@@ -901,25 +901,25 @@ namespace Slang
         {
             if (bucketSizeMinusOne == -1)
                 return false;
-            auto pos = FindPosition(key);
+            auto pos = findPosition(key);
             return pos.ObjectPosition != -1;
         }
-        template <typename T> TValue* TryGetValue(const T& key) const
+        template <typename T> TValue* tryGetValue(const T& key) const
         {
             if (bucketSizeMinusOne == -1)
                 return nullptr;
-            auto pos = FindPosition(key);
+            auto pos = findPosition(key);
             if (pos.ObjectPosition != -1)
             {
                 return &(hashMap[pos.ObjectPosition]->Value.Value);
             }
             return nullptr;
         }
-        template <typename T> bool TryGetValue(const T& key, TValue& value) const
+        template <typename T> bool tryGetValue(const T& key, TValue& value) const
         {
             if (bucketSizeMinusOne == -1)
                 return false;
-            auto pos = FindPosition(key);
+            auto pos = findPosition(key);
             if (pos.ObjectPosition != -1)
             {
                 value = hashMap[pos.ObjectPosition]->Value.Value;
@@ -946,7 +946,7 @@ namespace Slang
             }
             TValue& GetValue() const
             {
-                auto pos = dict->FindPosition(key);
+                auto pos = dict->findPosition(key);
                 if (pos.ObjectPosition != -1)
                 {
                     return dict->hashMap[pos.ObjectPosition]->Value.Value;

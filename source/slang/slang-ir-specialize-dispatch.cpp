@@ -262,7 +262,7 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
 
             // Get a sequential ID for the witness table using the map from the Linkage.
             uint32_t seqID = 0;
-            if (!linkage->mapMangledNameToRTTIObjectIndex.TryGetValue(
+            if (!linkage->mapMangledNameToRTTIObjectIndex.tryGetValue(
                 witnessTableMangledName, seqID))
             {
                 auto interfaceType =
@@ -273,13 +273,13 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
                                         "but a witness table associated with it has one.");
                 auto interfaceName = interfaceLinkage->getMangledName();
                 auto idAllocator =
-                    linkage->mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(
+                    linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
                         interfaceName);
                 if (!idAllocator)
                 {
                     linkage->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
                     idAllocator =
-                        linkage->mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(
+                        linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
                             interfaceName);
                 }
                 seqID = *idAllocator;

@@ -93,7 +93,7 @@ public:
                 return false;
         }
 
-        if (auto existingLevel = differentiableFunctions.TryGetValue(func))
+        if (auto existingLevel = differentiableFunctions.tryGetValue(func))
             return *existingLevel >= level;
 
         if (func->findDecoration<IRTreatAsDifferentiableDecoration>())
@@ -124,7 +124,7 @@ public:
         {
             if (as<IRGeneric>(func))
             {
-                if (auto existingLevel = differentiableFunctions.TryGetValue(func))
+                if (auto existingLevel = differentiableFunctions.tryGetValue(func))
                 {
                     if (*existingLevel >= level)
                         return true;
@@ -586,7 +586,7 @@ public:
                 if (bwdDifferentiableSymbolNames.Contains(linkageDecor->getMangledName()))
                     differentiableFunctions[inst] = DifferentiableLevel::Backward;
                 else if (fwdDifferentiableSymbolNames.Contains(linkageDecor->getMangledName()))
-                    differentiableFunctions.AddIfNotExists(inst, DifferentiableLevel::Forward);
+                    differentiableFunctions.addIfNotExists(inst, DifferentiableLevel::Forward);
             }
         }
 

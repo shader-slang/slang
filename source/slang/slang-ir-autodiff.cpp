@@ -298,7 +298,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     // purposes.
 
     auto primalType = pairType->getValueType();
-    if (pairTypeCache.TryGetValue(primalType, result))
+    if (pairTypeCache.tryGetValue(primalType, result))
         return result;
     if (!pairType)
     {
@@ -391,7 +391,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
     {
         if (auto item = as<IRDifferentiableTypeDictionaryItem>(child))
         {
-            auto existingItem = differentiableWitnessDictionary.TryGetValue(item->getConcreteType());
+            auto existingItem = differentiableWitnessDictionary.tryGetValue(item->getConcreteType());
             if (existingItem)
             {
                 *existingItem = item->getWitness();
@@ -404,7 +404,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                 IRBuilder subBuilder(item->getConcreteType());
                 if (!as<IRInterfaceType>(item->getConcreteType()))
                 {
-                    differentiableWitnessDictionary.AddIfNotExists(
+                    differentiableWitnessDictionary.addIfNotExists(
                         (IRType*)_lookupWitness(&subBuilder, item->getWitness(), sharedContext->differentialAssocTypeStructKey), 
                         item->getWitness());
                 }
@@ -418,7 +418,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                     auto diffWitness = _lookupWitness(&builder, diffPairType->getWitness(), sharedContext->differentialAssocTypeWitnessStructKey);
                     if (diffType && diffWitness)
                     {
-                        differentiableWitnessDictionary.AddIfNotExists((IRType*)diffType, diffWitness);
+                        differentiableWitnessDictionary.addIfNotExists((IRType*)diffType, diffWitness);
                     }
                 }
             }
@@ -429,7 +429,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 IRInst* DifferentiableTypeConformanceContext::lookUpConformanceForType(IRInst* type)
 {
     IRInst* foundResult = nullptr;
-    differentiableWitnessDictionary.TryGetValue(type, foundResult);
+    differentiableWitnessDictionary.tryGetValue(type, foundResult);
     return foundResult;
 }
 
@@ -464,7 +464,7 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
     {
         if (auto pairType = as<IRDifferentialPairTypeBase>(globalInst))
         {
-            differentiableWitnessDictionary.AddIfNotExists(pairType->getValueType(), pairType->getWitness());
+            differentiableWitnessDictionary.addIfNotExists(pairType->getValueType(), pairType->getWitness());
         }
     }
 }
@@ -1092,7 +1092,7 @@ struct AutoDiffPass : public InstPassBase
         {
             auto t = wlist[i];
             IntermediateContextTypeDifferentialInfo diffInfo;
-            if (!diffTypes.TryGetValue(t, diffInfo))
+            if (!diffTypes.tryGetValue(t, diffInfo))
                 continue;
             if (registeredType.Add(t))
                 builder.addDifferentiableTypeEntry(diffDecor, t, diffInfo.diffWitness);
@@ -1149,7 +1149,7 @@ struct AutoDiffPass : public InstPassBase
                 // A specialize of a context type translates to a specialize of its differential type/witness.
 
                 IntermediateContextTypeDifferentialInfo baseInfo;
-                SLANG_RELEASE_ASSERT(diffTypes.TryGetValue(specialize->getBase(), baseInfo));
+                SLANG_RELEASE_ASSERT(diffTypes.tryGetValue(specialize->getBase(), baseInfo));
                 builder.setInsertBefore(t);
                 List<IRInst*> args;
                 for (UInt i = 0; i < specialize->getArgCount(); i++)
@@ -1222,7 +1222,7 @@ struct AutoDiffPass : public InstPassBase
             else
             {
                 IntermediateContextTypeDifferentialInfo diffFieldTypeInfo;
-                diffTypes.TryGetValue(field->getFieldType(), diffFieldTypeInfo);
+                diffTypes.tryGetValue(field->getFieldType(), diffFieldTypeInfo);
                 diffFieldWitness = diffFieldTypeInfo.diffWitness;
             }
             if (diffFieldWitness)

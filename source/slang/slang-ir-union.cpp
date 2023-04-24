@@ -611,7 +611,7 @@ struct DesugarUnionTypesContext
         //
         {
             TaggedUnionInfo* info = nullptr;
-            if(mapIRTypeToTaggedUnionInfo.TryGetValue(type, info))
+            if(mapIRTypeToTaggedUnionInfo.tryGetValue(type, info))
                 return info;
         }
 

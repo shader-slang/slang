@@ -145,7 +145,7 @@ void StringSlicePool::swapWith(ThisType& rhs)
 
 StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
 {
-    const Handle* handlePtr = m_map.TryGetValue(slice);
+    const Handle* handlePtr = m_map.tryGetValue(slice);
     if (handlePtr)
     {
         return *handlePtr;
@@ -163,7 +163,7 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
 
 bool StringSlicePool::findOrAdd(const Slice& slice, Handle& outHandle)
 {
-    const Handle* handlePtr = m_map.TryGetValue(slice);
+    const Handle* handlePtr = m_map.tryGetValue(slice);
     if (handlePtr)
     {
         outHandle = *handlePtr;
@@ -226,7 +226,7 @@ StringSlicePool::Handle StringSlicePool::add(const char* chars)
 
 Index StringSlicePool::findIndex(const Slice& slice) const
 {
-    const Handle* handlePtr = m_map.TryGetValue(slice);
+    const Handle* handlePtr = m_map.tryGetValue(slice);
     return handlePtr ? Index(*handlePtr) : -1;
 }
 

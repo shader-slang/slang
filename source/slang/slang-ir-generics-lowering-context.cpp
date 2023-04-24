@@ -56,7 +56,7 @@ namespace Slang
     IRInst* SharedGenericsLoweringContext::maybeEmitRTTIObject(IRInst* typeInst)
     {
         IRInst* result = nullptr;
-        if (mapTypeToRTTIObject.TryGetValue(typeInst, result))
+        if (mapTypeToRTTIObject.tryGetValue(typeInst, result))
             return result;
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
@@ -87,7 +87,7 @@ namespace Slang
 
     IRInst* SharedGenericsLoweringContext::findInterfaceRequirementVal(IRInterfaceType* interfaceType, IRInst* requirementKey)
     {
-        if (auto dict = mapInterfaceRequirementKeyValue.TryGetValue(interfaceType))
+        if (auto dict = mapInterfaceRequirementKeyValue.tryGetValue(interfaceType))
             return (*dict)[requirementKey].GetValue();
         _builldInterfaceRequirementMap(interfaceType);
         return findInterfaceRequirementVal(interfaceType, requirementKey);
@@ -97,7 +97,7 @@ namespace Slang
     {
         mapInterfaceRequirementKeyValue.Add(interfaceType,
             Dictionary<IRInst*, IRInst*>());
-        auto dict = mapInterfaceRequirementKeyValue.TryGetValue(interfaceType);
+        auto dict = mapInterfaceRequirementKeyValue.tryGetValue(interfaceType);
         for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
         {
             auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
@@ -136,7 +136,7 @@ namespace Slang
             return nullptr;
 
         IRInst* resultType;
-        if (typeMapping.TryGetValue(paramType, resultType))
+        if (typeMapping.tryGetValue(paramType, resultType))
             return (IRType*)resultType;
 
         if (isTypeValue(paramType))
@@ -302,7 +302,7 @@ namespace Slang
             // Only in the original interface type will an associated type entry have an IRAssociatedType value.
             // We need to extract AnyValueSize from this IRAssociatedType.
             // In lowered interface type, that entry is lowered into an Ptr(RTTIType) and this info is lost.
-            mapLoweredInterfaceToOriginal.TryGetValue(interfaceType, interfaceType);
+            mapLoweredInterfaceToOriginal.tryGetValue(interfaceType, interfaceType);
             auto reqVal = findInterfaceRequirementVal(
                 interfaceType,
                 lookupInterface->getRequirementKey());

@@ -1039,7 +1039,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     {
         auto name = getNamePool()->getName(moduleName);
         RefPtr<LoadedModule> loadedModule;
-        if (mapNameToLoadedModules.TryGetValue(name, loadedModule))
+        if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
             return loadedModule;
         }
@@ -1172,7 +1172,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
 
     Type* containerTypeReflection = nullptr;
     ContainerTypeKey key = {inType, containerType};
-    if (!m_containerTypes.TryGetValue(key, containerTypeReflection))
+    if (!m_containerTypes.tryGetValue(key, containerTypeReflection))
     {
         switch (containerType)
         {
@@ -1267,17 +1267,17 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     auto name = getMangledNameForConformanceWitness(subType->getASTBuilder(), subType, supType);
     auto interfaceName = getMangledTypeName(supType->getASTBuilder(), supType);
     uint32_t resultIndex = 0;
-    if (mapMangledNameToRTTIObjectIndex.TryGetValue(name, resultIndex))
+    if (mapMangledNameToRTTIObjectIndex.tryGetValue(name, resultIndex))
     {
         if (outId)
             *outId = resultIndex;
         return SLANG_OK;
     }
-    auto idAllocator = mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(interfaceName);
+    auto idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
     if (!idAllocator)
     {
         mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
-        idAllocator = mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(interfaceName);
+        idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
     }
     resultIndex = (*idAllocator);
     ++(*idAllocator);
@@ -1536,7 +1536,7 @@ TypeLayout* TargetRequest::getTypeLayout(Type* type)
     auto layoutContext = getInitialLayoutContextForTarget(this, nullptr);
 
     RefPtr<TypeLayout> result;
-    if (getTypeLayouts().TryGetValue(type, result))
+    if (getTypeLayouts().tryGetValue(type, result))
         return result.Ptr();
     result = createTypeLayout(layoutContext, type);
     getTypeLayouts()[type] = result;
@@ -1819,7 +1819,7 @@ Type* ComponentType::getTypeFromString(
     // then we can re-use it.
     //
     Type* type = nullptr;
-    if(m_types.TryGetValue(typeStr, type))
+    if(m_types.tryGetValue(typeStr, type))
         return type;
 
 
@@ -2001,7 +2001,7 @@ static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewIniti
                 SourceView* parentView = sourceManager->findSourceViewRecursively(view->getInitiatingSourceLoc());
                 if (parentView)
                 {
-                    List<SourceView*>& children = outHierarchy.GetOrAddValue(parentView, emptyList);
+                    List<SourceView*>& children = outHierarchy.getOrAddValue(parentView, emptyList);
                     // It shouldn't have already been added
                     SLANG_ASSERT(children.indexOf(view) < 0);
                     children.add(view);
@@ -2085,7 +2085,7 @@ static void _outputIncludesRec(SourceView* sourceView, Index depth, ViewInitiati
     _outputInclude(sourceFile, depth, sink);
 
     // Now recurse to all of the children at the next depth
-    List<SourceView*>* children = hierarchy.TryGetValue(sourceView);
+    List<SourceView*>* children = hierarchy.tryGetValue(sourceView);
     if (children)
     {
         for (SourceView* child : *children)
@@ -2188,28 +2188,28 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // Of course this means using #ifndef/#ifdef/defined() is probably not appropraite with thes variables.
     {
         // Used to identify level of HLSL language compatibility
-        combinedPreprocessorDefinitions.AddIfNotExists("__HLSL_VERSION", "2020");
+        combinedPreprocessorDefinitions.addIfNotExists("__HLSL_VERSION", "2020");
 
         // Indicates this is being compiled by the slang *compiler*
-        combinedPreprocessorDefinitions.AddIfNotExists("__SLANG_COMPILER__", "1");
+        combinedPreprocessorDefinitions.addIfNotExists("__SLANG_COMPILER__", "1");
 
         // Set macro depending on source type
         switch (translationUnit->sourceLanguage)
         {
             case SourceLanguage::HLSL:
                 // Used to indicate compiled as HLSL language
-                combinedPreprocessorDefinitions.AddIfNotExists("__HLSL__", "1");
+                combinedPreprocessorDefinitions.addIfNotExists("__HLSL__", "1");
                 break;
             case SourceLanguage::Slang:
                 // Used to indicate compiled as Slang language
-                combinedPreprocessorDefinitions.AddIfNotExists("__SLANG__", "1");
+                combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "1");
                 break;
             default: break;
         }
 
         // If not set, define as 0.
-        combinedPreprocessorDefinitions.AddIfNotExists("__HLSL__", "0");
-        combinedPreprocessorDefinitions.AddIfNotExists("__SLANG__", "0");
+        combinedPreprocessorDefinitions.addIfNotExists("__HLSL__", "0");
+        combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "0");
     }
 
     auto module = translationUnit->getModule();
@@ -3069,7 +3069,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     // Have we already loaded a module matching this name?
     //
     RefPtr<LoadedModule> loadedModule;
-    if (mapNameToLoadedModules.TryGetValue(name, loadedModule))
+    if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
     {
         // If the map shows a null module having been loaded,
         // then that means there was a prior load attempt,
@@ -3097,7 +3097,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     // unit to use previously checked translation units in the same
     // FrontEndCompileRequest.
     Module* previouslyLoadedModule = nullptr;
-    if (loadedModules && loadedModules->TryGetValue(name, previouslyLoadedModule))
+    if (loadedModules && loadedModules->tryGetValue(name, previouslyLoadedModule))
     {
         return previouslyLoadedModule;
     }
@@ -3145,7 +3145,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     }
 
     // Maybe this was loaded previously at a different relative name?
-    if (mapPathToLoadedModule.TryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
+    if (mapPathToLoadedModule.tryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
         return loadedModule;
 
     // Try to load it
@@ -4399,7 +4399,7 @@ void ComponentTypeVisitor::visitChildren(SpecializedComponentType* specialized)
 TargetProgram* ComponentType::getTargetProgram(TargetRequest* target)
 {
     RefPtr<TargetProgram> targetProgram;
-    if(!m_targetPrograms.TryGetValue(target, targetProgram))
+    if(!m_targetPrograms.tryGetValue(target, targetProgram))
     {
         targetProgram = new TargetProgram(this, target);
         m_targetPrograms[target] = targetProgram;

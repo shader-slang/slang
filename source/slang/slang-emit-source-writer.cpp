@@ -468,7 +468,7 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
                 // extension and then emit a traditional line directive.
 
                 int id = 0;
-                if (!m_mapGLSLSourcePathToID.TryGetValue(path, id))
+                if (!m_mapGLSLSourcePathToID.tryGetValue(path, id))
                 {
                     id = m_glslSourceIDCount++;
                     m_mapGLSLSourcePathToID.Add(path, id);

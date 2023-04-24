@@ -816,7 +816,7 @@ SourceFile* SourceManager::findSourceFileByPath(const String& name) const
 
 SourceFile* SourceManager::findSourceFile(const String& uniqueIdentity) const
 {
-    SourceFile*const* filePtr = m_sourceFileMap.TryGetValue(uniqueIdentity);
+    SourceFile*const* filePtr = m_sourceFileMap.tryGetValue(uniqueIdentity);
     return (filePtr) ? *filePtr : nullptr;
 }
 

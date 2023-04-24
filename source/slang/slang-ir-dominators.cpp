@@ -179,7 +179,7 @@ IRDominatorTree::DominatedList IRDominatorTree::getProperlyDominatedBlocks(IRBlo
 Int IRDominatorTree::getBlockIndex(IRBlock* block)
 {
     Int index = kInvalidIndex;
-    if(!mapBlockToIndex.TryGetValue(block, index))
+    if(!mapBlockToIndex.tryGetValue(block, index))
     {
         SLANG_UNEXPECTED("block was not present in dominator tree");
     }

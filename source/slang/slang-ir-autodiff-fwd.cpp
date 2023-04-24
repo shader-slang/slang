@@ -560,7 +560,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     IRInst* diffCallee = nullptr;
     if (substPrimalCallee == primalCallee)
     {
-        instMapD.TryGetValue(origCallee, diffCallee);
+        instMapD.tryGetValue(origCallee, diffCallee);
     }
     else
     {
@@ -890,7 +890,7 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
         (IRType*)primalType, primalBase, primalArgs.getCount(), primalArgs.getBuffer());
 
     IRInst* diffBase = nullptr;
-    if (instMapD.TryGetValue(origSpecialize->getBase(), diffBase))
+    if (instMapD.tryGetValue(origSpecialize->getBase(), diffBase))
     {
         if (diffBase)
         {

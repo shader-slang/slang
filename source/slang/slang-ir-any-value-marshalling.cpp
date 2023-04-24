@@ -49,7 +49,7 @@ namespace Slang
         AnyValueTypeInfo* ensureAnyValueType(IRAnyValueType* type)
         {
             auto size = getIntVal(type->getSize());
-            if (auto typeInfo = generatedAnyValueTypes.TryGetValue(size))
+            if (auto typeInfo = generatedAnyValueTypes.tryGetValue(size))
                 return typeInfo->Ptr();
             RefPtr<AnyValueTypeInfo> info = new AnyValueTypeInfo();
             IRBuilder builder(sharedContext->module);
@@ -560,7 +560,7 @@ namespace Slang
             key.originalType = type;
             key.anyValueSize = size;
             MarshallingFunctionSet funcSet;
-            if (mapTypeMarshalingFunctions.TryGetValue(key, funcSet))
+            if (mapTypeMarshalingFunctions.tryGetValue(key, funcSet))
                 return funcSet;
             funcSet.packFunc = generatePackingFunc(type, anyValueType);
             funcSet.unpackFunc = generateUnpackingFunc(type, anyValueType);

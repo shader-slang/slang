@@ -1993,7 +1993,7 @@ public:
     void _removeGlobalNumberingEntry(IRInst* inst)
     {
         IRInst* value = nullptr;
-        if (m_globalValueNumberingMap.TryGetValue(IRInstKey{ inst }, value))
+        if (m_globalValueNumberingMap.tryGetValue(IRInstKey{ inst }, value))
         {
             if (value == inst)
             {

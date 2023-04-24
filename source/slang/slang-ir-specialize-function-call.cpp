@@ -326,7 +326,7 @@ struct FunctionParameterSpecializationContext
         // that is suitable to this call site.
         //
         IRFunc* newFunc = nullptr;
-        if( !specializedFuncs.TryGetValue(callInfo.key, newFunc) )
+        if( !specializedFuncs.tryGetValue(callInfo.key, newFunc) )
         {
             // If we didn't find a pre-existing specialized
             // function, then we will go ahead and create one.

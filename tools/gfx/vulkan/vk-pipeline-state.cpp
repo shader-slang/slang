@@ -329,7 +329,7 @@ uint32_t RayTracingPipelineStateImpl::findEntryPointIndexByName(
     if (!name)
         return VK_SHADER_UNUSED_KHR;
 
-    auto indexPtr = entryPointNameToIndex.TryGetValue(String(name));
+    auto indexPtr = entryPointNameToIndex.tryGetValue(String(name));
     if (indexPtr)
         return (uint32_t)*indexPtr;
     // TODO: Error reporting?

@@ -444,7 +444,7 @@ struct IntroduceExplicitGlobalContextPass
         // If we already created such a pointer (perhaps because
         // `func` is an entry point), then we are home free.
         //
-        if( auto found = m_mapFuncToContextPtr.TryGetValue(func) )
+        if( auto found = m_mapFuncToContextPtr.tryGetValue(func) )
         {
             return *found;
         }

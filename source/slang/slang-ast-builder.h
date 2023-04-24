@@ -139,7 +139,7 @@ public:
     template<typename NodeCreateFunc>
     NodeBase* _getOrCreateImpl(NodeDesc const& desc, NodeCreateFunc createFunc)
     {
-        if (auto found = m_cachedNodes.TryGetValue(desc))
+        if (auto found = m_cachedNodes.tryGetValue(desc))
             return *found;
 
         auto node = createFunc();

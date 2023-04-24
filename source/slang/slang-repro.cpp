@@ -90,7 +90,7 @@ struct StoreContext
     Offset32Ptr<FileState> findFile(const String& uniqueIdentity)
     {
         Offset32Ptr<FileState> file;
-        m_uniqueToFileMap.TryGetValue(uniqueIdentity, file);
+        m_uniqueToFileMap.tryGetValue(uniqueIdentity, file);
         return file;
     }
 
@@ -103,7 +103,7 @@ struct StoreContext
         // Get the file, if it has an identity
         if (uniqueIdentity.getLength())
         {
-            if (!m_uniqueToFileMap.TryGetValue(uniqueIdentity, file))
+            if (!m_uniqueToFileMap.tryGetValue(uniqueIdentity, file))
             {
                 // If file was not found create it
                 // Create the file
@@ -147,7 +147,7 @@ struct StoreContext
         auto& base = m_container->asBase();
 
         Offset32Ptr<ReproUtil::SourceFileState> sourceFileState;
-        if (m_sourceFileMap.TryGetValue(sourceFile, sourceFileState))
+        if (m_sourceFileMap.tryGetValue(sourceFile, sourceFileState))
         {
             return sourceFileState;
         }
@@ -185,7 +185,7 @@ struct StoreContext
     {
         Offset32Ptr<OffsetString> value;
         
-        if (m_stringMap.TryGetValue(in, value))
+        if (m_stringMap.tryGetValue(in, value))
         {
             return value;
         }
@@ -212,7 +212,7 @@ struct StoreContext
         OffsetBase& base = m_container->asBase();
 
         Offset32Ptr<PathInfoState> pathInfo;
-        if (!m_pathInfoMap.TryGetValue(srcPathInfo, pathInfo))
+        if (!m_pathInfoMap.tryGetValue(srcPathInfo, pathInfo))
         {
             // Get the associated file
             Offset32Ptr<FileState> fileState;
@@ -447,7 +447,7 @@ static String _scrubName(const String& in)
             {
                 const auto& srcTargetInfos = request->m_targetInfos;
 
-                if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.TryGetValue(srcTargetRequest))
+                if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.tryGetValue(srcTargetRequest))
                 {
                     EndToEndCompileRequest::TargetInfo* infos = *infosPtr;
 
@@ -613,7 +613,7 @@ static String _scrubName(const String& in)
                 }
 
                 int dummy = 0;
-                if (!uniqueNameMap.TryGetValueOrAdd(uniqueName, dummy))
+                if (!uniqueNameMap.tryGetValueOrAdd(uniqueName, dummy))
                 {
                     // It was added so we are done
                     break;
@@ -665,7 +665,7 @@ struct LoadContext
         }
 
         CacheFileSystem::PathInfo* dstInfo = nullptr;
-        if (!m_fileToPathInfoMap.TryGetValue(file, dstInfo))
+        if (!m_fileToPathInfoMap.tryGetValue(file, dstInfo))
         {
             ComPtr<ISlangBlob> blob;
 
@@ -723,7 +723,7 @@ struct LoadContext
         }
 
         SourceFile* dstFile;
-        if (!m_sourceFileMap.TryGetValue(sourceFile, dstFile))
+        if (!m_sourceFileMap.tryGetValue(sourceFile, dstFile))
         {
             FileState* file = m_base->asRaw(sourceFile->file);
             ISlangBlob* blob = getFileBlobFromFile(file);
@@ -766,7 +766,7 @@ struct LoadContext
         }
 
         CacheFileSystem::PathInfo* pathInfo;
-        if (m_pathInfoMap.TryGetValue(srcInfo, pathInfo))
+        if (m_pathInfoMap.tryGetValue(srcInfo, pathInfo))
         {
             return pathInfo;
         }
@@ -857,7 +857,7 @@ struct LoadContext
         if (fileState->foundPath)
         {
             String foundPath = base.asRaw(fileState->foundPath)->getSlice();
-            dstPathMap.AddIfNotExists(foundPath, pathInfo);
+            dstPathMap.addIfNotExists(foundPath, pathInfo);
         }
     }
 
@@ -867,7 +867,7 @@ struct LoadContext
         {
             const auto& pair = base.asRaw(pairOffset);
             CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(base.asRaw(pair.pathInfo));
-            dstPathMap.AddIfNotExists(base.asRaw(pair.path)->getSlice(), pathInfo);
+            dstPathMap.addIfNotExists(base.asRaw(pair.path)->getSlice(), pathInfo);
         }
     }
 
@@ -884,7 +884,7 @@ struct LoadContext
             {
                 String canonicalPath = pathInfo->m_canonicalPath;
 
-                dstPathMap.AddIfNotExists(canonicalPath, pathInfo);
+                dstPathMap.addIfNotExists(canonicalPath, pathInfo);
             }
         }
     }

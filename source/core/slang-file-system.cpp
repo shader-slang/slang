@@ -581,7 +581,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolveUniqueIdentityCacheInfo(cons
 
     // Now try looking up by uniqueIdentity path. If not found, add a new result
     PathInfo* pathInfo = nullptr;
-    if (!m_uniqueIdentityMap.TryGetValue(uniqueIdentity, pathInfo))
+    if (!m_uniqueIdentityMap.tryGetValue(uniqueIdentity, pathInfo))
     {
         // Create with found uniqueIdentity
         pathInfo = new PathInfo(uniqueIdentity);
@@ -623,7 +623,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolvePathCacheInfo(const String& 
 {
     // Lookup in path cache
     PathInfo* pathInfo;
-    if (m_pathMap.TryGetValue(path, pathInfo))
+    if (m_pathMap.tryGetValue(path, pathInfo))
     {
         // Found so done
         return pathInfo;

@@ -12,7 +12,7 @@ IRInst* lookUp(IRCloneEnv* env, IRInst* oldVal)
     for( auto ee = env; ee; ee = ee->parent )
     {
         IRInst* newVal = nullptr;
-        if(ee->mapOldValToNew.TryGetValue(oldVal, newVal))
+        if(ee->mapOldValToNew.tryGetValue(oldVal, newVal))
             return newVal;
     }
     return nullptr;
@@ -245,7 +245,7 @@ IRInst* cloneInst(
     SLANG_ASSERT(oldInst);
 
     IRInst* newInst = nullptr;
-    if( env->mapOldValToNew.TryGetValue(oldInst, newInst) )
+    if( env->mapOldValToNew.tryGetValue(oldInst, newInst) )
     {
         // In this case, somebody is trying to clone an
         // instruction that already had been cloned

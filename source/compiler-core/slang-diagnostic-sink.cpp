@@ -584,7 +584,7 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
 {
     Severity effectiveSeverity = info.severity;
 
-    Severity* pSeverityOverride = m_severityOverrides.TryGetValue(info.id);
+    Severity* pSeverityOverride = m_severityOverrides.tryGetValue(info.id);
 
     // See if there is an override
     if (pSeverityOverride)
@@ -689,7 +689,7 @@ void DiagnosticSink::overrideDiagnosticSeverity(int diagnosticId, Severity overr
 
 Index DiagnosticsLookup::_findDiagnosticIndexByExactName(const UnownedStringSlice& slice) const
 {
-    const Index* indexPtr = m_nameMap.TryGetValue(slice);
+    const Index* indexPtr = m_nameMap.tryGetValue(slice);
     return indexPtr ? *indexPtr : -1;
 }
 
@@ -711,13 +711,13 @@ void DiagnosticsLookup::addAlias(const char* name, const char* diagnosticName)
 
 const DiagnosticInfo* DiagnosticsLookup::getDiagnosticById(Int id) const
 {
-    const auto indexPtr = m_idMap.TryGetValue(id);
+    const auto indexPtr = m_idMap.tryGetValue(id);
     return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
 }
 
 const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByExactName(const UnownedStringSlice& slice) const
 {
-    const Index* indexPtr = m_nameMap.TryGetValue(slice);
+    const Index* indexPtr = m_nameMap.tryGetValue(slice);
     return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
 }
 
@@ -746,7 +746,7 @@ Index DiagnosticsLookup::add(const DiagnosticInfo* info)
     m_diagnostics.add(info);
 
     _addName(info->name, diagnosticIndex);
-    m_idMap.AddIfNotExists(info->id, diagnosticIndex);
+    m_idMap.addIfNotExists(info->id, diagnosticIndex);
     
     return diagnosticIndex;
 }

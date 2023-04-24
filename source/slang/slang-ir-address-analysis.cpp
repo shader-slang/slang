@@ -158,7 +158,7 @@ namespace Slang
         {
             RefPtr<AddressInfo> parentInfo;
             if (addr.Value->addrInst->getOperandCount() > 1 &&
-                info.addressInfos.TryGetValue(addr.Value->addrInst->getOperand(0), parentInfo))
+                info.addressInfos.tryGetValue(addr.Value->addrInst->getOperand(0), parentInfo))
             {
                 addr.Value->parentAddress = parentInfo;
                 parentInfo->children.add(addr.Value);

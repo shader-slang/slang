@@ -55,7 +55,7 @@ MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromCanonicalPath(const Stri
     }
     else
     {
-        return m_entries.TryGetValue(canonicalPath);
+        return m_entries.tryGetValue(canonicalPath);
     }
 }
 

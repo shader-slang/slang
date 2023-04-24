@@ -77,7 +77,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         auto dstHandlePtr = subTablePtr + i * rtProps.shaderGroupBaseAlignment;
         auto shaderGroupName = m_shaderGroupNames[shaderTableEntryCounter++];
         auto shaderGroupIndexPtr =
-            pipelineImpl->shaderGroupNameToIndex.TryGetValue(shaderGroupName);
+            pipelineImpl->shaderGroupNameToIndex.tryGetValue(shaderGroupName);
         if (!shaderGroupIndexPtr)
             continue;
 
@@ -93,7 +93,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         auto dstHandlePtr = subTablePtr + i * handleSize;
         auto shaderGroupName = m_shaderGroupNames[shaderTableEntryCounter++];
         auto shaderGroupIndexPtr =
-            pipelineImpl->shaderGroupNameToIndex.TryGetValue(shaderGroupName);
+            pipelineImpl->shaderGroupNameToIndex.tryGetValue(shaderGroupName);
         if (!shaderGroupIndexPtr)
             continue;
 
@@ -108,7 +108,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         auto dstHandlePtr = subTablePtr + i * handleSize;
         auto shaderGroupName = m_shaderGroupNames[shaderTableEntryCounter++];
         auto shaderGroupIndexPtr =
-            pipelineImpl->shaderGroupNameToIndex.TryGetValue(shaderGroupName);
+            pipelineImpl->shaderGroupNameToIndex.tryGetValue(shaderGroupName);
         if (!shaderGroupIndexPtr)
             continue;
 

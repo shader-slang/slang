@@ -3155,7 +3155,7 @@ namespace Slang
             // lookup will only give us the first.
             //
             Decl* firstDecl = nullptr;
-            parentDecl->getMemberDictionary().TryGetValue(nameAndLoc.name, firstDecl);
+            parentDecl->getMemberDictionary().tryGetValue(nameAndLoc.name, firstDecl);
             //
             // We will search through the declarations of the name
             // and find the first that is a namespace (if any).

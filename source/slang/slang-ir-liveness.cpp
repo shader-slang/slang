@@ -1484,7 +1484,7 @@ void LivenessContext::_orderRangeStartsDeterministically()
 
         Index order = -1;
 
-        if (auto orderPtr = rootOrderMap.TryGetValueOrAdd(root, orderCounter + 1))
+        if (auto orderPtr = rootOrderMap.tryGetValueOrAdd(root, orderCounter + 1))
         {
             order = *orderPtr;
         }

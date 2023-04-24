@@ -20,7 +20,7 @@ namespace Slang
         IRInst* lowerGenericFunction(IRInst* genericValue)
         {
             IRInst* result = nullptr;
-            if (sharedContext->loweredGenericFunctions.TryGetValue(genericValue, result))
+            if (sharedContext->loweredGenericFunctions.tryGetValue(genericValue, result))
                 return result;
             // Do not lower intrinsic functions.
             if (genericValue->findDecoration<IRTargetIntrinsicDecoration>())
@@ -197,7 +197,7 @@ namespace Slang
         IRInterfaceType* maybeLowerInterfaceType(IRInterfaceType* interfaceType)
         {
             IRInterfaceType* loweredType = nullptr;
-            if (sharedContext->loweredInterfaceTypes.TryGetValue(interfaceType, loweredType))
+            if (sharedContext->loweredInterfaceTypes.tryGetValue(interfaceType, loweredType))
                 return loweredType;
             if (sharedContext->mapLoweredInterfaceToOriginal.ContainsKey(interfaceType))
                 return interfaceType;

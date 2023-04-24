@@ -326,7 +326,7 @@ IRInst* findClonedValue(
     IRInst* clonedValue = nullptr;
     for (auto env = context->getEnv(); env; env = env->parent)
     {
-        if (env->clonedValues.TryGetValue(originalValue, clonedValue))
+        if (env->clonedValues.tryGetValue(originalValue, clonedValue))
         {
             return clonedValue;
         }
@@ -891,11 +891,11 @@ IRFunc* specializeIRForEntryPoint(
     // not the same as the mangled name of the decl.
     //
     RefPtr<IRSpecSymbol> sym;
-    if (!context->getSymbols().TryGetValue(mangledName, sym))
+    if (!context->getSymbols().tryGetValue(mangledName, sym))
     {
         String hashedName = getHashedName(mangledName.getUnownedSlice());
 
-        if (!context->getSymbols().TryGetValue(hashedName, sym))
+        if (!context->getSymbols().tryGetValue(hashedName, sym))
         {
             SLANG_UNEXPECTED("no matching IR symbol");
             return nullptr;
@@ -1263,7 +1263,7 @@ IRInst* cloneGlobalValueWithLinkage(
 
     auto mangledName = String(originalLinkage->getMangledName());
     RefPtr<IRSpecSymbol> sym;
-    if( !context->getSymbols().TryGetValue(mangledName, sym) )
+    if( !context->getSymbols().tryGetValue(mangledName, sym) )
     {
         if(!originalVal)
             return nullptr;
@@ -1338,7 +1338,7 @@ void insertGlobalValueSymbol(
     sym->irGlobalValue = gv;
 
     RefPtr<IRSpecSymbol> prev;
-    if (sharedContext->symbols.TryGetValue(mangledName, prev))
+    if (sharedContext->symbols.tryGetValue(mangledName, prev))
     {
         sym->nextWithSameName = prev->nextWithSameName;
         prev->nextWithSameName = sym;

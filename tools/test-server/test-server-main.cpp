@@ -209,7 +209,7 @@ slang::IGlobalSession* TestServer::getOrCreateGlobalSession()
 ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, DiagnosticSink* sink)
 {
     ComPtr<ISlangSharedLibrary> lib;
-    if (m_sharedLibraryMap.TryGetValue(name, lib))
+    if (m_sharedLibraryMap.tryGetValue(name, lib))
     {
         return lib;
     }
@@ -235,7 +235,7 @@ ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, Diagnosti
 
 IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSink* sink)
 {
-    auto unitTestModulePtr = m_unitTestModules.TryGetValue(name);
+    auto unitTestModulePtr = m_unitTestModules.tryGetValue(name);
     if (unitTestModulePtr)
     {
         return *unitTestModulePtr;

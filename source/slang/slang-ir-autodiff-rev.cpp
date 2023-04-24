@@ -743,7 +743,7 @@ namespace Slang
             if (param->hasUses())
             {
                 IRInst* replacement = nullptr;
-                paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc.TryGetValue(param, replacement);
+                paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc.tryGetValue(param, replacement);
                 SLANG_RELEASE_ASSERT(replacement);
                 param->replaceUsesWith(replacement);
             }
@@ -1214,7 +1214,7 @@ namespace Slang
         auto primalSpecialize = (IRSpecialize*)builder->emitSpecializeInst(
             (IRType*)primalType, primalBase, primalArgs.getCount(), primalArgs.getBuffer());
 
-        if (auto diffBase = instMapD.TryGetValue(origSpecialize->getBase()))
+        if (auto diffBase = instMapD.tryGetValue(origSpecialize->getBase()))
         {
             List<IRInst*> args;
             for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)

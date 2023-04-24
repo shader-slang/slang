@@ -15,7 +15,7 @@ struct RegisterAllocateContext
     OrderedDictionary<IRType*, List<RefPtr<RegisterInfo>>> mapTypeToRegisterList;
     List<RefPtr<RegisterInfo>>& getRegisterListForType(IRType* type)
     {
-        if (auto list = mapTypeToRegisterList.TryGetValue(type))
+        if (auto list = mapTypeToRegisterList.tryGetValue(type))
         {
             return *list;
         }

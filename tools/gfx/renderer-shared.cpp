@@ -715,7 +715,7 @@ Result RendererBase::getShaderObjectLayout(
     slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    if (!m_shaderObjectLayoutCache.TryGetValue(typeLayout, shaderObjectLayout))
+    if (!m_shaderObjectLayoutCache.tryGetValue(typeLayout, shaderObjectLayout))
     {
         SLANG_RETURN_ON_FAIL(createShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
         m_shaderObjectLayoutCache.Add(typeLayout, shaderObjectLayout);
@@ -803,7 +803,7 @@ ShaderComponentID ShaderCache::getComponentId(UnownedStringSlice name)
 ShaderComponentID ShaderCache::getComponentId(ComponentKey key)
 {
     ShaderComponentID componentId = 0;
-    if (componentIds.TryGetValue(key, componentId))
+    if (componentIds.tryGetValue(key, componentId))
         return componentId;
     OwningComponentKey owningTypeKey;
     owningTypeKey.hash = key.hash;

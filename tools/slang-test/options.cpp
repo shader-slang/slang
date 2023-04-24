@@ -23,7 +23,7 @@ TestCategory* TestCategorySet::add(String const& name, TestCategory* parent)
 
 TestCategory* TestCategorySet::find(String const& name)
 {
-    if (auto category = m_categoryMap.TryGetValue(name))
+    if (auto category = m_categoryMap.tryGetValue(name))
     {
         return category->Ptr();
     }

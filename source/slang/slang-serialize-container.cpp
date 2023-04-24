@@ -292,7 +292,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>>& mapTypeToCandidateExtensions)
 {
     RefPtr<CandidateExtensionList> entry;
-    if (!mapTypeToCandidateExtensions.TryGetValue(typeDecl, entry))
+    if (!mapTypeToCandidateExtensions.tryGetValue(typeDecl, entry))
     {
         entry = new CandidateExtensionList();
         mapTypeToCandidateExtensions.Add(typeDecl, entry);
@@ -550,7 +550,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                     }
 
                                     // Look up the index 
-                                    Index* entryIndexPtr = syntaxKeywordDict.TryGetValue(syntaxDecl->getName());
+                                    Index* entryIndexPtr = syntaxKeywordDict.tryGetValue(syntaxDecl->getName());
                                     if (entryIndexPtr)
                                     {
                                         // Set up SyntaxDecl based on the ParseSyntaxIndo

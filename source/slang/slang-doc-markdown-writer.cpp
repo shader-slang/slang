@@ -381,7 +381,7 @@ List<DocMarkdownWriter::NameAndText> DocMarkdownWriter::_getUniqueParams(const L
             continue;
         }
 
-        Index index = nameDict.GetOrAddValue(name, out.getCount());
+        Index index = nameDict.getOrAddValue(name, out.getCount());
 
         if (index >= out.getCount())
         {
@@ -675,7 +675,7 @@ static bool _isFirstOverridden(Decl* decl)
     Name* declName = decl->getName();
     if (declName)
     {
-        Decl** firstDeclPtr = parentDecl->getMemberDictionary().TryGetValue(declName);
+        Decl** firstDeclPtr = parentDecl->getMemberDictionary().tryGetValue(declName);
         return (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
     }
 

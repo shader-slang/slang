@@ -229,7 +229,7 @@ SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* 
     }
 
     // This pointer cannot be in the map
-    SLANG_ASSERT(m_ptrMap.TryGetValue(ptr) == nullptr);
+    SLANG_ASSERT(m_ptrMap.tryGetValue(ptr) == nullptr);
 
     typedef SerialInfo::ObjectEntry ObjectEntry;
 
@@ -312,7 +312,7 @@ SerialIndex SerialWriter::addPointer(const NodeBase* node)
         return SerialIndex(0);
     }
     // Look up in the map
-    Index* indexPtr = m_ptrMap.TryGetValue(node);
+    Index* indexPtr = m_ptrMap.tryGetValue(node);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);
@@ -336,7 +336,7 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
         return SerialIndex(0);
     }
     // Look up in the map
-    Index* indexPtr = m_ptrMap.TryGetValue(obj);
+    Index* indexPtr = m_ptrMap.tryGetValue(obj);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);
@@ -377,7 +377,7 @@ SerialIndex SerialWriter::_addStringSlice(SerialTypeKind typeKind, SliceMap& sli
         return SerialIndex(0);
     }
 
-    Index* indexPtr = sliceMap.TryGetValue(slice);
+    Index* indexPtr = sliceMap.tryGetValue(slice);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);
@@ -424,7 +424,7 @@ SerialIndex SerialWriter::addName(const Name* name)
     }
 
     // Look it up
-    Index* indexPtr = m_ptrMap.TryGetValue(name);
+    Index* indexPtr = m_ptrMap.tryGetValue(name);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);

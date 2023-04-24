@@ -92,7 +92,7 @@ void ContainerDecl::buildMemberDictionary()
         m->nextInContainerWithSameName = nullptr;
 
         Decl* next = nullptr;
-        if (memberDictionary.TryGetValue(name, next))
+        if (memberDictionary.tryGetValue(name, next))
             m->nextInContainerWithSameName = next;
 
         memberDictionary[name] = m;

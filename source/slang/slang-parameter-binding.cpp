@@ -776,7 +776,7 @@ static RefPtr<UsedRangeSet> findUsedRangeSetForSpace(
     UInt                        space)
 {
     RefPtr<UsedRangeSet> usedRangeSet;
-    if (context->shared->globalSpaceUsedRangeSets.TryGetValue(space, usedRangeSet))
+    if (context->shared->globalSpaceUsedRangeSets.tryGetValue(space, usedRangeSet))
         return usedRangeSet;
 
     usedRangeSet = new UsedRangeSet();

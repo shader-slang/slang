@@ -243,7 +243,7 @@ struct SCCPContext
 
         // Look up in the dictionary and just return the value we get from it.
         LatticeVal latticeVal;
-        if(mapInstToLatticeVal.TryGetValue(inst, latticeVal))
+        if(mapInstToLatticeVal.tryGetValue(inst, latticeVal))
             return latticeVal;
 
         // If we can't find the value from dictionary, we want to return None if this is a value

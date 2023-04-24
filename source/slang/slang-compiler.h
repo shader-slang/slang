@@ -2870,7 +2870,7 @@ namespace Slang
         PassThroughMode getTransition(CodeGenTarget source, CodeGenTarget target) const
         {
             const Pair pair{ source, target };
-            auto value = m_map.TryGetValue(pair);
+            auto value = m_map.tryGetValue(pair);
             return value ? *value : PassThroughMode::None;
         }
 

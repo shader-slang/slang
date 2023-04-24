@@ -157,9 +157,9 @@ struct EliminateMultiLevelBreakContext
                         continue;
                     BreakableRegionInfo* breakTargetRegion = nullptr;
                     BreakableRegionInfo* currentRegion = nullptr;
-                    if (!mapBreakBlockToRegion.TryGetValue(branch->getTargetBlock(), breakTargetRegion))
+                    if (!mapBreakBlockToRegion.tryGetValue(branch->getTargetBlock(), breakTargetRegion))
                         continue;
-                    if (mapBlockToRegion.TryGetValue(block, currentRegion))
+                    if (mapBlockToRegion.tryGetValue(block, currentRegion))
                     {
                         if (currentRegion != breakTargetRegion)
                         {

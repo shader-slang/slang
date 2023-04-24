@@ -102,7 +102,7 @@ static const char s_xyzwNames[] = "xyzw";
 UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
 {
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
-    if (m_typeNameMap.TryGetValue(type, handle))
+    if (m_typeNameMap.tryGetValue(type, handle))
     {
         return m_slicePool.getSlice(handle);
     }

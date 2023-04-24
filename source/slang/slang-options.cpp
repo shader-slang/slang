@@ -1999,7 +1999,7 @@ struct OptionsParser
                         continue;
 
                     int targetIndex = 0;
-                    if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
+                    if( !mapFormatToTargetIndex.tryGetValue(impliedFormat, targetIndex) )
                     {
                         targetIndex = (int) rawTargets.getCount();
 
@@ -2272,7 +2272,7 @@ struct OptionsParser
                     //
                     sink->diagnose(SourceLoc(), Diagnostics::cannotDeduceOutputFormatFromPath, rawOutput.path);
                 }
-                else if( mapFormatToTargetIndex.TryGetValue(rawOutput.impliedFormat, targetIndex) )
+                else if( mapFormatToTargetIndex.tryGetValue(rawOutput.impliedFormat, targetIndex) )
                 {
                     rawOutput.targetIndex = targetIndex;
                 }
@@ -2330,7 +2330,7 @@ struct OptionsParser
             auto targetID = rawTargets[rawOutput.targetIndex].targetID;
             auto target = requestImpl->getLinkage()->targets[targetID];
             RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-            if( !requestImpl->m_targetInfos.TryGetValue(target, targetInfo) )
+            if( !requestImpl->m_targetInfos.tryGetValue(target, targetInfo) )
             {
                 targetInfo = new EndToEndCompileRequest::TargetInfo();
                 requestImpl->m_targetInfos[target] = targetInfo;

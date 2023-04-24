@@ -197,7 +197,7 @@ StructRttiInfo StructRttiBuilder::make()
 
 RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo)
 {
-    if (auto funcsPtr = m_map.TryGetValue(rttiInfo))
+    if (auto funcsPtr = m_map.tryGetValue(rttiInfo))
     {
         return *funcsPtr;
     }
@@ -213,7 +213,7 @@ RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo)
 
 void RttiTypeFuncsMap::add(const RttiInfo* rttiInfo, const RttiTypeFuncs& funcs)
 {
-    if (auto funcsPtr = m_map.TryGetValueOrAdd(rttiInfo, funcs))
+    if (auto funcsPtr = m_map.tryGetValueOrAdd(rttiInfo, funcs))
     {
         // If there are funcs set, they aren't valid otherwise this would be 
         // replacing, so assert on that scenario.

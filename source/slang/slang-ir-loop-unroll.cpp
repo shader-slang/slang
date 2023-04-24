@@ -347,7 +347,7 @@ static bool _unrollLoop(
             builder.setInsertBefore(firstIterationBreakBlock);
             auto clonedBlock = builder.createBlock();
             clonedBlock->insertBefore(firstIterationBreakBlock);
-            cloneEnv.mapOldValToNew.AddIfNotExists(b, clonedBlock);
+            cloneEnv.mapOldValToNew.addIfNotExists(b, clonedBlock);
             clonedBlocks.add(clonedBlock);
         }
 
@@ -415,7 +415,7 @@ static bool _unrollLoop(
                 for (auto inst : block->getChildren())
                 {
                     IRInst* newInst = nullptr;
-                    if (!cloneEnv.mapOldValToNew.TryGetValue(inst, newInst))
+                    if (!cloneEnv.mapOldValToNew.tryGetValue(inst, newInst))
                         continue;
                     for (auto use = inst->firstUse; use;)
                     {

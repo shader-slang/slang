@@ -529,7 +529,7 @@ struct IRGenContext
         IRGenEnv* envToFindIn = env;
         while (envToFindIn)
         {
-            if (auto rs = envToFindIn->mapDeclToValue.TryGetValue(decl))
+            if (auto rs = envToFindIn->mapDeclToValue.tryGetValue(decl))
                 return rs;
             envToFindIn = envToFindIn->outer;
         }
@@ -1348,7 +1348,7 @@ IRStructKey* getInterfaceRequirementKey(
         return nullptr;
 
     IRStructKey* requirementKey = nullptr;
-    if(context->shared->interfaceRequirementKeys.TryGetValue(requirementDecl, requirementKey))
+    if(context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
     {
         return requirementKey;
     }
@@ -5488,7 +5488,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // corresponds to the break label for that statement,
         // and then emit an instruction to jump to it.
         IRBlock* targetBlock = nullptr;
-        context->shared->breakLabels.TryGetValue(parentStmt, targetBlock);
+        context->shared->breakLabels.tryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitBreak(targetBlock);
     }
@@ -5507,7 +5507,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // corresponds to the continue label for that statement,
         // and then emit an instruction to jump to it.
         IRBlock* targetBlock = nullptr;
-        context->shared->continueLabels.TryGetValue(parentStmt, targetBlock);
+        context->shared->continueLabels.tryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitContinue(targetBlock);
     }
@@ -6581,7 +6581,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     auto astReqWitnessTable = satisfyingWitness.getWitnessTable();
                     IRWitnessTable* irSatisfyingWitnessTable = nullptr;
-                    if(!mapASTToIRWitnessTable.TryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
+                    if(!mapASTToIRWitnessTable.tryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
                     {
                         // Need to construct a sub-witness-table
                         auto irWitnessTableBaseType = lowerType(subContext, astReqWitnessTable->baseType);
@@ -8077,7 +8077,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         }
                     }
                     IRInst* clonedReturnType = nullptr;
-                    cloneEnv.mapOldValToNew.TryGetValue(returnType, clonedReturnType);
+                    cloneEnv.mapOldValToNew.tryGetValue(returnType, clonedReturnType);
                     if (clonedReturnType)
                     {
                         // If the type has explicit dependency on generic parameters, use
@@ -8110,7 +8110,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 for (auto param : parentGeneric->getParams())
                 {
                     IRInst* arg = nullptr;
-                    if (cloneEnv.mapOldValToNew.TryGetValue(param, arg))
+                    if (cloneEnv.mapOldValToNew.tryGetValue(param, arg))
                     {
                         specializeArgs.add(arg);
                     }
@@ -9040,7 +9040,7 @@ LoweredValInfo ensureDecl(
     auto env = context->env;
     while(env)
     {
-        if(env->mapDeclToValue.TryGetValue(decl, result))
+        if(env->mapDeclToValue.tryGetValue(decl, result))
             return result;
 
         env = env->outer;
@@ -9995,7 +9995,7 @@ IRTypeLayout* lowerTypeLayout(
                 // so that if we run into another type layout for the
                 // same entry point we will re-use the same keys.
                 //
-                if( !context->mapEntryPointParamToKey.TryGetValue(paramDecl, irFieldKey) )
+                if( !context->mapEntryPointParamToKey.tryGetValue(paramDecl, irFieldKey) )
                 {
                     irFieldKey = context->irBuilder->createStructKey();
 

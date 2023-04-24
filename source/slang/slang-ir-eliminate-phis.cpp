@@ -144,7 +144,7 @@ struct PhiEliminationContext
         {
             auto inst = instAlloc.Key;
             IRInst* registerVar = nullptr;
-            m_mapRegToTempVar.TryGetValue(instAlloc.Value, registerVar);
+            m_mapRegToTempVar.tryGetValue(instAlloc.Value, registerVar);
             SLANG_RELEASE_ASSERT(registerVar);
 
             switch (inst->getOp())
@@ -156,7 +156,7 @@ struct PhiEliminationContext
                     auto updateInst = as<IRUpdateElement>(inst);
                     builder.setInsertBefore(updateInst);
                     RefPtr<RegisterInfo> oldReg;
-                    m_registerAllocation.mapInstToRegister.TryGetValue(updateInst->getOldValue(), oldReg);
+                    m_registerAllocation.mapInstToRegister.tryGetValue(updateInst->getOldValue(), oldReg);
                     // If the original value is not assigned to the same register as this inst,
                     // we need to insert a copy.
                     if (instAlloc.Value != oldReg)
@@ -182,7 +182,7 @@ struct PhiEliminationContext
         {
             auto inst = instAlloc.Key;
             IRInst* registerVar = nullptr;
-            m_mapRegToTempVar.TryGetValue(instAlloc.Value, registerVar);
+            m_mapRegToTempVar.tryGetValue(instAlloc.Value, registerVar);
             SLANG_RELEASE_ASSERT(registerVar);
             while (auto use = inst->firstUse)
             {
@@ -429,9 +429,9 @@ struct PhiEliminationContext
 
             // Have we already allocated a register for this inst?
             // If so we use the var for that register.
-            if (auto registerInfo = m_registerAllocation.mapInstToRegister.TryGetValue(param))
+            if (auto registerInfo = m_registerAllocation.mapInstToRegister.tryGetValue(param))
             {
-                m_mapRegToTempVar.TryGetValue(registerInfo->get(), temp);
+                m_mapRegToTempVar.tryGetValue(registerInfo->get(), temp);
             }
 
             if (!temp)
@@ -700,7 +700,7 @@ struct PhiEliminationContext
         // the map we pre-computed.
         //
         Index srcParamIndex = kInvalidIndex;
-        mapParamToIndex.TryGetValue(srcArgVal, srcParamIndex);
+        mapParamToIndex.tryGetValue(srcArgVal, srcParamIndex);
         srcArg.paramIndex = srcParamIndex;
 
         if (srcParamIndex != kInvalidIndex)

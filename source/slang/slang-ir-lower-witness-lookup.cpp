@@ -119,7 +119,7 @@ struct WitnessLookupLoweringContext
     {
         IRInst* func = nullptr;
         auto requirementKey = cast<IRStructKey>(lookupInst->getRequirementKey());
-        if (witnessDispatchFunctions.TryGetValue(requirementKey, func))
+        if (witnessDispatchFunctions.tryGetValue(requirementKey, func))
         {
             return func;
         }

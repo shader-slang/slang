@@ -129,7 +129,7 @@ struct ComMethodLoweringContext : public InstPassBase
         for (auto entry : witnessTable->getEntries())
         {
             IRInst* interfaceRequirement = nullptr;
-            if (!interfaceReqDict.TryGetValue(entry->getRequirementKey(), interfaceRequirement))
+            if (!interfaceReqDict.tryGetValue(entry->getRequirementKey(), interfaceRequirement))
                 continue;
             auto implFunc = as<IRFunc>(entry->getSatisfyingVal());
             if (!implFunc) continue;

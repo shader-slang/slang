@@ -121,7 +121,7 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
 
     IRFunc* func = nullptr;
     
-    if (IRFunc** funcPtr = entry.m_funcs.TryGetValue(referencedType))
+    if (IRFunc** funcPtr = entry.m_funcs.tryGetValue(referencedType))
     {
         func = *funcPtr;
     }

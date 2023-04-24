@@ -57,7 +57,7 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
     SourceFile* sourceFile = sourceView->getSourceFile();
     Source* debugSourceFile;
     {
-        RefPtr<Source>* ptrDebugSourceFile = m_sourceFileMap.TryGetValue(sourceFile);
+        RefPtr<Source>* ptrDebugSourceFile = m_sourceFileMap.tryGetValue(sourceFile);
         if (ptrDebugSourceFile == nullptr)
         {
             const SourceLoc::RawValue baseSourceLoc = m_freeSourceLoc;

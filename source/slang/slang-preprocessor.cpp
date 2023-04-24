@@ -1143,7 +1143,7 @@ static MacroDefinition* LookupMacro(Environment* environment, Name* name)
     for(Environment* e = environment; e; e = e->parent)
     {
         MacroDefinition* macro = NULL;
-        if (e->macros.TryGetValue(name, macro))
+        if (e->macros.tryGetValue(name, macro))
             return macro;
     }
 
@@ -3093,7 +3093,7 @@ static void _parseMacroOps(
             {
                 auto paramName = token.getName();
                 Index paramIndex = -1;
-                if(!mapParamNameToIndex.TryGetValue(paramName, paramIndex))
+                if(!mapParamNameToIndex.tryGetValue(paramName, paramIndex))
                 {
                     continue;
                 }
@@ -3115,7 +3115,7 @@ static void _parseMacroOps(
                 }
                 auto paramName = paramNameToken.getName();
                 Index paramIndex = -1;
-                if(!mapParamNameToIndex.TryGetValue(paramName, paramIndex))
+                if(!mapParamNameToIndex.tryGetValue(paramName, paramIndex))
                 {
                     GetSink(preprocessor)->diagnose(token.loc, Diagnostics::expectedMacroParameterAfterStringize);
                     continue;
@@ -3899,7 +3899,7 @@ static void DefineMacro(
     macro->nameAndLoc.loc = keyView->getRange().begin;
     
     MacroDefinition* oldMacro = NULL;
-    if (preprocessor->globalEnv.macros.TryGetValue(keyName, oldMacro))
+    if (preprocessor->globalEnv.macros.tryGetValue(keyName, oldMacro))
     {
         delete oldMacro;
     }

@@ -304,7 +304,7 @@ namespace gfx
             *object = nullptr;
 
             Slang::RefPtr<ShaderObjectBase> subObject;
-            if (m_objects.TryGetValue(offset, subObject))
+            if (m_objects.tryGetValue(offset, subObject))
             {
                 returnComPtr(object, subObject);
             }

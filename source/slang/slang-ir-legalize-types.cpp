@@ -179,7 +179,7 @@ static LegalVal legalizeOperand(
     IRInst*                    irValue)
 {
     LegalVal legalVal;
-    if( context->mapValToLegalVal.TryGetValue(irValue, legalVal) )
+    if( context->mapValToLegalVal.tryGetValue(irValue, legalVal) )
     {
         return maybeMaterializeWrappedValue(context, legalVal);
     }
@@ -599,7 +599,7 @@ private:
                     // recorded for the function.
                     //
                     RefPtr<LegalFuncInfo> parentFuncInfo;
-                    if( !m_context->mapFuncToInfo.TryGetValue(parentFunc, parentFuncInfo) )
+                    if( !m_context->mapFuncToInfo.tryGetValue(parentFunc, parentFuncInfo) )
                     {
                         // If we fail to find the extended information then either:
                         //

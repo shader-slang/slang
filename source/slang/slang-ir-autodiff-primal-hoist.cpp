@@ -145,7 +145,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         auto primalBlock = workItem.primalBlock;
         auto recomputeBlock = workItem.recomptueBlock;
 
-        List<IndexTrackingInfo>* thisBlockIndexInfo = indexedBlockInfo.TryGetValue(primalBlock);
+        List<IndexTrackingInfo>* thisBlockIndexInfo = indexedBlockInfo.tryGetValue(primalBlock);
         if (!thisBlockIndexInfo)
             continue;
 
@@ -165,7 +165,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
                 // Have we already created a recompute block for this target?
                 // If so, use it.
                 IRBlock* existingRecomputeBlock = nullptr;
-                if (recomputeBlockMap.TryGetValue(subRegionEndBlock, existingRecomputeBlock))
+                if (recomputeBlockMap.tryGetValue(subRegionEndBlock, existingRecomputeBlock))
                 {
                     builder.emitBranch(existingRecomputeBlock);
                 }
@@ -242,7 +242,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
                 // Have we already created a recompute block for this target?
                 // If so, use it.
                 IRBlock* existingRecomputeBlock = nullptr;
-                if (recomputeBlockMap.TryGetValue(target, existingRecomputeBlock))
+                if (recomputeBlockMap.tryGetValue(target, existingRecomputeBlock))
                 {
                     newTerminator->setOperand(op, existingRecomputeBlock);
                     continue;
@@ -641,7 +641,7 @@ void applyCheckpointSet(
         }
 
         IRBlock* recomputeBlock = block;
-        mapPrimalBlockToRecomputeBlock.TryGetValue(block, recomputeBlock);
+        mapPrimalBlockToRecomputeBlock.tryGetValue(block, recomputeBlock);
         auto recomputeInsertBeforeInst = recomputeBlock->getFirstOrdinaryInst();
 
         for (auto child : block->getChildren())
@@ -1169,7 +1169,7 @@ void buildIndexedBlocks(
         for (auto region : regionMap->getAllAncestorRegions(block))
         {
             IndexTrackingInfo trackingInfo;
-            if (mapLoopToTrackingInfo.TryGetValue(region->loop, trackingInfo))
+            if (mapLoopToTrackingInfo.tryGetValue(region->loop, trackingInfo))
             {
                 tryInferMaxIndex(region, &trackingInfo);
                 trackingInfos.add(trackingInfo);

@@ -1660,7 +1660,7 @@ namespace Slang
             if (key.fromOperatorExpr(opExpr))
             {
                 OverloadCandidate candidate;
-                if (typeCheckingCache->resolvedOperatorOverloadCache.TryGetValue(key, candidate))
+                if (typeCheckingCache->resolvedOperatorOverloadCache.tryGetValue(key, candidate))
                 {
                     context.bestCandidateStorage = candidate;
                     context.bestCandidate = &context.bestCandidateStorage;

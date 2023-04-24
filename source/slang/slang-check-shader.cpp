@@ -239,7 +239,7 @@ namespace Slang
         // We will look up any global-scope declarations in the translation
         // unit that match the name of our entry point.
         Decl* firstDeclWithName = nullptr;
-        if (!translationUnitSyntax->getMemberDictionary().TryGetValue(name, firstDeclWithName))
+        if (!translationUnitSyntax->getMemberDictionary().tryGetValue(name, firstDeclWithName))
         {
             // If there doesn't appear to be any such declaration, then we are done.
 
@@ -454,7 +454,7 @@ namespace Slang
         // We will look up any global-scope declarations in the translation
         // unit that match the name of our entry point.
         Decl* firstDeclWithName = nullptr;
-        if( !translationUnitSyntax->getMemberDictionary().TryGetValue(entryPointName, firstDeclWithName))
+        if( !translationUnitSyntax->getMemberDictionary().tryGetValue(entryPointName, firstDeclWithName))
         {
             // If there doesn't appear to be any such declaration, then
             // we need to diagnose it as an error, and then bail out.

@@ -71,7 +71,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     bool useDefProc = true;
     Window* window = nullptr;
-    Win32AppContext::windows.TryGetValue(hWnd, window);
+    Win32AppContext::windows.tryGetValue(hWnd, window);
     switch (message)
     {
     case WM_LBUTTONUP:

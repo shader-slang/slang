@@ -134,11 +134,11 @@ namespace Slang
             IRInst* requirementKey,
             IRInst* requirementVal)
         {
-            if (auto func = sharedContext->mapInterfaceRequirementKeyToDispatchMethods.TryGetValue(requirementKey))
+            if (auto func = sharedContext->mapInterfaceRequirementKeyToDispatchMethods.tryGetValue(requirementKey))
                 return *func;
             auto dispatchFunc =
                 _createInterfaceDispatchMethod(builder, interfaceType, requirementKey, requirementVal);
-            sharedContext->mapInterfaceRequirementKeyToDispatchMethods.AddIfNotExists(
+            sharedContext->mapInterfaceRequirementKeyToDispatchMethods.addIfNotExists(
                 requirementKey, dispatchFunc);
             return dispatchFunc;
         }

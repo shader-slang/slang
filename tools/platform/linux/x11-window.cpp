@@ -382,7 +382,7 @@ void doEventsImpl(bool waitForEvents)
                 else if (X11AppContext::keyStates[iKeyCode] == KeyState::Pressed) 
                     X11AppContext::keyStates[iKeyCode] = KeyState::Hold;
             }
-            if (X11AppContext::windows.TryGetValue(nextEvent.xkey.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xkey.window, sysWindow))
             {
                 wchar_t keyChar = getKeyChar(vKeyCode, nextEvent.xkey.state);
                 sysWindow->handleKeyEvent(KeyEvent::Press, vKeyCode, keyChar, nextEvent.xkey.state);
@@ -395,13 +395,13 @@ void doEventsImpl(bool waitForEvents)
             {
                 X11AppContext::keyStates[iKeyCode] = KeyState::Released;
             }
-            if (X11AppContext::windows.TryGetValue(nextEvent.xkey.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xkey.window, sysWindow))
             {
                 sysWindow->handleKeyEvent(KeyEvent::Release, vKeyCode, 0, nextEvent.xkey.state);
             }
             break;
         case MotionNotify:
-            if (X11AppContext::windows.TryGetValue(nextEvent.xmotion.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xmotion.window, sysWindow))
             {
                 X11AppContext::currentMouseEventWindow = sysWindow;
                 sysWindow->handleMouseEvent(MouseEvent::Move, nextEvent.xmotion.x, nextEvent.xmotion.y, 0, 
@@ -409,7 +409,7 @@ void doEventsImpl(bool waitForEvents)
             }
             break;
         case ButtonPress:
-            if (X11AppContext::windows.TryGetValue(nextEvent.xbutton.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xbutton.window, sysWindow))
             {
                 X11AppContext::currentMouseEventWindow = sysWindow;
                 if (nextEvent.xbutton.button <= Button3)
@@ -424,7 +424,7 @@ void doEventsImpl(bool waitForEvents)
             }
             break;
         case ButtonRelease:
-            if (X11AppContext::windows.TryGetValue(nextEvent.xbutton.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xbutton.window, sysWindow))
             {
                 X11AppContext::currentMouseEventWindow = sysWindow;
                 sysWindow->handleMouseEvent(MouseEvent::Up, nextEvent.xbutton.x, nextEvent.xbutton.y, 0,
@@ -432,19 +432,19 @@ void doEventsImpl(bool waitForEvents)
             }
             break;
         case ConfigureNotify:
-            if (X11AppContext::windows.TryGetValue(nextEvent.xconfigure.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xconfigure.window, sysWindow))
             {
                 sysWindow->handleResizeEvent(nextEvent.xconfigure.width, nextEvent.xconfigure.height);
             }
             break;
         case Expose:
-            if (X11AppContext::windows.TryGetValue(nextEvent.xexpose.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xexpose.window, sysWindow))
             {
                 sysWindow->handleExposeEvent();
             }
             break;
         case ClientMessage:
-            if (X11AppContext::windows.TryGetValue(nextEvent.xclient.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xclient.window, sysWindow))
             {
                 Atom wmDelete = XInternAtom(X11AppContext::xdisplay, "WM_DELETE_WINDOW", True);
                 if (nextEvent.xclient.data.l[0] == wmDelete)
@@ -454,13 +454,13 @@ void doEventsImpl(bool waitForEvents)
             }
             break;
         case FocusIn:
-            if (X11AppContext::windows.TryGetValue(nextEvent.xfocus.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xfocus.window, sysWindow))
             {
                 sysWindow->handleFocus(true);
             }
             break;
         case FocusOut:
-            if (X11AppContext::windows.TryGetValue(nextEvent.xfocus.window, sysWindow))
+            if (X11AppContext::windows.tryGetValue(nextEvent.xfocus.window, sysWindow))
             {
                 sysWindow->handleFocus(false);
             }

@@ -25,7 +25,7 @@ struct SPIRVEmitSharedContext
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic)
     {
         RefPtr<SpvSnippet> snippet;
-        if (m_parsedSpvSnippets.TryGetValue(intrinsic, snippet))
+        if (m_parsedSpvSnippets.tryGetValue(intrinsic, snippet))
         {
             return snippet.Ptr();
         }

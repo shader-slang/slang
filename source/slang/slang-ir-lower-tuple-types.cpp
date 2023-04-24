@@ -33,9 +33,9 @@ namespace Slang
 
         LoweredTupleInfo* getLoweredTupleType(IRBuilder* builder, IRInst* type)
         {
-            if (auto loweredInfo = loweredTuples.TryGetValue(type))
+            if (auto loweredInfo = loweredTuples.tryGetValue(type))
                 return loweredInfo->Ptr();
-            if (auto loweredInfo = mapLoweredStructToTupleInfo.TryGetValue(type))
+            if (auto loweredInfo = mapLoweredStructToTupleInfo.tryGetValue(type))
                 return loweredInfo->Ptr();
 
             if (!type)

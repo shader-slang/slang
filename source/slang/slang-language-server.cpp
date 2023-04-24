@@ -429,7 +429,7 @@ SlangResult LanguageServer::hover(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -608,7 +608,7 @@ SlangResult LanguageServer::gotoDefinition(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -734,7 +734,7 @@ SlangResult LanguageServer::completion(
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -898,7 +898,7 @@ SlangResult LanguageServer::semanticTokens(
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1036,7 +1036,7 @@ SlangResult LanguageServer::signatureHelp(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1249,7 +1249,7 @@ SlangResult LanguageServer::documentSymbol(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1270,7 +1270,7 @@ SlangResult LanguageServer::inlayHint(const LanguageServerProtocol::InlayHintPar
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1319,7 +1319,7 @@ SlangResult LanguageServer::formatting(const LanguageServerProtocol::DocumentFor
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1337,7 +1337,7 @@ SlangResult LanguageServer::rangeFormatting(const LanguageServerProtocol::Docume
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1360,7 +1360,7 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1413,7 +1413,7 @@ void LanguageServer::publishDiagnostics()
     // Send updates for any files whose diagnostic messages has changed since last update.
     for (auto& list : version->diagnostics)
     {
-        auto lastPublished = m_lastPublishedDiagnostics.TryGetValue(list.Key);
+        auto lastPublished = m_lastPublishedDiagnostics.tryGetValue(list.Key);
         if (!lastPublished || *lastPublished != list.Value.originalOutput)
         {
             PublishDiagnosticsParams args;

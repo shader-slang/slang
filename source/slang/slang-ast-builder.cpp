@@ -52,13 +52,13 @@ void SharedASTBuilder::init(Session* session)
 const ReflectClassInfo* SharedASTBuilder::findClassInfo(const UnownedStringSlice& slice)
 {
     const ReflectClassInfo* typeInfo;
-    return m_sliceToTypeMap.TryGetValue(slice, typeInfo) ? typeInfo : nullptr;
+    return m_sliceToTypeMap.tryGetValue(slice, typeInfo) ? typeInfo : nullptr;
 }
 
 SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
 {
     const ReflectClassInfo* typeInfo;
-    if (m_sliceToTypeMap.TryGetValue(slice, typeInfo))
+    if (m_sliceToTypeMap.tryGetValue(slice, typeInfo))
     {
         return SyntaxClass<NodeBase>(typeInfo);
     }
@@ -68,13 +68,13 @@ SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice
 const ReflectClassInfo* SharedASTBuilder::findClassInfo(Name* name)
 {
     const ReflectClassInfo* typeInfo;
-    return m_nameToTypeMap.TryGetValue(name, typeInfo) ? typeInfo : nullptr;
+    return m_nameToTypeMap.tryGetValue(name, typeInfo) ? typeInfo : nullptr;
 }
 
 SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(Name* name)
 {
     const ReflectClassInfo* typeInfo;
-    if (m_nameToTypeMap.TryGetValue(name, typeInfo))
+    if (m_nameToTypeMap.tryGetValue(name, typeInfo))
     {
         return SyntaxClass<NodeBase>(typeInfo);
     }

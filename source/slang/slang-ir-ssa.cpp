@@ -96,7 +96,7 @@ struct ConstructSSAContext
 
     PhiInfo* getPhiInfo(IRParam* phi)
     {
-        if(auto found = phiInfos.TryGetValue(phi))
+        if(auto found = phiInfos.tryGetValue(phi))
             return *found;
         return nullptr;
     }
@@ -546,7 +546,7 @@ IRInst* addPhiOperands(
         //
         SLANG_RELEASE_ASSERT(predecessorCount <= 1 || predBlock->getSuccessors().getCount() == 1);
 
-        auto predInfo = *context->blockInfos.TryGetValue(predBlock);
+        auto predInfo = *context->blockInfos.tryGetValue(predBlock);
 
         auto phiOperand = readVar(context, predInfo, var);
         SLANG_ASSERT(phiOperand != nullptr);
@@ -590,7 +590,7 @@ void maybeSealBlock(
     // have been filled.
     for (auto pp : blockInfo->block->getPredecessors())
     {
-        auto predInfo = *context->blockInfos.TryGetValue(pp);
+        auto predInfo = *context->blockInfos.tryGetValue(pp);
         if (!predInfo->isFilled)
             return;
     }
@@ -635,7 +635,7 @@ IRInst* maybeGetPhiReplacement(
         // The value is a parameter, but is it a phi?
         IRParam* maybePhi = (IRParam*) val;
         RefPtr<PhiInfo> phiInfo = nullptr;
-        if(!context->phiInfos.TryGetValue(maybePhi, phiInfo))
+        if(!context->phiInfos.tryGetValue(maybePhi, phiInfo))
             break;
 
         // Okay, this is indeed a phi we are adding, but
@@ -714,7 +714,7 @@ IRInst* readVarRec(
             // so there is no need to insert a phi. Instead, we
             // just perform the lookup step recursively in
             // the predecessor.
-            auto predInfo = *context->blockInfos.TryGetValue(firstPred);
+            auto predInfo = *context->blockInfos.tryGetValue(firstPred);
             val = readVar(context, predInfo, var);
         }
         else
@@ -770,7 +770,7 @@ IRInst* readVar(
     // store in the same block, so we can use
     // that local value.
     IRInst* val = nullptr;
-    if (blockInfo->valueForVar.TryGetValue(var, val))
+    if (blockInfo->valueForVar.tryGetValue(var, val))
     {
         // Hooray, we found a value to use, and we
         // can proceed without too many complications.
@@ -922,7 +922,7 @@ void processBlock(
     // of its successor(s)
     for (auto ss : block->getSuccessors())
     {
-        auto successorInfo = *context->blockInfos.TryGetValue(ss);
+        auto successorInfo = *context->blockInfos.tryGetValue(ss);
         maybeSealBlock(context, successorInfo);
     }
 }
@@ -1099,7 +1099,7 @@ bool constructSSA(ConstructSSAContext* context)
 
     for(auto bb : globalVal->getBlocks())
     {
-        auto blockInfo = * context->blockInfos.TryGetValue(bb);
+        auto blockInfo = * context->blockInfos.tryGetValue(bb);
         processBlock(context, bb, blockInfo);
     }
 
@@ -1108,7 +1108,7 @@ bool constructSSA(ConstructSSAContext* context)
     // pass them in.
     for(auto bb : globalVal->getBlocks())
     {
-        auto blockInfo = *context->blockInfos.TryGetValue(bb);
+        auto blockInfo = *context->blockInfos.tryGetValue(bb);
 
         for (auto phiInfo : blockInfo->phis)
         {
@@ -1125,7 +1125,7 @@ bool constructSSA(ConstructSSAContext* context)
             for (auto pp : bb->getPredecessors())
             {
                 UInt predIndex = predCounter++;
-                auto predInfo = *context->blockInfos.TryGetValue(pp);
+                auto predInfo = *context->blockInfos.tryGetValue(pp);
 
                 IRInst* operandVal = phiInfo->operands[predIndex].get();
 
@@ -1140,7 +1140,7 @@ bool constructSSA(ConstructSSAContext* context)
     // which have been stored into the `SSABlockInfo::successorArgs` field.
     for(auto bb : globalVal->getBlocks())
     {
-        auto blockInfo = * context->blockInfos.TryGetValue(bb);
+        auto blockInfo = * context->blockInfos.tryGetValue(bb);
 
         // Sanity check: all blocks should be filled and sealed.
         SLANG_ASSERT(blockInfo->isSealed);

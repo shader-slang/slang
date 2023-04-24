@@ -156,7 +156,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
         EnumNode* enumNode = as<EnumNode>(node);
         if (enumNode && enumNode->m_kind == Node::Kind::Enum)
         {
-            Node** nodePtr = enumNode->m_childMap.TryGetValue(name);
+            Node** nodePtr = enumNode->m_childMap.tryGetValue(name);
             if (nodePtr)
             {
                 return *nodePtr;
@@ -316,7 +316,7 @@ void ScopeNode::addChild(Node* child)
 
 Node* ScopeNode::findChild(const UnownedStringSlice& name) const
 {
-    Node** nodePtr = m_childMap.TryGetValue(name);
+    Node** nodePtr = m_childMap.tryGetValue(name);
     if (nodePtr)
     {
         return *nodePtr;

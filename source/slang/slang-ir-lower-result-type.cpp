@@ -36,9 +36,9 @@ namespace Slang
 
         LoweredResultTypeInfo* getLoweredResultType(IRBuilder* builder, IRInst* type)
         {
-            if (auto loweredInfo = loweredResultTypes.TryGetValue(type))
+            if (auto loweredInfo = loweredResultTypes.tryGetValue(type))
                 return loweredInfo->Ptr();
-            if (auto loweredInfo = mapLoweredTypeToResultTypeInfo.TryGetValue(type))
+            if (auto loweredInfo = mapLoweredTypeToResultTypeInfo.tryGetValue(type))
                 return loweredInfo->Ptr();
 
             if (!type)

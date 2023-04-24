@@ -86,7 +86,7 @@ Result DebugShaderObject::getObject(ShaderOffset const& offset, IShaderObject** 
     auto resultCode = baseObject->getObject(offset, innerObject.writeRef());
     SLANG_RETURN_ON_FAIL(resultCode);
     RefPtr<DebugShaderObject> debugShaderObject;
-    if (m_objects.TryGetValue(ShaderOffsetKey{offset}, debugShaderObject))
+    if (m_objects.tryGetValue(ShaderOffsetKey{offset}, debugShaderObject))
     {
         if (debugShaderObject->baseObject == innerObject)
         {

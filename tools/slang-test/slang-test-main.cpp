@@ -82,11 +82,11 @@ struct TestOptions
     // Small helper to help consistently interrogating for filecheck usage
     bool getFileCheckPrefix(String& prefix) const
     {
-        return commandOptions.TryGetValue("filecheck", prefix);
+        return commandOptions.tryGetValue("filecheck", prefix);
     }
     bool getFileCheckBufferPrefix(String& prefix) const
     {
-        return commandOptions.TryGetValue("filecheck-buffer", prefix);
+        return commandOptions.tryGetValue("filecheck-buffer", prefix);
     }
 
     Type type = Type::Normal;

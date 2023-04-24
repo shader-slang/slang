@@ -276,7 +276,7 @@ struct ASTDumpContext
 
     Index getObjectIndex(const ReflectClassInfo& typeInfo, NodeBase* obj)
     {
-        Index* indexPtr = m_objectMap.TryGetValueOrAdd(obj, m_objects.getCount());
+        Index* indexPtr = m_objectMap.tryGetValueOrAdd(obj, m_objects.getCount());
         if (indexPtr)
         {
             return *indexPtr;

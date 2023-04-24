@@ -53,9 +53,9 @@ namespace Slang
 
         LoweredOptionalTypeInfo* getLoweredOptionalType(IRBuilder* builder, IRInst* type)
         {
-            if (auto loweredInfo = loweredOptionalTypes.TryGetValue(type))
+            if (auto loweredInfo = loweredOptionalTypes.tryGetValue(type))
                 return loweredInfo->Ptr();
-            if (auto loweredInfo = mapLoweredTypeToOptionalTypeInfo.TryGetValue(type))
+            if (auto loweredInfo = mapLoweredTypeToOptionalTypeInfo.tryGetValue(type))
                 return loweredInfo->Ptr();
 
             if (!type)

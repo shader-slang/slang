@@ -30,7 +30,7 @@ bool ReachabilityContext::isBlockReachable(IRBlock* from, IRBlock* to)
     pair.first = from;
     pair.second = to;
     bool result = false;
-    if (reachabilityResults.TryGetValue(pair, result))
+    if (reachabilityResults.tryGetValue(pair, result))
         return result;
     result = computeReachability(from, to);
     reachabilityResults[pair] = result;

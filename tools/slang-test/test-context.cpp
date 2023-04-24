@@ -111,7 +111,7 @@ TestContext::~TestContext()
 TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, const String& name)
 {
     {
-        SharedLibraryTool* tool = m_sharedLibTools.TryGetValue(name);
+        SharedLibraryTool* tool = m_sharedLibTools.tryGetValue(name);
         if (tool)
         {
             return tool->m_func;
@@ -141,7 +141,7 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
 
 void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
 {
-    SharedLibraryTool* tool = m_sharedLibTools.TryGetValue(name);
+    SharedLibraryTool* tool = m_sharedLibTools.tryGetValue(name);
     if (tool)
     {
         tool->m_sharedLibrary.setNull();

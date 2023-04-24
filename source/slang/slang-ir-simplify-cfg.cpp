@@ -60,7 +60,7 @@ static bool isTrivialSingleIterationLoop(
         context.regionTree = generateRegionTreeForFunc(func, nullptr);
 
     SimpleRegion* targetBlockRegion = nullptr;
-    if (!context.regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
+    if (!context.regionTree->mapBlockToRegion.tryGetValue(targetBlock, targetBlockRegion))
         return false;
     BreakableRegion* loopBreakableRegion = findBreakableRegion(targetBlockRegion);
     LoopRegion* loopRegion = as<LoopRegion>(loopBreakableRegion);
@@ -73,13 +73,13 @@ static bool isTrivialSingleIterationLoop(
         if (context.domTree->dominates(loop->getBreakBlock(), block))
             continue;
         SimpleRegion* region = nullptr;
-        if (!context.regionTree->mapBlockToRegion.TryGetValue(block, region))
+        if (!context.regionTree->mapBlockToRegion.tryGetValue(block, region))
             return false;
 
         for (auto branchTarget : block->getSuccessors())
         {
             SimpleRegion* targetRegion = nullptr;
-            if (!context.regionTree->mapBlockToRegion.TryGetValue(branchTarget, targetRegion))
+            if (!context.regionTree->mapBlockToRegion.tryGetValue(branchTarget, targetRegion))
                 return false;
             // If multi-level break out that skips over this loop exists, then this is not a trivial loop.
             if (targetRegion->isDescendentOf(loopRegion))

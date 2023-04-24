@@ -278,7 +278,7 @@ struct ExtractPrimalFuncContext
 static void copyPrimalValueStructKeyDecorations(IRInst* inst, IRCloneEnv& cloneEnv)
 {
     IRInst* newInst = nullptr;
-    if (cloneEnv.mapOldValToNew.TryGetValue(inst, newInst))
+    if (cloneEnv.mapOldValToNew.tryGetValue(inst, newInst))
     {
         if (auto decor = newInst->findDecoration<IRPrimalValueStructKeyDecoration>())
         {
@@ -318,7 +318,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     for (auto inst : paramInfo.propagateFuncSpecificPrimalInsts)
     {
         IRInst* newInst = nullptr;
-        if (subEnv.mapOldValToNew.TryGetValue(inst, newInst))
+        if (subEnv.mapOldValToNew.tryGetValue(inst, newInst))
         {
             newInst->removeAndDeallocate();
         }

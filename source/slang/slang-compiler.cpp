@@ -1620,7 +1620,7 @@ namespace Slang
     String EndToEndCompileRequest::_getWholeProgramPath(TargetRequest* targetReq)
     {
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        if (m_targetInfos.TryGetValue(targetReq, targetInfo))
+        if (m_targetInfos.tryGetValue(targetReq, targetInfo))
         {
             return targetInfo->wholeTargetOutputPath;
         }
@@ -1635,10 +1635,10 @@ namespace Slang
         // get paths specified via command-line options.
         //
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        if (m_targetInfos.TryGetValue(targetReq, targetInfo))
+        if (m_targetInfos.tryGetValue(targetReq, targetInfo))
         {
             String outputPath;
-            if (targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
+            if (targetInfo->entryPointOutputPaths.tryGetValue(entryPointIndex, outputPath))
             {
                 return outputPath;
             }
@@ -2045,7 +2045,7 @@ namespace Slang
             if (targetReq->isWholeProgramRequest())
             {
                 RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-                if (compileRequest->m_targetInfos.TryGetValue(targetReq, targetInfo))
+                if (compileRequest->m_targetInfos.tryGetValue(targetReq, targetInfo))
                 {
                     _writeDependencyStatement(stream, compileRequest, targetInfo->wholeTargetOutputPath);
                 }
@@ -2056,10 +2056,10 @@ namespace Slang
                 for (Index entryPointIndex = 0; entryPointIndex < entryPointCount; ++entryPointIndex)
                 {
                     RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-                    if (compileRequest->m_targetInfos.TryGetValue(targetReq, targetInfo))
+                    if (compileRequest->m_targetInfos.tryGetValue(targetReq, targetInfo))
                     {
                         String outputPath;
-                        if (targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
+                        if (targetInfo->entryPointOutputPaths.tryGetValue(entryPointIndex, outputPath))
                         {
                             _writeDependencyStatement(stream, compileRequest, outputPath);
                         }
