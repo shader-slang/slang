@@ -42,14 +42,6 @@ void twoOkReturns(bool b, out float y)
     return;
 }
 
-// TODO: This should warn that n is potentially uninitialized
-int ok(bool b, out int n)
-{
-    if(b)
-        n = 0;
-    return n;
-}
-
 // TODO: This should warn that arr isn't fully initialized
 void partial(out float arr[2])
 {

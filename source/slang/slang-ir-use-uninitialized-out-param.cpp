@@ -1,4 +1,6 @@
 #include "slang-ir-use-uninitialized-out-param.h"
+
+#include "slang-ir-dataflow.h"
 #include "slang-ir-util.h"
 #include "slang-ir-reachability.h"
 
@@ -7,11 +9,214 @@ namespace Slang
     class DiagnosticSink;
     struct IRModule;
 
-    struct StoreSite
+
+    static void checkForUsingUninitializedOutParam(
+        IRFunc* func,
+        DiagnosticSink* sink,
+        ReachabilityContext& reachability,
+        IRParam* param)
     {
-        IRInst* storeInst;
-        IRInst* address;
-    };
+        // Our join semilattice to dataflow over
+        struct Initialization
+        {
+            enum V
+            {
+                Bottom             = 0b00,
+                Initialized        = 0b01,
+                Uninitialized      = 0b10,
+                MaybeUninitialized = 0b11,
+            };
+            bool join(Initialization other)
+            {
+                V joined = V(v | other.v);
+                if(joined != v)
+                {
+                    v = joined;
+                    return true;
+                }
+                return false;
+            }
+            static auto bottom() { return Initialization{Bottom}; }
+
+            V v;
+        };
+
+        struct StoreSite
+        {
+            IRInst* storeInst;
+            IRInst* address;
+        };
+
+        // Our dataflow context
+        struct UninitializedDataFlow : BasicBlockForwardDataFlow
+        {
+            using Domain = Initialization;
+            //
+            // The transfer function changes nothing, unless there is a write to
+            // the variable, in which case it becomes Initialized
+            //
+            bool transfer(IRBlock* bb, Initialization& out, const Initialization& in)
+            {
+                Initialization next = in;
+                // No need to check anything if it's already initialized, it can't
+                // become uninitialized
+                if(in.v != Initialization::Initialized)
+                {
+                    for( auto i = bb->getFirstInst(); i; i = i->getNextInst() )
+                    {
+                        for(const auto& s : stores)
+                        {
+                            if(i == s.storeInst)
+                            {
+                                next.v = Initialization::Initialized;
+                            }
+                        }
+                    }
+                }
+                return out.join(next);
+            }
+            const List<StoreSite>& stores;
+        };
+
+        // Collect all sub-addresses from the param.
+        // TODO: Currently a write to any of these makes us assume that the
+        // whole value is written to, we should be more precise here.
+        List<IRInst*> addresses;
+        addresses.add(param);
+        List<StoreSite> stores;
+        for (Index i = 0; i < addresses.getCount(); i++)
+        {
+            auto addr = addresses[i];
+            for (auto use = addr->firstUse; use; use = use->nextUse)
+            {
+                switch (use->getUser()->getOp())
+                {
+                case kIROp_GetElementPtr:
+                case kIROp_FieldAddress:
+                    addresses.add(use->getUser());
+                    break;
+                case kIROp_Store:
+                case kIROp_SwizzledStore:
+                    // If we see a store of this address, add it to stores set.
+                    if (use == use->getUser()->getOperands())
+                        stores.add(StoreSite{ use->getUser(), addr });
+                    break;
+                case kIROp_Call:
+                    // If we see a call using this address, treat it as a store.
+                    stores.add(StoreSite{ use->getUser(), addr });
+                    break;
+                }
+            }
+        }
+
+        //
+        // Get the list of blocks where this value is used, i.e. any loads or
+        // returns from its addresses.
+        //
+        List<IRInst*> loadsAndReturns;
+        List<IRBlock*> loadingBlocks;
+        for (auto addr : addresses)
+        {
+            for (auto use = addr->firstUse; use; use = use->nextUse)
+            {
+                if (auto load = as<IRLoad>(use->getUser()))
+                {
+                    loadsAndReturns.add(load);
+                    IRBlock* bb = as<IRBlock>(load->getParent());
+                    if(bb && !loadingBlocks.contains(bb))
+                        loadingBlocks.add(bb);
+                }
+            }
+        }
+        for(auto bb : func->getBlocks())
+        {
+            auto t = bb->getTerminator();
+            if (t->m_op == kIROp_Return)
+            {
+                loadsAndReturns.add(t);
+                if(!loadingBlocks.contains(bb))
+                    loadingBlocks.add(bb);
+            }
+        }
+
+        //
+        // Run the dataflow analysis
+        //
+        UninitializedDataFlow context{{}, stores};
+        auto ios = basicBlockForwardDataFlow(
+            context,
+            loadingBlocks,
+            reachability,
+            Initialization{Initialization::Uninitialized});
+
+        // Sort the instructions under investigation so we don't have to walk
+        // the whole basic block list for each one
+        loadsAndReturns.sort([&](IRInst* x, IRInst* y){
+            IRInst* bx = x->getParent();
+            IRInst* by = y->getParent();
+            return loadingBlocks.indexOf(bx) < loadingBlocks.indexOf(by);
+        });
+        int bbIndex = 0;
+
+        //
+        // Walk over all of our instructions under investigation,
+        //
+        // If their value was uninitialized when they loaded, produce a
+        // diagnostic
+        //
+        for(auto l : loadsAndReturns)
+        {
+            IRBlock* bb = as<IRBlock>(l->getParent());
+            if(loadingBlocks[bbIndex] != bb)
+                bbIndex++;
+            SLANG_ASSERT(loadingBlocks[bbIndex] == bb);
+
+            const auto& io = ios[bbIndex];
+            SLANG_ASSERT(io.in.v != Initialization::Bottom);
+            if(io.in.v == Initialization::Initialized)
+                continue;
+
+            auto diag = [&](){
+                sink->diagnose(
+                    l,
+                    l->m_op == kIROp_Return
+                        ? (io.in.v == Initialization::Uninitialized
+                            ? Diagnostics::returningWithUninitializedOut
+                            : Diagnostics::returningWithMaybeUninitializedOut)
+                        : (io.in.v == Initialization::Uninitialized
+                            ? Diagnostics::usingUninitializedValue
+                            : Diagnostics::maybeUsingUninitializedValue),
+                    param);
+            };
+
+            // The easy case, the initialization state didn't change during
+            // this BB
+            if(io.in.v == io.out.v)
+            {
+                diag();
+            }
+            // Otherwise, walk and find the place where it changed (only care
+            // about loads here, as the return is necessarily after any
+            // possible store)
+            else if(!as<IRTerminatorInst>(l))
+            {
+                bool stored = false;
+                for(IRInst* i = bb->getFirstInst(); i != l && !stored; i = i->getNextInst())
+                {
+                    if(i == l)
+                        diag();
+                    for(const auto& s : stores)
+                    {
+                        if(i == s.storeInst)
+                        {
+                            stored = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     void checkForUsingUninitializedOutParams(IRFunc* func, DiagnosticSink* sink)
     {
@@ -40,86 +245,9 @@ namespace Slang
                 case kIROp_PrimitivesType:
                     continue;
                 default:
+                    checkForUsingUninitializedOutParam(func, sink, reachability, param);
                     break;
                 }
-            }
-            else
-            {
-                continue;
-            }
-            List<IRInst*> addresses;
-            addresses.add(param);
-            List<StoreSite> stores;
-            // Collect all sub-addresses from the param.
-            for (Index i = 0; i < addresses.getCount(); i++)
-            {
-                auto addr = addresses[i];
-                for (auto use = addr->firstUse; use; use = use->nextUse)
-                {
-                    switch (use->getUser()->getOp())
-                    {
-                    case kIROp_GetElementPtr:
-                    case kIROp_FieldAddress:
-                        addresses.add(use->getUser());
-                        break;
-                    case kIROp_Store:
-                    case kIROp_SwizzledStore:
-                        // If we see a store of this address, add it to stores set.
-                        if (use == use->getUser()->getOperands())
-                            stores.add(StoreSite{ use->getUser(), addr });
-                        break;
-                    case kIROp_Call:
-                    case kIROp_SPIRVAsm:
-                        // If we see a call using this address, treat it as a store.
-                        stores.add(StoreSite{ use->getUser(), addr });
-                        break;
-                    }
-                }
-            }
-            // Check all address loads.
-            List<IRInst*> loadsAndReturns;
-            for (auto addr : addresses)
-            {
-                for (auto use = addr->firstUse; use; use = use->nextUse)
-                {
-                    if (auto load = as<IRLoad>(use->getUser()))
-                        loadsAndReturns.add(load);
-                }
-            }
-            for(const auto& b : func->getBlocks())
-            {
-                auto t = b->getTerminator();
-                if (t->m_op == kIROp_Return)
-                    loadsAndReturns.add(t);
-            }
-
-            for (auto store : stores)
-            {
-                // Remove insts from `loads` that is reachable from the store.
-                for (Index i = 0; i < loadsAndReturns.getCount();)
-                {
-                    auto load = as<IRLoad>(loadsAndReturns[i]);
-                    if (load && !canAddressesPotentiallyAlias(func, store.address, load->getPtr()))
-                        continue;
-                    if (reachability.isInstReachable(store.storeInst, loadsAndReturns[i]))
-                    {
-                        loadsAndReturns.fastRemoveAt(i);
-                    }
-                    else
-                    {
-                        i++;
-                    }
-                }
-            }
-            // If there are any loads left, it means they are using uninitialized out params.
-            for (auto load : loadsAndReturns)
-            {
-                sink->diagnose(
-                    load,
-                    load->m_op == kIROp_Return
-                        ? Diagnostics::returningWithUninitializedOut
-                        : Diagnostics::usingUninitializedValue,
-                    param);
             }
         }
     }
