@@ -3546,7 +3546,7 @@ struct IRTypeLegalizationPass
         //
         for (;;)
         {
-            auto lastReplacedInstCount = context->replacedInstructions.Count();
+            auto lastReplacedInstCount = context->replacedInstructions.getCount();
             addToWorkList(module->getModuleInst());
             while( workList.getCount() != 0 )
             {
@@ -3575,7 +3575,7 @@ struct IRTypeLegalizationPass
             }
             
             // Any changes made? Run the process again.
-            if (lastReplacedInstCount == context->replacedInstructions.Count())
+            if (lastReplacedInstCount == context->replacedInstructions.getCount())
                 break;
         }
 

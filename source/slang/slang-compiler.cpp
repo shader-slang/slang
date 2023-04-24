@@ -1374,7 +1374,7 @@ namespace Slang
 
             // Add the specified defines (as calculated earlier - they will only be set if this is a pass through else will be empty)
             {
-                const auto count = preprocessorDefinitions.Count();
+                const auto count = preprocessorDefinitions.getCount();
                 auto dst = allocator.getArena().allocateArray<DownstreamCompileOptions::Define>(count);
 
                 Index i = 0;

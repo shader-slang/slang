@@ -261,7 +261,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processModule()
     {
         addToWorkList(m_module->getModuleInst());
-        while (workList.Count() != 0)
+        while (workList.getCount() != 0)
         {
             IRInst* inst = workList.getLast();
             workList.removeLast();

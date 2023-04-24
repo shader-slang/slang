@@ -455,7 +455,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
         case RttiInfo::Kind::Dictionary:
         {
             const auto& v = *(const Dictionary<Byte, Byte>*)src;
-            return v.Count() == 0;
+            return v.getCount() == 0;
         }
         case RttiInfo::Kind::Other:
         {

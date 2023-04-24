@@ -4381,7 +4381,7 @@ SlangResult innerMain(int argc, char** argv)
         return func(StdWriters::getSingleton(), context.getSession(), int(args.getCount()), args.getBuffer());
     }
 
-    if( options.includeCategories.Count() == 0 )
+    if( options.includeCategories.getCount() == 0 )
     {
         options.includeCategories.add(fullTestCategory, fullTestCategory);
     }

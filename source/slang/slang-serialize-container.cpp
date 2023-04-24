@@ -537,7 +537,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 else if (SyntaxDecl* syntaxDecl = dynamicCast<SyntaxDecl>(nodeBase))
                                 {
                                     // Set up the dictionary lazily
-                                    if (syntaxKeywordDict.Count() == 0)
+                                    if (syntaxKeywordDict.getCount() == 0)
                                     {
                                         NamePool* namePool = options.session->getNamePool();
                                         for (Index i = 0; i < syntaxParseInfos.getCount(); ++i)
@@ -546,7 +546,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                             syntaxKeywordDict.add(namePool->getName(entry.keywordName), i);
                                         }
                                         // Must have something in it at this point
-                                        SLANG_ASSERT(syntaxKeywordDict.Count());
+                                        SLANG_ASSERT(syntaxKeywordDict.getCount());
                                     }
 
                                     // Look up the index 

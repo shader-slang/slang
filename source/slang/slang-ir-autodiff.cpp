@@ -1115,7 +1115,7 @@ struct AutoDiffPass : public InstPassBase
         OrderedHashSet<IRInst*> sortedContextTypes;
         for (;;)
         {
-            auto lastCount = sortedContextTypes.Count();
+            auto lastCount = sortedContextTypes.getCount();
             for (auto t : contextTypes)
             {
                 if (sortedContextTypes.contains(t))
@@ -1124,7 +1124,7 @@ struct AutoDiffPass : public InstPassBase
                 if (isIntermediateContextTypeReadyForProcess(contextTypes, sortedContextTypes, t))
                     sortedContextTypes.add(t);
             }
-            if (lastCount == sortedContextTypes.Count())
+            if (lastCount == sortedContextTypes.getCount())
                 break;
         }
 

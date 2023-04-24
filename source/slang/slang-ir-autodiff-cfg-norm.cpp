@@ -453,7 +453,7 @@ struct CFGNormalizationPass
         auto firstLoopBlock = loop->getTargetBlock();
 
         // If we only have one predecessor, the loop is trivial.
-        return (getPredecessorSet(firstLoopBlock).Count() == 1);
+        return (getPredecessorSet(firstLoopBlock).getCount() == 1);
     }
 
     IRBlock* normalizeBreakableRegion(IRInst* branchInst)

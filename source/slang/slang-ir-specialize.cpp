@@ -874,11 +874,11 @@ struct SpecializationContext
             bool iterChanged = false;
             addToWorkList(module->getModuleInst());
 
-            while (workList.Count() != 0)
+            while (workList.getCount() != 0)
             {
                 // We will then iterate until our work list goes dry.
                 //
-                while (workList.Count() != 0)
+                while (workList.getCount() != 0)
                 {
                     IRInst* inst = workList.getLast();
 

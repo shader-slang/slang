@@ -496,7 +496,7 @@ static bool removeTrivialPhiParams(IRBlock* block)
         {
             targetVal = args[i].knownValue;
         }
-        else if (args[i].sameAsParamSet.Count())
+        else if (args[i].sameAsParamSet.getCount())
         {
             auto targetParamId = *args[i].sameAsParamSet.begin();
             targetVal = params[targetParamId];

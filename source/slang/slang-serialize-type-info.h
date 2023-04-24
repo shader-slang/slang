@@ -280,7 +280,7 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
         List<KeySerialType> keys;
         List<ValueSerialType> values;
 
-        Index count = Index(src.Count());
+        Index count = Index(src.getCount());
         keys.setCount(count);
         values.setCount(count);
 
@@ -350,7 +350,7 @@ struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
         List<KeySerialType> keys;
         List<ValueSerialType> values;
 
-        Index count = Index(src.Count());
+        Index count = Index(src.getCount());
         keys.setCount(count);
         values.setCount(count);
 

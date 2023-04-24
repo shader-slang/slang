@@ -273,7 +273,7 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
             diagnostic.range.end.character--;
         }
         diagnosticList.messages.add(diagnostic);
-        if (diagnosticList.messages.Count() >= 1000)
+        if (diagnosticList.messages.getCount() >= 1000)
             break;
     }
 }
@@ -540,7 +540,7 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
 
 MacroDefinitionContentAssistInfo* WorkspaceVersion::tryGetMacroDefinition(UnownedStringSlice name)
 {
-    if (macroDefinitions.Count() == 0)
+    if (macroDefinitions.getCount() == 0)
     {
         // build dictionary.
         for (auto& def : linkage->contentAssistInfo.preprocessorInfo.macroDefinitions)

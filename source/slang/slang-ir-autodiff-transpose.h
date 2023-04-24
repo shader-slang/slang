@@ -145,7 +145,7 @@ struct DiffTransposePass
         for (auto predecessor : block->getPredecessors())
             predecessorSet.add(predecessor);
         
-        SLANG_ASSERT(predecessorSet.Count() == 1);
+        SLANG_ASSERT(predecessorSet.getCount() == 1);
 
         return (*predecessorSet.begin());
     }
@@ -965,7 +965,7 @@ struct DiffTransposePass
         }
 
         // We _should_ be completely out of gradients to process at this point.
-        SLANG_ASSERT(gradientsMap.Count() == 0);
+        SLANG_ASSERT(gradientsMap.getCount() == 0);
 
         // Record any phi gradients for the CFG reversal pass.
         phiGradsMap[fwdBlock] = phiParamRevGradInsts;
@@ -1127,7 +1127,7 @@ struct DiffTransposePass
                     for (auto predecessor : nextBlock->getPredecessors())
                         predecessorSet.add(predecessor);
 
-                    if (predecessorSet.Count() > 1)
+                    if (predecessorSet.getCount() > 1)
                     {
                         keepGoing = false;
                         break;

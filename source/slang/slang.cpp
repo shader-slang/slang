@@ -293,7 +293,7 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
 
 SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 {
-    if (m_builtinLinkage->mapNameToLoadedModules.Count())
+    if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
         // Already have a StdLib loaded
         return SLANG_FAIL;
@@ -348,7 +348,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
 SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 {
-    if (m_builtinLinkage->mapNameToLoadedModules.Count())
+    if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
         // Already have a StdLib loaded
         return SLANG_FAIL;
@@ -367,7 +367,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
 SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob)
 {
-    if (m_builtinLinkage->mapNameToLoadedModules.Count() == 0)
+    if (m_builtinLinkage->mapNameToLoadedModules.getCount() == 0)
     {
         // There is no standard lib loaded
         return SLANG_FAIL;

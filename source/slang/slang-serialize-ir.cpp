@@ -168,8 +168,8 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
     {
         List<IRInst*> workInsts;
         calcInstructionList(module, workInsts);
-        SLANG_ASSERT(workInsts.Count() == m_insts.Count());
-        for (UInt i = 0; i < workInsts.Count(); ++i)
+        SLANG_ASSERT(workInsts.getCount() == m_insts.getCount());
+        for (UInt i = 0; i < workInsts.getCount(); ++i)
         {
             SLANG_ASSERT(workInsts[i] == m_insts[i]);
         }

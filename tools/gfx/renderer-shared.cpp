@@ -809,7 +809,7 @@ ShaderComponentID ShaderCache::getComponentId(ComponentKey key)
     owningTypeKey.hash = key.hash;
     owningTypeKey.typeName = key.typeName;
     owningTypeKey.specializationArgs.addRange(key.specializationArgs);
-    ShaderComponentID resultId = static_cast<ShaderComponentID>(componentIds.Count());
+    ShaderComponentID resultId = static_cast<ShaderComponentID>(componentIds.getCount());
     componentIds[owningTypeKey] = resultId;
     return resultId;
 }

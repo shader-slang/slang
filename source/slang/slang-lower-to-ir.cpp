@@ -8052,7 +8052,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), genericParam);
                     }
                 }
-                if (valuesToClone.Count() == 0)
+                if (valuesToClone.getCount() == 0)
                 {
                     // If the new generic has no parameters, set
                     // the generic inst's type to just `returnType`.

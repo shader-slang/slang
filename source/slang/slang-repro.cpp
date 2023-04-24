@@ -273,7 +273,7 @@ struct StoreContext
     {
         typedef ReproUtil::StringPair StringPair;
 
-        Offset32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.Count());
+        Offset32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.getCount());
 
         OffsetBase& base = m_container->asBase();
 
@@ -453,7 +453,7 @@ static String _scrubName(const String& in)
 
                     const auto& entryPointOutputPaths = infos->entryPointOutputPaths;
 
-                    Offset32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.Count());
+                    Offset32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.getCount());
 
                     Index index = 0;
                     for (const auto& pair : entryPointOutputPaths)
@@ -542,7 +542,7 @@ static String _scrubName(const String& in)
         {
             const auto& srcFiles = cacheFileSystem->getPathMap();
 
-            Offset32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.Count());
+            Offset32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.getCount());
 
             Index index = 0;
             for (const auto& pair : srcFiles)
@@ -634,7 +634,7 @@ static String _scrubName(const String& in)
     // Save all the SourceFile state
     {
         const auto& srcSourceFiles = context.m_sourceFileMap;
-        auto dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcSourceFiles.Count());
+        auto dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcSourceFiles.getCount());
 
         Index index = 0;
         for (const auto& pair : srcSourceFiles)

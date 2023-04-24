@@ -341,7 +341,7 @@ public:
         Index lastProduceDiffCount = 0;
         do
         {
-            lastProduceDiffCount = produceDiffSet.Count();
+            lastProduceDiffCount = produceDiffSet.getCount();
             for (auto block : funcInst->getBlocks())
             {
                 if (block != funcInst->getFirstBlock())
@@ -406,7 +406,7 @@ public:
                     }
                 }
             }
-        } while (produceDiffSet.Count() != lastProduceDiffCount);
+        } while (produceDiffSet.getCount() != lastProduceDiffCount);
 
         // Reverse propagate `expectDiffSet`.
         for (int i = 0; i < expectDiffInstWorkList.getCount(); i++)

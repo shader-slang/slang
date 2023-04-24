@@ -43,7 +43,7 @@ struct BitCastLoweringContext
     {
         addToWorkList(module->getModuleInst());
 
-        while (workList.Count() != 0)
+        while (workList.getCount() != 0)
         {
             IRInst* inst = workList.getLast();
 
