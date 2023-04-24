@@ -187,7 +187,7 @@ TestServer::~TestServer()
 {
     for (auto& pair : m_unitTestModules)
     {
-        pair.Value->destroy();
+        pair.value->destroy();
     }
 }
 

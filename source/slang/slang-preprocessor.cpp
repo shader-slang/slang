@@ -3858,7 +3858,7 @@ Environment::~Environment()
 {
     for (auto pair : this->macros)
     {
-        auto macro = pair.Value;
+        auto macro = pair.value;
         delete macro;
     }
 }
@@ -4060,7 +4060,7 @@ TokenList preprocessSource(
     {
         for (auto p : *desc.defines)
         {
-            DefineMacro(&preprocessor, p.Key, p.Value);
+            DefineMacro(&preprocessor, p.key, p.value);
         }
     }
 

@@ -321,7 +321,7 @@ CacheFileSystem::~CacheFileSystem()
 {
     for (const auto& pair : m_uniqueIdentityMap)
     {
-        PathInfo* pathInfo = pair.Value;
+        PathInfo* pathInfo = pair.value;
         delete pathInfo;
     }
 }
@@ -376,7 +376,7 @@ void CacheFileSystem::clearCache()
 {
     for (const auto& pair : m_uniqueIdentityMap)
     {
-        PathInfo* pathInfo = pair.Value;
+        PathInfo* pathInfo = pair.value;
         delete pathInfo;
     }
 
@@ -438,7 +438,7 @@ SlangResult CacheFileSystem::enumeratePathContents(const char* path, FileSystemC
     {
         // NOTE! The currentPath can be a *non* simplified path (the m_pathMap is the cache of paths simplified and other to a file/directory)
         // Also note that there will always be the simplified version of the path in cache.
-        const String& currentPath = pair.Key;
+        const String& currentPath = pair.key;
 
         // If it doesn't start with simplified path, then it can't be a hit
         if (!currentPath.startsWith(simplifiedPath))
@@ -468,7 +468,7 @@ SlangResult CacheFileSystem::enumeratePathContents(const char* path, FileSystemC
         // Let's check that fact...
         SLANG_ASSERT(foundPath[remaining.getLength()] == 0);
 
-        PathInfo* pathInfo = pair.Value;
+        PathInfo* pathInfo = pair.value;
 
         SlangPathType pathType;
         if (SLANG_FAILED(_getPathType(pathInfo, currentPath.getBuffer(), &pathType)))

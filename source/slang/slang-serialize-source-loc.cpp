@@ -126,7 +126,7 @@ void SerialSourceLocWriter::write(SerialSourceLocData* outSourceLocData)
 
     for (auto& pair : m_sourceFileMap)
     {
-        Source* debugSourceFile = pair.Value;
+        Source* debugSourceFile = pair.value;
         SourceFile* sourceFile = debugSourceFile->m_sourceFile;
 
         SerialSourceLocData::SourceInfo sourceInfo;

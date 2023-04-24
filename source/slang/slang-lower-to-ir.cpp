@@ -6550,8 +6550,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for(auto entry : astWitnessTable->requirementDictionary)
         {
-            auto requiredMemberDecl = entry.Key;
-            auto satisfyingWitness = entry.Value;
+            auto requiredMemberDecl = entry.key;
+            auto satisfyingWitness = entry.value;
 
             auto irRequirementKey = getInterfaceRequirementKey(requiredMemberDecl);
             if (!irRequirementKey) continue;
@@ -7695,8 +7695,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto& entry : attr->m_mapTypeToIDifferentiableWitness)
         {
             // Lower type and witness.
-            IRType* irType = lowerType(subContext, entry.Value->sub);
-            IRInst* irWitness = lowerVal(subContext, entry.Value).val;
+            IRType* irType = lowerType(subContext, entry.value->sub);
+            IRInst* irWitness = lowerVal(subContext, entry.value).val;
 
             SLANG_ASSERT(irType);
 

@@ -334,7 +334,7 @@ void specializeDispatchFunctions(SharedGenericsLoweringContext* sharedContext)
     // Generate specialized dispatch functions and fixup call sites.
     for (auto kv : sharedContext->mapInterfaceRequirementKeyToDispatchMethods)
     {
-        auto dispatchFunc = kv.Value;
+        auto dispatchFunc = kv.value;
 
         // Generate a specialized `switch` statement based dispatch func,
         // from the witness tables present in the module.

@@ -28,7 +28,7 @@ namespace Slang
         for (auto rtti : sharedContext->mapTypeToRTTIObject)
         {
             IRBuilder builder(sharedContext->module);
-            builder.setInsertBefore(rtti.Value);
+            builder.setInsertBefore(rtti.value);
             IRUse* nextUse = nullptr;
             auto uint2Type = builder.getVectorType(
                 builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
@@ -36,7 +36,7 @@ namespace Slang
                 builder.getIntValue(builder.getUIntType(), id),
                 builder.getIntValue(builder.getUIntType(), 0)};
             auto idOperand = builder.emitMakeVector(uint2Type, 2, uint2Args);
-            for (auto use = rtti.Value->firstUse; use; use = nextUse)
+            for (auto use = rtti.value->firstUse; use; use = nextUse)
             {
                 nextUse = use->nextUse;
                 if (use->getUser()->getOp() == kIROp_GetAddr)

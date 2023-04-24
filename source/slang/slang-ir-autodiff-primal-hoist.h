@@ -112,8 +112,8 @@ namespace Slang
                     newPrimalsInfo->instsToInvert.add(env->mapOldValToNew[inst]);
 
             for (auto kvpair : this->invertInfoMap)
-                if (env->mapOldValToNew.containsKey(kvpair.Key))
-                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.Key]] = kvpair.Value.applyMap(env);
+                if (env->mapOldValToNew.containsKey(kvpair.key))
+                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.key]] = kvpair.value.applyMap(env);
             
             return newPrimalsInfo;
         }
@@ -136,7 +136,7 @@ namespace Slang
                 instsToInvert.add(inst);
 
             for (auto kvpair : info->invertInfoMap)
-                invertInfoMap[kvpair.Key] = kvpair.Value;
+                invertInfoMap[kvpair.key] = kvpair.value;
         }
     };
 

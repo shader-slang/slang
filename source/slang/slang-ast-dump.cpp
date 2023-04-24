@@ -394,8 +394,8 @@ struct ASTDumpContext
 
         for (auto iter : dict)
         {
-            const auto& key = iter.Key;
-            const auto& value = iter.Value;
+            const auto& key = iter.key;
+            const auto& value = iter.value;
 
             dump(key);
             m_writer->emit(" : ");
@@ -416,8 +416,8 @@ struct ASTDumpContext
 
         for (auto iter : dict)
         {
-            const auto& key = iter.Key;
-            const auto& value = iter.Value;
+            const auto& key = iter.key;
+            const auto& value = iter.value;
 
             dump(key);
             m_writer->emit(" : ");

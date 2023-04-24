@@ -3610,7 +3610,7 @@ bool testCategoryMatches(
 {
     for( auto item : categorySet )
     {
-        if(testCategoryMatches(categoryToMatch, item.Value))
+        if(testCategoryMatches(categoryToMatch, item.value))
             return true;
     }
     return false;

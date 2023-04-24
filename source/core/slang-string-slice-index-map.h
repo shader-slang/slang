@@ -68,8 +68,8 @@ Index StringSliceIndexMap::getValue(const UnownedStringSlice& key)
 KeyValuePair<UnownedStringSlice, Index> StringSliceIndexMap::getAt(CountIndex countIndex) const
 {
     KeyValuePair<UnownedStringSlice, Index> pair;
-    pair.Key = m_pool.getSlice(StringSlicePool::Handle(countIndex));
-    pair.Value = m_indexMap[countIndex];
+    pair.key = m_pool.getSlice(StringSlicePool::Handle(countIndex));
+    pair.value = m_indexMap[countIndex];
     return pair;
 }
 

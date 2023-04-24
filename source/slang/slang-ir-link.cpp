@@ -596,7 +596,7 @@ IRGeneric* cloneGenericImpl(
             continue;
         for (auto kv : paramMapping)
         {
-            registerClonedValue(context, kv.Key, kv.Value);
+            registerClonedValue(context, kv.key, kv.value);
         }
 
         IRBuilder builderStorage = *builder;

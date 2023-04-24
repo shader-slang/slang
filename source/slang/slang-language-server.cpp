@@ -1398,12 +1398,12 @@ void LanguageServer::publishDiagnostics()
     List<String> filesToRemove;
     for (auto& file : m_lastPublishedDiagnostics)
     {
-        if (!version->diagnostics.containsKey(file.Key))
+        if (!version->diagnostics.containsKey(file.key))
         {
             PublishDiagnosticsParams args;
-            args.uri = URI::fromLocalFilePath(file.Key.getUnownedSlice()).uri;
+            args.uri = URI::fromLocalFilePath(file.key.getUnownedSlice()).uri;
             m_connection->sendCall(UnownedStringSlice("textDocument/publishDiagnostics"), &args);
-            filesToRemove.add(file.Key);
+            filesToRemove.add(file.key);
         }
     }
     for (auto& toRemove : filesToRemove)
@@ -1413,15 +1413,15 @@ void LanguageServer::publishDiagnostics()
     // Send updates for any files whose diagnostic messages has changed since last update.
     for (auto& list : version->diagnostics)
     {
-        auto lastPublished = m_lastPublishedDiagnostics.tryGetValue(list.Key);
-        if (!lastPublished || *lastPublished != list.Value.originalOutput)
+        auto lastPublished = m_lastPublishedDiagnostics.tryGetValue(list.key);
+        if (!lastPublished || *lastPublished != list.value.originalOutput)
         {
             PublishDiagnosticsParams args;
-            args.uri = URI::fromLocalFilePath(list.Key.getUnownedSlice()).uri;
-            for (auto& d : list.Value.messages)
+            args.uri = URI::fromLocalFilePath(list.key.getUnownedSlice()).uri;
+            for (auto& d : list.value.messages)
                 args.diagnostics.add(d);
             m_connection->sendCall(UnownedStringSlice("textDocument/publishDiagnostics"), &args);
-            m_lastPublishedDiagnostics[list.Key] = list.Value.originalOutput;
+            m_lastPublishedDiagnostics[list.key] = list.value.originalOutput;
         }
     }
 }

@@ -635,14 +635,14 @@ namespace Slang
     static void _lockPrimalParamReplacementInsts(IRBuilder* builder, ParameterBlockTransposeInfo& paramInfo)
     {
         for (auto& kv : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
-            builder->addKeepAliveDecoration(kv.Value);
+            builder->addKeepAliveDecoration(kv.value);
     }
 
     // Remove [KeepAlive] decorations for primal param replacement insts.
     static void _unlockPrimalParamReplacementInsts(ParameterBlockTransposeInfo& paramInfo)
     {
         for (auto& kv : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
-            kv.Value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
+            kv.value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
     }
 
     // Transcribe a function definition.
@@ -1193,9 +1193,9 @@ namespace Slang
         builder.setInsertBefore(returnInst);
         for (auto& wb : info.outDiffWritebacks)
         {
-            auto dest = wb.Key;
-            auto srcPrimalVal = wb.Value.primal;
-            auto srcDiffAddr = wb.Value.differential;
+            auto dest = wb.key;
+            auto srcPrimalVal = wb.value.primal;
+            auto srcDiffAddr = wb.value.differential;
             auto srcDiffVal = builder.emitLoad(srcDiffAddr);
             auto destVal = builder.emitMakeDifferentialPair(as<IRPtrTypeBase>(dest->getFullType())->getValueType(), srcPrimalVal, srcDiffVal);
             builder.emitStore(dest, destVal);

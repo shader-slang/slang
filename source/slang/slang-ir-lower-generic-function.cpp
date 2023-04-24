@@ -371,7 +371,7 @@ namespace Slang
         {
             for (auto lowered : sharedContext->loweredInterfaceTypes)
             {
-                 lowered.Key->replaceUsesWith(lowered.Value);
+                 lowered.key->replaceUsesWith(lowered.value);
             }
             sharedContext->mapInterfaceRequirementKeyValue.clear();
         }

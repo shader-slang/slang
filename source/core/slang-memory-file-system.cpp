@@ -173,7 +173,7 @@ SlangResult MemoryFileSystem::enumeratePathContents(const char* path, FileSystem
     // If it is a directory, we need to see if there is anything in it
     for (const auto& pair : m_entries)
     {
-        const Entry* childEntry = &pair.Value;
+        const Entry* childEntry = &pair.value;
         collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
     }
 
@@ -277,7 +277,7 @@ SlangResult MemoryFileSystem::remove(const char* path)
             // If it is a directory, we need to see if there is anything in it
             for (const auto& pair : m_entries)
             {
-                const Entry* childEntry = &pair.Value;
+                const Entry* childEntry = &pair.value;
                 collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
                 if (collector.hasContent())
                 {

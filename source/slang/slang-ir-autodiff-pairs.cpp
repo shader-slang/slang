@@ -134,8 +134,8 @@ struct DiffPairLoweringPass : InstPassBase
             });
         for (auto replacement : pendingReplacements)
         {
-            replacement.Key->replaceUsesWith(replacement.Value);
-            replacement.Key->removeAndDeallocate();
+            replacement.key->replaceUsesWith(replacement.value);
+            replacement.key->removeAndDeallocate();
         }
 
         return modified;
@@ -243,8 +243,8 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
             });
         for (auto replacement : pendingReplacements)
         {
-            replacement.Key->replaceUsesWith(replacement.Value);
-            replacement.Key->removeAndDeallocate();
+            replacement.key->replaceUsesWith(replacement.value);
+            replacement.key->removeAndDeallocate();
         }
 
         return modified;

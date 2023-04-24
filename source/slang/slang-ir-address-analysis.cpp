@@ -157,13 +157,13 @@ namespace Slang
         for (auto& addr : info.addressInfos)
         {
             RefPtr<AddressInfo> parentInfo;
-            if (addr.Value->addrInst->getOperandCount() > 1 &&
-                info.addressInfos.tryGetValue(addr.Value->addrInst->getOperand(0), parentInfo))
+            if (addr.value->addrInst->getOperandCount() > 1 &&
+                info.addressInfos.tryGetValue(addr.value->addrInst->getOperand(0), parentInfo))
             {
-                addr.Value->parentAddress = parentInfo;
-                parentInfo->children.add(addr.Value);
+                addr.value->parentAddress = parentInfo;
+                parentInfo->children.add(addr.value);
                 if (!parentInfo->isConstant)
-                    addr.Value->isConstant = false;
+                    addr.value->isConstant = false;
             }
         }
         return info;

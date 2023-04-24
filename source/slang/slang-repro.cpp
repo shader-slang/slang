@@ -281,8 +281,8 @@ struct StoreContext
         for (const auto& srcDefine : srcDefines)
         {
             // Do allocation before setting
-            const auto key = fromString(srcDefine.Key);
-            const auto value = fromString(srcDefine.Value);
+            const auto key = fromString(srcDefine.key);
+            const auto value = fromString(srcDefine.value);
 
             auto& dstDefine = base[dstDefines[index]];
             dstDefine.first = key;
@@ -458,11 +458,11 @@ static String _scrubName(const String& in)
                     Index index = 0;
                     for (const auto& pair : entryPointOutputPaths)
                     {
-                        Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(pair.Value.getUnownedSlice());
+                        Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(pair.value.getUnownedSlice());
 
                         auto& dstOutputState = base[dstOutputStates[index]];
 
-                        dstOutputState.entryPointIndex = int32_t(pair.Key);
+                        dstOutputState.entryPointIndex = int32_t(pair.key);
                         dstOutputState.outputPath = outputPath;
 
                         index++;
@@ -547,8 +547,8 @@ static String _scrubName(const String& in)
             Index index = 0;
             for (const auto& pair : srcFiles)
             {
-                const auto path = context.fromString(pair.Key);
-                const auto pathInfo = context.addPathInfo(pair.Value);
+                const auto path = context.fromString(pair.key);
+                const auto pathInfo = context.addPathInfo(pair.value);
 
                 PathAndPathInfo& dstInfo = base[pathMap[index]];
                 dstInfo.path = path;
@@ -639,7 +639,7 @@ static String _scrubName(const String& in)
         Index index = 0;
         for (const auto& pair : srcSourceFiles)
         {
-            base[dstSourceFiles[index]] = pair.Value; 
+            base[dstSourceFiles[index]] = pair.value; 
             index++;
         }
         base[requestState]->sourceFiles = dstSourceFiles;
@@ -875,7 +875,7 @@ struct LoadContext
     {
         for (const auto& pair : context.m_fileToPathInfoMap)
         {
-            CacheFileSystem::PathInfo* pathInfo = pair.Value;
+            CacheFileSystem::PathInfo* pathInfo = pair.value;
             SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
             dstUniqueMap.add(pathInfo->m_uniqueIdentity, pathInfo);
 
@@ -1071,7 +1071,7 @@ struct LoadContext
         {
             for (const auto& pair : context.m_fileToPathInfoMap)
             {
-                CacheFileSystem::PathInfo* pathInfo = pair.Value;
+                CacheFileSystem::PathInfo* pathInfo = pair.value;
 
                 // TODO(JS): It's not 100% clear why we are ending up 
                 // with entries that don't have a unique identity.

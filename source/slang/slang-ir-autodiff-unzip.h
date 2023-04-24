@@ -161,7 +161,7 @@ struct DiffUnzipPass
             List<IRBlock*> workList;
             for (auto blockRegionPair : indexRegionMap->map)
             {
-                IRBlock* block = blockRegionPair.Key;
+                IRBlock* block = blockRegionPair.key;
                 workList.add(block);
             }
 

@@ -15,55 +15,55 @@ namespace Slang
     class KeyValuePair
     {
     public:
-        TKey Key;
-        TValue Value;
+        TKey key;
+        TValue value;
         KeyValuePair()
         {}
-        KeyValuePair(const TKey& key, const TValue& value)
+        KeyValuePair(const TKey& inKey, const TValue& inValue)
         {
-            Key = key;
-            Value = value;
+            key = inKey;
+            value = inValue;
         }
-        KeyValuePair(TKey&& key, TValue&& value)
+        KeyValuePair(TKey&& inKey, TValue&& inValue)
         {
-            Key = _Move(key);
-            Value = _Move(value);
+            key = _Move(inKey);
+            value = _Move(inValue);
         }
-        KeyValuePair(TKey&& key, const TValue& value)
+        KeyValuePair(TKey&& inKey, const TValue& inValue)
         {
-            Key = _Move(key);
-            Value = value;
+            key = _Move(inKey);
+            value = inValue;
         }
-        KeyValuePair(const KeyValuePair<TKey, TValue>& _that)
+        KeyValuePair(const KeyValuePair<TKey, TValue>& that)
         {
-            Key = _that.Key;
-            Value = _that.Value;
+            key = that.key;
+            value = that.value;
         }
-        KeyValuePair(KeyValuePair<TKey, TValue>&& _that)
+        KeyValuePair(KeyValuePair<TKey, TValue>&& that)
         {
-            operator=(_Move(_that));
+            operator=(_Move(that));
         }
         KeyValuePair& operator=(KeyValuePair<TKey, TValue>&& that)
         {
-            Key = _Move(that.Key);
-            Value = _Move(that.Value);
+            key = _Move(that.key);
+            value = _Move(that.value);
             return *this;
         }
         KeyValuePair& operator=(const KeyValuePair<TKey, TValue>& that)
         {
-            Key = that.Key;
-            Value = that.Value;
+            key = that.key;
+            value = that.value;
             return *this;
         }
         HashCode getHashCode()
         {
             return combineHash(
-                Slang::getHashCode(Key),
-                Slang::getHashCode(Value));
+                Slang::getHashCode(key),
+                Slang::getHashCode(value));
         }
         bool operator==(const KeyValuePair<TKey, TValue>& that) const
         {
-            return (Key == that.Key) && (Value == that.Value);
+            return (key == that.key) && (value == that.value);
         }
     };
 
@@ -91,37 +91,37 @@ namespace Slang
             return 1;
         }
     private:
-        int bucketSizeMinusOne;
-        int _count;
-        UIntSet marks;
-        KeyValuePair<TKey, TValue>* hashMap;
+        int m_bucketCountMinusOne;
+        int m_count;
+        UIntSet m_marks;
+        KeyValuePair<TKey, TValue>* m_hashMap;
         void deallocateAll()
         {
-            if (hashMap)
-                delete[] hashMap;
-            hashMap = nullptr;
+            if (m_hashMap)
+                delete[] m_hashMap;
+            m_hashMap = nullptr;
         }
         inline bool isDeleted(int pos) const
         {
-            return marks.contains((pos << 1) + 1);
+            return m_marks.contains((pos << 1) + 1);
         }
         inline bool isEmpty(int pos) const
         {
-            return !marks.contains((pos << 1));
+            return !m_marks.contains((pos << 1));
         }
         inline void setDeleted(int pos, bool val)
         {
             if (val)
-                marks.add((pos << 1) + 1);
+                m_marks.add((pos << 1) + 1);
             else
-                marks.remove((pos << 1) + 1);
+                m_marks.remove((pos << 1) + 1);
         }
         inline void setEmpty(int pos, bool val)
         {
             if (val)
-                marks.remove((pos << 1));
+                m_marks.remove((pos << 1));
             else
-                marks.add((pos << 1));
+                m_marks.add((pos << 1));
         }
         struct FindPositionResult
         {
@@ -142,9 +142,9 @@ namespace Slang
         template<typename KeyType>
         inline int getHashPos(KeyType& key) const
         {
-            SLANG_ASSERT(bucketSizeMinusOne > 0);
+            SLANG_ASSERT(m_bucketCountMinusOne > 0);
             const unsigned int hash = (unsigned int)getHashCode(key);
-            return (hash * 2654435761u) % (unsigned int)(bucketSizeMinusOne);
+            return (hash * 2654435761u) % (unsigned int)(m_bucketCountMinusOne);
         }
         template<typename KeyType>
         FindPositionResult findPosition(const KeyType& key) const
@@ -152,7 +152,7 @@ namespace Slang
             int hashPos = getHashPos(const_cast<KeyType&>(key));
             int insertPos = -1;
             int numProbes = 0;
-            while (numProbes <= bucketSizeMinusOne)
+            while (numProbes <= m_bucketCountMinusOne)
             {
                 if (isEmpty(hashPos))
                 {
@@ -166,12 +166,12 @@ namespace Slang
                     if (insertPos == -1)
                         insertPos = hashPos;
                 }
-                else if (hashMap[hashPos].Key == key)
+                else if (m_hashMap[hashPos].key == key)
                 {
                     return FindPositionResult(hashPos, -1);
                 }
                 numProbes++;
-                hashPos = (hashPos + getProbeOffset(numProbes)) & bucketSizeMinusOne;
+                hashPos = (hashPos + getProbeOffset(numProbes)) & m_bucketCountMinusOne;
             }
             if (insertPos != -1)
                 return FindPositionResult(-1, insertPos);
@@ -179,25 +179,25 @@ namespace Slang
         }
         TValue & _insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
         {
-            hashMap[pos] = _Move(kvPair);
+            m_hashMap[pos] = _Move(kvPair);
             setEmpty(pos, false);
             setDeleted(pos, false);
-            return hashMap[pos].Value;
+            return m_hashMap[pos].value;
         }
-        void rehash()
+        void maybeRehash()
         {
-            if (bucketSizeMinusOne == -1 || _count >= int(MaxLoadFactor * bucketSizeMinusOne))
+            if (m_bucketCountMinusOne == -1 || m_count >= int(MaxLoadFactor * m_bucketCountMinusOne))
             {
-                int newSize = (bucketSizeMinusOne + 1) * 2;
+                int newSize = (m_bucketCountMinusOne + 1) * 2;
                 if (newSize == 0)
                 {
                     newSize = 16;
                 }
                 Dictionary<TKey, TValue> newDict;
-                newDict.bucketSizeMinusOne = newSize - 1;
-                newDict.hashMap = new KeyValuePair<TKey, TValue>[newSize];
-                newDict.marks.resizeAndClear(newSize * 2);
-                if (hashMap)
+                newDict.m_bucketCountMinusOne = newSize - 1;
+                newDict.m_hashMap = new KeyValuePair<TKey, TValue>[newSize];
+                newDict.m_marks.resizeAndClear(newSize * 2);
+                if (m_hashMap)
                 {
                     for (auto & kvPair : *this)
                     {
@@ -210,13 +210,13 @@ namespace Slang
 
         bool addIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
         {
-            rehash();
-            auto pos = findPosition(kvPair.Key);
+            maybeRehash();
+            auto pos = findPosition(kvPair.key);
             if (pos.objectPosition != -1)
                 return false;
             else if (pos.insertionPosition != -1)
             {
-                _count++;
+                m_count++;
                 _insert(_Move(kvPair), pos.insertionPosition);
                 return true;
             }
@@ -230,13 +230,13 @@ namespace Slang
         }
         TValue& set(KeyValuePair<TKey, TValue>&& kvPair)
         {
-            rehash();
-            auto pos = findPosition(kvPair.Key);
+            maybeRehash();
+            auto pos = findPosition(kvPair.key);
             if (pos.objectPosition != -1)
                 return _insert(_Move(kvPair), pos.objectPosition);
             else if (pos.insertionPosition != -1)
             {
-                _count++;
+                m_count++;
                 return _insert(_Move(kvPair), pos.insertionPosition);
             }
             else
@@ -249,20 +249,20 @@ namespace Slang
             const Dictionary<TKey, TValue>* dict;
             int pos;
         public:
-            KeyValuePair<TKey, TValue>& operator *() const
+            KeyValuePair<TKey, TValue>& operator*() const
             {
-                return dict->hashMap[pos];
+                return dict->m_hashMap[pos];
             }
-            KeyValuePair<TKey, TValue>* operator ->() const
+            KeyValuePair<TKey, TValue>* operator->() const
             {
-                return dict->hashMap + pos;
+                return dict->m_hashMap + pos;
             }
             Iterator& operator++()
             {
-                if (pos > dict->bucketSizeMinusOne)
+                if (pos > dict->m_bucketCountMinusOne)
                     return *this;
                 pos++;
-                while (pos <= dict->bucketSizeMinusOne && (dict->isDeleted(pos) || dict->isEmpty(pos)))
+                while (pos <= dict->m_bucketCountMinusOne && (dict->isDeleted(pos) || dict->isEmpty(pos)))
                 {
                     pos++;
                 }
@@ -274,22 +274,22 @@ namespace Slang
                 operator++();
                 return rs;
             }
-            bool operator!=(const Iterator& _that) const
+            bool operator!=(const Iterator& that) const
             {
-                return pos != _that.pos || dict != _that.dict;
+                return pos != that.pos || dict != that.dict;
             }
-            bool operator==(const Iterator& _that) const
+            bool operator==(const Iterator& that) const
             {
-                return pos == _that.pos && dict == _that.dict;
+                return pos == that.pos && dict == that.dict;
             }
-            Iterator(const Dictionary<TKey, TValue>* _dict, int _pos)
+            Iterator(const Dictionary<TKey, TValue>* inDict, int inPos)
             {
-                this->dict = _dict;
-                this->pos = _pos;
+                this->dict = inDict;
+                this->pos = inPos;
             }
             Iterator()
             {
-                this->dict = 0;
+                this->dict = nullptr;
                 this->pos = 0;
             }
         };
@@ -297,7 +297,7 @@ namespace Slang
         Iterator begin() const
         {
             int pos = 0;
-            while (pos < bucketSizeMinusOne + 1)
+            while (pos < m_bucketCountMinusOne + 1)
             {
                 if (isEmpty(pos) || isDeleted(pos))
                     pos++;
@@ -308,7 +308,7 @@ namespace Slang
         }
         Iterator end() const
         {
-            return Iterator(this, bucketSizeMinusOne + 1);
+            return Iterator(this, m_bucketCountMinusOne + 1);
         }
     public:
         void add(const TKey & key, const TValue & value)
@@ -329,35 +329,35 @@ namespace Slang
         }
         void remove(const TKey & key)
         {
-            if (_count == 0)
+            if (m_count == 0)
                 return;
             auto pos = findPosition(key);
             if (pos.objectPosition != -1)
             {
                 setDeleted(pos.objectPosition, true);
-                _count--;
+                m_count--;
             }
         }
         void clear()
         {
-            _count = 0;
+            m_count = 0;
 
-            marks.clear();
+            m_marks.clear();
         }
 
         TValue* tryGetValueOrAdd(const TKey& key, const TValue& value)
         {
-            rehash();
+            maybeRehash();
             auto pos = findPosition(key);
             if (pos.objectPosition != -1)
             {
-                return &hashMap[pos.objectPosition].Value;
+                return &m_hashMap[pos.objectPosition].value;
             }
             else if (pos.insertionPosition != -1)
             {
                 // Make pair
                 KeyValuePair<TKey, TValue> kvPair(_Move(key), _Move(value));
-                _count++;
+                m_count++;
                 _insert(_Move(kvPair), pos.insertionPosition);
                 return nullptr;
             }
@@ -369,17 +369,17 @@ namespace Slang
             /// If there isn't already an entry for 'key', a value is added with defaultValue. 
         TValue& getOrAddValue(const TKey& key, const TValue& defaultValue)
         {
-            rehash();
+            maybeRehash();
             auto pos = findPosition(key);
             if (pos.objectPosition != -1)
             {
-                return hashMap[pos.objectPosition].Value;
+                return m_hashMap[pos.objectPosition].value;
             }
             else if (pos.insertionPosition != -1)
             {
                 // Make pair
                 KeyValuePair<TKey, TValue> kvPair(_Move(key), _Move(defaultValue));
-                _count++;
+                m_count++;
                 return _insert(_Move(kvPair), pos.insertionPosition);
             }
             else
@@ -396,7 +396,7 @@ namespace Slang
         template<typename KeyType>
         bool containsKey(const KeyType& key) const
         {
-            if (bucketSizeMinusOne == -1)
+            if (m_bucketCountMinusOne == -1)
                 return false;
             auto pos = findPosition(key);
             return pos.objectPosition != -1;
@@ -404,12 +404,12 @@ namespace Slang
         template<typename KeyType>
         bool tryGetValue(const KeyType& key, TValue& value) const
         {
-            if (bucketSizeMinusOne == -1)
+            if (m_bucketCountMinusOne == -1)
                 return false;
             auto pos = findPosition(key);
             if (pos.objectPosition != -1)
             {
-                value = hashMap[pos.objectPosition].Value;
+                value = m_hashMap[pos.objectPosition].value;
                 return true;
             }
             return false;
@@ -417,12 +417,12 @@ namespace Slang
         template<typename KeyType>
         TValue* tryGetValue(const KeyType& key) const
         {
-            if (bucketSizeMinusOne == -1)
+            if (m_bucketCountMinusOne == -1)
                 return nullptr;
             auto pos = findPosition(key);
             if (pos.objectPosition != -1)
             {
-                return &hashMap[pos.objectPosition].Value;
+                return &m_hashMap[pos.objectPosition].value;
             }
             return nullptr;
         }
@@ -448,7 +448,7 @@ namespace Slang
                 auto pos = dict->findPosition(key);
                 if (pos.objectPosition != -1)
                 {
-                    return dict->hashMap[pos.objectPosition].Value;
+                    return dict->m_hashMap[pos.objectPosition].value;
                 }
                 else
                     SLANG_ASSERT_FAILURE("The key does not exist in dictionary.");
@@ -480,7 +480,7 @@ namespace Slang
         }
         int getCount() const
         {
-            return _count;
+            return m_count;
         }
 
             /// Swap this with rhs
@@ -496,9 +496,9 @@ namespace Slang
     public:
         Dictionary()
         {
-            bucketSizeMinusOne = -1;
-            _count = 0;
-            hashMap = nullptr;
+            m_bucketCountMinusOne = -1;
+            m_count = 0;
+            m_hashMap = nullptr;
         }
         template<typename Arg, typename... Args>
         Dictionary(Arg arg, Args... args)
@@ -506,12 +506,12 @@ namespace Slang
             init(arg, args...);
         }
         Dictionary(const Dictionary<TKey, TValue>& other)
-            : bucketSizeMinusOne(-1), _count(0), hashMap(nullptr)
+            : m_bucketCountMinusOne(-1), m_count(0), m_hashMap(nullptr)
         {
             *this = other;
         }
         Dictionary(Dictionary<TKey, TValue>&& other)
-            : bucketSizeMinusOne(-1), _count(0), hashMap(nullptr)
+            : m_bucketCountMinusOne(-1), m_count(0), m_hashMap(nullptr)
         {
             *this = (_Move(other));
         }
@@ -520,12 +520,12 @@ namespace Slang
             if (this == &other)
                 return *this;
             deallocateAll();
-            bucketSizeMinusOne = other.bucketSizeMinusOne;
-            _count = other._count;
-            hashMap = new KeyValuePair<TKey, TValue>[other.bucketSizeMinusOne + 1];
-            marks = other.marks;
-            for (int i = 0; i <= bucketSizeMinusOne; i++)
-                hashMap[i] = other.hashMap[i];
+            m_bucketCountMinusOne = other.m_bucketCountMinusOne;
+            m_count = other.m_count;
+            m_hashMap = new KeyValuePair<TKey, TValue>[other.m_bucketCountMinusOne + 1];
+            m_marks = other.m_marks;
+            for (int i = 0; i <= m_bucketCountMinusOne; i++)
+                m_hashMap[i] = other.m_hashMap[i];
             return *this;
         }
         Dictionary<TKey, TValue>& operator=(Dictionary<TKey, TValue>&& other)
@@ -533,13 +533,13 @@ namespace Slang
             if (this == &other)
                 return *this;
             deallocateAll();
-            bucketSizeMinusOne = other.bucketSizeMinusOne;
-            _count = other._count;
-            hashMap = other.hashMap;
-            marks = _Move(other.marks);
-            other.hashMap = 0;
-            other._count = 0;
-            other.bucketSizeMinusOne = -1;
+            m_bucketCountMinusOne = other.m_bucketCountMinusOne;
+            m_count = other.m_count;
+            m_hashMap = other.m_hashMap;
+            m_marks = _Move(other.m_marks);
+            other.m_hashMap = nullptr;
+            other.m_count = 0;
+            other.m_bucketCountMinusOne = -1;
             return *this;
         }
         ~Dictionary()
@@ -552,10 +552,10 @@ namespace Slang
     template<typename TKey, typename TValue>
     void Dictionary<TKey, TValue>::swapWith(ThisType& rhs)
     {
-        Swap(bucketSizeMinusOne, rhs.bucketSizeMinusOne);
-        Swap(_count, rhs._count);
-        marks.swapWith(rhs.marks);
-        Swap(hashMap, rhs.hashMap);
+        Swap(m_bucketCountMinusOne, rhs.m_bucketCountMinusOne);
+        Swap(m_count, rhs.m_count);
+        m_marks.swapWith(rhs.m_marks);
+        Swap(m_hashMap, rhs.m_hashMap);
     }
 
     class _DummyClass
@@ -608,11 +608,11 @@ namespace Slang
             Iterator() = default;
             T& operator*() const
             {
-                return (*iter).Key;
+                return (*iter).key;
             }
             T* operator->() const
             {
-                return &(*iter).Key;
+                return &(*iter).key;
             }
             Iterator& operator++()
             {
@@ -690,34 +690,34 @@ namespace Slang
         }
 
     private:
-        int bucketSizeMinusOne;
-        int _count;
-        UIntSet marks;
+        int m_bucketCountMinusOne;
+        int m_count;
+        UIntSet m_marks;
 
-        LinkedList<KeyValuePair<TKey, TValue>> kvPairs;
-        LinkedNode<KeyValuePair<TKey, TValue>>** hashMap;
+        LinkedList<KeyValuePair<TKey, TValue>> m_kvPairs;
+        LinkedNode<KeyValuePair<TKey, TValue>>** m_hashMap;
         void deallocateAll()
         {
-            if (hashMap)
-                delete[] hashMap;
-            hashMap = 0;
-            kvPairs.Clear();
+            if (m_hashMap)
+                delete[] m_hashMap;
+            m_hashMap = nullptr;
+            m_kvPairs.clear();
         }
-        inline bool isDeleted(int pos) const { return marks.contains((pos << 1) + 1); }
-        inline bool isEmpty(int pos) const { return !marks.contains((pos << 1)); }
+        inline bool isDeleted(int pos) const { return m_marks.contains((pos << 1) + 1); }
+        inline bool isEmpty(int pos) const { return !m_marks.contains((pos << 1)); }
         inline void setDeleted(int pos, bool val)
         {
             if (val)
-                marks.add((pos << 1) + 1);
+                m_marks.add((pos << 1) + 1);
             else
-                marks.remove((pos << 1) + 1);
+                m_marks.remove((pos << 1) + 1);
         }
         inline void setEmpty(int pos, bool val)
         {
             if (val)
-                marks.remove((pos << 1));
+                m_marks.remove((pos << 1));
             else
-                marks.add((pos << 1));
+                m_marks.add((pos << 1));
         }
         struct FindPositionResult
         {
@@ -737,14 +737,14 @@ namespace Slang
         template <typename T> inline int getHashPos(T& key) const
         {
             const unsigned int hash = (unsigned int)getHashCode(key);
-            return ((unsigned int)(hash * 2654435761)) % bucketSizeMinusOne;
+            return ((unsigned int)(hash * 2654435761)) % m_bucketCountMinusOne;
         }
         template <typename T> FindPositionResult findPosition(const T& key) const
         {
             int hashPos = getHashPos((T&)key);
             int insertPos = -1;
             int numProbes = 0;
-            while (numProbes <= bucketSizeMinusOne)
+            while (numProbes <= m_bucketCountMinusOne)
             {
                 if (isEmpty(hashPos))
                 {
@@ -758,12 +758,12 @@ namespace Slang
                     if (insertPos == -1)
                         insertPos = hashPos;
                 }
-                else if (hashMap[hashPos]->Value.Key == key)
+                else if (m_hashMap[hashPos]->value.key == key)
                 {
                     return FindPositionResult(hashPos, -1);
                 }
                 numProbes++;
-                hashPos = (hashPos + getProbeOffset(numProbes)) & bucketSizeMinusOne;
+                hashPos = (hashPos + getProbeOffset(numProbes)) & m_bucketCountMinusOne;
             }
             if (insertPos != -1)
                 return FindPositionResult(-1, insertPos);
@@ -771,27 +771,27 @@ namespace Slang
         }
         TValue& _insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
         {
-            auto node = kvPairs.AddLast();
-            node->Value = _Move(kvPair);
-            hashMap[pos] = node;
+            auto node = m_kvPairs.addLast();
+            node->value = _Move(kvPair);
+            m_hashMap[pos] = node;
             setEmpty(pos, false);
             setDeleted(pos, false);
-            return node->Value.Value;
+            return node->value.value;
         }
-        void rehash()
+        void maybeRehash()
         {
-            if (bucketSizeMinusOne == -1 || _count / (float)bucketSizeMinusOne >= MaxLoadFactor)
+            if (m_bucketCountMinusOne == -1 || m_count / (float)m_bucketCountMinusOne >= MaxLoadFactor)
             {
-                int newSize = (bucketSizeMinusOne + 1) * 2;
+                int newSize = (m_bucketCountMinusOne + 1) * 2;
                 if (newSize == 0)
                 {
                     newSize = 16;
                 }
                 OrderedDictionary<TKey, TValue> newDict;
-                newDict.bucketSizeMinusOne = newSize - 1;
-                newDict.hashMap = new LinkedNode<KeyValuePair<TKey, TValue>>*[newSize];
-                newDict.marks.resizeAndClear(newSize * 2);
-                if (hashMap)
+                newDict.m_bucketCountMinusOne = newSize - 1;
+                newDict.m_hashMap = new LinkedNode<KeyValuePair<TKey, TValue>>*[newSize];
+                newDict.m_marks.resizeAndClear(newSize * 2);
+                if (m_hashMap)
                 {
                     for (auto& kvPair : *this)
                     {
@@ -804,13 +804,13 @@ namespace Slang
 
         bool addIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
         {
-            rehash();
-            auto pos = findPosition(kvPair.Key);
+            maybeRehash();
+            auto pos = findPosition(kvPair.key);
             if (pos.objectPosition != -1)
                 return false;
             else if (pos.insertionPosition != -1)
             {
-                _count++;
+                m_count++;
                 _insert(_Move(kvPair), pos.insertionPosition);
                 return true;
             }
@@ -824,16 +824,16 @@ namespace Slang
         }
         TValue& set(KeyValuePair<TKey, TValue>&& kvPair)
         {
-            rehash();
-            auto pos = findPosition(kvPair.Key);
+            maybeRehash();
+            auto pos = findPosition(kvPair.key);
             if (pos.objectPosition != -1)
             {
-                hashMap[pos.objectPosition]->Delete();
+                m_hashMap[pos.objectPosition]->removeAndDelete();
                 return _insert(_Move(kvPair), pos.objectPosition);
             }
             else if (pos.insertionPosition != -1)
             {
-                _count++;
+                m_count++;
                 return _insert(_Move(kvPair), pos.insertionPosition);
             }
             else
@@ -845,11 +845,11 @@ namespace Slang
 
         typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator begin() const
         {
-            return kvPairs.begin();
+            return m_kvPairs.begin();
         }
         typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator end() const
         {
-            return kvPairs.end();
+            return m_kvPairs.end();
         }
 
     public:
@@ -871,50 +871,50 @@ namespace Slang
         }
         void remove(const TKey& key)
         {
-            if (_count > 0)
+            if (m_count > 0)
             {
                 auto pos = findPosition(key);
                 if (pos.objectPosition != -1)
                 {
-                    kvPairs.Delete(hashMap[pos.objectPosition]);
-                    hashMap[pos.objectPosition] = 0;
+                    m_kvPairs.removeAndDelete(m_hashMap[pos.objectPosition]);
+                    m_hashMap[pos.objectPosition] = 0;
                     setDeleted(pos.objectPosition, true);
-                    _count--;
+                    m_count--;
                 }
             }
         }
         void clear()
         {
-            _count = 0;
-            kvPairs.Clear();
-            marks.clear();
+            m_count = 0;
+            m_kvPairs.clear();
+            m_marks.clear();
         }
         template <typename T> bool containsKey(const T& key) const
         {
-            if (bucketSizeMinusOne == -1)
+            if (m_bucketCountMinusOne == -1)
                 return false;
             auto pos = findPosition(key);
             return pos.objectPosition != -1;
         }
         template <typename T> TValue* tryGetValue(const T& key) const
         {
-            if (bucketSizeMinusOne == -1)
+            if (m_bucketCountMinusOne == -1)
                 return nullptr;
             auto pos = findPosition(key);
             if (pos.objectPosition != -1)
             {
-                return &(hashMap[pos.objectPosition]->Value.Value);
+                return &(m_hashMap[pos.objectPosition]->value.value);
             }
             return nullptr;
         }
         template <typename T> bool tryGetValue(const T& key, TValue& value) const
         {
-            if (bucketSizeMinusOne == -1)
+            if (m_bucketCountMinusOne == -1)
                 return false;
             auto pos = findPosition(key);
             if (pos.objectPosition != -1)
             {
-                value = hashMap[pos.objectPosition]->Value.Value;
+                value = m_hashMap[pos.objectPosition]->value.value;
                 return true;
             }
             return false;
@@ -941,7 +941,7 @@ namespace Slang
                 auto pos = dict->findPosition(key);
                 if (pos.objectPosition != -1)
                 {
-                    return dict->hashMap[pos.objectPosition]->Value.Value;
+                    return dict->m_hashMap[pos.objectPosition]->value.value;
                 }
                 else
                 {
@@ -964,9 +964,9 @@ namespace Slang
         ItemProxy operator[](const TKey& key) const { return ItemProxy(key, this); }
         ItemProxy operator[](TKey&& key) const { return ItemProxy(_Move(key), this); }
 
-        int getCount() const { return _count; }
-        KeyValuePair<TKey, TValue>& First() const { return kvPairs.First(); }
-        KeyValuePair<TKey, TValue>& Last() const { return kvPairs.Last(); }
+        int getCount() const { return m_count; }
+        KeyValuePair<TKey, TValue>& getFirst() const { return m_kvPairs.getFirst(); }
+        KeyValuePair<TKey, TValue>& getLast() const { return m_kvPairs.getLast(); }
 
     private:
         template <typename... Args>
@@ -979,25 +979,25 @@ namespace Slang
     public:
         OrderedDictionary()
         {
-            bucketSizeMinusOne = -1;
-            _count = 0;
-            hashMap = 0;
+            m_bucketCountMinusOne = -1;
+            m_count = 0;
+            m_hashMap = 0;
         }
         template <typename Arg, typename... Args> OrderedDictionary(Arg arg, Args... args)
         {
             init(arg, args...);
         }
         OrderedDictionary(const OrderedDictionary<TKey, TValue>& other)
-            : bucketSizeMinusOne(-1)
-            , _count(0)
-            , hashMap(0)
+            : m_bucketCountMinusOne(-1)
+            , m_count(0)
+            , m_hashMap(0)
         {
             *this = other;
         }
         OrderedDictionary(OrderedDictionary<TKey, TValue>&& other)
-            : bucketSizeMinusOne(-1)
-            , _count(0)
-            , hashMap(0)
+            : m_bucketCountMinusOne(-1)
+            , m_count(0)
+            , m_hashMap(0)
         {
             *this = (_Move(other));
         }
@@ -1008,7 +1008,7 @@ namespace Slang
                 return *this;
             clear();
             for (auto& item : other)
-                add(item.Key, item.Value);
+                add(item.key, item.value);
             return *this;
         }
         OrderedDictionary<TKey, TValue>&
@@ -1017,14 +1017,14 @@ namespace Slang
             if (this == &other)
                 return *this;
             deallocateAll();
-            bucketSizeMinusOne = other.bucketSizeMinusOne;
-            _count = other._count;
-            hashMap = other.hashMap;
-            marks = _Move(other.marks);
-            other.hashMap = 0;
-            other._count = 0;
-            other.bucketSizeMinusOne = -1;
-            kvPairs = _Move(other.kvPairs);
+            m_bucketCountMinusOne = other.m_bucketCountMinusOne;
+            m_count = other.m_count;
+            m_hashMap = other.m_hashMap;
+            m_marks = _Move(other.m_marks);
+            other.m_hashMap = 0;
+            other.m_count = 0;
+            other.m_bucketCountMinusOne = -1;
+            m_kvPairs = _Move(other.m_kvPairs);
             return *this;
         }
         ~OrderedDictionary() { deallocateAll(); }
@@ -1035,7 +1035,7 @@ namespace Slang
     public:
         T& getLast()
         {
-            return this->dict.Last().Key;
+            return this->dict.getLast().key;
         }
         void removeLast()
         {

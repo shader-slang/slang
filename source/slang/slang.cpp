@@ -386,8 +386,8 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {
-        const Name* moduleName = pair.Key;
-        Module* module = pair.Value;
+        const Name* moduleName = pair.key;
+        Module* module = pair.value;
 
         // Set up options
         SerialContainerUtil::WriteOptions options;
@@ -912,7 +912,7 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     {
         for (const auto& pair : builtinLinkage->mapNameToLoadedModules)
         {
-            mapNameToLoadedModules.add(pair.Key, pair.Value);
+            mapNameToLoadedModules.add(pair.key, pair.value);
         }
     }
 
@@ -1341,8 +1341,8 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     // Add the preprocessor definitions to the hash
     for (auto& key : preprocessorDefinitions)
     {
-        builder.append(key.Key);
-        builder.append(key.Value);
+        builder.append(key.key);
+        builder.append(key.value);
     }
 
     // Add the target specified by targetIndex
@@ -2015,7 +2015,7 @@ static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewIniti
     // This assumes they increase in SourceLoc implies an later within a source file - this is true currently.
     for (auto& pair : outHierarchy)
     {
-        pair.Value.sort([](SourceView* a, SourceView* b) -> bool { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
+        pair.value.sort([](SourceView* a, SourceView* b) -> bool { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
     }
 }
 
@@ -2171,11 +2171,11 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // that may be desirable or not...
     Dictionary<String, String> combinedPreprocessorDefinitions;
     for(auto& def : getLinkage()->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.key, def.value);
     for(auto& def : preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.key, def.value);
     for(auto& def : translationUnit->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.key, def.value);
 
     // Define standard macros, if not already defined. This style assumes using `#if __SOME_VAR` style, as in
     //

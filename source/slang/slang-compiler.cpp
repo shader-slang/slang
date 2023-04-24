@@ -1049,11 +1049,11 @@ namespace Slang
             // If it's pass through we accumulate the preprocessor definitions. 
             for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)
             {
-                preprocessorDefinitions.add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.key, define.value);
             }
             for (auto& define : translationUnit->preprocessorDefinitions)
             {
-                preprocessorDefinitions.add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.key, define.value);
             }
             
             {
@@ -1134,7 +1134,7 @@ namespace Slang
             auto linkage = getLinkage();
             for (auto& define : linkage->preprocessorDefinitions)
             {
-                preprocessorDefinitions.add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.key, define.value);
             }
         }
 
@@ -1383,8 +1383,8 @@ namespace Slang
                 {
                     auto& define = dst[i];
                     
-                    define.nameWithSig = allocator.allocate(def.Key);
-                    define.value = allocator.allocate(def.Value);
+                    define.nameWithSig = allocator.allocate(def.key);
+                    define.value = allocator.allocate(def.value);
 
                     ++i;
                 }

@@ -21,17 +21,17 @@ private:
     LinkedList<T>* list;
 
 public:
-    T Value;
+    T value;
     LinkedNode(LinkedList<T>* lnk)
         : list(lnk)
     {
     };
-    LinkedNode<T>* GetPrevious() { return prev; };
-    LinkedNode<T>* GetNext() { return next; };
-    LinkedNode<T>* InsertAfter(const T& nData)
+    LinkedNode<T>* getPrevious() { return prev; };
+    LinkedNode<T>* getNext() { return next; };
+    LinkedNode<T>* insertAfter(const T& nData)
     {
         LinkedNode<T>* n = new LinkedNode<T>(list);
-        n->Value = nData;
+        n->value = nData;
         n->prev = this;
         n->next = this->next;
         LinkedNode<T>* npp = n->next;
@@ -45,10 +45,10 @@ public:
         list->count++;
         return n;
     };
-    LinkedNode<T>* InsertBefore(const T& nData)
+    LinkedNode<T>* insertBefore(const T& nData)
     {
         LinkedNode<T>* n = new LinkedNode<T>(list);
-        n->Value = nData;
+        n->value = nData;
         n->prev = prev;
         n->next = this;
         prev = n;
@@ -60,7 +60,7 @@ public:
         list->count++;
         return n;
     };
-    void Delete()
+    void removeAndDelete()
     {
         if (prev)
             prev->next = next;
@@ -84,38 +84,38 @@ template <typename T> class LinkedList
     template <typename T1> friend class LinkedNode;
 
 private:
-    LinkedNode<T>*head, *tail;
+    LinkedNode<T>* head, *tail;
     int count;
 
 public:
     class Iterator
     {
     public:
-        LinkedNode<T>*Current, *Next;
-        void SetCurrent(LinkedNode<T>* cur)
+        LinkedNode<T>* current, *next;
+        void setCurrent(LinkedNode<T>* cur)
         {
-            Current = cur;
-            if (Current)
-                Next = Current->GetNext();
+            current = cur;
+            if (current)
+                next = current->getNext();
             else
-                Next = 0;
+                next = 0;
         }
-        Iterator() { Current = Next = 0; }
-        Iterator(LinkedNode<T>* cur) { SetCurrent(cur); }
-        T& operator*() const { return Current->Value; }
+        Iterator() { current = next = nullptr; }
+        Iterator(LinkedNode<T>* cur) { setCurrent(cur); }
+        T& operator*() const { return current->value; }
         Iterator& operator++()
         {
-            SetCurrent(Next);
+            setCurrent(next);
             return *this;
         }
         Iterator operator++(int)
         {
             Iterator rs = *this;
-            SetCurrent(Next);
+            setCurrent(next);
             return rs;
         }
-        bool operator!=(const Iterator& iter) const { return Current != iter.Current; }
-        bool operator==(const Iterator& iter) const { return Current == iter.Current; }
+        bool operator!=(const Iterator& iter) const { return current != iter.current; }
+        bool operator==(const Iterator& iter) const { return current == iter.current; }
     };
     Iterator begin() const { return Iterator(head); }
     Iterator end() const { return Iterator(0); }
@@ -126,7 +126,7 @@ public:
         , tail(0)
         , count(0)
     {}
-    ~LinkedList() { Clear(); }
+    ~LinkedList() { clear(); }
     LinkedList(const LinkedList<T>& link)
         : head(0)
         , tail(0)
@@ -144,39 +144,39 @@ public:
     LinkedList<T>& operator=(LinkedList<T>&& link)
     {
         if (head != 0)
-            Clear();
+            clear();
         head = link.head;
         tail = link.tail;
         count = link.count;
         link.head = 0;
         link.tail = 0;
         link.count = 0;
-        for (auto node = head; node; node = node->GetNext())
+        for (auto node = head; node; node = node->getNext())
             node->list = this;
         return *this;
     }
     LinkedList<T>& operator=(const LinkedList<T>& link)
     {
-        if (head != 0)
-            Clear();
+        if (head != nullptr)
+            clear();
         auto p = link.head;
         while (p)
         {
-            AddLast(p->Value);
-            p = p->GetNext();
+            addLast(p->value);
+            p = p->getNext();
         }
         return *this;
     }
-    template <typename IteratorFunc> void ForEach(const IteratorFunc& f)
+    template <typename IteratorFunc> void forEach(const IteratorFunc& f)
     {
         auto p = head;
         while (p)
         {
-            f(p->Value);
-            p = p->GetNext();
+            f(p->value);
+            p = p->getNext();
         }
     }
-    LinkedNode<T>* GetNode(int x)
+    LinkedNode<T>* getNode(int x)
     {
         LinkedNode<T>* pCur = head;
         for (int i = 0; i < x; i++)
@@ -188,33 +188,33 @@ public:
         }
         return pCur;
     };
-    LinkedNode<T>* Find(const T& fData)
+    LinkedNode<T>* find(const T& fData)
     {
         for (LinkedNode<T>* pCur = head; pCur; pCur = pCur->next)
         {
-            if (pCur->Value == fData)
+            if (pCur->value == fData)
                 return pCur;
         }
-        return 0;
+        return nullptr;
     };
-    LinkedNode<T>* FirstNode() const { return head; };
-    T& First() const
+    LinkedNode<T>* getFirstNode() const { return head; };
+    T& getFirst() const
     {
         if (!head)
             SLANG_UNEXPECTED("LinkedList: index out of range.");
-        return head->Value;
+        return head->value;
     }
-    T& Last() const
+    T& getLast() const
     {
         if (!tail)
             SLANG_UNEXPECTED("LinkedList: index out of range.");
-        return tail->Value;
+        return tail->value;
     }
-    LinkedNode<T>* LastNode() const { return tail; };
-    LinkedNode<T>* AddLast(const T& nData)
+    LinkedNode<T>* getLastNode() const { return tail; };
+    LinkedNode<T>* addLast(const T& nData)
     {
         LinkedNode<T>* n = new LinkedNode<T>(this);
-        n->Value = nData;
+        n->value = nData;
         n->prev = tail;
         if (tail)
             tail->next = n;
@@ -226,7 +226,7 @@ public:
         return n;
     };
     // Insert a blank node
-    LinkedNode<T>* AddLast()
+    LinkedNode<T>* addLast()
     {
         LinkedNode<T>* n = new LinkedNode<T>(this);
         n->prev = tail;
@@ -239,15 +239,15 @@ public:
         count++;
         return n;
     };
-    LinkedNode<T>* AddFirst(const T& nData)
+    LinkedNode<T>* addFirst(const T& nData)
     {
         LinkedNode<T>* n = new LinkedNode<T>(this);
-        n->Value = nData;
-        AddFirst(n);
+        n->value = nData;
+        addFirst(n);
         count++;
         return n;
     };
-    void AddFirst(LinkedNode<T>* n)
+    void addFirst(LinkedNode<T>* n)
     {
         n->prev = 0;
         n->next = head;
@@ -257,7 +257,7 @@ public:
         if (!tail)
             tail = n;
     }
-    void RemoveFromList(LinkedNode<T>* n)
+    void removeFromList(LinkedNode<T>* n)
     {
         LinkedNode<T>*n1, *n2 = 0;
         n1 = n->prev;
@@ -273,7 +273,7 @@ public:
         n->prev = nullptr;
         n->next = nullptr;
     }
-    void Delete(LinkedNode<T>* n, int Count = 1)
+    void removeAndDelete(LinkedNode<T>* n, int Count = 1)
     {
         LinkedNode<T>*cur, *next;
         cur = n;
@@ -281,7 +281,7 @@ public:
         for (int i = 0; i < Count; i++)
         {
             next = cur->next;
-            RemoveFromList(cur);
+            removeFromList(cur);
             delete cur;
             cur = next;
             numDeleted++;
@@ -290,7 +290,7 @@ public:
         }
         count -= numDeleted;
     }
-    void Clear()
+    void clear()
     {
         for (LinkedNode<T>* n = head; n;)
         {
@@ -302,7 +302,7 @@ public:
         tail = 0;
         count = 0;
     }
-    List<T> ToList() const
+    List<T> toList() const
     {
         List<T> rs;
         rs.Reserve(count);
@@ -312,7 +312,7 @@ public:
         }
         return rs;
     }
-    int Count() { return count; }
+    int getCount() { return count; }
 };
 } // namespace Slang
 #endif

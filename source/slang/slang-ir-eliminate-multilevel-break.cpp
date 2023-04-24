@@ -334,8 +334,8 @@ struct EliminateMultiLevelBreakContext
         // value equal to the level of its corresponding region.
         for (auto breakBlockKV : mapNewBreakBlockToRegionLevel)
         {
-            auto breakBlock = breakBlockKV.Key;
-            auto level = breakBlockKV.Value;
+            auto breakBlock = breakBlockKV.key;
+            auto level = breakBlockKV.value;
             IRInst* levelInst = nullptr;
             List<IRUse*> uses;
             for (auto use = breakBlock->firstUse; use; use = use->nextUse)

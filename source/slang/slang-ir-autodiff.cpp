@@ -873,9 +873,9 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
     // Look for equivalent types.
     for (auto type : context.differentiableWitnessDictionary)
     {
-        if (isTypeEqual(type.Key, (IRType*)typeInst))
+        if (isTypeEqual(type.key, (IRType*)typeInst))
         {
-            context.differentiableWitnessDictionary[(IRType*)typeInst] = type.Value;
+            context.differentiableWitnessDictionary[(IRType*)typeInst] = type.value;
             return true;
         }
     }
@@ -1178,7 +1178,7 @@ struct AutoDiffPass : public InstPassBase
         for (auto t : diffTypes)
         {
             HashSet<IRFunc*> registeredFuncs;
-            for (auto use = t.Key->firstUse; use; use = use->nextUse)
+            for (auto use = t.key->firstUse; use; use = use->nextUse)
             {
                 auto parentFunc = getParentFunc(use->getUser());
                 if (!parentFunc)
@@ -1187,7 +1187,7 @@ struct AutoDiffPass : public InstPassBase
                     continue;
                 if (auto dictDecor = parentFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
                 {
-                    registerDiffContextType(builder, dictDecor, diffTypes, t.Key);
+                    registerDiffContextType(builder, dictDecor, diffTypes, t.key);
                 }
             }
         }

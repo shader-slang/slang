@@ -301,7 +301,7 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
         HashSet<String> set;
         for (auto& p : openedDocuments)
         {
-            auto dir = Path::getParentDirectory(p.Key.getBuffer());
+            auto dir = Path::getParentDirectory(p.key.getBuffer());
             if (set.add(dir))
                 searchPathsRaw.add(dir.getBuffer());
         }

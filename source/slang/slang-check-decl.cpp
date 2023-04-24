@@ -2112,8 +2112,8 @@ namespace Slang
         for( auto p : mapRequiredToSatisfyingAccessorDeclRef )
         {
             witnessTable->add(
-                p.Key,
-                RequirementWitness(p.Value));
+                p.key,
+                RequirementWitness(p.value));
         }
         //
         // Note: the property declaration itself isn't something that
@@ -3264,7 +3264,7 @@ namespace Slang
         //
         for(auto p : mapRequiredAccessorToSynAccessor)
         {
-            witnessTable->add(p.Key, RequirementWitness(makeDeclRef(p.Value)));
+            witnessTable->add(p.key, RequirementWitness(makeDeclRef(p.value)));
         }
         witnessTable->add(requiredMemberDeclRef,
             RequirementWitness(makeDeclRef(synPropertyDecl)));
@@ -3413,10 +3413,10 @@ namespace Slang
         bool hasDifferentialAssocType = false;
         for (auto existingEntry : witnessTable->requirementDictionary)
         {
-            if (auto builtinReqAttr = existingEntry.Key->findModifier<BuiltinRequirementModifier>())
+            if (auto builtinReqAttr = existingEntry.key->findModifier<BuiltinRequirementModifier>())
             {
                 if (builtinReqAttr->kind == BuiltinRequirementKind::DifferentialType &&
-                    existingEntry.Value.getFlavor() != RequirementWitness::Flavor::none)
+                    existingEntry.value.getFlavor() != RequirementWitness::Flavor::none)
                 {
                     hasDifferentialAssocType = true;
                 }
@@ -5324,7 +5324,7 @@ namespace Slang
             bool hasConflict = false;
             for (auto& pair : newTargets)
             {
-                Name* target = pair.Key;
+                Name* target = pair.key;
                 auto found = currentTargets.tryGetValue(target);
                 if (found)
                 {
@@ -6574,8 +6574,8 @@ namespace Slang
     {
         for( auto& entry : moduleDecl->mapTypeToCandidateExtensions )
         {
-            auto& list = _getCandidateExtensionList(entry.Key, m_mapTypeDeclToCandidateExtensions);
-            list.addRange(entry.Value->candidateExtensions);
+            auto& list = _getCandidateExtensionList(entry.key, m_mapTypeDeclToCandidateExtensions);
+            list.addRange(entry.value->candidateExtensions);
         }
     }
 
@@ -6601,8 +6601,8 @@ namespace Slang
     {
         for (auto& entry : moduleDecl->mapDeclToAssociatedDecls)
         {
-            auto& list = _getDeclAssociationList(entry.Key, m_mapDeclToAssociatedDecls);
-            list.addRange(entry.Value->associations);
+            auto& list = _getDeclAssociationList(entry.key, m_mapDeclToAssociatedDecls);
+            list.addRange(entry.value->associations);
         }
     }
 
@@ -6866,12 +6866,12 @@ namespace Slang
         for (auto& constraints : genericConstraints)
         {
             List<Type*> typeList;
-            for (auto type : constraints.Value)
+            for (auto type : constraints.value)
             {
                 _getCanonicalConstraintTypes(typeList, type);
             }
             // TODO: we also need to sort the types within the list for each generic type param.
-            result[constraints.Key] = typeList;
+            result[constraints.key] = typeList;
         }
         return result;
     }

@@ -217,7 +217,7 @@ struct RegisterAllocateContext
         result.mapTypeToRegisterList = _Move(mapTypeToRegisterList);
         for (auto& regList : result.mapTypeToRegisterList)
         {
-            for (auto reg : regList.Value)
+            for (auto reg : regList.value)
             {
                 for (auto inst : reg->insts)
                 {

@@ -237,7 +237,7 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
 
     for (const auto& pair : m_entries)
     {
-        const Entry* srcEntry = &pair.Value;
+        const Entry* srcEntry = &pair.value;
 
         // Ignore the root entry
         if (srcEntry->m_canonicalPath == toSlice("."))

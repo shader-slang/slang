@@ -1828,9 +1828,9 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
         for (auto entry : oldStructTypeLayout->mapVarToLayout)
         {
             VarLayout* newFieldLayout = nullptr;
-            if (mapOldFieldToNew.tryGetValue(entry.Value.Ptr(), newFieldLayout))
+            if (mapOldFieldToNew.tryGetValue(entry.value.Ptr(), newFieldLayout))
             {
-                newStructTypeLayout->mapVarToLayout.add(entry.Key, newFieldLayout);
+                newStructTypeLayout->mapVarToLayout.add(entry.key, newFieldLayout);
             }
         }
 
@@ -2989,8 +2989,8 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
 
         for( auto p : originalStructTypeLayout->mapVarToLayout )
         {
-            VarDeclBase* key = p.Key;
-            RefPtr<VarLayout> originalVal = p.Value;
+            VarDeclBase* key = p.key;
+            RefPtr<VarLayout> originalVal = p.value;
             RefPtr<VarLayout> adjustedVal;
             if( mapOriginalFieldToAdjusted.tryGetValue(originalVal, adjustedVal) )
             {

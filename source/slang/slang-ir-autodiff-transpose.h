@@ -868,7 +868,7 @@ struct DiffTransposePass
         // 
         for (auto pair : gradientsMap)
         {
-            if (auto loadInst = as<IRLoad>(pair.Key))
+            if (auto loadInst = as<IRLoad>(pair.key))
                 accumulateGradientsForLoad(&builder, loadInst);
         }
 
@@ -916,14 +916,14 @@ struct DiffTransposePass
         List<IRInst*> globalInsts; // Holds insts in the global scope.
         for (auto pair : gradientsMap)
         {
-            auto instParent = pair.Key->getParent();
+            auto instParent = pair.key->getParent();
             if (instParent != fwdBlock)
             {
                 if (instParent->getParent() == fwdBlock->getParent())
-                    externInsts.add(pair.Key);
+                    externInsts.add(pair.key);
                 
                 if (as<IRModuleInst>(instParent))
-                    globalInsts.add(pair.Key);
+                    globalInsts.add(pair.key);
             }
         }
 
@@ -2681,7 +2681,7 @@ struct DiffTransposePass
 
         for (auto pair : bucketedGradients)
         {
-            auto subGrads = pair.Value;
+            auto subGrads = pair.value;
 
             auto primalType = tryGetPrimalTypeFromDiffInst(subGrads[0].fwdGradInst);
 
@@ -2691,7 +2691,7 @@ struct DiffTransposePass
             auto revGradTargetAddress = builder->emitElementAddress(
                 builder->getPtrType(subGrads[0].revGradInst->getDataType()),
                 revGradVar,
-                pair.Key);
+                pair.key);
 
             builder->emitStore(revGradTargetAddress, emitAggregateValue(builder, primalType, subGrads));
         }
@@ -2747,7 +2747,7 @@ struct DiffTransposePass
 
         for (auto pair : bucketedGradients)
         {
-            auto subGrads = pair.Value;
+            auto subGrads = pair.value;
 
             auto primalType = tryGetPrimalTypeFromDiffInst(subGrads[0].fwdGradInst);
 
@@ -2757,7 +2757,7 @@ struct DiffTransposePass
             auto revGradTargetAddress = builder->emitFieldAddress(
                 builder->getPtrType(subGrads[0].revGradInst->getDataType()),
                 revGradVar,
-                pair.Key);
+                pair.key);
 
             builder->emitStore(revGradTargetAddress, emitAggregateValue(builder, primalType, subGrads));
         }

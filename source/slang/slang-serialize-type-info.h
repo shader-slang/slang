@@ -293,8 +293,8 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
         Index i = 0;
         for (const auto& pair : src)
         {
-            SerialTypeInfo<KEY>::toSerial(writer, &pair.Key, &keys[i]);
-            SerialTypeInfo<VALUE>::toSerial(writer, &pair.Value, &values[i]);
+            SerialTypeInfo<KEY>::toSerial(writer, &pair.key, &keys[i]);
+            SerialTypeInfo<VALUE>::toSerial(writer, &pair.value, &values[i]);
             i++;
         }
 
@@ -363,8 +363,8 @@ struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
         Index i = 0;
         for (const auto& pair : src)
         {
-            SerialTypeInfo<KEY>::toSerial(writer, &pair.Key, &keys[i]);
-            SerialTypeInfo<VALUE>::toSerial(writer, &pair.Value, &values[i]);
+            SerialTypeInfo<KEY>::toSerial(writer, &pair.key, &keys[i]);
+            SerialTypeInfo<VALUE>::toSerial(writer, &pair.value, &values[i]);
             i++;
         }
 
@@ -418,16 +418,16 @@ struct SerialTypeInfo<KeyValuePair<KEY, VALUE>>
         auto& src = *(const NativeType*)native;
         auto& dst = *(SerialType*)serial;
 
-        SerialTypeInfo<KEY>::toSerial(writer, &src.Key, &dst.key);
-        SerialTypeInfo<VALUE>::toSerial(writer, &src.Value, &dst.value);
+        SerialTypeInfo<KEY>::toSerial(writer, &src.key, &dst.key);
+        SerialTypeInfo<VALUE>::toSerial(writer, &src.value, &dst.value);
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
         auto& src = *(const SerialType*)serial;
         auto& dst = *(NativeType*)native;
 
-        SerialTypeInfo<KEY>::toNative(reader, &src.key, &dst.Key);
-        SerialTypeInfo<VALUE>::toNative(reader, &src.value, &dst.Value);
+        SerialTypeInfo<KEY>::toNative(reader, &src.key, &dst.key);
+        SerialTypeInfo<VALUE>::toNative(reader, &src.value, &dst.value);
     }
 };
 
