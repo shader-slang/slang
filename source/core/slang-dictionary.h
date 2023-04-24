@@ -73,7 +73,7 @@ namespace Slang
         return KeyValuePair<TKey, TValue>(k, v);
     }
 
-    const float MaxLoadFactor = 0.7f;
+    const float kMaxLoadFactor = 0.7f;
 
     template<typename TKey, typename TValue>
     class Dictionary
@@ -177,7 +177,7 @@ namespace Slang
                 return FindPositionResult(-1, insertPos);
             SLANG_ASSERT_FAILURE("Hash map is full. This indicates an error in Key::Equal or Key::getHashCode.");
         }
-        TValue & _insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
+        TValue& _insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
         {
             m_hashMap[pos] = _Move(kvPair);
             setEmpty(pos, false);
@@ -186,7 +186,7 @@ namespace Slang
         }
         void maybeRehash()
         {
-            if (m_bucketCountMinusOne == -1 || m_count >= int(MaxLoadFactor * m_bucketCountMinusOne))
+            if (m_bucketCountMinusOne == -1 || m_count >= int(kMaxLoadFactor * m_bucketCountMinusOne))
             {
                 int newSize = (m_bucketCountMinusOne + 1) * 2;
                 if (newSize == 0)
@@ -199,7 +199,7 @@ namespace Slang
                 newDict.m_marks.resizeAndClear(newSize * 2);
                 if (m_hashMap)
                 {
-                    for (auto & kvPair : *this)
+                    for (auto& kvPair : *this)
                     {
                         newDict.add(_Move(kvPair));
                     }
@@ -311,23 +311,23 @@ namespace Slang
             return Iterator(this, m_bucketCountMinusOne + 1);
         }
     public:
-        void add(const TKey & key, const TValue & value)
+        void add(const TKey& key, const TValue& value)
         {
             add(KeyValuePair<TKey, TValue>(key, value));
         }
-        void add(TKey && key, TValue && value)
+        void add(TKey&& key, TValue&& value)
         {
             add(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
         }
-        bool addIfNotExists(const TKey & key, const TValue & value)
+        bool addIfNotExists(const TKey& key, const TValue& value)
         {
             return addIfNotExists(KeyValuePair<TKey, TValue>(key, value));
         }
-        bool addIfNotExists(TKey && key, TValue && value)
+        bool addIfNotExists(TKey&& key, TValue&& value)
         {
             return addIfNotExists(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
         }
-        void remove(const TKey & key)
+        void remove(const TKey& key)
         {
             if (m_count == 0)
                 return;
@@ -341,7 +341,6 @@ namespace Slang
         void clear()
         {
             m_count = 0;
-
             m_marks.clear();
         }
 
@@ -488,7 +487,7 @@ namespace Slang
 
     private:
         template<typename... Args>
-        void init(const KeyValuePair<TKey, TValue> & kvPair, Args... args)
+        void init(const KeyValuePair<TKey, TValue>& kvPair, Args... args)
         {
             add(kvPair);
             init(args...);
@@ -558,6 +557,7 @@ namespace Slang
         Swap(m_hashMap, rhs.m_hashMap);
     }
 
+    /* We may want to rename this, as strictly speaking _Caps names are reserved */
     class _DummyClass
     {};
 
@@ -625,15 +625,15 @@ namespace Slang
                 operator++();
                 return rs;
             }
-            bool operator!=(const Iterator& _that) const
+            bool operator!=(const Iterator& that) const
             {
-                return iter != _that.iter;
+                return iter != that.iter;
             }
-            bool operator==(const Iterator& _that) const
+            bool operator==(const Iterator& that) const
             {
-                return iter == _that.iter;
+                return iter == that.iter;
             }
-            Iterator(const typename DictionaryType::Iterator & _iter)
+            Iterator(const typename DictionaryType::Iterator& _iter)
             {
                 this->iter = _iter;
             }
@@ -780,7 +780,7 @@ namespace Slang
         }
         void maybeRehash()
         {
-            if (m_bucketCountMinusOne == -1 || m_count / (float)m_bucketCountMinusOne >= MaxLoadFactor)
+            if (m_bucketCountMinusOne == -1 || m_count / (float)m_bucketCountMinusOne >= kMaxLoadFactor)
             {
                 int newSize = (m_bucketCountMinusOne + 1) * 2;
                 if (newSize == 0)

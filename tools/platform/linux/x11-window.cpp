@@ -179,7 +179,7 @@ public:
     {
         if (handle)
         {
-            X11AppContext::windows.Remove(handle);
+            X11AppContext::windows.remove(handle);
             XDestroyWindow(X11AppContext::xdisplay, handle);
             handle = 0;
         }
