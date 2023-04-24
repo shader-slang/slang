@@ -23,6 +23,7 @@ struct ListFuncs
             new (dst + i) Type;
         }
     }
+
     static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
