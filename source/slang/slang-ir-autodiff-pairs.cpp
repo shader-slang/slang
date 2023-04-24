@@ -127,7 +127,7 @@ struct DiffPairLoweringPass : InstPassBase
                 {
                     if (auto loweredType = lowerPairType(builder, pairType))
                     {
-                        pendingReplacements.Add(pairType, loweredType);
+                        pendingReplacements.add(pairType, loweredType);
                         modified = true;
                     }
                 }
@@ -237,7 +237,7 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
             {
                 if (auto loweredType = rewritePairType(builder, inst))
                 {
-                    pendingReplacements.Add(inst, loweredType);
+                    pendingReplacements.add(inst, loweredType);
                     modified = true;
                 }
             });

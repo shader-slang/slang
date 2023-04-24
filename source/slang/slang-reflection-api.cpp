@@ -1413,7 +1413,7 @@ namespace Slang
                 return index;
 
             index = m_extendedInfo->m_descriptorSets.getCount();
-            m_mapSpaceToDescriptorSetIndex.Add(space, index);
+            m_mapSpaceToDescriptorSetIndex.add(space, index);
 
             RefPtr<TypeLayout::ExtendedInfo::DescriptorSetInfo> descriptorSet = new TypeLayout::ExtendedInfo::DescriptorSetInfo();
             m_extendedInfo->m_descriptorSets.add(descriptorSet);

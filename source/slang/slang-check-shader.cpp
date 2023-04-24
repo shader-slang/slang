@@ -673,7 +673,7 @@ namespace Slang
                 auto importedModule = getModule(importDecl->importedModuleDecl);
                 if(!requiredModuleSet.Contains(importedModule))
                 {
-                    requiredModuleSet.Add(importedModule);
+                    requiredModuleSet.add(importedModule);
                     m_requirements.add(importedModule);
                 }
             }

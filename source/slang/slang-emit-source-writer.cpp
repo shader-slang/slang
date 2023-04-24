@@ -471,7 +471,7 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
                 if (!m_mapGLSLSourcePathToID.tryGetValue(path, id))
                 {
                     id = m_glslSourceIDCount++;
-                    m_mapGLSLSourcePathToID.Add(path, id);
+                    m_mapGLSLSourcePathToID.add(path, id);
                 }
 
                 sprintf(buffer, "%d", id);

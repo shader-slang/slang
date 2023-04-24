@@ -1059,7 +1059,7 @@ namespace Slang
 #endif
         friend std::ostream& operator<< (std::ostream& stream, const String& s);
 
-        void Clear()
+        void clear()
         {
             m_buffer.setNull();
         }

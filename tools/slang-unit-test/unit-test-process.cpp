@@ -102,7 +102,7 @@ static SlangResult _countTest(UnitTestContext* context, Index size, Index crashI
 
         if (crashIndex >= 0)
         {
-            buf.Clear();
+            buf.clear();
             buf << crashIndex;
             args.add(buf);
         }

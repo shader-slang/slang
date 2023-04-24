@@ -207,7 +207,7 @@ RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo)
     const auto funcs = RttiUtil::getDefaultTypeFuncs(rttiInfo);
 
     // Add to the map
-    m_map.Add(rttiInfo, funcs);
+    m_map.add(rttiInfo, funcs);
     return funcs;
 }
 

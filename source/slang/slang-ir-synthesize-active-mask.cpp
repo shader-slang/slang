@@ -154,7 +154,7 @@ struct SynthesizeActiveMaskForModuleContext
             return;
 
         m_funcsUsingActiveMask.add(func);
-        m_funcsUsingActiveMaskSet.Add(func);
+        m_funcsUsingActiveMaskSet.add(func);
     }
 
     // The easiest way to know that a function uses the active
@@ -633,7 +633,7 @@ struct SynthesizeActiveMaskForFunctionContext
             {
                 if( inst->getOp() == kIROp_WaveGetActiveMask )
                 {
-                    m_blocksNeedingActiveMask.Add(block);
+                    m_blocksNeedingActiveMask.add(block);
                     break;
                 }
             }
@@ -678,7 +678,7 @@ struct SynthesizeActiveMaskForFunctionContext
                         // `successor` which *has* been marked, so we need
                         // to mark `block` and keep looking for changes.
                         //
-                        m_blocksNeedingActiveMask.Add(block);
+                        m_blocksNeedingActiveMask.add(block);
                         change = true;
                         break;
                     }
@@ -754,7 +754,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // Once we've computed the mask value to start with, we add it to
             // our tracking structure so we can remember which value to use.
             //
-            m_activeMaskForBlock.Add(funcEntryBlock, initialActiveMask);
+            m_activeMaskForBlock.add(funcEntryBlock, initialActiveMask);
         }
     }
 
@@ -827,7 +827,7 @@ struct SynthesizeActiveMaskForFunctionContext
 
         auto activeMaskParam = builder.emitParam(m_maskType);
 
-        m_activeMaskForBlock.Add(block, activeMaskParam);
+        m_activeMaskForBlock.add(block, activeMaskParam);
     }
 
     // The remainder of the work in this pass is going to be based
@@ -1669,7 +1669,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // active mask on input to `toBlock` is the `fromActiveMask` being
         // provided as part of the conditional branch.
         //
-        m_activeMaskForBlock.Add(toBlock, fromActiveMask);
+        m_activeMaskForBlock.add(toBlock, fromActiveMask);
     }
 
     // Unconditional edges are more complicated than conditional
@@ -1898,7 +1898,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // block, and we can just bind the comptue value
             // directly.
             //
-            m_activeMaskForBlock.Add(toBlock, toActiveMask);
+            m_activeMaskForBlock.add(toBlock, toActiveMask);
         }
     }
 

@@ -212,7 +212,7 @@ void maybeAddToWorkList(
     if( !context->onWorkList.Contains(gv) )
     {
         context->workList.add(gv);
-        context->onWorkList.Add(gv);
+        context->onWorkList.add(gv);
     }
 }
 
@@ -532,7 +532,7 @@ void propagateConstExpr(
     {
         auto gv = context.workList[0];
         context.workList.fastRemoveAt(0);
-        context.onWorkList.Remove(gv);
+        context.onWorkList.remove(gv);
 
         switch( gv->getOp() )
         {

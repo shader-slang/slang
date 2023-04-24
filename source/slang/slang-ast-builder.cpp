@@ -42,9 +42,9 @@ void SharedASTBuilder::init(Session* session)
         const ReflectClassInfo* info = ASTClassInfo::getInfo(ASTNodeType(i));
         if (info)
         {
-            m_sliceToTypeMap.Add(UnownedStringSlice(info->m_name), info);
+            m_sliceToTypeMap.add(UnownedStringSlice(info->m_name), info);
             Name* name = m_namePool->getName(String(info->m_name));
-            m_nameToTypeMap.Add(name, info);
+            m_nameToTypeMap.add(name, info);
         }
     }
 }

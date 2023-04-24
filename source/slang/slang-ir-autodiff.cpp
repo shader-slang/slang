@@ -315,7 +315,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     if (!diffType)
         return result;
     result = _createDiffPairType(pairType->getValueType(), (IRType*)diffType);
-    pairTypeCache.Add(primalType, result);
+    pairTypeCache.add(primalType, result);
 
     return result;
 }
@@ -398,7 +398,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             }
             else
             {
-                differentiableWitnessDictionary.Add((IRType*)item->getConcreteType(), item->getWitness());
+                differentiableWitnessDictionary.add((IRType*)item->getConcreteType(), item->getWitness());
 
                 // Also register the type's differential type with the same witness.
                 IRBuilder subBuilder(item->getConcreteType());
@@ -1010,7 +1010,7 @@ struct AutoDiffPass : public InstPassBase
                         auto type = processIntermediateContextTypeBase(&subBuilder, baseFunc);
                         if (type)
                         {
-                            loweredIntermediateTypes.Add(type);
+                            loweredIntermediateTypes.add(type);
                             inst->replaceUsesWith(type);
                             inst->removeAndDeallocate();
                             changed = true;
@@ -1082,7 +1082,7 @@ struct AutoDiffPass : public InstPassBase
         {
             if (auto e = as<IRDifferentiableTypeDictionaryItem>(entry))
             {
-                registeredType.Add(e->getOperand(0));
+                registeredType.add(e->getOperand(0));
             }
         }
         // Use a work list to recursively walk through all sub fields of the struct type.
@@ -1094,7 +1094,7 @@ struct AutoDiffPass : public InstPassBase
             IntermediateContextTypeDifferentialInfo diffInfo;
             if (!diffTypes.tryGetValue(t, diffInfo))
                 continue;
-            if (registeredType.Add(t))
+            if (registeredType.add(t))
                 builder.addDifferentiableTypeEntry(diffDecor, t, diffInfo.diffWitness);
             else
                 continue;
@@ -1122,7 +1122,7 @@ struct AutoDiffPass : public InstPassBase
                     continue;
                 // Have all dependent types been added yet?
                 if (isIntermediateContextTypeReadyForProcess(contextTypes, sortedContextTypes, t))
-                    sortedContextTypes.Add(t);
+                    sortedContextTypes.add(t);
             }
             if (lastCount == sortedContextTypes.Count())
                 break;
@@ -1183,7 +1183,7 @@ struct AutoDiffPass : public InstPassBase
                 auto parentFunc = getParentFunc(use->getUser());
                 if (!parentFunc)
                     continue;
-                if (!registeredFuncs.Add(parentFunc))
+                if (!registeredFuncs.add(parentFunc))
                     continue;
                 if (auto dictDecor = parentFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
                 {
@@ -1384,7 +1384,7 @@ struct AutoDiffPass : public InstPassBase
         {
             bool result = isTypeFullyDifferentiated(findGenericReturnVal(genType));
             if (result)
-                fullyDifferentiatedInsts.Add(genType);
+                fullyDifferentiatedInsts.add(genType);
             return result;
         }
         switch (type->getOp())
@@ -1401,7 +1401,7 @@ struct AutoDiffPass : public InstPassBase
                 if (!isTypeFullyDifferentiated(type->getOperand(i)))
                     return false;
         default:
-            fullyDifferentiatedInsts.Add(type);
+            fullyDifferentiatedInsts.add(type);
             return true;
         }
     }
@@ -1430,7 +1430,7 @@ struct AutoDiffPass : public InstPassBase
                     return false;
             }
         }
-        fullyDifferentiatedInsts.Add(func);
+        fullyDifferentiatedInsts.add(func);
         return true;
     }
 
@@ -1439,7 +1439,7 @@ struct AutoDiffPass : public InstPassBase
     //
     bool processReferencedFunctions(IRBuilder* builder)
     {
-        fullyDifferentiatedInsts.Clear();
+        fullyDifferentiatedInsts.clear();
         bool hasChanges = false;
         for (;;)
         {

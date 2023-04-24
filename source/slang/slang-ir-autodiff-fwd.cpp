@@ -1629,7 +1629,7 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
 
     differentiableTypeConformanceContext.setFunc(primalFuncClone);
     
-    mapInOutParamToWriteBackValue.Clear();
+    mapInOutParamToWriteBackValue.clear();
 
     // Create and map blocks in diff func.
     for (auto block = primalFuncClone->getFirstBlock(); block; block = block->getNextBlock())

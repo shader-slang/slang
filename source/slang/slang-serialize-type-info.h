@@ -321,7 +321,7 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
         const Index count = keys.getCount();
         for (Index i = 0; i < count; ++i)
         {
-            dst.Add(keys[i], values[i]);
+            dst.add(keys[i], values[i]);
         }
     }
 };
@@ -391,7 +391,7 @@ struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
         const Index count = keys.getCount();
         for (Index i = 0; i < count; ++i)
         {
-            dst.Add(keys[i], values[i]);
+            dst.add(keys[i], values[i]);
         }
     }
 };

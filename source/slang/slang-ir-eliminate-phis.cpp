@@ -417,13 +417,13 @@ struct PhiEliminationContext
         // be building up auxilliary data structures that the
         // subsequent steps will make use of.
         //
-        mapParamToIndex.Clear();
+        mapParamToIndex.clear();
         phiInfos.clear();
         Count paramCounter = 0;
         for (auto param : block->getParams())
         {
             Index paramIndex = paramCounter++;
-            mapParamToIndex.Add(param, paramIndex);
+            mapParamToIndex.add(param, paramIndex);
 
             IRInst* temp = nullptr;
 

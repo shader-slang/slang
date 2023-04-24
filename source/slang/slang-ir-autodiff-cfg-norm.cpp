@@ -442,7 +442,7 @@ struct CFGNormalizationPass
     {
         HashSet<IRBlock*> predecessorSet;
         for (auto predecessor : block->getPredecessors())
-            predecessorSet.Add(predecessor);
+            predecessorSet.add(predecessor);
 
         return predecessorSet;
     }
@@ -690,7 +690,7 @@ void normalizeCFG(
 
             // Collect loop body blocks.
             workList.clear();
-            workListSet.Clear();
+            workListSet.clear();
             workList.add(bodyBlock);
             workListSet.add(bodyBlock);
             for (Index i = 0; i < workList.getCount(); i++)

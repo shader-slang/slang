@@ -106,7 +106,7 @@ namespace Slang
                 return;
 
             workList.add(inst);
-            workListSet.Add(inst);
+            workListSet.add(inst);
         }
 
         void processMakeOptionalValue(IRMakeOptionalValue* inst)
@@ -255,7 +255,7 @@ namespace Slang
                 IRInst* inst = workList.getLast();
 
                 workList.removeLast();
-                workListSet.Remove(inst);
+                workListSet.remove(inst);
 
                 processInst(inst);
 

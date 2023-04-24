@@ -191,7 +191,7 @@ bool _isWitnessTableTransitivelyVisible(IRInst* witness)
             {
                 if (user->getParent())
                 {
-                    if (workSet.Add(user->getParent()))
+                    if (workSet.add(user->getParent()))
                     {
                         workList.add(user->getParent());
                     }

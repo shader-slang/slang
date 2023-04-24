@@ -69,7 +69,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     String pathString = String::fromWString(path);
 
     // We don't want the instance name, just the path to it
-    out.Clear();
+    out.clear();
     out.append(Path::getParentDirectory(pathString));
 
     return out.getLength() > 0 ? SLANG_OK : SLANG_FAIL;

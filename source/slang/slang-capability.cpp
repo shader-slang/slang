@@ -222,7 +222,7 @@ static void _addAtomsRec(
     //
     if(atomInfo.flavor != CapabilityAtomFlavor::Alias)
     {
-        ioExpandedAtoms.Add(atom);
+        ioExpandedAtoms.add(atom);
     }
 
     // Next we add all the atoms transitively implied by `atom`.
@@ -291,7 +291,7 @@ void CapabilitySet::calcCompactedAtoms(List<CapabilityAtom>& outAtoms) const
             if(baseAtom == CapabilityAtom::Invalid)
                 break;
 
-            redundantAtomsSet.Add(baseAtom);
+            redundantAtomsSet.add(baseAtom);
         }
     }
 

@@ -24,7 +24,7 @@ struct BitCastLoweringContext
         if (workList.Contains(inst))
             return;
 
-        workList.Add(inst);
+        workList.add(inst);
     }
 
     void processInst(IRInst* inst)

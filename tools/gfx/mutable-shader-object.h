@@ -142,7 +142,7 @@ namespace gfx
             setObject(ShaderOffset const& offset, IShaderObject* object) override
         {
             Super::setObject(offset, object);
-            m_objectOffsets.Add(offset);
+            m_objectOffsets.add(offset);
             markDirty();
             return SLANG_OK;
         }

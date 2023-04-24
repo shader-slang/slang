@@ -146,7 +146,7 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
         _addDecorations(kind, func);
 
         // Add to the map
-        entry.m_funcs.Add(referencedType, func);
+        entry.m_funcs.add(referencedType, func);
     }
     SLANG_ASSERT(func);
 

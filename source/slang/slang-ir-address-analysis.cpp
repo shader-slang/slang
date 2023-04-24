@@ -15,7 +15,7 @@ namespace Slang
         HashSet<IRInst*> operandInsts;
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
-            operandInsts.Add(inst->getOperand(i));
+            operandInsts.add(inst->getOperand(i));
             auto parentBlock = as<IRBlock>(inst->getOperand(i)->getParent());
             if (parentBlock)
             {
@@ -24,7 +24,7 @@ namespace Slang
             }
         }
         {
-            operandInsts.Add(inst->getFullType());
+            operandInsts.add(inst->getFullType());
             auto parentBlock = as<IRBlock>(inst->getFullType()->getParent());
             if (parentBlock)
             {

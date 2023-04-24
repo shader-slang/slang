@@ -143,7 +143,7 @@ struct DiffTransposePass
     {
         HashSet<IRBlock*> predecessorSet;
         for (auto predecessor : block->getPredecessors())
-            predecessorSet.Add(predecessor);
+            predecessorSet.add(predecessor);
         
         SLANG_ASSERT(predecessorSet.Count() == 1);
 
@@ -539,7 +539,7 @@ struct DiffTransposePass
         HashSet<IRBlock*> traverseSet;
         traverseWorkList.add(revDiffFunc->getFirstBlock());
 
-        traverseSet.Add(revDiffFunc->getFirstBlock());
+        traverseSet.add(revDiffFunc->getFirstBlock());
         for (IRBlock* block = revDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
         {
             if (!isDifferentialInst(block))
@@ -1125,7 +1125,7 @@ struct DiffTransposePass
 
                     HashSet<IRBlock*> predecessorSet;
                     for (auto predecessor : nextBlock->getPredecessors())
-                        predecessorSet.Add(predecessor);
+                        predecessorSet.add(predecessor);
 
                     if (predecessorSet.Count() > 1)
                     {
@@ -2987,7 +2987,7 @@ struct DiffTransposePass
     List<RevGradient> popRevGradients(IRInst* fwdInst)
     {
         List<RevGradient> val = gradientsMap[fwdInst].getValue();
-        gradientsMap.Remove(fwdInst);
+        gradientsMap.remove(fwdInst);
         return val;
     }
 

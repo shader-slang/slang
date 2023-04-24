@@ -242,8 +242,8 @@ public:
             {
                 if (as<IROutTypeBase>(param->getFullType()))
                     differentiableOutputs++;
-                produceDiffSet.Add(param);
-                carryNonTrivialDiffSet.Add(param);
+                produceDiffSet.add(param);
+                carryNonTrivialDiffSet.add(param);
             }
         }
         if (auto funcType = as<IRFuncType>(funcInst->getDataType()))
@@ -330,7 +330,7 @@ public:
         {
             if (isInstInFunc(inst, funcInst))
             {
-                if (expectDiffInstWorkListSet.Add(inst))
+                if (expectDiffInstWorkListSet.add(inst))
                 {
                     expectDiffInstWorkList.add(inst);
                 }
@@ -358,9 +358,9 @@ public:
                                 {
                                     auto arg = branch->getArg(paramIndex);
                                     if (produceDiffSet.Contains(arg))
-                                        produceDiffSet.Add(param);
+                                        produceDiffSet.add(param);
                                     if (carryNonTrivialDiffSet.Contains(arg))
-                                        carryNonTrivialDiffSet.Add(param);
+                                        carryNonTrivialDiffSet.add(param);
                                 }
                             }
                         }
@@ -370,9 +370,9 @@ public:
                 for (auto inst : block->getChildren())
                 {
                     if (isInstProducingDiff(inst))
-                        produceDiffSet.Add(inst);
+                        produceDiffSet.add(inst);
                     if (isInstCarryingOverDiff(inst))
-                        carryNonTrivialDiffSet.Add(inst);
+                        carryNonTrivialDiffSet.add(inst);
                     switch (inst->getOp())
                     {
                     case kIROp_Call:
@@ -569,14 +569,14 @@ public:
             if (_isDifferentiableFuncImpl(inst, DifferentiableLevel::Backward))
             {
                 if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
-                    bwdDifferentiableSymbolNames.Add(linkageDecor->getMangledName());
-                differentiableFunctions.Add(inst, DifferentiableLevel::Backward);
+                    bwdDifferentiableSymbolNames.add(linkageDecor->getMangledName());
+                differentiableFunctions.add(inst, DifferentiableLevel::Backward);
             }
             else if (_isDifferentiableFuncImpl(inst, DifferentiableLevel::Forward))
             {
                 if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
-                    fwdDifferentiableSymbolNames.Add(linkageDecor->getMangledName());
-                differentiableFunctions.Add(inst, DifferentiableLevel::Forward);
+                    fwdDifferentiableSymbolNames.add(linkageDecor->getMangledName());
+                differentiableFunctions.add(inst, DifferentiableLevel::Forward);
             }
         }
         for (auto inst : module->getGlobalInsts())

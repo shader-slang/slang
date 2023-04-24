@@ -102,7 +102,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
     auto blocks = collectBlocksInLoop(func, loopInst);
     HashSet<IRBlock*> loopBlocks;
     for (auto b : blocks)
-        loopBlocks.Add(b);
+        loopBlocks.add(b);
     auto addressHasOutOfLoopUses = [&](IRInst* addr)
     {
         // The entire access chain of `addr` must have no uses outside the loop.
@@ -224,7 +224,7 @@ static bool removeDeadBlocks(IRGlobalValueWithCode* func)
             {
                 for (auto succ : block->getSuccessors())
                 {
-                    if (workListSet.Add(succ))
+                    if (workListSet.add(succ))
                     {
                         nextWorkList.add(succ);
                     }
@@ -236,7 +236,7 @@ static bool removeDeadBlocks(IRGlobalValueWithCode* func)
         if (nextWorkList.getCount())
         {
             workList = _Move(nextWorkList);
-            workListSet.Clear();
+            workListSet.clear();
         }
         else
         {
@@ -462,7 +462,7 @@ static bool removeTrivialPhiParams(IRBlock* block)
 
     for (UInt i = 1; i < (UInt)args.getCount(); i++)
         for (UInt j = 0; j < i; j++)
-            args[i].sameAsParamSet.Add(j);
+            args[i].sameAsParamSet.add(j);
 
     for (auto pred : block->getPredecessors())
     {
@@ -484,7 +484,7 @@ static bool removeTrivialPhiParams(IRBlock* block)
             {
                 if (termInst->getArg(i) != termInst->getArg(j))
                 {
-                    args[i].sameAsParamSet.Remove(j);
+                    args[i].sameAsParamSet.remove(j);
                 }
             }
         }
@@ -620,7 +620,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
             }
             for (auto successor : block->getSuccessors())
             {
-                if (processedBlock.Add(successor))
+                if (processedBlock.add(successor))
                 {
                     workList.add(successor);
                 }

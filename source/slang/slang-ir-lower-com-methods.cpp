@@ -42,7 +42,7 @@ struct ComMethodLoweringContext : public InstPassBase
                 innerMostCallee->getWitnessTable(),
                 callee->getRequirementKey());
         }
-        comCallees.Add(callee);
+        comCallees.add(callee);
         
         auto calleeType = as<IRFuncType>(callee->getDataType());
         SLANG_ASSERT(calleeType);

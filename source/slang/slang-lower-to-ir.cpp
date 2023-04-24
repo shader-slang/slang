@@ -1365,7 +1365,7 @@ IRStructKey* getInterfaceRequirementKey(
 
     addLinkageDecoration(context, requirementKey, requirementDecl);
 
-    context->shared->interfaceRequirementKeys.Add(requirementDecl, requirementKey);
+    context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
 
     return requirementKey;
 }
@@ -5131,8 +5131,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.Add(stmt, breakLabel);
-        context->shared->continueLabels.Add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->continueLabels.add(stmt, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -5229,8 +5229,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.Add(stmt, breakLabel);
-        context->shared->continueLabels.Add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->continueLabels.add(stmt, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -5291,8 +5291,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.Add(stmt, breakLabel);
-        context->shared->continueLabels.Add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->continueLabels.add(stmt, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -5759,7 +5759,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` label so
         // that we can find it for nested statements.
-        context->shared->breakLabels.Add(stmt, breakLabel);
+        context->shared->breakLabels.add(stmt, breakLabel);
 
         builder->setInsertInto(initialBlock->getParent());
 
@@ -5812,7 +5812,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // (and that control flow will fall through to otherwise).
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
-        context->shared->breakLabels.Remove(stmt);
+        context->shared->breakLabels.remove(stmt);
     }
 };
 
@@ -7985,7 +7985,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         if (!isChildOf(value, parentBlock))
             return;
-        if (valuesToClone.Add(value))
+        if (valuesToClone.add(value))
         {
             for (UInt i = 0; i < value->getOperandCount(); i++)
             {
@@ -7998,7 +7998,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto parent = parentBlock->getParent();
         while (parent && parent != parentBlock)
         {
-            valuesToClone.Add(parent);
+            valuesToClone.add(parent);
             parent = parent->getParent();
         }
     }
@@ -10012,7 +10012,7 @@ IRTypeLayout* lowerTypeLayout(
                     // of these keys will be local to a single `IREntryPointLayout`,
                     // and we don't support combination at a finer granularity than that.
 
-                    context->mapEntryPointParamToKey.Add(paramDecl, irFieldKey);
+                    context->mapEntryPointParamToKey.add(paramDecl, irFieldKey);
                 }
             }
             else

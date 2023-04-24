@@ -409,7 +409,7 @@ PhiInfo* addPhi(
     cloneRelevantDecorations(var, phi);
 
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
-    context->phiInfos.Add(phi, phiInfo);
+    context->phiInfos.add(phi, phiInfo);
 
     phiInfo->phi = phi;
     phiInfo->var = var;
@@ -1091,7 +1091,7 @@ bool constructSSA(ConstructSSAContext* context)
         blockInfo->builder = IRBuilder(context->module);
         blockInfo->builder.setInsertBefore(bb->getLastInst());
 
-        context->blockInfos.Add(bb, blockInfo);
+        context->blockInfos.add(bb, blockInfo);
     }
 
     for(auto bb : globalVal->getBlocks())

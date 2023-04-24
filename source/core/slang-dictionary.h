@@ -19,37 +19,37 @@ namespace Slang
 		TValue Value;
 		KeyValuePair()
 		{}
-		KeyValuePair(const TKey & key, const TValue & value)
+		KeyValuePair(const TKey& key, const TValue& value)
 		{
 			Key = key;
 			Value = value;
 		}
-		KeyValuePair(TKey && key, TValue && value)
+		KeyValuePair(TKey&& key, TValue&& value)
 		{
 			Key = _Move(key);
 			Value = _Move(value);
 		}
-		KeyValuePair(TKey && key, const TValue & value)
+		KeyValuePair(TKey&& key, const TValue& value)
 		{
 			Key = _Move(key);
 			Value = value;
 		}
-		KeyValuePair(const KeyValuePair<TKey, TValue> & _that)
+		KeyValuePair(const KeyValuePair<TKey, TValue>& _that)
 		{
 			Key = _that.Key;
 			Value = _that.Value;
 		}
-		KeyValuePair(KeyValuePair<TKey, TValue> && _that)
+		KeyValuePair(KeyValuePair<TKey, TValue>&& _that)
 		{
 			operator=(_Move(_that));
 		}
-		KeyValuePair & operator=(KeyValuePair<TKey, TValue> && that)
+		KeyValuePair& operator=(KeyValuePair<TKey, TValue>&& that)
 		{
 			Key = _Move(that.Key);
 			Value = _Move(that.Value);
 			return *this;
 		}
-		KeyValuePair & operator=(const KeyValuePair<TKey, TValue> & that)
+		KeyValuePair& operator=(const KeyValuePair<TKey, TValue>& that)
 		{
 			Key = that.Key;
 			Value = that.Value;
@@ -68,7 +68,7 @@ namespace Slang
 	};
 
 	template<typename TKey, typename TValue>
-	inline KeyValuePair<TKey, TValue> KVPair(const TKey & k, const TValue & v)
+	inline KeyValuePair<TKey, TValue> KVPair(const TKey& k, const TValue& v)
 	{
 		return KeyValuePair<TKey, TValue>(k, v);
 	}
@@ -95,11 +95,11 @@ namespace Slang
 		int _count;
 		UIntSet marks;
 		KeyValuePair<TKey, TValue>* hashMap;
-		void Free()
+		void deallocateAll()
 		{
 			if (hashMap)
 				delete[] hashMap;
-			hashMap = 0;
+			hashMap = nullptr;
 		}
 		inline bool isDeleted(int pos) const
 		{
@@ -127,6 +127,7 @@ namespace Slang
 		{
 			int ObjectPosition;
 			int InsertionPosition;
+
 			FindPositionResult()
 			{
 				ObjectPosition = -1;
@@ -184,7 +185,7 @@ namespace Slang
 			setDeleted(pos, false);
 			return hashMap[pos].Value;
 		}
-		void Rehash()
+		void rehash()
 		{
 			if (bucketSizeMinusOne == -1 || _count >= int(MaxLoadFactor * bucketSizeMinusOne))
 			{
@@ -201,7 +202,7 @@ namespace Slang
 				{
 					for (auto & kvPair : *this)
 					{
-						newDict.Add(_Move(kvPair));
+						newDict.add(_Move(kvPair));
 					}
 				}
 				*this = _Move(newDict);
@@ -210,7 +211,7 @@ namespace Slang
 
 		bool addIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
 		{
-			Rehash();
+			rehash();
 			auto pos = findPosition(kvPair.Key);
 			if (pos.ObjectPosition != -1)
 				return false;
@@ -223,14 +224,14 @@ namespace Slang
 			else
 				SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 		}
-		void Add(KeyValuePair<TKey, TValue>&& kvPair)
+		void add(KeyValuePair<TKey, TValue>&& kvPair)
 		{
 			if (!addIfNotExists(_Move(kvPair)))
                 SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
 		}
-		TValue& Set(KeyValuePair<TKey, TValue>&& kvPair)
+		TValue& set(KeyValuePair<TKey, TValue>&& kvPair)
 		{
-			Rehash();
+			rehash();
 			auto pos = findPosition(kvPair.Key);
 			if (pos.ObjectPosition != -1)
 				return _insert(_Move(kvPair), pos.ObjectPosition);
@@ -246,18 +247,18 @@ namespace Slang
 		class Iterator
 		{
 		private:
-			const Dictionary<TKey, TValue> * dict;
+			const Dictionary<TKey, TValue>* dict;
 			int pos;
 		public:
-			KeyValuePair<TKey, TValue> & operator *() const
+			KeyValuePair<TKey, TValue>& operator *() const
 			{
 				return dict->hashMap[pos];
 			}
-			KeyValuePair<TKey, TValue> * operator ->() const
+			KeyValuePair<TKey, TValue>* operator ->() const
 			{
 				return dict->hashMap + pos;
 			}
-			Iterator & operator ++()
+			Iterator& operator++()
 			{
 				if (pos > dict->bucketSizeMinusOne)
 					return *this;
@@ -268,21 +269,21 @@ namespace Slang
 				}
 				return *this;
 			}
-			Iterator operator ++(int)
+			Iterator operator++(int)
 			{
 				Iterator rs = *this;
 				operator++();
 				return rs;
 			}
-			bool operator != (const Iterator & _that) const
+			bool operator!=(const Iterator& _that) const
 			{
 				return pos != _that.pos || dict != _that.dict;
 			}
-			bool operator == (const Iterator & _that) const
+			bool operator==(const Iterator& _that) const
 			{
 				return pos == _that.pos && dict == _that.dict;
 			}
-			Iterator(const Dictionary<TKey, TValue> * _dict, int _pos)
+			Iterator(const Dictionary<TKey, TValue>* _dict, int _pos)
 			{
 				this->dict = _dict;
 				this->pos = _pos;
@@ -311,13 +312,13 @@ namespace Slang
 			return Iterator(this, bucketSizeMinusOne + 1);
 		}
 	public:
-		void Add(const TKey & key, const TValue & value)
+		void add(const TKey & key, const TValue & value)
 		{
-			Add(KeyValuePair<TKey, TValue>(key, value));
+			add(KeyValuePair<TKey, TValue>(key, value));
 		}
-		void Add(TKey && key, TValue && value)
+		void add(TKey && key, TValue && value)
 		{
-			Add(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
+			add(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
 		}
 		bool addIfNotExists(const TKey & key, const TValue & value)
 		{
@@ -327,7 +328,7 @@ namespace Slang
 		{
 			return addIfNotExists(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
 		}
-		void Remove(const TKey & key)
+		void remove(const TKey & key)
 		{
 			if (_count == 0)
 				return;
@@ -338,7 +339,7 @@ namespace Slang
 				_count--;
 			}
 		}
-		void Clear()
+		void clear()
 		{
 			_count = 0;
 
@@ -347,7 +348,7 @@ namespace Slang
 
         TValue* tryGetValueOrAdd(const TKey& key, const TValue& value)
         {
-            Rehash();
+            rehash();
             auto pos = findPosition(key);
             if (pos.ObjectPosition != -1)
             {
@@ -365,11 +366,11 @@ namespace Slang
                 SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
 
-            /// This differs from TryGetValueOrAdd, in that it always returns the Value held in the Dictionary.
+            /// This differs from tryGetValueOrAdd, in that it always returns the Value held in the Dictionary.
             /// If there isn't already an entry for 'key', a value is added with defaultValue. 
         TValue& getOrAddValue(const TKey& key, const TValue& defaultValue)
         {
-            Rehash();
+            rehash();
             auto pos = findPosition(key);
             if (pos.ObjectPosition != -1)
             {
@@ -385,7 +386,7 @@ namespace Slang
             else
                 SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
-        void Set(const TKey& key, const TValue& value)
+        void set(const TKey& key, const TValue& value)
 		{
 			if (auto ptr = tryGetValueOrAdd(key, value))
 			{
@@ -453,7 +454,7 @@ namespace Slang
 				else
                     SLANG_ASSERT_FAILURE("The key does not exist in dictionary.");
 			}
-			inline TValue & operator()() const
+			inline TValue& operator()() const
 			{
 				return getValue();
 			}
@@ -461,20 +462,20 @@ namespace Slang
 			{
 				return getValue();
 			}
-			TValue & operator = (const TValue& val) const
+			TValue& operator=(const TValue& val) const
 			{
-				return ((Dictionary<TKey, TValue>*)dict)->Set(KeyValuePair<TKey, TValue>(_Move(key), val));
+				return ((Dictionary<TKey, TValue>*)dict)->set(KeyValuePair<TKey, TValue>(_Move(key), val));
 			}
-			TValue & operator = (TValue&& val) const
+			TValue& operator=(TValue&& val) const
 			{
-				return ((Dictionary<TKey, TValue>*)dict)->Set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
+				return ((Dictionary<TKey, TValue>*)dict)->set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
 			}
 		};
-		ItemProxy operator [](const TKey& key) const
+		ItemProxy operator[](const TKey& key) const
 		{
 			return ItemProxy(key, this);
 		}
-		ItemProxy operator [](TKey&& key) const
+		ItemProxy operator[](TKey&& key) const
 		{
 			return ItemProxy(_Move(key), this);
 		}
@@ -488,10 +489,10 @@ namespace Slang
 
 	private:
 		template<typename... Args>
-		void Init(const KeyValuePair<TKey, TValue> & kvPair, Args... args)
+		void init(const KeyValuePair<TKey, TValue> & kvPair, Args... args)
 		{
-			Add(kvPair);
-			Init(args...);
+			add(kvPair);
+			init(args...);
 		}
 	public:
 		Dictionary()
@@ -503,7 +504,7 @@ namespace Slang
 		template<typename Arg, typename... Args>
 		Dictionary(Arg arg, Args... args)
 		{
-			Init(arg, args...);
+			init(arg, args...);
 		}
 		Dictionary(const Dictionary<TKey, TValue>& other)
 			: bucketSizeMinusOne(-1), _count(0), hashMap(nullptr)
@@ -515,11 +516,11 @@ namespace Slang
 		{
 			*this = (_Move(other));
 		}
-		Dictionary<TKey, TValue>& operator = (const Dictionary<TKey, TValue>& other)
+		Dictionary<TKey, TValue>& operator=(const Dictionary<TKey, TValue>& other)
 		{
 			if (this == &other)
 				return *this;
-			Free();
+			deallocateAll();
 			bucketSizeMinusOne = other.bucketSizeMinusOne;
 			_count = other._count;
 			hashMap = new KeyValuePair<TKey, TValue>[other.bucketSizeMinusOne + 1];
@@ -528,11 +529,11 @@ namespace Slang
 				hashMap[i] = other.hashMap[i];
 			return *this;
 		}
-		Dictionary<TKey, TValue> & operator = (Dictionary<TKey, TValue>&& other)
+		Dictionary<TKey, TValue>& operator=(Dictionary<TKey, TValue>&& other)
 		{
 			if (this == &other)
 				return *this;
-			Free();
+			deallocateAll();
 			bucketSizeMinusOne = other.bucketSizeMinusOne;
 			_count = other._count;
 			hashMap = other.hashMap;
@@ -544,7 +545,7 @@ namespace Slang
 		}
 		~Dictionary()
 		{
-			Free();
+			deallocateAll();
 		}
 	};
 
@@ -568,10 +569,10 @@ namespace Slang
 		DictionaryType dict;
 	private:
 		template<typename... Args>
-		void Init(const T & v, Args... args)
+		void init(const T & v, Args... args)
 		{
-			Add(v);
-			Init(args...);
+			add(v);
+			init(args...);
 		}
 	public:
 		HashSetBase()
@@ -579,7 +580,7 @@ namespace Slang
 		template<typename Arg, typename... Args>
 		HashSetBase(Arg arg, Args... args)
 		{
-			Init(arg, args...);
+			init(arg, args...);
 		}
 		HashSetBase(const HashSetBase & set)
 		{
@@ -651,17 +652,9 @@ namespace Slang
 		{
 			return dict.Count();
 		}
-		void Clear()
+		void clear()
 		{
-			dict.Clear();
-		}
-		bool Add(const T& obj)
-		{
-			return dict.addIfNotExists(obj, _DummyClass());
-		}
-		bool Add(T && obj)
-		{
-			return dict.addIfNotExists(_Move(obj), _DummyClass());
+			dict.clear();
 		}
         bool add(const T& obj)
         {
@@ -671,11 +664,11 @@ namespace Slang
         {
             return dict.addIfNotExists(_Move(obj), _DummyClass());
         }
-		void Remove(const T & obj)
+		void remove(const T& obj)
 		{
-			dict.Remove(obj);
+			dict.remove(obj);
 		}
-		bool Contains(const T & obj) const
+		bool Contains(const T& obj) const
 		{
 			return dict.containsKey(obj);
 		}
@@ -704,7 +697,7 @@ namespace Slang
 
         LinkedList<KeyValuePair<TKey, TValue>> kvPairs;
         LinkedNode<KeyValuePair<TKey, TValue>>** hashMap;
-        void Free()
+        void deallocateAll()
         {
             if (hashMap)
                 delete[] hashMap;
@@ -786,7 +779,7 @@ namespace Slang
             setDeleted(pos, false);
             return node->Value.Value;
         }
-        void Rehash()
+        void rehash()
         {
             if (bucketSizeMinusOne == -1 || _count / (float)bucketSizeMinusOne >= MaxLoadFactor)
             {
@@ -803,7 +796,7 @@ namespace Slang
                 {
                     for (auto& kvPair : *this)
                     {
-                        newDict.Add(_Move(kvPair));
+                        newDict.add(_Move(kvPair));
                     }
                 }
                 *this = _Move(newDict);
@@ -812,7 +805,7 @@ namespace Slang
 
         bool addIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
         {
-            Rehash();
+            rehash();
             auto pos = findPosition(kvPair.Key);
             if (pos.ObjectPosition != -1)
                 return false;
@@ -825,14 +818,14 @@ namespace Slang
             else
                 SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
-        void Add(KeyValuePair<TKey, TValue>&& kvPair)
+        void add(KeyValuePair<TKey, TValue>&& kvPair)
         {
             if (!addIfNotExists(_Move(kvPair)))
                 SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
         }
         TValue& Set(KeyValuePair<TKey, TValue>&& kvPair)
         {
-            Rehash();
+            rehash();
             auto pos = findPosition(kvPair.Key);
             if (pos.ObjectPosition != -1)
             {
@@ -861,13 +854,13 @@ namespace Slang
         }
 
     public:
-        void Add(const TKey& key, const TValue& value)
+        void add(const TKey& key, const TValue& value)
         {
-            Add(KeyValuePair<TKey, TValue>(key, value));
+            add(KeyValuePair<TKey, TValue>(key, value));
         }
-        void Add(TKey&& key, TValue&& value)
+        void add(TKey&& key, TValue&& value)
         {
-            Add(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
+            add(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
         }
         bool addIfNotExists(const TKey& key, const TValue& value)
         {
@@ -877,7 +870,7 @@ namespace Slang
         {
             return addIfNotExists(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
         }
-        void Remove(const TKey& key)
+        void remove(const TKey& key)
         {
             if (_count > 0)
             {
@@ -891,7 +884,7 @@ namespace Slang
                 }
             }
         }
-        void Clear()
+        void clear()
         {
             _count = 0;
             kvPairs.Clear();
@@ -977,10 +970,10 @@ namespace Slang
 
     private:
         template <typename... Args>
-        void Init(const KeyValuePair<TKey, TValue>& kvPair, Args... args)
+        void init(const KeyValuePair<TKey, TValue>& kvPair, Args... args)
         {
-            Add(kvPair);
-            Init(args...);
+            add(kvPair);
+            init(args...);
         }
 
     public:
@@ -992,7 +985,7 @@ namespace Slang
         }
         template <typename Arg, typename... Args> OrderedDictionary(Arg arg, Args... args)
         {
-            Init(arg, args...);
+            init(arg, args...);
         }
         OrderedDictionary(const OrderedDictionary<TKey, TValue>& other)
             : bucketSizeMinusOne(-1)
@@ -1013,9 +1006,9 @@ namespace Slang
         {
             if (this == &other)
                 return *this;
-            Clear();
+            clear();
             for (auto& item : other)
-                Add(item.Key, item.Value);
+                add(item.Key, item.Value);
             return *this;
         }
         OrderedDictionary<TKey, TValue>&
@@ -1023,7 +1016,7 @@ namespace Slang
         {
             if (this == &other)
                 return *this;
-            Free();
+            deallocateAll();
             bucketSizeMinusOne = other.bucketSizeMinusOne;
             _count = other._count;
             hashMap = other.hashMap;
@@ -1034,7 +1027,7 @@ namespace Slang
             kvPairs = _Move(other.kvPairs);
             return *this;
         }
-        ~OrderedDictionary() { Free(); }
+        ~OrderedDictionary() { deallocateAll(); }
     };
 
     template <typename T> class OrderedHashSet : public HashSetBase<T, OrderedDictionary<T, _DummyClass>>
@@ -1046,7 +1039,7 @@ namespace Slang
         }
         void removeLast()
         {
-            this->Remove(getLast());
+            this->remove(getLast());
         }
     };
 }

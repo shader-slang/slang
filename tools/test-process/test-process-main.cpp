@@ -49,7 +49,7 @@ static SlangResult _outputCount(int argc, const char* const* argv)
     StringBuilder buf;
     for (Index i = 0; i < count; ++i)
     {
-        buf.Clear();
+        buf.clear();
         buf << i << "\n";
 
         fwrite(buf.getBuffer(), 1, buf.getLength(), fileOut);

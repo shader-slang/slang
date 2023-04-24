@@ -27,7 +27,7 @@ struct ASTDumpContext
         {
             if (m_context->m_scopeWriteCount == 0)
             {
-                m_context->m_buf.Clear();
+                m_context->m_buf.clear();
             }
             m_context->m_scopeWriteCount++;
         }
@@ -446,14 +446,14 @@ struct ASTDumpContext
 
     void dump(TextureFlavor texFlavor)
     {
-        m_buf.Clear();
+        m_buf.clear();
         m_buf << "TextureFlavor{" << Index(texFlavor.flavor) << "}";
         m_writer->emit(m_buf);
     }
 
     void dump(FeedbackType::Kind kind)
     {
-        m_buf.Clear();
+        m_buf.clear();
         const char* name = nullptr;
         switch (kind)
         {

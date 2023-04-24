@@ -76,7 +76,7 @@ void* ArtifactDiagnostics::castAs(const Guid& guid)
 void ArtifactDiagnostics::reset()
 {
     m_diagnostics.clear();
-    m_raw.Clear();
+    m_raw.clear();
     m_result = SLANG_OK;
 
     m_allocator.deallocateAll();
@@ -95,7 +95,7 @@ void ArtifactDiagnostics::add(const Diagnostic& inDiagnostic)
 
 void ArtifactDiagnostics::setRaw(const CharSlice& slice)
 {
-    m_raw.Clear();
+    m_raw.clear();
     m_raw << asStringSlice(slice);
 }
 

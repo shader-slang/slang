@@ -121,7 +121,7 @@ void TestReporter::startTest(const char* testName)
 
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
-    m_currentMessage.Clear();
+    m_currentMessage.clear();
 }
 
 void TestReporter::endTest()

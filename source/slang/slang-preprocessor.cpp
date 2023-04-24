@@ -3390,7 +3390,7 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     if (macro != NULL)
     {
         // name was defined, so remove it
-        env->macros.Remove(name);
+        env->macros.remove(name);
 
         delete macro;
     }
@@ -3565,7 +3565,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
         return;
     }
 
-    context->m_preprocessor->pragmaOnceUniqueIdentities.Add(issuedFromPathInfo.uniqueIdentity);
+    context->m_preprocessor->pragmaOnceUniqueIdentities.add(issuedFromPathInfo.uniqueIdentity);
 }
 
 // Information about a specific `#pragma` directive

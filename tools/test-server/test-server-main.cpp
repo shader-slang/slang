@@ -229,7 +229,7 @@ ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, Diagnosti
         return nullptr;
     }
 
-    m_sharedLibraryMap.Add(name, sharedLibrary);
+    m_sharedLibraryMap.add(name, sharedLibrary);
     return sharedLibrary;
 }
 
@@ -270,7 +270,7 @@ IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSin
         return nullptr;
     }
 
-    m_unitTestModules.Add(name, testModule);
+    m_unitTestModules.add(name, testModule);
     return testModule;
 }
 

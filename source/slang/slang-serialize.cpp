@@ -218,7 +218,7 @@ SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags f
 {
     // 0 is always the null pointer
     m_entries.add(nullptr);
-    m_ptrMap.Add(nullptr, 0);
+    m_ptrMap.add(nullptr, 0);
 }
 
 SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* ptr)
@@ -296,12 +296,12 @@ SerialIndex SerialWriter::writeObject(const RefObject* obj)
 
 void SerialWriter::setPointerIndex(const NodeBase* ptr, SerialIndex index)
 {
-    m_ptrMap.Add(ptr, Index(index));
+    m_ptrMap.add(ptr, Index(index));
 }
 
 void SerialWriter::setPointerIndex(const RefObject* ptr, SerialIndex index)
 {
-    m_ptrMap.Add(ptr, Index(index));
+    m_ptrMap.add(ptr, Index(index));
 }
 
 SerialIndex SerialWriter::addPointer(const NodeBase* node)
@@ -349,7 +349,7 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
     if (auto stringRep = dynamicCast<StringRepresentation>(obj))
     {
         SerialIndex index = addString(StringRepresentation::asSlice(stringRep));
-        m_ptrMap.Add(obj, Index(index));
+        m_ptrMap.add(obj, Index(index));
         return index;
     }
     else if (auto name = dynamicCast<const Name>(obj))
@@ -405,7 +405,7 @@ SerialIndex SerialWriter::_addStringSlice(SerialTypeKind typeKind, SliceMap& sli
     UnownedStringSlice keySlice(((const char*)dst) + encodeCount, slice.getLength());
 
     Index newIndex = m_entries.getCount();
-    sliceMap.Add(keySlice, newIndex);
+    sliceMap.add(keySlice, newIndex);
 
     m_entries.add(entry);
     return SerialIndex(newIndex);
@@ -431,7 +431,7 @@ SerialIndex SerialWriter::addName(const Name* name)
     }
 
     SerialIndex index = addString(name->text);
-    m_ptrMap.Add(name, Index(index));
+    m_ptrMap.add(name, Index(index));
     return index;
 }
 

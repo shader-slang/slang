@@ -5041,13 +5041,13 @@ namespace Slang
                 SelectExpr* select = new SelectExpr();
                 FillPosition(select.Ptr());
 
-                select->Arguments.Add(condition);
+                select->Arguments.add(condition);
 
                 select->FunctionExpr = parseOperator(this);
 
-                select->Arguments.Add(ParseExpression(level));
+                select->Arguments.add(ParseExpression(level));
                 ReadToken(TokenType::Colon);
-                select->Arguments.Add(ParseExpression(level));
+                select->Arguments.add(ParseExpression(level));
                 return select;
             }
             else
@@ -5063,9 +5063,9 @@ namespace Slang
                     OperatorExpr* tmp = new InfixExpr();
                     tmp->FunctionExpr = parseOperator(this);
 
-                    tmp->Arguments.Add(left);
+                    tmp->Arguments.add(left);
                     FillPosition(tmp.Ptr());
-                    tmp->Arguments.Add(ParseExpression(Precedence(level + 1)));
+                    tmp->Arguments.add(ParseExpression(Precedence(level + 1)));
                     left = tmp;
                 }
                 return left;
@@ -5076,10 +5076,10 @@ namespace Slang
                 if (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                 {
                     OperatorExpr* tmp = new InfixExpr();
-                    tmp->Arguments.Add(left);
+                    tmp->Arguments.add(left);
                     FillPosition(tmp.Ptr());
                     tmp->FunctionExpr = parseOperator(this);
-                    tmp->Arguments.Add(ParseExpression(level));
+                    tmp->Arguments.add(ParseExpression(level));
                     left = tmp;
                 }
                 return left;

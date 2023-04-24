@@ -479,7 +479,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
         module->setIRModule(srcModule.irModule);
 
         // Put in the loaded module map
-        linkage->mapNameToLoadedModules.Add(sessionNamePool->getName(moduleName), module);
+        linkage->mapNameToLoadedModules.add(sessionNamePool->getName(moduleName), module);
 
         // Add the resulting code to the appropriate scope
         if (!scope->containerDecl)
@@ -912,7 +912,7 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     {
         for (const auto& pair : builtinLinkage->mapNameToLoadedModules)
         {
-            mapNameToLoadedModules.Add(pair.Key, pair.Value);
+            mapNameToLoadedModules.add(pair.Key, pair.Value);
         }
     }
 
@@ -1215,7 +1215,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
             break;
         }
 
-        m_containerTypes.Add(key, containerTypeReflection);
+        m_containerTypes.add(key, containerTypeReflection);
     }
 
     SLANG_UNUSED(outDiagnostics);
@@ -1987,7 +1987,7 @@ typedef Dictionary<SourceView*, List<SourceView*>> ViewInitiatingHierarchy;
 static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewInitiatingHierarchy& outHierarchy)
 {
     const List<SourceView*> emptyList;
-    outHierarchy.Clear();
+    outHierarchy.clear();
 
     // Iterate over all managers
     for (SourceManager* curManager = sourceManager; curManager; curManager = curManager->getParent())
@@ -2171,11 +2171,11 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // that may be desirable or not...
     Dictionary<String, String> combinedPreprocessorDefinitions;
     for(auto& def : getLinkage()->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.Add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.Key, def.Value);
     for(auto& def : preprocessorDefinitions)
-        combinedPreprocessorDefinitions.Add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.Key, def.Value);
     for(auto& def : translationUnit->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.Add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.Key, def.Value);
 
     // Define standard macros, if not already defined. This style assumes using `#if __SOME_VAR` style, as in
     //
@@ -2340,7 +2340,7 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
         // another translation unit added later to the compilation request.
         // We should output an error message when we detect such a case, or support
         // this scenario with a recursive style checking.
-        loadedModules.Add(translationUnit->moduleName, translationUnit->getModule());
+        loadedModules.add(translationUnit->moduleName, translationUnit->getModule());
     }
     checkEntryPoints();
 }
@@ -2853,7 +2853,7 @@ int FrontEndCompileRequest::addEntryPoint(
         entryPointProfile);
 
     m_entryPointReqs.add(entryPointReq);
-//    translationUnitReq->entryPoints.Add(entryPointReq);
+//    translationUnitReq->entryPoints.add(entryPointReq);
 
     return int(result);
 }
@@ -2901,8 +2901,8 @@ void Linkage::loadParsedModule(
     String mostUniqueIdentity = pathInfo.getMostUniqueIdentity();
     SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
 
-    mapPathToLoadedModule.Add(mostUniqueIdentity, loadedModule);
-    mapNameToLoadedModules.Add(name, loadedModule);
+    mapPathToLoadedModule.add(mostUniqueIdentity, loadedModule);
+    mapNameToLoadedModules.add(name, loadedModule);
 
     auto sink = translationUnit->compileRequest->getSink();
 
@@ -3203,7 +3203,7 @@ void ModuleDependencyList::_addDependency(Module* module)
         return;
 
     m_moduleList.add(module);
-    m_moduleSet.Add(module);
+    m_moduleSet.add(module);
 }
 
 //
@@ -3216,7 +3216,7 @@ void FileDependencyList::addDependency(SourceFile* sourceFile)
         return;
 
     m_fileList.add(sourceFile);
-    m_fileSet.Add(sourceFile);
+    m_fileSet.add(sourceFile);
 }
 
 void FileDependencyList::addDependency(Module* module)
@@ -3778,7 +3778,7 @@ CompositeComponentType::CompositeComponentType(
     {
         child->enumerateModules([&](Module* module)
         {
-            requirementsSet.Add(module);
+            requirementsSet.add(module);
         });
     }
 
@@ -3819,7 +3819,7 @@ CompositeComponentType::CompositeComponentType(
             auto childRequirement = child->getRequirement(rr);
             if(!requirementsSet.Contains(childRequirement))
             {
-                requirementsSet.Add(childRequirement);
+                requirementsSet.add(childRequirement);
                 m_requirements.add(childRequirement);
             }
         }
@@ -3941,7 +3941,7 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
     void addModule(Module* module)
     {
         m_modulesList.add(module);
-        m_modulesSet.Add(module);
+        m_modulesSet.add(module);
     }
 
     void maybeAddModule(Module* module)
@@ -4101,7 +4101,7 @@ SpecializedComponentType::SpecializedComponentType(
     //
     base->enumerateModules([&](Module* module)
     {
-        moduleCollector.m_modulesSet.Add(module);
+        moduleCollector.m_modulesSet.add(module);
     });
 
     // In order to collect the additional modules, we need
@@ -4174,7 +4174,7 @@ SpecializedComponentType::SpecializedComponentType(
     //
     HashSet<SourceFile*> fileDependencySet;
     for(SourceFile* sourceFile : m_fileDependencies)
-        fileDependencySet.Add(sourceFile);
+        fileDependencySet.add(sourceFile);
 
     for(auto module : moduleCollector.m_modulesList)
     {
@@ -4204,7 +4204,7 @@ SpecializedComponentType::SpecializedComponentType(
         {
             if(fileDependencySet.Contains(sourceFile))
                 continue;
-            fileDependencySet.Add(sourceFile);
+            fileDependencySet.add(sourceFile);
             m_fileDependencies.add(sourceFile);
         }
 
@@ -4544,7 +4544,7 @@ void Session::addBuiltinSource(
     auto moduleDecl = module->getModuleDecl();
 
     // Put in the loaded module map
-    linkage->mapNameToLoadedModules.Add(moduleName, module);
+    linkage->mapNameToLoadedModules.add(moduleName, module);
 
     // Add the resulting code to the appropriate scope
     if (!scope->containerDecl)

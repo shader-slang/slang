@@ -20,7 +20,7 @@ struct DirEnumerationContext
         {
             String canonicalPath;
             Path::getCanonical(path, canonicalPath);
-            if (!paths.Add(canonicalPath))
+            if (!paths.add(canonicalPath))
                 break;
             path = Path::getParentDirectory(path);
             if (!path.startsWith(root))
@@ -34,7 +34,7 @@ DocumentVersion* Workspace::openDoc(String path, String text)
     doc->setText(text.getUnownedSlice());
     doc->setPath(path);
     openedDocuments[path] = doc;
-    workspaceSearchPaths.Add(Path::getParentDirectory(path));
+    workspaceSearchPaths.add(Path::getParentDirectory(path));
     invalidate();
     return doc.Ptr();
 }
@@ -68,7 +68,7 @@ void Workspace::changeDoc(DocumentVersion* doc, const String& newText)
 
 void Workspace::closeDoc(const String& path)
 {
-    openedDocuments.Remove(path);
+    openedDocuments.remove(path);
     invalidate();
 }
 
@@ -272,7 +272,7 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
             diagnostic.range.end.line--;
             diagnostic.range.end.character--;
         }
-        diagnosticList.messages.Add(diagnostic);
+        diagnosticList.messages.add(diagnostic);
         if (diagnosticList.messages.Count() >= 1000)
             break;
     }
@@ -302,7 +302,7 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
         for (auto& p : openedDocuments)
         {
             auto dir = Path::getParentDirectory(p.Key.getBuffer());
-            if (set.Add(dir))
+            if (set.add(dir))
                 searchPathsRaw.add(dir.getBuffer());
         }
     }

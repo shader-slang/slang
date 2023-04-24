@@ -2097,7 +2097,7 @@ namespace Slang
                     // record it into the actual witness table yet, in case
                     // a later accessor comes along that doesn't find a match.
                     //
-                    mapRequiredToSatisfyingAccessorDeclRef.Add(requiredAccessorDeclRef, satisfyingAccessorDeclRef);
+                    mapRequiredToSatisfyingAccessorDeclRef.add(requiredAccessorDeclRef, satisfyingAccessorDeclRef);
                     found = true;
                     break;
                 }
@@ -3249,7 +3249,7 @@ namespace Slang
             // to leave the witness table in a state where a requirement is
             // "partially satisfied."
             //
-            mapRequiredAccessorToSynAccessor.Add(requiredAccessorDeclRef, synAccessorDecl);
+            mapRequiredAccessorToSynAccessor.add(requiredAccessorDeclRef, synAccessorDecl);
         }
 
         synPropertyDecl->parentDecl = context->parentDecl;
@@ -3722,7 +3722,7 @@ namespace Slang
             witnessTable->baseType = DeclRefType::create(m_astBuilder, superInterfaceDeclRef);
             witnessTable->witnessedType = subType;
         }
-        context->mapInterfaceToWitnessTable.Add(superInterfaceDeclRef, witnessTable);
+        context->mapInterfaceToWitnessTable.add(superInterfaceDeclRef, witnessTable);
 
         if(!checkInterfaceConformance(context, subType, superInterfaceType, inheritanceDecl, superInterfaceDeclRef, subTypeConformsToSuperInterfaceWitnes, witnessTable))
             return nullptr;
@@ -6331,7 +6331,7 @@ namespace Slang
             return;
         }
         importedModulesList.add(moduleDecl);
-        importedModulesSet.Add(moduleDecl);
+        importedModulesSet.add(moduleDecl);
 
         // Create a new sub-scope to wire the module
         // into our lookup chain.
@@ -6457,7 +6457,7 @@ namespace Slang
         if( !mapTypeToCandidateExtensions.tryGetValue(typeDecl, entry) )
         {
             entry = new CandidateExtensionList();
-            mapTypeToCandidateExtensions.Add(typeDecl, entry);
+            mapTypeToCandidateExtensions.add(typeDecl, entry);
         }
         return entry->candidateExtensions;
     }
@@ -6567,7 +6567,7 @@ namespace Slang
         // `import`.
         //
         m_candidateExtensionListsBuilt = false;
-        m_mapTypeDeclToCandidateExtensions.Clear();
+        m_mapTypeDeclToCandidateExtensions.clear();
     }
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
@@ -6592,7 +6592,7 @@ namespace Slang
         if (!mapDeclToDeclarations.tryGetValue(decl, entry))
         {
             entry = new DeclAssociationList();
-            mapDeclToDeclarations.Add(decl, entry);
+            mapDeclToDeclarations.add(decl, entry);
         }
         return entry->associations;
     }
@@ -6615,7 +6615,7 @@ namespace Slang
         _getDeclAssociationList(original, moduleDecl->mapDeclToAssociatedDecls).add(assoc);
 
         m_associatedDeclListsBuilt = false;
-        m_mapDeclToAssociatedDecls.Clear();
+        m_mapDeclToAssociatedDecls.clear();
     }
 
     List<RefPtr<DeclAssociation>> const& SharedSemanticsContext::getAssociatedDeclsForDecl(Decl* decl)

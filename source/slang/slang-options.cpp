@@ -819,7 +819,7 @@ struct OptionsParser
                 continue;
             }
 
-            buf.Clear();
+            buf.clear();
 
             buf << diagnostic->id << " : ";
             NameConventionUtil::convert(NameStyle::Camel, UnownedStringSlice(diagnostic->name), NameConvention::LowerKabab, buf);

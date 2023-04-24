@@ -374,7 +374,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         SLANG_ASSERT(!requirementDictionary.containsKey(decl));
 
-        requirementDictionary.Add(decl, witness);
+        requirementDictionary.add(decl, witness);
     }
 
     //

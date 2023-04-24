@@ -185,7 +185,7 @@ struct ExtractPrimalFuncContext
         auto outIntermediary =
             builder.emitParam(builder.getOutType((IRType*)intermediateType));
         oldIntermediateParam->transferDecorationsTo(outIntermediary);
-        primalParams.Add(outIntermediary);
+        primalParams.add(outIntermediary);
         oldIntermediateParam->replaceUsesWith(outIntermediary);
         oldIntermediateParam->removeAndDeallocate();
 
@@ -328,7 +328,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     for (auto param : func->getParams())
     {
         if (paramInfo.primalFuncParams.Contains(param))
-            newPrimalParams.Add(subEnv.mapOldValToNew[param].getValue());
+            newPrimalParams.add(subEnv.mapOldValToNew[param].getValue());
     }
 
     ExtractPrimalFuncContext context;

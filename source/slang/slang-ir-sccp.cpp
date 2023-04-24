@@ -978,7 +978,7 @@ struct SCCPContext
 
     void markAsExecuted(IRBlock* block)
     {
-        executedBlocks.Add(block);
+        executedBlocks.add(block);
     }
 
     // The core of the algorithm is based on two work lists.

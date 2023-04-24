@@ -268,7 +268,7 @@ namespace Slang
             auto declModule = getModule(declaredWitness->declRef.getDecl());
             m_moduleDependencyList.addDependency(declModule);
             m_fileDependencyList.addDependency(declModule);
-            if (m_requirementSet.Add(declModule))
+            if (m_requirementSet.add(declModule))
             {
                 m_requirements.add(declModule);
             }
@@ -1049,11 +1049,11 @@ namespace Slang
             // If it's pass through we accumulate the preprocessor definitions. 
             for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)
             {
-                preprocessorDefinitions.Add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.Key, define.Value);
             }
             for (auto& define : translationUnit->preprocessorDefinitions)
             {
-                preprocessorDefinitions.Add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.Key, define.Value);
             }
             
             {
@@ -1134,7 +1134,7 @@ namespace Slang
             auto linkage = getLinkage();
             for (auto& define : linkage->preprocessorDefinitions)
             {
-                preprocessorDefinitions.Add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.Key, define.Value);
             }
         }
 
@@ -1422,7 +1422,7 @@ namespace Slang
             {
                 const auto& diagnostic = *diagnostics->getAt(i);
 
-                builder.Clear();
+                builder.clear();
 
                 const Severity severity = _getDiagnosticSeverity(diagnostic.severity);
                 
@@ -2020,7 +2020,7 @@ namespace Slang
         int dependencyCount = compileRequest->getDependencyFileCount();
         for (int dependencyIndex = 0; dependencyIndex < dependencyCount; ++dependencyIndex)
         {
-            builder.Clear();
+            builder.clear();
             _escapeDependencyString(compileRequest->getDependencyFilePath(dependencyIndex), builder);
             _writeString(stream, builder.begin());
             _writeString(stream, (dependencyIndex + 1 < dependencyCount) ? " " : "\n");

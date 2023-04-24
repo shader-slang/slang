@@ -774,7 +774,7 @@ void LivenessContext::_addAccessInst(IRInst* inst)
     }
     
     // Add to the access set
-    m_accessSet.Add(inst);
+    m_accessSet.add(inst);
 
     // Add the instruction to the block info
     _addInst(inst);
@@ -785,7 +785,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
     // Clear all the aliases
     m_aliases.clear();
     // Clear the access set
-    m_accessSet.Clear();
+    m_accessSet.clear();
 
     // Add the root to the list of aliases, to start lookup
     m_aliases.add(root);
@@ -1289,7 +1289,7 @@ void LivenessContext::_processFunction(IRFunc* func)
     // By having as an index we can easily/quickly associate information with blocks with arrays
 
     // Set up the map from blocks to indices
-    m_blockIndexMap.Clear();
+    m_blockIndexMap.clear();
 
     m_blockInfos.clear();
     m_fixedBlockInfos.clear();
@@ -1304,7 +1304,7 @@ void LivenessContext::_processFunction(IRFunc* func)
         for (auto block : func->getChildren())
         {
             IRBlock* blockInst = as<IRBlock>(block);
-            m_blockIndexMap.Add(blockInst, BlockIndex(index++));
+            m_blockIndexMap.add(blockInst, BlockIndex(index++));
 
             FixedBlockInfo fixedBlockInfo;
             fixedBlockInfo.init(blockInst);

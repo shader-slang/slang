@@ -27,7 +27,7 @@ Name* NamePool::getName(String const& text)
 
     name = new Name();
     name->text = text;
-    rootPool->names.Add(text, name);
+    rootPool->names.add(text, name);
     return name;
 }
 

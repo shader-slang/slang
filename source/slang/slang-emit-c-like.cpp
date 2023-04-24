@@ -652,7 +652,7 @@ UInt CLikeSourceEmitter::getID(IRInst* value)
         return id;
 
     id = allocateUniqueID();
-    mapIRValueToID.Add(value, id);
+    mapIRValueToID.add(value, id);
     return id;
 }
 
@@ -940,7 +940,7 @@ String CLikeSourceEmitter::getName(IRInst* inst)
     if(!m_mapInstToName.tryGetValue(inst, name))
     {
         name = generateName(inst);
-        m_mapInstToName.Add(inst, name);
+        m_mapInstToName.add(inst, name);
     }
     return name;
 }
@@ -3740,11 +3740,11 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
             return;
         }
 
-        ctx->openInsts.Add(inst);
+        ctx->openInsts.add(inst);
 
         ensureInstOperandsRec(ctx, inst);
 
-        ctx->openInsts.Remove(inst);
+        ctx->openInsts.remove(inst);
     }
 
     ctx->mapInstToLevel[inst] = requiredLevel;

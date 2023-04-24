@@ -255,7 +255,7 @@ namespace Slang
             IRCloneEnv cloneEnv;
             cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module,
                 interfaceType, loweredType);
-            sharedContext->loweredInterfaceTypes.Add(interfaceType, loweredType);
+            sharedContext->loweredInterfaceTypes.add(interfaceType, loweredType);
             sharedContext->mapLoweredInterfaceToOriginal[loweredType] = interfaceType;
             return loweredType;
         }
@@ -373,7 +373,7 @@ namespace Slang
             {
                  lowered.Key->replaceUsesWith(lowered.Value);
             }
-            sharedContext->mapInterfaceRequirementKeyValue.Clear();
+            sharedContext->mapInterfaceRequirementKeyValue.clear();
         }
 
         void processModule()
@@ -385,7 +385,7 @@ namespace Slang
                 IRInst* inst = sharedContext->workList.getLast();
 
                 sharedContext->workList.removeLast();
-                sharedContext->workListSet.Remove(inst);
+                sharedContext->workListSet.remove(inst);
 
                 processInst(inst);
 

@@ -358,7 +358,7 @@ static String _formatDocumentation(String doc)
     if (!hasDoxygen)
     {
         // For ordinary comments, we want to preserve line breaks in the original comment.
-        result.Clear();
+        result.clear();
         for (Index i = 0; i < lines.getCount(); i++)
         {
             result << lines[i] << "  \n";
@@ -1408,7 +1408,7 @@ void LanguageServer::publishDiagnostics()
     }
     for (auto& toRemove : filesToRemove)
     {
-        m_lastPublishedDiagnostics.Remove(toRemove);
+        m_lastPublishedDiagnostics.remove(toRemove);
     }
     // Send updates for any files whose diagnostic messages has changed since last update.
     for (auto& list : version->diagnostics)
@@ -1906,7 +1906,7 @@ void LanguageServer::processCommands()
             auto id = cmd.cancelArgs.get().id;
             if (id > 0)
             {
-                canceledIDs.Add(id);
+                canceledIDs.add(id);
             }
         }
     }

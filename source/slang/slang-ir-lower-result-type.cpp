@@ -90,7 +90,7 @@ namespace Slang
                 return;
 
             workList.add(inst);
-            workListSet.Add(inst);
+            workListSet.add(inst);
         }
 
         IRInst* getSuccessErrorValue(IRType* type)
@@ -276,7 +276,7 @@ namespace Slang
                 IRInst* inst = workList.getLast();
 
                 workList.removeLast();
-                workListSet.Remove(inst);
+                workListSet.remove(inst);
 
                 processInst(inst);
 

@@ -310,7 +310,7 @@ void ScopeNode::addChild(Node* child)
 
     if (child->m_name.hasContent())
     {
-        m_childMap.Add(child->m_name.getContent(), child);
+        m_childMap.add(child->m_name.getContent(), child);
     }
 }
 

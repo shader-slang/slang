@@ -608,7 +608,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         HashSet<String> extensionNames;
         for (const auto& e : extensions)
         {
-            extensionNames.Add(e.extensionName);
+            extensionNames.add(e.extensionName);
         }
 
         if (extensionNames.Contains("VK_KHR_external_memory"))
@@ -1759,15 +1759,15 @@ Result DeviceImpl::getFormatSupportedResourceStates(Format format, ResourceState
     m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, surfaceFormats.getBuffer());
     for (auto surfaceFormat : surfaceFormats)
     {
-        presentableFormats.Add(surfaceFormat.format);
+        presentableFormats.add(surfaceFormat.format);
     }
 #else
 // Until we have a solution to query presentable formats without needing a surface,
 // hard code presentable formats that is supported by most drivers.
-    presentableFormats.Add(VK_FORMAT_R8G8B8A8_UNORM);
-    presentableFormats.Add(VK_FORMAT_B8G8R8A8_UNORM);
-    presentableFormats.Add(VK_FORMAT_R8G8B8A8_SRGB);
-    presentableFormats.Add(VK_FORMAT_B8G8R8A8_SRGB);
+    presentableFormats.add(VK_FORMAT_R8G8B8A8_UNORM);
+    presentableFormats.add(VK_FORMAT_B8G8R8A8_UNORM);
+    presentableFormats.add(VK_FORMAT_R8G8B8A8_SRGB);
+    presentableFormats.add(VK_FORMAT_B8G8R8A8_SRGB);
 #endif
 
     ResourceStateSet allowedStates;

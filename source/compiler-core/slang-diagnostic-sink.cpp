@@ -295,7 +295,7 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
 
         // Now make all spaces
         const Index length = caretLine.getLength();
-        caretLine.Clear();
+        caretLine.clear();
         caretLine.appendRepeatedChar(' ', length);
 
         Index caretIndex = caretLine.getLength();
@@ -506,7 +506,7 @@ void DiagnosticSink::reset()
     m_errorCount = 0;
     m_internalErrorLocsNoted = 0;
 
-    outputBuffer.Clear();
+    outputBuffer.clear();
 }
 
 
@@ -676,7 +676,7 @@ void DiagnosticSink::overrideDiagnosticSeverity(int diagnosticId, Severity overr
         // If the override is the same as the default, we can just remove the override
         if (info->severity == overrideSeverity)
         {
-            m_severityOverrides.Remove(diagnosticId);
+            m_severityOverrides.remove(diagnosticId);
             return;
         }
     }
@@ -696,7 +696,7 @@ Index DiagnosticsLookup::_findDiagnosticIndexByExactName(const UnownedStringSlic
 void DiagnosticsLookup::_addName(const char* name, Index diagnosticIndex)
 {
     UnownedStringSlice nameSlice(name);
-    m_nameMap.Add(nameSlice, diagnosticIndex);
+    m_nameMap.add(nameSlice, diagnosticIndex);
 }
 
 void DiagnosticsLookup::addAlias(const char* name, const char* diagnosticName)

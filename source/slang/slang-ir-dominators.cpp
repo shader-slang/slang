@@ -279,7 +279,7 @@ struct DepthFirstSearchContext
     template<typename SuccessorFunc>
     void walk(IRBlock* block, const SuccessorFunc& getSuccessors)
     {
-        visited.Add(block);
+        visited.add(block);
         preVisit(block);
         for(auto succ : getSuccessors(block))
         {
@@ -753,7 +753,7 @@ struct DominatorTreeComputationContext
             // from the block to  the node index.
             //
             node.block = block;
-            dominatorTree->mapBlockToIndex.Add(block, nodeIndex);
+            dominatorTree->mapBlockToIndex.add(block, nodeIndex);
 
             // Filling in the parent is easy enough, just with the detail that
             // we need to handle the invalid case explicitly (for a node with

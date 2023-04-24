@@ -411,7 +411,7 @@ struct SPIRVEmitContext
         /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
     {
-        m_mapIRInstToSpvInst.Add(irInst, spvInst);
+        m_mapIRInstToSpvInst.add(irInst, spvInst);
 
         // If we have reserved an SpvID for `irInst`, make sure to use it.
         SpvWord reservedID = 0;
@@ -2837,7 +2837,7 @@ struct SPIRVEmitContext
 
     void requireSPIRVCapability(SpvCapability capability)
     {
-        if (m_capabilities.Add(capability))
+        if (m_capabilities.add(capability))
         {
             emitInst(
                 getSection(SpvLogicalSectionID::Capabilities),

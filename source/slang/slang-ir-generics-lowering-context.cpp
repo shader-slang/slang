@@ -95,7 +95,7 @@ namespace Slang
 
     void SharedGenericsLoweringContext::_builldInterfaceRequirementMap(IRInterfaceType* interfaceType)
     {
-        mapInterfaceRequirementKeyValue.Add(interfaceType,
+        mapInterfaceRequirementKeyValue.add(interfaceType,
             Dictionary<IRInst*, IRInst*>());
         auto dict = mapInterfaceRequirementKeyValue.tryGetValue(interfaceType);
         for (UInt i = 0; i < interfaceType->getOperandCount(); i++)

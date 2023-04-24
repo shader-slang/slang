@@ -2313,7 +2313,7 @@ struct LegalFuncBuilder
                 // the reuslt value into the newly-declared parameter(s).
                 //
                 RefPtr<LegalFuncInfo> funcInfo = new LegalFuncInfo();
-                m_context->mapFuncToInfo.Add(oldFunc, funcInfo);
+                m_context->mapFuncToInfo.add(oldFunc, funcInfo);
 
                 // We know that our new parameters need to come after
                 // those that were declared for the "base" parameters
@@ -3532,8 +3532,8 @@ struct IRTypeLegalizationPass
         if(addedToWorkListSet.Contains(inst))
             return;
         workList.add(inst);
-        addedToWorkListSet.Add(inst);
-        hasBeenAddedOrProcessedSet.Add(inst);
+        addedToWorkListSet.add(inst);
+        hasBeenAddedOrProcessedSet.add(inst);
     }
 
     void processModule(IRModule* module)
@@ -3562,7 +3562,7 @@ struct IRTypeLegalizationPass
                 //
                 List<IRInst*> workListCopy;
                 Swap(workListCopy, workList);
-                addedToWorkListSet.Clear();
+                addedToWorkListSet.clear();
 
                 // Now we simply process each instruction on the copy of
                 // the work list, knowing that `processInst` may add additional

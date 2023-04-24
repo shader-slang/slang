@@ -250,7 +250,7 @@ SlangResult MemoryFileSystem::_requireFile(const char* path, Entry** outEntry)
     {
         Entry entry;
         entry.initFile(canonicalPath);
-        m_entries.Add(canonicalPath, entry);
+        m_entries.add(canonicalPath, entry);
 
         foundEntry = _getEntryFromCanonicalPath(canonicalPath);
     }
@@ -289,7 +289,7 @@ SlangResult MemoryFileSystem::remove(const char* path)
 
         // Reset so doesn't hold references/keep memory in scope
         entry->reset();
-        m_entries.Remove(canonicalPath);
+        m_entries.remove(canonicalPath);
         return SLANG_OK;
     }
 
@@ -308,7 +308,7 @@ SlangResult MemoryFileSystem::createDirectory(const char* path)
 
     Entry entry;
     entry.initDirectory(canonicalPath);
-    m_entries.Add(canonicalPath, entry);
+    m_entries.add(canonicalPath, entry);
     return SLANG_OK;
 }
 

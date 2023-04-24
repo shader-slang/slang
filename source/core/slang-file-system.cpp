@@ -199,7 +199,7 @@ SlangResult OSFileSystem::enumeratePathContents(const char* path, FileSystemCont
     {
         void accept(Path::Type type, const UnownedStringSlice& filename) SLANG_OVERRIDE
         {
-            m_buffer.Clear();
+            m_buffer.clear();
             m_buffer.append(filename);
 
             SlangPathType pathType;
@@ -380,8 +380,8 @@ void CacheFileSystem::clearCache()
         delete pathInfo;
     }
 
-    m_uniqueIdentityMap.Clear();
-    m_pathMap.Clear();
+    m_uniqueIdentityMap.clear();
+    m_pathMap.clear();
 
     if (m_fileSystemExt)
     {
@@ -585,7 +585,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolveUniqueIdentityCacheInfo(cons
     {
         // Create with found uniqueIdentity
         pathInfo = new PathInfo(uniqueIdentity);
-        m_uniqueIdentityMap.Add(uniqueIdentity, pathInfo);
+        m_uniqueIdentityMap.add(uniqueIdentity, pathInfo);
     }
 
     // At this point they must have same uniqueIdentity
@@ -632,7 +632,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolvePathCacheInfo(const String& 
     // Try getting or creating taking into account possible path simplification
     pathInfo = _resolveSimplifiedPathCacheInfo(path);
     // Always add the result to the path cache (even if null)
-    m_pathMap.Add(path, pathInfo);
+    m_pathMap.add(path, pathInfo);
     return pathInfo;
 }
 

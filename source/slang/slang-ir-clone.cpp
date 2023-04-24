@@ -173,7 +173,7 @@ static void _cloneInstDecorationsAndChildren(
         // old to new values.
         //
         auto newChild = cloneInstAndOperands(env, builder, oldChild);
-        env->mapOldValToNew.Add(oldChild, newChild);
+        env->mapOldValToNew.add(oldChild, newChild);
 
         // If and only if the old child had decorations
         // or children, we will register it into our
@@ -266,7 +266,7 @@ IRInst* cloneInst(
     newInst = cloneInstAndOperands(
         env, builder, oldInst);
 
-    env->mapOldValToNew.Add(oldInst, newInst);
+    env->mapOldValToNew.add(oldInst, newInst);
 
     cloneInstDecorationsAndChildren(
         env, builder->getModule(), oldInst, newInst);

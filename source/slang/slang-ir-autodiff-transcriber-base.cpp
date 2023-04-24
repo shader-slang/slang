@@ -489,7 +489,7 @@ static bool _findDifferentiableInterfaceLookupPathImpl(
 {
     if (processedTypes.Contains(type))
         return false;
-    processedTypes.Add(type);
+    processedTypes.add(type);
 
     List<IRInterfaceRequirementEntry*> lookupKeyPath;
     for (UInt i = 0; i < type->getOperandCount(); i++)
@@ -968,7 +968,7 @@ static void _markGenericChildrenWithoutRelaventUse(IRGeneric* origGeneric, HashS
             }
             if (!hasRelaventUse)
             {
-                if (outInstsToSkip.Add(inst))
+                if (outInstsToSkip.add(inst))
                 {
                     changed = true;
                 }
@@ -1074,11 +1074,11 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
     // Otherwise, dispatch to the appropriate method 
     // depending on the op-code.
     // 
-    instsInProgress.Add(origInst);
+    instsInProgress.add(origInst);
     auto actualInstToTranscribe = getActualInstToTranscribe(origInst);
     InstPair pair = transcribeInst(builder, actualInstToTranscribe);
 
-    instsInProgress.Remove(origInst);
+    instsInProgress.remove(origInst);
 
     if (auto primalInst = pair.primal)
     {

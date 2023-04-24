@@ -109,7 +109,7 @@ struct StoreContext
                 // Create the file
                 file = m_container->newObject<FileState>();
                 // Add it 
-                m_uniqueToFileMap.Add(uniqueIdentity, file);
+                m_uniqueToFileMap.add(uniqueIdentity, file);
 
                 // Set the identity
                 auto offsetUniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
@@ -176,7 +176,7 @@ struct StoreContext
             dst->type = pathInfo.type;
         }
 
-        m_sourceFileMap.Add(sourceFile, sourceFileState);
+        m_sourceFileMap.add(sourceFile, sourceFileState);
 
         return sourceFileState;
     }
@@ -190,7 +190,7 @@ struct StoreContext
             return value;
         }
         value = m_container->newString(in.getUnownedSlice());
-        m_stringMap.Add(in, value);
+        m_stringMap.add(in, value);
         return value;
     }
     Offset32Ptr<OffsetString> fromName(Name* name)
@@ -237,7 +237,7 @@ struct StoreContext
             dst.loadFileResult = srcPathInfo->m_loadFileResult;
             dst.pathType = srcPathInfo->m_pathType;
 
-            m_pathInfoMap.Add(srcPathInfo, pathInfo);
+            m_pathInfoMap.add(srcPathInfo, pathInfo);
         }
 
         // Fill in info on the file
@@ -599,7 +599,7 @@ static String _scrubName(const String& in)
             StringBuilder uniqueName;
             for (Index j = 0; j < 0x10000; j++)
             {
-                uniqueName.Clear();
+                uniqueName.clear();
                 uniqueName << filename;
 
                 if (j > 0)
@@ -703,7 +703,7 @@ struct LoadContext
             dstInfo->m_fileBlob = blob;
 
             // Add to map, even if the blob is nullptr (say from a failed read)
-            m_fileToPathInfoMap.Add(file, dstInfo);
+            m_fileToPathInfoMap.add(file, dstInfo);
         }
 
         return dstInfo;
@@ -750,7 +750,7 @@ struct LoadContext
             dstFile->setContents(blob);
 
             // Add to map
-            m_sourceFileMap.Add(sourceFile, dstFile);
+            m_sourceFileMap.add(sourceFile, dstFile);
 
             // Add to manager
             m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, dstFile);
@@ -790,7 +790,7 @@ struct LoadContext
         dstInfo->m_loadFileResult = srcInfo->loadFileResult;
         dstInfo->m_pathType = srcInfo->pathType;
 
-        m_pathInfoMap.Add(srcInfo, dstInfo);
+        m_pathInfoMap.add(srcInfo, dstInfo);
         return dstInfo;
     }
 
@@ -809,11 +809,11 @@ struct LoadContext
 
     void loadDefines(const Offset32Array<ReproUtil::StringPair>& in, Dictionary<String, String>& out)
     {
-        out.Clear();
+        out.clear();
 
         for (const auto& define : in)
         {
-            out.Add(m_base->asRaw(m_base->asRaw(define).first)->getSlice(), m_base->asRaw(m_base->asRaw(define).second)->getSlice());
+            out.add(m_base->asRaw(m_base->asRaw(define).first)->getSlice(), m_base->asRaw(m_base->asRaw(define).second)->getSlice());
         }
     }
 
@@ -877,7 +877,7 @@ struct LoadContext
         {
             CacheFileSystem::PathInfo* pathInfo = pair.Value;
             SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
-            dstUniqueMap.Add(pathInfo->m_uniqueIdentity, pathInfo);
+            dstUniqueMap.add(pathInfo->m_uniqueIdentity, pathInfo);
 
             // Add canonical paths too..
             if (pathInfo->m_canonicalPath.getLength())
@@ -902,7 +902,7 @@ struct LoadContext
     // TODO(JS): Really should be more exhaustive here, and set up to initial state ideally
     // Reset state
     {
-        request->m_targetInfos.Clear();
+        request->m_targetInfos.clear();
         // Remove any requests
         linkage->targets.clear();
     }
@@ -959,7 +959,7 @@ struct LoadContext
                         entryPointPath = base.asRaw(srcOutputState.outputPath)->getSlice();
                     }
                     
-                    dstTargetInfo->entryPointOutputPaths.Add(srcOutputState.entryPointIndex, entryPointPath);
+                    dstTargetInfo->entryPointOutputPaths.add(srcOutputState.entryPointIndex, entryPointPath);
                 }
             }
         }
@@ -1064,7 +1064,7 @@ struct LoadContext
                 auto srcPathInfo = base.asRaw(pair.pathInfo);
 
                 CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(srcPathInfo);
-                dstPathMap.Add(base.asRaw(pair.path)->getSlice(), pathInfo);
+                dstPathMap.add(base.asRaw(pair.path)->getSlice(), pathInfo);
             }
         }
         // Put all the path infos in the cache system
@@ -1082,7 +1082,7 @@ struct LoadContext
                     continue;
                 }
                 SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
-                dstUniqueMap.Add(pathInfo->m_uniqueIdentity, pathInfo);
+                dstUniqueMap.add(pathInfo->m_uniqueIdentity, pathInfo);
             }
         }
     
@@ -1368,7 +1368,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
                         entryPointPath = base.asRaw(srcOutputState.outputPath)->getSlice();
                     }
 
-                    dstTargetInfo->entryPointOutputPaths.Add(srcOutputState.entryPointIndex, entryPointPath);
+                    dstTargetInfo->entryPointOutputPaths.add(srcOutputState.entryPointIndex, entryPointPath);
                 }
             }
 #endif

@@ -30,7 +30,7 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     SLANG_ASSERT(!m_instMap.containsKey(inst));
 
     // Add to the map
-    m_instMap.Add(inst, Ser::InstIndex(m_insts.getCount()));
+    m_instMap.add(inst, Ser::InstIndex(m_insts.getCount()));
     m_insts.add(inst);
 }
 
@@ -117,7 +117,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
     m_insts.add(nullptr);
 
     // Reset
-    m_instMap.Clear();
+    m_instMap.clear();
     m_decorations.clear();
     
     // Stack for parentInst

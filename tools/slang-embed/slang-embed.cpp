@@ -93,7 +93,7 @@ struct App
         String canonicalPath;
         if (SLANG_SUCCEEDED(Slang::Path::getCanonical(inputPath, canonicalPath)))
         {
-            if (!includedFiles.Add(canonicalPath))
+            if (!includedFiles.add(canonicalPath))
                 return;
         }
 

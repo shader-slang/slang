@@ -160,7 +160,7 @@ static SlangResult _readTestFile(const TestInput& input, const String& suffix, S
         return r;
     }
 
-    buf.Clear();
+    buf.clear();
     buf << input.filePath << suffix;
     return Slang::File::readAllText(buf, out);
 }
@@ -335,11 +335,11 @@ static SlangResult _parseCommandArguments(char const** ioCursor, TestOptions& ou
             auto i = option.indexOf('=');
             if(i == -1)
             {
-                out.commandOptions.Add(option.trim(), "");
+                out.commandOptions.add(option.trim(), "");
             }
             else
             {
-                out.commandOptions.Add(option.head(i).trim(), option.tail(i+1).trim());
+                out.commandOptions.add(option.head(i).trim(), option.tail(i+1).trim());
             }
         }
     }
@@ -1345,7 +1345,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 
     // Try the default name
     StringBuilder defaultBuf;
-    defaultBuf.Clear();
+    defaultBuf.clear();
     defaultBuf << input.filePath;
     if (postFix)
     {
@@ -4383,13 +4383,13 @@ SlangResult innerMain(int argc, char** argv)
 
     if( options.includeCategories.Count() == 0 )
     {
-        options.includeCategories.Add(fullTestCategory, fullTestCategory);
+        options.includeCategories.add(fullTestCategory, fullTestCategory);
     }
 
     // Don't include OptiX tests unless the client has explicit opted into them.
     if( !options.includeCategories.containsKey(optixTestCategory) )
     {
-        options.excludeCategories.Add(optixTestCategory, optixTestCategory);
+        options.excludeCategories.add(optixTestCategory, optixTestCategory);
     }
 
     // Exclude rendering tests when building under AppVeyor.
@@ -4397,8 +4397,8 @@ SlangResult innerMain(int argc, char** argv)
     // TODO: this is very ad hoc, and we should do something cleaner.
     if( options.outputMode == TestOutputMode::AppVeyor )
     {
-        options.excludeCategories.Add(renderTestCategory, renderTestCategory);
-        options.excludeCategories.Add(vulkanTestCategory, vulkanTestCategory);
+        options.excludeCategories.add(renderTestCategory, renderTestCategory);
+        options.excludeCategories.add(vulkanTestCategory, vulkanTestCategory);
     }
 
     {

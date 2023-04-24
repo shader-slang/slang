@@ -143,7 +143,7 @@ public:
             return *found;
 
         auto node = createFunc();
-        m_cachedNodes.Add(desc, node);
+        m_cachedNodes.add(desc, node);
         return node;
     }
 

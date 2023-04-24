@@ -104,7 +104,7 @@ struct RegisterAllocateContext
     RegisterAllocationResult allocateRegisters(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom)
     {
         ReachabilityContext reachabilityContext;
-        mapTypeToRegisterList.Clear();
+        mapTypeToRegisterList.clear();
 
         auto dom = computeDominatorTree(func);
         inOutDom = dom;
@@ -141,7 +141,7 @@ struct RegisterAllocateContext
 
             // Pop dominatingInst stack to correct location.
             for (Index i = item.dominatingInstCount; i < dominatingInsts.getCount(); i++)
-                dominatingInstSet.Remove(dominatingInsts[i]);
+                dominatingInstSet.remove(dominatingInsts[i]);
             dominatingInsts.setCount(item.dominatingInstCount);
 
             for (auto inst : item.block->getChildren())
@@ -203,7 +203,7 @@ struct RegisterAllocateContext
                     allocatedReg->insts.add(inst);
                 }
                 dominatingInsts.add(inst);
-                dominatingInstSet.Add(inst);
+                dominatingInstSet.add(inst);
             }
 
             // Recursively visit idom children.

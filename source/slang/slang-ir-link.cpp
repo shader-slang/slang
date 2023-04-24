@@ -1345,7 +1345,7 @@ void insertGlobalValueSymbol(
     }
     else
     {
-        sharedContext->symbols.Add(mangledName, sym);
+        sharedContext->symbols.add(mangledName, sym);
     }
 }
 

@@ -2224,7 +2224,7 @@ namespace Slang
         }
 
         key.inst = irValue;
-        m_dedupContext->getConstantMap().Add(key, irValue);
+        m_dedupContext->getConstantMap().add(key, irValue);
 
         addHoistableInst(this, irValue);
 
@@ -5911,7 +5911,7 @@ namespace Slang
             return name;
 
         name = createName(context, value);
-        context->mapValueToName.Add(value, name);
+        context->mapValueToName.add(value, name);
         return name;
     }
 
@@ -6773,7 +6773,7 @@ namespace Slang
 
         auto addToWorkList = [&](IRInst* src, IRInst* target)
         {
-            if (workListSet.Add(src))
+            if (workListSet.add(src))
             {
                 WorkItem item;
                 item.thisInst = src;
@@ -7075,9 +7075,9 @@ namespace Slang
             }
             else if (auto constInst = as<IRConstant>(this))
             {
-                module->getDeduplicationContext()->getConstantMap().Remove(IRConstantKey{ constInst });
+                module->getDeduplicationContext()->getConstantMap().remove(IRConstantKey{ constInst });
             }
-            module->getDeduplicationContext()->getInstReplacementMap().Remove(this);
+            module->getDeduplicationContext()->getInstReplacementMap().remove(this);
         }
         removeArguments();
         removeAndDeallocateAllDecorationsAndChildren();

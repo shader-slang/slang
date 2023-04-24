@@ -64,7 +64,7 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
             m_freeSourceLoc += SourceLoc::RawValue(sourceView->getRange().getSize() + 1);
 
             debugSourceFile = new Source(sourceFile, baseSourceLoc);
-            m_sourceFileMap.Add(sourceFile, debugSourceFile);
+            m_sourceFileMap.add(sourceFile, debugSourceFile);
         }
         else
         {

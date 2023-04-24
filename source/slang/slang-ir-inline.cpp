@@ -309,7 +309,7 @@ struct InliningPassBase
                 SLANG_ASSERT(argCounter < (Int)specialize->getArgCount());
                 auto arg = specialize->getArg(argCounter++);
 
-                env.mapOldValToNew.Add(param, arg);
+                env.mapOldValToNew.add(param, arg);
             }
             SLANG_ASSERT(argCounter == (Int)specialize->getArgCount());
 
@@ -365,7 +365,7 @@ struct InliningPassBase
             {
                 SLANG_ASSERT(argCounter < (Int)call->getArgCount());
                 auto arg = call->getArg(argCounter++);
-                env.mapOldValToNew.Add(param, arg);
+                env.mapOldValToNew.add(param, arg);
             }
             SLANG_ASSERT(argCounter == (Int)call->getArgCount());
         }

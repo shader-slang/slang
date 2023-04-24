@@ -176,7 +176,7 @@ struct ValSet
     HashSet<ValItem> set;
     bool add(Val* val)
     {
-        return set.Add(ValItem(val));
+        return set.add(ValItem(val));
     }
     bool contains(Val* val)
     {

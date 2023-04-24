@@ -56,7 +56,7 @@ void ContainerDecl::buildMemberDictionary()
     if (dictionaryLastCount < 0)
     {
         dictionaryLastCount = 0;
-        memberDictionary.Clear();
+        memberDictionary.clear();
         transparentMembers.clear();
     }
 

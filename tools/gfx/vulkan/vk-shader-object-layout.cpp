@@ -21,7 +21,7 @@ Index ShaderObjectLayoutImpl::Builder::findOrAddDescriptorSet(Index space)
     index = m_descriptorSetBuildInfos.getCount();
     m_descriptorSetBuildInfos.add(info);
 
-    m_mapSpaceToDescriptorSetIndex.Add(space, index);
+    m_mapSpaceToDescriptorSetIndex.add(space, index);
     return index;
 }
 

@@ -133,7 +133,7 @@ namespace Slang
         if (sink->getErrorCount() != 0)
             return;
 
-        sharedContext->mapInterfaceRequirementKeyValue.Clear();
+        sharedContext->mapInterfaceRequirementKeyValue.clear();
 
         specializeRTTIObjectReferences(sharedContext);
 
@@ -152,7 +152,7 @@ namespace Slang
             if (inst->getOp() == kIROp_WitnessTable)
             {
                 auto interfaceType = cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
-                implementedInterfaces.Add(interfaceType);
+                implementedInterfaces.add(interfaceType);
             }
         }
         // Check if an interface type has any implementations.
@@ -170,7 +170,7 @@ namespace Slang
                     {
                         context->sink->diagnose(interfaceType->sourceLoc, Diagnostics::noTypeConformancesFoundForInterface, interfaceType);
                         // Add to set to prevent duplicate diagnostic messages.
-                        implementedInterfaces.Add(interfaceType);
+                        implementedInterfaces.add(interfaceType);
                     }
                 }
             });

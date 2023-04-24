@@ -281,7 +281,7 @@ namespace Slang
     {
         HashSet<IRBlock*> blocks;
         for (auto block : code->getBlocks())
-            blocks.Add(block);
+            blocks.add(block);
         auto validateBranchTarget = [&](IRInst* inst, IRBlock* target)
         {
             validate(
@@ -327,7 +327,7 @@ namespace Slang
     {
         // Validate that any operands of the instruction are used appropriately
         validateIRInstOperands(context, inst);
-        context->seenInsts.Add(inst);
+        context->seenInsts.add(inst);
 
         // If `inst` is itself a parent instruction, then we need to recursively
         // validate its children.

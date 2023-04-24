@@ -308,7 +308,7 @@ public:
         rs.Reserve(count);
         for (auto& item : *this)
         {
-            rs.Add(item);
+            rs.add(item);
         }
         return rs;
     }

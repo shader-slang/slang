@@ -400,7 +400,7 @@ public:
     {
         if (handle)
         {
-            Win32AppContext::windows.Remove(handle);
+            Win32AppContext::windows.remove(handle);
         }
         DestroyWindow(handle);
         handle = NULL;

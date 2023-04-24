@@ -718,7 +718,7 @@ Result RendererBase::getShaderObjectLayout(
     if (!m_shaderObjectLayoutCache.tryGetValue(typeLayout, shaderObjectLayout))
     {
         SLANG_RETURN_ON_FAIL(createShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
-        m_shaderObjectLayoutCache.Add(typeLayout, shaderObjectLayout);
+        m_shaderObjectLayoutCache.add(typeLayout, shaderObjectLayout);
     }
     *outLayout = shaderObjectLayout.detach();
     return SLANG_OK;

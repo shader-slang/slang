@@ -17,7 +17,7 @@ TestCategory* TestCategorySet::add(String const& name, TestCategory* parent)
     category->name = name;
     category->parent = parent;
 
-    m_categoryMap.Add(name, category);
+    m_categoryMap.add(name, category);
     return category;
 }
 
@@ -239,7 +239,7 @@ static bool _isSubCommand(const char* arg)
             auto category = categorySet->findOrError(*argCursor++);
             if (category)
             {
-                optionsOut->includeCategories.Add(category, category);
+                optionsOut->includeCategories.add(category, category);
             }
         }
         else if (strcmp(arg, "-exclude") == 0)
@@ -252,7 +252,7 @@ static bool _isSubCommand(const char* arg)
             auto category = categorySet->findOrError(*argCursor++);
             if (category)
             {
-                optionsOut->excludeCategories.Add(category, category);
+                optionsOut->excludeCategories.add(category, category);
             }
         }
         else if (strcmp(arg, "-api") == 0)

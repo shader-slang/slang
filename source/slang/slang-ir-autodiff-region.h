@@ -65,7 +65,7 @@ struct IndexedRegionMap : public RefObject
 
     void mapBlock(IRBlock* block, IndexedRegion* region)
     {
-        map.Add(block, region);
+        map.add(block, region);
     }
 
     bool hasMapping(IRBlock* block)

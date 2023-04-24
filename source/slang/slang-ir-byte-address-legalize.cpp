@@ -674,7 +674,7 @@ struct ByteAddressBufferLegalizationContext
         if(!m_cachedStructuredBuffers.tryGetValue(key, structuredBufferParam))
         {
             structuredBufferParam = createEquivalentStructuredBufferParam(elementType, byteAddressBufferParam);
-            m_cachedStructuredBuffers.Add(key, structuredBufferParam);
+            m_cachedStructuredBuffers.add(key, structuredBufferParam);
         }
         return structuredBufferParam;
     }

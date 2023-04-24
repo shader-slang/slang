@@ -780,7 +780,7 @@ static RefPtr<UsedRangeSet> findUsedRangeSetForSpace(
         return usedRangeSet;
 
     usedRangeSet = new UsedRangeSet();
-    context->shared->globalSpaceUsedRangeSets.Add(space, usedRangeSet);
+    context->shared->globalSpaceUsedRangeSets.add(space, usedRangeSet);
     return usedRangeSet;
 }
 
@@ -1979,7 +1979,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 fieldVarLayout->varDecl = field;
 
                 structLayout->fields.add(fieldVarLayout);
-                structLayout->mapVarToLayout.Add(field.getDecl(), fieldVarLayout);
+                structLayout->mapVarToLayout.add(field.getDecl(), fieldVarLayout);
 
                 auto fieldTypeLayout = processEntryPointVaryingParameterDecl(
                     context,
@@ -2220,7 +2220,7 @@ struct ScopeLayoutBuilder
 
         m_structLayout->fields.add(varLayout);
 
-        m_structLayout->mapVarToLayout.Add(varLayout->varDecl.getDecl(), varLayout);
+        m_structLayout->mapVarToLayout.add(varLayout->varDecl.getDecl(), varLayout);
     }
 
     void addParameter(
@@ -2794,7 +2794,7 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
         {
             if(auto globalGenericTypeParamDecl = as<GlobalGenericParamDecl>(globalGenericArg.paramDecl))
             {
-                m_context->shared->programLayout->globalGenericArgs.Add(globalGenericTypeParamDecl, globalGenericArg.argVal);
+                m_context->shared->programLayout->globalGenericArgs.add(globalGenericTypeParamDecl, globalGenericArg.argVal);
             }
         }
     }

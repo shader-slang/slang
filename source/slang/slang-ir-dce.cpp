@@ -83,7 +83,7 @@ struct DeadCodeEliminationContext
 
         if(liveInsts.Contains(inst))
             return;
-        liveInsts.Add(inst);
+        liveInsts.add(inst);
         workList.add(inst);
     }
 
@@ -106,7 +106,7 @@ struct DeadCodeEliminationContext
         bool result = false;
         for (;;)
         {
-            liveInsts.Clear();
+            liveInsts.clear();
             workList.clear();
 
             // First of all, we know that the root instruction

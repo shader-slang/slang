@@ -295,7 +295,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     if (!mapTypeToCandidateExtensions.tryGetValue(typeDecl, entry))
     {
         entry = new CandidateExtensionList();
-        mapTypeToCandidateExtensions.Add(typeDecl, entry);
+        mapTypeToCandidateExtensions.add(typeDecl, entry);
     }
     return entry->candidateExtensions;
 }
@@ -543,7 +543,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                         for (Index i = 0; i < syntaxParseInfos.getCount(); ++i)
                                         {
                                             const auto& entry = syntaxParseInfos[i];
-                                            syntaxKeywordDict.Add(namePool->getName(entry.keywordName), i);
+                                            syntaxKeywordDict.add(namePool->getName(entry.keywordName), i);
                                         }
                                         // Must have something in it at this point
                                         SLANG_ASSERT(syntaxKeywordDict.Count());

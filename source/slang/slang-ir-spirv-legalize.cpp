@@ -28,7 +28,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void addToWorkList(IRInst* inst)
     {
-        if (workList.Add(inst))
+        if (workList.add(inst))
         {
             addUsersToWorkList(inst);
         }

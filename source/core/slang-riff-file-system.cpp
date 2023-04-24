@@ -213,7 +213,7 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
             }
 
             // Add to the list of entries
-            m_entries.Add(dstEntry.m_canonicalPath, dstEntry);
+            m_entries.add(dstEntry.m_canonicalPath, dstEntry);
         }
     }
 

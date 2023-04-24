@@ -2856,12 +2856,12 @@ namespace Slang
 
         void removeTransition(CodeGenTarget source, CodeGenTarget target)
         {
-            m_map.Remove(Pair{ source, target });
+            m_map.remove(Pair{ source, target });
         }
         void addTransition(CodeGenTarget source, CodeGenTarget target, PassThroughMode compiler)
         {
             SLANG_ASSERT(source != target);
-            m_map.Set(Pair{ source, target }, compiler);
+            m_map.set(Pair{ source, target }, compiler);
         }
         bool hasTransition(CodeGenTarget source, CodeGenTarget target) const
         {

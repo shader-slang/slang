@@ -63,7 +63,7 @@ namespace Slang
             for (decltype(fieldCount) i = 0; i < fieldCount; i++)
             {
                 auto key = builder.createStructKey();
-                nameSb.Clear();
+                nameSb.clear();
                 nameSb << "field" << i;
                 builder.addNameHintDecoration(key, nameSb.getUnownedSlice());
                 nameSb << "_anyVal" << size;
@@ -627,7 +627,7 @@ namespace Slang
                 IRInst* inst = sharedContext->workList.getLast();
 
                 sharedContext->workList.removeLast();
-                sharedContext->workListSet.Remove(inst);
+                sharedContext->workListSet.remove(inst);
 
                 processInst(inst);
 
@@ -643,7 +643,7 @@ namespace Slang
                 if (auto anyValueType = as<IRAnyValueType>(inst))
                     processAnyValueType(anyValueType);
             }
-            sharedContext->mapInterfaceRequirementKeyValue.Clear();
+            sharedContext->mapInterfaceRequirementKeyValue.clear();
         }
     };
 

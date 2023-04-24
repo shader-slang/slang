@@ -233,7 +233,7 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
             for (Index i = 0; i < linesCount; ++i)
             {
                 UnownedStringSlice line = lines[i];
-                unindentedLine.Clear();
+                unindentedLine.clear();
 
                 if (i == 0)
                 {
