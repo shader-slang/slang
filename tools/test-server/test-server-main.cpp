@@ -187,7 +187,7 @@ TestServer::~TestServer()
 {
     for (auto& pair : m_unitTestModules)
     {
-        pair.Value->destroy();
+        pair.value->destroy();
     }
 }
 
@@ -209,7 +209,7 @@ slang::IGlobalSession* TestServer::getOrCreateGlobalSession()
 ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, DiagnosticSink* sink)
 {
     ComPtr<ISlangSharedLibrary> lib;
-    if (m_sharedLibraryMap.TryGetValue(name, lib))
+    if (m_sharedLibraryMap.tryGetValue(name, lib))
     {
         return lib;
     }
@@ -229,13 +229,13 @@ ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, Diagnosti
         return nullptr;
     }
 
-    m_sharedLibraryMap.Add(name, sharedLibrary);
+    m_sharedLibraryMap.add(name, sharedLibrary);
     return sharedLibrary;
 }
 
 IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSink* sink)
 {
-    auto unitTestModulePtr = m_unitTestModules.TryGetValue(name);
+    auto unitTestModulePtr = m_unitTestModules.tryGetValue(name);
     if (unitTestModulePtr)
     {
         return *unitTestModulePtr;
@@ -270,7 +270,7 @@ IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSin
         return nullptr;
     }
 
-    m_unitTestModules.Add(name, testModule);
+    m_unitTestModules.add(name, testModule);
     return testModule;
 }
 

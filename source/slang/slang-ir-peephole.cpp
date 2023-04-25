@@ -559,7 +559,7 @@ struct PeepholeContext : InstPassBase
                             // If the key already exists, it means there is already a later update at this key.
                             // We need to be careful not to override it with an earlier value.
                             // AddIfNotExists will ensure this does not happen.
-                            mapFieldKeyToVal.AddIfNotExists(
+                            mapFieldKeyToVal.addIfNotExists(
                                 subStructKey, updateElement->getElementValue());
                         }
 
@@ -572,7 +572,7 @@ struct PeepholeContext : InstPassBase
                         for (auto field : structType->getFields())
                         {
                             IRInst* arg = nullptr;
-                            if (mapFieldKeyToVal.TryGetValue(field->getKey(), arg))
+                            if (mapFieldKeyToVal.tryGetValue(field->getKey(), arg))
                             {
                                 args.add(arg);
                             }

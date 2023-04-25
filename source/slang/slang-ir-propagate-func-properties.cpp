@@ -15,7 +15,7 @@ bool propagateFuncProperties(IRModule* module)
 
     auto addToWorkList = [&](IRFunc* f)
     {
-        if (workListSet.Add(f))
+        if (workListSet.add(f))
             workList.add(f);
     };
     auto addCallersToWorkList = [&](IRFunc* f)
@@ -49,7 +49,7 @@ bool propagateFuncProperties(IRModule* module)
     {
         bool changed = false;
         workList.clear();
-        workListSet.Clear();
+        workListSet.clear();
 
         // Add side effect free functions and their transitive callers to work list.
         for (auto inst : module->getGlobalInsts())

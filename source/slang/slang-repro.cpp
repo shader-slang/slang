@@ -90,7 +90,7 @@ struct StoreContext
     Offset32Ptr<FileState> findFile(const String& uniqueIdentity)
     {
         Offset32Ptr<FileState> file;
-        m_uniqueToFileMap.TryGetValue(uniqueIdentity, file);
+        m_uniqueToFileMap.tryGetValue(uniqueIdentity, file);
         return file;
     }
 
@@ -103,13 +103,13 @@ struct StoreContext
         // Get the file, if it has an identity
         if (uniqueIdentity.getLength())
         {
-            if (!m_uniqueToFileMap.TryGetValue(uniqueIdentity, file))
+            if (!m_uniqueToFileMap.tryGetValue(uniqueIdentity, file))
             {
                 // If file was not found create it
                 // Create the file
                 file = m_container->newObject<FileState>();
                 // Add it 
-                m_uniqueToFileMap.Add(uniqueIdentity, file);
+                m_uniqueToFileMap.add(uniqueIdentity, file);
 
                 // Set the identity
                 auto offsetUniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
@@ -147,7 +147,7 @@ struct StoreContext
         auto& base = m_container->asBase();
 
         Offset32Ptr<ReproUtil::SourceFileState> sourceFileState;
-        if (m_sourceFileMap.TryGetValue(sourceFile, sourceFileState))
+        if (m_sourceFileMap.tryGetValue(sourceFile, sourceFileState))
         {
             return sourceFileState;
         }
@@ -176,7 +176,7 @@ struct StoreContext
             dst->type = pathInfo.type;
         }
 
-        m_sourceFileMap.Add(sourceFile, sourceFileState);
+        m_sourceFileMap.add(sourceFile, sourceFileState);
 
         return sourceFileState;
     }
@@ -185,12 +185,12 @@ struct StoreContext
     {
         Offset32Ptr<OffsetString> value;
         
-        if (m_stringMap.TryGetValue(in, value))
+        if (m_stringMap.tryGetValue(in, value))
         {
             return value;
         }
         value = m_container->newString(in.getUnownedSlice());
-        m_stringMap.Add(in, value);
+        m_stringMap.add(in, value);
         return value;
     }
     Offset32Ptr<OffsetString> fromName(Name* name)
@@ -212,7 +212,7 @@ struct StoreContext
         OffsetBase& base = m_container->asBase();
 
         Offset32Ptr<PathInfoState> pathInfo;
-        if (!m_pathInfoMap.TryGetValue(srcPathInfo, pathInfo))
+        if (!m_pathInfoMap.tryGetValue(srcPathInfo, pathInfo))
         {
             // Get the associated file
             Offset32Ptr<FileState> fileState;
@@ -237,7 +237,7 @@ struct StoreContext
             dst.loadFileResult = srcPathInfo->m_loadFileResult;
             dst.pathType = srcPathInfo->m_pathType;
 
-            m_pathInfoMap.Add(srcPathInfo, pathInfo);
+            m_pathInfoMap.add(srcPathInfo, pathInfo);
         }
 
         // Fill in info on the file
@@ -273,7 +273,7 @@ struct StoreContext
     {
         typedef ReproUtil::StringPair StringPair;
 
-        Offset32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.Count());
+        Offset32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.getCount());
 
         OffsetBase& base = m_container->asBase();
 
@@ -281,8 +281,8 @@ struct StoreContext
         for (const auto& srcDefine : srcDefines)
         {
             // Do allocation before setting
-            const auto key = fromString(srcDefine.Key);
-            const auto value = fromString(srcDefine.Value);
+            const auto key = fromString(srcDefine.key);
+            const auto value = fromString(srcDefine.value);
 
             auto& dstDefine = base[dstDefines[index]];
             dstDefine.first = key;
@@ -447,22 +447,22 @@ static String _scrubName(const String& in)
             {
                 const auto& srcTargetInfos = request->m_targetInfos;
 
-                if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.TryGetValue(srcTargetRequest))
+                if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.tryGetValue(srcTargetRequest))
                 {
                     EndToEndCompileRequest::TargetInfo* infos = *infosPtr;
 
                     const auto& entryPointOutputPaths = infos->entryPointOutputPaths;
 
-                    Offset32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.Count());
+                    Offset32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.getCount());
 
                     Index index = 0;
                     for (const auto& pair : entryPointOutputPaths)
                     {
-                        Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(pair.Value.getUnownedSlice());
+                        Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(pair.value.getUnownedSlice());
 
                         auto& dstOutputState = base[dstOutputStates[index]];
 
-                        dstOutputState.entryPointIndex = int32_t(pair.Key);
+                        dstOutputState.entryPointIndex = int32_t(pair.key);
                         dstOutputState.outputPath = outputPath;
 
                         index++;
@@ -542,13 +542,13 @@ static String _scrubName(const String& in)
         {
             const auto& srcFiles = cacheFileSystem->getPathMap();
 
-            Offset32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.Count());
+            Offset32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.getCount());
 
             Index index = 0;
             for (const auto& pair : srcFiles)
             {
-                const auto path = context.fromString(pair.Key);
-                const auto pathInfo = context.addPathInfo(pair.Value);
+                const auto path = context.fromString(pair.key);
+                const auto pathInfo = context.addPathInfo(pair.value);
 
                 PathAndPathInfo& dstInfo = base[pathMap[index]];
                 dstInfo.path = path;
@@ -599,7 +599,7 @@ static String _scrubName(const String& in)
             StringBuilder uniqueName;
             for (Index j = 0; j < 0x10000; j++)
             {
-                uniqueName.Clear();
+                uniqueName.clear();
                 uniqueName << filename;
 
                 if (j > 0)
@@ -613,7 +613,7 @@ static String _scrubName(const String& in)
                 }
 
                 int dummy = 0;
-                if (!uniqueNameMap.TryGetValueOrAdd(uniqueName, dummy))
+                if (!uniqueNameMap.tryGetValueOrAdd(uniqueName, dummy))
                 {
                     // It was added so we are done
                     break;
@@ -634,12 +634,12 @@ static String _scrubName(const String& in)
     // Save all the SourceFile state
     {
         const auto& srcSourceFiles = context.m_sourceFileMap;
-        auto dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcSourceFiles.Count());
+        auto dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcSourceFiles.getCount());
 
         Index index = 0;
         for (const auto& pair : srcSourceFiles)
         {
-            base[dstSourceFiles[index]] = pair.Value; 
+            base[dstSourceFiles[index]] = pair.value; 
             index++;
         }
         base[requestState]->sourceFiles = dstSourceFiles;
@@ -665,7 +665,7 @@ struct LoadContext
         }
 
         CacheFileSystem::PathInfo* dstInfo = nullptr;
-        if (!m_fileToPathInfoMap.TryGetValue(file, dstInfo))
+        if (!m_fileToPathInfoMap.tryGetValue(file, dstInfo))
         {
             ComPtr<ISlangBlob> blob;
 
@@ -703,7 +703,7 @@ struct LoadContext
             dstInfo->m_fileBlob = blob;
 
             // Add to map, even if the blob is nullptr (say from a failed read)
-            m_fileToPathInfoMap.Add(file, dstInfo);
+            m_fileToPathInfoMap.add(file, dstInfo);
         }
 
         return dstInfo;
@@ -723,7 +723,7 @@ struct LoadContext
         }
 
         SourceFile* dstFile;
-        if (!m_sourceFileMap.TryGetValue(sourceFile, dstFile))
+        if (!m_sourceFileMap.tryGetValue(sourceFile, dstFile))
         {
             FileState* file = m_base->asRaw(sourceFile->file);
             ISlangBlob* blob = getFileBlobFromFile(file);
@@ -750,7 +750,7 @@ struct LoadContext
             dstFile->setContents(blob);
 
             // Add to map
-            m_sourceFileMap.Add(sourceFile, dstFile);
+            m_sourceFileMap.add(sourceFile, dstFile);
 
             // Add to manager
             m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, dstFile);
@@ -766,7 +766,7 @@ struct LoadContext
         }
 
         CacheFileSystem::PathInfo* pathInfo;
-        if (m_pathInfoMap.TryGetValue(srcInfo, pathInfo))
+        if (m_pathInfoMap.tryGetValue(srcInfo, pathInfo))
         {
             return pathInfo;
         }
@@ -790,7 +790,7 @@ struct LoadContext
         dstInfo->m_loadFileResult = srcInfo->loadFileResult;
         dstInfo->m_pathType = srcInfo->pathType;
 
-        m_pathInfoMap.Add(srcInfo, dstInfo);
+        m_pathInfoMap.add(srcInfo, dstInfo);
         return dstInfo;
     }
 
@@ -809,11 +809,11 @@ struct LoadContext
 
     void loadDefines(const Offset32Array<ReproUtil::StringPair>& in, Dictionary<String, String>& out)
     {
-        out.Clear();
+        out.clear();
 
         for (const auto& define : in)
         {
-            out.Add(m_base->asRaw(m_base->asRaw(define).first)->getSlice(), m_base->asRaw(m_base->asRaw(define).second)->getSlice());
+            out.add(m_base->asRaw(m_base->asRaw(define).first)->getSlice(), m_base->asRaw(m_base->asRaw(define).second)->getSlice());
         }
     }
 
@@ -857,7 +857,7 @@ struct LoadContext
         if (fileState->foundPath)
         {
             String foundPath = base.asRaw(fileState->foundPath)->getSlice();
-            dstPathMap.AddIfNotExists(foundPath, pathInfo);
+            dstPathMap.addIfNotExists(foundPath, pathInfo);
         }
     }
 
@@ -867,7 +867,7 @@ struct LoadContext
         {
             const auto& pair = base.asRaw(pairOffset);
             CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(base.asRaw(pair.pathInfo));
-            dstPathMap.AddIfNotExists(base.asRaw(pair.path)->getSlice(), pathInfo);
+            dstPathMap.addIfNotExists(base.asRaw(pair.path)->getSlice(), pathInfo);
         }
     }
 
@@ -875,16 +875,16 @@ struct LoadContext
     {
         for (const auto& pair : context.m_fileToPathInfoMap)
         {
-            CacheFileSystem::PathInfo* pathInfo = pair.Value;
+            CacheFileSystem::PathInfo* pathInfo = pair.value;
             SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
-            dstUniqueMap.Add(pathInfo->m_uniqueIdentity, pathInfo);
+            dstUniqueMap.add(pathInfo->m_uniqueIdentity, pathInfo);
 
             // Add canonical paths too..
             if (pathInfo->m_canonicalPath.getLength())
             {
                 String canonicalPath = pathInfo->m_canonicalPath;
 
-                dstPathMap.AddIfNotExists(canonicalPath, pathInfo);
+                dstPathMap.addIfNotExists(canonicalPath, pathInfo);
             }
         }
     }
@@ -902,7 +902,7 @@ struct LoadContext
     // TODO(JS): Really should be more exhaustive here, and set up to initial state ideally
     // Reset state
     {
-        request->m_targetInfos.Clear();
+        request->m_targetInfos.clear();
         // Remove any requests
         linkage->targets.clear();
     }
@@ -959,7 +959,7 @@ struct LoadContext
                         entryPointPath = base.asRaw(srcOutputState.outputPath)->getSlice();
                     }
                     
-                    dstTargetInfo->entryPointOutputPaths.Add(srcOutputState.entryPointIndex, entryPointPath);
+                    dstTargetInfo->entryPointOutputPaths.add(srcOutputState.entryPointIndex, entryPointPath);
                 }
             }
         }
@@ -1064,14 +1064,14 @@ struct LoadContext
                 auto srcPathInfo = base.asRaw(pair.pathInfo);
 
                 CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(srcPathInfo);
-                dstPathMap.Add(base.asRaw(pair.path)->getSlice(), pathInfo);
+                dstPathMap.add(base.asRaw(pair.path)->getSlice(), pathInfo);
             }
         }
         // Put all the path infos in the cache system
         {
             for (const auto& pair : context.m_fileToPathInfoMap)
             {
-                CacheFileSystem::PathInfo* pathInfo = pair.Value;
+                CacheFileSystem::PathInfo* pathInfo = pair.value;
 
                 // TODO(JS): It's not 100% clear why we are ending up 
                 // with entries that don't have a unique identity.
@@ -1082,7 +1082,7 @@ struct LoadContext
                     continue;
                 }
                 SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
-                dstUniqueMap.Add(pathInfo->m_uniqueIdentity, pathInfo);
+                dstUniqueMap.add(pathInfo->m_uniqueIdentity, pathInfo);
             }
         }
     
@@ -1368,7 +1368,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
                         entryPointPath = base.asRaw(srcOutputState.outputPath)->getSlice();
                     }
 
-                    dstTargetInfo->entryPointOutputPaths.Add(srcOutputState.entryPointIndex, entryPointPath);
+                    dstTargetInfo->entryPointOutputPaths.add(srcOutputState.entryPointIndex, entryPointPath);
                 }
             }
 #endif

@@ -268,7 +268,7 @@ namespace Slang
             auto declModule = getModule(declaredWitness->declRef.getDecl());
             m_moduleDependencyList.addDependency(declModule);
             m_fileDependencyList.addDependency(declModule);
-            if (m_requirementSet.Add(declModule))
+            if (m_requirementSet.add(declModule))
             {
                 m_requirements.add(declModule);
             }
@@ -1049,11 +1049,11 @@ namespace Slang
             // If it's pass through we accumulate the preprocessor definitions. 
             for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)
             {
-                preprocessorDefinitions.Add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.key, define.value);
             }
             for (auto& define : translationUnit->preprocessorDefinitions)
             {
-                preprocessorDefinitions.Add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.key, define.value);
             }
             
             {
@@ -1134,7 +1134,7 @@ namespace Slang
             auto linkage = getLinkage();
             for (auto& define : linkage->preprocessorDefinitions)
             {
-                preprocessorDefinitions.Add(define.Key, define.Value);
+                preprocessorDefinitions.add(define.key, define.value);
             }
         }
 
@@ -1374,7 +1374,7 @@ namespace Slang
 
             // Add the specified defines (as calculated earlier - they will only be set if this is a pass through else will be empty)
             {
-                const auto count = preprocessorDefinitions.Count();
+                const auto count = preprocessorDefinitions.getCount();
                 auto dst = allocator.getArena().allocateArray<DownstreamCompileOptions::Define>(count);
 
                 Index i = 0;
@@ -1383,8 +1383,8 @@ namespace Slang
                 {
                     auto& define = dst[i];
                     
-                    define.nameWithSig = allocator.allocate(def.Key);
-                    define.value = allocator.allocate(def.Value);
+                    define.nameWithSig = allocator.allocate(def.key);
+                    define.value = allocator.allocate(def.value);
 
                     ++i;
                 }
@@ -1422,7 +1422,7 @@ namespace Slang
             {
                 const auto& diagnostic = *diagnostics->getAt(i);
 
-                builder.Clear();
+                builder.clear();
 
                 const Severity severity = _getDiagnosticSeverity(diagnostic.severity);
                 
@@ -1620,7 +1620,7 @@ namespace Slang
     String EndToEndCompileRequest::_getWholeProgramPath(TargetRequest* targetReq)
     {
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        if (m_targetInfos.TryGetValue(targetReq, targetInfo))
+        if (m_targetInfos.tryGetValue(targetReq, targetInfo))
         {
             return targetInfo->wholeTargetOutputPath;
         }
@@ -1635,10 +1635,10 @@ namespace Slang
         // get paths specified via command-line options.
         //
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        if (m_targetInfos.TryGetValue(targetReq, targetInfo))
+        if (m_targetInfos.tryGetValue(targetReq, targetInfo))
         {
             String outputPath;
-            if (targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
+            if (targetInfo->entryPointOutputPaths.tryGetValue(entryPointIndex, outputPath))
             {
                 return outputPath;
             }
@@ -2020,7 +2020,7 @@ namespace Slang
         int dependencyCount = compileRequest->getDependencyFileCount();
         for (int dependencyIndex = 0; dependencyIndex < dependencyCount; ++dependencyIndex)
         {
-            builder.Clear();
+            builder.clear();
             _escapeDependencyString(compileRequest->getDependencyFilePath(dependencyIndex), builder);
             _writeString(stream, builder.begin());
             _writeString(stream, (dependencyIndex + 1 < dependencyCount) ? " " : "\n");
@@ -2045,7 +2045,7 @@ namespace Slang
             if (targetReq->isWholeProgramRequest())
             {
                 RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-                if (compileRequest->m_targetInfos.TryGetValue(targetReq, targetInfo))
+                if (compileRequest->m_targetInfos.tryGetValue(targetReq, targetInfo))
                 {
                     _writeDependencyStatement(stream, compileRequest, targetInfo->wholeTargetOutputPath);
                 }
@@ -2056,10 +2056,10 @@ namespace Slang
                 for (Index entryPointIndex = 0; entryPointIndex < entryPointCount; ++entryPointIndex)
                 {
                     RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-                    if (compileRequest->m_targetInfos.TryGetValue(targetReq, targetInfo))
+                    if (compileRequest->m_targetInfos.tryGetValue(targetReq, targetInfo))
                     {
                         String outputPath;
-                        if (targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
+                        if (targetInfo->entryPointOutputPaths.tryGetValue(entryPointIndex, outputPath))
                         {
                             _writeDependencyStatement(stream, compileRequest, outputPath);
                         }

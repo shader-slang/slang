@@ -23,6 +23,7 @@ struct ListFuncs
             new (dst + i) Type;
         }
     }
+
     static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
@@ -455,7 +456,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
         case RttiInfo::Kind::Dictionary:
         {
             const auto& v = *(const Dictionary<Byte, Byte>*)src;
-            return v.Count() == 0;
+            return v.getCount() == 0;
         }
         case RttiInfo::Kind::Other:
         {

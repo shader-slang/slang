@@ -75,7 +75,7 @@ namespace Slang {
     const auto size = blob->getBufferSize();
     auto chars = (const char*)blob->getBufferPointer();
 
-    storage.Clear();
+    storage.clear();
     storage.append(UnownedStringSlice(chars, size));
    
     return TerminatedCharSlice(storage.getBuffer(), Count(size));

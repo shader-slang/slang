@@ -28,7 +28,7 @@ struct WitnessLookupLoweringContext
                 {
                     if (auto witnessDispatchFunc = as<IRDispatchFuncDecoration>(decor))
                     {
-                        witnessDispatchFunctions.Add(key, witnessDispatchFunc->getFunc());
+                        witnessDispatchFunctions.add(key, witnessDispatchFunc->getFunc());
                     }
                 }
             }
@@ -54,7 +54,7 @@ struct WitnessLookupLoweringContext
             {
                 if (!inst->getOperand(j))
                     continue;
-                if (processedSet.Add(inst->getOperand(j)))
+                if (processedSet.add(inst->getOperand(j)))
                     workList.add(inst->getOperand(j));
             }
         }
@@ -119,7 +119,7 @@ struct WitnessLookupLoweringContext
     {
         IRInst* func = nullptr;
         auto requirementKey = cast<IRStructKey>(lookupInst->getRequirementKey());
-        if (witnessDispatchFunctions.TryGetValue(requirementKey, func))
+        if (witnessDispatchFunctions.tryGetValue(requirementKey, func))
         {
             return func;
         }

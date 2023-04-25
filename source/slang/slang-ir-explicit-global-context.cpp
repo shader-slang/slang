@@ -256,7 +256,7 @@ struct IntroduceExplicitGlobalContextPass
         // for the instruction, so that we can use the key
         // to access the field later.
         //
-        m_mapInstToContextFieldKey.Add(originalInst, key);
+        m_mapInstToContextFieldKey.add(originalInst, key);
     }
 
     void createContextForEntryPoint(IRFunc* entryPointFunc)
@@ -309,7 +309,7 @@ struct IntroduceExplicitGlobalContextPass
         //
         auto contextVarPtr = builder.emitVar(m_contextStructType);
         addKernelContextNameHint(contextVarPtr);
-        m_mapFuncToContextPtr.Add(entryPointFunc, contextVarPtr);
+        m_mapFuncToContextPtr.add(entryPointFunc, contextVarPtr);
 
         // If there is a global-scope uniform parameter, then
         // we need to use our new explicit entry point parameter
@@ -444,7 +444,7 @@ struct IntroduceExplicitGlobalContextPass
         // If we already created such a pointer (perhaps because
         // `func` is an entry point), then we are home free.
         //
-        if( auto found = m_mapFuncToContextPtr.TryGetValue(func) )
+        if( auto found = m_mapFuncToContextPtr.tryGetValue(func) )
         {
             return *found;
         }
@@ -476,7 +476,7 @@ struct IntroduceExplicitGlobalContextPass
         // that call `func` to protect against a possible infinite-recursion
         // situation if `func` is recursive along some path.
         //
-        m_mapFuncToContextPtr.Add(func, contextParam);
+        m_mapFuncToContextPtr.add(func, contextParam);
 
         // Any code that calls `func` now needs to be updated to pass
         // the context parameter.

@@ -71,7 +71,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     bool useDefProc = true;
     Window* window = nullptr;
-    Win32AppContext::windows.TryGetValue(hWnd, window);
+    Win32AppContext::windows.tryGetValue(hWnd, window);
     switch (message)
     {
     case WM_LBUTTONUP:
@@ -400,7 +400,7 @@ public:
     {
         if (handle)
         {
-            Win32AppContext::windows.Remove(handle);
+            Win32AppContext::windows.remove(handle);
         }
         DestroyWindow(handle);
         handle = NULL;

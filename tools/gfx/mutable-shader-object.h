@@ -142,7 +142,7 @@ namespace gfx
             setObject(ShaderOffset const& offset, IShaderObject* object) override
         {
             Super::setObject(offset, object);
-            m_objectOffsets.Add(offset);
+            m_objectOffsets.add(offset);
             markDirty();
             return SLANG_OK;
         }
@@ -182,9 +182,9 @@ namespace gfx
                 allocateShaderObject(static_cast<TransientResourceHeapBase*>(transientHeap));
             SLANG_RETURN_ON_FAIL(object->setData(ShaderOffset(), this->m_data.getBuffer(), this->m_data.getCount()));
             for (auto res : m_resources)
-                SLANG_RETURN_ON_FAIL(object->setResource(res.Key, res.Value));
+                SLANG_RETURN_ON_FAIL(object->setResource(res.key, res.value));
             for (auto sampler : m_samplers)
-                SLANG_RETURN_ON_FAIL(object->setSampler(sampler.Key, sampler.Value));
+                SLANG_RETURN_ON_FAIL(object->setSampler(sampler.key, sampler.value));
             for (auto offset : m_objectOffsets)
             {
                 if (offset.bindingRangeIndex < 0)
@@ -304,7 +304,7 @@ namespace gfx
             *object = nullptr;
 
             Slang::RefPtr<ShaderObjectBase> subObject;
-            if (m_objects.TryGetValue(offset, subObject))
+            if (m_objects.tryGetValue(offset, subObject))
             {
                 returnComPtr(object, subObject);
             }

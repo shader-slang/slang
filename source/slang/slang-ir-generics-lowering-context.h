@@ -58,11 +58,11 @@ namespace Slang
                     return;
             }
 
-            if (workListSet.Contains(inst))
+            if (workListSet.contains(inst))
                 return;
 
             workList.add(inst);
-            workListSet.Add(inst);
+            workListSet.add(inst);
         }
 
 
@@ -108,7 +108,7 @@ namespace Slang
             IRInst* inst = sharedContext->workList.getLast();
 
             sharedContext->workList.removeLast();
-            sharedContext->workListSet.Remove(inst);
+            sharedContext->workListSet.remove(inst);
 
             func(inst);
 

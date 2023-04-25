@@ -560,7 +560,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     IRInst* diffCallee = nullptr;
     if (substPrimalCallee == primalCallee)
     {
-        instMapD.TryGetValue(origCallee, diffCallee);
+        instMapD.tryGetValue(origCallee, diffCallee);
     }
     else
     {
@@ -890,7 +890,7 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
         (IRType*)primalType, primalBase, primalArgs.getCount(), primalArgs.getBuffer());
 
     IRInst* diffBase = nullptr;
-    if (instMapD.TryGetValue(origSpecialize->getBase(), diffBase))
+    if (instMapD.tryGetValue(origSpecialize->getBase(), diffBase))
     {
         if (diffBase)
         {
@@ -1570,7 +1570,7 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
                 builder.setInsertBefore(inst);
                 for (auto& kv : mapParamToTempVar)
                 {
-                    builder.emitStore(kv.Key, builder.emitLoad(kv.Value));
+                    builder.emitStore(kv.key, builder.emitLoad(kv.value));
                 }
             }
         }
@@ -1629,7 +1629,7 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
 
     differentiableTypeConformanceContext.setFunc(primalFuncClone);
     
-    mapInOutParamToWriteBackValue.Clear();
+    mapInOutParamToWriteBackValue.clear();
 
     // Create and map blocks in diff func.
     for (auto block = primalFuncClone->getFirstBlock(); block; block = block->getNextBlock())
@@ -1653,12 +1653,12 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
                 builder.setInsertBefore(inst);
                 for (auto& writeBack : mapInOutParamToWriteBackValue)
                 {
-                    auto param = writeBack.Key;
-                    auto primalVal = builder.emitLoad(writeBack.Value.primal);
+                    auto param = writeBack.key;
+                    auto primalVal = builder.emitLoad(writeBack.value.primal);
                     IRInst* valToStore = nullptr;
-                    if (writeBack.Value.differential)
+                    if (writeBack.value.differential)
                     {
-                        auto diffVal = builder.emitLoad(writeBack.Value.differential);
+                        auto diffVal = builder.emitLoad(writeBack.value.differential);
                         builder.markInstAsDifferential(diffVal, primalVal->getFullType());
                         valToStore = builder.emitMakeDifferentialPair(cast<IRPtrTypeBase>(param->getFullType())->getValueType(),
                             primalVal, diffVal);
@@ -1666,12 +1666,12 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
                     }
                     else
                     {
-                        valToStore = builder.emitLoad(writeBack.Value.primal);
+                        valToStore = builder.emitLoad(writeBack.value.primal);
                     }
 
                     auto storeInst = builder.emitStore(param, valToStore);
 
-                    if (writeBack.Value.differential)
+                    if (writeBack.value.differential)
                     {
                         builder.markInstAsMixedDifferential(storeInst, valToStore->getFullType());
                     }

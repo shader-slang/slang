@@ -628,7 +628,7 @@ void SourceManager::_resetSource()
     m_sourceViews.clear();
     m_sourceFiles.clear();
 
-    m_sourceFileMap.Clear();
+    m_sourceFileMap.clear();
 }
 
 
@@ -816,7 +816,7 @@ SourceFile* SourceManager::findSourceFileByPath(const String& name) const
 
 SourceFile* SourceManager::findSourceFile(const String& uniqueIdentity) const
 {
-    SourceFile*const* filePtr = m_sourceFileMap.TryGetValue(uniqueIdentity);
+    SourceFile*const* filePtr = m_sourceFileMap.tryGetValue(uniqueIdentity);
     return (filePtr) ? *filePtr : nullptr;
 }
 
@@ -867,7 +867,7 @@ SourceFile* SourceManager::findSourceFileByContent(const char* text) const
 void SourceManager::addSourceFile(const String& uniqueIdentity, SourceFile* sourceFile)
 {
     SLANG_ASSERT(!findSourceFileRecursively(uniqueIdentity));
-    m_sourceFileMap.Add(uniqueIdentity, sourceFile);
+    m_sourceFileMap.add(uniqueIdentity, sourceFile);
 }
 
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)

@@ -155,7 +155,7 @@ namespace Slang
                     // in order.
                     if (context)
                     {
-                        validate(context, context->seenInsts.Contains(operandValue),    inst, "def must come before use in same block");
+                        validate(context, context->seenInsts.contains(operandValue),    inst, "def must come before use in same block");
                     }
                     return;
                 }
@@ -281,12 +281,12 @@ namespace Slang
     {
         HashSet<IRBlock*> blocks;
         for (auto block : code->getBlocks())
-            blocks.Add(block);
+            blocks.add(block);
         auto validateBranchTarget = [&](IRInst* inst, IRBlock* target)
         {
             validate(
                 context,
-                blocks.Contains(target),
+                blocks.contains(target),
                 inst,
                 "branch inst must have a valid target block that is defined within the same "
                 "scope.");
@@ -327,7 +327,7 @@ namespace Slang
     {
         // Validate that any operands of the instruction are used appropriately
         validateIRInstOperands(context, inst);
-        context->seenInsts.Add(inst);
+        context->seenInsts.add(inst);
 
         // If `inst` is itself a parent instruction, then we need to recursively
         // validate its children.

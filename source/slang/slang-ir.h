@@ -1986,18 +1986,18 @@ public:
 
     void _addGlobalNumberingEntry(IRInst* inst)
     {
-        m_globalValueNumberingMap.Add(IRInstKey{ inst }, inst);
-        m_instReplacementMap.Remove(inst);
+        m_globalValueNumberingMap.add(IRInstKey{ inst }, inst);
+        m_instReplacementMap.remove(inst);
         tryHoistInst(inst);
     }
     void _removeGlobalNumberingEntry(IRInst* inst)
     {
         IRInst* value = nullptr;
-        if (m_globalValueNumberingMap.TryGetValue(IRInstKey{ inst }, value))
+        if (m_globalValueNumberingMap.tryGetValue(IRInstKey{ inst }, value))
         {
             if (value == inst)
             {
-                m_globalValueNumberingMap.Remove(IRInstKey{ inst });
+                m_globalValueNumberingMap.remove(IRInstKey{ inst });
             }
         }
     }

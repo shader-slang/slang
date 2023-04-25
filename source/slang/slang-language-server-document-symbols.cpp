@@ -131,7 +131,7 @@ namespace Slang
         auto containerDecl = as<ContainerDecl>(parent);
         if (!containerDecl)
             return;
-        if (!context.processedDecls.Add(parent))
+        if (!context.processedDecls.add(parent))
             return;
         auto srcManager = context.linkage->getSourceManager();
         for (auto child : containerDecl->members)

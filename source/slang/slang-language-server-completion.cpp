@@ -202,7 +202,7 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
                     if (item.label.getLength())
                     {
                         auto key = String(item.kind) + item.label;
-                        if (context->itemSet.Add(key))
+                        if (context->itemSet.add(key))
                         {
                             item.detail = Path::combine(context->path, String(name));
                             Path::getCanonical(item.detail, item.detail);
@@ -483,7 +483,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
             continue;
         if (item.label.startsWith("$"))
             continue;
-        if (!deduplicateSet.Add(item.label))
+        if (!deduplicateSet.add(item.label))
             continue;
 
         if (as<StructDecl>(member))
@@ -536,7 +536,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
         {
             for (auto keyword : kDeclKeywords)
             {
-                if (!deduplicateSet.Add(keyword))
+                if (!deduplicateSet.add(keyword))
                     continue;
                 LanguageServerProtocol::CompletionItem item;
                 item.label = keyword;
@@ -549,7 +549,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
         {
             for (auto keyword : kStmtKeywords)
             {
-                if (!deduplicateSet.Add(keyword))
+                if (!deduplicateSet.add(keyword))
                     continue;
                 LanguageServerProtocol::CompletionItem item;
                 item.label = keyword;
@@ -564,7 +564,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
             if (!def.name)
                 continue;
             auto& text = def.name->text;
-            if (!deduplicateSet.Add(text))
+            if (!deduplicateSet.add(text))
                 continue;
             LanguageServerProtocol::CompletionItem item;
             item.label = text;
@@ -629,11 +629,11 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::createSwizzleCan
                 item.data = 0;
                 item.detail = typeStr;
                 item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-                nameSB.Clear();
+                nameSB.clear();
                 nameSB << "_m" << i << j;
                 item.label = nameSB.ToString();
                 result.add(item);
-                nameSB.Clear();
+                nameSB.clear();
                 nameSB << "_" << i + 1 << j + 1;
                 item.label = nameSB.ToString();
                 result.add(item);

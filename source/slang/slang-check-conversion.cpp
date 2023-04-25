@@ -1153,7 +1153,7 @@ namespace Slang
     
         if( cacheKey.isValid())
         {
-            if (typeCheckingCache->conversionCostCache.TryGetValue(cacheKey, cost))
+            if (typeCheckingCache->conversionCostCache.tryGetValue(cacheKey, cost))
             {
                 if (outCost)
                     *outCost = cost;

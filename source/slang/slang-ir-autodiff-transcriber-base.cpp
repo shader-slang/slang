@@ -33,7 +33,7 @@ void AutoDiffTranscriberBase::mapDifferentialInst(IRInst* origInst, IRInst* diff
 
 void AutoDiffTranscriberBase::mapPrimalInst(IRInst* origInst, IRInst* primalInst)
 {
-    if (cloneEnv.mapOldValToNew.ContainsKey(origInst) && cloneEnv.mapOldValToNew[origInst] != primalInst)
+    if (cloneEnv.mapOldValToNew.containsKey(origInst) && cloneEnv.mapOldValToNew[origInst] != primalInst)
     {
         getSink()->diagnose(origInst->sourceLoc,
             Diagnostics::internalCompilerError,
@@ -52,7 +52,7 @@ IRInst* AutoDiffTranscriberBase::lookupDiffInst(IRInst* origInst)
 
 IRInst* AutoDiffTranscriberBase::lookupDiffInst(IRInst* origInst, IRInst* defaultInst)
 {
-    if (auto lookupResult = instMapD.TryGetValue(origInst))
+    if (auto lookupResult = instMapD.tryGetValue(origInst))
         return *lookupResult;
     return defaultInst;
 }
@@ -61,7 +61,7 @@ bool AutoDiffTranscriberBase::hasDifferentialInst(IRInst* origInst)
 {
     if (!origInst)
         return false;
-    return instMapD.ContainsKey(origInst);
+    return instMapD.containsKey(origInst);
 }
 
 bool AutoDiffTranscriberBase::shouldUseOriginalAsPrimal(IRInst* currentParent, IRInst* origInst)
@@ -105,7 +105,7 @@ bool AutoDiffTranscriberBase::hasPrimalInst(IRInst* currentParent, IRInst* origI
         return false;
     if (shouldUseOriginalAsPrimal(currentParent, origInst))
         return true;
-    return cloneEnv.mapOldValToNew.ContainsKey(origInst);
+    return cloneEnv.mapOldValToNew.containsKey(origInst);
 }
 
 IRInst* AutoDiffTranscriberBase::findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst)
@@ -487,9 +487,9 @@ static bool _findDifferentiableInterfaceLookupPathImpl(
     IRInterfaceType* type,
     List<IRInterfaceRequirementEntry*>& currentPath)
 {
-    if (processedTypes.Contains(type))
+    if (processedTypes.contains(type))
         return false;
-    processedTypes.Add(type);
+    processedTypes.add(type);
 
     List<IRInterfaceRequirementEntry*> lookupKeyPath;
     for (UInt i = 0; i < type->getOperandCount(); i++)
@@ -859,7 +859,7 @@ InstPair AutoDiffTranscriberBase::transcribeBlockImpl(IRBuilder* builder, IRBloc
     //
     for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
     {
-        if (instsToSkip.Contains(child))
+        if (instsToSkip.contains(child))
         {
             continue;
         }
@@ -959,7 +959,7 @@ static void _markGenericChildrenWithoutRelaventUse(IRGeneric* origGeneric, HashS
                 case kIROp_PrimalSubstituteDecoration:
                     break;
                 default:
-                    if (!outInstsToSkip.Contains(use->getUser()))
+                    if (!outInstsToSkip.contains(use->getUser()))
                     {
                         hasRelaventUse = true;
                     }
@@ -968,7 +968,7 @@ static void _markGenericChildrenWithoutRelaventUse(IRGeneric* origGeneric, HashS
             }
             if (!hasRelaventUse)
             {
-                if (outInstsToSkip.Add(inst))
+                if (outInstsToSkip.add(inst))
                 {
                     changed = true;
                 }
@@ -1074,11 +1074,11 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
     // Otherwise, dispatch to the appropriate method 
     // depending on the op-code.
     // 
-    instsInProgress.Add(origInst);
+    instsInProgress.add(origInst);
     auto actualInstToTranscribe = getActualInstToTranscribe(origInst);
     InstPair pair = transcribeInst(builder, actualInstToTranscribe);
 
-    instsInProgress.Remove(origInst);
+    instsInProgress.remove(origInst);
 
     if (auto primalInst = pair.primal)
     {
@@ -1176,7 +1176,7 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
             // 
             if (as<IRGeneric>(origType->getParent()->getParent()) &&
                 findInnerMostGenericReturnVal(as<IRGeneric>(origType->getParent()->getParent())) == origType &&
-                !instsInProgress.Contains(origType->getParent()->getParent()))
+                !instsInProgress.contains(origType->getParent()->getParent()))
             {
                 auto origGenericType = origType->getParent()->getParent();
                 auto diffGenericType = findOrTranscribeDiffInst(builder, origGenericType);

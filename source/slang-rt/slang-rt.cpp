@@ -23,7 +23,7 @@ extern "C"
     SLANG_RT_API void* SLANG_MCALL _slang_rt_load_dll(Slang::String modulePath)
     {
         ComPtr<ISlangSharedLibrary> lib;
-        if (!slangRT_loadedLibraries.TryGetValue(modulePath, lib))
+        if (!slangRT_loadedLibraries.tryGetValue(modulePath, lib))
         {
             if (DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(
                     modulePath.getBuffer(), lib.writeRef()) != SLANG_OK)

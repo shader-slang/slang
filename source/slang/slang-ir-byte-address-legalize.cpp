@@ -671,10 +671,10 @@ struct ByteAddressBufferLegalizationContext
         KeyValuePair<IRInst*, IRInst*> key(elementType, byteAddressBufferParam);
 
         IRGlobalParam* structuredBufferParam;
-        if(!m_cachedStructuredBuffers.TryGetValue(key, structuredBufferParam))
+        if(!m_cachedStructuredBuffers.tryGetValue(key, structuredBufferParam))
         {
             structuredBufferParam = createEquivalentStructuredBufferParam(elementType, byteAddressBufferParam);
-            m_cachedStructuredBuffers.Add(key, structuredBufferParam);
+            m_cachedStructuredBuffers.add(key, structuredBufferParam);
         }
         return structuredBufferParam;
     }

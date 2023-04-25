@@ -324,7 +324,7 @@ namespace Slang
 
     /* static */void Path::combineIntoBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder)
     {
-        outBuilder.Clear();
+        outBuilder.clear();
         outBuilder.Append(path1);
         append(outBuilder, path2);
     }
@@ -519,7 +519,7 @@ namespace Slang
 
     /* static */void Path::join(const UnownedStringSlice* slices, Index count, StringBuilder& out)
     {
-        out.Clear();
+        out.clear();
 
         if (count == 0)
         {

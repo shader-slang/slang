@@ -65,7 +65,7 @@ public:
         /// Get the content as a string
     String getContent() { return m_builder.ProduceString(); }
         /// Clear the content
-    void clearContent() { m_builder.Clear(); }
+    void clearContent() { m_builder.clear(); }
         /// Get the content as a string and clear the internal representation
     String getContentAndClear();
 

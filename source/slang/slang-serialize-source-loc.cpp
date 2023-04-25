@@ -57,14 +57,14 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
     SourceFile* sourceFile = sourceView->getSourceFile();
     Source* debugSourceFile;
     {
-        RefPtr<Source>* ptrDebugSourceFile = m_sourceFileMap.TryGetValue(sourceFile);
+        RefPtr<Source>* ptrDebugSourceFile = m_sourceFileMap.tryGetValue(sourceFile);
         if (ptrDebugSourceFile == nullptr)
         {
             const SourceLoc::RawValue baseSourceLoc = m_freeSourceLoc;
             m_freeSourceLoc += SourceLoc::RawValue(sourceView->getRange().getSize() + 1);
 
             debugSourceFile = new Source(sourceFile, baseSourceLoc);
-            m_sourceFileMap.Add(sourceFile, debugSourceFile);
+            m_sourceFileMap.add(sourceFile, debugSourceFile);
         }
         else
         {
@@ -126,7 +126,7 @@ void SerialSourceLocWriter::write(SerialSourceLocData* outSourceLocData)
 
     for (auto& pair : m_sourceFileMap)
     {
-        Source* debugSourceFile = pair.Value;
+        Source* debugSourceFile = pair.value;
         SourceFile* sourceFile = debugSourceFile->m_sourceFile;
 
         SerialSourceLocData::SourceInfo sourceInfo;

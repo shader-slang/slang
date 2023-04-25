@@ -52,7 +52,7 @@ public:
 
     Decl* findBuiltinRequirementDecl(BuiltinRequirementKind kind)
     {
-        return m_builtinRequirementDecls[kind].GetValue();
+        return m_builtinRequirementDecls[kind].getValue();
     }
 
         /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.
@@ -139,11 +139,11 @@ public:
     template<typename NodeCreateFunc>
     NodeBase* _getOrCreateImpl(NodeDesc const& desc, NodeCreateFunc createFunc)
     {
-        if (auto found = m_cachedNodes.TryGetValue(desc))
+        if (auto found = m_cachedNodes.tryGetValue(desc))
             return *found;
 
         auto node = createFunc();
-        m_cachedNodes.Add(desc, node);
+        m_cachedNodes.add(desc, node);
         return node;
     }
 

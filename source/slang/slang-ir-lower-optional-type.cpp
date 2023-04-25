@@ -53,9 +53,9 @@ namespace Slang
 
         LoweredOptionalTypeInfo* getLoweredOptionalType(IRBuilder* builder, IRInst* type)
         {
-            if (auto loweredInfo = loweredOptionalTypes.TryGetValue(type))
+            if (auto loweredInfo = loweredOptionalTypes.tryGetValue(type))
                 return loweredInfo->Ptr();
-            if (auto loweredInfo = mapLoweredTypeToOptionalTypeInfo.TryGetValue(type))
+            if (auto loweredInfo = mapLoweredTypeToOptionalTypeInfo.tryGetValue(type))
                 return loweredInfo->Ptr();
 
             if (!type)
@@ -102,11 +102,11 @@ namespace Slang
                     return;
             }
 
-            if (workListSet.Contains(inst))
+            if (workListSet.contains(inst))
                 return;
 
             workList.add(inst);
-            workListSet.Add(inst);
+            workListSet.add(inst);
         }
 
         void processMakeOptionalValue(IRMakeOptionalValue* inst)
@@ -255,7 +255,7 @@ namespace Slang
                 IRInst* inst = workList.getLast();
 
                 workList.removeLast();
-                workListSet.Remove(inst);
+                workListSet.remove(inst);
 
                 processInst(inst);
 
@@ -268,7 +268,7 @@ namespace Slang
             // Replace all optional types with lowered struct types.
             for (auto kv : loweredOptionalTypes)
             {
-                kv.Key->replaceUsesWith(kv.Value->loweredType);
+                kv.key->replaceUsesWith(kv.value->loweredType);
             }
         }
     };

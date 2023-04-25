@@ -63,21 +63,21 @@ struct EliminateMultiLevelBreakContext
         {
             // Push break block to a stack so we can easily check if a block is a break block in its
             // parent regions.
-            breakBlocks.Add(info.getBreakBlock());
+            breakBlocks.add(info.getBreakBlock());
             
             auto successors = as<IRBlock>(info.headerInst->getParent())->getSuccessors();
             for (auto successor : successors)
             {
-                if (!breakBlocks.Add(successor))
+                if (!breakBlocks.add(successor))
                     continue;
-                if (info.blockSet.Add(successor))
+                if (info.blockSet.add(successor))
                     info.blocks.add(successor);
             }
 
             for (Index i = 0; i < info.blocks.getCount(); i++)
             {
                 auto block = info.blocks[i];
-                if (!processedBlocks.Add(block))
+                if (!processedBlocks.add(block))
                     continue;
                 switch (block->getTerminator()->getOp())
                 {
@@ -92,7 +92,7 @@ struct EliminateMultiLevelBreakContext
                         collectBreakableRegionBlocks(*childRegion);
                         info.childRegions.add(childRegion);
                         block = childRegion->getBreakBlock();
-                        if (info.blockSet.Add(block))
+                        if (info.blockSet.add(block))
                         {
                             info.blocks.add(block);
                         }
@@ -103,23 +103,23 @@ struct EliminateMultiLevelBreakContext
                 }
                 for (auto succ : block->getSuccessors())
                 {
-                    if (!breakBlocks.Contains(succ))
+                    if (!breakBlocks.contains(succ))
                     {
-                        if (info.blockSet.Add(succ))
+                        if (info.blockSet.add(succ))
                             info.blocks.add(succ);
                     }
                 }
             }
 
             // Pop the break block from stack since we are no longer processing the region.
-            breakBlocks.Remove(info.getBreakBlock());
+            breakBlocks.remove(info.getBreakBlock());
         }
 
         void gatherInfo(IRGlobalValueWithCode* func)
         {
             for (auto block : func->getBlocks())
             {
-                if (processedBlocks.Contains(block))
+                if (processedBlocks.contains(block))
                     continue;
                 auto terminator = block->getTerminator();
                 switch (terminator->getOp())
@@ -142,9 +142,9 @@ struct EliminateMultiLevelBreakContext
                 l->forEach(
                     [&](BreakableRegionInfo* region)
                     {
-                        mapBreakBlockToRegion.Add(region->getBreakBlock(), region);
+                        mapBreakBlockToRegion.add(region->getBreakBlock(), region);
                         for (auto block : region->blocks)
-                            mapBlockToRegion.Add(block, region);
+                            mapBlockToRegion.add(block, region);
                     });
             }
 
@@ -157,9 +157,9 @@ struct EliminateMultiLevelBreakContext
                         continue;
                     BreakableRegionInfo* breakTargetRegion = nullptr;
                     BreakableRegionInfo* currentRegion = nullptr;
-                    if (!mapBreakBlockToRegion.TryGetValue(branch->getTargetBlock(), breakTargetRegion))
+                    if (!mapBreakBlockToRegion.tryGetValue(branch->getTargetBlock(), breakTargetRegion))
                         continue;
-                    if (mapBlockToRegion.TryGetValue(block, currentRegion))
+                    if (mapBlockToRegion.tryGetValue(block, currentRegion))
                     {
                         if (currentRegion != breakTargetRegion)
                         {
@@ -265,7 +265,7 @@ struct EliminateMultiLevelBreakContext
             auto region = breakInfo.currentRegion;
             while (region)
             {
-                skippedOverRegions.Add(region);
+                skippedOverRegions.add(region);
                 region = region->parent;
                 if (region == breakInfo.breakTargetRegion)
                     break;
@@ -319,7 +319,7 @@ struct EliminateMultiLevelBreakContext
             }
             
             builder.setInsertInto(jumpToOuterBlock);
-            if (skippedOverRegions.Contains(skippedRegion->parent))
+            if (skippedOverRegions.contains(skippedRegion->parent))
             {
                 builder.emitBranch(skippedRegion->parent->getBreakBlock(), 1, (IRInst**)&targetLevelParam);
             }
@@ -334,8 +334,8 @@ struct EliminateMultiLevelBreakContext
         // value equal to the level of its corresponding region.
         for (auto breakBlockKV : mapNewBreakBlockToRegionLevel)
         {
-            auto breakBlock = breakBlockKV.Key;
-            auto level = breakBlockKV.Value;
+            auto breakBlock = breakBlockKV.key;
+            auto level = breakBlockKV.value;
             IRInst* levelInst = nullptr;
             List<IRUse*> uses;
             for (auto use = breakBlock->firstUse; use; use = use->nextUse)

@@ -213,7 +213,7 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
             }
 
             // Add to the list of entries
-            m_entries.Add(dstEntry.m_canonicalPath, dstEntry);
+            m_entries.add(dstEntry.m_canonicalPath, dstEntry);
         }
     }
 
@@ -237,7 +237,7 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
 
     for (const auto& pair : m_entries)
     {
-        const Entry* srcEntry = &pair.Value;
+        const Entry* srcEntry = &pair.value;
 
         // Ignore the root entry
         if (srcEntry->m_canonicalPath == toSlice("."))

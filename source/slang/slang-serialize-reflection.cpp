@@ -44,7 +44,7 @@ static uint32_t _calcRangeRec(ReflectClassInfo* classInfo, const Dictionary<cons
 {
     classInfo->m_classId = index++;
     // Do the calc range for all the children
-    auto list = childMap.TryGetValue(classInfo);
+    auto list = childMap.tryGetValue(classInfo);
 
     if (list)
     {
@@ -90,10 +90,10 @@ static ReflectClassInfo* _calcRoot(ReflectClassInfo* classInfo)
             if (typeInfo->m_superClass)
             {
                 // Add to that item
-                List<ThisType*>* list = childMap.TryGetValueOrAdd(typeInfo->m_superClass, emptyList);
+                List<ThisType*>* list = childMap.tryGetValueOrAdd(typeInfo->m_superClass, emptyList);
                 if (!list)
                 {
-                    list = childMap.TryGetValue(typeInfo->m_superClass);
+                    list = childMap.tryGetValue(typeInfo->m_superClass);
                 }
                 SLANG_ASSERT(list);
                 list->add(typeInfo);

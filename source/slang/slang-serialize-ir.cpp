@@ -27,10 +27,10 @@ static bool _isConstant(IROp opIn)
 void IRSerialWriter::_addInstruction(IRInst* inst)
 {
     // It cannot already be in the map
-    SLANG_ASSERT(!m_instMap.ContainsKey(inst));
+    SLANG_ASSERT(!m_instMap.containsKey(inst));
 
     // Add to the map
-    m_instMap.Add(inst, Ser::InstIndex(m_insts.getCount()));
+    m_instMap.add(inst, Ser::InstIndex(m_insts.getCount()));
     m_insts.add(inst);
 }
 
@@ -117,7 +117,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
     m_insts.add(nullptr);
 
     // Reset
-    m_instMap.Clear();
+    m_instMap.clear();
     m_decorations.clear();
     
     // Stack for parentInst
@@ -135,7 +135,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
         // If it's in the stack it is assumed it is already in the inst map
         IRInst* parentInst = parentInstStack.getLast();
         parentInstStack.removeLast();
-        SLANG_ASSERT(m_instMap.ContainsKey(parentInst));
+        SLANG_ASSERT(m_instMap.containsKey(parentInst));
 
         // Okay we go through each of the children in order. If they are IRInstParent derived, we add to stack to process later 
         // cos we want breadth first so the order of children is the same as their index order, meaning we don't need to store explicit indices
@@ -145,7 +145,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
         for (IRInst* child : childrenList)
         {
             // This instruction can't be in the map...
-            SLANG_ASSERT(!m_instMap.ContainsKey(child));
+            SLANG_ASSERT(!m_instMap.containsKey(child));
 
             _addInstruction(child);
             
@@ -168,8 +168,8 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
     {
         List<IRInst*> workInsts;
         calcInstructionList(module, workInsts);
-        SLANG_ASSERT(workInsts.Count() == m_insts.Count());
-        for (UInt i = 0; i < workInsts.Count(); ++i)
+        SLANG_ASSERT(workInsts.getCount() == m_insts.getCount());
+        for (UInt i = 0; i < workInsts.getCount(); ++i)
         {
             SLANG_ASSERT(workInsts[i] == m_insts[i]);
         }

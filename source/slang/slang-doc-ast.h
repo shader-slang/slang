@@ -41,7 +41,7 @@ protected:
 SLANG_INLINE ASTMarkup::Entry& ASTMarkup::addEntry(NodeBase* base)
 {
     const Index count = m_entries.getCount();
-    const Index index = m_entryMap.GetOrAddValue(base, count);
+    const Index index = m_entryMap.getOrAddValue(base, count);
 
     if (index == count)
     {
@@ -55,7 +55,7 @@ SLANG_INLINE ASTMarkup::Entry& ASTMarkup::addEntry(NodeBase* base)
 // ---------------------------------------------------------------------------
 SLANG_INLINE ASTMarkup::Entry* ASTMarkup::getEntry(NodeBase* base)
 {
-    Index* indexPtr = m_entryMap.TryGetValue(base);
+    Index* indexPtr = m_entryMap.tryGetValue(base);
     return (indexPtr) ? &m_entries[*indexPtr] : nullptr;
 }
 

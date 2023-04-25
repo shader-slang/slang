@@ -174,7 +174,7 @@ static void _lookUpDirectAndTransparentMembers(
     {
         // Look up the declarations with the chosen name in the container.
         Decl* firstDecl = nullptr;
-        containerDecl->getMemberDictionary().TryGetValue(name, firstDecl);
+        containerDecl->getMemberDictionary().tryGetValue(name, firstDecl);
 
         // Now iterate over those declarations (if any) and see if
         // we find any that meet our filtering criteria.

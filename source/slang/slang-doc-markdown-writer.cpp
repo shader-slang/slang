@@ -123,7 +123,7 @@ String DocMarkdownWriter::_getName(Decl* decl)
 String DocMarkdownWriter::_getName(InheritanceDecl* decl)
 {
     StringBuilder buf;
-    buf.Clear();
+    buf.clear();
     buf << decl->base;
     return buf.ProduceString();
 }
@@ -338,7 +338,7 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
             for (Index i = 0; i < paramCount; ++i)
             {
                 const auto& param = signature.params[i];
-                line.Clear();
+                line.clear();
                 // If we want to tab these over... we'll need to know how must space I have
                 line << "    " << printer.getPartSlice(param.first);
 
@@ -381,7 +381,7 @@ List<DocMarkdownWriter::NameAndText> DocMarkdownWriter::_getUniqueParams(const L
             continue;
         }
 
-        Index index = nameDict.GetOrAddValue(name, out.getCount());
+        Index index = nameDict.getOrAddValue(name, out.getCount());
 
         if (index >= out.getCount())
         {
@@ -499,7 +499,7 @@ static void _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& i
 
     if (auto spirvRequiredModifier = decl->findModifier<RequiredSPIRVVersionModifier>())
     {
-        buf.Clear();
+        buf.clear();
         buf << "SPIR-V ";
         spirvRequiredModifier->version.append(buf);
         _addRequirement(CodeGenTarget::GLSL, buf, ioReqs);
@@ -507,14 +507,14 @@ static void _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& i
 
     if (auto glslRequiredModifier = decl->findModifier<RequiredGLSLVersionModifier>())
     {
-        buf.Clear();
+        buf.clear();
         buf << "GLSL" << glslRequiredModifier->versionNumberToken.getContent();
         _addRequirement(CodeGenTarget::GLSL, buf, ioReqs);
     }
 
     if (auto cudaSMVersionModifier = decl->findModifier<RequiredCUDASMVersionModifier>())
     {
-        buf.Clear();
+        buf.clear();
         buf << "SM ";
         cudaSMVersionModifier->version.append(buf);
         _addRequirement(CodeGenTarget::CUDASource, buf, ioReqs);
@@ -522,7 +522,7 @@ static void _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& i
 
     if (auto extensionModifier = decl->findModifier<RequiredGLSLExtensionModifier>())
     {
-        buf.Clear();
+        buf.clear();
         buf << extensionModifier->extensionNameToken.getContent();
         _addRequirement(CodeGenTarget::GLSL, buf, ioReqs);
     }
@@ -675,7 +675,7 @@ static bool _isFirstOverridden(Decl* decl)
     Name* declName = decl->getName();
     if (declName)
     {
-        Decl** firstDeclPtr = parentDecl->getMemberDictionary().TryGetValue(declName);
+        Decl** firstDeclPtr = parentDecl->getMemberDictionary().tryGetValue(declName);
         return (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
     }
 
@@ -1068,7 +1068,7 @@ void DocMarkdownWriter::writeAggType(const ASTMarkup::Entry& entry, AggTypeDeclB
         List<Decl*> uniqueMethods;
         for (const auto& pair : memberDict)
         {
-            CallableDecl* callableDecl = as<CallableDecl>(pair.Value);
+            CallableDecl* callableDecl = as<CallableDecl>(pair.value);
             if (callableDecl && isVisible(callableDecl))
             {
                 uniqueMethods.add(callableDecl);

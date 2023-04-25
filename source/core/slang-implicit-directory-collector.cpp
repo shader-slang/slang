@@ -77,8 +77,8 @@ SlangResult ImplicitDirectoryCollector::enumerate(FileSystemContentsCallBack cal
     {
         const auto& pair = m_map.getAt(i);
 
-        UnownedStringSlice path = pair.Key;
-        SlangPathType pathType = SlangPathType(pair.Value);
+        UnownedStringSlice path = pair.key;
+        SlangPathType pathType = SlangPathType(pair.value);
 
         // Note *is* 0 terminated in the pool
         // Let's check tho

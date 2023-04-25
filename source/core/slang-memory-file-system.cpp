@@ -55,7 +55,7 @@ MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromCanonicalPath(const Stri
     }
     else
     {
-        return m_entries.TryGetValue(canonicalPath);
+        return m_entries.tryGetValue(canonicalPath);
     }
 }
 
@@ -173,7 +173,7 @@ SlangResult MemoryFileSystem::enumeratePathContents(const char* path, FileSystem
     // If it is a directory, we need to see if there is anything in it
     for (const auto& pair : m_entries)
     {
-        const Entry* childEntry = &pair.Value;
+        const Entry* childEntry = &pair.value;
         collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
     }
 
@@ -250,7 +250,7 @@ SlangResult MemoryFileSystem::_requireFile(const char* path, Entry** outEntry)
     {
         Entry entry;
         entry.initFile(canonicalPath);
-        m_entries.Add(canonicalPath, entry);
+        m_entries.add(canonicalPath, entry);
 
         foundEntry = _getEntryFromCanonicalPath(canonicalPath);
     }
@@ -277,7 +277,7 @@ SlangResult MemoryFileSystem::remove(const char* path)
             // If it is a directory, we need to see if there is anything in it
             for (const auto& pair : m_entries)
             {
-                const Entry* childEntry = &pair.Value;
+                const Entry* childEntry = &pair.value;
                 collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
                 if (collector.hasContent())
                 {
@@ -289,7 +289,7 @@ SlangResult MemoryFileSystem::remove(const char* path)
 
         // Reset so doesn't hold references/keep memory in scope
         entry->reset();
-        m_entries.Remove(canonicalPath);
+        m_entries.remove(canonicalPath);
         return SLANG_OK;
     }
 
@@ -308,7 +308,7 @@ SlangResult MemoryFileSystem::createDirectory(const char* path)
 
     Entry entry;
     entry.initDirectory(canonicalPath);
-    m_entries.Add(canonicalPath, entry);
+    m_entries.add(canonicalPath, entry);
     return SLANG_OK;
 }
 

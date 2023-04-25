@@ -179,7 +179,7 @@ IRDominatorTree::DominatedList IRDominatorTree::getProperlyDominatedBlocks(IRBlo
 Int IRDominatorTree::getBlockIndex(IRBlock* block)
 {
     Int index = kInvalidIndex;
-    if(!mapBlockToIndex.TryGetValue(block, index))
+    if(!mapBlockToIndex.tryGetValue(block, index))
     {
         SLANG_UNEXPECTED("block was not present in dominator tree");
     }
@@ -188,7 +188,7 @@ Int IRDominatorTree::getBlockIndex(IRBlock* block)
 
 bool IRDominatorTree::isUnreachable(IRBlock* block)
 {
-    return !mapBlockToIndex.ContainsKey(block);
+    return !mapBlockToIndex.containsKey(block);
 }
 
 
@@ -279,11 +279,11 @@ struct DepthFirstSearchContext
     template<typename SuccessorFunc>
     void walk(IRBlock* block, const SuccessorFunc& getSuccessors)
     {
-        visited.Add(block);
+        visited.add(block);
         preVisit(block);
         for(auto succ : getSuccessors(block))
         {
-            if(!visited.Contains(succ))
+            if(!visited.contains(succ))
             {
                 walk(succ, getSuccessors);
             }
@@ -328,7 +328,7 @@ void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
     List<IRBlock*> prefix;
     for (auto block : code->getBlocks())
     {
-        if (!context.visited.Contains(block))
+        if (!context.visited.contains(block))
         {
             prefix.add(block);
         }
@@ -753,7 +753,7 @@ struct DominatorTreeComputationContext
             // from the block to  the node index.
             //
             node.block = block;
-            dominatorTree->mapBlockToIndex.Add(block, nodeIndex);
+            dominatorTree->mapBlockToIndex.add(block, nodeIndex);
 
             // Filling in the parent is easy enough, just with the detail that
             // we need to handle the invalid case explicitly (for a node with

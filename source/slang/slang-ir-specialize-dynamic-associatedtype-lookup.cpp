@@ -149,7 +149,7 @@ struct AssociatedTypeLookupSpecializationContext
             return;
         auto key = inst->getRequirementKey();
         IRFunc* func = nullptr;
-        if (!sharedContext->mapInterfaceRequirementKeyToDispatchMethods.TryGetValue(key, func))
+        if (!sharedContext->mapInterfaceRequirementKeyToDispatchMethods.tryGetValue(key, func))
         {
             func = createWitnessTableLookupFunc(interfaceType, key);
             sharedContext->mapInterfaceRequirementKeyToDispatchMethods[key] = func;

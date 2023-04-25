@@ -280,7 +280,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // for each of its requirements.
                 RequirementWitness requirementWitness;
                 auto witnessTable = inheritanceDeclRef.getDecl()->witnessTable;
-                if(witnessTable && witnessTable->requirementDictionary.TryGetValue(requirementKey, requirementWitness))
+                if(witnessTable && witnessTable->requirementDictionary.tryGetValue(requirementKey, requirementWitness))
                 {
                     // The `inheritanceDeclRef` has substitutions applied to it that
                     // *aren't* present in the `requirementWitness`, because it was
@@ -343,7 +343,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 {
                     auto table = midWitness.getWitnessTable();
                     RequirementWitness result;
-                    if (table->requirementDictionary.TryGetValue(requirementKey, result))
+                    if (table->requirementDictionary.tryGetValue(requirementKey, result))
                     {
                         result = result.specialize(astBuilder, midKey.substitutions);
                     }
@@ -372,9 +372,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     void WitnessTable::add(Decl* decl, RequirementWitness const& witness)
     {
-        SLANG_ASSERT(!requirementDictionary.ContainsKey(decl));
+        SLANG_ASSERT(!requirementDictionary.containsKey(decl));
 
-        requirementDictionary.Add(decl, witness);
+        requirementDictionary.add(decl, witness);
     }
 
     //

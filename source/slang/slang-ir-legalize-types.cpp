@@ -179,7 +179,7 @@ static LegalVal legalizeOperand(
     IRInst*                    irValue)
 {
     LegalVal legalVal;
-    if( context->mapValToLegalVal.TryGetValue(irValue, legalVal) )
+    if( context->mapValToLegalVal.tryGetValue(irValue, legalVal) )
     {
         return maybeMaterializeWrappedValue(context, legalVal);
     }
@@ -599,7 +599,7 @@ private:
                     // recorded for the function.
                     //
                     RefPtr<LegalFuncInfo> parentFuncInfo;
-                    if( !m_context->mapFuncToInfo.TryGetValue(parentFunc, parentFuncInfo) )
+                    if( !m_context->mapFuncToInfo.tryGetValue(parentFunc, parentFuncInfo) )
                     {
                         // If we fail to find the extended information then either:
                         //
@@ -2313,7 +2313,7 @@ struct LegalFuncBuilder
                 // the reuslt value into the newly-declared parameter(s).
                 //
                 RefPtr<LegalFuncInfo> funcInfo = new LegalFuncInfo();
-                m_context->mapFuncToInfo.Add(oldFunc, funcInfo);
+                m_context->mapFuncToInfo.add(oldFunc, funcInfo);
 
                 // We know that our new parameters need to come after
                 // those that were declared for the "base" parameters
@@ -3480,7 +3480,7 @@ struct IRTypeLegalizationPass
     bool hasBeenAddedToWorkListOrProcessed(IRInst* inst)
     {
         if (hasBeenAddedToWorkList(inst)) return true;
-        return hasBeenAddedOrProcessedSet.Contains(inst);
+        return hasBeenAddedOrProcessedSet.contains(inst);
     }
 
     // We will add a simple query to check whether an instruciton
@@ -3520,7 +3520,7 @@ struct IRTypeLegalizationPass
         //
         if(inst->getOp() == kIROp_InterfaceRequirementEntry) return true;
 
-        return addedToWorkListSet.Contains(inst);
+        return addedToWorkListSet.contains(inst);
     }
 
     // Next we define a convenience routine for adding something to the work list.
@@ -3529,11 +3529,11 @@ struct IRTypeLegalizationPass
     {
         // We want to avoid adding anything we've already added or processed.
         //
-        if(addedToWorkListSet.Contains(inst))
+        if(addedToWorkListSet.contains(inst))
             return;
         workList.add(inst);
-        addedToWorkListSet.Add(inst);
-        hasBeenAddedOrProcessedSet.Add(inst);
+        addedToWorkListSet.add(inst);
+        hasBeenAddedOrProcessedSet.add(inst);
     }
 
     void processModule(IRModule* module)
@@ -3546,7 +3546,7 @@ struct IRTypeLegalizationPass
         //
         for (;;)
         {
-            auto lastReplacedInstCount = context->replacedInstructions.Count();
+            auto lastReplacedInstCount = context->replacedInstructions.getCount();
             addToWorkList(module->getModuleInst());
             while( workList.getCount() != 0 )
             {
@@ -3562,7 +3562,7 @@ struct IRTypeLegalizationPass
                 //
                 List<IRInst*> workListCopy;
                 Swap(workListCopy, workList);
-                addedToWorkListSet.Clear();
+                addedToWorkListSet.clear();
 
                 // Now we simply process each instruction on the copy of
                 // the work list, knowing that `processInst` may add additional
@@ -3575,7 +3575,7 @@ struct IRTypeLegalizationPass
             }
             
             // Any changes made? Run the process again.
-            if (lastReplacedInstCount == context->replacedInstructions.Count())
+            if (lastReplacedInstCount == context->replacedInstructions.getCount())
                 break;
         }
 
@@ -3594,7 +3594,7 @@ struct IRTypeLegalizationPass
                     continue;
                 if (as<IRType>(user))
                     continue;
-                if (!context->replacedInstructions.Contains(user))
+                if (!context->replacedInstructions.contains(user))
                     SLANG_UNEXPECTED("replaced inst still has use.");
                 if (lv->getParent())
                     SLANG_UNEXPECTED("replaced inst still in a parent.");

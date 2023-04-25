@@ -411,11 +411,11 @@ struct SPIRVEmitContext
         /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
     {
-        m_mapIRInstToSpvInst.Add(irInst, spvInst);
+        m_mapIRInstToSpvInst.add(irInst, spvInst);
 
         // If we have reserved an SpvID for `irInst`, make sure to use it.
         SpvWord reservedID = 0;
-        m_mapIRInstToSpvID.TryGetValue(irInst, reservedID);
+        m_mapIRInstToSpvID.tryGetValue(irInst, reservedID);
 
         if (reservedID)
         {
@@ -429,11 +429,11 @@ struct SPIRVEmitContext
     {
         // If we have already emitted an SpvInst for `inst`, return its ID.
         SpvInst* spvInst = nullptr;
-        if (m_mapIRInstToSpvInst.TryGetValue(inst, spvInst))
+        if (m_mapIRInstToSpvInst.tryGetValue(inst, spvInst))
             return getID(spvInst);
         // Check if we have reserved an ID for `inst`.
         SpvWord result = 0;
-        if (m_mapIRInstToSpvID.TryGetValue(inst, result))
+        if (m_mapIRInstToSpvID.tryGetValue(inst, result))
             return result;
         // Otherwise, reserve a new ID for inst, and register it in `m_mapIRInstToSpvID`.
         result = m_nextID;
@@ -558,7 +558,7 @@ struct SPIRVEmitContext
     SpvInst* ensureInst(IRInst* irInst)
     {
         SpvInst* spvInst = nullptr;
-        if (!m_mapIRInstToSpvInst.TryGetValue(irInst, spvInst))
+        if (!m_mapIRInstToSpvInst.tryGetValue(irInst, spvInst))
         {
             // If the `irInst` hasn't already been emitted,
             // then we will assume that is is a global instruction
@@ -704,7 +704,7 @@ struct SPIRVEmitContext
         key.value = val;
         key.type = type;
         SpvInst* result = nullptr;
-        if (m_spvIntConstants.TryGetValue(key, result))
+        if (m_spvIntConstants.tryGetValue(key, result))
             return result;
         SpvWord valWord;
         memcpy(&valWord, &val, sizeof(SpvWord));
@@ -750,7 +750,7 @@ struct SPIRVEmitContext
         key.value = val;
         key.type = type;
         SpvInst* result = nullptr;
-        if (m_spvFloatConstants.TryGetValue(key, result))
+        if (m_spvFloatConstants.tryGetValue(key, result))
             return result;
         SpvWord valWord;
         memcpy(&valWord, &val, sizeof(SpvWord));
@@ -961,7 +961,7 @@ struct SPIRVEmitContext
     SpvInst* ensureExtensionDeclaration(UnownedStringSlice name)
     {
         SpvInst* result = nullptr;
-        if (m_extensionInsts.TryGetValue(name, result))
+        if (m_extensionInsts.tryGetValue(name, result))
             return result;
         result =
             emitInst(getSection(SpvLogicalSectionID::Extensions), nullptr, SpvOpExtension, name);
@@ -1001,7 +1001,7 @@ struct SPIRVEmitContext
         for (auto op : operands)
             key.words.add(op);
         SpvInst* result = nullptr;
-        if (m_spvTypeInsts.TryGetValue(key, result))
+        if (m_spvTypeInsts.tryGetValue(key, result))
         {
             return result;
         }
@@ -1499,7 +1499,7 @@ struct SPIRVEmitContext
             // we can be sure that it will have been registred.
             //
             SpvInst* spvBlock = nullptr;
-            m_mapIRInstToSpvInst.TryGetValue(irBlock, spvBlock);
+            m_mapIRInstToSpvInst.tryGetValue(irBlock, spvBlock);
             SLANG_ASSERT(spvBlock);
 
             // [3.32.17. Control-Flow Instructions]
@@ -1527,7 +1527,7 @@ struct SPIRVEmitContext
         for (auto loopInst : pendingLoopInsts)
         {
             SpvInst* headerBlock = nullptr;
-            m_mapIRInstToSpvInst.TryGetValue(loopInst, headerBlock);
+            m_mapIRInstToSpvInst.tryGetValue(loopInst, headerBlock);
             SLANG_ASSERT(headerBlock);
             emitLoopHeaderBlock(loopInst, headerBlock);
         }
@@ -1671,7 +1671,7 @@ struct SPIRVEmitContext
                 // Return loop header block in its own block.
                 auto blockId = getIRInstSpvID(inst);
                 SpvInst* block = nullptr;
-                m_mapIRInstToSpvInst.TryGetValue(inst, block);
+                m_mapIRInstToSpvInst.tryGetValue(inst, block);
                 SLANG_ASSERT(block);
 
                 // Emit a jump to the loop header block.
@@ -1995,7 +1995,7 @@ struct SPIRVEmitContext
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal)
     {
         SpvInst* result = nullptr;
-        if (m_builtinGlobalVars.TryGetValue(builtinVal, result))
+        if (m_builtinGlobalVars.tryGetValue(builtinVal, result))
         {
             return result;
         }
@@ -2070,9 +2070,9 @@ struct SPIRVEmitContext
     {
         RefPtr<BlockParamIndexInfo> info;
         int result = -1;
-        if (m_mapIRBlockToParamIndexInfo.TryGetValue(block, info))
+        if (m_mapIRBlockToParamIndexInfo.tryGetValue(block, info))
         {
-            info->mapParamToIndex.TryGetValue(paramInst, result);
+            info->mapParamToIndex.tryGetValue(paramInst, result);
             SLANG_ASSERT(result != -1);
             return result;
         }
@@ -2147,7 +2147,7 @@ struct SPIRVEmitContext
         if (isLoopTargetBlock(block, loopInst))
         {
             SpvInst* loopSpvBlockInst = nullptr;
-            m_mapIRInstToSpvInst.TryGetValue(loopInst, loopSpvBlockInst);
+            m_mapIRInstToSpvInst.tryGetValue(loopInst, loopSpvBlockInst);
             SLANG_ASSERT(loopSpvBlockInst);
             parent = loopSpvBlockInst;
         }
@@ -2257,7 +2257,7 @@ struct SPIRVEmitContext
     SpvInst* maybeEmitSpvConstant(SpvSnippet::ASMConstant constant)
     {
         SpvInst* result = nullptr;
-        if (m_spvSnippetConstantInsts.TryGetValue(constant, result))
+        if (m_spvSnippetConstantInsts.tryGetValue(constant, result))
             return result;
 
         IRBuilder builder(m_irModule);
@@ -2362,7 +2362,7 @@ struct SPIRVEmitContext
                     if (operand.content != -1)
                     {
                         emitOperand(context.qualifiedResultTypes[(SpvStorageClass)operand.content]
-                                        .GetValue());
+                                        .getValue());
                     }
                     else
                     {
@@ -2460,13 +2460,13 @@ struct SPIRVEmitContext
     Index getStructFieldId(IRStructType* structType, IRStructKey* structFieldKey)
     {
         RefPtr<StructTypeInfo> info;
-        if (!m_structTypeInfos.TryGetValue(structType, info))
+        if (!m_structTypeInfos.tryGetValue(structType, info))
         {
             info = createStructTypeInfo(structType);
             m_structTypeInfos[structType] = info;
         }
         Index fieldIndex = -1;
-        info->structFieldIndices.TryGetValue(structFieldKey, fieldIndex);
+        info->structFieldIndices.tryGetValue(structFieldKey, fieldIndex);
         SLANG_ASSERT(fieldIndex != -1);
         return fieldIndex;
     }
@@ -2837,7 +2837,7 @@ struct SPIRVEmitContext
 
     void requireSPIRVCapability(SpvCapability capability)
     {
-        if (m_capabilities.Add(capability))
+        if (m_capabilities.add(capability))
         {
             emitInst(
                 getSection(SpvLogicalSectionID::Capabilities),

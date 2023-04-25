@@ -17,11 +17,11 @@ namespace Slang
         HashSet<IRInst*> workListSet;
         void addToWorkList(IRInst* inst)
         {
-            if (workListSet.Contains(inst))
+            if (workListSet.contains(inst))
                 return;
 
             workList.add(inst);
-            workListSet.Add(inst);
+            workListSet.add(inst);
         }
 
         IRInst* pop(bool removeFromSet = true)
@@ -32,7 +32,7 @@ namespace Slang
             IRInst* inst = workList.getLast();
             workList.removeLast();
             if (removeFromSet)
-                workListSet.Remove(inst);
+                workListSet.remove(inst);
             return inst;
         }
 
@@ -45,7 +45,7 @@ namespace Slang
         void processInstsOfType(IROp instOp, const Func& f)
         {
             workList.clear();
-            workListSet.Clear();
+            workListSet.clear();
 
             addToWorkList(module->getModuleInst());
 
@@ -69,7 +69,7 @@ namespace Slang
         void processChildInstsOfType(IROp instOp, IRInst* parent, const Func& f)
         {
             workList.clear();
-            workListSet.Clear();
+            workListSet.clear();
 
             addToWorkList(parent);
 
@@ -92,7 +92,7 @@ namespace Slang
         void processChildInsts(IRInst* root, const Func& f)
         {
             workList.clear();
-            workListSet.Clear();
+            workListSet.clear();
 
             addToWorkList(root);
 
@@ -119,7 +119,7 @@ namespace Slang
         void processAllReachableInsts(const Func& f)
         {
             workList.clear();
-            workListSet.Clear();
+            workListSet.clear();
 
             addToWorkList(module->getModuleInst());
             while (workList.getCount() != 0)

@@ -715,10 +715,10 @@ Result RendererBase::getShaderObjectLayout(
     slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    if (!m_shaderObjectLayoutCache.TryGetValue(typeLayout, shaderObjectLayout))
+    if (!m_shaderObjectLayoutCache.tryGetValue(typeLayout, shaderObjectLayout))
     {
         SLANG_RETURN_ON_FAIL(createShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
-        m_shaderObjectLayoutCache.Add(typeLayout, shaderObjectLayout);
+        m_shaderObjectLayoutCache.add(typeLayout, shaderObjectLayout);
     }
     *outLayout = shaderObjectLayout.detach();
     return SLANG_OK;
@@ -803,13 +803,13 @@ ShaderComponentID ShaderCache::getComponentId(UnownedStringSlice name)
 ShaderComponentID ShaderCache::getComponentId(ComponentKey key)
 {
     ShaderComponentID componentId = 0;
-    if (componentIds.TryGetValue(key, componentId))
+    if (componentIds.tryGetValue(key, componentId))
         return componentId;
     OwningComponentKey owningTypeKey;
     owningTypeKey.hash = key.hash;
     owningTypeKey.typeName = key.typeName;
     owningTypeKey.specializationArgs.addRange(key.specializationArgs);
-    ShaderComponentID resultId = static_cast<ShaderComponentID>(componentIds.Count());
+    ShaderComponentID resultId = static_cast<ShaderComponentID>(componentIds.getCount());
     componentIds[owningTypeKey] = resultId;
     return resultId;
 }
@@ -1187,20 +1187,20 @@ Result ShaderObjectBase::copyFrom(IShaderObject* object, ITransientResourceHeap*
         for (auto& kv : srcObj->m_objects)
         {
             ComPtr<IShaderObject> subObject;
-            SLANG_RETURN_ON_FAIL(kv.Value->getCurrentVersion(transientHeap, subObject.writeRef()));
-            setObject(kv.Key, subObject);
+            SLANG_RETURN_ON_FAIL(kv.value->getCurrentVersion(transientHeap, subObject.writeRef()));
+            setObject(kv.key, subObject);
         }
         for (auto& kv : srcObj->m_resources)
         {
-            setResource(kv.Key, kv.Value.Ptr());
+            setResource(kv.key, kv.value.Ptr());
         }
         for (auto& kv : srcObj->m_samplers)
         {
-            setSampler(kv.Key, kv.Value.Ptr());
+            setSampler(kv.key, kv.value.Ptr());
         }
         for (auto& kv : srcObj->m_specializationArgs)
         {
-            setSpecializationArgs(kv.Key, kv.Value.begin(), (uint32_t)kv.Value.getCount());
+            setSpecializationArgs(kv.key, kv.value.begin(), (uint32_t)kv.value.getCount());
         }
         return SLANG_OK;
     }

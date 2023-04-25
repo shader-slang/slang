@@ -1121,7 +1121,7 @@ public:
     Slang::RefPtr<PipelineStateBase> getSpecializedPipelineState(PipelineKey programKey)
     {
         Slang::RefPtr<PipelineStateBase> result;
-        if (specializedPipelines.TryGetValue(programKey, result))
+        if (specializedPipelines.tryGetValue(programKey, result))
             return result;
         return nullptr;
     }
@@ -1199,7 +1199,7 @@ public:
         TransientResourceHeapBase* transientHeap,
         IResourceCommandEncoder* encoder)
     {
-        if (auto ptr = m_deviceBuffers.TryGetValue(pipeline))
+        if (auto ptr = m_deviceBuffers.tryGetValue(pipeline))
         {
             return ptr->Ptr();
         }

@@ -33,9 +33,9 @@ namespace Slang
 
         LoweredTupleInfo* getLoweredTupleType(IRBuilder* builder, IRInst* type)
         {
-            if (auto loweredInfo = loweredTuples.TryGetValue(type))
+            if (auto loweredInfo = loweredTuples.tryGetValue(type))
                 return loweredInfo->Ptr();
-            if (auto loweredInfo = mapLoweredStructToTupleInfo.TryGetValue(type))
+            if (auto loweredInfo = mapLoweredStructToTupleInfo.tryGetValue(type))
                 return loweredInfo->Ptr();
 
             if (!type)
@@ -54,7 +54,7 @@ namespace Slang
             {
                 auto elementType = maybeLowerTupleType(builder, (IRType*)(type->getOperand(i)));
                 auto key = builder->createStructKey();
-                fieldNameSb.Clear();
+                fieldNameSb.clear();
                 fieldNameSb << "value" << i;
                 builder->addNameHintDecoration(key, fieldNameSb.getUnownedSlice());
                 auto field = builder->createStructField(structType, key, (IRType*)elementType);
@@ -74,11 +74,11 @@ namespace Slang
                     return;
             }
 
-            if (workListSet.Contains(inst))
+            if (workListSet.contains(inst))
                 return;
 
             workList.add(inst);
-            workListSet.Add(inst);
+            workListSet.add(inst);
         }
 
         void processMakeTuple(IRMakeTuple* inst)
@@ -155,7 +155,7 @@ namespace Slang
                 IRInst* inst = workList.getLast();
 
                 workList.removeLast();
-                workListSet.Remove(inst);
+                workListSet.remove(inst);
 
                 processInst(inst);
 
@@ -168,7 +168,7 @@ namespace Slang
             // Replace all tuple types with lowered struct types.
             for (auto kv : loweredTuples)
             {
-                kv.Key->replaceUsesWith(kv.Value->structType);
+                kv.key->replaceUsesWith(kv.value->structType);
             }
         }
     };

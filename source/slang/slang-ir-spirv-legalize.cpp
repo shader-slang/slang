@@ -28,7 +28,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void addToWorkList(IRInst* inst)
     {
-        if (workList.Add(inst))
+        if (workList.add(inst))
         {
             addUsersToWorkList(inst);
         }
@@ -261,7 +261,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processModule()
     {
         addToWorkList(m_module->getModuleInst());
-        while (workList.Count() != 0)
+        while (workList.getCount() != 0)
         {
             IRInst* inst = workList.getLast();
             workList.removeLast();

@@ -16,10 +16,10 @@ struct ReinterpretLoweringContext
 
     void addToWorkList(IRInst* inst)
     {
-        if (workList.Contains(inst))
+        if (workList.contains(inst))
             return;
 
-        workList.Add(inst);
+        workList.add(inst);
     }
 
     void processInst(IRInst* inst)
@@ -38,7 +38,7 @@ struct ReinterpretLoweringContext
     {
         addToWorkList(module->getModuleInst());
 
-        while (workList.Count() != 0)
+        while (workList.getCount() != 0)
         {
             IRInst* inst = workList.getLast();
 
