@@ -715,8 +715,8 @@ namespace Slang
 
         eliminateDeadCode(diffPropagateFunc);
 
-        // Extracts the primal computations into its own func, and replace the primal insts
-        // with the intermediate results computed from the extracted func.
+        // Extracts the primal computations into its own func, turn all accesses to stored primal insts into
+        // explicit intermediate data structure reads and writes.
         IRInst* intermediateType = nullptr;
         auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
             diffPropagateFunc, primalFunc, primalsInfo, paramTransposeInfo, intermediateType);
@@ -779,7 +779,7 @@ namespace Slang
 
         initializeLocalVariables(builder->getModule(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
         initializeLocalVariables(builder->getModule(), diffPropagateFunc);
-        // insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
+
         stripTempDecorations(diffPropagateFunc);
 
         sortBlocksInFunc(diffPropagateFunc);

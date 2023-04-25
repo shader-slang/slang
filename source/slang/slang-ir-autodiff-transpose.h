@@ -514,7 +514,6 @@ struct DiffTransposePass
         // (i.e. not store per-func info in 'this')
         // since it is reused for every reverse-mode call.
         //
-        primalVarsToHoist.clear();
         // Grab all differentiable type information.
         diffTypeContext.setFunc(revDiffFunc);
         
@@ -663,9 +662,6 @@ struct DiffTransposePass
         for (auto block : workList)
             block->removeFromParent();
 
-        finishHoistingPrimals(revDiffFunc);
-
-        
         // At this point, the only block left without terminator insts
         // should be the last one. Add a void return to complete it.
         // 
@@ -972,259 +968,6 @@ struct DiffTransposePass
 
     }
 
-    struct InvInstPair
-    {
-        IRInst* inst;
-        IRInst* invInst;
-
-        InvInstPair(IRInst* inst, IRInst* invInst) :
-            inst(inst), invInst(invInst)
-        { }
-
-        InvInstPair() : inst(nullptr), invInst(nullptr)
-        { }
-    };
-
-    List<InvInstPair> invertArithmetic(IRBuilder* builder, IRInst* primalInst, InversionInfo invInfo)
-    {
-        SLANG_RELEASE_ASSERT(invInfo.requiredOperands.getCount() == 1);
-        SLANG_RELEASE_ASSERT(invInfo.targetInsts.getCount() == 1);
-
-        auto invOutput = invInfo.requiredOperands[0];
-
-        auto invTargetInst = invInfo.targetInsts[0];
-
-        switch (primalInst->getOp())
-        {
-            case kIROp_Add:
-            {
-                SLANG_RELEASE_ASSERT(as<IRConstant>(primalInst->getOperand(1)));
-                return List<InvInstPair>(
-                    InvInstPair(
-                        invTargetInst,
-                        builder->emitSub(
-                            primalInst->getOperand(0)->getDataType(),
-                            invOutput,
-                            primalInst->getOperand(1))));
-            }
-            case kIROp_Sub:
-            {
-                SLANG_RELEASE_ASSERT(as<IRConstant>(primalInst->getOperand(1)));
-                return List<InvInstPair>(
-                    InvInstPair(
-                        invTargetInst,
-                        builder->emitAdd(
-                            primalInst->getOperand(0)->getDataType(),
-                            invOutput,
-                            primalInst->getOperand(1))));
-            }
-
-            default:
-                SLANG_UNEXPECTED("Unhandled arithmetic inst for inversion");
-        }
-    }
-
-    // Go through loop block phi-args, and look for loop counter
-    // arguments, which for a loop means inserting a check into
-    // loop condition block.
-    // This method also adds logic to skip the first iteration. 
-    // (a 'do-while' loop)
-    // 
-    void invertLoopCondition(IRBuilder* builder, IRLoop* loopInst)
-    {   
-        auto firstLoopBlock = loopInst->getTargetBlock();
-
-        IRBlock* revLoopCondBlock = revBlockMap[firstLoopBlock];
-        builder->setInsertBefore(revLoopCondBlock->getTerminator());
-
-        // Add a terminating condition based on the loop counter's initial primal value
-
-        IRParam* loopCounterParam = nullptr;
-        UIndex loopCounterParamIndex = 0;
-        for (auto param : firstLoopBlock->getParams())
-        {   
-            if (param->findDecoration<IRLoopCounterDecoration>())
-            {
-                // There really not should be two (or more) loop counter params.
-                SLANG_RELEASE_ASSERT(loopCounterParam == nullptr);
-                loopCounterParam = param;
-            }
-            else
-            {
-                loopCounterParamIndex++;
-            }
-        }
-
-        // Should see atleast one loop counter parameter on the first loop block.
-        SLANG_RELEASE_ASSERT(loopCounterParam);
-
-        IRInst* loopCounterInitVal = loopInst->getArg(loopCounterParamIndex);
-
-        auto paramBoundsCheck = builder->emitIntrinsicInst(
-                builder->getBoolType(),
-                kIROp_Neq,
-                2,
-                List<IRInst*>(
-                    loopCounterParam,
-                    loopCounterInitVal).getBuffer());
-
-        as<IRIfElse>(revLoopCondBlock->getTerminator())->condition.set(paramBoundsCheck);
-    }
-
-    IRInst* lookupInstInPrimalBlock(IRInst* invInst)
-    {
-        // Lookup the inst in the primal block whose value we can use as an operand
-        // for the inverted inst.
-        // 
-        // auto inversionInfo = this->hoistedPrimalsInfo->invertInfoMap[invInst];
-        return invInst;
-    }
-    
-    bool doesInstRequireHoisting(IRInst* inst)
-    {
-        if (as<IRModuleInst>(inst->getParent()))
-            return false;
-
-        if (as<IRBlock>(inst) ||
-            as<IRGlobalValueWithCode>(inst) ||
-            as<IRConstant>(inst))
-            return false;
-
-        if (as<IRTerminatorInst>(inst))
-            return false;
-
-        if (as<IRDecoration>(inst))
-            return doesInstRequireHoisting(getInstInBlock(inst));
-
-        // We're looking for primal insts in differential blocks
-        // that have not yet been moved to the 'active' blocks
-        // (i.e in diff blocks that do not have parents)
-        // 
-        return (!isDifferentialInst(inst) &&
-            (isDifferentialInst(getBlock(inst)) || getBlock(inst) == tempInvBlock) &&
-            getBlock(inst)->getParent() == nullptr);
-    }
-
-    IRBlock* walkToEndOfRegion(IRBlock* block)
-    {
-        IRBlock* currBlock = block;
-
-        bool keepGoing = true;
-        while (keepGoing)
-        {
-            auto terminator = currBlock->getTerminator();
-            switch (terminator->getOp())
-            {
-                case kIROp_Return: 
-                    keepGoing = false;
-                    break;
-
-                case kIROp_unconditionalBranch:
-                {
-                    auto nextBlock = as<IRUnconditionalBranch>(terminator)->getTargetBlock();
-
-                    HashSet<IRBlock*> predecessorSet;
-                    for (auto predecessor : nextBlock->getPredecessors())
-                        predecessorSet.add(predecessor);
-
-                    if (predecessorSet.getCount() > 1)
-                    {
-                        keepGoing = false;
-                        break;
-                    }
-                    
-                    currBlock = nextBlock;
-                    break;
-                }
-                
-                case kIROp_ifElse:
-                {
-                    for (auto predecessor : currBlock->getPredecessors())
-                    {
-                        if (as<IRLoop>(predecessor->getTerminator()))
-                        {
-                            keepGoing = false;
-                            break;
-                        }
-                    }
-                        
-                    currBlock = as<IRIfElse>(terminator)->getAfterBlock();
-                    break;
-                }
-                
-                case kIROp_Switch:
-                    currBlock = as<IRSwitch>(terminator)->getBreakLabel();
-                    break;
-                
-                case kIROp_loop:
-                    currBlock = as<IRLoop>(terminator)->getBreakBlock();
-                    break;
-            }
-        }
-
-        return currBlock;
-    }
-
-    void finishHoistingPrimals(IRGlobalValueWithCode* func)
-    {
-        auto varBlock = func->getFirstBlock()->getNextBlock();
-
-        for (auto inst : primalVarsToHoist)
-        {
-            if (!doesInstRequireHoisting(inst))
-                continue;
-           
-            List<IRUse*> relevantUses;
-
-            IRBlock* defBlock = nullptr;
-            if (auto varToHoist = as<IRVar>(inst))
-            {
-                varToHoist->insertBefore(varBlock->getFirstOrdinaryInst());
-                auto uniqueStoreUse = findUniqueStoredVal(varToHoist);
-                if (uniqueStoreUse)
-                {
-                    inst = uniqueStoreUse->getUser();
-                    SLANG_ASSERT(inst);
-
-                    defBlock = getBlock(inst);
-                }
-                else
-                {
-                    defBlock = getBlock(inst);
-                }
-            }
-            else
-            {
-                defBlock = getBlock(inst);
-            }
-
-            if (!doesInstRequireHoisting(inst))
-                continue;
-
-            // Move this inst to after it's diff uses.
-            // 
-            {
-
-                IRBlock* currTopBlock = revBlockMap[walkToEndOfRegion(defBlock)];
-
-                SLANG_RELEASE_ASSERT(currTopBlock);
-
-                // More consistency checks
-                SLANG_RELEASE_ASSERT(currTopBlock->getFirstOrdinaryInst() != nullptr);
-                SLANG_RELEASE_ASSERT(currTopBlock->getParent() != nullptr);
-                SLANG_RELEASE_ASSERT(isDifferentialInst(currTopBlock));
-
-                // Insert at top. (disabling validation since the operands of 
-                // this inst might not be hoisted to the right place yet)
-                // 
-                disableIRValidationAtInsert();
-                inst->insertBefore(currTopBlock->getFirstOrdinaryInst());
-                enableIRValidationAtInsert();
-            }
-        }
-    }
-
-
     void transposeInst(IRBuilder* builder, IRInst* inst)
     {
         switch (inst->getOp())
@@ -1386,8 +1129,6 @@ struct DiffTransposePass
                 auto pairType = as<IRPtrTypeBase>(arg->getDataType())->getValueType();
                 auto tempVar = builder->emitVar(pairType);
                 auto primalVal = builder->emitLoad(instPair->getPrimal());
-                auto primalVar = instPair->getPrimal();
-                primalVarsToHoist.add(primalVar);
 
                 auto diffVal = builder->emitLoad(instPair->getDiff());
                 auto pairVal = builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
@@ -3001,8 +2742,6 @@ struct DiffTransposePass
     DifferentiableTypeConformanceContext                 diffTypeContext;
 
     DifferentialPairTypeBuilder                          pairBuilder;
-
-    List<IRInst*>                                        primalVarsToHoist;
 
     IRBlock*                                             tempInvBlock;
 

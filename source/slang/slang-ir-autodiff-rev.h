@@ -114,8 +114,6 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 
     IRFunc* generateNewForwardDerivativeForFunc(IRBuilder* builder, IRFunc* originalFunc, IRFunc* diffPropagateFunc);
 
-    void insertVariableForRecomputedPrimalInsts(IRFunc* diffPropFunc);
-
     void transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc);
 
     InstPair transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc);
