@@ -14,10 +14,8 @@ namespace Slang
         IRCloneEnv cloneEnv;
         HashSet<IRUse*> pendingUses;
 
-        IRInst* cloneInstOutOfOrder(IRBuilder* builder, IRInst* inst)
+        void registerClonedInst(IRBuilder* builder, IRInst* inst, IRInst* clonedInst)
         {
-            IRInst* clonedInst = cloneInst(&cloneEnv, builder, inst);
-
             UInt operandCount = clonedInst->getOperandCount();
             for (UInt ii = 0; ii < operandCount; ++ii)
             {
@@ -31,16 +29,21 @@ namespace Slang
             for (auto use = inst->firstUse; use;)
             {
                 auto nextUse = use->nextUse;
-                
+
                 if (pendingUses.Contains(use))
                 {
                     pendingUses.Remove(use);
                     builder->replaceOperand(use, clonedInst);
                 }
-                
+
                 use = nextUse;
             }
+        }
 
+        IRInst* cloneInstOutOfOrder(IRBuilder* builder, IRInst* inst)
+        {
+            IRInst* clonedInst = cloneInst(&cloneEnv, builder, inst);
+            registerClonedInst(builder, inst, clonedInst);
             return clonedInst;
         }
     };
@@ -86,7 +89,6 @@ namespace Slang
         OrderedHashSet<IRInst*> storeSet;
         OrderedHashSet<IRInst*> recomputeSet;
         OrderedHashSet<IRInst*> invertSet;
-        OrderedHashSet<IRInst*> ignoreSet;
         OrderedHashSet<IRInst*> instsToInvert;
 
         Dictionary<IRInst*, InversionInfo> invertInfoMap;
@@ -128,9 +130,6 @@ namespace Slang
 
             for (auto inst : info->invertSet)
                 invertSet.Add(inst);
-
-            for (auto inst : info->ignoreSet)
-                ignoreSet.add(inst);
 
             for (auto inst : info->instsToInvert)
                 instsToInvert.Add(inst);
@@ -261,7 +260,8 @@ namespace Slang
 
         RefPtr<HoistedPrimalsInfo> processFunc(
             IRGlobalValueWithCode* func,
-            Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock);
+            Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock,
+            IROutOfOrderCloneContext* cloneCtx);
 
         // Do pre-processing on the function (mainly for 
         // 'global' checkpointing methods that consider the entire
@@ -290,9 +290,5 @@ namespace Slang
         RefPtr<IRDominatorTree> domTree;
     };
 
-    RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(
-        IRGlobalValueWithCode* func,
-        const List<IRInst*>& instsToIgnore);
-
-
+    RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func);
 };

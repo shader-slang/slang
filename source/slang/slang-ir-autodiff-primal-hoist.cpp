@@ -1,5 +1,6 @@
 #include "slang-ir-autodiff-primal-hoist.h"
 #include "slang-ir-autodiff-region.h"
+#include "slang-ir-simplify-cfg.h"
 
 namespace Slang
 {
@@ -9,7 +10,8 @@ void applyCheckpointSet(
     IRGlobalValueWithCode* func,
     HoistedPrimalsInfo* hoistInfo,
     HashSet<IRUse*> pendingUses,
-    Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock);
+    Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock,
+    IROutOfOrderCloneContext* cloneCtx);
 
 bool containsOperand(IRInst* inst, IRInst* operand)
 {
@@ -68,7 +70,8 @@ static IRBlock* tryGetSubRegionEndBlock(IRInst* terminator)
 
 static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
     IRGlobalValueWithCode* func,
-    Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo)
+    Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo,
+    IROutOfOrderCloneContext* cloneCtx)
 {
     IRBlock* firstDiffBlock = nullptr;
     for (auto block : func->getBlocks())
@@ -136,7 +139,6 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
     WorkItem firstWorkItem = { func->getFirstBlock(), firstRecomputeBlock, firstRecomputeBlock, firstDiffBlock };
     workList.add(firstWorkItem);
 
-    IRCloneEnv recomputeCloneEnv;
     recomputeBlockMap[func->getFirstBlock()] = firstRecomputeBlock;
 
     for (Index i = 0; i < workList.getCount(); i++)
@@ -216,7 +218,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             {
             case kIROp_Switch:
             case kIROp_ifElse:
-                newTerminator = cloneInst(&recomputeCloneEnv, &builder, primalBlock->getTerminator());
+                newTerminator = cloneCtx->cloneInstOutOfOrder(&builder, primalBlock->getTerminator());
                 break;
             case kIROp_unconditionalBranch:
                 newTerminator = builder.emitBranch(as<IRUnconditionalBranch>(terminator)->getTargetBlock());
@@ -271,7 +273,8 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
 
 RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     IRGlobalValueWithCode* func,
-    Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock)
+    Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock,
+    IROutOfOrderCloneContext* cloneCtx)
 {
     RefPtr<CheckpointSetInfo> checkpointInfo = new CheckpointSetInfo();
 
@@ -483,7 +486,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     }
 
     RefPtr<HoistedPrimalsInfo> hoistInfo = new HoistedPrimalsInfo();
-    applyCheckpointSet(checkpointInfo, func, hoistInfo, usesToReplace, mapDiffBlockToRecomputeBlock);
+    applyCheckpointSet(checkpointInfo, func, hoistInfo, usesToReplace, mapDiffBlockToRecomputeBlock, cloneCtx);
     return hoistInfo;
 }
 
@@ -498,11 +501,6 @@ void applyToInst(
     if (checkpointInfo->storeSet.Contains(inst))
     {
         hoistInfo->storeSet.Add(inst);
-        return;
-    }
-
-    if (hoistInfo->ignoreSet.Contains(inst))
-    {
         return;
     }
 
@@ -522,11 +520,10 @@ void applyToInst(
                 // 
                 SLANG_UNIMPLEMENTED_X("Parameter recompute is not currently supported");
             }
+            return;
         }
-        else
-        {
-            hoistInfo->recomputeSet.Add(cloneCtx->cloneInstOutOfOrder(builder, inst));
-        }
+        auto recomputeInst = cloneCtx->cloneInstOutOfOrder(builder, inst);
+        hoistInfo->recomputeSet.Add(recomputeInst);
     }
 
     bool isInstInverted = checkpointInfo->invertSet.Contains(inst);
@@ -553,17 +550,22 @@ void applyToInst(
     }
 }
 
+static IRBlock* getParamPreludeBlock(IRGlobalValueWithCode* func)
+{
+    return func->getFirstBlock()->getNextBlock();
+}
+
 void applyCheckpointSet(
     CheckpointSetInfo* checkpointInfo,
     IRGlobalValueWithCode* func,
     HoistedPrimalsInfo* hoistInfo,
     HashSet<IRUse*> pendingUses,
-    Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock)
+    Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock,
+    IROutOfOrderCloneContext* cloneCtx)
 {
     // Reconstruct diff block map.
     Dictionary<IRBlock*, IRBlock*> diffBlockMap = reconstructDiffBlockMap(func);
 
-    RefPtr<IROutOfOrderCloneContext> cloneCtx = new IROutOfOrderCloneContext();
 
     for (auto use : pendingUses)
         cloneCtx->pendingUses.Add(use);
@@ -583,10 +585,11 @@ void applyCheckpointSet(
     };
 
     // Go back over the insts and move/clone them accoridngly.
+    auto paramPreludeBlock = getParamPreludeBlock(func);
     for (auto block : func->getBlocks())
     {
-        // Skip parameter block.
-        if (block == func->getFirstBlock())
+        // Skip parameter block and the param prelude block.
+        if (block == func->getFirstBlock() || block == paramPreludeBlock)
             continue;
 
         if (isDifferentialBlock(block))
@@ -646,7 +649,22 @@ void applyCheckpointSet(
 
         for (auto child : block->getChildren())
         {
+            // Determine the insertion point for the recomputeInst.
+            // Normally we insert recomputeInst into the block's corresponding recomputeBlock.
+            // The exception is a load(inoutParam), in which case we insert the recomputed load
+            // at the right beginning of the function to correctly receive the initial parameter
+            // value. We can't just insert the load at recomputeBlock because at that point the
+            // primal logic may have already updated the param with a new value, and instead we
+            // want the original value.
             builder.setInsertBefore(recomputeInsertBeforeInst);    
+            if (auto load = as<IRLoad>(child))
+            {
+                if (load->getPtr()->getOp() == kIROp_Param &&
+                    load->getPtr()->getParent() == func->getFirstBlock())
+                {
+                    builder.setInsertBefore(getParamPreludeBlock(func)->getTerminator());
+                }
+            }
             applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, child);
         }
     }
@@ -833,28 +851,33 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo)
 {
     RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
-
-    IRBuilder builder(func->getModule());
+    
     IRBlock* defaultVarBlock = func->getFirstBlock()->getNextBlock();
 
-    SLANG_ASSERT(!isDifferentialBlock(defaultVarBlock));
+    IRBuilder builder(func->getModule());
+
+    IRBlock* defaultRecomptueVarBlock = nullptr;
+    for (auto block : func->getBlocks())
+        if (isDifferentialOrRecomputeBlock(block))
+        {
+            defaultRecomptueVarBlock = block;
+            break;
+        }
+    SLANG_RELEASE_ASSERT(defaultRecomptueVarBlock);
 
     OrderedHashSet<IRInst*> processedStoreSet;
 
-    auto ensureInstAvailable = [&](OrderedHashSet<IRInst*>& instSet)
+    auto ensureInstAvailable = [&](OrderedHashSet<IRInst*>& instSet, bool isRecomputeInst)
     {
+        SLANG_ASSERT(!isDifferentialBlock(defaultVarBlock));
+
         for (auto instToStore : instSet)
         {
-            if (!instSet.Contains(instToStore))
-                continue;
-
-            if (hoistInfo->ignoreSet.Contains(instToStore))
-                continue;
             IRBlock* defBlock = nullptr;
             if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
                 auto varInst = as<IRVar>(instToStore);
-                auto storeUse = findUniqueStoredVal(varInst);
+                auto storeUse = findEarliestUniqueWriteUse(varInst);
 
                 defBlock = getBlock(storeUse->getUser());
             }
@@ -899,19 +922,28 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
             if (outOfScopeUses.getCount() == 0)
             {
-                processedStoreSet.Add(instToStore);
+                if (!isRecomputeInst)
+                    processedStoreSet.Add(instToStore);
                 continue;
             }
 
+            auto defBlockIndices = indexedBlockInfo[defBlock].GetValue();
+            IRBlock* varBlock = defaultVarBlock;
+            if (isRecomputeInst)
+            {
+                varBlock = defaultRecomptueVarBlock;
+                if (defBlockIndices.getCount())
+                {
+                    varBlock = as<IRBlock>(defBlockIndices[0].diffCountParam->getParent());
+                    defBlockIndices.clear();
+                }
+            }
             if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
-
                 IRVar* varToStore = as<IRVar>(instToStore);
                 SLANG_RELEASE_ASSERT(varToStore);
 
-                auto storeUse = findUniqueStoredVal(varToStore);
-
-                List<IndexTrackingInfo>& defBlockIndices = indexedBlockInfo[defBlock];
+                auto storeUse = findLatestUniqueWriteUse(varToStore);
 
                 bool isIndexedStore = (storeUse && defBlockIndices.getCount() > 0);
 
@@ -921,7 +953,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 if (!isIndexedStore && isDerivativeContextVar(varToStore))
                 {
                     varToStore->insertBefore(defaultVarBlock->getFirstOrdinaryInst());
-                    processedStoreSet.Add(varToStore);
+                    if (!isRecomputeInst)
+                        processedStoreSet.Add(varToStore);
                     continue;
                 }
 
@@ -929,7 +962,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
                 IRVar* localVar = storeIndexedValue(
                     &builder,
-                    defaultVarBlock,
+                    varBlock,
                     builder.emitLoad(varToStore),
                     defBlockIndices);
 
@@ -942,8 +975,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     IRInst* loadAddr = emitIndexedLoadAddressForVar(&builder, localVar, defBlockIndices, useBlockIndices);
                     builder.replaceOperand(use, loadAddr);
                 }
-
-                processedStoreSet.Add(localVar);
+                if (!isRecomputeInst)
+                    processedStoreSet.Add(localVar);
             }
             else
             {
@@ -951,7 +984,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 // The only case where there will be a reference of primal loop counter from rev blocks
                 // is the start of a loop in the reverse code. Since loop counters are not considered a
                 // part of their loop region, so we remove the first index info.
-                List<IndexTrackingInfo> defBlockIndices = indexedBlockInfo[defBlock];
                 bool isLoopCounter = (instToStore->findDecoration<IRLoopCounterDecoration>() != nullptr);
                 if (isLoopCounter)
                 {
@@ -959,7 +991,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 }
 
                 setInsertAfterOrdinaryInst(&builder, instToStore);
-                auto localVar = storeIndexedValue(&builder, defaultVarBlock, instToStore, defBlockIndices);
+                auto localVar = storeIndexedValue(&builder, varBlock, instToStore, defBlockIndices);
 
                 for (auto use : outOfScopeUses)
                 {
@@ -974,14 +1006,15 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
                     builder.replaceOperand(use, loadIndexedValue(&builder, localVar, defBlockIndices, useBlockIndices));
                 }
-
-                processedStoreSet.Add(localVar);
+                if (!isRecomputeInst)
+                    processedStoreSet.Add(localVar);
             }
         }
     };
 
-    ensureInstAvailable(hoistInfo->storeSet);
-    
+    ensureInstAvailable(hoistInfo->storeSet, false);
+    ensureInstAvailable(hoistInfo->recomputeSet, true);
+
     // Replace the old store set with the processed one.
     hoistInfo->storeSet = processedStoreSet;
 
@@ -1179,27 +1212,23 @@ void buildIndexedBlocks(
     }
 }
 
-RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(
-    IRGlobalValueWithCode* func, const List<IRInst*>& instsToIgnore)
+RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
 {
     sortBlocksInFunc(func);
 
     Dictionary<IRBlock*, List<IndexTrackingInfo>> indexedBlockInfo;
     buildIndexedBlocks(indexedBlockInfo, func);
 
-    auto recomputeBlockMap = createPrimalRecomputeBlocks(func, indexedBlockInfo);
+    RefPtr<IROutOfOrderCloneContext> cloneCtx = new IROutOfOrderCloneContext();
+    auto recomputeBlockMap = createPrimalRecomputeBlocks(func, indexedBlockInfo, cloneCtx);
 
     sortBlocksInFunc(func);
 
     RefPtr<AutodiffCheckpointPolicyBase> chkPolicy = new DefaultCheckpointPolicy(func->getModule());
     chkPolicy->preparePolicy(func);
 
-    auto primalsInfo = chkPolicy->processFunc(func, recomputeBlockMap);
+    auto primalsInfo = chkPolicy->processFunc(func, recomputeBlockMap, cloneCtx);
 
-    for (auto propagateFuncSpecificInst : instsToIgnore)
-    {
-        primalsInfo->ignoreSet.add(propagateFuncSpecificInst);
-    }
     primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
     return primalsInfo;
 }
@@ -1343,7 +1372,6 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_GetSequentialID:
     case kIROp_Specialize:
     case kIROp_LookupWitness:
-#if 0
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
@@ -1364,7 +1392,6 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_BitXor:
     case kIROp_Lsh:
     case kIROp_Rsh:
-#endif
         return false;
     case kIROp_GetElement:
     case kIROp_FieldExtract:
@@ -1387,17 +1414,29 @@ static bool shouldStoreInst(IRInst* inst)
     if (as<IRType>(inst))
         return false;
 
-    // Only store if the inst has differential inst user.
-    bool hasDiffUser = doesInstHaveDiffUse(inst);
-    if (!hasDiffUser)
-        return false;
-
     return true;
 }
 
 bool canRecompute(IRDominatorTree* domTree, IRUse* use)
 {
     SLANG_UNUSED(domTree);
+    if (auto load = as<IRLoad>(use->get()))
+    {
+        // Generally, we cannot recompute a load(ptr), since ptr may be modified
+        // afterwards. The exceptions are a load of an inout param, since the
+        // propagation function never actually writes to the primal part of the
+        // inout param, and we can always just read the original param.
+
+        auto ptr = load->getPtr();
+        if (ptr->getOp() == kIROp_Param)
+        {
+            if (auto block = as<IRBlock>(ptr->getParent()))
+            {
+                return (block == block->getParent()->getFirstBlock());
+            }
+        }
+        return false;
+    }
     auto param = as<IRParam>(use->get());
     if (!param)
         return true;

@@ -216,12 +216,15 @@ struct ExtractPrimalFuncContext
                 {
                     if (as<IRVar>(inst))
                     {
-                        auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
-                        builder.setInsertBefore(inst);
-                        auto fieldAddr = builder.emitFieldAddress(
-                            inst->getFullType(), outIntermediary, field->getKey());
-                        inst->replaceUsesWith(fieldAddr);
-                        builder.addPrimalValueStructKeyDecoration(inst, field->getKey());
+                        if (inst->hasUses())
+                        {
+                            auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
+                            builder.setInsertBefore(inst);
+                            auto fieldAddr = builder.emitFieldAddress(
+                                inst->getFullType(), outIntermediary, field->getKey());
+                            inst->replaceUsesWith(fieldAddr);
+                            builder.addPrimalValueStructKeyDecoration(inst, field->getKey());
+                        }
                     }
                     else
                     {
@@ -359,7 +362,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     List<IRInst*> instsToRemove;
     for (auto block : func->getBlocks())
     {
-        for (auto inst : block->getOrdinaryInsts())
+        for (auto inst : block->getChildren())
         {
             if (auto structKeyDecor = inst->findDecoration<IRPrimalValueStructKeyDecoration>())
             {
@@ -420,6 +423,8 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
 
     for (auto inst : instsToRemove)
     {
+        if (as<IRParam>(inst))
+            removePhiArgs(inst);
         inst->removeAndDeallocate();
     }
 

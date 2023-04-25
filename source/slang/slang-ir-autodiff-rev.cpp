@@ -711,12 +711,9 @@ namespace Slang
 
         // Apply checkpointing policy to legalize cross-scope uses of primal values
         // using either recompute or store strategies.
-        auto primalsInfo = applyCheckpointPolicy(
-            diffPropagateFunc, paramTransposeInfo.propagateFuncSpecificPrimalInsts);
-
+        auto primalsInfo = applyCheckpointPolicy(diffPropagateFunc);
 
         eliminateDeadCode(diffPropagateFunc);
-        
 
         // Extracts the primal computations into its own func, and replace the primal insts
         // with the intermediate results computed from the extracted func.
@@ -810,10 +807,13 @@ namespace Slang
 
         // Find the 'next' block using the terminator inst of the parameter block.
         auto fwdParamBlockBranch = as<IRUnconditionalBranch>(fwdDiffParameterBlock->getTerminator());
-        auto nextBlock = fwdParamBlockBranch->getTargetBlock();
+        // We create a new block after parameter block to hold insts that translates from transposed parameters
+        // into something that the rest of the function can use.
+        IRBuilder::insertBlockAlongEdge(diffFunc->getModule(), IREdge(&fwdParamBlockBranch->block));
+        auto paramPreludeBlock = fwdParamBlockBranch->getTargetBlock();
 
         auto nextBlockBuilder = *builder;
-        nextBlockBuilder.setInsertBefore(nextBlock->getFirstOrdinaryInst());
+        nextBlockBuilder.setInsertBefore(paramPreludeBlock->getFirstOrdinaryInst());
 
         IRBlock* firstDiffBlock = nullptr;
         for (auto block : diffFunc->getBlocks())
