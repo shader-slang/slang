@@ -201,7 +201,7 @@ static bool _isSubCommand(const char* arg)
                 stdError.print("error: expected operand for '%s'\n", arg);
                 return SLANG_FAIL;
             }
-            optionsOut->serverCount = StringToInt(* argCursor++);
+            optionsOut->serverCount = stringToInt(* argCursor++);
             if (optionsOut->serverCount <= 0)
             {
                 optionsOut->serverCount = 1;

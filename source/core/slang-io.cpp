@@ -1099,8 +1099,8 @@ namespace Slang
             else
             {
                 char buffer[32];
-                int length = IntToAscii(buffer, (int)ch, 16);
-                ReverseInternalAscii(buffer, length);
+                int length = intToAscii(buffer, (int)ch, 16);
+                reverseInplaceAscii(buffer, length);
                 sb << "%" << buffer;
             }
         }

@@ -112,9 +112,9 @@ namespace Misc {
             if (token.Type == TokenType::IntLiteral)
             {
                 if (neg)
-                    return -StringToInt(token.Content);
+                    return -stringToInt(token.Content);
                 else
-                    return StringToInt(token.Content);
+                    return stringToInt(token.Content);
             }
             throw TextFormatException("Text parsing error: int expected.");
         }
@@ -123,7 +123,7 @@ namespace Misc {
             auto token = ReadToken();
             if (token.Type == TokenType::IntLiteral)
             {
-                return StringToUInt(token.Content);
+                return stringToUInt(token.Content);
             }
             throw TextFormatException("Text parsing error: int expected.");
         }
@@ -139,9 +139,9 @@ namespace Misc {
             if (token.Type == TokenType::DoubleLiteral || token.Type == TokenType::IntLiteral)
             {
                 if (neg)
-                    return -StringToDouble(token.Content);
+                    return -stringToDouble(token.Content);
                 else
-                    return StringToDouble(token.Content);
+                    return stringToDouble(token.Content);
             }
             throw TextFormatException("Text parsing error: floating point value expected.");
         }

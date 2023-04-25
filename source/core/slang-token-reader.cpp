@@ -537,7 +537,7 @@ namespace Misc {
                     if (derivative == LexDerivative::Line)
                     {
                         derivative = LexDerivative::None;
-                        line = StringToInt(tokenBuilder.toString()) - 1;
+                        line = stringToInt(tokenBuilder.toString()) - 1;
                         col = 0;
                         tokenBuilder.clear();
                     }

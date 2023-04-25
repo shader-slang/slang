@@ -20,7 +20,7 @@ namespace Slang
     extern _EndLine EndLine;
 
     // in-place reversion, works only for ascii string
-    inline void ReverseInternalAscii(char * buffer, int length)
+    inline void reverseInplaceAscii(char * buffer, int length)
     {
         int i, j;
         char c;
@@ -32,7 +32,7 @@ namespace Slang
         }
     }
     template<typename IntType>
-    inline int IntToAscii(char * buffer, IntType val, int radix)
+    inline int intToAscii(char * buffer, IntType val, int radix)
     {
         int i = 0;
         IntType sign;
@@ -53,12 +53,12 @@ namespace Slang
         return i;
     }
 
-    inline bool IsUtf8LeadingByte(char ch)
+    SLANG_FORCE_INLINE bool isUtf8LeadingByte(char ch)
     {
         return (((unsigned char)ch) & 0xC0) == 0xC0;
     }
 
-    inline bool IsUtf8ContinuationByte(char ch)
+    SLANG_FORCE_INLINE bool isUtf8ContinuationByte(char ch)
     {
         return (((unsigned char)ch) & 0xC0) == 0x80;
     }
@@ -467,11 +467,11 @@ namespace Slang
 
         SLANG_FORCE_INLINE StringRepresentation* getStringRepresentation() const { return m_buffer; }
 
-        const char * begin() const
+        const char* begin() const
         {
             return getData();
         }
-        const char * end() const
+        const char* end() const
         {
             return getData() + getLength();
         }
@@ -957,10 +957,10 @@ namespace Slang
         }
     };
 
-    int StringToInt(const String& str, int radix = 10);
-    unsigned int StringToUInt(const String& str, int radix = 10);
-    double StringToDouble(const String& str);
-    float StringToFloat(const String& str);
+    int stringToInt(const String& str, int radix = 10);
+    unsigned int stringToUInt(const String& str, int radix = 10);
+    double stringToDouble(const String& str);
+    float stringToFloat(const String& str);
 }
 
 std::ostream& operator<< (std::ostream& stream, const Slang::String& s);

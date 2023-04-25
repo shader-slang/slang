@@ -174,7 +174,7 @@ static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
             for (Index i = 0; i < 3; ++i)
             {
                 string = slices[i];
-                int v = StringToInt(string);
+                int v = stringToInt(string);
                 if (v < 1)
                 {
                     sink.diagnose(dispatchSize.loc, RenderTestDiagnostics::expectingPositiveComputeDispatch);

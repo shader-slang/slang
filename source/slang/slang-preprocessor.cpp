@@ -2532,7 +2532,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
         }
 
     case TokenType::IntegerLiteral:
-        return StringToInt(token.getContent());
+        return stringToInt(token.getContent());
 
     case TokenType::Identifier:
         {
@@ -3484,7 +3484,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     switch(PeekTokenType(context))
     {
     case TokenType::IntegerLiteral:
-        line = StringToInt(AdvanceToken(context).getContent());
+        line = stringToInt(AdvanceToken(context).getContent());
         break;
 
     case TokenType::EndOfFile:

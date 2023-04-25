@@ -227,8 +227,8 @@ static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice&
             return SLANG_FAIL;
         }
         // Extract the size
-        size = StringToInt(String(slices[1]));
-        hash = HashCode32(StringToInt(String(slices[2])));
+        size = stringToInt(String(slices[1]));
+        hash = HashCode32(stringToInt(String(slices[2])));
     }
 
     SLANG_RETURN_ON_FAIL(parse(UnownedStringSlice(startLine.end(), endLine.begin()), outBytes));

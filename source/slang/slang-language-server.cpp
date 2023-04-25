@@ -871,7 +871,7 @@ SlangResult LanguageServer::completionResolve(
     }
 
     LanguageServerProtocol::CompletionItem resolvedItem = args;
-    int itemId = StringToInt(args.data);
+    int itemId = stringToInt(args.data);
     auto version = m_workspace->getCurrentCompletionVersion();
     if (!version || !version->linkage)
     {

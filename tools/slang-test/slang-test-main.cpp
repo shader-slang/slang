@@ -2954,7 +2954,7 @@ static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& t
             UnownedStringSlice remaining(line.begin() + lineStart.getLength(), line.end());
             remaining.trim();
 
-            timeOut = StringToDouble(String(remaining));
+            timeOut = stringToDouble(String(remaining));
             return SLANG_OK;
         }
     }
