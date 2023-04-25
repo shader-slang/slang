@@ -1100,8 +1100,7 @@ namespace Slang
             {
                 char buffer[32];
                 int length = intToAscii(buffer, (int)ch, 16);
-                reverseInplaceAscii(buffer, length);
-                sb << "%" << buffer;
+                sb << "%" << UnownedStringSlice(buffer, length);
             }
         }
         return URI::fromString(sb.getUnownedSlice());

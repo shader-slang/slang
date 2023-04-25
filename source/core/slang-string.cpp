@@ -568,8 +568,7 @@ namespace Slang
     {
         enum { kCount = 33 };
         char* data = prepareForAppend(kCount);
-        auto count = intToAscii(data, value, radix);
-        reverseInplaceAscii(data, count);
+        const auto count = intToAscii(data, value, radix);
         m_buffer->length += count;
     }
 
@@ -577,8 +576,7 @@ namespace Slang
     {
         enum { kCount = 33 };
         char* data = prepareForAppend(kCount);
-        auto count = intToAscii(data, value, radix);
-        reverseInplaceAscii(data, count);
+        const auto count = intToAscii(data, value, radix);
         m_buffer->length += count;
     }
 
@@ -587,7 +585,6 @@ namespace Slang
         enum { kCount = 65 };
         char* data = prepareForAppend(kCount);
         auto count = intToAscii(data, value, radix);
-        reverseInplaceAscii(data, count);
         m_buffer->length += count;
     }
 
@@ -596,7 +593,6 @@ namespace Slang
         enum { kCount = 65 };
         char* data = prepareForAppend(kCount);
         auto count = intToAscii(data, value, radix);
-        reverseInplaceAscii(data, count);
         m_buffer->length += count;
     }
 

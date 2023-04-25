@@ -20,7 +20,7 @@ namespace Slang
     extern _EndLine EndLine;
 
     // in-place reversion, works only for ascii string
-    inline void reverseInplaceAscii(char * buffer, int length)
+    inline void reverseInplaceAscii(char* buffer, int length)
     {
         int i, j;
         char c;
@@ -32,13 +32,17 @@ namespace Slang
         }
     }
     template<typename IntType>
-    inline int intToAscii(char * buffer, IntType val, int radix)
+    inline int intToAscii(char* buffer, IntType val, int radix)
     {
         int i = 0;
         IntType sign;
+        
         sign = val;
         if (sign < 0)
+        {
             val = (IntType)(0 - val);
+        }
+
         do
         {
             int digit = (val % radix);
@@ -47,8 +51,13 @@ namespace Slang
             else
                 buffer[i++] = (char)(digit - 10 + 'A');
         } while ((val /= radix) > 0);
+
         if (sign < 0)
             buffer[i++] = '-';
+
+        // Put in normal character order
+        reverseInplaceAscii(buffer, i);
+
         buffer[i] = '\0';
         return i;
     }
