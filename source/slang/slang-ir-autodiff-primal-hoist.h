@@ -286,8 +286,6 @@ namespace Slang
 
         virtual void preparePolicy(IRGlobalValueWithCode* func);
         virtual HoistResult classify(IRUse* use);
-
-        RefPtr<IRDominatorTree> domTree;
     };
 
     RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func);

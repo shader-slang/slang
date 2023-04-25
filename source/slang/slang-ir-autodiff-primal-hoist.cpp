@@ -35,20 +35,6 @@ static bool isDifferentialBlock(IRBlock* block)
     return block->findDecoration<IRDifferentialInstDecoration>();
 }
 
-static Dictionary<IRBlock*, IRBlock*> reconstructDiffBlockMap(IRGlobalValueWithCode* func)
-{
-    Dictionary<IRBlock*, IRBlock*> diffBlockMap;
-    for (auto block : func->getBlocks())
-    {
-        if (auto diffDecor = block->findDecoration<IRDifferentialInstDecoration>())
-        {
-            if (diffDecor->getPrimalType())
-                diffBlockMap[as<IRBlock>(diffDecor->getPrimalInst())] = block;
-        }
-    }
-    return diffBlockMap;
-}
-
 static IRBlock* getLoopRegionBodyBlock(IRLoop* loop)
 {
     auto condBlock = as<IRBlock>(loop->getTargetBlock());
@@ -565,10 +551,6 @@ void applyCheckpointSet(
     Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock,
     IROutOfOrderCloneContext* cloneCtx)
 {
-    // Reconstruct diff block map.
-    Dictionary<IRBlock*, IRBlock*> diffBlockMap = reconstructDiffBlockMap(func);
-
-
     for (auto use : pendingUses)
         cloneCtx->pendingUses.add(use);
     
@@ -600,13 +582,24 @@ void applyCheckpointSet(
         if (block->findDecoration<IRRecomputeBlockDecoration>())
             continue;
 
-        auto diffBlock = as<IRBlock>(diffBlockMap[block]);
+        IRBlock* recomputeBlock = block;
+        mapPrimalBlockToRecomputeBlock.tryGetValue(block, recomputeBlock);
+        auto recomputeInsertBeforeInst = recomputeBlock->getFirstOrdinaryInst();
 
         IRBuilder builder(func->getModule());
         UIndex ii = 0;
         for (auto param : block->getParams())
         {
-            builder.setInsertBefore(diffBlock->getFirstOrdinaryInst());
+            builder.setInsertBefore(recomputeInsertBeforeInst);
+            bool isRecomputed = checkpointInfo->recomputeSet.contains(param);
+            bool isInverted = checkpointInfo->invertSet.contains(param);
+
+            if (!isRecomputed && !isInverted)
+                continue;
+
+            SLANG_RELEASE_ASSERT(
+                recomputeBlock != block &&
+                "recomputed param should belong to block that has recompute block.");
 
             // Apply checkpoint rule to the parameter itself.
             applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, param);
@@ -617,37 +610,36 @@ void applyCheckpointSet(
             {
                 if (predecessorSet.contains(predecessor))
                     continue;
-
                 predecessorSet.add(predecessor);
-
-                auto diffPredecessor = as<IRBlock>(diffBlockMap[block]);
- 
-                if (checkpointInfo->recomputeSet.contains(param))
-                {
-                    IRInst* terminator = diffPredecessor->getTerminator();
-                    addPhiOutputArg(&builder,
-                        diffPredecessor,
-                        terminator,
-                        as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii));
-                }
                 
-                if (checkpointInfo->invertSet.contains(param))
-                {
-                    IRInst* terminator = diffPredecessor->getTerminator();
+                auto primalPhiArg = as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii);
+                auto recomputePredecessor = mapPrimalBlockToRecomputeBlock[predecessor].getValue();
 
+                // For now, find the primal phi argument in this predecessor,
+                // and stick it into the recompute predecessor's branch inst. We
+                // will use a patch-up pass in the end to replace all these
+                // arguments to their recomputed versions if they exist.
+                
+                if (isRecomputed)
+                {
+                    IRInst* terminator = recomputeBlock->getTerminator();
                     addPhiOutputArg(&builder,
-                        diffPredecessor,
+                        recomputePredecessor,
                         terminator,
-                        as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii));
+                        primalPhiArg);
+                }
+                else if (isInverted)
+                {
+                    IRInst* terminator = recomputeBlock->getTerminator();
+                    addPhiOutputArg(&builder,
+                        recomputePredecessor,
+                        terminator,
+                        primalPhiArg);
                 }
             }
-
             ii++;
         }
 
-        IRBlock* recomputeBlock = block;
-        mapPrimalBlockToRecomputeBlock.tryGetValue(block, recomputeBlock);
-        auto recomputeInsertBeforeInst = recomputeBlock->getFirstOrdinaryInst();
 
         for (auto child : block->getChildren())
         {
@@ -668,6 +660,25 @@ void applyCheckpointSet(
                 }
             }
             applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, child);
+        }
+    }
+
+    // Go through phi arguments in recompute blocks and replace them to
+    // recomputed insts if they exist.
+    for (auto block : func->getBlocks())
+    {
+        if (!block->findDecoration<IRRecomputeBlockDecoration>())
+            continue;
+        auto terminator = block->getTerminator();
+        for (UInt i = 0; i < terminator->getOperandCount(); i++)
+        {
+            auto arg = terminator->getOperand(i);
+            if (as<IRBlock>(arg))
+                continue;
+            if (auto recomputeArg = cloneCtx->cloneEnv.mapOldValToNew.tryGetValue(arg))
+            {
+                terminator->setOperand(i, *recomputeArg);
+            }
         }
     }
 }
@@ -1313,7 +1324,7 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
 
 void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)
 {
-    domTree = computeDominatorTree(func);
+    SLANG_UNUSED(func)
     return;
 }
 
@@ -1422,9 +1433,9 @@ static bool shouldStoreInst(IRInst* inst)
     if (!canTypeBeStored(inst->getDataType()))
         return false;
 
-    // Never store certain opcodes.
     switch (inst->getOp())
     {
+    // Never store these opcodes because they are not real computations.
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:
     case kIROp_IntCast:
@@ -1439,17 +1450,26 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeDifferentialPair:
+    case kIROp_MakeDifferentialPairUserCode:
     case kIROp_MakeOptionalNone:
     case kIROp_MakeOptionalValue:
+    case kIROp_MakeExistential:
     case kIROp_DifferentialPairGetDifferential:
     case kIROp_DifferentialPairGetPrimal:
+    case kIROp_DifferentialPairGetDifferentialUserCode:
+    case kIROp_DifferentialPairGetPrimalUserCode:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_undefined:
     case kIROp_GetSequentialID:
+    case kIROp_GetStringHash:
     case kIROp_Specialize:
     case kIROp_LookupWitness:
+    case kIROp_Param:
+        return false;
+    
+    // Never store these op codes because they are trivial to compute.
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
@@ -1471,6 +1491,7 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_Lsh:
     case kIROp_Rsh:
         return false;
+
     case kIROp_GetElement:
     case kIROp_FieldExtract:
     case kIROp_swizzle:
@@ -1479,12 +1500,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_GetOptionalValue:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
-        // If the operand is already stored, don't store the result of these insts.
-        if (inst->getOperand(0)->findDecoration<IRPrimalValueStructKeyDecoration>())
-        {
-            return false;
-        }
-        break;
+    case kIROp_GetTupleElement:
+        return false;
     default:
         break;
     }
@@ -1495,9 +1512,8 @@ static bool shouldStoreInst(IRInst* inst)
     return true;
 }
 
-bool canRecompute(IRDominatorTree* domTree, IRUse* use)
+bool canRecompute(IRUse* use)
 {
-    SLANG_UNUSED(domTree);
     if (auto load = as<IRLoad>(use->get()))
     {
         // Generally, we cannot recompute a load(ptr), since ptr may be modified
@@ -1518,6 +1534,17 @@ bool canRecompute(IRDominatorTree* domTree, IRUse* use)
     auto param = as<IRParam>(use->get());
     if (!param)
         return true;
+
+    // We can recompute a phi param if it is not in a loop start block.
+    auto parentBlock = as<IRBlock>(param->getParent());
+    for (auto pred : parentBlock->getPredecessors())
+    {
+        if (auto loop = as<IRLoop>(pred->getTerminator()))
+        {
+            if (loop->getTargetBlock() == parentBlock)
+                return false;
+        }
+    }
     return false;
 }
 
@@ -1541,7 +1568,7 @@ HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
         {
             // We may not be able to recompute due to limitations of
             // the unzip pass. If so we will store the result.
-            if (canRecompute(domTree, use))
+            if (canRecompute(use))
                 return HoistResult::recompute(use->get());
 
             // The fallback is to store.

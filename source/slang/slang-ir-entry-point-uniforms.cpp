@@ -387,6 +387,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         builder.setInsertBefore(m_entryPoint.func);
         paramStructType = builder.createStructType();
         builder.addNameHintDecoration(paramStructType, UnownedTerminatedStringSlice("EntryPointParams"));
+        builder.addPublicDecoration(paramStructType);
 
         if( needConstantBuffer )
         {

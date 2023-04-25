@@ -140,6 +140,7 @@ struct CollectGlobalUniformParametersContext
         //
         auto wrapperStructType = builder->createStructType();
         builder->addNameHintDecoration(wrapperStructType, UnownedTerminatedStringSlice("GlobalParams"));
+        builder->addPublicDecoration(wrapperStructType);
 
         // If the computed layout used a bare `struct` type, then we will use
         // our `GlobalParams` struct as-is, but if the layout involved an

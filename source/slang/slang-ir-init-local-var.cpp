@@ -9,16 +9,42 @@ namespace Slang
 void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
 {
     IRBuilder builder(module);
+    HashSet<IRInst*> userSet;
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
         {
             if (inst->getOp() == kIROp_Var)
             {
-                auto firstUse = inst->firstUse;
-                bool initialized =
-                    (firstUse && firstUse->getUser()->getOp() == kIROp_Store &&
-                        firstUse->getUser()->getParent() == inst->getParent());
+                bool initialized = false;
+                userSet.clear();
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                    userSet.add(use->getUser());
+
+                // Check if the variable is initialized in the same block.
+                for (auto nextInst = inst->next; nextInst; nextInst = nextInst->next)
+                {
+                    switch (nextInst->getOp())
+                    {
+                    case kIROp_Store:
+                        if (nextInst->getOperand(0) == inst)
+                            initialized = true;
+                        break;
+                    case kIROp_GetElementPtr:
+                    case kIROp_FieldAddress:
+                        continue;
+                    default:
+                        if (userSet.contains(nextInst))
+                        {
+                            // We encountered a user of the variable before it was initialized.
+                            // Break out of the loop and insert the initialization code.
+                            goto breakLabel;
+                        }
+                    }
+                    if (initialized)
+                        break;
+                }
+            breakLabel:;
                 if (initialized)
                     continue;
                 builder.setInsertAfter(inst);
