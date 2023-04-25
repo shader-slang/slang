@@ -9,7 +9,7 @@ void applyCheckpointSet(
     CheckpointSetInfo* checkpointInfo,
     IRGlobalValueWithCode* func,
     HoistedPrimalsInfo* hoistInfo,
-    HashSet<IRUse*> pendingUses,
+    HashSet<IRUse*>& pendingUses,
     Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock,
     IROutOfOrderCloneContext* cloneCtx);
 
@@ -559,7 +559,7 @@ void applyCheckpointSet(
     CheckpointSetInfo* checkpointInfo,
     IRGlobalValueWithCode* func,
     HoistedPrimalsInfo* hoistInfo,
-    HashSet<IRUse*> pendingUses,
+    HashSet<IRUse*>& pendingUses,
     Dictionary<IRBlock*, IRBlock*>& mapPrimalBlockToRecomputeBlock,
     IROutOfOrderCloneContext* cloneCtx)
 {
@@ -845,11 +845,64 @@ static int getInstRegionNestLevel(
     return (int)result;
 }
 
+
+/// Legalizes all accesses to primal insts from recompute and diff blocks.
+///
 RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     HoistedPrimalsInfo* hoistInfo,
     IRGlobalValueWithCode* func,
     Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo)
 {
+    // In general, after checkpointing, we can have a function like the following:
+    // ```
+    // void func()
+    // {
+    // primal:
+    //      for (int i = 0; i < 5; i++)
+    //      {
+    //            float x = g(i);
+    //            use(x);
+    //      }
+    // recompute:
+    //      ...
+    // diff:
+    //      for (int i = 5; i >= 0; i--)
+    //      {
+    //      recompute:
+    //          ...
+    //      diff:
+    //          use_diff(x); // def of x is not dominating this location!
+    //      }
+    // }
+    // ```
+    // This function will legalize the access to x in the dff block by creating
+    // a proper local variable and insert store/loads, so that the above function
+    // will be transformed to:
+    // ```
+    // void func()
+    // {
+    // primal:
+    //      float x_storage[5];
+    //      
+    //      for (int i = 0; i < 5; i++)
+    //      {
+    //            float x = g(i);
+    //            x_storage[i] = x;
+    //            use(x);
+    //      }
+    // recompute:
+    //      ...
+    // diff:
+    //      for (int i = 5; i >= 0; i--)
+    //      {
+    //      recompute:
+    //          ...
+    //      diff:
+    //          use_diff(x_storage[i]);
+    //      }
+    // }
+    //
+
     RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
     
     IRBlock* defaultVarBlock = func->getFirstBlock()->getNextBlock();
@@ -1021,7 +1074,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     return hoistInfo;
 }
 
-
 void tryInferMaxIndex(IndexedRegion* region, IndexTrackingInfo* info)
 {
     if (info->status != IndexTrackingInfo::CountStatus::Unresolved)
@@ -1035,7 +1087,6 @@ void tryInferMaxIndex(IndexedRegion* region, IndexTrackingInfo* info)
         info->status = IndexTrackingInfo::CountStatus::Static;
     }
 }
-
 
 IRInst* addPhiInputParam(IRBuilder* builder, IRBlock* block, IRType* type)
 {
@@ -1169,6 +1220,13 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
     }
 }
 
+// Insert iteration counters for all loops to form indexed regions. For loops in
+// primal blocks, the counter is incremented from 0. For loops in reverse
+// blocks, the counter is decremented from the final value in primal block
+// downto 0. Returns a mapping from each block to a list of their enclosing loop
+// regions. A loop region records the iteration counter for the corresponding
+// loop in the primal block and the reverse block.
+//
 void buildIndexedBlocks(
     Dictionary<IRBlock*, List<IndexTrackingInfo>>& info,
     IRGlobalValueWithCode* func)
@@ -1212,23 +1270,37 @@ void buildIndexedBlocks(
     }
 }
 
+// For each primal inst that is used in reverse blocks, decide if we should recompute or store
+// its value, then make them accessible in reverse blocks based the decision.
+//
 RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
 {
     sortBlocksInFunc(func);
 
+    // Insert loop counters and establish loop regions.
+    // Also makes the reverse loops counting downwards from the final iteration count.
+    //
     Dictionary<IRBlock*, List<IndexTrackingInfo>> indexedBlockInfo;
     buildIndexedBlocks(indexedBlockInfo, func);
 
+    // Create recompute blocks for each region following the same control flow structure
+    // as in primal code.
+    //
     RefPtr<IROutOfOrderCloneContext> cloneCtx = new IROutOfOrderCloneContext();
     auto recomputeBlockMap = createPrimalRecomputeBlocks(func, indexedBlockInfo, cloneCtx);
 
     sortBlocksInFunc(func);
 
+    // Determine the strategy we should use to make a primal inst available.
+    // If we decide to recompute the inst, emit the recompute inst in the corresponding recompute block.
+    //
     RefPtr<AutodiffCheckpointPolicyBase> chkPolicy = new DefaultCheckpointPolicy(func->getModule());
     chkPolicy->preparePolicy(func);
-
     auto primalsInfo = chkPolicy->processFunc(func, recomputeBlockMap, cloneCtx);
 
+    // Legalize the primal inst accesses by introducing local variables / arrays and emitting
+    // necessary load/store logic.
+    //
     primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
     return primalsInfo;
 }
