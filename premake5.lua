@@ -352,9 +352,7 @@ workspace "slang"
         -- Makes all symbols hidden by default unless explicitly 'exported'
         buildoptions { "-fvisibility=hidden" } 
         -- Warnings
-        buildoptions {
-            "-Wno-switch",
-        }
+        buildoptions { "-Wno-switch" }
     filter { "toolset:clang or gcc*", "language:C++" }
         buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }
 
