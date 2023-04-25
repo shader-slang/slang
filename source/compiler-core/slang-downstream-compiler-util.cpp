@@ -41,7 +41,6 @@ struct DownstreamCompilerInfos
 {
     typedef DownstreamCompilerInfo Info;
     typedef Info::SourceLanguageFlag SourceLanguageFlag;
-    typedef Info::SourceLanguageFlags SourceLanguageFlags;
 
     DownstreamCompilerInfos infos;
 

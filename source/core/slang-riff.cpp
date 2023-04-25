@@ -278,7 +278,6 @@ struct DumpVisitor : public RiffContainer::Visitor
 /* static */SlangResult RiffUtil::read(Stream* stream, RiffContainer& outContainer)
 {
     typedef RiffContainer::ScopeChunk ScopeChunk;
-    typedef RiffContainer::ScopeChunk ScopeContainer;
     outContainer.reset();
 
     size_t remaining;

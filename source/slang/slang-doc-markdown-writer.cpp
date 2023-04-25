@@ -493,8 +493,6 @@ static void _addRequirementFromTargetToken(const Token& tok, List<DocMarkdownWri
 
 static void _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& ioReqs)
 {
-    typedef DocMarkdownWriter::Requirement Requirement;
-
     StringBuilder buf;
 
     if (auto spirvRequiredModifier = decl->findModifier<RequiredSPIRVVersionModifier>())
