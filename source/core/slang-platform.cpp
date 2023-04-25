@@ -158,14 +158,14 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 #else // _WIN32
 
-/* static */SlangResult PlatformUtil::getInstancePath(StringBuilder& out)
+/* static */SlangResult PlatformUtil::getInstancePath([[maybe_unused]] StringBuilder& out)
 {
     // On non Windows it's typically hard to get the instance path, so we'll say not implemented.
     // The meaning is also somewhat more ambiguous - is it the exe or the shared library path?
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-/* static */SlangResult PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
+/* static */SlangResult PlatformUtil::appendResult([[maybe_unused]] SlangResult res, [[maybe_unused]] StringBuilder& builderOut)
 {
     return SLANG_E_NOT_IMPLEMENTED;
 }
@@ -301,7 +301,7 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] =
     return s_familyFlags[int(family)];
 }
 
-/* static */SlangResult PlatformUtil::outputDebugMessage(const char* text)
+/* static */SlangResult PlatformUtil::outputDebugMessage([[maybe_unused]] const char* text)
 {
 #ifdef _WIN32
     OutputDebugStringA(text);

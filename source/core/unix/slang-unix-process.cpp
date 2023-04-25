@@ -389,7 +389,7 @@ static int pipeCLOEXEC(int pipefd[2])
 #endif
 }
 
-/* static */SlangResult Process::create(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess)
+/* static */SlangResult Process::create(const CommandLine& commandLine, Process::Flags, RefPtr<Process>& outProcess)
 {
     const char* whatFailed = nullptr;
     pid_t childPid;

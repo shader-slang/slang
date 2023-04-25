@@ -1089,8 +1089,7 @@ void generateParameterBindings(
 static void completeBindingsForParameterImpl(
     ParameterBindingContext*    context,
     RefPtr<VarLayout>           firstVarLayout,
-    ParameterBindingInfo        bindingInfos[kLayoutResourceKindCount],
-    RefPtr<ParameterInfo>       parameterInfo)
+    ParameterBindingInfo        bindingInfos[kLayoutResourceKindCount])
 {
     // For any resource kind used by the parameter
     // we need to update its layout information
@@ -1316,8 +1315,7 @@ static void completeBindingsForParameter(
     completeBindingsForParameterImpl(
         context,
         varLayout,
-        parameterInfo->bindingInfo,
-        parameterInfo);
+        parameterInfo->bindingInfo);
 
     // At this point we should have explicit binding locations chosen for
     // all the relevant resource kinds, so we can apply these to the
@@ -1334,8 +1332,7 @@ static void completeBindingsForParameter(
     completeBindingsForParameterImpl(
         context,
         varLayout,
-        bindingInfos,
-        nullptr);
+        bindingInfos);
     applyBindingInfoToParameter(varLayout, bindingInfos);
 }
 

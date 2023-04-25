@@ -21,6 +21,7 @@ public:
     {
         enum Enum : Flags
         {
+            // Ignored on non-Windows platforms
             AttachDebugger = 0x01,
         };
     };

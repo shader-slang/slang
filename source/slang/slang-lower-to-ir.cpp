@@ -3978,7 +3978,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     void addFuncBaseArgs(
         LoweredValInfo funcVal,
-        List<IRInst*>* ioArgs)
+        List<IRInst*>* /*ioArgs*/)
     {
         switch (funcVal.flavor)
         {
@@ -4517,7 +4517,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
+    LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* /*decl*/)
     {
         SLANG_UNIMPLEMENTED_X("associatedtype expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
