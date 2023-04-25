@@ -1233,7 +1233,7 @@ SlangResult LanguageServer::signatureHelp(
         auto delimLoc = version->linkage->getSourceManager()->getHumaneLoc(
             appExpr->argumentDelimeterLocs[i], SourceLocType::Actual);
         if (delimLoc.line > args.position.line + 1 ||
-            delimLoc.line == args.position.line + 1 && delimLoc.column >= args.position.character + 1)
+            (delimLoc.line == args.position.line + 1 && delimLoc.column >= args.position.character + 1))
         {
             response.activeParameter = i - 1;
             break;

@@ -354,7 +354,6 @@ workspace "slang"
         -- Warnings
         buildoptions {
             "-Wno-switch",
-            "-Wno-parentheses",
         }
     filter { "toolset:clang or gcc*", "language:C++" }
         buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }

@@ -444,7 +444,7 @@ void DocumentVersion::zeroBasedUTF16LocToOneBasedUTF8Loc(
 
 static bool _isIdentifierChar(char ch)
 {
-    return ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_';
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_';
 }
 
 UnownedStringSlice DocumentVersion::peekIdentifier(Index& offset)

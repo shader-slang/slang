@@ -162,7 +162,7 @@ namespace Slang
         }
         // It would probably be slightly neater to set all executable bits
         // aside from those in umask..
-        if(::chmod(fileName.getBuffer(), st.st_mode & 07777 | S_IXUSR) != 0)
+        if(::chmod(fileName.getBuffer(), (st.st_mode & 07777) | S_IXUSR) != 0)
         {
             return SLANG_FAIL;
         }
