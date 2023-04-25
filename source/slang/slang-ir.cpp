@@ -1710,7 +1710,9 @@ namespace Slang
         Int const*              listArgCounts,
         IRInst* const* const*   listArgs)
     {
-        m_dedupContext->getInstReplacementMap().tryGetValue((IRInst*)(type), *(IRInst**)&type);
+        IRInst* instReplacement = type;
+        m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
+        type = (IRType*)instReplacement;
 
         if (getIROpInfo(op).flags & kIROpFlag_Hoistable)
         {

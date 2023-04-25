@@ -55,7 +55,7 @@ void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFu
 
     for (auto param : primalFunc->getParams())
     {
-        transcribeFuncParam(&builder, param, param->getFullType()).differential;
+        transcribeFuncParam(&builder, param, param->getFullType());
     }
     List<IRParam*> diffParams;
     for (auto param : diffFunc->getParams())
@@ -1470,13 +1470,9 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
 {
     IRBuilder builder = *inBuilder;
 
-    IRFunc* primalFunc = origFunc;
-
     maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
 
     differentiableTypeConformanceContext.setFunc(origFunc);
-
-    primalFunc = origFunc;
 
     auto diffFunc = builder.createFunc();
 

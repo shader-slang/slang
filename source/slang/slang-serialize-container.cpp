@@ -601,17 +601,6 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         {
             auto reader = entryPointChunk->asReadHelper();
 
-            auto readString = [&]()
-            {
-                uint32_t length = 0;
-                reader.read(length);
-
-                char* begin = (char*)reader.getData();
-                reader.skip(length + 1);
-
-                return UnownedStringSlice(begin, begin + length);
-            };
-
             SerialContainerBinary::EntryPoint srcEntryPoint;
             SLANG_RETURN_ON_FAIL(reader.read(srcEntryPoint));
 

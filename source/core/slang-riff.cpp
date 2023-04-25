@@ -773,7 +773,8 @@ void RiffContainer::endChunk()
     size_t chunkPayloadSize;
 
     // The chunk we are popping 
-    Chunk* chunk = nullptr;
+    // Only keep track of this in debug builds
+    [[maybe_unused]] Chunk* chunk = nullptr;
 
     ListChunk* parent;
     if (m_dataChunk)

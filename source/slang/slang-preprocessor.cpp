@@ -3342,7 +3342,6 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
         macro->flavor = MacroDefinition::Flavor::ObjectLike;
     }
 
-    auto nameLoc = NameLoc(nameToken);
     macro->nameAndLoc = NameLoc(nameToken);
 
     context->m_preprocessor->globalEnv.macros[name] = macro;

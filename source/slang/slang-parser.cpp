@@ -1094,8 +1094,6 @@ namespace Slang
         Modifier** modifierLink = &modifiers.first;
         for (;;)
         {
-            SourceLoc loc = parser->tokenReader.peekLoc();
-
             switch (peekTokenType(parser))
             {
             default:

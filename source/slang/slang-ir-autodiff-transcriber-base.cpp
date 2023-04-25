@@ -1029,7 +1029,7 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     auto bodyBlock = builder.emitBlock();
     mapPrimalInst(origGeneric->getFirstBlock(), bodyBlock);
     mapDifferentialInst(origGeneric->getFirstBlock(), bodyBlock);
-    auto transcribedBlock = transcribeBlockImpl(&builder, origGeneric->getFirstBlock(), instsToSkip);
+    transcribeBlockImpl(&builder, origGeneric->getFirstBlock(), instsToSkip);
 
     return InstPair(primalGeneric, diffGeneric);
 }

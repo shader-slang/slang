@@ -3341,7 +3341,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
     {
-        auto baseVal = lowerSubExpr(expr->arrayExpr);
         auto type = lowerType(context, expr->arrayExpr->type);
         auto arrayType = as<IRArrayType>(type);
         SLANG_ASSERT(arrayType);

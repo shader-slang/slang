@@ -546,20 +546,6 @@ void applyCheckpointSet(
 {
     for (auto use : pendingUses)
         cloneCtx->pendingUses.add(use);
-    
-    // Populate the clone context with all the primal uses that we may need to replace with
-    // cloned versions. That way any insts we clone into the diff block will automatically replace
-    // their uses.
-    //
-    auto addPrimalUsesToCloneContext = [&](IRInst* inst)
-    {
-        UIndex opIndex = 0;
-        for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
-        {   
-            if (!isDifferentialInst(operand->get()))
-                cloneCtx->pendingUses.add(operand);
-        }
-    };
 
     // Go back over the insts and move/clone them accoridngly.
     auto paramPreludeBlock = getParamPreludeBlock(func);

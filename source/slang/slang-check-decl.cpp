@@ -2338,7 +2338,7 @@ namespace Slang
 
             if(auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
             {
-                auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
+                [[maybe_unused]] auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
                 SLANG_ASSERT(satisfyingTypeParamDeclRef);
 
                 // There are no additional checks we need to make on plain old
@@ -2348,7 +2348,6 @@ namespace Slang
                 // then this is possibly where we'd want to check that the kinds of
                 // the two parameters match.
                 //
-                SLANG_UNUSED(satisfyingGenericDeclRef);
             }
             else if (auto requiredValueParamDeclRef = requiredMemberDeclRef.as<GenericValueParamDecl>())
             {

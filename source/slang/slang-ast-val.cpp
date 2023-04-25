@@ -538,7 +538,7 @@ Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBu
     (*ioDiff)++;
 
     ExtractExistentialSubtypeWitness* substValue = astBuilder->create<ExtractExistentialSubtypeWitness>();
-    substValue->declRef = declRef;
+    substValue->declRef = substDeclRef;
     substValue->sub = substSub;
     substValue->sup = substSup;
     return substValue;
