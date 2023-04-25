@@ -3816,6 +3816,7 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
             case kIROp_DllImportDecoration:
             case kIROp_DllExportDecoration:
             case kIROp_HLSLExportDecoration:
+            case kIROp_BinaryInterfaceTypeDecoration:
                 return true;
             }
         }

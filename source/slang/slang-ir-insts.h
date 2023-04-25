@@ -3675,6 +3675,11 @@ public:
         addNameHintDecoration(value, getStringValue(text));
     }
 
+    void addBinaryInterfaceTypeDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_BinaryInterfaceTypeDecoration);
+    }
+
     void addGLSLOuterArrayDecoration(IRInst* value, UnownedStringSlice const& text)
     {
         addDecoration(value, kIROp_GLSLOuterArrayDecoration, getStringValue(text));
