@@ -313,17 +313,6 @@ struct DiffUnzipPass
                 auto primalArg = lookupPrimalInst(arg);
                 auto diffArg = lookupDiffInst(arg);
 
-                if (auto primalVar = as<IRVar>(primalArg))
-                {
-                    primalArg = diffBuilder->emitVar(as<IRPtrTypeBase>(primalVar->getDataType())->getValueType());
-                    if (auto storeUse = findUniqueStoredVal(primalVar))
-                    {
-                        auto storeInst = diffBuilder->emitStore(primalArg, as<IRStore>(storeUse->getUser())->getVal());
-                        storeInst->insertAfter(storeUse->getUser());
-                        primalArg->insertBefore(storeInst);
-                    }
-                }
-
                 // If arg is a mixed differential (pair), it should have already been split.
                 SLANG_ASSERT(primalArg);
                 SLANG_ASSERT(diffArg);
