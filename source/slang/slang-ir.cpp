@@ -7488,6 +7488,17 @@ namespace Slang
                 candidate = specInst->getBase();
                 continue;
             }
+            switch(candidate->getOp())
+            {
+            case kIROp_ForwardDifferentiate:
+            case kIROp_BackwardDifferentiate:
+            case kIROp_BackwardDifferentiatePrimal:
+            case kIROp_BackwardDifferentiatePropagate:
+                candidate = candidate->getOperand(0);
+                continue;
+            default:
+                break;
+            }
             if( auto genericInst = as<IRGeneric>(candidate) )
             {
                 if( auto returnVal = findGenericReturnVal(genericInst) )

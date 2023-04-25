@@ -846,6 +846,15 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Treat a function as differentiable function, or an IRCall as a call to a differentiable function.
     INST(TreatAsDifferentiableDecoration, treatAsDifferentiableDecoration, 0, 0)
 
+
+        /// Hint that the result from a call to the decorated function should be stored in backward prop function.
+    INST(PreferCheckpointDecoration, PreferCheckpointDecoration, 0, 0)
+
+        /// Hint that the result from a call to the decorated function should be recomputed in backward prop function.
+    INST(PreferRecomputeDecoration, PreferRecomputeDecoration, 0, 0)
+
+    INST_RANGE(CheckpointHintDecoration, PreferCheckpointDecoration, PreferRecomputeDecoration)
+
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.
     INST(COMWitnessDecoration, COMWitnessDecoration, 1, 0)

@@ -10,7 +10,7 @@ typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
 [BackwardDifferentiable]
-[PreferCheckpoint]
+[PreferRecompute]
 float g(float x)
 {
     return log(x);
@@ -29,7 +29,7 @@ float f(int p, float x)
 // Check that there are no calls to primal_g in bwd_f.
 
 // CHECK: void s_bwd_f_{{[0-9]+}}
-// CHECK-NOT: {{[_a-zA-Z0-9]+}} = s_bwd_primal_g_{{[0-9]+}}
+// CHECK: {{[_a-zA-Z0-9]+}} = s_bwd_primal_g_{{[0-9]+}}
 // CHECK: return
 
 

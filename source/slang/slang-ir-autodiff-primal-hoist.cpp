@@ -1416,6 +1416,30 @@ static bool shouldStoreVar(IRVar* var)
     return (doesInstHaveDiffUse(var) && doesInstHaveStore(var) && canTypeBeStored(as<IRPtrTypeBase>(var->getDataType())->getValueType()));
 }
 
+enum CheckpointPreference
+{
+    None,
+    PreferCheckpoint,
+    PreferRecompute
+};
+
+static CheckpointPreference getCheckpointPreference(IRInst* callee)
+{
+    callee = getResolvedInstForDecorations(callee);
+    for (auto decor : callee->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_PreferCheckpointDecoration:
+            return CheckpointPreference::PreferCheckpoint;
+        case kIROp_PreferRecomputeDecoration:
+        case kIROp_TargetIntrinsicDecoration:
+            return CheckpointPreference::PreferRecompute;
+        }
+    }
+    return CheckpointPreference::None;
+}
+
 static bool shouldStoreInst(IRInst* inst)
 {
     if (!inst->getDataType())
@@ -1497,6 +1521,14 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_VectorReshape:
     case kIROp_GetTupleElement:
         return false;
+
+    case kIROp_Call:
+        // If the callee prefers recompute policy, don't store.
+        if (getCheckpointPreference(inst->getOperand(0)) == CheckpointPreference::PreferRecompute)
+        {
+            return false;
+        }
+        break;
     default:
         break;
     }

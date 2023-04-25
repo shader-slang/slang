@@ -712,6 +712,30 @@ struct IRBackwardDerivativeDecoration : IRDecoration
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRCheckpointHintDecoration : public IRDecoration
+{
+    IR_PARENT_ISA(CheckpointHintDecoration)
+};
+
+struct IRPreferRecomputeDecoration : IRCheckpointHintDecoration
+{
+    enum
+    {
+        kOp = kIROp_PreferRecomputeDecoration
+    };
+    IR_LEAF_ISA(PreferRecomputeDecoration)
+};
+
+struct IRPreferCheckpointDecoration : IRCheckpointHintDecoration
+{
+    enum
+    {
+        kOp = kIROp_PreferCheckpointDecoration
+    };
+    IR_LEAF_ISA(PreferCheckpointDecoration)
+};
+
+
 struct IRLoopCounterDecoration : IRDecoration
 {
     enum
