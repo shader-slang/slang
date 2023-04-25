@@ -858,6 +858,7 @@ static LoweredValInfo _emitCallToAccessor(
     /// encapsulates the reference to the storage so that downstream
     /// code can decide which accessor(s) to invoke.
     ///
+
 static LoweredValInfo lowerStorageReference(
     IRGenContext*           context,
     IRType*                 type,
@@ -1305,22 +1306,22 @@ static void addLinkageDecoration(
 
 bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
 {
-    if (auto funcDecl = as<CallableDecl>(requirementDecl))
+    if (const auto funcDecl = as<CallableDecl>(requirementDecl))
     {
     }
-    else if (auto propertyDecl = as<PropertyDecl>(requirementDecl))
+    else if (const auto propertyDecl = as<PropertyDecl>(requirementDecl))
     {
     }
-    else if (auto assocTypeDecl = as<AssocTypeDecl>(requirementDecl))
+    else if (const auto assocTypeDecl = as<AssocTypeDecl>(requirementDecl))
     {
     }
-    else if (auto typeConstraint = as<TypeConstraintDecl>(requirementDecl))
+    else if (const auto typeConstraint = as<TypeConstraintDecl>(requirementDecl))
     {
     }
-    else if (auto varDecl = as<VarDeclBase>(requirementDecl))
+    else if (const auto varDecl = as<VarDeclBase>(requirementDecl))
     {
     }
-    else if (auto genericDecl = as<GenericDecl>(requirementDecl))
+    else if (const auto genericDecl = as<GenericDecl>(requirementDecl))
     {
         return shouldDeclBeTreatedAsInterfaceRequirement(genericDecl->inner);
     }
@@ -2382,7 +2383,7 @@ static String getNameForNameHint(
         return String();
 
 
-    if(auto varDecl = as<VarDeclBase>(decl))
+    if(const auto varDecl = as<VarDeclBase>(decl))
     {
         // For an ordinary local variable, global variable,
         // parameter, or field, we will just use the name
@@ -5145,7 +5146,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->predicateExpression)
+        if (const auto condExpr = stmt->predicateExpression)
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, stmt->predicateExpression));
@@ -5586,11 +5587,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 }
             }
         }
-        else if (auto caseStmt = as<CaseStmt>(stmt))
+        else if (const auto caseStmt = as<CaseStmt>(stmt))
         {
             return true;
         }
-        else if (auto defaultStmt = as<DefaultStmt>(stmt))
+        else if (const auto defaultStmt = as<DefaultStmt>(stmt))
         {
             // A 'default:' is a kind of case. 
             return true;
@@ -5661,7 +5662,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             info->cases.add(caseVal);
             info->cases.add(label);
         }
-        else if(auto defaultStmt = as<DefaultStmt>(stmt))
+        else if(const auto defaultStmt = as<DefaultStmt>(stmt))
         {
             auto label = getLabelForCase(info);
 
@@ -5670,7 +5671,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             info->defaultLabel = label;
         }
-        else if(auto emptyStmt = as<EmptyStmt>(stmt))
+        else if(const auto emptyStmt = as<EmptyStmt>(stmt))
         {
             // Special-case empty statements so they don't
             // mess up our "trivial fall-through" optimization.
@@ -6482,7 +6483,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // generic associated types.
 
 
-            if(auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
+            if(const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
             {
                 // Okay, this seems to be an interface rquirement, and
                 // we should lower it as such.
@@ -6490,7 +6491,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        if(auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if(const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
@@ -6630,7 +6631,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // interface requires, and not what it provides.
         //
         auto parentDecl = inheritanceDecl->parentDecl;
-        if (auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
+        if (const auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
         }
@@ -6841,7 +6842,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         if (auto extDecl = as<ExtensionDecl>(parent))
         {
-            if (auto declRefType = as<DeclRefType>(extDecl->targetType.type))
+            if (const auto declRefType = as<DeclRefType>(extDecl->targetType.type))
             {
                 return true;
             }
@@ -7451,7 +7452,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
         }
-        if (auto specializeAttr = decl->findModifier<SpecializeAttribute>())
+        if (const auto specializeAttr = decl->findModifier<SpecializeAttribute>())
         {
             subBuilder->addSpecializeDecoration(irInterface);
         }
@@ -7459,7 +7460,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addComInterfaceDecoration(irInterface, comInterfaceAttr->guid.getUnownedSlice());
         }
-        if (auto builtinAttr = decl->findModifier<BuiltinAttribute>())
+        if (const auto builtinAttr = decl->findModifier<BuiltinAttribute>())
         {
             subBuilder->addBuiltinDecoration(irInterface);
         }
@@ -7581,7 +7582,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
 
-        if( auto payloadAttribute = decl->findModifier<PayloadAttribute>() )
+        if( const auto payloadAttribute = decl->findModifier<PayloadAttribute>() )
         {
             subBuilder->addDecoration(irAggType, kIROp_PayloadDecoration);
         }
@@ -8193,7 +8194,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             builder->addTargetIntrinsicDecoration(irInst, targetCaps, definition.getUnownedSlice());
         }
 
-        if(auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
+        if(const auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
         {
             builder->addNVAPIMagicDecoration(irInst, decl->getName()->text.getUnownedSlice());
         }
@@ -8312,7 +8313,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // have a name, but its parent should.
         //
         Decl* declForName = decl;
-        if(auto accessorDecl = as<AccessorDecl>(decl))
+        if(const auto accessorDecl = as<AccessorDecl>(decl))
             declForName = decl->parentDecl;
 
         definition.append(getText(declForName->getName()));

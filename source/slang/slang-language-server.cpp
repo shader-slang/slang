@@ -524,7 +524,7 @@ SlangResult LanguageServer::hover(
     {
         if (auto declRefExpr = as<DeclRefExpr>(expr))
             return fillDeclRefHoverInfo(declRefExpr->declRef);
-        if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
+        if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
         {
             String documentation;
             String signature = getExprDeclSignature(expr, &documentation, nullptr);

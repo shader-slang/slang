@@ -919,7 +919,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
         for (auto instToStore : instSet)
         {
             IRBlock* defBlock = nullptr;
-            if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+            if (const auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
                 auto varInst = as<IRVar>(instToStore);
                 auto storeUse = findEarliestUniqueWriteUse(varInst);
@@ -984,7 +984,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     defBlockIndices.clear();
                 }
             }
-            if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+            if (const auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
                 IRVar* varToStore = as<IRVar>(instToStore);
                 SLANG_RELEASE_ASSERT(varToStore);
@@ -1374,7 +1374,7 @@ static bool isIntermediateContextType(IRType* type)
 static bool shouldStoreVar(IRVar* var)
 {
     // Always store intermediate context var.
-    if (auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+    if (const auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
     {
         // If we are specializing a callee's intermediate context with types that can't be stored,
         // we can't store the entire context.

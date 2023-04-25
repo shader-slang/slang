@@ -158,7 +158,7 @@ namespace Slang
 
         auto decl = candidate.item.declRef.decl;
 
-        if(auto prefixExpr = as<PrefixExpr>(expr))
+        if(const auto prefixExpr = as<PrefixExpr>(expr))
         {
             if(decl->hasModifier<PrefixModifier>())
                 return true;
@@ -171,7 +171,7 @@ namespace Slang
 
             return false;
         }
-        else if(auto postfixExpr = as<PostfixExpr>(expr))
+        else if(const auto postfixExpr = as<PostfixExpr>(expr))
         {
             if(decl->hasModifier<PostfixModifier>())
                 return true;

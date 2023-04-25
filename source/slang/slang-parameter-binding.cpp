@@ -1939,9 +1939,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         return arrayTypeLayout;
     }
     // Ignore a bunch of types that don't make sense here...
-    else if (auto textureType = as<TextureType>(type)) { return nullptr;  }
-    else if(auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
-    else if(auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
+    else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
+    else if(const auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
+    else if(const auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
     else if( auto declRefType = as<DeclRefType>(type) )
@@ -2082,7 +2082,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         }
     }
     // If we ran into an error in checking the user's code, then skip this parameter
-    else if( auto errorType = as<ErrorType>(type) )
+    else if( const auto errorType = as<ErrorType>(type) )
     {
         return nullptr;
     }

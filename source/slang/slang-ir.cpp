@@ -1208,7 +1208,7 @@ namespace Slang
     IRGlobalValueWithCode* IRInsertLoc::getFunc() const
     {
         auto pp = getParent();
-        if (auto block = as<IRBlock>(pp))
+        if (const auto block = as<IRBlock>(pp))
         {
             pp = pp->getParent();
         }
@@ -4701,7 +4701,7 @@ namespace Slang
         {
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
         }
-        else if (auto basicType = as<IRBasicType>(basePtrType->getValueType()))
+        else if (const auto basicType = as<IRBasicType>(basePtrType->getValueType()))
         {
             // HLSL support things like float.x, in which case we just return the base pointer.
             return basePtr;

@@ -838,7 +838,7 @@ namespace Slang
         }
 
         // Disallow converting to a ParameterGroupType.
-        if (auto toParameterGroupType = as<ParameterGroupType>(toType))
+        if (const auto toParameterGroupType = as<ParameterGroupType>(toType))
         {
             return _failedCoercion(toType, outToExpr, fromExpr);
         }

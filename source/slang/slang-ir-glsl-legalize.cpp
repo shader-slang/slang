@@ -1894,7 +1894,7 @@ void legalizeMeshOutputParam(
                     assign(builder, d,
                             ScalarizedVal::value(builder->emitLoad(tmp)));
                 }
-                else if(auto swiz = as<IRSwizzledStore>(s))
+                else if(const auto swiz = as<IRSwizzledStore>(s))
                 {
                     SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
                 }
@@ -2107,7 +2107,7 @@ void legalizeEntryPointParameterForGLSL(
 
         if (auto streamType = as<IRHLSLStreamOutputType>(type))
         {
-            if (auto decor = func->findDecoration<IRStreamOutputTypeDecoration>())
+            if ([[maybe_unused]] auto decor = func->findDecoration<IRStreamOutputTypeDecoration>())
             {
                 // If it has the same stream out type, we *may* be ok (might not work for all types of streams)
                 SLANG_ASSERT(decor->getStreamType()->getOp() == streamType->getOp());
@@ -2155,7 +2155,7 @@ void legalizeEntryPointParameterForGLSL(
     if( auto paramPtrType = as<IROutTypeBase>(paramType) )
     {
         auto valueType = paramPtrType->getValueType();
-        if( auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
+        if( const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
         {
             // An output stream type like `TriangleStream<Foo>` should
             // more or less translate into `out Foo` (plus scalarization).
@@ -2321,7 +2321,7 @@ void legalizeEntryPointParameterForGLSL(
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
-        if( auto inOutType = as<IRInOutType>(paramPtrType) )
+        if( const auto inOutType = as<IRInOutType>(paramPtrType) )
         {
             // In the `in out` case we need to declare two
             // sets of global variables: one for the `in`

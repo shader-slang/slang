@@ -180,7 +180,7 @@ namespace Slang
                     sym.range.end.line = (int)line;
                     sym.range.end.character = (int)col;
                 }
-                if (auto childContainerDecl = as<ContainerDecl>(child))
+                if (const auto childContainerDecl = as<ContainerDecl>(child))
                 {
                     // Recurse
                     bool shouldRecurse = true;

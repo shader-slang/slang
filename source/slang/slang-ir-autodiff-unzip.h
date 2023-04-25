@@ -318,7 +318,7 @@ struct DiffUnzipPass
                 SLANG_ASSERT(diffArg);
                 auto primalParamType = primalFuncType->getParamType(ii);
                 
-                if (auto outType = as<IROutType>(primalParamType))
+                if (const auto outType = as<IROutType>(primalParamType))
                 {
                     // For `out` parameters that expects an input derivative to propagate through,
                     // we insert a `LoadReverseGradient` inst here to signify the logic in `transposeStore`
@@ -331,7 +331,7 @@ struct DiffUnzipPass
                     diffBuilder->markInstAsDifferential(gradArg, primalArg->getDataType());
                     diffArgs.add(gradArg);
                 }
-                else if (auto inoutType = as<IRInOutType>(primalParamType))
+                else if (const auto inoutType = as<IRInOutType>(primalParamType))
                 {
                     // Since arg is split into separate vars, we need a new temp var that represents
                     // the remerged diff pair.

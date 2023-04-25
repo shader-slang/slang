@@ -153,7 +153,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(IRBuilder* builder, IRIns
         if (auto ptrInnerSpecializedType = as<IRSpecialize>(ptrType->getValueType()))
         {
             auto genericType = findInnerMostGenericReturnVal(as<IRGeneric>(ptrInnerSpecializedType->getBase()));
-            if (auto genericBasePairStructType = as<IRStructType>(genericType))
+            if (const auto genericBasePairStructType = as<IRStructType>(genericType))
             {
                 return as<IRFieldAddress>(builder->emitFieldAddress(
                     builder->getPtrType((IRType*)
@@ -1768,7 +1768,7 @@ IRInst* getInstInBlock(IRInst* inst)
 {
     SLANG_RELEASE_ASSERT(inst);
 
-    if (auto block = as<IRBlock>(inst->getParent()))
+    if (const auto block = as<IRBlock>(inst->getParent()))
         return inst;
 
     return getInstInBlock(inst->getParent());
@@ -1841,7 +1841,7 @@ IRUse* findUniqueStoredVal(IRVar* var)
         IRUse* primalCallUse = nullptr;
         for (auto use = var->firstUse; use; use = use->nextUse)
         {
-            if (auto callInst = as<IRCall>(use->getUser()))
+            if (const auto callInst = as<IRCall>(use->getUser()))
             {
                 // Should not see more than one IRCall. If we do
                 // we'll need to pick the primal call.
@@ -1857,7 +1857,7 @@ IRUse* findUniqueStoredVal(IRVar* var)
         IRUse* storeUse = nullptr;
         for (auto use = var->firstUse; use; use = use->nextUse)
         {
-            if (auto storeInst = as<IRStore>(use->getUser()))
+            if (const auto storeInst = as<IRStore>(use->getUser()))
             {
                 // Should not see more than one IRStore
                 SLANG_RELEASE_ASSERT(!storeUse);
@@ -1878,7 +1878,7 @@ IRUse* findLatestUniqueWriteUse(IRVar* var)
     // If no unique store found, try to look for a call.
     for (auto use = var->firstUse; use; use = use->nextUse)
     {
-        if (auto callInst = as<IRCall>(use->getUser()))
+        if (const auto callInst = as<IRCall>(use->getUser()))
         {
             SLANG_RELEASE_ASSERT(!storeUse);
             storeUse = use;
@@ -1900,7 +1900,7 @@ IRUse* findEarliestUniqueWriteUse(IRVar* var)
     // If no unique store found, try to look for a call.
     for (auto use = var->firstUse; use; use = use->nextUse)
     {
-        if (auto callInst = as<IRCall>(use->getUser()))
+        if (const auto callInst = as<IRCall>(use->getUser()))
         {
             SLANG_RELEASE_ASSERT(!storeUse);
             storeUse = use;

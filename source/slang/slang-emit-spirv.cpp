@@ -2731,7 +2731,7 @@ struct SPIRVEmitContext
         {
             elementType = vectorType->getElementType();
         }
-        else if (auto matrixType = as<IRMatrixType>(inst->getDataType()))
+        else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             //TODO: implement.
             SLANG_ASSERT(!"unimplemented: matrix arithemetic");

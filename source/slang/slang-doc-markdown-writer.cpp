@@ -527,7 +527,7 @@ static void _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& i
         _addRequirement(CodeGenTarget::GLSL, buf, ioReqs);
     }
 
-    if (auto requiresNVAPIAttribute = decl->findModifier<RequiresNVAPIAttribute>())
+    if (const auto requiresNVAPIAttribute = decl->findModifier<RequiresNVAPIAttribute>())
     {
         _addRequirement(CodeGenTarget::HLSL, "NVAPI", ioReqs);
     }

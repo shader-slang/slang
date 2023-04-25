@@ -59,7 +59,7 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
         // The "root" of the parameter must be a reference to a global-scope
         // shader parameter, so that we know we can substitute it into the callee.
         //
-        if (auto argGlobalParam = as<IRGlobalParam>(a))
+        if (const auto argGlobalParam = as<IRGlobalParam>(a))
         {
             return true;
         }

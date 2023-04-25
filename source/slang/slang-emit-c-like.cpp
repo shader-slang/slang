@@ -3094,7 +3094,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if(auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
+    if(const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
     {
         return;
     }
@@ -3143,7 +3143,7 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
 {
     // If the selected `class` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if (auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
+    if (const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
     {
         return;
     }

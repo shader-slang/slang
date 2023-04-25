@@ -990,7 +990,7 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
             return InstPair(origGeneric, nullptr);
         differentiableTypeConformanceContext.setFunc(innerFunc);
     }
-    else if (auto funcType = as<IRFuncType>(innerVal))
+    else if (const auto funcType = as<IRFuncType>(innerVal))
     {
     }
     else
