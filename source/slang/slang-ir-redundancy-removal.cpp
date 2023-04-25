@@ -253,12 +253,12 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
         HashSet<IRInst*> knownAccessChain;
         for (auto accessChain = store->getPtr(); accessChain;)
         {
-            knownAccessChain.Add(accessChain);
+            knownAccessChain.add(accessChain);
             for (auto use = accessChain->firstUse; use; use = use->nextUse)
             {
                 if (as<IRDecoration>(use->getUser()))
                     continue;
-                if (knownAccessChain.Contains(use->getUser()))
+                if (knownAccessChain.contains(use->getUser()))
                     continue;
                 if (use->getUser()->getOp() == kIROp_Store && 
                     use == use->getUser()->getOperands())
@@ -331,7 +331,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
         if (auto branch = as<IRUnconditionalBranch>(next))
         {
             auto nextBlock = branch->getTargetBlock();
-            if (visitedBlocks.Add(nextBlock))
+            if (visitedBlocks.add(nextBlock))
             {
                 next = nextBlock->getFirstInst();
                 continue;

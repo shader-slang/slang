@@ -329,7 +329,7 @@ uint32_t RayTracingPipelineStateImpl::findEntryPointIndexByName(
     if (!name)
         return VK_SHADER_UNUSED_KHR;
 
-    auto indexPtr = entryPointNameToIndex.TryGetValue(String(name));
+    auto indexPtr = entryPointNameToIndex.tryGetValue(String(name));
     if (indexPtr)
         return (uint32_t)*indexPtr;
     // TODO: Error reporting?
@@ -360,7 +360,7 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
     {
         auto stageCreateInfo = programImpl->m_stageCreateInfos[i];
         auto entryPointName = programImpl->m_entryPointNames[i];
-        entryPointNameToIndex.Add(entryPointName, i);
+        entryPointNameToIndex.add(entryPointName, i);
         if (stageCreateInfo.stage &
             (VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
              VK_SHADER_STAGE_INTERSECTION_BIT_KHR))
@@ -380,7 +380,7 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
         auto shaderGroupName = entryPointName;
         auto shaderGroupIndex = shaderGroupInfos.getCount();
         shaderGroupInfos.add(shaderGroupInfo);
-        shaderGroupNameToIndex.Add(shaderGroupName, shaderGroupIndex);
+        shaderGroupNameToIndex.add(shaderGroupName, shaderGroupIndex);
     }
 
     for (int32_t i = 0; i < desc.rayTracing.hitGroupDescs.getCount(); ++i)
@@ -404,7 +404,7 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
 
         auto shaderGroupIndex = shaderGroupInfos.getCount();
         shaderGroupInfos.add(shaderGroupInfo);
-        shaderGroupNameToIndex.Add(String(groupDesc.hitGroupName), shaderGroupIndex);
+        shaderGroupNameToIndex.add(String(groupDesc.hitGroupName), shaderGroupIndex);
     }
 
     raytracingPipelineInfo.groupCount = (uint32_t)shaderGroupInfos.getCount();

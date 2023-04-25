@@ -403,7 +403,7 @@ protected:
         // Okay I need to allocate space for this
         SerialIndex index = SerialIndex(m_entries.getCount() - 1);
         // Add to the map
-        m_ptrMap.Add(nativePtr, Index(index));
+        m_ptrMap.add(nativePtr, Index(index));
         return index;
     }
 

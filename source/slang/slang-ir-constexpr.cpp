@@ -209,10 +209,10 @@ void maybeAddToWorkList(
     PropagateConstExprContext*  context,
     IRInst*                     gv)
 {
-    if( !context->onWorkList.Contains(gv) )
+    if( !context->onWorkList.contains(gv) )
     {
         context->workList.add(gv);
-        context->onWorkList.Add(gv);
+        context->onWorkList.add(gv);
     }
 }
 
@@ -532,7 +532,7 @@ void propagateConstExpr(
     {
         auto gv = context.workList[0];
         context.workList.fastRemoveAt(0);
-        context.onWorkList.Remove(gv);
+        context.onWorkList.remove(gv);
 
         switch( gv->getOp() )
         {

@@ -96,7 +96,7 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
         StringBuilder buf;
         for (Index i = 0; i < SLANG_COUNT_OF(names); ++i)
         {
-            buf.Clear();
+            buf.clear();
             buf << markPrefix << names[i];
             set(buf.getUnownedSlice(), styles[i]);
         }

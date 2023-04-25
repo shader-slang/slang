@@ -100,7 +100,7 @@ public:
     Index getOffset() const { return m_builder.getLength(); }
 
         /// Reset the state
-    void reset() { m_builder.Clear(); }
+    void reset() { m_builder.clear(); }
 
         /// Get the current string
     String getString() { return m_builder.ProduceString(); }

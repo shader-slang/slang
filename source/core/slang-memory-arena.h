@@ -377,7 +377,7 @@ SLANG_FORCE_INLINE T* MemoryArena::allocateArray(size_t numElems)
 template <typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocateAndCopyArray(const T* arr, size_t numElems)
 {
-    SLANG_COMPILE_TIME_ASSERT(std::is_pod<T>::value);
+    static_assert(std::is_trivially_copyable_v<T>);
     if (numElems > 0)
     {
         const size_t totalSize = sizeof(T) * numElems;

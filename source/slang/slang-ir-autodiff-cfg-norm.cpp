@@ -442,7 +442,7 @@ struct CFGNormalizationPass
     {
         HashSet<IRBlock*> predecessorSet;
         for (auto predecessor : block->getPredecessors())
-            predecessorSet.Add(predecessor);
+            predecessorSet.add(predecessor);
 
         return predecessorSet;
     }
@@ -453,7 +453,7 @@ struct CFGNormalizationPass
         auto firstLoopBlock = loop->getTargetBlock();
 
         // If we only have one predecessor, the loop is trivial.
-        return (getPredecessorSet(firstLoopBlock).Count() == 1);
+        return (getPredecessorSet(firstLoopBlock).getCount() == 1);
     }
 
     IRBlock* normalizeBreakableRegion(IRInst* branchInst)
@@ -690,7 +690,7 @@ void normalizeCFG(
 
             // Collect loop body blocks.
             workList.clear();
-            workListSet.Clear();
+            workListSet.clear();
             workList.add(bodyBlock);
             workListSet.add(bodyBlock);
             for (Index i = 0; i < workList.getCount(); i++)
@@ -716,7 +716,7 @@ void normalizeCFG(
                     for (auto use = inst->firstUse; use; use = use->nextUse)
                     {
                         auto userBlock = as<IRBlock>(use->getUser()->getParent());
-                        if (userBlock && !workListSet.Contains(userBlock))
+                        if (userBlock && !workListSet.contains(userBlock))
                         {
                             // Hoist the inst.
                             if (auto var = as<IRVar>(inst))

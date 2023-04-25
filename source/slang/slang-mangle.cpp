@@ -441,10 +441,10 @@ namespace Slang
                 auto canonicalizedConstraints = getCanonicalGenericConstraints(parentGenericDeclRef);
                 for (auto& constraint : canonicalizedConstraints)
                 {
-                    for (auto type : constraint.Value)
+                    for (auto type : constraint.value)
                     {
                         emitRaw(context, "C");
-                        emitQualifiedName(context, DeclRef<Decl>(constraint.Key, nullptr));
+                        emitQualifiedName(context, DeclRef<Decl>(constraint.key, nullptr));
                             emitType(context, type);
                     }
                 }

@@ -40,12 +40,16 @@ private:
         resultChunk->size = 0;
         resultChunk->next = nullptr;
         auto firstItem = resultChunk->begin();
-        Initializer<T, std::is_pod<T>::value>::initialize(firstItem, size);
+        if (!std::is_trivially_constructible_v<T>)
+        {
+            for (uint32_t i = 0; i < size; i++)
+                new (firstItem + i) T();
+        }
         return resultChunk;
     }
     void freeChunk(Chunk* chunk)
     {
-        if (!std::is_trivially_destructible<T>::value)
+        if (!std::is_trivially_destructible_v<T>)
         {
             for (uint32_t i = 0; i < chunk->capacity; i++)
                 chunk->begin()[i].~T();

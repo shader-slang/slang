@@ -226,7 +226,7 @@ namespace Slang
                 IRInst* inst = sharedContext->workList.getLast();
 
                 sharedContext->workList.removeLast();
-                sharedContext->workListSet.Remove(inst);
+                sharedContext->workListSet.remove(inst);
 
                 processInst(inst);
 

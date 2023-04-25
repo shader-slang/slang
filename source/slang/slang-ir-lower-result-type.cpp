@@ -36,9 +36,9 @@ namespace Slang
 
         LoweredResultTypeInfo* getLoweredResultType(IRBuilder* builder, IRInst* type)
         {
-            if (auto loweredInfo = loweredResultTypes.TryGetValue(type))
+            if (auto loweredInfo = loweredResultTypes.tryGetValue(type))
                 return loweredInfo->Ptr();
-            if (auto loweredInfo = mapLoweredTypeToResultTypeInfo.TryGetValue(type))
+            if (auto loweredInfo = mapLoweredTypeToResultTypeInfo.tryGetValue(type))
                 return loweredInfo->Ptr();
 
             if (!type)
@@ -86,11 +86,11 @@ namespace Slang
                     return;
             }
 
-            if (workListSet.Contains(inst))
+            if (workListSet.contains(inst))
                 return;
 
             workList.add(inst);
-            workListSet.Add(inst);
+            workListSet.add(inst);
         }
 
         IRInst* getSuccessErrorValue(IRType* type)
@@ -276,7 +276,7 @@ namespace Slang
                 IRInst* inst = workList.getLast();
 
                 workList.removeLast();
-                workListSet.Remove(inst);
+                workListSet.remove(inst);
 
                 processInst(inst);
 
@@ -289,7 +289,7 @@ namespace Slang
             // Replace all result types with lowered struct types.
             for (auto kv : loweredResultTypes)
             {
-                kv.Key->replaceUsesWith(kv.Value->loweredType);
+                kv.key->replaceUsesWith(kv.value->loweredType);
             }
         }
     };

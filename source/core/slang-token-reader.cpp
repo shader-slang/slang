@@ -338,7 +338,7 @@ namespace Misc {
             derivative = LexDerivative::None;
             tokenList.add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, int(pos), file, tokenFlags));
             tokenFlags = 0;
-            tokenBuilder.Clear();
+            tokenBuilder.clear();
         };
         auto ProcessTransferChar = [&](char nextChar)
         {
@@ -462,17 +462,17 @@ namespace Misc {
                     {
                         line = 0;
                         col = 0;
-                        tokenBuilder.Clear();
+                        tokenBuilder.clear();
                     }
                     else if (tokenStr == "#line")
                     {
                         derivative = LexDerivative::Line;
-                        tokenBuilder.Clear();
+                        tokenBuilder.clear();
                     }
                     else if (tokenStr == "#file")
                     {
                         derivative = LexDerivative::File;
-                        tokenBuilder.Clear();
+                        tokenBuilder.clear();
                         line = 0;
                         col = 0;
                     }
@@ -492,7 +492,7 @@ namespace Misc {
                 {
                     //do token analyze
                     ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, (int)(pos - tokenBuilder.getLength()), file);
-                    tokenBuilder.Clear();
+                    tokenBuilder.clear();
                     state = State::Start;
                 }
                 break;
@@ -539,7 +539,7 @@ namespace Misc {
                         derivative = LexDerivative::None;
                         line = StringToInt(tokenBuilder.ToString()) - 1;
                         col = 0;
-                        tokenBuilder.Clear();
+                        tokenBuilder.clear();
                     }
                     else
                     {
@@ -616,7 +616,7 @@ namespace Misc {
                     {
                         derivative = LexDerivative::None;
                         file = tokenBuilder.ToString();
-                        tokenBuilder.Clear();
+                        tokenBuilder.clear();
                     }
                     else
                     {

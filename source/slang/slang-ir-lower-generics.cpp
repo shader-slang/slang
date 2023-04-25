@@ -28,7 +28,7 @@ namespace Slang
         for (auto rtti : sharedContext->mapTypeToRTTIObject)
         {
             IRBuilder builder(sharedContext->module);
-            builder.setInsertBefore(rtti.Value);
+            builder.setInsertBefore(rtti.value);
             IRUse* nextUse = nullptr;
             auto uint2Type = builder.getVectorType(
                 builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
@@ -36,7 +36,7 @@ namespace Slang
                 builder.getIntValue(builder.getUIntType(), id),
                 builder.getIntValue(builder.getUIntType(), 0)};
             auto idOperand = builder.emitMakeVector(uint2Type, 2, uint2Args);
-            for (auto use = rtti.Value->firstUse; use; use = nextUse)
+            for (auto use = rtti.value->firstUse; use; use = nextUse)
             {
                 nextUse = use->nextUse;
                 if (use->getUser()->getOp() == kIROp_GetAddr)
@@ -133,7 +133,7 @@ namespace Slang
         if (sink->getErrorCount() != 0)
             return;
 
-        sharedContext->mapInterfaceRequirementKeyValue.Clear();
+        sharedContext->mapInterfaceRequirementKeyValue.clear();
 
         specializeRTTIObjectReferences(sharedContext);
 
@@ -152,7 +152,7 @@ namespace Slang
             if (inst->getOp() == kIROp_WitnessTable)
             {
                 auto interfaceType = cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
-                implementedInterfaces.Add(interfaceType);
+                implementedInterfaces.add(interfaceType);
             }
         }
         // Check if an interface type has any implementations.
@@ -166,11 +166,11 @@ namespace Slang
                     auto interfaceType = cast<IRWitnessTableType>(witnessTableType)->getConformanceType();
                     if (isComInterfaceType((IRType*)interfaceType))
                         return;
-                    if (!implementedInterfaces.Contains(interfaceType))
+                    if (!implementedInterfaces.contains(interfaceType))
                     {
                         context->sink->diagnose(interfaceType->sourceLoc, Diagnostics::noTypeConformancesFoundForInterface, interfaceType);
                         // Add to set to prevent duplicate diagnostic messages.
-                        implementedInterfaces.Add(interfaceType);
+                        implementedInterfaces.add(interfaceType);
                     }
                 }
             });

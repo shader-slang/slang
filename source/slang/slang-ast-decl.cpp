@@ -56,7 +56,7 @@ void ContainerDecl::buildMemberDictionary()
     if (dictionaryLastCount < 0)
     {
         dictionaryLastCount = 0;
-        memberDictionary.Clear();
+        memberDictionary.clear();
         transparentMembers.clear();
     }
 
@@ -92,7 +92,7 @@ void ContainerDecl::buildMemberDictionary()
         m->nextInContainerWithSameName = nullptr;
 
         Decl* next = nullptr;
-        if (memberDictionary.TryGetValue(name, next))
+        if (memberDictionary.tryGetValue(name, next))
             m->nextInContainerWithSameName = next;
 
         memberDictionary[name] = m;

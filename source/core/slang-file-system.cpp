@@ -199,7 +199,7 @@ SlangResult OSFileSystem::enumeratePathContents(const char* path, FileSystemCont
     {
         void accept(Path::Type type, const UnownedStringSlice& filename) SLANG_OVERRIDE
         {
-            m_buffer.Clear();
+            m_buffer.clear();
             m_buffer.append(filename);
 
             SlangPathType pathType;
@@ -321,7 +321,7 @@ CacheFileSystem::~CacheFileSystem()
 {
     for (const auto& pair : m_uniqueIdentityMap)
     {
-        PathInfo* pathInfo = pair.Value;
+        PathInfo* pathInfo = pair.value;
         delete pathInfo;
     }
 }
@@ -376,12 +376,12 @@ void CacheFileSystem::clearCache()
 {
     for (const auto& pair : m_uniqueIdentityMap)
     {
-        PathInfo* pathInfo = pair.Value;
+        PathInfo* pathInfo = pair.value;
         delete pathInfo;
     }
 
-    m_uniqueIdentityMap.Clear();
-    m_pathMap.Clear();
+    m_uniqueIdentityMap.clear();
+    m_pathMap.clear();
 
     if (m_fileSystemExt)
     {
@@ -438,7 +438,7 @@ SlangResult CacheFileSystem::enumeratePathContents(const char* path, FileSystemC
     {
         // NOTE! The currentPath can be a *non* simplified path (the m_pathMap is the cache of paths simplified and other to a file/directory)
         // Also note that there will always be the simplified version of the path in cache.
-        const String& currentPath = pair.Key;
+        const String& currentPath = pair.key;
 
         // If it doesn't start with simplified path, then it can't be a hit
         if (!currentPath.startsWith(simplifiedPath))
@@ -468,7 +468,7 @@ SlangResult CacheFileSystem::enumeratePathContents(const char* path, FileSystemC
         // Let's check that fact...
         SLANG_ASSERT(foundPath[remaining.getLength()] == 0);
 
-        PathInfo* pathInfo = pair.Value;
+        PathInfo* pathInfo = pair.value;
 
         SlangPathType pathType;
         if (SLANG_FAILED(_getPathType(pathInfo, currentPath.getBuffer(), &pathType)))
@@ -581,11 +581,11 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolveUniqueIdentityCacheInfo(cons
 
     // Now try looking up by uniqueIdentity path. If not found, add a new result
     PathInfo* pathInfo = nullptr;
-    if (!m_uniqueIdentityMap.TryGetValue(uniqueIdentity, pathInfo))
+    if (!m_uniqueIdentityMap.tryGetValue(uniqueIdentity, pathInfo))
     {
         // Create with found uniqueIdentity
         pathInfo = new PathInfo(uniqueIdentity);
-        m_uniqueIdentityMap.Add(uniqueIdentity, pathInfo);
+        m_uniqueIdentityMap.add(uniqueIdentity, pathInfo);
     }
 
     // At this point they must have same uniqueIdentity
@@ -623,7 +623,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolvePathCacheInfo(const String& 
 {
     // Lookup in path cache
     PathInfo* pathInfo;
-    if (m_pathMap.TryGetValue(path, pathInfo))
+    if (m_pathMap.tryGetValue(path, pathInfo))
     {
         // Found so done
         return pathInfo;
@@ -632,7 +632,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolvePathCacheInfo(const String& 
     // Try getting or creating taking into account possible path simplification
     pathInfo = _resolveSimplifiedPathCacheInfo(path);
     // Always add the result to the path cache (even if null)
-    m_pathMap.Add(path, pathInfo);
+    m_pathMap.add(path, pathInfo);
     return pathInfo;
 }
 

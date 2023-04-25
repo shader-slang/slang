@@ -22,11 +22,11 @@ namespace Slang
                     return;
             }
 
-            if (workListSet.Contains(inst))
+            if (workListSet.contains(inst))
                 return;
 
             workList.add(inst);
-            workListSet.Add(inst);
+            workListSet.add(inst);
         }
 
         void processInst(IRInst* inst)
@@ -160,7 +160,7 @@ namespace Slang
                 IRInst* inst = workList.getLast();
 
                 workList.removeLast();
-                workListSet.Remove(inst);
+                workListSet.remove(inst);
 
                 processInst(inst);
 

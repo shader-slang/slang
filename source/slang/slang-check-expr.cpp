@@ -989,7 +989,7 @@ namespace Slang
         SLANG_RELEASE_ASSERT(m_parentDifferentiableAttr);
         if (witness)
         {
-            m_parentDifferentiableAttr->m_mapTypeToIDifferentiableWitness.AddIfNotExists(type->declRef, witness);
+            m_parentDifferentiableAttr->m_mapTypeToIDifferentiableWitness.addIfNotExists(type->declRef, witness);
         }
     }
 

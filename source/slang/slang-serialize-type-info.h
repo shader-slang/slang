@@ -280,7 +280,7 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
         List<KeySerialType> keys;
         List<ValueSerialType> values;
 
-        Index count = Index(src.Count());
+        Index count = Index(src.getCount());
         keys.setCount(count);
         values.setCount(count);
 
@@ -293,8 +293,8 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
         Index i = 0;
         for (const auto& pair : src)
         {
-            SerialTypeInfo<KEY>::toSerial(writer, &pair.Key, &keys[i]);
-            SerialTypeInfo<VALUE>::toSerial(writer, &pair.Value, &values[i]);
+            SerialTypeInfo<KEY>::toSerial(writer, &pair.key, &keys[i]);
+            SerialTypeInfo<VALUE>::toSerial(writer, &pair.value, &values[i]);
             i++;
         }
 
@@ -321,7 +321,7 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
         const Index count = keys.getCount();
         for (Index i = 0; i < count; ++i)
         {
-            dst.Add(keys[i], values[i]);
+            dst.add(keys[i], values[i]);
         }
     }
 };
@@ -350,7 +350,7 @@ struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
         List<KeySerialType> keys;
         List<ValueSerialType> values;
 
-        Index count = Index(src.Count());
+        Index count = Index(src.getCount());
         keys.setCount(count);
         values.setCount(count);
 
@@ -363,8 +363,8 @@ struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
         Index i = 0;
         for (const auto& pair : src)
         {
-            SerialTypeInfo<KEY>::toSerial(writer, &pair.Key, &keys[i]);
-            SerialTypeInfo<VALUE>::toSerial(writer, &pair.Value, &values[i]);
+            SerialTypeInfo<KEY>::toSerial(writer, &pair.key, &keys[i]);
+            SerialTypeInfo<VALUE>::toSerial(writer, &pair.value, &values[i]);
             i++;
         }
 
@@ -391,7 +391,7 @@ struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
         const Index count = keys.getCount();
         for (Index i = 0; i < count; ++i)
         {
-            dst.Add(keys[i], values[i]);
+            dst.add(keys[i], values[i]);
         }
     }
 };
@@ -418,16 +418,16 @@ struct SerialTypeInfo<KeyValuePair<KEY, VALUE>>
         auto& src = *(const NativeType*)native;
         auto& dst = *(SerialType*)serial;
 
-        SerialTypeInfo<KEY>::toSerial(writer, &src.Key, &dst.key);
-        SerialTypeInfo<VALUE>::toSerial(writer, &src.Value, &dst.value);
+        SerialTypeInfo<KEY>::toSerial(writer, &src.key, &dst.key);
+        SerialTypeInfo<VALUE>::toSerial(writer, &src.value, &dst.value);
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
         auto& src = *(const SerialType*)serial;
         auto& dst = *(NativeType*)native;
 
-        SerialTypeInfo<KEY>::toNative(reader, &src.key, &dst.Key);
-        SerialTypeInfo<VALUE>::toNative(reader, &src.value, &dst.Value);
+        SerialTypeInfo<KEY>::toNative(reader, &src.key, &dst.key);
+        SerialTypeInfo<VALUE>::toNative(reader, &src.value, &dst.value);
     }
 };
 

@@ -629,7 +629,7 @@ namespace Slang
         Substitutions*   outerSubst)
     {
         GenericSubstitution* cachedResult = nullptr;
-        if (astBuilder->m_genericDefaultSubst.TryGetValue(genericDecl, cachedResult))
+        if (astBuilder->m_genericDefaultSubst.tryGetValue(genericDecl, cachedResult))
         {
             if (cachedResult->outer == outerSubst)
                 return cachedResult;
@@ -1452,7 +1452,7 @@ namespace Slang
         ASTSynthesizer synth(m_astBuilder, getNamePool());
         Decl* existingDecl = nullptr;
         AggTypeDecl* aggTypeDecl = nullptr;
-        if (context->parentDecl->getMemberDictionary().TryGetValue(requirementDeclRef.getName(), existingDecl))
+        if (context->parentDecl->getMemberDictionary().tryGetValue(requirementDeclRef.getName(), existingDecl))
         {
             // Remove the `ToBeSynthesizedModifier`.
             if (as<ToBeSynthesizedModifier>(existingDecl->modifiers.first))
@@ -1757,7 +1757,7 @@ namespace Slang
                 return;
             RequirementWitness witnessValue;
             auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(BuiltinRequirementKind::DifferentialType);
-            if (!inheritanceDecl->witnessTable->requirementDictionary.TryGetValue(requirementDecl, witnessValue))
+            if (!inheritanceDecl->witnessTable->requirementDictionary.tryGetValue(requirementDecl, witnessValue))
                 return;
 
             // A type used as differential type must have itself as its own differential type.
@@ -2097,7 +2097,7 @@ namespace Slang
                     // record it into the actual witness table yet, in case
                     // a later accessor comes along that doesn't find a match.
                     //
-                    mapRequiredToSatisfyingAccessorDeclRef.Add(requiredAccessorDeclRef, satisfyingAccessorDeclRef);
+                    mapRequiredToSatisfyingAccessorDeclRef.add(requiredAccessorDeclRef, satisfyingAccessorDeclRef);
                     found = true;
                     break;
                 }
@@ -2112,8 +2112,8 @@ namespace Slang
         for( auto p : mapRequiredToSatisfyingAccessorDeclRef )
         {
             witnessTable->add(
-                p.Key,
-                RequirementWitness(p.Value));
+                p.key,
+                RequirementWitness(p.value));
         }
         //
         // Note: the property declaration itself isn't something that
@@ -3249,7 +3249,7 @@ namespace Slang
             // to leave the witness table in a state where a requirement is
             // "partially satisfied."
             //
-            mapRequiredAccessorToSynAccessor.Add(requiredAccessorDeclRef, synAccessorDecl);
+            mapRequiredAccessorToSynAccessor.add(requiredAccessorDeclRef, synAccessorDecl);
         }
 
         synPropertyDecl->parentDecl = context->parentDecl;
@@ -3264,7 +3264,7 @@ namespace Slang
         //
         for(auto p : mapRequiredAccessorToSynAccessor)
         {
-            witnessTable->add(p.Key, RequirementWitness(makeDeclRef(p.Value)));
+            witnessTable->add(p.key, RequirementWitness(makeDeclRef(p.value)));
         }
         witnessTable->add(requiredMemberDeclRef,
             RequirementWitness(makeDeclRef(synPropertyDecl)));
@@ -3413,10 +3413,10 @@ namespace Slang
         bool hasDifferentialAssocType = false;
         for (auto existingEntry : witnessTable->requirementDictionary)
         {
-            if (auto builtinReqAttr = existingEntry.Key->findModifier<BuiltinRequirementModifier>())
+            if (auto builtinReqAttr = existingEntry.key->findModifier<BuiltinRequirementModifier>())
             {
                 if (builtinReqAttr->kind == BuiltinRequirementKind::DifferentialType &&
-                    existingEntry.Value.getFlavor() != RequirementWitness::Flavor::none)
+                    existingEntry.value.getFlavor() != RequirementWitness::Flavor::none)
                 {
                     hasDifferentialAssocType = true;
                 }
@@ -3534,7 +3534,7 @@ namespace Slang
         // witness in the table for the requirement, so
         // that we can bail out early.
         //
-        if(witnessTable->requirementDictionary.ContainsKey(requiredMemberDeclRef.getDecl()))
+        if(witnessTable->requirementDictionary.containsKey(requiredMemberDeclRef.getDecl()))
         {
             return true;
         }
@@ -3699,7 +3699,7 @@ namespace Slang
         // Has somebody already checked this conformance,
         // and/or is in the middle of checking it?
         RefPtr<WitnessTable> witnessTable;
-        if(context->mapInterfaceToWitnessTable.TryGetValue(superInterfaceDeclRef, witnessTable))
+        if(context->mapInterfaceToWitnessTable.tryGetValue(superInterfaceDeclRef, witnessTable))
             return witnessTable;
 
         // We need to check the declaration of the interface
@@ -3722,7 +3722,7 @@ namespace Slang
             witnessTable->baseType = DeclRefType::create(m_astBuilder, superInterfaceDeclRef);
             witnessTable->witnessedType = subType;
         }
-        context->mapInterfaceToWitnessTable.Add(superInterfaceDeclRef, witnessTable);
+        context->mapInterfaceToWitnessTable.add(superInterfaceDeclRef, witnessTable);
 
         if(!checkInterfaceConformance(context, subType, superInterfaceType, inheritanceDecl, superInterfaceDeclRef, subTypeConformsToSuperInterfaceWitnes, witnessTable))
             return nullptr;
@@ -5111,14 +5111,14 @@ namespace Slang
             }
             Name* targetName = specializedModifier->targetToken.getName();
 
-            ioDict.AddIfNotExists(targetName, decl);
+            ioDict.addIfNotExists(targetName, decl);
         }
         else
         {
             for (auto modifier : decl->getModifiersOfType<TargetIntrinsicModifier>())
             {
                 Name* targetName = modifier->targetToken.getName();
-                ioDict.AddIfNotExists(targetName, decl);
+                ioDict.addIfNotExists(targetName, decl);
             }
 
             auto funcDecl = as<FunctionDeclBase>(decl);
@@ -5126,7 +5126,7 @@ namespace Slang
             {
                 // Should only be one body if it isn't specialized for target.
                 // Use nullptr for this scenario
-                ioDict.AddIfNotExists(nullptr, decl);
+                ioDict.addIfNotExists(nullptr, decl);
             }
         }  
     }
@@ -5324,8 +5324,8 @@ namespace Slang
             bool hasConflict = false;
             for (auto& pair : newTargets)
             {
-                Name* target = pair.Key;
-                auto found = currentTargets.TryGetValue(target);
+                Name* target = pair.key;
+                auto found = currentTargets.tryGetValue(target);
                 if (found)
                 {
                     // Redefinition
@@ -6326,12 +6326,12 @@ namespace Slang
         // skip the step where we modify the current scope.
         auto& importedModulesList = getShared()->importedModulesList;
         auto& importedModulesSet = getShared()->importedModulesSet;
-        if (importedModulesSet.Contains(moduleDecl))
+        if (importedModulesSet.contains(moduleDecl))
         {
             return;
         }
         importedModulesList.add(moduleDecl);
-        importedModulesSet.Add(moduleDecl);
+        importedModulesSet.add(moduleDecl);
 
         // Create a new sub-scope to wire the module
         // into our lookup chain.
@@ -6454,10 +6454,10 @@ namespace Slang
         Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>>& mapTypeToCandidateExtensions)
     {
         RefPtr<CandidateExtensionList> entry;
-        if( !mapTypeToCandidateExtensions.TryGetValue(typeDecl, entry) )
+        if( !mapTypeToCandidateExtensions.tryGetValue(typeDecl, entry) )
         {
             entry = new CandidateExtensionList();
-            mapTypeToCandidateExtensions.Add(typeDecl, entry);
+            mapTypeToCandidateExtensions.add(typeDecl, entry);
         }
         return entry->candidateExtensions;
     }
@@ -6567,15 +6567,15 @@ namespace Slang
         // `import`.
         //
         m_candidateExtensionListsBuilt = false;
-        m_mapTypeDeclToCandidateExtensions.Clear();
+        m_mapTypeDeclToCandidateExtensions.clear();
     }
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
     {
         for( auto& entry : moduleDecl->mapTypeToCandidateExtensions )
         {
-            auto& list = _getCandidateExtensionList(entry.Key, m_mapTypeDeclToCandidateExtensions);
-            list.addRange(entry.Value->candidateExtensions);
+            auto& list = _getCandidateExtensionList(entry.key, m_mapTypeDeclToCandidateExtensions);
+            list.addRange(entry.value->candidateExtensions);
         }
     }
 
@@ -6589,10 +6589,10 @@ namespace Slang
         OrderedDictionary<Decl*, RefPtr<DeclAssociationList>>& mapDeclToDeclarations)
     {
         RefPtr<DeclAssociationList> entry;
-        if (!mapDeclToDeclarations.TryGetValue(decl, entry))
+        if (!mapDeclToDeclarations.tryGetValue(decl, entry))
         {
             entry = new DeclAssociationList();
-            mapDeclToDeclarations.Add(decl, entry);
+            mapDeclToDeclarations.add(decl, entry);
         }
         return entry->associations;
     }
@@ -6601,8 +6601,8 @@ namespace Slang
     {
         for (auto& entry : moduleDecl->mapDeclToAssociatedDecls)
         {
-            auto& list = _getDeclAssociationList(entry.Key, m_mapDeclToAssociatedDecls);
-            list.addRange(entry.Value->associations);
+            auto& list = _getDeclAssociationList(entry.key, m_mapDeclToAssociatedDecls);
+            list.addRange(entry.value->associations);
         }
     }
 
@@ -6615,7 +6615,7 @@ namespace Slang
         _getDeclAssociationList(original, moduleDecl->mapDeclToAssociatedDecls).add(assoc);
 
         m_associatedDeclListsBuilt = false;
-        m_mapDeclToAssociatedDecls.Clear();
+        m_mapDeclToAssociatedDecls.clear();
     }
 
     List<RefPtr<DeclAssociation>> const& SharedSemanticsContext::getAssociatedDeclsForDecl(Decl* decl)
@@ -6857,7 +6857,7 @@ namespace Slang
                 genericTypeConstraintDecl.getDecl()->sub.type->astNodeType ==
                 ASTNodeType::DeclRefType);
             auto typeParamDecl = as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)->declRef.getDecl();
-            List<Type*>* constraintTypes = genericConstraints.TryGetValue(typeParamDecl);
+            List<Type*>* constraintTypes = genericConstraints.tryGetValue(typeParamDecl);
             assert(constraintTypes);
             constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
         }
@@ -6866,12 +6866,12 @@ namespace Slang
         for (auto& constraints : genericConstraints)
         {
             List<Type*> typeList;
-            for (auto type : constraints.Value)
+            for (auto type : constraints.value)
             {
                 _getCanonicalConstraintTypes(typeList, type);
             }
             // TODO: we also need to sort the types within the list for each generic type param.
-            result[constraints.Key] = typeList;
+            result[constraints.key] = typeList;
         }
         return result;
     }

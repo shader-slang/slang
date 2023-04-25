@@ -15,7 +15,7 @@ namespace Slang
         HashSet<IRInst*> operandInsts;
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
-            operandInsts.Add(inst->getOperand(i));
+            operandInsts.add(inst->getOperand(i));
             auto parentBlock = as<IRBlock>(inst->getOperand(i)->getParent());
             if (parentBlock)
             {
@@ -24,7 +24,7 @@ namespace Slang
             }
         }
         {
-            operandInsts.Add(inst->getFullType());
+            operandInsts.add(inst->getFullType());
             auto parentBlock = as<IRBlock>(inst->getFullType()->getParent());
             if (parentBlock)
             {
@@ -58,7 +58,7 @@ namespace Slang
         IRInst* latestOperand = nullptr;
         for (auto childInst : earliestBlock->getChildren())
         {
-            if (operandInsts.Contains(childInst))
+            if (operandInsts.contains(childInst))
             {
                 latestOperand = childInst;
             }
@@ -157,13 +157,13 @@ namespace Slang
         for (auto& addr : info.addressInfos)
         {
             RefPtr<AddressInfo> parentInfo;
-            if (addr.Value->addrInst->getOperandCount() > 1 &&
-                info.addressInfos.TryGetValue(addr.Value->addrInst->getOperand(0), parentInfo))
+            if (addr.value->addrInst->getOperandCount() > 1 &&
+                info.addressInfos.tryGetValue(addr.value->addrInst->getOperand(0), parentInfo))
             {
-                addr.Value->parentAddress = parentInfo;
-                parentInfo->children.add(addr.Value);
+                addr.value->parentAddress = parentInfo;
+                parentInfo->children.add(addr.value);
                 if (!parentInfo->isConstant)
-                    addr.Value->isConstant = false;
+                    addr.value->isConstant = false;
             }
         }
         return info;

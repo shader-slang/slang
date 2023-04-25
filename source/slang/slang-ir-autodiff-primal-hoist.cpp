@@ -110,8 +110,8 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         auto recomputeBlock = builder.createBlock();
         recomputeBlock->insertAtEnd(func);
         builder.addDecoration(recomputeBlock, kIROp_RecomputeBlockDecoration);
-        recomputeBlockMap.Add(primalBlock, recomputeBlock);
-        indexedBlockInfo[recomputeBlock] = indexedBlockInfo[primalBlock].GetValue();
+        recomputeBlockMap.add(primalBlock, recomputeBlock);
+        indexedBlockInfo[recomputeBlock] = indexedBlockInfo[primalBlock].getValue();
         return recomputeBlock;
     };
     
@@ -147,7 +147,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         auto primalBlock = workItem.primalBlock;
         auto recomputeBlock = workItem.recomptueBlock;
 
-        List<IndexTrackingInfo>* thisBlockIndexInfo = indexedBlockInfo.TryGetValue(primalBlock);
+        List<IndexTrackingInfo>* thisBlockIndexInfo = indexedBlockInfo.tryGetValue(primalBlock);
         if (!thisBlockIndexInfo)
             continue;
 
@@ -167,7 +167,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
                 // Have we already created a recompute block for this target?
                 // If so, use it.
                 IRBlock* existingRecomputeBlock = nullptr;
-                if (recomputeBlockMap.TryGetValue(subRegionEndBlock, existingRecomputeBlock))
+                if (recomputeBlockMap.tryGetValue(subRegionEndBlock, existingRecomputeBlock))
                 {
                     builder.emitBranch(existingRecomputeBlock);
                 }
@@ -191,7 +191,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             // Queue work for the subregion.
             auto loop = as<IRLoop>(primalBlock->getTerminator());
             auto bodyBlock = getLoopRegionBodyBlock(loop);
-            auto diffLoop = mapPrimalLoopToDiffLoop[loop].GetValue();
+            auto diffLoop = mapPrimalLoopToDiffLoop[loop].getValue();
             auto diffBodyBlock = getLoopRegionBodyBlock(diffLoop);
             auto bodyRecomputeBlock = createRecomputeBlock(bodyBlock);
             bodyRecomputeBlock->insertBefore(diffBodyBlock);
@@ -244,7 +244,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
                 // Have we already created a recompute block for this target?
                 // If so, use it.
                 IRBlock* existingRecomputeBlock = nullptr;
-                if (recomputeBlockMap.TryGetValue(target, existingRecomputeBlock))
+                if (recomputeBlockMap.tryGetValue(target, existingRecomputeBlock))
                 {
                     newTerminator->setOperand(op, existingRecomputeBlock);
                     continue;
@@ -355,25 +355,25 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         auto use = workList.getLast();
         workList.removeLast();
 
-        if (processedUses.Contains(use))
+        if (processedUses.contains(use))
             continue;
 
-        processedUses.Add(use);
+        processedUses.add(use);
 
         HoistResult result = this->classify(use);
 
         if (result.mode == HoistResult::Mode::Store)
         {
-            SLANG_ASSERT(!checkpointInfo->recomputeSet.Contains(result.instToStore));
-            checkpointInfo->storeSet.Add(result.instToStore);
+            SLANG_ASSERT(!checkpointInfo->recomputeSet.contains(result.instToStore));
+            checkpointInfo->storeSet.add(result.instToStore);
         }
         else if (result.mode == HoistResult::Mode::Recompute)
         {
-            SLANG_ASSERT(!checkpointInfo->storeSet.Contains(result.instToRecompute));
-            checkpointInfo->recomputeSet.Add(result.instToRecompute);
+            SLANG_ASSERT(!checkpointInfo->storeSet.contains(result.instToRecompute));
+            checkpointInfo->recomputeSet.add(result.instToRecompute);
 
             if (isDifferentialInst(use->getUser()))
-                usesToReplace.Add(use);
+                usesToReplace.add(use);
 
             if (auto param = as<IRParam>(result.instToRecompute))
             {
@@ -422,13 +422,13 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
             SLANG_RELEASE_ASSERT(result.inversionInfo.targetInsts.contains(use->getUser()));
 
             if (isDifferentialInst(use->getUser()))
-                usesToReplace.Add(use);
+                usesToReplace.add(use);
 
-            checkpointInfo->invertSet.Add(instToInvert);
+            checkpointInfo->invertSet.add(instToInvert);
 
-            if (checkpointInfo->invInfoMap.ContainsKey(instToInvert))
+            if (checkpointInfo->invInfoMap.containsKey(instToInvert))
             {
-                List<IRInst*> currOperands = checkpointInfo->invInfoMap[instToInvert].GetValue().requiredOperands;
+                List<IRInst*> currOperands = checkpointInfo->invInfoMap[instToInvert].getValue().requiredOperands;
                 for (Index ii = 0; ii < result.inversionInfo.requiredOperands.getCount(); ii++)
                 {
                     SLANG_RELEASE_ASSERT(result.inversionInfo.requiredOperands[ii] == currOperands[ii]);
@@ -465,7 +465,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 if (!callUser)
                     continue;
                 checkpointInfo->recomputeSet.add(callUser);
-                checkpointInfo->storeSet.Remove(callUser);
+                checkpointInfo->storeSet.remove(callUser);
                 if (instWorkListSet.add(callUser))
                     instWorkList.add(callUser);
             }
@@ -477,7 +477,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 if (auto varArg = as<IRVar>(call->getArg(j)))
                 {
                     checkpointInfo->recomputeSet.add(varArg);
-                    checkpointInfo->storeSet.Remove(varArg);
+                    checkpointInfo->storeSet.remove(varArg);
                     if (instWorkListSet.add(varArg))
                         instWorkList.add(varArg);
                 }
@@ -498,13 +498,14 @@ void applyToInst(
     IRInst* inst)
 {
     // Early-out..
-    if (checkpointInfo->storeSet.Contains(inst))
+    if (checkpointInfo->storeSet.contains(inst))
     {
-        hoistInfo->storeSet.Add(inst);
+        hoistInfo->storeSet.add(inst);
         return;
     }
 
-    bool isInstRecomputed = checkpointInfo->recomputeSet.Contains(inst);
+
+    bool isInstRecomputed = checkpointInfo->recomputeSet.contains(inst);
     if (isInstRecomputed)
     {
         if (as<IRParam>(inst))
@@ -522,11 +523,12 @@ void applyToInst(
             }
             return;
         }
+
         auto recomputeInst = cloneCtx->cloneInstOutOfOrder(builder, inst);
-        hoistInfo->recomputeSet.Add(recomputeInst);
+        hoistInfo->recomputeSet.add(recomputeInst);
     }
 
-    bool isInstInverted = checkpointInfo->invertSet.Contains(inst);
+    bool isInstInverted = checkpointInfo->invertSet.contains(inst);
     if (isInstInverted)
     {
         InversionInfo info = checkpointInfo->invInfoMap[inst];
@@ -536,7 +538,7 @@ void applyToInst(
         List<IRInst*> newOperands;
         for (auto operand : info.requiredOperands)
         {
-            if (cloneCtx->cloneEnv.mapOldValToNew.ContainsKey(operand))
+            if (cloneCtx->cloneEnv.mapOldValToNew.containsKey(operand))
                 newOperands.add(cloneCtx->cloneEnv.mapOldValToNew[operand]);
             else
                 newOperands.add(operand);
@@ -545,8 +547,8 @@ void applyToInst(
         info.requiredOperands = newOperands;
 
         hoistInfo->invertInfoMap[clonedInstToInvert] = info;
-        hoistInfo->instsToInvert.Add(clonedInstToInvert);
-        hoistInfo->invertSet.Add(cloneCtx->cloneInstOutOfOrder(builder, inst));
+        hoistInfo->instsToInvert.add(clonedInstToInvert);
+        hoistInfo->invertSet.add(cloneCtx->cloneInstOutOfOrder(builder, inst));
     }
 }
 
@@ -568,7 +570,7 @@ void applyCheckpointSet(
 
 
     for (auto use : pendingUses)
-        cloneCtx->pendingUses.Add(use);
+        cloneCtx->pendingUses.add(use);
     
     // Populate the clone context with all the primal uses that we may need to replace with
     // cloned versions. That way any insts we clone into the diff block will automatically replace
@@ -580,7 +582,7 @@ void applyCheckpointSet(
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
         {   
             if (!isDifferentialInst(operand->get()))
-                cloneCtx->pendingUses.Add(operand);
+                cloneCtx->pendingUses.add(operand);
         }
     };
 
@@ -613,14 +615,14 @@ void applyCheckpointSet(
             HashSet<IRBlock*> predecessorSet;
             for (auto predecessor : block->getPredecessors())
             {
-                if (predecessorSet.Contains(predecessor))
+                if (predecessorSet.contains(predecessor))
                     continue;
 
-                predecessorSet.Add(predecessor);
+                predecessorSet.add(predecessor);
 
                 auto diffPredecessor = as<IRBlock>(diffBlockMap[block]);
  
-                if (checkpointInfo->recomputeSet.Contains(param))
+                if (checkpointInfo->recomputeSet.contains(param))
                 {
                     IRInst* terminator = diffPredecessor->getTerminator();
                     addPhiOutputArg(&builder,
@@ -629,7 +631,7 @@ void applyCheckpointSet(
                         as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii));
                 }
                 
-                if (checkpointInfo->invertSet.Contains(param))
+                if (checkpointInfo->invertSet.contains(param))
                 {
                     IRInst* terminator = diffPredecessor->getTerminator();
 
@@ -644,7 +646,7 @@ void applyCheckpointSet(
         }
 
         IRBlock* recomputeBlock = block;
-        mapPrimalBlockToRecomputeBlock.TryGetValue(block, recomputeBlock);
+        mapPrimalBlockToRecomputeBlock.tryGetValue(block, recomputeBlock);
         auto recomputeInsertBeforeInst = recomputeBlock->getFirstOrdinaryInst();
 
         for (auto child : block->getChildren())
@@ -838,7 +840,7 @@ static int getInstRegionNestLevel(
     IRBlock* defBlock,
     IRInst* inst)
 {
-    auto result = indexedBlockInfo[defBlock].GetValue().getCount();
+    auto result = indexedBlockInfo[defBlock].getValue().getCount();
     // Loop counters are considered to not belong to the region started by the its loop.
     if (result > 0 && inst->findDecoration<IRLoopCounterDecoration>())
         result--;
@@ -975,12 +977,13 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
             if (outOfScopeUses.getCount() == 0)
             {
+
                 if (!isRecomputeInst)
-                    processedStoreSet.Add(instToStore);
+                    processedStoreSet.add(instToStore);
                 continue;
             }
 
-            auto defBlockIndices = indexedBlockInfo[defBlock].GetValue();
+            auto defBlockIndices = indexedBlockInfo[defBlock].getValue();
             IRBlock* varBlock = defaultVarBlock;
             if (isRecomputeInst)
             {
@@ -1006,8 +1009,9 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 if (!isIndexedStore && isDerivativeContextVar(varToStore))
                 {
                     varToStore->insertBefore(defaultVarBlock->getFirstOrdinaryInst());
+
                     if (!isRecomputeInst)
-                        processedStoreSet.Add(varToStore);
+                        processedStoreSet.add(varToStore);
                     continue;
                 }
 
@@ -1028,8 +1032,9 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     IRInst* loadAddr = emitIndexedLoadAddressForVar(&builder, localVar, defBlockIndices, useBlockIndices);
                     builder.replaceOperand(use, loadAddr);
                 }
+
                 if (!isRecomputeInst)
-                    processedStoreSet.Add(localVar);
+                    processedStoreSet.add(localVar);
             }
             else
             {
@@ -1059,8 +1064,9 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
                     builder.replaceOperand(use, loadIndexedValue(&builder, localVar, defBlockIndices, useBlockIndices));
                 }
+
                 if (!isRecomputeInst)
-                    processedStoreSet.Add(localVar);
+                    processedStoreSet.add(localVar);
             }
         }
     };
@@ -1260,7 +1266,7 @@ void buildIndexedBlocks(
         for (auto region : regionMap->getAllAncestorRegions(block))
         {
             IndexTrackingInfo trackingInfo;
-            if (mapLoopToTrackingInfo.TryGetValue(region->loop, trackingInfo))
+            if (mapLoopToTrackingInfo.tryGetValue(region->loop, trackingInfo))
             {
                 tryInferMaxIndex(region, &trackingInfo);
                 trackingInfos.add(trackingInfo);

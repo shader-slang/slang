@@ -608,55 +608,55 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         HashSet<String> extensionNames;
         for (const auto& e : extensions)
         {
-            extensionNames.Add(e.extensionName);
+            extensionNames.add(e.extensionName);
         }
 
-        if (extensionNames.Contains("VK_KHR_external_memory"))
+        if (extensionNames.contains("VK_KHR_external_memory"))
         {
             deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
 #if SLANG_WINDOWS_FAMILY
-            if (extensionNames.Contains("VK_KHR_external_memory_win32"))
+            if (extensionNames.contains("VK_KHR_external_memory_win32"))
             {
                 deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
             }
 #endif
             m_features.add("external-memory");
         }
-        if (extensionNames.Contains(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME))
+        if (extensionNames.contains(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
             m_features.add("conservative-rasterization-3");
             m_features.add("conservative-rasterization-2");
             m_features.add("conservative-rasterization-1");
         }
-        if (extensionNames.Contains(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
+        if (extensionNames.contains(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-            if (extensionNames.Contains(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+            if (extensionNames.contains(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
             {
                 deviceExtensions.add(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
             }
         }
-        if (extensionNames.Contains(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME))
+        if (extensionNames.contains(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME);
         }
-        if (extensionNames.Contains(VK_NVX_BINARY_IMPORT_EXTENSION_NAME))
+        if (extensionNames.contains(VK_NVX_BINARY_IMPORT_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_NVX_BINARY_IMPORT_EXTENSION_NAME);
             m_features.add("nvx-binary-import");
         }
-        if (extensionNames.Contains(VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME))
+        if (extensionNames.contains(VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME);
             m_features.add("nvx-image-view-handle");
         }
-        if (extensionNames.Contains(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME))
+        if (extensionNames.contains(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
             m_features.add("push-descriptor");
         }
-        if (extensionNames.Contains(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME))
+        if (extensionNames.contains(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
             m_features.add("barycentrics");
@@ -1759,15 +1759,15 @@ Result DeviceImpl::getFormatSupportedResourceStates(Format format, ResourceState
     m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, surfaceFormats.getBuffer());
     for (auto surfaceFormat : surfaceFormats)
     {
-        presentableFormats.Add(surfaceFormat.format);
+        presentableFormats.add(surfaceFormat.format);
     }
 #else
 // Until we have a solution to query presentable formats without needing a surface,
 // hard code presentable formats that is supported by most drivers.
-    presentableFormats.Add(VK_FORMAT_R8G8B8A8_UNORM);
-    presentableFormats.Add(VK_FORMAT_B8G8R8A8_UNORM);
-    presentableFormats.Add(VK_FORMAT_R8G8B8A8_SRGB);
-    presentableFormats.Add(VK_FORMAT_B8G8R8A8_SRGB);
+    presentableFormats.add(VK_FORMAT_R8G8B8A8_UNORM);
+    presentableFormats.add(VK_FORMAT_B8G8R8A8_UNORM);
+    presentableFormats.add(VK_FORMAT_R8G8B8A8_SRGB);
+    presentableFormats.add(VK_FORMAT_B8G8R8A8_SRGB);
 #endif
 
     ResourceStateSet allowedStates;
@@ -1813,7 +1813,7 @@ Result DeviceImpl::getFormatSupportedResourceStates(Format format, ResourceState
         allowedStates.add(ResourceState::DepthWrite);
     }
     // Present
-    if (presentableFormats.Contains(vkFormat))
+    if (presentableFormats.contains(vkFormat))
         allowedStates.add(ResourceState::Present);
     // IndirectArgument
     allowedStates.add(ResourceState::IndirectArgument);

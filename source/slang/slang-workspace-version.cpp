@@ -20,7 +20,7 @@ struct DirEnumerationContext
         {
             String canonicalPath;
             Path::getCanonical(path, canonicalPath);
-            if (!paths.Add(canonicalPath))
+            if (!paths.add(canonicalPath))
                 break;
             path = Path::getParentDirectory(path);
             if (!path.startsWith(root))
@@ -34,7 +34,7 @@ DocumentVersion* Workspace::openDoc(String path, String text)
     doc->setText(text.getUnownedSlice());
     doc->setPath(path);
     openedDocuments[path] = doc;
-    workspaceSearchPaths.Add(Path::getParentDirectory(path));
+    workspaceSearchPaths.add(Path::getParentDirectory(path));
     invalidate();
     return doc.Ptr();
 }
@@ -42,7 +42,7 @@ DocumentVersion* Workspace::openDoc(String path, String text)
 void Workspace::changeDoc(const String& path, LanguageServerProtocol::Range range, const String& text)
 {
     RefPtr<DocumentVersion> doc;
-    if (openedDocuments.TryGetValue(path, doc))
+    if (openedDocuments.tryGetValue(path, doc))
     {
         Index line, col;
         doc->zeroBasedUTF16LocToOneBasedUTF8Loc(range.start.line, range.start.character, line, col);
@@ -68,7 +68,7 @@ void Workspace::changeDoc(DocumentVersion* doc, const String& newText)
 
 void Workspace::closeDoc(const String& path)
 {
-    openedDocuments.Remove(path);
+    openedDocuments.remove(path);
     invalidate();
 }
 
@@ -205,7 +205,7 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
             continue;
         String fileName = line.subString(0, lparentIndex);
         Path::getCanonical(fileName, fileName);
-        auto& diagnosticList = diagnostics.GetOrAddValue(fileName, DocumentDiagnostics());
+        auto& diagnosticList = diagnostics.getOrAddValue(fileName, DocumentDiagnostics());
 
         LanguageServerProtocol::Diagnostic diagnostic;
         Index pos = lparentIndex + 1;
@@ -251,7 +251,7 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
             diagnostic.range.end.character += tokenLength;
         }
 
-        if (auto doc = workspace->openedDocuments.TryGetValue(fileName))
+        if (auto doc = workspace->openedDocuments.tryGetValue(fileName))
         {
             // If the file is open, translate to UTF16 positions using the document.
             Index lineUTF16, colUTF16;
@@ -272,8 +272,8 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
             diagnostic.range.end.line--;
             diagnostic.range.end.character--;
         }
-        diagnosticList.messages.Add(diagnostic);
-        if (diagnosticList.messages.Count() >= 1000)
+        diagnosticList.messages.add(diagnostic);
+        if (diagnosticList.messages.getCount() >= 1000)
             break;
     }
 }
@@ -301,8 +301,8 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
         HashSet<String> set;
         for (auto& p : openedDocuments)
         {
-            auto dir = Path::getParentDirectory(p.Key.getBuffer());
-            if (set.Add(dir))
+            auto dir = Path::getParentDirectory(p.key.getBuffer());
+            if (set.add(dir))
                 searchPathsRaw.add(dir.getBuffer());
         }
     }
@@ -332,7 +332,7 @@ SlangResult Workspace::loadFile(const char* path, ISlangBlob** outBlob)
     String canonnicalPath;
     SLANG_RETURN_ON_FAIL(Path::getCanonical(path, canonnicalPath));
     RefPtr<DocumentVersion> doc;
-    if (openedDocuments.TryGetValue(canonnicalPath, doc))
+    if (openedDocuments.tryGetValue(canonnicalPath, doc))
     {
         *outBlob = StringBlob::create(doc->getText()).detach();
         return SLANG_OK;
@@ -484,7 +484,7 @@ int DocumentVersion::getTokenLength(Index line, Index col)
 ASTMarkup* WorkspaceVersion::getOrCreateMarkupAST(ModuleDecl* module)
 {
     RefPtr<ASTMarkup> astMarkup;
-    if (markupASTs.TryGetValue(module, astMarkup))
+    if (markupASTs.tryGetValue(module, astMarkup))
         return astMarkup.Ptr();
     DiagnosticSink sink;
     astMarkup = new ASTMarkup();
@@ -497,11 +497,11 @@ ASTMarkup* WorkspaceVersion::getOrCreateMarkupAST(ModuleDecl* module)
 Module* WorkspaceVersion::getOrLoadModule(String path)
 {
     Module* module;
-    if (modules.TryGetValue(path, module))
+    if (modules.tryGetValue(path, module))
     {
         return module;
     }
-    auto doc = workspace->openedDocuments.TryGetValue(path);
+    auto doc = workspace->openedDocuments.tryGetValue(path);
     if (!doc)
         return nullptr;
     ComPtr<ISlangBlob> diagnosticBlob;
@@ -531,7 +531,7 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
     {
         auto diagnosticString = String((const char*)diagnosticBlob->getBufferPointer());
         parseDiagnostics(diagnosticString);
-        auto docDiagnostic = diagnostics.TryGetValue(path);
+        auto docDiagnostic = diagnostics.tryGetValue(path);
         if (docDiagnostic)
             docDiagnostic->originalOutput = diagnosticString;
     }
@@ -540,7 +540,7 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
 
 MacroDefinitionContentAssistInfo* WorkspaceVersion::tryGetMacroDefinition(UnownedStringSlice name)
 {
-    if (macroDefinitions.Count() == 0)
+    if (macroDefinitions.getCount() == 0)
     {
         // build dictionary.
         for (auto& def : linkage->contentAssistInfo.preprocessorInfo.macroDefinitions)
@@ -552,7 +552,7 @@ MacroDefinitionContentAssistInfo* WorkspaceVersion::tryGetMacroDefinition(Unowne
     auto namePtr = linkage->getNamePool()->tryGetName(name);
     if (!namePtr)
         return nullptr;
-    macroDefinitions.TryGetValue(namePtr, result);
+    macroDefinitions.tryGetValue(namePtr, result);
     return result;
 }
 

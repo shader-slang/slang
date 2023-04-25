@@ -124,7 +124,7 @@ namespace platform
     KeyCode translateKeyCode(int keyCode)
     {
         KeyCode result = KeyCode::None;
-        keyCodeMap.TryGetValue(keyCode, result);
+        keyCodeMap.tryGetValue(keyCode, result);
         return result;
     }
 

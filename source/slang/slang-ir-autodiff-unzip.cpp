@@ -185,7 +185,7 @@ struct ExtractPrimalFuncContext
         auto outIntermediary =
             builder.emitParam(builder.getOutType((IRType*)intermediateType));
         oldIntermediateParam->transferDecorationsTo(outIntermediary);
-        primalParams.Add(outIntermediary);
+        primalParams.add(outIntermediary);
         oldIntermediateParam->replaceUsesWith(outIntermediary);
         oldIntermediateParam->removeAndDeallocate();
 
@@ -212,7 +212,7 @@ struct ExtractPrimalFuncContext
             // output intermediary struct.
             for (auto inst : block->getChildren())
             {
-                if (primalsInfo->storeSet.Contains(inst))
+                if (primalsInfo->storeSet.contains(inst))
                 {
                     if (as<IRVar>(inst))
                     {
@@ -267,7 +267,7 @@ struct ExtractPrimalFuncContext
         for (auto param = func->getFirstParam(); param;)
         {
             auto nextParam = param->getNextParam();
-            if (!primalParams.Contains(param))
+            if (!primalParams.contains(param))
             {
                 param->replaceUsesWith(builder.getVoidValue());
                 param->removeAndDeallocate();
@@ -281,7 +281,7 @@ struct ExtractPrimalFuncContext
 static void copyPrimalValueStructKeyDecorations(IRInst* inst, IRCloneEnv& cloneEnv)
 {
     IRInst* newInst = nullptr;
-    if (cloneEnv.mapOldValToNew.TryGetValue(inst, newInst))
+    if (cloneEnv.mapOldValToNew.tryGetValue(inst, newInst))
     {
         if (auto decor = newInst->findDecoration<IRPrimalValueStructKeyDecoration>())
         {
@@ -321,7 +321,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     for (auto inst : paramInfo.propagateFuncSpecificPrimalInsts)
     {
         IRInst* newInst = nullptr;
-        if (subEnv.mapOldValToNew.TryGetValue(inst, newInst))
+        if (subEnv.mapOldValToNew.tryGetValue(inst, newInst))
         {
             newInst->removeAndDeallocate();
         }
@@ -330,8 +330,8 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     HashSet<IRInst*> newPrimalParams;
     for (auto param : func->getParams())
     {
-        if (paramInfo.primalFuncParams.Contains(param))
-            newPrimalParams.Add(subEnv.mapOldValToNew[param].GetValue());
+        if (paramInfo.primalFuncParams.contains(param))
+            newPrimalParams.add(subEnv.mapOldValToNew[param].getValue());
     }
 
     ExtractPrimalFuncContext context;

@@ -42,7 +42,7 @@ struct ComMethodLoweringContext : public InstPassBase
                 innerMostCallee->getWitnessTable(),
                 callee->getRequirementKey());
         }
-        comCallees.Add(callee);
+        comCallees.add(callee);
         
         auto calleeType = as<IRFuncType>(callee->getDataType());
         SLANG_ASSERT(calleeType);
@@ -129,7 +129,7 @@ struct ComMethodLoweringContext : public InstPassBase
         for (auto entry : witnessTable->getEntries())
         {
             IRInst* interfaceRequirement = nullptr;
-            if (!interfaceReqDict.TryGetValue(entry->getRequirementKey(), interfaceRequirement))
+            if (!interfaceReqDict.tryGetValue(entry->getRequirementKey(), interfaceRequirement))
                 continue;
             auto implFunc = as<IRFunc>(entry->getSatisfyingVal());
             if (!implFunc) continue;

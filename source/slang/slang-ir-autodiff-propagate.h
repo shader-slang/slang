@@ -79,7 +79,7 @@ struct DiffPropagationPass : InstPassBase
 
 
         workList.clear();
-        workListSet.Clear();
+        workListSet.clear();
 
         // Add the marked insts to the work list.
         for (auto inst : initialList)

@@ -63,7 +63,7 @@ namespace Slang
                 IRInst* inst = sharedContext->workList.getLast();
 
                 sharedContext->workList.removeLast();
-                sharedContext->workListSet.Remove(inst);
+                sharedContext->workListSet.remove(inst);
 
                 inst = processInst(inst);
 
@@ -72,7 +72,7 @@ namespace Slang
                     sharedContext->addToWorkList(child);
                 }
             }
-            sharedContext->mapInterfaceRequirementKeyValue.Clear();
+            sharedContext->mapInterfaceRequirementKeyValue.clear();
         }
     };
 

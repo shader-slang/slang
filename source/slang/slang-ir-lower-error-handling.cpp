@@ -18,11 +18,11 @@ struct ErrorHandlingLoweringContext
 
     void addToWorkList(IRInst* inst)
     {
-        if (workListSet.Contains(inst))
+        if (workListSet.contains(inst))
             return;
 
         workList.add(inst);
-        workListSet.Add(inst);
+        workListSet.add(inst);
     }
 
     void processFuncType(IRFuncType* funcType)
@@ -182,7 +182,7 @@ struct ErrorHandlingLoweringContext
             IRInst* inst = workList.getLast();
 
             workList.removeLast();
-            workListSet.Remove(inst);
+            workListSet.remove(inst);
 
             processInst(inst);
 

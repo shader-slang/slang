@@ -109,7 +109,7 @@ struct SpecializationContext
             }
         }
 
-        return fullySpecializedInsts.Contains(inst);
+        return fullySpecializedInsts.contains(inst);
     }
 
     // When an instruction isn't fully specialized, but its operands *are*
@@ -162,9 +162,9 @@ struct SpecializationContext
         }
 #endif
 
-        if (workList.Add(inst))
+        if (workList.add(inst))
         {
-            cleanInsts.Remove(inst);
+            cleanInsts.remove(inst);
 
             addUsersToWorkList(inst);
         }
@@ -192,9 +192,9 @@ struct SpecializationContext
     void markInstAsFullySpecialized(
         IRInst* inst)
     {
-        if(fullySpecializedInsts.Contains(inst))
+        if(fullySpecializedInsts.contains(inst))
             return;
-        fullySpecializedInsts.Add(inst);
+        fullySpecializedInsts.add(inst);
 
         // If we know that an instruction is fully specialized,
         // then we should start to consider its uses and children
@@ -257,7 +257,7 @@ struct SpecializationContext
             // If one is found, our work is done.
             //
             IRInst* specializedVal = nullptr;
-            if(genericSpecializations.TryGetValue(key, specializedVal))
+            if(genericSpecializations.tryGetValue(key, specializedVal))
                 return specializedVal;
         }
 
@@ -284,7 +284,7 @@ struct SpecializationContext
         // specializations so that we don't instantiate
         // this generic again for the same arguments.
         //
-        genericSpecializations.Add(key, specializedVal);
+        genericSpecializations.add(key, specializedVal);
 
         return specializedVal;
     }
@@ -797,16 +797,16 @@ struct SpecializationContext
         builder.setInsertInto(dictInst);
         for (auto kv : dict)
         {
-            if (!kv.Value->parent)
+            if (!kv.value->parent)
                 continue;
-            for (auto keyVal : kv.Key.vals)
+            for (auto keyVal : kv.key.vals)
             {
                 if (!keyVal->parent) goto next;
             }
             {
                 List<IRInst*> args;
-                args.add(kv.Value);
-                args.addRange(kv.Key.vals);
+                args.add(kv.value);
+                args.addRange(kv.key.vals);
                 builder.emitIntrinsicInst(nullptr, kIROp_SpecializationDictionaryItem, args.getCount(), args.getBuffer());
             }
         next:;
@@ -874,17 +874,17 @@ struct SpecializationContext
             bool iterChanged = false;
             addToWorkList(module->getModuleInst());
 
-            while (workList.Count() != 0)
+            while (workList.getCount() != 0)
             {
                 // We will then iterate until our work list goes dry.
                 //
-                while (workList.Count() != 0)
+                while (workList.getCount() != 0)
                 {
                     IRInst* inst = workList.getLast();
 
                     workList.removeLast();
 
-                    cleanInsts.Add(inst);
+                    cleanInsts.add(inst);
 
                     // For each instruction we process, we want to perform
                     // a few steps.
@@ -957,7 +957,7 @@ struct SpecializationContext
 
     void addDirtyInstsToWorkListRec(IRInst* inst)
     {
-        if( !cleanInsts.Contains(inst) )
+        if( !cleanInsts.contains(inst) )
         {
             addToWorkList(inst);
         }
@@ -1060,11 +1060,11 @@ struct SpecializationContext
                     auto newWrapExistential = builder.emitWrapExistential(
                         resultType, newCall, slotOperandCount, slotOperands.getBuffer());
                     inst->replaceUsesWith(newWrapExistential);
-                    workList.Remove(inst);
+                    workList.remove(inst);
                     inst->removeAndDeallocate();
                     addUsersToWorkList(newWrapExistential);
 
-                    workList.Remove(wrapExistential);
+                    workList.remove(wrapExistential);
                     SLANG_ASSERT(!wrapExistential->hasUses());
                     wrapExistential->removeAndDeallocate();
                     return true;
@@ -1211,13 +1211,13 @@ struct SpecializationContext
         // existing specialization of the callee that we can use.
         //
         IRFunc* specializedCallee = nullptr;
-        if( !existentialSpecializedFuncs.TryGetValue(key, specializedCallee) )
+        if( !existentialSpecializedFuncs.tryGetValue(key, specializedCallee) )
         {
             // If we didn't find a specialized callee already made, then we
             // will go ahead and create one, and then register it in our cache.
             //
             specializedCallee = createExistentialSpecializedFunc(inst, calleeFunc);
-            existentialSpecializedFuncs.Add(key, specializedCallee);
+            existentialSpecializedFuncs.add(key, specializedCallee);
         }
 
         // At this point we have found or generated a specialized version
@@ -1322,7 +1322,7 @@ struct SpecializationContext
         List<IRInst*> localWorkList;
         HashSet<IRInst*> processedInsts;
         localWorkList.add(inst);
-        processedInsts.Add(inst);
+        processedInsts.add(inst);
 
         while (localWorkList.getCount() != 0)
         {
@@ -1345,7 +1345,7 @@ struct SpecializationContext
             for (UInt i = 0; i < curInst->getOperandCount(); ++i)
             {
                 auto operand = curInst->getOperand(i);
-                if (processedInsts.Add(operand))
+                if (processedInsts.add(operand))
                 {
                     localWorkList.add(operand);
                 }
@@ -1528,7 +1528,7 @@ struct SpecializationContext
             // Whatever replacement value was constructed, we need to
             // register it as the replacement for the original parameter.
             //
-            cloneEnv.mapOldValToNew.Add(oldParam, replacementVal);
+            cloneEnv.mapOldValToNew.add(oldParam, replacementVal);
         }
 
         // Next we will create the skeleton of the new
@@ -1553,7 +1553,7 @@ struct SpecializationContext
         // "fully specialized" by the rules used for doing
         // generic specialization elsewhere in this pass.
         //
-        fullySpecializedInsts.Add(newFuncType);
+        fullySpecializedInsts.add(newFuncType);
 
         // The above steps have accomplished the "first phase"
         // of cloning the function (since `IRFunc`s have no
@@ -2223,7 +2223,7 @@ struct SpecializationContext
             IRStructType* newStructType = nullptr;
             addUsersToWorkList(type);
 
-            if( !existentialSpecializedStructs.TryGetValue(key, newStructType) )
+            if( !existentialSpecializedStructs.tryGetValue(key, newStructType) )
             {
                 builder.setInsertBefore(baseStructType);
                 newStructType = builder.createStructType();
@@ -2251,7 +2251,7 @@ struct SpecializationContext
                     builder.createStructField(newStructType, oldField->getKey(), newFieldType);
                 }
 
-                existentialSpecializedStructs.Add(key, newStructType);
+                existentialSpecializedStructs.add(key, newStructType);
             }
 
             type->replaceUsesWith(newStructType);
@@ -2405,7 +2405,7 @@ IRInst* specializeGenericImpl(
 
         IRInst* arg = specializeInst->getArg(argIndex);
 
-        env.mapOldValToNew.Add(param, arg);
+        env.mapOldValToNew.add(param, arg);
     }
 
     // We will set up an IR builder for insertion

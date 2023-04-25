@@ -284,7 +284,7 @@ namespace Misc {
                 auto str = sb.ToString();
                 if (str.getLength() != 0)
                     result.add(str);
-                sb.Clear();
+                sb.clear();
             }
             else
                 sb << text[i];

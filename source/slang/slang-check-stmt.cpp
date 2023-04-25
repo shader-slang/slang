@@ -590,7 +590,7 @@ namespace Slang
         litExpr->type.type = m_astBuilder->getIntType();
         litExpr->token.setName(getNamePool()->getName(String(iterations)));
         maxItersAttr->args.add(litExpr);
-        maxItersAttr->intArgVals.Add(0, m_astBuilder->getIntVal(m_astBuilder->getIntType(), iterations));
+        maxItersAttr->intArgVals.add(0, m_astBuilder->getIntVal(m_astBuilder->getIntType(), iterations));
         maxItersAttr->value = (int32_t)iterations;
         maxItersAttr->inductionVar = initialVar;
         addModifier(stmt, maxItersAttr);

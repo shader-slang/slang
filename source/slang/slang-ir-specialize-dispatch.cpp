@@ -191,7 +191,7 @@ bool _isWitnessTableTransitivelyVisible(IRInst* witness)
             {
                 if (user->getParent())
                 {
-                    if (workSet.Add(user->getParent()))
+                    if (workSet.add(user->getParent()))
                     {
                         workList.add(user->getParent());
                     }
@@ -262,7 +262,7 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
 
             // Get a sequential ID for the witness table using the map from the Linkage.
             uint32_t seqID = 0;
-            if (!linkage->mapMangledNameToRTTIObjectIndex.TryGetValue(
+            if (!linkage->mapMangledNameToRTTIObjectIndex.tryGetValue(
                 witnessTableMangledName, seqID))
             {
                 auto interfaceType =
@@ -273,13 +273,13 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
                                         "but a witness table associated with it has one.");
                 auto interfaceName = interfaceLinkage->getMangledName();
                 auto idAllocator =
-                    linkage->mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(
+                    linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
                         interfaceName);
                 if (!idAllocator)
                 {
                     linkage->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
                     idAllocator =
-                        linkage->mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(
+                        linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
                             interfaceName);
                 }
                 seqID = *idAllocator;
@@ -334,7 +334,7 @@ void specializeDispatchFunctions(SharedGenericsLoweringContext* sharedContext)
     // Generate specialized dispatch functions and fixup call sites.
     for (auto kv : sharedContext->mapInterfaceRequirementKeyToDispatchMethods)
     {
-        auto dispatchFunc = kv.Value;
+        auto dispatchFunc = kv.value;
 
         // Generate a specialized `switch` statement based dispatch func,
         // from the witness tables present in the module.

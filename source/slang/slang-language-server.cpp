@@ -358,7 +358,7 @@ static String _formatDocumentation(String doc)
     if (!hasDoxygen)
     {
         // For ordinary comments, we want to preserve line breaks in the original comment.
-        result.Clear();
+        result.clear();
         for (Index i = 0; i < lines.getCount(); i++)
         {
             result << lines[i] << "  \n";
@@ -429,7 +429,7 @@ SlangResult LanguageServer::hover(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -608,7 +608,7 @@ SlangResult LanguageServer::gotoDefinition(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -734,7 +734,7 @@ SlangResult LanguageServer::completion(
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -898,7 +898,7 @@ SlangResult LanguageServer::semanticTokens(
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1036,7 +1036,7 @@ SlangResult LanguageServer::signatureHelp(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1249,7 +1249,7 @@ SlangResult LanguageServer::documentSymbol(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1270,7 +1270,7 @@ SlangResult LanguageServer::inlayHint(const LanguageServerProtocol::InlayHintPar
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1319,7 +1319,7 @@ SlangResult LanguageServer::formatting(const LanguageServerProtocol::DocumentFor
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1337,7 +1337,7 @@ SlangResult LanguageServer::rangeFormatting(const LanguageServerProtocol::Docume
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1360,7 +1360,7 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
-    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1398,30 +1398,30 @@ void LanguageServer::publishDiagnostics()
     List<String> filesToRemove;
     for (auto& file : m_lastPublishedDiagnostics)
     {
-        if (!version->diagnostics.ContainsKey(file.Key))
+        if (!version->diagnostics.containsKey(file.key))
         {
             PublishDiagnosticsParams args;
-            args.uri = URI::fromLocalFilePath(file.Key.getUnownedSlice()).uri;
+            args.uri = URI::fromLocalFilePath(file.key.getUnownedSlice()).uri;
             m_connection->sendCall(UnownedStringSlice("textDocument/publishDiagnostics"), &args);
-            filesToRemove.add(file.Key);
+            filesToRemove.add(file.key);
         }
     }
     for (auto& toRemove : filesToRemove)
     {
-        m_lastPublishedDiagnostics.Remove(toRemove);
+        m_lastPublishedDiagnostics.remove(toRemove);
     }
     // Send updates for any files whose diagnostic messages has changed since last update.
     for (auto& list : version->diagnostics)
     {
-        auto lastPublished = m_lastPublishedDiagnostics.TryGetValue(list.Key);
-        if (!lastPublished || *lastPublished != list.Value.originalOutput)
+        auto lastPublished = m_lastPublishedDiagnostics.tryGetValue(list.key);
+        if (!lastPublished || *lastPublished != list.value.originalOutput)
         {
             PublishDiagnosticsParams args;
-            args.uri = URI::fromLocalFilePath(list.Key.getUnownedSlice()).uri;
-            for (auto& d : list.Value.messages)
+            args.uri = URI::fromLocalFilePath(list.key.getUnownedSlice()).uri;
+            for (auto& d : list.value.messages)
                 args.diagnostics.add(d);
             m_connection->sendCall(UnownedStringSlice("textDocument/publishDiagnostics"), &args);
-            m_lastPublishedDiagnostics[list.Key] = list.Value.originalOutput;
+            m_lastPublishedDiagnostics[list.key] = list.value.originalOutput;
         }
     }
 }
@@ -1906,14 +1906,14 @@ void LanguageServer::processCommands()
             auto id = cmd.cancelArgs.get().id;
             if (id > 0)
             {
-                canceledIDs.Add(id);
+                canceledIDs.add(id);
             }
         }
     }
     const int kErrorRequestCanceled = -32800;
     for (auto& cmd : commands)
     {
-        if (cmd.id.getKind() == JSONValue::Kind::Integer && canceledIDs.Contains(cmd.id.asInteger()))
+        if (cmd.id.getKind() == JSONValue::Kind::Integer && canceledIDs.contains(cmd.id.asInteger()))
         {
             m_connection->sendError((JSONRPC::ErrorCode)kErrorRequestCanceled, cmd.id);
         }

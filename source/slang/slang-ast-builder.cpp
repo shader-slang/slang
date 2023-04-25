@@ -42,9 +42,9 @@ void SharedASTBuilder::init(Session* session)
         const ReflectClassInfo* info = ASTClassInfo::getInfo(ASTNodeType(i));
         if (info)
         {
-            m_sliceToTypeMap.Add(UnownedStringSlice(info->m_name), info);
+            m_sliceToTypeMap.add(UnownedStringSlice(info->m_name), info);
             Name* name = m_namePool->getName(String(info->m_name));
-            m_nameToTypeMap.Add(name, info);
+            m_nameToTypeMap.add(name, info);
         }
     }
 }
@@ -52,13 +52,13 @@ void SharedASTBuilder::init(Session* session)
 const ReflectClassInfo* SharedASTBuilder::findClassInfo(const UnownedStringSlice& slice)
 {
     const ReflectClassInfo* typeInfo;
-    return m_sliceToTypeMap.TryGetValue(slice, typeInfo) ? typeInfo : nullptr;
+    return m_sliceToTypeMap.tryGetValue(slice, typeInfo) ? typeInfo : nullptr;
 }
 
 SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
 {
     const ReflectClassInfo* typeInfo;
-    if (m_sliceToTypeMap.TryGetValue(slice, typeInfo))
+    if (m_sliceToTypeMap.tryGetValue(slice, typeInfo))
     {
         return SyntaxClass<NodeBase>(typeInfo);
     }
@@ -68,13 +68,13 @@ SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice
 const ReflectClassInfo* SharedASTBuilder::findClassInfo(Name* name)
 {
     const ReflectClassInfo* typeInfo;
-    return m_nameToTypeMap.TryGetValue(name, typeInfo) ? typeInfo : nullptr;
+    return m_nameToTypeMap.tryGetValue(name, typeInfo) ? typeInfo : nullptr;
 }
 
 SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(Name* name)
 {
     const ReflectClassInfo* typeInfo;
-    if (m_nameToTypeMap.TryGetValue(name, typeInfo))
+    if (m_nameToTypeMap.tryGetValue(name, typeInfo))
     {
         return SyntaxClass<NodeBase>(typeInfo);
     }
@@ -191,14 +191,14 @@ void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier
 
 Decl* SharedASTBuilder::findMagicDecl(const String& name)
 {
-    return m_magicDecls[name].GetValue();
+    return m_magicDecls[name].getValue();
 }
 
 Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 {
-    if (m_magicDecls.ContainsKey(name))
+    if (m_magicDecls.containsKey(name))
     {
-        return m_magicDecls[name].GetValue();
+        return m_magicDecls[name].getValue();
     }
     else
     {

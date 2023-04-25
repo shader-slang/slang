@@ -229,7 +229,7 @@ namespace Slang
             // pass that avoids duplicating blocks (by introducing new temporaries...)
             //
             SimpleRegion* nextSimpleRegionForSameBlock = nullptr;
-            ctx->regionTree->mapBlockToRegion.TryGetValue(block, nextSimpleRegionForSameBlock);
+            ctx->regionTree->mapBlockToRegion.tryGetValue(block, nextSimpleRegionForSameBlock);
             ctx->regionTree->mapBlockToRegion[block] = simpleRegion;
 
             *resultLink = simpleRegion;

@@ -156,7 +156,7 @@ SlangResult JSONRPCConnection::toNativeArgsOrSendError(const JSONValue& srcArgs,
 
 SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id)
 {
-    m_diagnosticSink.outputBuffer.Clear();
+    m_diagnosticSink.outputBuffer.clear();
 
     JSONToNativeConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
     
@@ -271,7 +271,7 @@ SlangResult JSONRPCConnection::getMessage(const RttiInfo* rttiInfo, void* out)
         return SLANG_FAIL;
     }
 
-    m_diagnosticSink.outputBuffer.Clear();
+    m_diagnosticSink.outputBuffer.clear();
     JSONToNativeConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
 
     // Get the RPC response
@@ -305,7 +305,7 @@ SlangResult JSONRPCConnection::getRPC(const RttiInfo* rttiInfo, void* out)
         return SLANG_FAIL;
     }
 
-    m_diagnosticSink.outputBuffer.Clear();
+    m_diagnosticSink.outputBuffer.clear();
     JSONToNativeConverter converter(&m_container, &m_typeMap, &m_diagnosticSink);
 
     // Convert the result in the response

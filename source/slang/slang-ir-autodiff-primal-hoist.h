@@ -23,16 +23,16 @@ namespace Slang
                 auto newOperand = clonedInst->getOperand(ii);
 
                 if (oldOperand == newOperand)
-                    pendingUses.Add(&clonedInst->getOperands()[ii]);
+                    pendingUses.add(&clonedInst->getOperands()[ii]);
             }
 
             for (auto use = inst->firstUse; use;)
             {
                 auto nextUse = use->nextUse;
 
-                if (pendingUses.Contains(use))
+                if (pendingUses.contains(use))
                 {
-                    pendingUses.Remove(use);
+                    pendingUses.remove(use);
                     builder->replaceOperand(use, clonedInst);
                 }
 
@@ -69,15 +69,15 @@ namespace Slang
         InversionInfo applyMap(IRCloneEnv* env)
         {
             InversionInfo newInfo;
-            if (env->mapOldValToNew.ContainsKey(instToInvert))
+            if (env->mapOldValToNew.containsKey(instToInvert))
                 newInfo.instToInvert = env->mapOldValToNew[instToInvert];
             
             for (auto inst : requiredOperands)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newInfo.requiredOperands.add(env->mapOldValToNew[inst]);
                 
             for (auto inst : targetInsts)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newInfo.targetInsts.add(env->mapOldValToNew[inst]);
             
             return newInfo;
@@ -98,24 +98,24 @@ namespace Slang
             RefPtr<HoistedPrimalsInfo> newPrimalsInfo = new HoistedPrimalsInfo();
             
             for (auto inst : this->storeSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
-                    newPrimalsInfo->storeSet.Add(env->mapOldValToNew[inst]);
+                if (env->mapOldValToNew.containsKey(inst))
+                    newPrimalsInfo->storeSet.add(env->mapOldValToNew[inst]);
             
             for (auto inst : this->recomputeSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
-                    newPrimalsInfo->recomputeSet.Add(env->mapOldValToNew[inst]);
+                if (env->mapOldValToNew.containsKey(inst))
+                    newPrimalsInfo->recomputeSet.add(env->mapOldValToNew[inst]);
                 
             for (auto inst : this->invertSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
-                    newPrimalsInfo->invertSet.Add(env->mapOldValToNew[inst]);
+                if (env->mapOldValToNew.containsKey(inst))
+                    newPrimalsInfo->invertSet.add(env->mapOldValToNew[inst]);
             
             for (auto inst : this->instsToInvert)
-                if (env->mapOldValToNew.ContainsKey(inst))
-                    newPrimalsInfo->instsToInvert.Add(env->mapOldValToNew[inst]);
+                if (env->mapOldValToNew.containsKey(inst))
+                    newPrimalsInfo->instsToInvert.add(env->mapOldValToNew[inst]);
 
             for (auto kvpair : this->invertInfoMap)
-                if (env->mapOldValToNew.ContainsKey(kvpair.Key))
-                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.Key]] = kvpair.Value.applyMap(env);
+                if (env->mapOldValToNew.containsKey(kvpair.key))
+                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.key]] = kvpair.value.applyMap(env);
             
             return newPrimalsInfo;
         }
@@ -123,19 +123,19 @@ namespace Slang
         void merge(HoistedPrimalsInfo* info)
         {
             for (auto inst : info->storeSet)
-                storeSet.Add(inst);
+                storeSet.add(inst);
 
             for (auto inst : info->recomputeSet)
-                recomputeSet.Add(inst);
+                recomputeSet.add(inst);
 
             for (auto inst : info->invertSet)
-                invertSet.Add(inst);
+                invertSet.add(inst);
 
             for (auto inst : info->instsToInvert)
-                instsToInvert.Add(inst);
+                instsToInvert.add(inst);
 
             for (auto kvpair : info->invertInfoMap)
-                invertInfoMap[kvpair.Key] = kvpair.Value;
+                invertInfoMap[kvpair.key] = kvpair.value;
         }
     };
 

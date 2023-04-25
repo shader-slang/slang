@@ -26,7 +26,7 @@ void DebugShaderObject::checkCompleteness()
     {
         if (layout->getBindingRangeBindingCount(i) != 0)
         {
-            if (!m_initializedBindingRanges.Contains(i))
+            if (!m_initializedBindingRanges.contains(i))
             {
                 auto var = layout->getBindingRangeLeafVariable(i);
                 GFX_DIAGNOSE_ERROR_FORMAT(
@@ -86,7 +86,7 @@ Result DebugShaderObject::getObject(ShaderOffset const& offset, IShaderObject** 
     auto resultCode = baseObject->getObject(offset, innerObject.writeRef());
     SLANG_RETURN_ON_FAIL(resultCode);
     RefPtr<DebugShaderObject> debugShaderObject;
-    if (m_objects.TryGetValue(ShaderOffsetKey{offset}, debugShaderObject))
+    if (m_objects.tryGetValue(ShaderOffsetKey{offset}, debugShaderObject))
     {
         if (debugShaderObject->baseObject == innerObject)
         {
@@ -107,7 +107,7 @@ Result DebugShaderObject::setObject(ShaderOffset const& offset, IShaderObject* o
     SLANG_GFX_API_FUNC;
     auto objectImpl = getDebugObj(object);
     m_objects[ShaderOffsetKey{offset}] = objectImpl;
-    m_initializedBindingRanges.Add(offset.bindingRangeIndex);
+    m_initializedBindingRanges.add(offset.bindingRangeIndex);
     objectImpl->checkCompleteness();
     return baseObject->setObject(offset, getInnerObj(object));
 }
@@ -117,7 +117,7 @@ Result DebugShaderObject::setResource(ShaderOffset const& offset, IResourceView*
     SLANG_GFX_API_FUNC;
     auto viewImpl = getDebugObj(resourceView);
     m_resources[ShaderOffsetKey{offset}] = viewImpl;
-    m_initializedBindingRanges.Add(offset.bindingRangeIndex);
+    m_initializedBindingRanges.add(offset.bindingRangeIndex);
     return baseObject->setResource(offset, getInnerObj(resourceView));
 }
 
@@ -126,7 +126,7 @@ Result DebugShaderObject::setSampler(ShaderOffset const& offset, ISamplerState* 
     SLANG_GFX_API_FUNC;
     auto samplerImpl = getDebugObj(sampler);
     m_samplers[ShaderOffsetKey{offset}] = samplerImpl;
-    m_initializedBindingRanges.Add(offset.bindingRangeIndex);
+    m_initializedBindingRanges.add(offset.bindingRangeIndex);
     return baseObject->setSampler(offset, getInnerObj(sampler));
 }
 
@@ -140,7 +140,7 @@ Result DebugShaderObject::setCombinedTextureSampler(
     m_samplers[ShaderOffsetKey{offset}] = samplerImpl;
     auto viewImpl = getDebugObj(textureView);
     m_resources[ShaderOffsetKey{offset}] = viewImpl;
-    m_initializedBindingRanges.Add(offset.bindingRangeIndex);
+    m_initializedBindingRanges.add(offset.bindingRangeIndex);
     return baseObject->setCombinedTextureSampler(
         offset, getInnerObj(viewImpl), getInnerObj(sampler));
 }
@@ -198,9 +198,9 @@ Result DebugRootShaderObject::setSpecializationArgs(
 void DebugRootShaderObject::reset()
 {
     m_entryPoints.clear();
-    m_objects.Clear();
-    m_resources.Clear();
-    m_samplers.Clear();
+    m_objects.clear();
+    m_resources.clear();
+    m_samplers.clear();
     baseObject.detach();
 }
 
