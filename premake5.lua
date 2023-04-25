@@ -354,7 +354,6 @@ workspace "slang"
         -- Warnings
         buildoptions {
             "-Wno-switch",
-            "-Wno-return-type",
             "-Wno-unused-local-typedefs",
             "-Wno-parentheses",
         }
