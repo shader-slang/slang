@@ -1465,6 +1465,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_MakeStruct:
     case kIROp_MakeTuple:
     case kIROp_MakeArray:
+    case kIROp_MakeVector:
+    case kIROp_MakeMatrix:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeDifferentialPair:
     case kIROp_MakeDifferentialPairUserCode:
@@ -1484,6 +1486,7 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_Specialize:
     case kIROp_LookupWitness:
     case kIROp_Param:
+    case kIROp_DetachDerivative:
         return false;
     
     // Never store these op codes because they are trivial to compute.

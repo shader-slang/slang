@@ -1744,6 +1744,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Determinant _0")
 [__readNone]
+[PreferCheckpoint]
 T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
@@ -3810,6 +3811,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 [__readNone]
+[PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     matrix<T,M,N> result;
@@ -3822,6 +3824,7 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 [__readNone]
+[PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     matrix<T, M, N> result;
@@ -3834,6 +3837,7 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 [__readNone]
+[PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     matrix<T, M, N> result;
