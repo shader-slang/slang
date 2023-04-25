@@ -148,12 +148,12 @@ SlangResult StreamReader::readToEnd(String& outString)
 			break;
 		if (ch == '\r')
 		{
-			sb.Append('\n');
+			sb.append('\n');
 			if (peek() == '\n')
 				read();
 		}
 		else
-			sb.Append(ch);
+			sb.append(ch);
 	}
 
 	outString = sb.ProduceString();

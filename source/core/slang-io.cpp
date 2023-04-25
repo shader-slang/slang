@@ -189,9 +189,9 @@ namespace Slang
 
         if (dotPos < 0)
             dotPos = path.getLength();
-        sb.Append(path.getBuffer(), dotPos);
-        sb.Append('.');
-        sb.Append(newExt);
+        sb.append(path.getBuffer(), dotPos);
+        sb.append('.');
+        sb.append(newExt);
         return sb.ProduceString();
     }
 
@@ -325,7 +325,7 @@ namespace Slang
     /* static */void Path::combineIntoBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder)
     {
         outBuilder.clear();
-        outBuilder.Append(path1);
+        outBuilder.append(path1);
         append(outBuilder, path2);
     }
 

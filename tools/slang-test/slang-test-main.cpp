@@ -233,7 +233,7 @@ void skipToEndOfLine(char const** ioCursor)
 String getString(char const* textBegin, char  const* textEnd)
 {
     StringBuilder sb;
-    sb.Append(textBegin, textEnd - textBegin);
+    sb.append(textBegin, textEnd - textBegin);
     return sb.ProduceString();
 }
 
@@ -1314,13 +1314,13 @@ String getOutput(const ExecuteResult& exeRes)
     
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
-    actualOutputBuilder.Append("result code = ");
-    actualOutputBuilder.Append(resultCode);
-    actualOutputBuilder.Append("\nstandard error = {\n");
-    actualOutputBuilder.Append(standardError);
-    actualOutputBuilder.Append("}\nstandard output = {\n");
-    actualOutputBuilder.Append(standardOuptut);
-    actualOutputBuilder.Append("}\n");
+    actualOutputBuilder.append("result code = ");
+    actualOutputBuilder.append(resultCode);
+    actualOutputBuilder.append("\nstandard error = {\n");
+    actualOutputBuilder.append(standardError);
+    actualOutputBuilder.append("}\nstandard output = {\n");
+    actualOutputBuilder.append(standardOuptut);
+    actualOutputBuilder.append("}\n");
 
     return actualOutputBuilder.ProduceString();
 }
@@ -2797,13 +2797,13 @@ static TestResult _runHLSLComparisonTest(
     
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
-    actualOutputBuilder.Append("result code = ");
-    actualOutputBuilder.Append(resultCode);
-    actualOutputBuilder.Append("\nstandard error = {\n");
-    actualOutputBuilder.Append(standardError);
-    actualOutputBuilder.Append("}\nstandard output = {\n");
-    actualOutputBuilder.Append(standardOutput);
-    actualOutputBuilder.Append("}\n");
+    actualOutputBuilder.append("result code = ");
+    actualOutputBuilder.append(resultCode);
+    actualOutputBuilder.append("\nstandard error = {\n");
+    actualOutputBuilder.append(standardError);
+    actualOutputBuilder.append("}\nstandard output = {\n");
+    actualOutputBuilder.append(standardOutput);
+    actualOutputBuilder.append("}\n");
 
     String actualOutput = actualOutputBuilder.ProduceString();
 
@@ -2877,13 +2877,13 @@ TestResult doGLSLComparisonTestRun(TestContext* context,
 
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
-    outputBuilder.Append("result code = ");
-    outputBuilder.Append(resultCode);
-    outputBuilder.Append("\nstandard error = {\n");
-    outputBuilder.Append(standardError);
-    outputBuilder.Append("}\nstandard output = {\n");
-    outputBuilder.Append(standardOuptut);
-    outputBuilder.Append("}\n");
+    outputBuilder.append("result code = ");
+    outputBuilder.append(resultCode);
+    outputBuilder.append("\nstandard error = {\n");
+    outputBuilder.append(standardError);
+    outputBuilder.append("}\nstandard output = {\n");
+    outputBuilder.append(standardOuptut);
+    outputBuilder.append("}\n");
 
     String outputPath = outputStem + outputKind;
     String output = outputBuilder.ProduceString();
@@ -3249,13 +3249,13 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
     
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
-    outputBuilder.Append("result code = ");
-    outputBuilder.Append(resultCode);
-    outputBuilder.Append("\nstandard error = {\n");
-    outputBuilder.Append(standardError);
-    outputBuilder.Append("}\nstandard output = {\n");
-    outputBuilder.Append(standardOutput);
-    outputBuilder.Append("}\n");
+    outputBuilder.append("result code = ");
+    outputBuilder.append(resultCode);
+    outputBuilder.append("\nstandard error = {\n");
+    outputBuilder.append(standardError);
+    outputBuilder.append("}\nstandard output = {\n");
+    outputBuilder.append(standardOutput);
+    outputBuilder.append("}\n");
 
     String outputPath = outputStem + outputKind;
     String output = outputBuilder.ProduceString();

@@ -88,7 +88,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
             spanEnd++;
         }
 
-        sb.Append(spanBegin, int(spanEnd - spanBegin));
+        sb.append(spanBegin, int(spanEnd - spanBegin));
         if (!*spanEnd)
             return;
 
@@ -99,7 +99,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
         {
         // A double dollar sign `$$` is used to emit a single `$` 
         case '$':
-            sb.Append('$');
+            sb.append('$');
             break;
 
         // A single digit means to emit the corresponding argument.

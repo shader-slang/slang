@@ -99,7 +99,7 @@ SlangResult FileStream::_init(const String& fileName, FileMode fileMode, FileAcc
             mode = "wb";
         }
         break;
-    case FileMode::Append:
+    case FileMode::append:
         if (access == FileAccess::Read)
         {
             SLANG_ASSERT(!"Read-only access is incompatible with Append mode.");

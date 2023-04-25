@@ -60,7 +60,7 @@ public:
 
 enum class FileMode
 {
-	Create, Open, CreateNew, Append
+	Create, Open, CreateNew, append
 };
 
 enum class FileAccess

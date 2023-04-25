@@ -347,22 +347,22 @@ namespace Misc {
             case '\\':
             case '\"':
             case '\'':
-                tokenBuilder.Append(nextChar);
+                tokenBuilder.append(nextChar);
                 break;
             case 't':
-                tokenBuilder.Append('\t');
+                tokenBuilder.append('\t');
                 break;
             case 's':
-                tokenBuilder.Append(' ');
+                tokenBuilder.append(' ');
                 break;
             case 'n':
-                tokenBuilder.Append('\n');
+                tokenBuilder.append('\n');
                 break;
             case 'r':
-                tokenBuilder.Append('\r');
+                tokenBuilder.append('\r');
                 break;
             case 'b':
-                tokenBuilder.Append('\b');
+                tokenBuilder.append('\b');
                 break;
             }
         };
@@ -433,7 +433,7 @@ namespace Misc {
                 }
                 else if (curChar == '.' && IsDigit(nextChar))
                 {
-                    tokenBuilder.Append("0.");
+                    tokenBuilder.append("0.");
                     state = State::Fixed;
                     pos++;
                 }
@@ -451,7 +451,7 @@ namespace Misc {
             case State::Identifier:
                 if (IsLetter(curChar) || IsDigit(curChar))
                 {
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     pos++;
                 }
                 else
@@ -485,7 +485,7 @@ namespace Misc {
             case State::Operator:
                 if (IsPunctuation(curChar) && !((curChar == '/' && nextChar == '/') || (curChar == '/' && nextChar == '*')))
                 {
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     pos++;
                 }
                 else
@@ -499,22 +499,22 @@ namespace Misc {
             case State::Int:
                 if (IsDigit(curChar))
                 {
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     pos++;
                 }
                 else if (curChar == '.')
                 {
                     state = State::Fixed;
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     pos++;
                 }
                 else if (curChar == 'e' || curChar == 'E')
                 {
                     state = State::Double;
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     if (nextChar == '-' || nextChar == '+')
                     {
-                        tokenBuilder.Append(nextChar);
+                        tokenBuilder.append(nextChar);
                         pos++;
                     }
                     pos++;
@@ -522,13 +522,13 @@ namespace Misc {
                 else if (curChar == 'x')
                 {
                     state = State::Hex;
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     pos++;
                 }
                 else if (curChar == 'u')
                 {
                     pos++;
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     InsertToken(TokenType::IntLiteral);
                     state = State::Start;
                 }
@@ -551,7 +551,7 @@ namespace Misc {
             case State::Hex:
                 if (IsDigit(curChar) || (curChar >= 'a' && curChar <= 'f') || (curChar >= 'A' && curChar <= 'F'))
                 {
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     pos++;
                 }
                 else
@@ -563,16 +563,16 @@ namespace Misc {
             case State::Fixed:
                 if (IsDigit(curChar))
                 {
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     pos++;
                 }
                 else if (curChar == 'e' || curChar == 'E')
                 {
                     state = State::Double;
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     if (nextChar == '-' || nextChar == '+')
                     {
-                        tokenBuilder.Append(nextChar);
+                        tokenBuilder.append(nextChar);
                         pos++;
                     }
                     pos++;
@@ -588,7 +588,7 @@ namespace Misc {
             case State::Double:
                 if (IsDigit(curChar))
                 {
-                    tokenBuilder.Append(curChar);
+                    tokenBuilder.append(curChar);
                     pos++;
                 }
                 else
@@ -608,7 +608,7 @@ namespace Misc {
                         pos++;
                     }
                     else
-                        tokenBuilder.Append(curChar);
+                        tokenBuilder.append(curChar);
                 }
                 else
                 {
@@ -635,7 +635,7 @@ namespace Misc {
                         pos++;
                     }
                     else
-                        tokenBuilder.Append(curChar);
+                        tokenBuilder.append(curChar);
                 }
                 else
                 {

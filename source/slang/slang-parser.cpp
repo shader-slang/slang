@@ -891,17 +891,17 @@ namespace Slang
         StringBuilder scopedIdentifierBuilder;
         if (initialTokenType == TokenType::Scope)
         {
-            scopedIdentifierBuilder.Append('_'); 
+            scopedIdentifierBuilder.append('_'); 
         }
-        scopedIdentifierBuilder.Append(firstIdentifier.getContent());
+        scopedIdentifierBuilder.append(firstIdentifier.getContent());
 
         while (parser->tokenReader.peekTokenType() == TokenType::Scope)
         {
             parser->ReadToken(TokenType::Scope);
-            scopedIdentifierBuilder.Append('_'); 
+            scopedIdentifierBuilder.append('_'); 
             
             const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
-            scopedIdentifierBuilder.Append(nextIdentifier.getContent());
+            scopedIdentifierBuilder.append(nextIdentifier.getContent());
         }
 
         // Make a 'token'

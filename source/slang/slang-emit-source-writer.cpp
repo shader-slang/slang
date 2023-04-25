@@ -36,7 +36,7 @@ void SourceWriter::emitRawTextSpan(char const* textBegin, char const* textEnd)
 {
     // TODO(tfoley): Need to make "corelib" not use `int` for pointer-sized things...
     auto len = textEnd - textBegin;
-    m_builder.Append(textBegin, len);
+    m_builder.append(textBegin, len);
 }
 
 void SourceWriter::emitRawText(char const* text)

@@ -3117,9 +3117,9 @@ RefPtr<Module> Linkage::findOrImportModule(
             if (c == '_')
                 c = '-';
 
-            sb.Append(c);
+            sb.append(c);
         }
-        sb.Append(".slang");
+        sb.append(".slang");
         fileName = sb.ProduceString();
     }
     else

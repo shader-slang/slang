@@ -481,6 +481,11 @@ namespace Slang
         }
     }
 
+    void String::append(char const* str, size_t len)
+    {
+        append(str, str + len);
+    }
+
     void String::append(const char* textBegin, char const* textEnd)
     {
         auto oldLength = getLength();
@@ -595,7 +600,7 @@ namespace Slang
         m_buffer->length += count;
     }
 
-    void String::append(float val, const char * format)
+    void String::append(float val, const char* format)
     {
         enum { kCount = 128 };
         char* data = prepareForAppend(kCount);
@@ -603,7 +608,7 @@ namespace Slang
         m_buffer->length += strnlen_s(data, kCount);
     }
 
-    void String::append(double val, const char * format)
+    void String::append(double val, const char* format)
     {
         enum { kCount = 128 };
         char* data = prepareForAppend(kCount);
