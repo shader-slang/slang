@@ -33,7 +33,7 @@ static SlangResult _outputCount(int argc, const char* const* argv)
         return SLANG_FAIL;
     }
     // Get the count
-    const Index count = StringToInt(argv[2]);
+    const Index count = stringToInt(argv[2]);
 
     // If we want to crash
     Index crashIndex = -1;
@@ -41,7 +41,7 @@ static SlangResult _outputCount(int argc, const char* const* argv)
     {
         // When we crash, we want to make sure everything is flushed...
         _makeStdStreamsUnbuffered();
-        crashIndex = StringToInt(argv[3]);
+        crashIndex = stringToInt(argv[3]);
     }
 
     FILE* fileOut = stdout;

@@ -2390,7 +2390,7 @@ SlangResult parseOptions(
     if (sink->getErrorCount() > 0)
     {
         // Put the errors in the diagnostic 
-        compileRequest->m_diagnosticOutput = sink->outputBuffer.ProduceString();
+        compileRequest->m_diagnosticOutput = sink->outputBuffer.produceString();
     }
 
     return res;

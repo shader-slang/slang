@@ -1644,7 +1644,7 @@ namespace Slang
             context.getArgType(aa)->toText(argsListBuilder);
         }
         argsListBuilder << ")";
-        return argsListBuilder.ProduceString();
+        return argsListBuilder.produceString();
     }
 
     Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr * expr)

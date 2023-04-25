@@ -113,7 +113,7 @@ String parseXmlText(UnownedStringSlice text)
             pos++;
         }
     }
-    return sb.ProduceString();
+    return sb.produceString();
 }
 
 bool shouldUseFallbackStyle(const FormatOptions& options)

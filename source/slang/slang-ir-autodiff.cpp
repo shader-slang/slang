@@ -271,7 +271,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
     StringBuilder nameBuilder;
     nameBuilder << "DiffPair_";
     getTypeNameHint(nameBuilder, origBaseType);
-    builder.addNameHintDecoration(pairStructType, nameBuilder.ToString().getUnownedSlice());
+    builder.addNameHintDecoration(pairStructType, nameBuilder.toString().getUnownedSlice());
 
     builder.createStructField(pairStructType, _getOrCreatePrimalStructKey(), origBaseType);
     builder.createStructField(pairStructType, _getOrCreateDiffStructKey(), (IRType*)diffType);

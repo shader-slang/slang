@@ -210,7 +210,7 @@ SlangResult StringWriter::write(const char* chars, size_t numChars)
 {
     if (numChars > 0)
     {
-        m_builder->Append(chars, numChars);
+        m_builder->append(chars, numChars);
     }
     return SLANG_OK;
 }

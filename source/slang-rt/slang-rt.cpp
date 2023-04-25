@@ -49,7 +49,7 @@ extern "C"
             // If failed, try stdcall mangled name.
             StringBuilder sb;
             sb << "_" << funcName << "@" << argSize;
-            funcPtr = lib->findFuncByName(sb.ToString().getBuffer());
+            funcPtr = lib->findFuncByName(sb.toString().getBuffer());
         }
         if (!funcPtr)
         {

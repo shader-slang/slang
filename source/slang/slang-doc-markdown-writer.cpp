@@ -117,7 +117,7 @@ String DocMarkdownWriter::_getName(Decl* decl)
 {
     StringBuilder buf;
     ASTPrinter::appendDeclName(decl, buf);
-    return buf.ProduceString();
+    return buf.produceString();
 }
 
 String DocMarkdownWriter::_getName(InheritanceDecl* decl)
@@ -125,7 +125,7 @@ String DocMarkdownWriter::_getName(InheritanceDecl* decl)
     StringBuilder buf;
     buf.clear();
     buf << decl->base;
-    return buf.ProduceString();
+    return buf.produceString();
 }
 
 DocMarkdownWriter::NameAndText DocMarkdownWriter::_getNameAndText(ASTMarkup::Entry* entry, Decl* decl)

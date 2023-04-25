@@ -233,8 +233,8 @@ void skipToEndOfLine(char const** ioCursor)
 String getString(char const* textBegin, char  const* textEnd)
 {
     StringBuilder sb;
-    sb.Append(textBegin, textEnd - textBegin);
-    return sb.ProduceString();
+    sb.append(textBegin, textEnd - textBegin);
+    return sb.produceString();
 }
 
 String collectRestOfLine(char const** ioCursor)
@@ -1314,15 +1314,15 @@ String getOutput(const ExecuteResult& exeRes)
     
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
-    actualOutputBuilder.Append("result code = ");
-    actualOutputBuilder.Append(resultCode);
-    actualOutputBuilder.Append("\nstandard error = {\n");
-    actualOutputBuilder.Append(standardError);
-    actualOutputBuilder.Append("}\nstandard output = {\n");
-    actualOutputBuilder.Append(standardOuptut);
-    actualOutputBuilder.Append("}\n");
+    actualOutputBuilder.append("result code = ");
+    actualOutputBuilder.append(resultCode);
+    actualOutputBuilder.append("\nstandard error = {\n");
+    actualOutputBuilder.append(standardError);
+    actualOutputBuilder.append("}\nstandard output = {\n");
+    actualOutputBuilder.append(standardOuptut);
+    actualOutputBuilder.append("}\n");
 
-    return actualOutputBuilder.ProduceString();
+    return actualOutputBuilder.produceString();
 }
 
 // Finds the specialized or default path for expected data for a test. 
@@ -1631,7 +1631,7 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
         {
             StringBuilder buf;
             StringEscapeUtil::unescapeShellLike(escapeHandler, arg.getUnownedSlice(), buf);
-            cmdLine.addArg(buf.ProduceString());
+            cmdLine.addArg(buf.produceString());
         }
         else
         {
@@ -1935,7 +1935,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 
     TestResult result = TestResult::Pass;
 
-    auto actualOutput = actualOutputSB.ProduceString();
+    auto actualOutput = actualOutputSB.produceString();
 
     // Redact absolute file names from actualOutput
     List<UnownedStringSlice> outputLines;
@@ -1952,7 +1952,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         redactedSB << "{REDACTED}" << line.tail(extIdx) << "\n";
     }
 
-    actualOutput = redactedSB.ProduceString().trim();
+    actualOutput = redactedSB.produceString().trim();
 
     if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
     {
@@ -2120,7 +2120,7 @@ TestResult runCompile(TestContext* context, TestInput& input)
         {
             StringBuilder buf;
             StringEscapeUtil::unescapeShellLike(escapeHandler, arg.getUnownedSlice(), buf);
-            cmdLine.addArg(buf.ProduceString());
+            cmdLine.addArg(buf.produceString());
         }
         else
         {
@@ -2797,15 +2797,15 @@ static TestResult _runHLSLComparisonTest(
     
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
-    actualOutputBuilder.Append("result code = ");
-    actualOutputBuilder.Append(resultCode);
-    actualOutputBuilder.Append("\nstandard error = {\n");
-    actualOutputBuilder.Append(standardError);
-    actualOutputBuilder.Append("}\nstandard output = {\n");
-    actualOutputBuilder.Append(standardOutput);
-    actualOutputBuilder.Append("}\n");
+    actualOutputBuilder.append("result code = ");
+    actualOutputBuilder.append(resultCode);
+    actualOutputBuilder.append("\nstandard error = {\n");
+    actualOutputBuilder.append(standardError);
+    actualOutputBuilder.append("}\nstandard output = {\n");
+    actualOutputBuilder.append(standardOutput);
+    actualOutputBuilder.append("}\n");
 
-    String actualOutput = actualOutputBuilder.ProduceString();
+    String actualOutput = actualOutputBuilder.produceString();
 
     // Always fail if the compilation produced a failure, just
     // to catch situations where, e.g., command-line options parsing
@@ -2877,16 +2877,16 @@ TestResult doGLSLComparisonTestRun(TestContext* context,
 
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
-    outputBuilder.Append("result code = ");
-    outputBuilder.Append(resultCode);
-    outputBuilder.Append("\nstandard error = {\n");
-    outputBuilder.Append(standardError);
-    outputBuilder.Append("}\nstandard output = {\n");
-    outputBuilder.Append(standardOuptut);
-    outputBuilder.Append("}\n");
+    outputBuilder.append("result code = ");
+    outputBuilder.append(resultCode);
+    outputBuilder.append("\nstandard error = {\n");
+    outputBuilder.append(standardError);
+    outputBuilder.append("}\nstandard output = {\n");
+    outputBuilder.append(standardOuptut);
+    outputBuilder.append("}\n");
 
     String outputPath = outputStem + outputKind;
-    String output = outputBuilder.ProduceString();
+    String output = outputBuilder.produceString();
 
     *outOutput = output;
 
@@ -2954,7 +2954,7 @@ static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& t
             UnownedStringSlice remaining(line.begin() + lineStart.getLength(), line.end());
             remaining.trim();
 
-            timeOut = StringToDouble(String(remaining));
+            timeOut = stringToDouble(String(remaining));
             return SLANG_OK;
         }
     }
@@ -3249,16 +3249,16 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
     
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
-    outputBuilder.Append("result code = ");
-    outputBuilder.Append(resultCode);
-    outputBuilder.Append("\nstandard error = {\n");
-    outputBuilder.Append(standardError);
-    outputBuilder.Append("}\nstandard output = {\n");
-    outputBuilder.Append(standardOutput);
-    outputBuilder.Append("}\n");
+    outputBuilder.append("result code = ");
+    outputBuilder.append(resultCode);
+    outputBuilder.append("\nstandard error = {\n");
+    outputBuilder.append(standardError);
+    outputBuilder.append("}\nstandard output = {\n");
+    outputBuilder.append(standardOutput);
+    outputBuilder.append("}\n");
 
     String outputPath = outputStem + outputKind;
-    String output = outputBuilder.ProduceString();
+    String output = outputBuilder.produceString();
 
     *outOutput = output;
 

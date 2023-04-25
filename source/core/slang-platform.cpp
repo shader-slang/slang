@@ -49,7 +49,7 @@ namespace Slang
 {
     StringBuilder builder;
     calcPlatformPath(path, builder);
-    return builder.ToString();
+    return builder.toString();
 }
 
 #ifdef _WIN32
@@ -92,7 +92,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         {
             builderOut << " ";
             // Convert to string
-            builderOut.Append(String::fromWString(buffer));
+            builderOut.append(String::fromWString(buffer));
             LocalFree(buffer);
             return SLANG_OK;
         }
@@ -152,8 +152,8 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 /* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
 {
-    dst.Append(name);
-    dst.Append(".dll");
+    dst.append(name);
+    dst.append(".dll");
 }
 
 #else // _WIN32
@@ -221,21 +221,21 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 /* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
 {
 #if __CYGWIN__
-    dst.Append(name);
-    dst.Append(".dll");
+    dst.append(name);
+    dst.append(".dll");
 #elif SLANG_APPLE_FAMILY
-    dst.Append("lib");
-    dst.Append(name);
-    dst.Append(".dylib");
+    dst.append("lib");
+    dst.append(name);
+    dst.append(".dylib");
 #elif SLANG_LINUX_FAMILY
     if (!name.startsWith("lib"))
-        dst.Append("lib");
-    dst.Append(name);
+        dst.append("lib");
+    dst.append(name);
     if (name.indexOf(UnownedStringSlice(".so.")) == -1)
-        dst.Append(".so");
+        dst.append(".so");
 #else
     // Just guess we can do with the name on it's own
-    dst.Append(name);
+    dst.append(name);
 #endif
 }
 

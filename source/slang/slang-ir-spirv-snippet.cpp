@@ -202,7 +202,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                         else if (identifier.startsWith("_"))
                         {
                             operand.type = SpvSnippet::ASMOperandType::ObjectReference;
-                            operand.content = (SpvWord)StringToInt(
+                            operand.content = (SpvWord)stringToInt(
                                 identifier.subString(1, identifier.getLength() - 1));
                             inst.operands.add(operand);
                         }

@@ -118,7 +118,7 @@ public:
     void calcAbsoluteName(StringBuilder& outName) const;
 
         /// Get the absolute name
-    String getAbsoluteName() const { StringBuilder buf; calcAbsoluteName(buf); return buf.ProduceString(); }
+    String getAbsoluteName() const { StringBuilder buf; calcAbsoluteName(buf); return buf.produceString(); }
 
         /// Calculate the scope path to this node, from the root 
     void calcScopePath(List<Node*>& outPath) { calcScopePath(this, outPath); }

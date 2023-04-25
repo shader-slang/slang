@@ -266,7 +266,7 @@ namespace Slang
 
         #include "core.meta.slang.h"
 
-        coreLibraryCode = sb.ProduceString();
+        coreLibraryCode = sb.produceString();
 #endif
 
         return coreLibraryCode;
@@ -284,7 +284,7 @@ namespace Slang
 
         #include "hlsl.meta.slang.h"
 
-        hlslLibraryCode = sb.ProduceString();
+        hlslLibraryCode = sb.produceString();
 #endif
         return hlslLibraryCode;
     }
@@ -301,7 +301,7 @@ namespace Slang
 
         #include "diff.meta.slang.h"
 
-        autodiffLibraryCode = sb.ProduceString();
+        autodiffLibraryCode = sb.produceString();
 #endif
         return autodiffLibraryCode;
     }

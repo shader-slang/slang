@@ -792,10 +792,10 @@ namespace Slang
 
         if (diagnostic.getLength() > 0)
         {
-            builder.Append(diagnostic);
+            builder.append(diagnostic);
             if (!diagnostic.endsWith("\n"))
             {
-                builder.Append("\n");
+                builder.append("\n");
             }
         }
 

@@ -1833,7 +1833,7 @@ Token MacroInvocation::_readTokenImpl()
                 //
                 PathInfo pathInfo = PathInfo::makeTokenPaste();       
                 SourceManager* sourceManager = m_preprocessor->getSourceManager();
-                SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, pastedContent.ProduceString());
+                SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, pastedContent.produceString());
                 SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, tokenPasteLoc);
 
                 Lexer lexer;
@@ -2532,7 +2532,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
         }
 
     case TokenType::IntegerLiteral:
-        return StringToInt(token.getContent());
+        return stringToInt(token.getContent());
 
     case TokenType::Identifier:
         {
@@ -3484,7 +3484,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     switch(PeekTokenType(context))
     {
     case TokenType::IntegerLiteral:
-        line = StringToInt(AdvanceToken(context).getContent());
+        line = stringToInt(AdvanceToken(context).getContent());
         break;
 
     case TokenType::EndOfFile:
@@ -4098,7 +4098,7 @@ TokenList preprocessSource(
         sb << t.Content;
     }
 
-    String s = sb.ProduceString();
+    String s = sb.produceString();
 #endif
 
     return tokens;

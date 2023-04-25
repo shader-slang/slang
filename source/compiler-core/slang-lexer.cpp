@@ -878,14 +878,14 @@ namespace Slang
             if(c == quote)
             {
                 SLANG_ASSERT(cursor == end);
-                return valueBuilder.ProduceString();
+                return valueBuilder.produceString();
             }
 
             // Characters that don't being escape sequences are easy;
             // just append them to the buffer and move on.
             if(c != '\\')
             {
-                valueBuilder.Append(c);
+                valueBuilder.append(c);
                 continue;
             }
 
@@ -901,19 +901,19 @@ namespace Slang
             case '\"':
             case '\\':
             case '?':
-                valueBuilder.Append(d);
+                valueBuilder.append(d);
                 continue;
 
             // Traditional escape sequences for special characters
-            case 'a': valueBuilder.Append('\a'); continue;
-            case 'b': valueBuilder.Append('\b'); continue;
-            case 'f': valueBuilder.Append('\f'); continue;
-            case 'n': valueBuilder.Append('\n'); continue;
-            case 'r': valueBuilder.Append('\r'); continue;
-            case 't': valueBuilder.Append('\t'); continue;
-            case 'v': valueBuilder.Append('\v'); continue;
+            case 'a': valueBuilder.append('\a'); continue;
+            case 'b': valueBuilder.append('\b'); continue;
+            case 'f': valueBuilder.append('\f'); continue;
+            case 'n': valueBuilder.append('\n'); continue;
+            case 'r': valueBuilder.append('\r'); continue;
+            case 't': valueBuilder.append('\t'); continue;
+            case 'v': valueBuilder.append('\v'); continue;
 
-            // Octal escape: up to 3 characterws
+            // Octal escape: up to 3 characters
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7':
                 {
@@ -936,7 +936,7 @@ namespace Slang
                     }
 
                     // TODO: add support for appending an arbitrary code point?
-                    valueBuilder.Append((char) value);
+                    valueBuilder.append((char) value);
                 }
                 continue;
 
@@ -970,7 +970,7 @@ namespace Slang
                     }
 
                     // TODO: add support for appending an arbitrary code point?
-                    valueBuilder.Append((char) value);
+                    valueBuilder.append((char) value);
                 }
                 continue;
 

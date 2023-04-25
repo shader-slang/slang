@@ -31,7 +31,7 @@ String _getMessage(SignalType type, char const* message)
         buf << ": " << message;
     }
     
-    return buf.ProduceString();
+    return buf.produceString();
 }
 
 // One point of having as a single function is a choke point both for handling (allowing different

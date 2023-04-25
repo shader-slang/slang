@@ -434,7 +434,7 @@ struct ASTDumpContext
     {
         StringBuilder sb;
         sb << declRef;
-        m_writer->emit(sb.ToString());
+        m_writer->emit(sb.toString());
     }
 
     void dump(const DeclCheckStateExt& extState)

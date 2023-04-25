@@ -1024,7 +1024,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     {
         StringBuilder sb;
         calcTypeName(type, m_target, sb);
-        m_writer->emit(sb.ProduceString());
+        m_writer->emit(sb.produceString());
         m_writer->emit(" ");
         emitDeclarator(declarator);
         break;
