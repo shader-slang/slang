@@ -1,6 +1,7 @@
 // slang-ast-dump.cpp
 #include "slang-ast-dump.h"
 #include <assert.h>
+#include <cctype>
 
 #include "slang-compiler.h"
 
@@ -240,11 +241,6 @@ struct ASTDumpContext
         return (v < 10) ? char(v + '0') : char('a' + v - 10);
     }
 
-    static bool _isPrintableChar(char c)
-    {
-        return c >= 0x20 && c < 0x80;
-    }
-
     void dump(const UnownedStringSlice& slice)
     {
         
@@ -253,7 +249,7 @@ struct ASTDumpContext
         buf.appendChar('\"');
         for (const char c : slice)
         {
-            if (_isPrintableChar(c))
+            if (std::isprint(c))
             {
                 buf << c;
             }

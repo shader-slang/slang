@@ -353,7 +353,6 @@ workspace "slang"
         buildoptions { "-fvisibility=hidden" } 
         -- Warnings
         buildoptions {
-            "-Wno-type-limits",
             "-Wno-sign-compare",
             "-Wno-unused-variable",
             "-Wno-switch",
