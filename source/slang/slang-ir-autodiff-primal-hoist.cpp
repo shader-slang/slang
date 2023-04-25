@@ -383,7 +383,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                     auto branchInst = as<IRUnconditionalBranch>(predecessor->getTerminator());
                     SLANG_ASSERT(branchInst->getOperandCount() > paramIndex);
 
-                    workList.add(&branchInst->getOperands()[paramIndex]);
+                    workList.add(&branchInst->getArgs()[paramIndex]);
                 }
             }
             else
@@ -497,17 +497,10 @@ void applyToInst(
         if (as<IRParam>(inst))
         {
             // Can completely ignore first block parameters
-            if (getBlock(inst) != getBlock(inst)->getParent()->getFirstBlock())
+            if (getBlock(inst) == getBlock(inst)->getParent()->getFirstBlock())
             {    
-                // TODO: We would need to clone in the control-flow for each region (without nested loops)
-                // prior to this, and then hoist this parameter into the within-region block, otherwise
-                // this parameter will not be visible to transposed insts.
-                // This will also include adding an extra case to 'ensurePrimalAvailability': if both insts
-                // are withing the _same_ indexed region, skip the indexed store/load and use a simple var.
-                // 
-                SLANG_UNIMPLEMENTED_X("Parameter recompute is not currently supported");
+                return;
             }
-            return;
         }
 
         auto recomputeInst = cloneCtx->cloneInstOutOfOrder(builder, inst);
@@ -1476,6 +1469,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_Div:
     case kIROp_Neg:
     case kIROp_Geq:
+    case kIROp_FRem:
+    case kIROp_IRem:
     case kIROp_Leq:
     case kIROp_Neq:
     case kIROp_Eql:
@@ -1545,7 +1540,7 @@ bool canRecompute(IRUse* use)
                 return false;
         }
     }
-    return false;
+    return true;
 }
 
 HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
