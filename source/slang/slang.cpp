@@ -83,7 +83,7 @@ namespace Slang {
 
 /* static */bool BaseTypeInfo::check()
 {
-    for (Index i = 0; i < SLANG_COUNT_OF(s_info); ++i)
+    for (UIndex i = 0; i < SLANG_COUNT_OF(s_info); ++i)
     {
         if (s_info[i].baseType != i)
         {

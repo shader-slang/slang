@@ -169,7 +169,7 @@ struct DebugInfoFormatTable
 
 /* static */slang::TypeReflection::ScalarType TypeTextUtil::findScalarType(const UnownedStringSlice& inText)
 {
-    for (Index i = 0; i < SLANG_COUNT_OF(s_scalarTypeInfos); ++i)
+    for (UIndex i = 0; i < SLANG_COUNT_OF(s_scalarTypeInfos); ++i)
     {
         const auto& info = s_scalarTypeInfos[i];
         if (info.text == inText)
@@ -314,7 +314,7 @@ struct DebugInfoFormatTable
 
 static Index _getTargetInfoIndex(SlangCompileTarget target)
 {
-    for (Index i = 0; i < SLANG_COUNT_OF(s_compileTargetInfos); ++i)
+    for (UIndex i = 0; i < SLANG_COUNT_OF(s_compileTargetInfos); ++i)
     {
         if (s_compileTargetInfos[i].target == target)
         {

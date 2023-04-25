@@ -1427,7 +1427,7 @@ bool findImageFormatByName(char const* inName, ImageFormat* outFormat)
 {
     const UnownedStringSlice name(inName);
 
-    for (Index i = 0; i < SLANG_COUNT_OF(kImageFormatInfos); ++i)
+    for (UIndex i = 0; i < SLANG_COUNT_OF(kImageFormatInfos); ++i)
     {
         const auto& info = kImageFormatInfos[i];
         if (info.name == name)

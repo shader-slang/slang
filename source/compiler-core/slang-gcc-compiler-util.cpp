@@ -117,7 +117,7 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(const ExecutableLocation& exe
 
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(prefixes) == SLANG_COUNT_OF(types));
 
-    for (Index i = 0; i < SLANG_COUNT_OF(prefixes); ++i)
+    for (UIndex i = 0; i < SLANG_COUNT_OF(prefixes); ++i)
     {
         // Set the type
         outDesc.type = types[i];

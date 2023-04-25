@@ -4033,7 +4033,7 @@ TokenList preprocessSource(
         const char*const builtinNames[] = { "__FILE__", "__LINE__" };
         const MacroDefinition::Opcode builtinOpcodes[] = { MacroDefinition::Opcode::BuiltinFile, MacroDefinition::Opcode::BuiltinLine };
 
-        for (Index i = 0; i < SLANG_COUNT_OF(builtinNames); i++)
+        for (UIndex i = 0; i < SLANG_COUNT_OF(builtinNames); i++)
         {
             auto name = namePool->getName(builtinNames[i]);
 

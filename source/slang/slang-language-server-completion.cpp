@@ -658,7 +658,7 @@ LanguageServerProtocol::CompletionItem CompletionContext::generateGUIDCompletion
     auto hashStr = String(docHash, 16);
     sectionLengths[0] -= (int)hashStr.getLength();
     sb << hashStr;
-    for (int j = 0; j < SLANG_COUNT_OF(sectionLengths); j++)
+    for (UIndex j = 0; j < SLANG_COUNT_OF(sectionLengths); j++)
     {
         auto len = sectionLengths[j];
         if (j != 0)

@@ -83,7 +83,7 @@ struct VlqDecodeTable
     VlqDecodeTable()
     {
         ::memset(map, -1, sizeof(map));
-        for (Index i = 0; i < SLANG_COUNT_OF(g_vlqEncodeTable); ++i)
+        for (UIndex i = 0; i < SLANG_COUNT_OF(g_vlqEncodeTable); ++i)
         {
             map[g_vlqEncodeTable[i]] = int8_t(i);
         }
