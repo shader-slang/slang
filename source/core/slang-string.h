@@ -451,10 +451,11 @@ namespace Slang
             : m_buffer(buffer)
         {}
 
-        static String fromWString(const wchar_t * wstr);
-        static String fromWString(const wchar_t * wstr, const wchar_t * wend);
+        static String fromWString(const wchar_t* wstr);
+        static String fromWString(const wchar_t* wstr, const wchar_t* wend);
         static String fromWChar(const wchar_t ch);
         static String fromUnicodePoint(Char32 codePoint);
+
         String()
         {
         }
