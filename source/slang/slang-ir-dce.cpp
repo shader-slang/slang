@@ -52,7 +52,7 @@ struct DeadCodeEliminationContext
         //
         if(!inst) return false;
 
-        return liveInsts.Contains(inst);
+        return liveInsts.contains(inst);
     }
 
     // We are going to do an iterative analysis
@@ -81,9 +81,9 @@ struct DeadCodeEliminationContext
         //
         if(!inst) return;
 
-        if(liveInsts.Contains(inst))
+        if(liveInsts.contains(inst))
             return;
-        liveInsts.Add(inst);
+        liveInsts.add(inst);
         workList.add(inst);
     }
 
@@ -106,7 +106,7 @@ struct DeadCodeEliminationContext
         bool result = false;
         for (;;)
         {
-            liveInsts.Clear();
+            liveInsts.clear();
             workList.clear();
 
             // First of all, we know that the root instruction
@@ -223,25 +223,6 @@ struct DeadCodeEliminationContext
         return processInst(module->getModuleInst());
     }
 
-    void removePhiArgs(IRInst* phiParam)
-    {
-        auto block = cast<IRBlock>(phiParam->getParent());
-        UInt paramIndex = 0;
-        for (auto p = block->getFirstParam(); p; p = p->getNextParam())
-        {
-            if (p == phiParam)
-                break;
-            paramIndex++;
-        }
-        for (auto predBlock : block->getPredecessors())
-        {
-            auto termInst = as<IRUnconditionalBranch>(predBlock->getTerminator());
-            SLANG_ASSERT(paramIndex < termInst->getArgCount());
-            termInst->removeArgument(paramIndex);
-        }
-        phiRemoved = true;
-    }
-
     bool eliminateDeadInstsRec(IRInst* inst)
     {
         bool changed = false;
@@ -266,6 +247,7 @@ struct DeadCodeEliminationContext
             {
                 // For Phi parameters, we need to update all branch arguments.
                 removePhiArgs(inst);
+                phiRemoved = true;
             }
             inst->removeAndDeallocate();
             changed = true;

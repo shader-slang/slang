@@ -159,13 +159,13 @@ SLANG_UNIT_TEST(string)
         StringBuilder builder;
 
         {
-            builder.Clear();
+            builder.clear();
             StringUtil::join(values, 0, ',', builder);
             SLANG_CHECK(builder == "");
         }
 
         {
-            builder.Clear();
+            builder.clear();
             StringUtil::join(values, 1, ',', builder);
             SLANG_CHECK(builder == "hello");
 
@@ -174,7 +174,7 @@ SLANG_UNIT_TEST(string)
         }
 
         {
-            builder.Clear();
+            builder.clear();
             StringUtil::join(values, 2, ',', builder);
             SLANG_CHECK(builder == "hello,world");
 
@@ -183,7 +183,7 @@ SLANG_UNIT_TEST(string)
         }
 
         {
-            builder.Clear();
+            builder.clear();
             StringUtil::join(values, 3, UnownedStringSlice("ab"), builder);
             SLANG_CHECK(builder == "helloabworldab!");
 
@@ -212,7 +212,7 @@ SLANG_UNIT_TEST(string)
 
         for (auto value : values)
         {
-            buf.Clear();
+            buf.clear();
             _append(value, buf);
 
             UnownedStringSlice slice = buf.getUnownedSlice();
@@ -244,7 +244,7 @@ SLANG_UNIT_TEST(string)
 
         for (auto value : values)
         {
-            buf.Clear();
+            buf.clear();
             buf << value;
 
 

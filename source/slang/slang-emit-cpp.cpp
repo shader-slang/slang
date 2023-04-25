@@ -102,7 +102,7 @@ static const char s_xyzwNames[] = "xyzw";
 UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
 {
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
-    if (m_typeNameMap.TryGetValue(type, handle))
+    if (m_typeNameMap.tryGetValue(type, handle))
     {
         return m_slicePool.getSlice(handle);
     }
@@ -113,7 +113,7 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
         handle = m_slicePool.add(builder);
     }
 
-    m_typeNameMap.Add(type, handle);
+    m_typeNameMap.add(type, handle);
 
     SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
     return m_slicePool.getSlice(handle);
@@ -1024,7 +1024,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     {
         StringBuilder sb;
         calcTypeName(type, m_target, sb);
-        m_writer->emit(sb.ProduceString());
+        m_writer->emit(sb.produceString());
         m_writer->emit(" ");
         emitDeclarator(declarator);
         break;
@@ -1889,13 +1889,13 @@ void CPPSourceEmitter::_emitEntryPointGroup(const Int sizeAlongAxis[kThreadGroup
     for (Index i = 0; i < axes.getCount(); ++i)
     {
         const auto& axis = axes[i];
-        builder.Clear();
+        builder.clear();
         const char elem[2] = { s_xyzwNames[axis.axis], 0 };
         builder << "for (uint32_t " << elem << " = 0; " << elem << " < " << axis.size << "; ++" << elem << ")\n{\n";
         m_writer->emit(builder);
         m_writer->indent();
 
-        builder.Clear();
+        builder.clear();
         builder << "threadInput.groupThreadID." << elem << " = " << elem << ";\n";
         m_writer->emit(builder);
     }
@@ -1923,7 +1923,7 @@ void CPPSourceEmitter::_emitEntryPointGroupRange(const Int sizeAlongAxis[kThread
     for (Index i = 0; i < axes.getCount(); ++i)
     {
         const auto& axis = axes[i];
-        builder.Clear();
+        builder.clear();
         const char elem[2] = { s_xyzwNames[axis.axis], 0 };
 
         builder << "for (uint32_t " << elem << " = vi.startGroupID." << elem << "; " << elem << " < vi.endGroupID." << elem << "; ++" << elem << ")\n{\n";
@@ -1956,7 +1956,7 @@ void CPPSourceEmitter::_emitInitAxisValues(const Int sizeAlongAxis[kThreadGroupA
     m_writer->indent();
     for (int i = 0; i < kThreadGroupAxisCount; ++i)
     {
-        builder.Clear();
+        builder.clear();
         const char elem[2] = { s_xyzwNames[i], 0 };
         builder << mulName << "." << elem << " * " << sizeAlongAxis[i];
         if (addName.getLength() > 0)

@@ -60,7 +60,7 @@ static bool isTrivialSingleIterationLoop(
         context.regionTree = generateRegionTreeForFunc(func, nullptr);
 
     SimpleRegion* targetBlockRegion = nullptr;
-    if (!context.regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
+    if (!context.regionTree->mapBlockToRegion.tryGetValue(targetBlock, targetBlockRegion))
         return false;
     BreakableRegion* loopBreakableRegion = findBreakableRegion(targetBlockRegion);
     LoopRegion* loopRegion = as<LoopRegion>(loopBreakableRegion);
@@ -73,13 +73,13 @@ static bool isTrivialSingleIterationLoop(
         if (context.domTree->dominates(loop->getBreakBlock(), block))
             continue;
         SimpleRegion* region = nullptr;
-        if (!context.regionTree->mapBlockToRegion.TryGetValue(block, region))
+        if (!context.regionTree->mapBlockToRegion.tryGetValue(block, region))
             return false;
 
         for (auto branchTarget : block->getSuccessors())
         {
             SimpleRegion* targetRegion = nullptr;
-            if (!context.regionTree->mapBlockToRegion.TryGetValue(branchTarget, targetRegion))
+            if (!context.regionTree->mapBlockToRegion.tryGetValue(branchTarget, targetRegion))
                 return false;
             // If multi-level break out that skips over this loop exists, then this is not a trivial loop.
             if (targetRegion->isDescendentOf(loopRegion))
@@ -102,7 +102,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
     auto blocks = collectBlocksInLoop(func, loopInst);
     HashSet<IRBlock*> loopBlocks;
     for (auto b : blocks)
-        loopBlocks.Add(b);
+        loopBlocks.add(b);
     auto addressHasOutOfLoopUses = [&](IRInst* addr)
     {
         // The entire access chain of `addr` must have no uses outside the loop.
@@ -113,7 +113,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
                 return true;
             for (auto use = chainNode->firstUse; use; use = use->nextUse)
             {
-                if (!loopBlocks.Contains(as<IRBlock>(use->getUser()->getParent())))
+                if (!loopBlocks.contains(as<IRBlock>(use->getUser()->getParent())))
                     return true;
             }
             switch (chainNode->getOp())
@@ -144,7 +144,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
             // Is this inst used anywhere outside the loop? If so the loop has side effect.
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {
-                if (!loopBlocks.Contains(as<IRBlock>(use->getUser()->getParent())))
+                if (!loopBlocks.contains(as<IRBlock>(use->getUser()->getParent())))
                     return true;
             }
 
@@ -174,7 +174,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
             }
             else if (auto branch = as<IRUnconditionalBranch>(inst))
             {
-                if (loopBlocks.Contains(branch->getTargetBlock()))
+                if (loopBlocks.contains(branch->getTargetBlock()))
                     continue;
                 // Branching out of the loop with some argument is considered
                 // having a side effect.
@@ -224,7 +224,7 @@ static bool removeDeadBlocks(IRGlobalValueWithCode* func)
             {
                 for (auto succ : block->getSuccessors())
                 {
-                    if (workListSet.Add(succ))
+                    if (workListSet.add(succ))
                     {
                         nextWorkList.add(succ);
                     }
@@ -236,7 +236,7 @@ static bool removeDeadBlocks(IRGlobalValueWithCode* func)
         if (nextWorkList.getCount())
         {
             workList = _Move(nextWorkList);
-            workListSet.Clear();
+            workListSet.clear();
         }
         else
         {
@@ -462,7 +462,7 @@ static bool removeTrivialPhiParams(IRBlock* block)
 
     for (UInt i = 1; i < (UInt)args.getCount(); i++)
         for (UInt j = 0; j < i; j++)
-            args[i].sameAsParamSet.Add(j);
+            args[i].sameAsParamSet.add(j);
 
     for (auto pred : block->getPredecessors())
     {
@@ -484,7 +484,7 @@ static bool removeTrivialPhiParams(IRBlock* block)
             {
                 if (termInst->getArg(i) != termInst->getArg(j))
                 {
-                    args[i].sameAsParamSet.Remove(j);
+                    args[i].sameAsParamSet.remove(j);
                 }
             }
         }
@@ -496,7 +496,7 @@ static bool removeTrivialPhiParams(IRBlock* block)
         {
             targetVal = args[i].knownValue;
         }
-        else if (args[i].sameAsParamSet.Count())
+        else if (args[i].sameAsParamSet.getCount())
         {
             auto targetParamId = *args[i].sameAsParamSet.begin();
             targetVal = params[targetParamId];
@@ -620,7 +620,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
             }
             for (auto successor : block->getSuccessors())
             {
-                if (processedBlock.Add(successor))
+                if (processedBlock.add(successor))
                 {
                     workList.add(successor);
                 }

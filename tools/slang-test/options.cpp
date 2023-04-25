@@ -17,13 +17,13 @@ TestCategory* TestCategorySet::add(String const& name, TestCategory* parent)
     category->name = name;
     category->parent = parent;
 
-    m_categoryMap.Add(name, category);
+    m_categoryMap.add(name, category);
     return category;
 }
 
 TestCategory* TestCategorySet::find(String const& name)
 {
-    if (auto category = m_categoryMap.TryGetValue(name))
+    if (auto category = m_categoryMap.tryGetValue(name))
     {
         return category->Ptr();
     }
@@ -201,7 +201,7 @@ static bool _isSubCommand(const char* arg)
                 stdError.print("error: expected operand for '%s'\n", arg);
                 return SLANG_FAIL;
             }
-            optionsOut->serverCount = StringToInt(* argCursor++);
+            optionsOut->serverCount = stringToInt(* argCursor++);
             if (optionsOut->serverCount <= 0)
             {
                 optionsOut->serverCount = 1;
@@ -239,7 +239,7 @@ static bool _isSubCommand(const char* arg)
             auto category = categorySet->findOrError(*argCursor++);
             if (category)
             {
-                optionsOut->includeCategories.Add(category, category);
+                optionsOut->includeCategories.add(category, category);
             }
         }
         else if (strcmp(arg, "-exclude") == 0)
@@ -252,7 +252,7 @@ static bool _isSubCommand(const char* arg)
             auto category = categorySet->findOrError(*argCursor++);
             if (category)
             {
-                optionsOut->excludeCategories.Add(category, category);
+                optionsOut->excludeCategories.add(category, category);
             }
         }
         else if (strcmp(arg, "-api") == 0)

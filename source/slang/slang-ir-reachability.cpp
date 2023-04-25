@@ -8,7 +8,7 @@ namespace Slang
 bool ReachabilityContext::computeReachability(IRBlock* block1, IRBlock* block2)
 {
     workList.clear();
-    reachableBlocks.Clear();
+    reachableBlocks.clear();
     workList.add(block1);
     for (Index i = 0; i < workList.getCount(); i++)
     {
@@ -17,7 +17,7 @@ bool ReachabilityContext::computeReachability(IRBlock* block1, IRBlock* block2)
         {
             if (successor == block2)
                 return true;
-            if (reachableBlocks.Add(successor))
+            if (reachableBlocks.add(successor))
                 workList.add(successor);
         }
     }
@@ -30,7 +30,7 @@ bool ReachabilityContext::isBlockReachable(IRBlock* from, IRBlock* to)
     pair.first = from;
     pair.second = to;
     bool result = false;
-    if (reachabilityResults.TryGetValue(pair, result))
+    if (reachabilityResults.tryGetValue(pair, result))
         return result;
     result = computeReachability(from, to);
     reachabilityResults[pair] = result;

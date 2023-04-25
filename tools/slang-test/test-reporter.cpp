@@ -22,7 +22,7 @@ static void appendXmlEncode(char c, StringBuilder& out)
         case '>':   out << "&gt;"; break;
         case '\'':  out << "&apos;"; break;
         case '"':   out << "&quot;"; break;
-        default:    out.Append(c);
+        default:    out.append(c);
     }
 }
 
@@ -56,7 +56,7 @@ static void appendXmlEncode(const String& in, StringBuilder& out)
         // Write it
         if (cur > start)
         {
-            out.Append(start, UInt(end - start));
+            out.append(start, UInt(end - start));
         }
 
         // if not at the end, we must be on an xml encoded character, so just output it xml encoded.
@@ -121,7 +121,7 @@ void TestReporter::startTest(const char* testName)
 
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
-    m_currentMessage.Clear();
+    m_currentMessage.clear();
 }
 
 void TestReporter::endTest()
@@ -261,11 +261,11 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
             // Flush
             if (cur > start)
             {
-                builder.Append(start, UInt(cur - start));
+                builder.append(start, UInt(cur - start));
             }
 
-            builder.Append('|');
-            builder.Append(escapeChar);
+            builder.append('|');
+            builder.append(escapeChar);
             start = cur + 1;
         }
     }    
@@ -273,7 +273,7 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
     // Flush the end
     if (end > start)
     {
-        builder.Append(start, UInt(end - start));
+        builder.append(start, UInt(end - start));
     }
 }
 
@@ -544,7 +544,7 @@ void TestReporter::message(TestMessageType type, const String& message)
     {
         m_currentMessage << "\n";
     }
-    m_currentMessage.Append(message);
+    m_currentMessage.append(message);
 }
 
 void TestReporter::messageFormat(TestMessageType type, char const* format, ...)

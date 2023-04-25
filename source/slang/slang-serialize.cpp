@@ -218,7 +218,7 @@ SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags f
 {
     // 0 is always the null pointer
     m_entries.add(nullptr);
-    m_ptrMap.Add(nullptr, 0);
+    m_ptrMap.add(nullptr, 0);
 }
 
 SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* ptr)
@@ -229,7 +229,7 @@ SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* 
     }
 
     // This pointer cannot be in the map
-    SLANG_ASSERT(m_ptrMap.TryGetValue(ptr) == nullptr);
+    SLANG_ASSERT(m_ptrMap.tryGetValue(ptr) == nullptr);
 
     typedef SerialInfo::ObjectEntry ObjectEntry;
 
@@ -296,12 +296,12 @@ SerialIndex SerialWriter::writeObject(const RefObject* obj)
 
 void SerialWriter::setPointerIndex(const NodeBase* ptr, SerialIndex index)
 {
-    m_ptrMap.Add(ptr, Index(index));
+    m_ptrMap.add(ptr, Index(index));
 }
 
 void SerialWriter::setPointerIndex(const RefObject* ptr, SerialIndex index)
 {
-    m_ptrMap.Add(ptr, Index(index));
+    m_ptrMap.add(ptr, Index(index));
 }
 
 SerialIndex SerialWriter::addPointer(const NodeBase* node)
@@ -312,7 +312,7 @@ SerialIndex SerialWriter::addPointer(const NodeBase* node)
         return SerialIndex(0);
     }
     // Look up in the map
-    Index* indexPtr = m_ptrMap.TryGetValue(node);
+    Index* indexPtr = m_ptrMap.tryGetValue(node);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);
@@ -336,7 +336,7 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
         return SerialIndex(0);
     }
     // Look up in the map
-    Index* indexPtr = m_ptrMap.TryGetValue(obj);
+    Index* indexPtr = m_ptrMap.tryGetValue(obj);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);
@@ -349,7 +349,7 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
     if (auto stringRep = dynamicCast<StringRepresentation>(obj))
     {
         SerialIndex index = addString(StringRepresentation::asSlice(stringRep));
-        m_ptrMap.Add(obj, Index(index));
+        m_ptrMap.add(obj, Index(index));
         return index;
     }
     else if (auto name = dynamicCast<const Name>(obj))
@@ -377,7 +377,7 @@ SerialIndex SerialWriter::_addStringSlice(SerialTypeKind typeKind, SliceMap& sli
         return SerialIndex(0);
     }
 
-    Index* indexPtr = sliceMap.TryGetValue(slice);
+    Index* indexPtr = sliceMap.tryGetValue(slice);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);
@@ -405,7 +405,7 @@ SerialIndex SerialWriter::_addStringSlice(SerialTypeKind typeKind, SliceMap& sli
     UnownedStringSlice keySlice(((const char*)dst) + encodeCount, slice.getLength());
 
     Index newIndex = m_entries.getCount();
-    sliceMap.Add(keySlice, newIndex);
+    sliceMap.add(keySlice, newIndex);
 
     m_entries.add(entry);
     return SerialIndex(newIndex);
@@ -424,14 +424,14 @@ SerialIndex SerialWriter::addName(const Name* name)
     }
 
     // Look it up
-    Index* indexPtr = m_ptrMap.TryGetValue(name);
+    Index* indexPtr = m_ptrMap.tryGetValue(name);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);
     }
 
     SerialIndex index = addString(name->text);
-    m_ptrMap.Add(name, Index(index));
+    m_ptrMap.add(name, Index(index));
     return index;
 }
 

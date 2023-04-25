@@ -22,19 +22,19 @@ const char* getCstr(Name* name)
 Name* NamePool::getName(String const& text)
 {
     RefPtr<Name> name;
-    if (rootPool->names.TryGetValue(text, name))
+    if (rootPool->names.tryGetValue(text, name))
         return name;
 
     name = new Name();
     name->text = text;
-    rootPool->names.Add(text, name);
+    rootPool->names.add(text, name);
     return name;
 }
 
 Name* NamePool::tryGetName(String const& text)
 {
     RefPtr<Name> name;
-    if (rootPool->names.TryGetValue(text, name))
+    if (rootPool->names.tryGetValue(text, name))
         return name;
     return nullptr;
 }

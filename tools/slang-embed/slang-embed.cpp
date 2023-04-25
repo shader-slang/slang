@@ -93,7 +93,7 @@ struct App
         String canonicalPath;
         if (SLANG_SUCCEEDED(Slang::Path::getCanonical(inputPath, canonicalPath)))
         {
-            if (!includedFiles.Add(canonicalPath))
+            if (!includedFiles.add(canonicalPath))
                 return;
         }
 
@@ -283,7 +283,7 @@ struct App
         processInputFile(outputFile, Slang::UnownedStringSlice(inputPath));
 
         fprintf(outputFile, ";\n");
-        fprintf(outputFile, "return sb.ProduceString();\n}\n");
+        fprintf(outputFile, "return sb.produceString();\n}\n");
     }
 };
 

@@ -196,13 +196,13 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
                                 nameSB.appendChar(ch);
                             }
                         }
-                        item.label = nameSB.ProduceString();
+                        item.label = nameSB.produceString();
                         item.kind = LanguageServerProtocol::kCompletionItemKindFile;
                     }
                     if (item.label.getLength())
                     {
                         auto key = String(item.kind) + item.label;
-                        if (context->itemSet.Add(key))
+                        if (context->itemSet.add(key))
                         {
                             item.detail = Path::combine(context->path, String(name));
                             Path::getCanonical(item.detail, item.detail);
@@ -335,7 +335,7 @@ SlangResult CompletionContext::tryCompleteImport()
         else
             prefixSB.appendChar(ch);
     }
-    auto prefix = prefixSB.ProduceString();
+    auto prefix = prefixSB.produceString();
     auto items = gatherFileAndModuleCompletionItems(
         prefix, true, false, line - 1, fileNameEnd, lastPos + 1, sectionEnd, 0);
     server->m_connection->sendResult(&items, responseId);
@@ -382,7 +382,7 @@ SlangResult CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineCon
         else
             prefixSB.appendChar(ch);
     }
-    auto prefix = prefixSB.ProduceString();
+    auto prefix = prefixSB.produceString();
     auto items = gatherFileAndModuleCompletionItems(
         prefix,
         false,
@@ -483,7 +483,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
             continue;
         if (item.label.startsWith("$"))
             continue;
-        if (!deduplicateSet.Add(item.label))
+        if (!deduplicateSet.add(item.label))
             continue;
 
         if (as<StructDecl>(member))
@@ -536,7 +536,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
         {
             for (auto keyword : kDeclKeywords)
             {
-                if (!deduplicateSet.Add(keyword))
+                if (!deduplicateSet.add(keyword))
                     continue;
                 LanguageServerProtocol::CompletionItem item;
                 item.label = keyword;
@@ -549,7 +549,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
         {
             for (auto keyword : kStmtKeywords)
             {
-                if (!deduplicateSet.Add(keyword))
+                if (!deduplicateSet.add(keyword))
                     continue;
                 LanguageServerProtocol::CompletionItem item;
                 item.label = keyword;
@@ -564,7 +564,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
             if (!def.name)
                 continue;
             auto& text = def.name->text;
-            if (!deduplicateSet.Add(text))
+            if (!deduplicateSet.add(text))
                 continue;
             LanguageServerProtocol::CompletionItem item;
             item.label = text;
@@ -629,13 +629,13 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::createSwizzleCan
                 item.data = 0;
                 item.detail = typeStr;
                 item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-                nameSB.Clear();
+                nameSB.clear();
                 nameSB << "_m" << i << j;
-                item.label = nameSB.ToString();
+                item.label = nameSB.toString();
                 result.add(item);
-                nameSB.Clear();
+                nameSB.clear();
                 nameSB << "_" << i + 1 << j + 1;
-                item.label = nameSB.ToString();
+                item.label = nameSB.toString();
                 result.add(item);
             }
         }
@@ -675,7 +675,7 @@ LanguageServerProtocol::CompletionItem CompletionContext::generateGUIDCompletion
     sb << "\")";
     LanguageServerProtocol::CompletionItem resultItem;
     resultItem.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
-    resultItem.label = sb.ProduceString();
+    resultItem.label = sb.produceString();
     return resultItem;
 }
 

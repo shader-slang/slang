@@ -1323,7 +1323,7 @@ LegalType legalizeType(
     IRType*                     type)
 {
     LegalType legalType;
-    if(context->mapTypeToLegalType.TryGetValue(type, legalType))
+    if(context->mapTypeToLegalType.tryGetValue(type, legalType))
         return legalType;
 
     legalType = legalizeTypeImpl(context, type);

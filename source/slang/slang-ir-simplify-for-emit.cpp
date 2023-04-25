@@ -20,7 +20,7 @@ struct SimplifyForEmitContext : public InstPassBase
 
     void addToFollowUpWorkList(IRInst* inst)
     {
-        if (followUpWorkListSet.Add(inst))
+        if (followUpWorkListSet.add(inst))
             followUpWorkList.add(inst);
     }
 
@@ -197,12 +197,12 @@ struct SimplifyForEmitContext : public InstPassBase
         for (auto use = var->firstUse; use; use = use->nextUse)
             if (use->getUser()->getParent() == var->getParent())
             {
-                userInSameBlock.Add(use->getUser());
+                userInSameBlock.add(use->getUser());
             }
         IRInst* firstUser = nullptr;
         for (auto inst = var->getNextInst(); inst; inst = inst->getNextInst())
         {
-            if (userInSameBlock.Contains(inst))
+            if (userInSameBlock.contains(inst))
             {
                 firstUser = inst;
                 break;
@@ -250,7 +250,7 @@ struct SimplifyForEmitContext : public InstPassBase
     void eliminateCompositeConstruct(IRGlobalValueWithCode* func)
     {
         followUpWorkList.clear();
-        followUpWorkListSet.Clear();
+        followUpWorkListSet.clear();
 
         for (auto block : func->getBlocks())
         {
@@ -273,7 +273,7 @@ struct SimplifyForEmitContext : public InstPassBase
     void deferAndDuplicateLoad(IRGlobalValueWithCode* func)
     {
         followUpWorkList.clear();
-        followUpWorkListSet.Clear();
+        followUpWorkListSet.clear();
 
         for (auto block : func->getBlocks())
         {
@@ -294,7 +294,7 @@ struct SimplifyForEmitContext : public InstPassBase
     void deferVarDecl(IRGlobalValueWithCode* func)
     {
         followUpWorkList.clear();
-        followUpWorkListSet.Clear();
+        followUpWorkListSet.clear();
 
         for (auto block : func->getBlocks())
         {
@@ -315,7 +315,7 @@ struct SimplifyForEmitContext : public InstPassBase
     void deferAndDuplicateElementExtract(IRGlobalValueWithCode* func)
     {
         followUpWorkList.clear();
-        followUpWorkListSet.Clear();
+        followUpWorkListSet.clear();
 
         for (auto block = func->getLastBlock(); block; block = block->getPrevBlock())
         {

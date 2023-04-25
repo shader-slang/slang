@@ -189,10 +189,10 @@ namespace Slang
 
         if (dotPos < 0)
             dotPos = path.getLength();
-        sb.Append(path.getBuffer(), dotPos);
-        sb.Append('.');
-        sb.Append(newExt);
-        return sb.ProduceString();
+        sb.append(path.getBuffer(), dotPos);
+        sb.append('.');
+        sb.append(newExt);
+        return sb.produceString();
     }
 
     /* static */ Index Path::findLastSeparatorIndex(UnownedStringSlice const& path)
@@ -324,8 +324,8 @@ namespace Slang
 
     /* static */void Path::combineIntoBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder)
     {
-        outBuilder.Clear();
-        outBuilder.Append(path1);
+        outBuilder.clear();
+        outBuilder.append(path1);
         append(outBuilder, path2);
     }
 
@@ -338,7 +338,7 @@ namespace Slang
 
         StringBuilder sb;
         combineIntoBuilder(path1.getUnownedSlice(), path2.getUnownedSlice(), sb);
-        return sb.ProduceString();
+        return sb.produceString();
     }
     String Path::combine(const String& path1, const String& path2, const String& path3)
     {
@@ -346,7 +346,7 @@ namespace Slang
         sb.append(path1);
         append(sb, path2.getUnownedSlice());
         append(sb, path3.getUnownedSlice());
-        return sb.ProduceString();
+        return sb.produceString();
     }
 
     /* static */ bool Path::isDriveSpecification(const UnownedStringSlice& element)
@@ -519,7 +519,7 @@ namespace Slang
 
     /* static */void Path::join(const UnownedStringSlice* slices, Index count, StringBuilder& out)
     {
-        out.Clear();
+        out.clear();
 
         if (count == 0)
         {
@@ -546,7 +546,7 @@ namespace Slang
         // Reconstruct the string
         StringBuilder builder;
         join(splitPath.getBuffer(), splitPath.getCount(), builder);
-        return builder.ToString();
+        return builder.toString();
     }
 
     bool Path::createDirectory(const String& path)
@@ -1059,7 +1059,7 @@ namespace Slang
                 i++;
             }
         }
-        return sb.ProduceString();
+        return sb.produceString();
     }
 
     StringSlice URI::getProtocol() const
@@ -1099,9 +1099,8 @@ namespace Slang
             else
             {
                 char buffer[32];
-                int length = IntToAscii(buffer, (int)ch, 16);
-                ReverseInternalAscii(buffer, length);
-                sb << "%" << buffer;
+                int length = intToAscii(buffer, (int)ch, 16);
+                sb << "%" << UnownedStringSlice(buffer, length);
             }
         }
         return URI::fromString(sb.getUnownedSlice());

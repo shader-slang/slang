@@ -88,7 +88,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
             spanEnd++;
         }
 
-        sb.Append(spanBegin, int(spanEnd - spanBegin));
+        sb.append(spanBegin, int(spanEnd - spanBegin));
         if (!*spanEnd)
             return;
 
@@ -99,7 +99,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
         {
         // A double dollar sign `$$` is used to emit a single `$` 
         case '$':
-            sb.Append('$');
+            sb.append('$');
             break;
 
         // A single digit means to emit the corresponding argument.
@@ -295,7 +295,7 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
 
         // Now make all spaces
         const Index length = caretLine.getLength();
-        caretLine.Clear();
+        caretLine.clear();
         caretLine.appendRepeatedChar(' ', length);
 
         Index caretIndex = caretLine.getLength();
@@ -436,7 +436,7 @@ static void formatDiagnostic(
                 // Set up the diagnostic.
                 Diagnostic initiationDiagnostic;
                 initiationDiagnostic.ErrorID = diagnosticInfo.id;
-                initiationDiagnostic.Message = msg.ProduceString();
+                initiationDiagnostic.Message = msg.produceString();
                 initiationDiagnostic.loc = sourceView->getInitiatingSourceLoc();
                 initiationDiagnostic.severity = diagnosticInfo.severity;
 
@@ -506,7 +506,7 @@ void DiagnosticSink::reset()
     m_errorCount = 0;
     m_internalErrorLocsNoted = 0;
 
-    outputBuffer.Clear();
+    outputBuffer.clear();
 }
 
 
@@ -584,7 +584,7 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
 {
     Severity effectiveSeverity = info.severity;
 
-    Severity* pSeverityOverride = m_severityOverrides.TryGetValue(info.id);
+    Severity* pSeverityOverride = m_severityOverrides.tryGetValue(info.id);
 
     // See if there is an override
     if (pSeverityOverride)
@@ -615,7 +615,7 @@ void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int
 
         Diagnostic diagnostic;
         diagnostic.ErrorID = info.id;
-        diagnostic.Message = sb.ProduceString();
+        diagnostic.Message = sb.produceString();
         diagnostic.loc = pos;
         diagnostic.severity = info.severity;
 
@@ -676,7 +676,7 @@ void DiagnosticSink::overrideDiagnosticSeverity(int diagnosticId, Severity overr
         // If the override is the same as the default, we can just remove the override
         if (info->severity == overrideSeverity)
         {
-            m_severityOverrides.Remove(diagnosticId);
+            m_severityOverrides.remove(diagnosticId);
             return;
         }
     }
@@ -689,14 +689,14 @@ void DiagnosticSink::overrideDiagnosticSeverity(int diagnosticId, Severity overr
 
 Index DiagnosticsLookup::_findDiagnosticIndexByExactName(const UnownedStringSlice& slice) const
 {
-    const Index* indexPtr = m_nameMap.TryGetValue(slice);
+    const Index* indexPtr = m_nameMap.tryGetValue(slice);
     return indexPtr ? *indexPtr : -1;
 }
 
 void DiagnosticsLookup::_addName(const char* name, Index diagnosticIndex)
 {
     UnownedStringSlice nameSlice(name);
-    m_nameMap.Add(nameSlice, diagnosticIndex);
+    m_nameMap.add(nameSlice, diagnosticIndex);
 }
 
 void DiagnosticsLookup::addAlias(const char* name, const char* diagnosticName)
@@ -711,13 +711,13 @@ void DiagnosticsLookup::addAlias(const char* name, const char* diagnosticName)
 
 const DiagnosticInfo* DiagnosticsLookup::getDiagnosticById(Int id) const
 {
-    const auto indexPtr = m_idMap.TryGetValue(id);
+    const auto indexPtr = m_idMap.tryGetValue(id);
     return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
 }
 
 const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByExactName(const UnownedStringSlice& slice) const
 {
-    const Index* indexPtr = m_nameMap.TryGetValue(slice);
+    const Index* indexPtr = m_nameMap.tryGetValue(slice);
     return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
 }
 
@@ -746,7 +746,7 @@ Index DiagnosticsLookup::add(const DiagnosticInfo* info)
     m_diagnostics.add(info);
 
     _addName(info->name, diagnosticIndex);
-    m_idMap.AddIfNotExists(info->id, diagnosticIndex);
+    m_idMap.addIfNotExists(info->id, diagnosticIndex);
     
     return diagnosticIndex;
 }

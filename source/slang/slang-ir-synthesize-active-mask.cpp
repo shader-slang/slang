@@ -150,11 +150,11 @@ struct SynthesizeActiveMaskForModuleContext
     //
     void markFuncUsingActiveMask(IRFunc* func)
     {
-        if(m_funcsUsingActiveMaskSet.Contains(func))
+        if(m_funcsUsingActiveMaskSet.contains(func))
             return;
 
         m_funcsUsingActiveMask.add(func);
-        m_funcsUsingActiveMaskSet.Add(func);
+        m_funcsUsingActiveMaskSet.add(func);
     }
 
     // The easiest way to know that a function uses the active
@@ -459,7 +459,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // active mask, or else that would imply nothing else in the function
         // did, and we shouldn't be processing this function at all.
         //
-        SLANG_ASSERT(m_blocksNeedingActiveMask.Contains(funcEntryBlock));
+        SLANG_ASSERT(m_blocksNeedingActiveMask.contains(funcEntryBlock));
 
         // Our basic approach will be to associate an `IRInst*` that represents
         // the active mask value to use with each basic block of the function.
@@ -610,7 +610,7 @@ struct SynthesizeActiveMaskForFunctionContext
     //
     bool doesBlockNeedActiveMask(IRBlock* block)
     {
-        return m_blocksNeedingActiveMask.Contains(block);
+        return m_blocksNeedingActiveMask.contains(block);
     }
 
     void markBlocksNeedingActiveMask()
@@ -633,7 +633,7 @@ struct SynthesizeActiveMaskForFunctionContext
             {
                 if( inst->getOp() == kIROp_WaveGetActiveMask )
                 {
-                    m_blocksNeedingActiveMask.Add(block);
+                    m_blocksNeedingActiveMask.add(block);
                     break;
                 }
             }
@@ -665,12 +665,12 @@ struct SynthesizeActiveMaskForFunctionContext
                 //
                 for(auto block = m_func->getLastBlock(); block; block = block->getPrevBlock())
                 {
-                    if(m_blocksNeedingActiveMask.Contains(block))
+                    if(m_blocksNeedingActiveMask.contains(block))
                         continue;
 
                     for( auto successor : block->getSuccessors() )
                     {
-                        if( !m_blocksNeedingActiveMask.Contains(successor) )
+                        if( !m_blocksNeedingActiveMask.contains(successor) )
                             continue;
 
                         // If we get here then `block` has *not* been marked
@@ -678,7 +678,7 @@ struct SynthesizeActiveMaskForFunctionContext
                         // `successor` which *has* been marked, so we need
                         // to mark `block` and keep looking for changes.
                         //
-                        m_blocksNeedingActiveMask.Add(block);
+                        m_blocksNeedingActiveMask.add(block);
                         change = true;
                         break;
                     }
@@ -754,7 +754,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // Once we've computed the mask value to start with, we add it to
             // our tracking structure so we can remember which value to use.
             //
-            m_activeMaskForBlock.Add(funcEntryBlock, initialActiveMask);
+            m_activeMaskForBlock.add(funcEntryBlock, initialActiveMask);
         }
     }
 
@@ -827,7 +827,7 @@ struct SynthesizeActiveMaskForFunctionContext
 
         auto activeMaskParam = builder.emitParam(m_maskType);
 
-        m_activeMaskForBlock.Add(block, activeMaskParam);
+        m_activeMaskForBlock.add(block, activeMaskParam);
     }
 
     // The remainder of the work in this pass is going to be based
@@ -971,7 +971,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // we run this code.
         //
         IRInst* activeMaskOnFuncEntry = nullptr;
-        m_activeMaskForBlock.TryGetValue(funcEntryBlock, activeMaskOnFuncEntry);
+        m_activeMaskForBlock.tryGetValue(funcEntryBlock, activeMaskOnFuncEntry);
         SLANG_ASSERT(activeMaskOnFuncEntry);
 
         // The root region of our tree of regions will
@@ -1669,7 +1669,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // active mask on input to `toBlock` is the `fromActiveMask` being
         // provided as part of the conditional branch.
         //
-        m_activeMaskForBlock.Add(toBlock, fromActiveMask);
+        m_activeMaskForBlock.add(toBlock, fromActiveMask);
     }
 
     // Unconditional edges are more complicated than conditional
@@ -1898,7 +1898,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // block, and we can just bind the comptue value
             // directly.
             //
-            m_activeMaskForBlock.Add(toBlock, toActiveMask);
+            m_activeMaskForBlock.add(toBlock, toActiveMask);
         }
     }
 
@@ -2045,7 +2045,7 @@ struct SynthesizeActiveMaskForFunctionContext
         //   to each of its successors.
         //
         IRInst* activeMaskOnRegionEntry = nullptr;
-        if( !m_activeMaskForBlock.TryGetValue(regionEntry, activeMaskOnRegionEntry) )
+        if( !m_activeMaskForBlock.tryGetValue(regionEntry, activeMaskOnRegionEntry) )
         {
             SLANG_UNEXPECTED("no active mask registered for block");
         }

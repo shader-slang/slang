@@ -441,10 +441,10 @@ namespace Slang
                 auto canonicalizedConstraints = getCanonicalGenericConstraints(parentGenericDeclRef);
                 for (auto& constraint : canonicalizedConstraints)
                 {
-                    for (auto type : constraint.Value)
+                    for (auto type : constraint.value)
                     {
                         emitRaw(context, "C");
-                        emitQualifiedName(context, DeclRef<Decl>(constraint.Key, nullptr));
+                        emitQualifiedName(context, DeclRef<Decl>(constraint.key, nullptr));
                             emitType(context, type);
                     }
                 }
@@ -552,7 +552,7 @@ namespace Slang
     {
         ManglingContext context(astBuilder);
         mangleName(&context, declRef);
-        return context.sb.ProduceString();
+        return context.sb.produceString();
     }
 
     String getMangledName(ASTBuilder* astBuilder, DeclRefBase const & declRef)
@@ -575,7 +575,7 @@ namespace Slang
         emitRaw(&context, "_SW");
         emitQualifiedName(&context, sub);
         emitQualifiedName(&context, sup);
-        return context.sb.ProduceString();
+        return context.sb.produceString();
     }
 
     String getMangledNameForConformanceWitness(
@@ -592,7 +592,7 @@ namespace Slang
         emitRaw(&context, "_SW");
         emitQualifiedName(&context, sub);
         emitType(&context, sup);
-        return context.sb.ProduceString();
+        return context.sb.produceString();
     }
 
     String getMangledNameForConformanceWitness(
@@ -609,21 +609,21 @@ namespace Slang
         emitRaw(&context, "_SW");
         emitType(&context, sub);
         emitType(&context, sup);
-        return context.sb.ProduceString();
+        return context.sb.produceString();
     }
 
     String getMangledTypeName(ASTBuilder* astBuilder, Type* type)
     {
         ManglingContext context(astBuilder);
         emitType(&context, type);
-        return context.sb.ProduceString();
+        return context.sb.produceString();
     }
 
     String getMangledNameFromNameString(const UnownedStringSlice& name)
     {
         ManglingContext context(nullptr);
         emitNameImpl(&context, name);
-        return context.sb.ProduceString();
+        return context.sb.produceString();
     }
 
     String getHashedName(const UnownedStringSlice& mangledName)

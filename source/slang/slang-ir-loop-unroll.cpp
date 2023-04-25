@@ -17,7 +17,7 @@ static bool _eliminateDeadBlocks(List<IRBlock*>& blocks, IRBlock* unreachableBlo
         return false;
     bool changed = false;
     HashSet<IRBlock*> aliveBlocks;
-    aliveBlocks.Add(blocks[0]);
+    aliveBlocks.add(blocks[0]);
     List<IRBlock*> workList;
     workList.add(blocks[0]);
     for (Index i = 0; i < workList.getCount(); i++)
@@ -25,7 +25,7 @@ static bool _eliminateDeadBlocks(List<IRBlock*>& blocks, IRBlock* unreachableBlo
         auto block = workList[i];
         for (auto succ : block->getSuccessors())
         {
-            if (aliveBlocks.Add(succ))
+            if (aliveBlocks.add(succ))
             {
                 workList.add(succ);
             }
@@ -33,7 +33,7 @@ static bool _eliminateDeadBlocks(List<IRBlock*>& blocks, IRBlock* unreachableBlo
     }
     for (auto& b : blocks)
     {
-        if (!aliveBlocks.Contains(b))
+        if (!aliveBlocks.contains(b))
         {
             if (b->hasUses())
             {
@@ -53,7 +53,7 @@ List<IRBlock*> _collectBlocksInLoop(IRDominatorTree* dom, IRLoop* loopInst)
     HashSet<IRBlock*> loopBlocksSet;
     auto addBlock = [&](IRBlock* block)
     {
-        if (loopBlocksSet.Add(block))
+        if (loopBlocksSet.add(block))
             loopBlocks.add(block);
     };
     auto firstBlock = as<IRBlock>(loopInst->block.get());
@@ -347,7 +347,7 @@ static bool _unrollLoop(
             builder.setInsertBefore(firstIterationBreakBlock);
             auto clonedBlock = builder.createBlock();
             clonedBlock->insertBefore(firstIterationBreakBlock);
-            cloneEnv.mapOldValToNew.AddIfNotExists(b, clonedBlock);
+            cloneEnv.mapOldValToNew.addIfNotExists(b, clonedBlock);
             clonedBlocks.add(clonedBlock);
         }
 
@@ -408,19 +408,19 @@ static bool _unrollLoop(
             HashSet<IRBlock*> blockSet;
             for (auto block : blocks)
             {
-                blockSet.Add(block);
+                blockSet.add(block);
             }
             for (auto block : blocks)
             {
                 for (auto inst : block->getChildren())
                 {
                     IRInst* newInst = nullptr;
-                    if (!cloneEnv.mapOldValToNew.TryGetValue(inst, newInst))
+                    if (!cloneEnv.mapOldValToNew.tryGetValue(inst, newInst))
                         continue;
                     for (auto use = inst->firstUse; use;)
                     {
                         auto nextUse = use->nextUse;
-                        if (!blockSet.Contains(as<IRBlock>(use->getUser()->getParent())))
+                        if (!blockSet.contains(as<IRBlock>(use->getUser()->getParent())))
                         {
                             use->set(newInst);
                         }

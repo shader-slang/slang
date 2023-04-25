@@ -127,15 +127,15 @@ struct DiffPairLoweringPass : InstPassBase
                 {
                     if (auto loweredType = lowerPairType(builder, pairType))
                     {
-                        pendingReplacements.Add(pairType, loweredType);
+                        pendingReplacements.add(pairType, loweredType);
                         modified = true;
                     }
                 }
             });
         for (auto replacement : pendingReplacements)
         {
-            replacement.Key->replaceUsesWith(replacement.Value);
-            replacement.Key->removeAndDeallocate();
+            replacement.key->replaceUsesWith(replacement.value);
+            replacement.key->removeAndDeallocate();
         }
 
         return modified;
@@ -237,14 +237,14 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
             {
                 if (auto loweredType = rewritePairType(builder, inst))
                 {
-                    pendingReplacements.Add(inst, loweredType);
+                    pendingReplacements.add(inst, loweredType);
                     modified = true;
                 }
             });
         for (auto replacement : pendingReplacements)
         {
-            replacement.Key->replaceUsesWith(replacement.Value);
-            replacement.Key->removeAndDeallocate();
+            replacement.key->replaceUsesWith(replacement.value);
+            replacement.key->removeAndDeallocate();
         }
 
         return modified;

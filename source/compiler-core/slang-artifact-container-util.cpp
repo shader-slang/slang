@@ -411,7 +411,7 @@ SlangResult FileSystemContents::find(ISlangFileSystemExt* fileSystem, const Unow
             if (entry.isDirectory())
             {
                 // Clear the current path
-                currentPath.Clear();
+                currentPath.clear();
 
                 appendPath(i, currentPath);
 

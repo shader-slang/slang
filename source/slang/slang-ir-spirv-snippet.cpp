@@ -132,7 +132,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                         tokenReader.ReadToken();
                         operand.type = SpvSnippet::ASMOperandType::InstReference;
                         auto refName = tokenReader.ReadToken().Content;
-                        if (!mapInstNameToIndex.TryGetValue(refName, operand.content))
+                        if (!mapInstNameToIndex.tryGetValue(refName, operand.content))
                         {
                             SLANG_ASSERT(!"Invalid SPV ASM: referenced inst is not defined.");
                         }
@@ -202,7 +202,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                         else if (identifier.startsWith("_"))
                         {
                             operand.type = SpvSnippet::ASMOperandType::ObjectReference;
-                            operand.content = (SpvWord)StringToInt(
+                            operand.content = (SpvWord)stringToInt(
                                 identifier.subString(1, identifier.getLength() - 1));
                             inst.operands.add(operand);
                         }

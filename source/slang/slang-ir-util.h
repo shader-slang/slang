@@ -45,7 +45,7 @@ struct DeduplicateContext
         if (!shouldDeduplicate(value))
             return value;
         IRInstKey key = { value };
-        if (auto newValue = deduplicateMap.TryGetValue(key))
+        if (auto newValue = deduplicateMap.tryGetValue(key))
             return *newValue;
         for (UInt i = 0; i < value->getOperandCount(); i++)
         {
@@ -56,7 +56,7 @@ struct DeduplicateContext
         auto deduplicatedType = (IRType*)deduplicate(value->getFullType(), shouldDeduplicate);
         if (deduplicatedType != value->getFullType())
             value->setFullType(deduplicatedType);
-        if (auto newValue = deduplicateMap.TryGetValue(key))
+        if (auto newValue = deduplicateMap.tryGetValue(key))
             return *newValue;
         deduplicateMap[key] = value;
         return value;
@@ -200,6 +200,8 @@ IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 
 void moveParams(IRBlock* dest, IRBlock* src);
+
+void removePhiArgs(IRInst* phiParam);
 }
 
 #endif

@@ -42,7 +42,7 @@ String _gfxGetFuncName(const char* input)
     StringBuilder sb;
     sb.appendChar('I');
     sb.append(str.subString(startIndex, endIndex - startIndex));
-    return sb.ProduceString();
+    return sb.produceString();
 }
 
 void validateAccelerationStructureBuildInputs(

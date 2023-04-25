@@ -14,10 +14,8 @@ namespace Slang
         IRCloneEnv cloneEnv;
         HashSet<IRUse*> pendingUses;
 
-        IRInst* cloneInstOutOfOrder(IRBuilder* builder, IRInst* inst)
+        void registerClonedInst(IRBuilder* builder, IRInst* inst, IRInst* clonedInst)
         {
-            IRInst* clonedInst = cloneInst(&cloneEnv, builder, inst);
-
             UInt operandCount = clonedInst->getOperandCount();
             for (UInt ii = 0; ii < operandCount; ++ii)
             {
@@ -25,22 +23,27 @@ namespace Slang
                 auto newOperand = clonedInst->getOperand(ii);
 
                 if (oldOperand == newOperand)
-                    pendingUses.Add(&clonedInst->getOperands()[ii]);
+                    pendingUses.add(&clonedInst->getOperands()[ii]);
             }
 
             for (auto use = inst->firstUse; use;)
             {
                 auto nextUse = use->nextUse;
-                
-                if (pendingUses.Contains(use))
+
+                if (pendingUses.contains(use))
                 {
-                    pendingUses.Remove(use);
+                    pendingUses.remove(use);
                     builder->replaceOperand(use, clonedInst);
                 }
-                
+
                 use = nextUse;
             }
+        }
 
+        IRInst* cloneInstOutOfOrder(IRBuilder* builder, IRInst* inst)
+        {
+            IRInst* clonedInst = cloneInst(&cloneEnv, builder, inst);
+            registerClonedInst(builder, inst, clonedInst);
             return clonedInst;
         }
     };
@@ -66,15 +69,15 @@ namespace Slang
         InversionInfo applyMap(IRCloneEnv* env)
         {
             InversionInfo newInfo;
-            if (env->mapOldValToNew.ContainsKey(instToInvert))
+            if (env->mapOldValToNew.containsKey(instToInvert))
                 newInfo.instToInvert = env->mapOldValToNew[instToInvert];
             
             for (auto inst : requiredOperands)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newInfo.requiredOperands.add(env->mapOldValToNew[inst]);
                 
             for (auto inst : targetInsts)
-                if (env->mapOldValToNew.ContainsKey(inst))
+                if (env->mapOldValToNew.containsKey(inst))
                     newInfo.targetInsts.add(env->mapOldValToNew[inst]);
             
             return newInfo;
@@ -86,7 +89,6 @@ namespace Slang
         OrderedHashSet<IRInst*> storeSet;
         OrderedHashSet<IRInst*> recomputeSet;
         OrderedHashSet<IRInst*> invertSet;
-        OrderedHashSet<IRInst*> ignoreSet;
         OrderedHashSet<IRInst*> instsToInvert;
 
         Dictionary<IRInst*, InversionInfo> invertInfoMap;
@@ -96,24 +98,24 @@ namespace Slang
             RefPtr<HoistedPrimalsInfo> newPrimalsInfo = new HoistedPrimalsInfo();
             
             for (auto inst : this->storeSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
-                    newPrimalsInfo->storeSet.Add(env->mapOldValToNew[inst]);
+                if (env->mapOldValToNew.containsKey(inst))
+                    newPrimalsInfo->storeSet.add(env->mapOldValToNew[inst]);
             
             for (auto inst : this->recomputeSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
-                    newPrimalsInfo->recomputeSet.Add(env->mapOldValToNew[inst]);
+                if (env->mapOldValToNew.containsKey(inst))
+                    newPrimalsInfo->recomputeSet.add(env->mapOldValToNew[inst]);
                 
             for (auto inst : this->invertSet)
-                if (env->mapOldValToNew.ContainsKey(inst))
-                    newPrimalsInfo->invertSet.Add(env->mapOldValToNew[inst]);
+                if (env->mapOldValToNew.containsKey(inst))
+                    newPrimalsInfo->invertSet.add(env->mapOldValToNew[inst]);
             
             for (auto inst : this->instsToInvert)
-                if (env->mapOldValToNew.ContainsKey(inst))
-                    newPrimalsInfo->instsToInvert.Add(env->mapOldValToNew[inst]);
+                if (env->mapOldValToNew.containsKey(inst))
+                    newPrimalsInfo->instsToInvert.add(env->mapOldValToNew[inst]);
 
             for (auto kvpair : this->invertInfoMap)
-                if (env->mapOldValToNew.ContainsKey(kvpair.Key))
-                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.Key]] = kvpair.Value.applyMap(env);
+                if (env->mapOldValToNew.containsKey(kvpair.key))
+                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.key]] = kvpair.value.applyMap(env);
             
             return newPrimalsInfo;
         }
@@ -121,22 +123,19 @@ namespace Slang
         void merge(HoistedPrimalsInfo* info)
         {
             for (auto inst : info->storeSet)
-                storeSet.Add(inst);
+                storeSet.add(inst);
 
             for (auto inst : info->recomputeSet)
-                recomputeSet.Add(inst);
+                recomputeSet.add(inst);
 
             for (auto inst : info->invertSet)
-                invertSet.Add(inst);
-
-            for (auto inst : info->ignoreSet)
-                ignoreSet.add(inst);
+                invertSet.add(inst);
 
             for (auto inst : info->instsToInvert)
-                instsToInvert.Add(inst);
+                instsToInvert.add(inst);
 
             for (auto kvpair : info->invertInfoMap)
-                invertInfoMap[kvpair.Key] = kvpair.Value;
+                invertInfoMap[kvpair.key] = kvpair.value;
         }
     };
 
@@ -261,7 +260,8 @@ namespace Slang
 
         RefPtr<HoistedPrimalsInfo> processFunc(
             IRGlobalValueWithCode* func,
-            Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock);
+            Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock,
+            IROutOfOrderCloneContext* cloneCtx);
 
         // Do pre-processing on the function (mainly for 
         // 'global' checkpointing methods that consider the entire
@@ -290,9 +290,5 @@ namespace Slang
         RefPtr<IRDominatorTree> domTree;
     };
 
-    RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(
-        IRGlobalValueWithCode* func,
-        const List<IRInst*>& instsToIgnore);
-
-
+    RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func);
 };

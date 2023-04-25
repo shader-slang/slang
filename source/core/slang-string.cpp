@@ -261,25 +261,25 @@ namespace Slang
         return result;
     }
 
-    int StringToInt(const String & str, int radix)
+    int stringToInt(const String& str, int radix)
     {
         if (str.startsWith("0x"))
             return (int)strtoll(str.getBuffer(), NULL, 16);
         else
             return (int)strtoll(str.getBuffer(), NULL, radix);
     }
-    unsigned int StringToUInt(const String & str, int radix)
+    unsigned int stringToUInt(const String& str, int radix)
     {
         if (str.startsWith("0x"))
             return (unsigned int)strtoull(str.getBuffer(), NULL, 16);
         else
             return (unsigned int)strtoull(str.getBuffer(), NULL, radix);
     }
-    double StringToDouble(const String & str)
+    double stringToDouble(const String& str)
     {
         return (double)strtod(str.getBuffer(), NULL);
     }
-    float StringToFloat(const String & str)
+    float stringToFloat(const String& str)
     {
         return strtof(str.getBuffer(), NULL);
     }
@@ -300,7 +300,7 @@ namespace Slang
     }
 #endif
 
-    String String::fromWString(const wchar_t * wstr)
+    String String::fromWString(const wchar_t* wstr)
     {
         List<char> buf;
 #ifdef _WIN32
@@ -311,7 +311,7 @@ namespace Slang
         return String(buf.begin(), buf.end());
     }
 
-    String String::fromWString(const wchar_t * wstr, const wchar_t * wend)
+    String String::fromWString(const wchar_t* wstr, const wchar_t* wend)
     {
         List<char> buf;
 #ifdef _WIN32
@@ -481,6 +481,11 @@ namespace Slang
         }
     }
 
+    void String::append(char const* str, size_t len)
+    {
+        append(str, str + len);
+    }
+
     void String::append(const char* textBegin, char const* textEnd)
     {
         auto oldLength = getLength();
@@ -563,8 +568,7 @@ namespace Slang
     {
         enum { kCount = 33 };
         char* data = prepareForAppend(kCount);
-        auto count = IntToAscii(data, value, radix);
-        ReverseInternalAscii(data, count);
+        const auto count = intToAscii(data, value, radix);
         m_buffer->length += count;
     }
 
@@ -572,8 +576,7 @@ namespace Slang
     {
         enum { kCount = 33 };
         char* data = prepareForAppend(kCount);
-        auto count = IntToAscii(data, value, radix);
-        ReverseInternalAscii(data, count);
+        const auto count = intToAscii(data, value, radix);
         m_buffer->length += count;
     }
 
@@ -581,8 +584,7 @@ namespace Slang
     {
         enum { kCount = 65 };
         char* data = prepareForAppend(kCount);
-        auto count = IntToAscii(data, value, radix);
-        ReverseInternalAscii(data, count);
+        auto count = intToAscii(data, value, radix);
         m_buffer->length += count;
     }
 
@@ -590,12 +592,11 @@ namespace Slang
     {
         enum { kCount = 65 };
         char* data = prepareForAppend(kCount);
-        auto count = IntToAscii(data, value, radix);
-        ReverseInternalAscii(data, count);
+        auto count = intToAscii(data, value, radix);
         m_buffer->length += count;
     }
 
-    void String::append(float val, const char * format)
+    void String::append(float val, const char* format)
     {
         enum { kCount = 128 };
         char* data = prepareForAppend(kCount);
@@ -603,7 +604,7 @@ namespace Slang
         m_buffer->length += strnlen_s(data, kCount);
     }
 
-    void String::append(double val, const char * format)
+    void String::append(double val, const char* format)
     {
         enum { kCount = 128 };
         char* data = prepareForAppend(kCount);

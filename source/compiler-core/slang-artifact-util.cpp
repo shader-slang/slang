@@ -165,7 +165,7 @@ static SlangResult _calcInferred(IArtifact* artifact, const UnownedStringSlice& 
         ext = toSlice("unknown");
     }
 
-    outPath.Clear();
+    outPath.clear();
     outPath.append(basePath);
     if (ext.getLength())
     {

@@ -46,7 +46,7 @@ Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLeve
             outLevel = FunctionDifferentiableLevel::Backward;
         else if (as<ForwardDifferentiateExpr>(expr) && outLevel == FunctionDifferentiableLevel::None)
             outLevel = FunctionDifferentiableLevel::Forward;
-        if (workListSet.Add(higherOrder))
+        if (workListSet.add(higherOrder))
         {
             expr = higherOrder->baseFunction;
         }

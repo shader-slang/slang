@@ -292,10 +292,10 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>>& mapTypeToCandidateExtensions)
 {
     RefPtr<CandidateExtensionList> entry;
-    if (!mapTypeToCandidateExtensions.TryGetValue(typeDecl, entry))
+    if (!mapTypeToCandidateExtensions.tryGetValue(typeDecl, entry))
     {
         entry = new CandidateExtensionList();
-        mapTypeToCandidateExtensions.Add(typeDecl, entry);
+        mapTypeToCandidateExtensions.add(typeDecl, entry);
     }
     return entry->candidateExtensions;
 }
@@ -387,7 +387,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                     buf << "tu" << out.modules.getCount();
                     if (!astBuilder)
                     {
-                        astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.ProduceString());
+                        astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.produceString());
                     }
 
                     DefaultSerialObjectFactory objectFactory(astBuilder);
@@ -537,20 +537,20 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 else if (SyntaxDecl* syntaxDecl = dynamicCast<SyntaxDecl>(nodeBase))
                                 {
                                     // Set up the dictionary lazily
-                                    if (syntaxKeywordDict.Count() == 0)
+                                    if (syntaxKeywordDict.getCount() == 0)
                                     {
                                         NamePool* namePool = options.session->getNamePool();
                                         for (Index i = 0; i < syntaxParseInfos.getCount(); ++i)
                                         {
                                             const auto& entry = syntaxParseInfos[i];
-                                            syntaxKeywordDict.Add(namePool->getName(entry.keywordName), i);
+                                            syntaxKeywordDict.add(namePool->getName(entry.keywordName), i);
                                         }
                                         // Must have something in it at this point
-                                        SLANG_ASSERT(syntaxKeywordDict.Count());
+                                        SLANG_ASSERT(syntaxKeywordDict.getCount());
                                     }
 
                                     // Look up the index 
-                                    Index* entryIndexPtr = syntaxKeywordDict.TryGetValue(syntaxDecl->getName());
+                                    Index* entryIndexPtr = syntaxKeywordDict.tryGetValue(syntaxDecl->getName());
                                     if (entryIndexPtr)
                                     {
                                         // Set up SyntaxDecl based on the ParseSyntaxIndo

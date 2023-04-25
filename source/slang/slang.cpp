@@ -293,7 +293,7 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
 
 SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 {
-    if (m_builtinLinkage->mapNameToLoadedModules.Count())
+    if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
         // Already have a StdLib loaded
         return SLANG_FAIL;
@@ -348,7 +348,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
 SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 {
-    if (m_builtinLinkage->mapNameToLoadedModules.Count())
+    if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
         // Already have a StdLib loaded
         return SLANG_FAIL;
@@ -367,7 +367,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
 SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob)
 {
-    if (m_builtinLinkage->mapNameToLoadedModules.Count() == 0)
+    if (m_builtinLinkage->mapNameToLoadedModules.getCount() == 0)
     {
         // There is no standard lib loaded
         return SLANG_FAIL;
@@ -386,8 +386,8 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {
-        const Name* moduleName = pair.Key;
-        Module* module = pair.Value;
+        const Name* moduleName = pair.key;
+        Module* module = pair.value;
 
         // Set up options
         SerialContainerUtil::WriteOptions options;
@@ -479,7 +479,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
         module->setIRModule(srcModule.irModule);
 
         // Put in the loaded module map
-        linkage->mapNameToLoadedModules.Add(sessionNamePool->getName(moduleName), module);
+        linkage->mapNameToLoadedModules.add(sessionNamePool->getName(moduleName), module);
 
         // Add the resulting code to the appropriate scope
         if (!scope->containerDecl)
@@ -912,7 +912,7 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     {
         for (const auto& pair : builtinLinkage->mapNameToLoadedModules)
         {
-            mapNameToLoadedModules.Add(pair.Key, pair.Value);
+            mapNameToLoadedModules.add(pair.key, pair.value);
         }
     }
 
@@ -1039,7 +1039,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     {
         auto name = getNamePool()->getName(moduleName);
         RefPtr<LoadedModule> loadedModule;
-        if (mapNameToLoadedModules.TryGetValue(name, loadedModule))
+        if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
             return loadedModule;
         }
@@ -1172,7 +1172,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
 
     Type* containerTypeReflection = nullptr;
     ContainerTypeKey key = {inType, containerType};
-    if (!m_containerTypes.TryGetValue(key, containerTypeReflection))
+    if (!m_containerTypes.tryGetValue(key, containerTypeReflection))
     {
         switch (containerType)
         {
@@ -1215,7 +1215,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
             break;
         }
 
-        m_containerTypes.Add(key, containerTypeReflection);
+        m_containerTypes.add(key, containerTypeReflection);
     }
 
     SLANG_UNUSED(outDiagnostics);
@@ -1267,17 +1267,17 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     auto name = getMangledNameForConformanceWitness(subType->getASTBuilder(), subType, supType);
     auto interfaceName = getMangledTypeName(supType->getASTBuilder(), supType);
     uint32_t resultIndex = 0;
-    if (mapMangledNameToRTTIObjectIndex.TryGetValue(name, resultIndex))
+    if (mapMangledNameToRTTIObjectIndex.tryGetValue(name, resultIndex))
     {
         if (outId)
             *outId = resultIndex;
         return SLANG_OK;
     }
-    auto idAllocator = mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(interfaceName);
+    auto idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
     if (!idAllocator)
     {
         mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
-        idAllocator = mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(interfaceName);
+        idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
     }
     resultIndex = (*idAllocator);
     ++(*idAllocator);
@@ -1341,8 +1341,8 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     // Add the preprocessor definitions to the hash
     for (auto& key : preprocessorDefinitions)
     {
-        builder.append(key.Key);
-        builder.append(key.Value);
+        builder.append(key.key);
+        builder.append(key.value);
     }
 
     // Add the target specified by targetIndex
@@ -1536,7 +1536,7 @@ TypeLayout* TargetRequest::getTypeLayout(Type* type)
     auto layoutContext = getInitialLayoutContextForTarget(this, nullptr);
 
     RefPtr<TypeLayout> result;
-    if (getTypeLayouts().TryGetValue(type, result))
+    if (getTypeLayouts().tryGetValue(type, result))
         return result.Ptr();
     result = createTypeLayout(layoutContext, type);
     getTypeLayouts()[type] = result;
@@ -1819,7 +1819,7 @@ Type* ComponentType::getTypeFromString(
     // then we can re-use it.
     //
     Type* type = nullptr;
-    if(m_types.TryGetValue(typeStr, type))
+    if(m_types.tryGetValue(typeStr, type))
         return type;
 
 
@@ -1987,7 +1987,7 @@ typedef Dictionary<SourceView*, List<SourceView*>> ViewInitiatingHierarchy;
 static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewInitiatingHierarchy& outHierarchy)
 {
     const List<SourceView*> emptyList;
-    outHierarchy.Clear();
+    outHierarchy.clear();
 
     // Iterate over all managers
     for (SourceManager* curManager = sourceManager; curManager; curManager = curManager->getParent())
@@ -2001,7 +2001,7 @@ static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewIniti
                 SourceView* parentView = sourceManager->findSourceViewRecursively(view->getInitiatingSourceLoc());
                 if (parentView)
                 {
-                    List<SourceView*>& children = outHierarchy.GetOrAddValue(parentView, emptyList);
+                    List<SourceView*>& children = outHierarchy.getOrAddValue(parentView, emptyList);
                     // It shouldn't have already been added
                     SLANG_ASSERT(children.indexOf(view) < 0);
                     children.add(view);
@@ -2015,7 +2015,7 @@ static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewIniti
     // This assumes they increase in SourceLoc implies an later within a source file - this is true currently.
     for (auto& pair : outHierarchy)
     {
-        pair.Value.sort([](SourceView* a, SourceView* b) -> bool { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
+        pair.value.sort([](SourceView* a, SourceView* b) -> bool { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
     }
 }
 
@@ -2085,7 +2085,7 @@ static void _outputIncludesRec(SourceView* sourceView, Index depth, ViewInitiati
     _outputInclude(sourceFile, depth, sink);
 
     // Now recurse to all of the children at the next depth
-    List<SourceView*>* children = hierarchy.TryGetValue(sourceView);
+    List<SourceView*>* children = hierarchy.tryGetValue(sourceView);
     if (children)
     {
         for (SourceView* child : *children)
@@ -2171,11 +2171,11 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // that may be desirable or not...
     Dictionary<String, String> combinedPreprocessorDefinitions;
     for(auto& def : getLinkage()->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.Add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.key, def.value);
     for(auto& def : preprocessorDefinitions)
-        combinedPreprocessorDefinitions.Add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.key, def.value);
     for(auto& def : translationUnit->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.Add(def.Key, def.Value);
+        combinedPreprocessorDefinitions.add(def.key, def.value);
 
     // Define standard macros, if not already defined. This style assumes using `#if __SOME_VAR` style, as in
     //
@@ -2188,28 +2188,28 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // Of course this means using #ifndef/#ifdef/defined() is probably not appropraite with thes variables.
     {
         // Used to identify level of HLSL language compatibility
-        combinedPreprocessorDefinitions.AddIfNotExists("__HLSL_VERSION", "2020");
+        combinedPreprocessorDefinitions.addIfNotExists("__HLSL_VERSION", "2020");
 
         // Indicates this is being compiled by the slang *compiler*
-        combinedPreprocessorDefinitions.AddIfNotExists("__SLANG_COMPILER__", "1");
+        combinedPreprocessorDefinitions.addIfNotExists("__SLANG_COMPILER__", "1");
 
         // Set macro depending on source type
         switch (translationUnit->sourceLanguage)
         {
             case SourceLanguage::HLSL:
                 // Used to indicate compiled as HLSL language
-                combinedPreprocessorDefinitions.AddIfNotExists("__HLSL__", "1");
+                combinedPreprocessorDefinitions.addIfNotExists("__HLSL__", "1");
                 break;
             case SourceLanguage::Slang:
                 // Used to indicate compiled as Slang language
-                combinedPreprocessorDefinitions.AddIfNotExists("__SLANG__", "1");
+                combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "1");
                 break;
             default: break;
         }
 
         // If not set, define as 0.
-        combinedPreprocessorDefinitions.AddIfNotExists("__HLSL__", "0");
-        combinedPreprocessorDefinitions.AddIfNotExists("__SLANG__", "0");
+        combinedPreprocessorDefinitions.addIfNotExists("__HLSL__", "0");
+        combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "0");
     }
 
     auto module = translationUnit->getModule();
@@ -2340,7 +2340,7 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
         // another translation unit added later to the compilation request.
         // We should output an error message when we detect such a case, or support
         // this scenario with a recursive style checking.
-        loadedModules.Add(translationUnit->moduleName, translationUnit->getModule());
+        loadedModules.add(translationUnit->moduleName, translationUnit->getModule());
     }
     checkEntryPoints();
 }
@@ -2726,7 +2726,7 @@ SlangResult EndToEndCompileRequest::executeActions()
 {
     SlangResult res = executeActionsInner();
 
-    m_diagnosticOutput = getSink()->outputBuffer.ProduceString();
+    m_diagnosticOutput = getSink()->outputBuffer.produceString();
     return res;
 }
 
@@ -2853,7 +2853,7 @@ int FrontEndCompileRequest::addEntryPoint(
         entryPointProfile);
 
     m_entryPointReqs.add(entryPointReq);
-//    translationUnitReq->entryPoints.Add(entryPointReq);
+//    translationUnitReq->entryPoints.add(entryPointReq);
 
     return int(result);
 }
@@ -2901,8 +2901,8 @@ void Linkage::loadParsedModule(
     String mostUniqueIdentity = pathInfo.getMostUniqueIdentity();
     SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
 
-    mapPathToLoadedModule.Add(mostUniqueIdentity, loadedModule);
-    mapNameToLoadedModules.Add(name, loadedModule);
+    mapPathToLoadedModule.add(mostUniqueIdentity, loadedModule);
+    mapNameToLoadedModules.add(name, loadedModule);
 
     auto sink = translationUnit->compileRequest->getSink();
 
@@ -3069,7 +3069,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     // Have we already loaded a module matching this name?
     //
     RefPtr<LoadedModule> loadedModule;
-    if (mapNameToLoadedModules.TryGetValue(name, loadedModule))
+    if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
     {
         // If the map shows a null module having been loaded,
         // then that means there was a prior load attempt,
@@ -3097,7 +3097,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     // unit to use previously checked translation units in the same
     // FrontEndCompileRequest.
     Module* previouslyLoadedModule = nullptr;
-    if (loadedModules && loadedModules->TryGetValue(name, previouslyLoadedModule))
+    if (loadedModules && loadedModules->tryGetValue(name, previouslyLoadedModule))
     {
         return previouslyLoadedModule;
     }
@@ -3117,10 +3117,10 @@ RefPtr<Module> Linkage::findOrImportModule(
             if (c == '_')
                 c = '-';
 
-            sb.Append(c);
+            sb.append(c);
         }
-        sb.Append(".slang");
-        fileName = sb.ProduceString();
+        sb.append(".slang");
+        fileName = sb.produceString();
     }
     else
     {
@@ -3145,7 +3145,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     }
 
     // Maybe this was loaded previously at a different relative name?
-    if (mapPathToLoadedModule.TryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
+    if (mapPathToLoadedModule.tryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
         return loadedModule;
 
     // Try to load it
@@ -3199,11 +3199,11 @@ void ModuleDependencyList::addLeafDependency(Module* module)
 
 void ModuleDependencyList::_addDependency(Module* module)
 {
-    if(m_moduleSet.Contains(module))
+    if(m_moduleSet.contains(module))
         return;
 
     m_moduleList.add(module);
-    m_moduleSet.Add(module);
+    m_moduleSet.add(module);
 }
 
 //
@@ -3212,11 +3212,11 @@ void ModuleDependencyList::_addDependency(Module* module)
 
 void FileDependencyList::addDependency(SourceFile* sourceFile)
 {
-    if(m_fileSet.Contains(sourceFile))
+    if(m_fileSet.contains(sourceFile))
         return;
 
     m_fileList.add(sourceFile);
-    m_fileSet.Add(sourceFile);
+    m_fileSet.add(sourceFile);
 }
 
 void FileDependencyList::addDependency(Module* module)
@@ -3778,7 +3778,7 @@ CompositeComponentType::CompositeComponentType(
     {
         child->enumerateModules([&](Module* module)
         {
-            requirementsSet.Add(module);
+            requirementsSet.add(module);
         });
     }
 
@@ -3817,9 +3817,9 @@ CompositeComponentType::CompositeComponentType(
         for(Index rr = 0; rr < childRequirementCount; ++rr)
         {
             auto childRequirement = child->getRequirement(rr);
-            if(!requirementsSet.Contains(childRequirement))
+            if(!requirementsSet.contains(childRequirement))
             {
-                requirementsSet.Add(childRequirement);
+                requirementsSet.add(childRequirement);
                 m_requirements.add(childRequirement);
             }
         }
@@ -3941,14 +3941,14 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
     void addModule(Module* module)
     {
         m_modulesList.add(module);
-        m_modulesSet.Add(module);
+        m_modulesSet.add(module);
     }
 
     void maybeAddModule(Module* module)
     {
         if(!module)
             return;
-        if(m_modulesSet.Contains(module))
+        if(m_modulesSet.contains(module))
             return;
 
         addModule(module);
@@ -4101,7 +4101,7 @@ SpecializedComponentType::SpecializedComponentType(
     //
     base->enumerateModules([&](Module* module)
     {
-        moduleCollector.m_modulesSet.Add(module);
+        moduleCollector.m_modulesSet.add(module);
     });
 
     // In order to collect the additional modules, we need
@@ -4174,7 +4174,7 @@ SpecializedComponentType::SpecializedComponentType(
     //
     HashSet<SourceFile*> fileDependencySet;
     for(SourceFile* sourceFile : m_fileDependencies)
-        fileDependencySet.Add(sourceFile);
+        fileDependencySet.add(sourceFile);
 
     for(auto module : moduleCollector.m_modulesList)
     {
@@ -4202,9 +4202,9 @@ SpecializedComponentType::SpecializedComponentType(
         //
         for(SourceFile* sourceFile : module->getFileDependencies())
         {
-            if(fileDependencySet.Contains(sourceFile))
+            if(fileDependencySet.contains(sourceFile))
                 continue;
-            fileDependencySet.Add(sourceFile);
+            fileDependencySet.add(sourceFile);
             m_fileDependencies.add(sourceFile);
         }
 
@@ -4399,7 +4399,7 @@ void ComponentTypeVisitor::visitChildren(SpecializedComponentType* specialized)
 TargetProgram* ComponentType::getTargetProgram(TargetRequest* target)
 {
     RefPtr<TargetProgram> targetProgram;
-    if(!m_targetPrograms.TryGetValue(target, targetProgram))
+    if(!m_targetPrograms.tryGetValue(target, targetProgram))
     {
         targetProgram = new TargetProgram(this, target);
         m_targetPrograms[target] = targetProgram;
@@ -4544,7 +4544,7 @@ void Session::addBuiltinSource(
     auto moduleDecl = module->getModuleDecl();
 
     // Put in the loaded module map
-    linkage->mapNameToLoadedModules.Add(moduleName, module);
+    linkage->mapNameToLoadedModules.add(moduleName, module);
 
     // Add the resulting code to the appropriate scope
     if (!scope->containerDecl)
@@ -5108,7 +5108,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(SourceLoc(), Diagnostics::compilationAborted);
     }
-    m_diagnosticOutput = getSink()->outputBuffer.ProduceString();
+    m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
 #else
     // When debugging, we probably don't want to filter out any errors, since

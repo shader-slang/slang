@@ -96,7 +96,7 @@ namespace Slang
 
     IROpInfo getIROpInfo(IROp opIn)
     {
-        const int op = opIn & kIROpMeta_OpMask;
+        const int op = opIn & kIROpMask_OpMask;
         if (op < kIROpCount)
         {
             // It's a main op
@@ -1238,7 +1238,7 @@ namespace Slang
         auto user = use->getUser();
         if (user->getModule())
         {
-            user->getModule()->getDeduplicationContext()->getInstReplacementMap().TryGetValue(newValue, newValue);
+            user->getModule()->getDeduplicationContext()->getInstReplacementMap().tryGetValue(newValue, newValue);
         }
 
         if (!getIROpInfo(user->getOp()).isHoistable())
@@ -1256,7 +1256,7 @@ namespace Slang
         use->init(user, newValue);
 
         IRInst* existingVal = nullptr;
-        if (builder->getGlobalValueNumberingMap().TryGetValue(IRInstKey{ user }, existingVal))
+        if (builder->getGlobalValueNumberingMap().tryGetValue(IRInstKey{ user }, existingVal))
         {
             user->replaceUsesWith(existingVal);
             return existingVal;
@@ -1710,7 +1710,7 @@ namespace Slang
         Int const*              listArgCounts,
         IRInst* const* const*   listArgs)
     {
-        m_dedupContext->getInstReplacementMap().TryGetValue((IRInst*)(type), *(IRInst**)&type);
+        m_dedupContext->getInstReplacementMap().tryGetValue((IRInst*)(type), *(IRInst**)&type);
 
         if (getIROpInfo(op).flags & kIROpFlag_Hoistable)
         {
@@ -1744,7 +1744,7 @@ namespace Slang
             if (fixedArgs)
             {
                 auto arg = fixedArgs[aa];
-                m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
+                m_dedupContext->getInstReplacementMap().tryGetValue(arg, arg);
                 operand->init(inst, arg);
             }
             else
@@ -1762,7 +1762,7 @@ namespace Slang
                 if (listArgs[ii])
                 {
                     auto arg = listArgs[ii][jj];
-                    m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
+                    m_dedupContext->getInstReplacementMap().tryGetValue(arg, arg);
                     operand->init(inst, arg);
                 }
                 else
@@ -2157,7 +2157,7 @@ namespace Slang
         key.inst = &keyInst;
 
         IRConstant* irValue = nullptr;
-        if (m_dedupContext->getConstantMap().TryGetValue(key, irValue))
+        if (m_dedupContext->getConstantMap().tryGetValue(key, irValue))
         {
             // We found a match, so just use that.
             return irValue;
@@ -2224,7 +2224,7 @@ namespace Slang
         }
 
         key.inst = irValue;
-        m_dedupContext->getConstantMap().Add(key, irValue);
+        m_dedupContext->getConstantMap().add(key, irValue);
 
         addHoistableInst(this, irValue);
 
@@ -2459,7 +2459,7 @@ namespace Slang
             for (Int ii = 0; ii < fixedArgCount; ++ii)
             {
                 auto arg = canonicalizedOperands[ii];
-                m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
+                m_dedupContext->getInstReplacementMap().tryGetValue(arg, arg);
                 operand->usedValue = arg;
                 operand++;
             }
@@ -2469,7 +2469,7 @@ namespace Slang
                 for (UInt jj = 0; jj < listOperandCount; ++jj)
                 {
                     auto arg = listArgs[ii][jj];
-                    m_dedupContext->getInstReplacementMap().TryGetValue(arg, arg);
+                    m_dedupContext->getInstReplacementMap().tryGetValue(arg, arg);
                     operand->usedValue = arg;
                     operand++;
                 }
@@ -2481,7 +2481,7 @@ namespace Slang
             IRInstKey key = { inst };
 
             // Ideally we would add if not found, else return if was found instead of testing & then adding.
-            IRInst** found = m_dedupContext->getGlobalValueNumberingMap().TryGetValueOrAdd(key, inst);
+            IRInst** found = m_dedupContext->getGlobalValueNumberingMap().tryGetValueOrAdd(key, inst);
             SLANG_ASSERT(endCursor == memoryArena.getCursor());
             // If it's found, just return, and throw away the instruction
             if (found)
@@ -5881,9 +5881,9 @@ namespace Slang
             StringBuilder sb;
             scrubName(nameHint, sb);
 
-            String key = sb.ProduceString();
+            String key = sb.produceString();
             UInt count = 0;
-            context->uniqueNameCounters.TryGetValue(key, count);
+            context->uniqueNameCounters.tryGetValue(key, count);
 
             context->uniqueNameCounters[key] = count+1;
 
@@ -5891,14 +5891,14 @@ namespace Slang
             {
                 sb.append(count);
             }
-            return sb.ProduceString();
+            return sb.produceString();
         }
         else
         {
             StringBuilder sb;
             auto id = context->uniqueIDCounter++;
             sb.append(id);
-            return sb.ProduceString();
+            return sb.produceString();
         }
     }
 
@@ -5907,11 +5907,11 @@ namespace Slang
         IRInst*         value)
     {
         String name;
-        if (context->mapValueToName.TryGetValue(value, name))
+        if (context->mapValueToName.tryGetValue(value, name))
             return name;
 
         name = createName(context, value);
-        context->mapValueToName.Add(value, name);
+        context->mapValueToName.add(value, name);
         return name;
     }
 
@@ -6563,8 +6563,8 @@ namespace Slang
             return false;
         }
 
-        const IROp opA = IROp(a->getOp() & kIROpMeta_OpMask);
-        const IROp opB = IROp(b->getOp() & kIROpMeta_OpMask);
+        const IROp opA = IROp(a->getOp() & kIROpMask_OpMask);
+        const IROp opB = IROp(b->getOp() & kIROpMask_OpMask);
 
         if (opA != opB)
         {
@@ -6773,7 +6773,7 @@ namespace Slang
 
         auto addToWorkList = [&](IRInst* src, IRInst* target)
         {
-            if (workListSet.Add(src))
+            if (workListSet.add(src))
             {
                 WorkItem item;
                 item.thisInst = src;
@@ -6841,7 +6841,7 @@ namespace Slang
                     // Is the updated inst already exists in the global numbering map?
                     // If so, we need to continue work on replacing the updated inst with the existing value.
                     IRInst* existingVal = nullptr;
-                    if (dedupContext->getGlobalValueNumberingMap().TryGetValue(IRInstKey{ user }, existingVal))
+                    if (dedupContext->getGlobalValueNumberingMap().tryGetValue(IRInstKey{ user }, existingVal))
                     {
                         addToWorkList(user, existingVal);
                     }
@@ -7075,9 +7075,9 @@ namespace Slang
             }
             else if (auto constInst = as<IRConstant>(this))
             {
-                module->getDeduplicationContext()->getConstantMap().Remove(IRConstantKey{ constInst });
+                module->getDeduplicationContext()->getConstantMap().remove(IRConstantKey{ constInst });
             }
-            module->getDeduplicationContext()->getInstReplacementMap().Remove(this);
+            module->getDeduplicationContext()->getInstReplacementMap().remove(this);
         }
         removeArguments();
         removeAndDeallocateAllDecorationsAndChildren();

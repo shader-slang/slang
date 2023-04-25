@@ -1822,15 +1822,15 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
 
             newStructTypeLayout->fields.add(newField);
 
-            mapOldFieldToNew.Add(oldField.Ptr(), newField.Ptr());
+            mapOldFieldToNew.add(oldField.Ptr(), newField.Ptr());
         }
 
         for (auto entry : oldStructTypeLayout->mapVarToLayout)
         {
             VarLayout* newFieldLayout = nullptr;
-            if (mapOldFieldToNew.TryGetValue(entry.Value.Ptr(), newFieldLayout))
+            if (mapOldFieldToNew.tryGetValue(entry.value.Ptr(), newFieldLayout))
             {
-                newStructTypeLayout->mapVarToLayout.Add(entry.Key, newFieldLayout);
+                newStructTypeLayout->mapVarToLayout.add(entry.key, newFieldLayout);
             }
         }
 
@@ -2734,7 +2734,7 @@ Type* findGlobalGenericSpecializationArg(
     GlobalGenericParamDecl*     decl)
 {
     Val* arg = nullptr;
-    context.programLayout->globalGenericArgs.TryGetValue(decl, arg);
+    context.programLayout->globalGenericArgs.tryGetValue(decl, arg);
     return as<Type>(arg);
 }
 
@@ -2984,17 +2984,17 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
 
             adjustedStructTypeLayout->fields.add(adjustedField);
 
-            mapOriginalFieldToAdjusted.Add(originalField, adjustedField);
+            mapOriginalFieldToAdjusted.add(originalField, adjustedField);
         }
 
         for( auto p : originalStructTypeLayout->mapVarToLayout )
         {
-            VarDeclBase* key = p.Key;
-            RefPtr<VarLayout> originalVal = p.Value;
+            VarDeclBase* key = p.key;
+            RefPtr<VarLayout> originalVal = p.value;
             RefPtr<VarLayout> adjustedVal;
-            if( mapOriginalFieldToAdjusted.TryGetValue(originalVal, adjustedVal) )
+            if( mapOriginalFieldToAdjusted.tryGetValue(originalVal, adjustedVal) )
             {
-                adjustedStructTypeLayout->mapVarToLayout.Add(key, adjustedVal);
+                adjustedStructTypeLayout->mapVarToLayout.add(key, adjustedVal);
             }
         }
 
@@ -3123,7 +3123,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
 
     if( field )
     {
-        m_typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
+        m_typeLayout->mapVarToLayout.add(field.getDecl(), fieldLayout);
     }
 
     // Set up uniform offset information, if there is any uniform data in the field

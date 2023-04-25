@@ -20,7 +20,7 @@ namespace Slang
         IRInst* lowerGenericFunction(IRInst* genericValue)
         {
             IRInst* result = nullptr;
-            if (sharedContext->loweredGenericFunctions.TryGetValue(genericValue, result))
+            if (sharedContext->loweredGenericFunctions.tryGetValue(genericValue, result))
                 return result;
             // Do not lower intrinsic functions.
             if (genericValue->findDecoration<IRTargetIntrinsicDecoration>())
@@ -95,11 +95,11 @@ namespace Slang
                 default:
                     {
                         bool shouldDemote = false;
-                        if (childrenToDemote.Contains(clonedChild->getFullType()))
+                        if (childrenToDemote.contains(clonedChild->getFullType()))
                             shouldDemote = true;
                         for (UInt i = 0; i < clonedChild->getOperandCount(); i++)
                         {
-                            if (childrenToDemote.Contains(clonedChild->getOperand(i)))
+                            if (childrenToDemote.contains(clonedChild->getOperand(i)))
                             {
                                 shouldDemote = true;
                                 break;
@@ -197,9 +197,9 @@ namespace Slang
         IRInterfaceType* maybeLowerInterfaceType(IRInterfaceType* interfaceType)
         {
             IRInterfaceType* loweredType = nullptr;
-            if (sharedContext->loweredInterfaceTypes.TryGetValue(interfaceType, loweredType))
+            if (sharedContext->loweredInterfaceTypes.tryGetValue(interfaceType, loweredType))
                 return loweredType;
-            if (sharedContext->mapLoweredInterfaceToOriginal.ContainsKey(interfaceType))
+            if (sharedContext->mapLoweredInterfaceToOriginal.containsKey(interfaceType))
                 return interfaceType;
             // Do not lower intrinsic interfaces.
             if (isBuiltin(interfaceType))
@@ -255,7 +255,7 @@ namespace Slang
             IRCloneEnv cloneEnv;
             cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module,
                 interfaceType, loweredType);
-            sharedContext->loweredInterfaceTypes.Add(interfaceType, loweredType);
+            sharedContext->loweredInterfaceTypes.add(interfaceType, loweredType);
             sharedContext->mapLoweredInterfaceToOriginal[loweredType] = interfaceType;
             return loweredType;
         }
@@ -371,9 +371,9 @@ namespace Slang
         {
             for (auto lowered : sharedContext->loweredInterfaceTypes)
             {
-                 lowered.Key->replaceUsesWith(lowered.Value);
+                 lowered.key->replaceUsesWith(lowered.value);
             }
-            sharedContext->mapInterfaceRequirementKeyValue.Clear();
+            sharedContext->mapInterfaceRequirementKeyValue.clear();
         }
 
         void processModule()
@@ -385,7 +385,7 @@ namespace Slang
                 IRInst* inst = sharedContext->workList.getLast();
 
                 sharedContext->workList.removeLast();
-                sharedContext->workListSet.Remove(inst);
+                sharedContext->workListSet.remove(inst);
 
                 processInst(inst);
 

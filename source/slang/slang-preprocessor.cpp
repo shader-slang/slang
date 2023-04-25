@@ -1143,7 +1143,7 @@ static MacroDefinition* LookupMacro(Environment* environment, Name* name)
     for(Environment* e = environment; e; e = e->parent)
     {
         MacroDefinition* macro = NULL;
-        if (e->macros.TryGetValue(name, macro))
+        if (e->macros.tryGetValue(name, macro))
             return macro;
     }
 
@@ -1833,7 +1833,7 @@ Token MacroInvocation::_readTokenImpl()
                 //
                 PathInfo pathInfo = PathInfo::makeTokenPaste();       
                 SourceManager* sourceManager = m_preprocessor->getSourceManager();
-                SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, pastedContent.ProduceString());
+                SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, pastedContent.produceString());
                 SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, tokenPasteLoc);
 
                 Lexer lexer;
@@ -2532,7 +2532,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
         }
 
     case TokenType::IntegerLiteral:
-        return StringToInt(token.getContent());
+        return stringToInt(token.getContent());
 
     case TokenType::Identifier:
         {
@@ -3022,7 +3022,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     expectEndOfDirective(context);
 
     // Check whether we've previously included this file and seen a `#pragma once` directive
-    if(context->m_preprocessor->pragmaOnceUniqueIdentities.Contains(filePathInfo.uniqueIdentity))
+    if(context->m_preprocessor->pragmaOnceUniqueIdentities.contains(filePathInfo.uniqueIdentity))
     {
         return;
     }
@@ -3093,7 +3093,7 @@ static void _parseMacroOps(
             {
                 auto paramName = token.getName();
                 Index paramIndex = -1;
-                if(!mapParamNameToIndex.TryGetValue(paramName, paramIndex))
+                if(!mapParamNameToIndex.tryGetValue(paramName, paramIndex))
                 {
                     continue;
                 }
@@ -3115,7 +3115,7 @@ static void _parseMacroOps(
                 }
                 auto paramName = paramNameToken.getName();
                 Index paramIndex = -1;
-                if(!mapParamNameToIndex.TryGetValue(paramName, paramIndex))
+                if(!mapParamNameToIndex.tryGetValue(paramName, paramIndex))
                 {
                     GetSink(preprocessor)->diagnose(token.loc, Diagnostics::expectedMacroParameterAfterStringize);
                     continue;
@@ -3298,7 +3298,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
                 macro->params.add(param);
 
                 auto paramName = param.nameLoc.name;
-                if(mapParamNameToIndex.ContainsKey(paramName))
+                if(mapParamNameToIndex.containsKey(paramName))
                 {
                     GetSink(context)->diagnose(param.nameLoc.loc, Diagnostics::duplicateMacroParameterName, name);
                 }
@@ -3390,7 +3390,7 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     if (macro != NULL)
     {
         // name was defined, so remove it
-        env->macros.Remove(name);
+        env->macros.remove(name);
 
         delete macro;
     }
@@ -3484,7 +3484,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     switch(PeekTokenType(context))
     {
     case TokenType::IntegerLiteral:
-        line = StringToInt(AdvanceToken(context).getContent());
+        line = stringToInt(AdvanceToken(context).getContent());
         break;
 
     case TokenType::EndOfFile:
@@ -3565,7 +3565,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
         return;
     }
 
-    context->m_preprocessor->pragmaOnceUniqueIdentities.Add(issuedFromPathInfo.uniqueIdentity);
+    context->m_preprocessor->pragmaOnceUniqueIdentities.add(issuedFromPathInfo.uniqueIdentity);
 }
 
 // Information about a specific `#pragma` directive
@@ -3858,7 +3858,7 @@ Environment::~Environment()
 {
     for (auto pair : this->macros)
     {
-        auto macro = pair.Value;
+        auto macro = pair.value;
         delete macro;
     }
 }
@@ -3899,7 +3899,7 @@ static void DefineMacro(
     macro->nameAndLoc.loc = keyView->getRange().begin;
     
     MacroDefinition* oldMacro = NULL;
-    if (preprocessor->globalEnv.macros.TryGetValue(keyName, oldMacro))
+    if (preprocessor->globalEnv.macros.tryGetValue(keyName, oldMacro))
     {
         delete oldMacro;
     }
@@ -4060,7 +4060,7 @@ TokenList preprocessSource(
     {
         for (auto p : *desc.defines)
         {
-            DefineMacro(&preprocessor, p.Key, p.Value);
+            DefineMacro(&preprocessor, p.key, p.value);
         }
     }
 
@@ -4098,7 +4098,7 @@ TokenList preprocessSource(
         sb << t.Content;
     }
 
-    String s = sb.ProduceString();
+    String s = sb.produceString();
 #endif
 
     return tokens;

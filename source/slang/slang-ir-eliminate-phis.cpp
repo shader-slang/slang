@@ -142,9 +142,9 @@ struct PhiEliminationContext
 
         for (auto instAlloc : m_registerAllocation.mapInstToRegister)
         {
-            auto inst = instAlloc.Key;
+            auto inst = instAlloc.key;
             IRInst* registerVar = nullptr;
-            m_mapRegToTempVar.TryGetValue(instAlloc.Value, registerVar);
+            m_mapRegToTempVar.tryGetValue(instAlloc.value, registerVar);
             SLANG_RELEASE_ASSERT(registerVar);
 
             switch (inst->getOp())
@@ -156,10 +156,10 @@ struct PhiEliminationContext
                     auto updateInst = as<IRUpdateElement>(inst);
                     builder.setInsertBefore(updateInst);
                     RefPtr<RegisterInfo> oldReg;
-                    m_registerAllocation.mapInstToRegister.TryGetValue(updateInst->getOldValue(), oldReg);
+                    m_registerAllocation.mapInstToRegister.tryGetValue(updateInst->getOldValue(), oldReg);
                     // If the original value is not assigned to the same register as this inst,
                     // we need to insert a copy.
-                    if (instAlloc.Value != oldReg)
+                    if (instAlloc.value != oldReg)
                     {
                         builder.emitStore(registerVar, updateInst->getOldValue());
                     }
@@ -180,9 +180,9 @@ struct PhiEliminationContext
 
         for (auto instAlloc : m_registerAllocation.mapInstToRegister)
         {
-            auto inst = instAlloc.Key;
+            auto inst = instAlloc.key;
             IRInst* registerVar = nullptr;
-            m_mapRegToTempVar.TryGetValue(instAlloc.Value, registerVar);
+            m_mapRegToTempVar.tryGetValue(instAlloc.value, registerVar);
             SLANG_RELEASE_ASSERT(registerVar);
             while (auto use = inst->firstUse)
             {
@@ -221,8 +221,8 @@ struct PhiEliminationContext
         Dictionary<RegisterInfo*, IRInst*> mapRegToVar;
         for (auto& regList : m_registerAllocation.mapTypeToRegisterList)
         {
-            auto type = regList.Key;
-            for (auto reg : regList.Value)
+            auto type = regList.key;
+            for (auto reg : regList.value)
             {
                 // Find the common dominator for all the insts, and determine the latest insertion
                 // point of the tempVar inst.
@@ -417,21 +417,21 @@ struct PhiEliminationContext
         // be building up auxilliary data structures that the
         // subsequent steps will make use of.
         //
-        mapParamToIndex.Clear();
+        mapParamToIndex.clear();
         phiInfos.clear();
         Count paramCounter = 0;
         for (auto param : block->getParams())
         {
             Index paramIndex = paramCounter++;
-            mapParamToIndex.Add(param, paramIndex);
+            mapParamToIndex.add(param, paramIndex);
 
             IRInst* temp = nullptr;
 
             // Have we already allocated a register for this inst?
             // If so we use the var for that register.
-            if (auto registerInfo = m_registerAllocation.mapInstToRegister.TryGetValue(param))
+            if (auto registerInfo = m_registerAllocation.mapInstToRegister.tryGetValue(param))
             {
-                m_mapRegToTempVar.TryGetValue(registerInfo->get(), temp);
+                m_mapRegToTempVar.tryGetValue(registerInfo->get(), temp);
             }
 
             if (!temp)
@@ -700,7 +700,7 @@ struct PhiEliminationContext
         // the map we pre-computed.
         //
         Index srcParamIndex = kInvalidIndex;
-        mapParamToIndex.TryGetValue(srcArgVal, srcParamIndex);
+        mapParamToIndex.tryGetValue(srcArgVal, srcParamIndex);
         srcArg.paramIndex = srcParamIndex;
 
         if (srcParamIndex != kInvalidIndex)

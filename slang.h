@@ -252,10 +252,6 @@ convention for interface methods.
 
 // GCC Specific
 #if SLANG_GCC_FAMILY
-// This doesn't work on clang - because the typedef is seen as multiply defined, use the line numbered version defined later
-#	if !defined(__clang__) && (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7)) || defined(__ORBIS__))
-#		define SLANG_COMPILE_TIME_ASSERT(exp) typedef char SlangCompileTimeAssert_Dummy[(exp) ? 1 : -1] __attribute__((unused))
-#	endif
 
 #	define SLANG_NO_INLINE __attribute__((noinline))
 #	define SLANG_FORCE_INLINE inline __attribute__((always_inline))
@@ -289,7 +285,8 @@ convention for interface methods.
 #endif
 
 #ifndef SLANG_COMPILE_TIME_ASSERT
-#	define SLANG_COMPILE_TIME_ASSERT(exp) typedef char SLANG_CONCAT(SlangCompileTimeAssert,__LINE__)[(exp) ? 1 : -1]
+//  TODO(C++17), can use terse static_assert
+#   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x, #x)
 #endif
 
 #ifndef SLANG_OFFSET_OF

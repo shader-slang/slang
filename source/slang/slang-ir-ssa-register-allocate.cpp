@@ -15,12 +15,12 @@ struct RegisterAllocateContext
     OrderedDictionary<IRType*, List<RefPtr<RegisterInfo>>> mapTypeToRegisterList;
     List<RefPtr<RegisterInfo>>& getRegisterListForType(IRType* type)
     {
-        if (auto list = mapTypeToRegisterList.TryGetValue(type))
+        if (auto list = mapTypeToRegisterList.tryGetValue(type))
         {
             return *list;
         }
         mapTypeToRegisterList[type] = List<RefPtr<RegisterInfo>>();
-        return mapTypeToRegisterList[type].GetValue();
+        return mapTypeToRegisterList[type].getValue();
     }
 
     void assignInstToNewRegister(List<RefPtr<RegisterInfo>>& regList, IRInst* inst)
@@ -104,7 +104,7 @@ struct RegisterAllocateContext
     RegisterAllocationResult allocateRegisters(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom)
     {
         ReachabilityContext reachabilityContext;
-        mapTypeToRegisterList.Clear();
+        mapTypeToRegisterList.clear();
 
         auto dom = computeDominatorTree(func);
         inOutDom = dom;
@@ -141,7 +141,7 @@ struct RegisterAllocateContext
 
             // Pop dominatingInst stack to correct location.
             for (Index i = item.dominatingInstCount; i < dominatingInsts.getCount(); i++)
-                dominatingInstSet.Remove(dominatingInsts[i]);
+                dominatingInstSet.remove(dominatingInsts[i]);
             dominatingInsts.setCount(item.dominatingInstCount);
 
             for (auto inst : item.block->getChildren())
@@ -164,7 +164,7 @@ struct RegisterAllocateContext
                         // If `existingInst` does not dominate `inst`, it
                         // can't be alive here and during the entire life-time of the `inst`.
                         // This means that `inst` and `existingInst` won't interfere.
-                        if (!dominatingInstSet.Contains(existingInst))
+                        if (!dominatingInstSet.contains(existingInst))
                             continue;
 
                         // If `existingInst` does dominate `inst`, we need to check all
@@ -203,7 +203,7 @@ struct RegisterAllocateContext
                     allocatedReg->insts.add(inst);
                 }
                 dominatingInsts.add(inst);
-                dominatingInstSet.Add(inst);
+                dominatingInstSet.add(inst);
             }
 
             // Recursively visit idom children.
@@ -217,7 +217,7 @@ struct RegisterAllocateContext
         result.mapTypeToRegisterList = _Move(mapTypeToRegisterList);
         for (auto& regList : result.mapTypeToRegisterList)
         {
-            for (auto reg : regList.Value)
+            for (auto reg : regList.value)
             {
                 for (auto inst : reg->insts)
                 {

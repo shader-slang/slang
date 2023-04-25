@@ -43,7 +43,7 @@ void ExecutableLocation::set(const String& nameOrPath)
             StringBuilder builder;
             builder << nameOrPath;
             builder << suffix;
-            setPath(builder.ProduceString());
+            setPath(builder.produceString());
         }
     }
     else
@@ -86,7 +86,7 @@ void CommandLine::addPrefixPathArg(const char* prefix, const String& path, const
         // Work out the path with the postfix
         builder << pathPostfix;
     }
-    addArg(builder.ProduceString());
+    addArg(builder.produceString());
 }
 
 void CommandLine::append(StringBuilder& out) const
@@ -128,14 +128,14 @@ String CommandLine::toString() const
 {
     StringBuilder buf;
     append(buf);
-    return buf.ProduceString();
+    return buf.produceString();
 }
 
 String CommandLine::toStringArgs() const
 {
     StringBuilder buf;
     appendArgs(buf);
-    return buf.ProduceString();
+    return buf.produceString();
 }
 
 } // namespace Slang

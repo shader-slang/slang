@@ -266,7 +266,7 @@ String dumpIRToString(IRInst* root)
     options.flags = IRDumpOptions::Flag::DumpDebugIds;
 #endif
     dumpIR(root, options, nullptr, &writer);
-    return sb.ToString();
+    return sb.toString();
 }
 
 void copyNameHintDecoration(IRInst* dest, IRInst* src)
@@ -741,6 +741,24 @@ void moveParams(IRBlock* dest, IRBlock* src)
     }
 }
 
+void removePhiArgs(IRInst* phiParam)
+{
+    auto block = cast<IRBlock>(phiParam->getParent());
+    UInt paramIndex = 0;
+    for (auto p = block->getFirstParam(); p; p = p->getNextParam())
+    {
+        if (p == phiParam)
+            break;
+        paramIndex++;
+    }
+    for (auto predBlock : block->getPredecessors())
+    {
+        auto termInst = as<IRUnconditionalBranch>(predBlock->getTerminator());
+        SLANG_ASSERT(paramIndex < termInst->getArgCount());
+        termInst->removeArgument(paramIndex);
+    }
+}
+
 struct GenericChildrenMigrationContextImpl
 {
     IRCloneEnv cloneEnv;
@@ -773,7 +791,7 @@ struct GenericChildrenMigrationContextImpl
                 inst = inst->getNextInst())
             {
                 IRInstKey key = { inst };
-                deduplicateContext.deduplicateMap.AddIfNotExists(key, inst);
+                deduplicateContext.deduplicateMap.addIfNotExists(key, inst);
             }
         }
     }

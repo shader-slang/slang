@@ -529,7 +529,7 @@ struct IRGenContext
         IRGenEnv* envToFindIn = env;
         while (envToFindIn)
         {
-            if (auto rs = envToFindIn->mapDeclToValue.TryGetValue(decl))
+            if (auto rs = envToFindIn->mapDeclToValue.tryGetValue(decl))
                 return rs;
             envToFindIn = envToFindIn->outer;
         }
@@ -1348,7 +1348,7 @@ IRStructKey* getInterfaceRequirementKey(
         return nullptr;
 
     IRStructKey* requirementKey = nullptr;
-    if(context->shared->interfaceRequirementKeys.TryGetValue(requirementDecl, requirementKey))
+    if(context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
     {
         return requirementKey;
     }
@@ -1365,7 +1365,7 @@ IRStructKey* getInterfaceRequirementKey(
 
     addLinkageDecoration(context, requirementKey, requirementDecl);
 
-    context->shared->interfaceRequirementKeys.Add(requirementDecl, requirementKey);
+    context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
 
     return requirementKey;
 }
@@ -2436,7 +2436,7 @@ static String getNameForNameHint(
     sb.append(".");
     sb.append(leafName->text);
 
-    return sb.ProduceString();
+    return sb.produceString();
 }
 
 /// Try to add an appropriate name hint to the instruction,
@@ -5131,8 +5131,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.Add(stmt, breakLabel);
-        context->shared->continueLabels.Add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->continueLabels.add(stmt, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -5229,8 +5229,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.Add(stmt, breakLabel);
-        context->shared->continueLabels.Add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->continueLabels.add(stmt, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -5291,8 +5291,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.Add(stmt, breakLabel);
-        context->shared->continueLabels.Add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->continueLabels.add(stmt, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -5488,7 +5488,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // corresponds to the break label for that statement,
         // and then emit an instruction to jump to it.
         IRBlock* targetBlock = nullptr;
-        context->shared->breakLabels.TryGetValue(parentStmt, targetBlock);
+        context->shared->breakLabels.tryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitBreak(targetBlock);
     }
@@ -5507,7 +5507,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // corresponds to the continue label for that statement,
         // and then emit an instruction to jump to it.
         IRBlock* targetBlock = nullptr;
-        context->shared->continueLabels.TryGetValue(parentStmt, targetBlock);
+        context->shared->continueLabels.tryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitContinue(targetBlock);
     }
@@ -5759,7 +5759,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` label so
         // that we can find it for nested statements.
-        context->shared->breakLabels.Add(stmt, breakLabel);
+        context->shared->breakLabels.add(stmt, breakLabel);
 
         builder->setInsertInto(initialBlock->getParent());
 
@@ -5812,7 +5812,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // (and that control flow will fall through to otherwise).
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
-        context->shared->breakLabels.Remove(stmt);
+        context->shared->breakLabels.remove(stmt);
     }
 };
 
@@ -6550,8 +6550,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for(auto entry : astWitnessTable->requirementDictionary)
         {
-            auto requiredMemberDecl = entry.Key;
-            auto satisfyingWitness = entry.Value;
+            auto requiredMemberDecl = entry.key;
+            auto satisfyingWitness = entry.value;
 
             auto irRequirementKey = getInterfaceRequirementKey(requiredMemberDecl);
             if (!irRequirementKey) continue;
@@ -6581,7 +6581,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     auto astReqWitnessTable = satisfyingWitness.getWitnessTable();
                     IRWitnessTable* irSatisfyingWitnessTable = nullptr;
-                    if(!mapASTToIRWitnessTable.TryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
+                    if(!mapASTToIRWitnessTable.tryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
                     {
                         // Need to construct a sub-witness-table
                         auto irWitnessTableBaseType = lowerType(subContext, astReqWitnessTable->baseType);
@@ -7695,8 +7695,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto& entry : attr->m_mapTypeToIDifferentiableWitness)
         {
             // Lower type and witness.
-            IRType* irType = lowerType(subContext, entry.Value->sub);
-            IRInst* irWitness = lowerVal(subContext, entry.Value).val;
+            IRType* irType = lowerType(subContext, entry.value->sub);
+            IRInst* irWitness = lowerVal(subContext, entry.value).val;
 
             SLANG_ASSERT(irType);
 
@@ -7985,7 +7985,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         if (!isChildOf(value, parentBlock))
             return;
-        if (valuesToClone.Add(value))
+        if (valuesToClone.add(value))
         {
             for (UInt i = 0; i < value->getOperandCount(); i++)
             {
@@ -7998,7 +7998,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto parent = parentBlock->getParent();
         while (parent && parent != parentBlock)
         {
-            valuesToClone.Add(parent);
+            valuesToClone.add(parent);
             parent = parent->getParent();
         }
     }
@@ -8052,7 +8052,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), genericParam);
                     }
                 }
-                if (valuesToClone.Count() == 0)
+                if (valuesToClone.getCount() == 0)
                 {
                     // If the new generic has no parameters, set
                     // the generic inst's type to just `returnType`.
@@ -8071,13 +8071,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     
                     for (auto child : parentGeneric->getFirstBlock()->getChildren())
                     {
-                        if (valuesToClone.Contains(child))
+                        if (valuesToClone.contains(child))
                         {
                             cloneInst(&cloneEnv, &typeBuilder, child);
                         }
                     }
                     IRInst* clonedReturnType = nullptr;
-                    cloneEnv.mapOldValToNew.TryGetValue(returnType, clonedReturnType);
+                    cloneEnv.mapOldValToNew.tryGetValue(returnType, clonedReturnType);
                     if (clonedReturnType)
                     {
                         // If the type has explicit dependency on generic parameters, use
@@ -8110,7 +8110,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 for (auto param : parentGeneric->getParams())
                 {
                     IRInst* arg = nullptr;
-                    if (cloneEnv.mapOldValToNew.TryGetValue(param, arg))
+                    if (cloneEnv.mapOldValToNew.tryGetValue(param, arg))
                     {
                         specializeArgs.add(arg);
                     }
@@ -9040,7 +9040,7 @@ LoweredValInfo ensureDecl(
     auto env = context->env;
     while(env)
     {
-        if(env->mapDeclToValue.TryGetValue(decl, result))
+        if(env->mapDeclToValue.tryGetValue(decl, result))
             return result;
 
         env = env->outer;
@@ -9995,7 +9995,7 @@ IRTypeLayout* lowerTypeLayout(
                 // so that if we run into another type layout for the
                 // same entry point we will re-use the same keys.
                 //
-                if( !context->mapEntryPointParamToKey.TryGetValue(paramDecl, irFieldKey) )
+                if( !context->mapEntryPointParamToKey.tryGetValue(paramDecl, irFieldKey) )
                 {
                     irFieldKey = context->irBuilder->createStructKey();
 
@@ -10012,7 +10012,7 @@ IRTypeLayout* lowerTypeLayout(
                     // of these keys will be local to a single `IREntryPointLayout`,
                     // and we don't support combination at a finer granularity than that.
 
-                    context->mapEntryPointParamToKey.Add(paramDecl, irFieldKey);
+                    context->mapEntryPointParamToKey.add(paramDecl, irFieldKey);
                 }
             }
             else

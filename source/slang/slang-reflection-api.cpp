@@ -269,7 +269,7 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflect
     if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_E_INVALID_ARG;
 
     NodeBase* val = nullptr;
-    if (userAttr->intArgVals.TryGetValue(index, val))
+    if (userAttr->intArgVals.tryGetValue(index, val))
     {
         *rs = (int)as<ConstantIntVal>(val)->value;
         return 0;
@@ -1409,11 +1409,11 @@ namespace Slang
         Int _findOrAddDescriptorSet(Int space)
         {
             Int index = 0;
-            if(m_mapSpaceToDescriptorSetIndex.TryGetValue(space, index))
+            if(m_mapSpaceToDescriptorSetIndex.tryGetValue(space, index))
                 return index;
 
             index = m_extendedInfo->m_descriptorSets.getCount();
-            m_mapSpaceToDescriptorSetIndex.Add(space, index);
+            m_mapSpaceToDescriptorSetIndex.add(space, index);
 
             RefPtr<TypeLayout::ExtendedInfo::DescriptorSetInfo> descriptorSet = new TypeLayout::ExtendedInfo::DescriptorSetInfo();
             m_extendedInfo->m_descriptorSets.add(descriptorSet);

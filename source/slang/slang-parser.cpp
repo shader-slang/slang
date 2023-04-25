@@ -891,17 +891,17 @@ namespace Slang
         StringBuilder scopedIdentifierBuilder;
         if (initialTokenType == TokenType::Scope)
         {
-            scopedIdentifierBuilder.Append('_'); 
+            scopedIdentifierBuilder.append('_'); 
         }
-        scopedIdentifierBuilder.Append(firstIdentifier.getContent());
+        scopedIdentifierBuilder.append(firstIdentifier.getContent());
 
         while (parser->tokenReader.peekTokenType() == TokenType::Scope)
         {
             parser->ReadToken(TokenType::Scope);
-            scopedIdentifierBuilder.Append('_'); 
+            scopedIdentifierBuilder.append('_'); 
             
             const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
-            scopedIdentifierBuilder.Append(nextIdentifier.getContent());
+            scopedIdentifierBuilder.append(nextIdentifier.getContent());
         }
 
         // Make a 'token'
@@ -1195,7 +1195,7 @@ namespace Slang
                     sb << parser->ReadToken(TokenType::Identifier).getContent();
                 }
 
-                moduleNameAndLoc.name = getName(parser, sb.ProduceString());
+                moduleNameAndLoc.name = getName(parser, sb.produceString());
             }
 
             decl->moduleNameAndLoc = moduleNameAndLoc;
@@ -3155,7 +3155,7 @@ namespace Slang
             // lookup will only give us the first.
             //
             Decl* firstDecl = nullptr;
-            parentDecl->getMemberDictionary().TryGetValue(nameAndLoc.name, firstDecl);
+            parentDecl->getMemberDictionary().tryGetValue(nameAndLoc.name, firstDecl);
             //
             // We will search through the declarations of the name
             // and find the first that is a namespace (if any).
@@ -5041,13 +5041,13 @@ namespace Slang
                 SelectExpr* select = new SelectExpr();
                 FillPosition(select.Ptr());
 
-                select->Arguments.Add(condition);
+                select->Arguments.add(condition);
 
                 select->FunctionExpr = parseOperator(this);
 
-                select->Arguments.Add(ParseExpression(level));
+                select->Arguments.add(ParseExpression(level));
                 ReadToken(TokenType::Colon);
-                select->Arguments.Add(ParseExpression(level));
+                select->Arguments.add(ParseExpression(level));
                 return select;
             }
             else
@@ -5063,9 +5063,9 @@ namespace Slang
                     OperatorExpr* tmp = new InfixExpr();
                     tmp->FunctionExpr = parseOperator(this);
 
-                    tmp->Arguments.Add(left);
+                    tmp->Arguments.add(left);
                     FillPosition(tmp.Ptr());
-                    tmp->Arguments.Add(ParseExpression(Precedence(level + 1)));
+                    tmp->Arguments.add(ParseExpression(Precedence(level + 1)));
                     left = tmp;
                 }
                 return left;
@@ -5076,10 +5076,10 @@ namespace Slang
                 if (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                 {
                     OperatorExpr* tmp = new InfixExpr();
-                    tmp->Arguments.Add(left);
+                    tmp->Arguments.add(left);
                     FillPosition(tmp.Ptr());
                     tmp->FunctionExpr = parseOperator(this);
-                    tmp->Arguments.Add(ParseExpression(level));
+                    tmp->Arguments.add(ParseExpression(level));
                     left = tmp;
                 }
                 return left;
@@ -5819,7 +5819,7 @@ namespace Slang
                         token = parser->tokenReader.advanceToken();
                         sb << getStringLiteralTokenValue(token);
                     }
-                    constExpr->value = sb.ProduceString();
+                    constExpr->value = sb.produceString();
                 }
 
                 return constExpr;
@@ -6244,11 +6244,11 @@ namespace Slang
         {
             if (AdvanceIf(parser, TokenType::OpSub))
             {
-                modifier->op = IROp(-StringToInt(parser->ReadToken().getContent()));
+                modifier->op = IROp(-stringToInt(parser->ReadToken().getContent()));
             }
             else if (parser->LookAheadToken(TokenType::IntegerLiteral))
             {
-                modifier->op = IROp(StringToInt(parser->ReadToken().getContent()));
+                modifier->op = IROp(stringToInt(parser->ReadToken().getContent()));
             }
             else
             {
@@ -6513,7 +6513,7 @@ namespace Slang
     {
         BuiltinTypeModifier* modifier = parser->astBuilder->create<BuiltinTypeModifier>();
         parser->ReadToken(TokenType::LParent);
-        modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        modifier->tag = BaseType(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         parser->ReadToken(TokenType::RParent);
 
         return modifier;
@@ -6523,7 +6523,7 @@ namespace Slang
     {
         BuiltinRequirementModifier* modifier = parser->astBuilder->create<BuiltinRequirementModifier>();
         parser->ReadToken(TokenType::LParent);
-        modifier->kind = BuiltinRequirementKind(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        modifier->kind = BuiltinRequirementKind(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         parser->ReadToken(TokenType::RParent);
 
         return modifier;
@@ -6536,7 +6536,7 @@ namespace Slang
         modifier->magicName = parser->ReadToken(TokenType::Identifier).getContent();
         if (AdvanceIf(parser, TokenType::Comma))
         {
-            modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+            modifier->tag = uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         }
         parser->ReadToken(TokenType::RParent);
 
@@ -6547,10 +6547,10 @@ namespace Slang
     {
         IntrinsicTypeModifier* modifier = parser->astBuilder->create<IntrinsicTypeModifier>();
         parser->ReadToken(TokenType::LParent);
-        modifier->irOp = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        modifier->irOp = uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         while( AdvanceIf(parser, TokenType::Comma) )
         {
-            auto operand = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+            auto operand = uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
             modifier->irOperands.add(operand);
         }
         parser->ReadToken(TokenType::RParent);
@@ -6564,10 +6564,10 @@ namespace Slang
         ConversionCost cost = kConversionCost_Default;
         if( AdvanceIf(parser, TokenType::LParent) )
         {
-            cost = ConversionCost(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+            cost = ConversionCost(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
             if (AdvanceIf(parser, TokenType::Comma))
             {
-                builtinKind = BuiltinConversionKind(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+                builtinKind = BuiltinConversionKind(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
             }
             parser->ReadToken(TokenType::RParent);
         }

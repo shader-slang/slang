@@ -635,14 +635,14 @@ namespace Slang
     static void _lockPrimalParamReplacementInsts(IRBuilder* builder, ParameterBlockTransposeInfo& paramInfo)
     {
         for (auto& kv : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
-            builder->addKeepAliveDecoration(kv.Value);
+            builder->addKeepAliveDecoration(kv.value);
     }
 
     // Remove [KeepAlive] decorations for primal param replacement insts.
     static void _unlockPrimalParamReplacementInsts(ParameterBlockTransposeInfo& paramInfo)
     {
         for (auto& kv : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
-            kv.Value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
+            kv.value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
     }
 
     // Transcribe a function definition.
@@ -711,15 +711,12 @@ namespace Slang
 
         // Apply checkpointing policy to legalize cross-scope uses of primal values
         // using either recompute or store strategies.
-        auto primalsInfo = applyCheckpointPolicy(
-            diffPropagateFunc, paramTransposeInfo.propagateFuncSpecificPrimalInsts);
-
+        auto primalsInfo = applyCheckpointPolicy(diffPropagateFunc);
 
         eliminateDeadCode(diffPropagateFunc);
-        
 
-        // Extracts the primal computations into its own func, and replace the primal insts
-        // with the intermediate results computed from the extracted func.
+        // Extracts the primal computations into its own func, turn all accesses to stored primal insts into
+        // explicit intermediate data structure reads and writes.
         IRInst* intermediateType = nullptr;
         auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
             diffPropagateFunc, primalFunc, primalsInfo, paramTransposeInfo, intermediateType);
@@ -735,7 +732,7 @@ namespace Slang
         List<IRInst*> paramsToRemove;
         for (auto param : diffPropagateFunc->getParams())
         {
-            if (!paramTransposeInfo.propagateFuncParams.Contains(param))
+            if (!paramTransposeInfo.propagateFuncParams.contains(param))
                 paramsToRemove.add(param);
         }
         for (auto param : paramsToRemove)
@@ -743,7 +740,7 @@ namespace Slang
             if (param->hasUses())
             {
                 IRInst* replacement = nullptr;
-                paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc.TryGetValue(param, replacement);
+                paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc.tryGetValue(param, replacement);
                 SLANG_RELEASE_ASSERT(replacement);
                 param->replaceUsesWith(replacement);
             }
@@ -782,7 +779,7 @@ namespace Slang
 
         initializeLocalVariables(builder->getModule(), as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
         initializeLocalVariables(builder->getModule(), diffPropagateFunc);
-        // insertVariableForRecomputedPrimalInsts(diffPropagateFunc);
+
         stripTempDecorations(diffPropagateFunc);
 
         sortBlocksInFunc(diffPropagateFunc);
@@ -810,10 +807,13 @@ namespace Slang
 
         // Find the 'next' block using the terminator inst of the parameter block.
         auto fwdParamBlockBranch = as<IRUnconditionalBranch>(fwdDiffParameterBlock->getTerminator());
-        auto nextBlock = fwdParamBlockBranch->getTargetBlock();
+        // We create a new block after parameter block to hold insts that translates from transposed parameters
+        // into something that the rest of the function can use.
+        IRBuilder::insertBlockAlongEdge(diffFunc->getModule(), IREdge(&fwdParamBlockBranch->block));
+        auto paramPreludeBlock = fwdParamBlockBranch->getTargetBlock();
 
         auto nextBlockBuilder = *builder;
-        nextBlockBuilder.setInsertBefore(nextBlock->getFirstOrdinaryInst());
+        nextBlockBuilder.setInsertBefore(paramPreludeBlock->getFirstOrdinaryInst());
 
         IRBlock* firstDiffBlock = nullptr;
         for (auto block : diffFunc->getBlocks())
@@ -902,7 +902,7 @@ namespace Slang
                     // Create dOut param. 
                     auto diffParam = builder->emitParam(diffType);
                     copyNameHintDecoration(diffParam, fwdParam);
-                    result.propagateFuncParams.Add(diffParam);
+                    result.propagateFuncParams.add(diffParam);
                     primalRefReplacement = builder->emitParam(builder->getOutType(primalType));
                     copyNameHintDecoration(primalRefReplacement, fwdParam);
 
@@ -929,14 +929,14 @@ namespace Slang
                     primalRefReplacement = builder->emitParam(outType);
                     copyNameHintDecoration(primalRefReplacement, fwdParam);
                 }
-                result.primalFuncParams.Add(primalRefReplacement);
+                result.primalFuncParams.add(primalRefReplacement);
                 
                 // Create a local var for the out param for the primal part of the prop func.
                 auto tempPrimalVar = nextBlockBuilder.emitVar(outType->getValueType());
                 copyNameHintDecoration(tempPrimalVar, fwdParam);
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = tempPrimalVar;
 
-                instsToRemove.Add(fwdParam);
+                instsToRemove.add(fwdParam);
             }
             else if (!isRelevantDifferentialPair(fwdParam->getDataType()))
             {
@@ -947,14 +947,14 @@ namespace Slang
                     // bwd func.
                     fwdParam->removeFromParent();
                     fwdDiffParameterBlock->addParam(fwdParam);
-                    result.primalFuncParams.Add(fwdParam);
+                    result.primalFuncParams.add(fwdParam);
 
                     primalRefReplacement = fwdParam;
 
                     // Create an in param for the prop func.
                     auto propParam = builder->emitParam(inoutType->getValueType());
                     copyNameHintDecoration(propParam, fwdParam);
-                    result.propagateFuncParams.Add(propParam);
+                    result.propagateFuncParams.add(propParam);
 
                     // Create a local var for the out param for the primal part of the prop func.
                     auto tempPrimalVar = nextBlockBuilder.emitVar(inoutType->getValueType());
@@ -973,8 +973,8 @@ namespace Slang
                     //
                     fwdParam->removeFromParent();
                     fwdDiffParameterBlock->addParam(fwdParam);
-                    result.primalFuncParams.Add(fwdParam);
-                    result.propagateFuncParams.Add(fwdParam);
+                    result.primalFuncParams.add(fwdParam);
+                    result.propagateFuncParams.add(fwdParam);
                     continue;
                 }
             }
@@ -989,10 +989,10 @@ namespace Slang
                 primalRefReplacement = builder->emitParam(primalType);
                 copyNameHintDecoration(primalRefReplacement, fwdParam);
 
-                result.primalFuncParams.Add(primalRefReplacement);
+                result.primalFuncParams.add(primalRefReplacement);
                 auto propParam = builder->emitParam(inoutDiffPairType);
                 copyNameHintDecoration(propParam, fwdParam);
-                result.propagateFuncParams.Add(propParam);
+                result.propagateFuncParams.add(propParam);
 
                 // A reference to this parameter from the diff blocks should be replaced with a load
                 // of the differential component of the pair.
@@ -1014,7 +1014,7 @@ namespace Slang
                 result.propagateFuncSpecificPrimalInsts.add(primalVal);
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = primalVal;
 
-                instsToRemove.Add(fwdParam);
+                instsToRemove.add(fwdParam);
             }
             else
             {
@@ -1024,11 +1024,11 @@ namespace Slang
                 // Process differentiable inout parameters.
                 auto primalParam = builder->emitParam(builder->getInOutType(primalType));
                 copyNameHintDecoration(primalParam, fwdParam);
-                result.primalFuncParams.Add(primalParam);
+                result.primalFuncParams.add(primalParam);
 
                 auto diffParam = builder->emitParam(inoutType);
                 copyNameHintDecoration(diffParam, fwdParam);
-                result.propagateFuncParams.Add(diffParam);
+                result.propagateFuncParams.add(diffParam);
 
                 // Primal references to this param is the new primal param.
                 primalRefReplacement = primalParam;
@@ -1078,7 +1078,7 @@ namespace Slang
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalParam] = primalVar;
                 result.outDiffWritebacks[diffParam] = InstPair(initPrimalVal, diffVar);
 
-                instsToRemove.Add(fwdParam);
+                instsToRemove.add(fwdParam);
             }
 
             // We have emitted all the new parameters and computed the replacements for the original
@@ -1092,13 +1092,13 @@ namespace Slang
                 {
                     SLANG_RELEASE_ASSERT(primalRefReplacement);
                     primalRef->replaceUsesWith(primalRefReplacement);
-                    instsToRemove.Add(primalRef);
+                    instsToRemove.add(primalRef);
                 }
                 else if (auto getPrimal = as<IRDifferentialPairGetPrimal>(use->getUser()))
                 {
                     SLANG_RELEASE_ASSERT(primalRefReplacement);
                     getPrimal->replaceUsesWith(primalRefReplacement);
-                    instsToRemove.Add(getPrimal);
+                    instsToRemove.add(getPrimal);
                 }
                 else if (auto propagateRef = as<IRDiffParamRef>(use->getUser()))
                 {
@@ -1120,13 +1120,13 @@ namespace Slang
                         }
                         refUse = nextUse;
                     }
-                    instsToRemove.Add(propagateRef);
+                    instsToRemove.add(propagateRef);
                 }
                 else if (auto getDiff = as<IRDifferentialPairGetDifferential>(use->getUser()))
                 {
                     SLANG_RELEASE_ASSERT(diffRefReplacement);
                     getDiff->replaceUsesWith(diffRefReplacement);
-                    instsToRemove.Add(getDiff);
+                    instsToRemove.add(getDiff);
                 }
                 else
                 {
@@ -1161,14 +1161,14 @@ namespace Slang
 
             dOutParam = builder->emitParam(dOutParamType);
             builder->addNameHintDecoration(dOutParam, UnownedStringSlice("_s_dOut"));
-            result.propagateFuncParams.Add(dOutParam);
+            result.propagateFuncParams.add(dOutParam);
         }
 
         // Add a parameter for intermediate val.
         auto ctxParam = builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1));
         builder->addNameHintDecoration(ctxParam, UnownedStringSlice("_s_diff_ctx"));
-        result.primalFuncParams.Add(ctxParam);
-        result.propagateFuncParams.Add(ctxParam);
+        result.primalFuncParams.add(ctxParam);
+        result.propagateFuncParams.add(ctxParam);
         result.dOutParam = dOutParam;
         return result;
     }
@@ -1193,9 +1193,9 @@ namespace Slang
         builder.setInsertBefore(returnInst);
         for (auto& wb : info.outDiffWritebacks)
         {
-            auto dest = wb.Key;
-            auto srcPrimalVal = wb.Value.primal;
-            auto srcDiffAddr = wb.Value.differential;
+            auto dest = wb.key;
+            auto srcPrimalVal = wb.value.primal;
+            auto srcDiffAddr = wb.value.differential;
             auto srcDiffVal = builder.emitLoad(srcDiffAddr);
             auto destVal = builder.emitMakeDifferentialPair(as<IRPtrTypeBase>(dest->getFullType())->getValueType(), srcPrimalVal, srcDiffVal);
             builder.emitStore(dest, destVal);
@@ -1214,7 +1214,7 @@ namespace Slang
         auto primalSpecialize = (IRSpecialize*)builder->emitSpecializeInst(
             (IRType*)primalType, primalBase, primalArgs.getCount(), primalArgs.getBuffer());
 
-        if (auto diffBase = instMapD.TryGetValue(origSpecialize->getBase()))
+        if (auto diffBase = instMapD.tryGetValue(origSpecialize->getBase()))
         {
             List<IRInst*> args;
             for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)

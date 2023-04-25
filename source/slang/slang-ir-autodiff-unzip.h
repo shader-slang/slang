@@ -161,16 +161,16 @@ struct DiffUnzipPass
             List<IRBlock*> workList;
             for (auto blockRegionPair : indexRegionMap->map)
             {
-                IRBlock* block = blockRegionPair.Key;
+                IRBlock* block = blockRegionPair.key;
                 workList.add(block);
             }
 
             for (auto block : workList)
             {
-                if (primalMap.ContainsKey(block))
+                if (primalMap.containsKey(block))
                     indexRegionMap->map[as<IRBlock>(primalMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
                 
-                if (diffMap.ContainsKey(block))
+                if (diffMap.containsKey(block))
                     indexRegionMap->map[as<IRBlock>(diffMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
             }
         }
@@ -181,7 +181,7 @@ struct DiffUnzipPass
         RefPtr<BlockSplitInfo> splitInfo = new BlockSplitInfo();
 
         for (auto block : mixedBlocks)
-            if (primalMap.ContainsKey(block))
+            if (primalMap.containsKey(block))
                 splitInfo->diffBlockMap[as<IRBlock>(primalMap[block])] = as<IRBlock>(diffMap[block]);
 
         for (auto block : mixedBlocks)
@@ -312,13 +312,6 @@ struct DiffUnzipPass
             {
                 auto primalArg = lookupPrimalInst(arg);
                 auto diffArg = lookupDiffInst(arg);
-
-                if (auto primalVar = as<IRVar>(primalArg))
-                {
-                    primalArg = diffBuilder->emitVar(as<IRPtrTypeBase>(primalVar->getDataType())->getValueType());
-                    if (auto storeUse = findUniqueStoredVal(primalVar))   
-                        diffBuilder->emitStore(primalArg, as<IRStore>(storeUse->getUser())->getVal());
-                }
 
                 // If arg is a mixed differential (pair), it should have already been split.
                 SLANG_ASSERT(primalArg);
@@ -701,7 +694,7 @@ struct DiffUnzipPass
             if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(child))
             {
                 // Replace GetDiff(A) with A.d
-                if (diffMap.ContainsKey(getDiffInst->getBase()))
+                if (diffMap.containsKey(getDiffInst->getBase()))
                 {
                     getDiffInst->replaceUsesWith(lookupDiffInst(getDiffInst->getBase()));
                     getDiffInst->removeAndDeallocate();
@@ -711,7 +704,7 @@ struct DiffUnzipPass
             else if (auto getPrimalInst = as<IRDifferentialPairGetPrimal>(child))
             {
                 // Replace GetPrimal(A) with A.p
-                if (primalMap.ContainsKey(getPrimalInst->getBase()))
+                if (primalMap.containsKey(getPrimalInst->getBase()))
                 {
                     getPrimalInst->replaceUsesWith(lookupPrimalInst(getPrimalInst->getBase()));
                     getPrimalInst->removeAndDeallocate();

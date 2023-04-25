@@ -17,7 +17,7 @@ static SimpleRegion* getFirstRegionForBlock(
     IRBlock*    block)
 {
     SimpleRegion* region = nullptr;
-    if( regionTree->mapBlockToRegion.TryGetValue(block, region) )
+    if( regionTree->mapBlockToRegion.tryGetValue(block, region) )
     {
         return region;
     }

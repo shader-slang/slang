@@ -876,7 +876,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 
 /* static */SlangResult ArtifactDescUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
 {
-    outPath.Clear();
+    outPath.clear();
 
     // Append the directory
     Index pos = Path::findLastSeparatorIndex(basePath);

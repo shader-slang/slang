@@ -36,7 +36,7 @@ void SourceWriter::emitRawTextSpan(char const* textBegin, char const* textEnd)
 {
     // TODO(tfoley): Need to make "corelib" not use `int` for pointer-sized things...
     auto len = textEnd - textBegin;
-    m_builder.Append(textBegin, len);
+    m_builder.append(textBegin, len);
 }
 
 void SourceWriter::emitRawText(char const* text)
@@ -468,10 +468,10 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
                 // extension and then emit a traditional line directive.
 
                 int id = 0;
-                if (!m_mapGLSLSourcePathToID.TryGetValue(path, id))
+                if (!m_mapGLSLSourcePathToID.tryGetValue(path, id))
                 {
                     id = m_glslSourceIDCount++;
-                    m_mapGLSLSourcePathToID.Add(path, id);
+                    m_mapGLSLSourcePathToID.add(path, id);
                 }
 
                 sprintf(buffer, "%d", id);

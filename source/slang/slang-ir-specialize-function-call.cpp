@@ -326,7 +326,7 @@ struct FunctionParameterSpecializationContext
         // that is suitable to this call site.
         //
         IRFunc* newFunc = nullptr;
-        if( !specializedFuncs.TryGetValue(callInfo.key, newFunc) )
+        if( !specializedFuncs.tryGetValue(callInfo.key, newFunc) )
         {
             // If we didn't find a pre-existing specialized
             // function, then we will go ahead and create one.
@@ -344,7 +344,7 @@ struct FunctionParameterSpecializationContext
             // function and the information we gathered.
             //
             newFunc = generateSpecializedFunc(oldFunc, funcInfo);
-            specializedFuncs.Add(callInfo.key, newFunc);
+            specializedFuncs.add(callInfo.key, newFunc);
         }
 
         // Once we've other found or generated a specialized function
@@ -755,7 +755,7 @@ struct FunctionParameterSpecializationContext
         {
             UInt paramIndex = paramCounter++;
             auto newVal = funcInfo.replacementsForOldParameters[paramIndex];
-            cloneEnv.mapOldValToNew.Add(oldParam, newVal);
+            cloneEnv.mapOldValToNew.add(oldParam, newVal);
         }
 
         // Next we will create the skeleton of the new

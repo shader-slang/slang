@@ -7,8 +7,8 @@ namespace Slang
         m_module = module;
         m_session = module->getSession();
 
-        m_globalValueNumberingMap.Clear();
-        m_constantMap.Clear();
+        m_globalValueNumberingMap.clear();
+        m_constantMap.clear();
     }
 
     void IRDeduplicationContext::removeHoistableInstFromGlobalNumberingMap(IRInst* instToRemove)
@@ -17,7 +17,7 @@ namespace Slang
         List<IRInst*> userWorkList;
         auto addToWorkList = [&](IRInst* i)
         {
-            if (userWorkListSet.Add(i))
+            if (userWorkListSet.add(i))
                 userWorkList.add(i);
         };
         addToWorkList(instToRemove);
@@ -40,7 +40,7 @@ namespace Slang
         List<IRInst*> workList;
         HashSet<IRInst*> workListSet;
         workList.add(inst);
-        workListSet.Add(inst);
+        workListSet.add(inst);
         IRBuilder builder(inst->getModule());
 
         for (Index i = 0; i < workList.getCount(); i++)
@@ -71,7 +71,7 @@ namespace Slang
                 {
                     if (getIROpInfo(use->getUser()->getOp()).isHoistable())
                     {
-                        if (workListSet.Add(use->getUser()))
+                        if (workListSet.add(use->getUser()))
                             workList.add(use->getUser());
                     }
                 }

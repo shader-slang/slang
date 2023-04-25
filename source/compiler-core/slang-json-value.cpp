@@ -600,7 +600,7 @@ UnownedStringSlice JSONContainer::getTransientString(const JSONValue& in)
 
             if (handler->isUnescapingNeeeded(unquoted))
             {
-                m_buf.Clear();
+                m_buf.clear();
                 handler->appendUnescaped(unquoted, m_buf);
                 return m_buf.getUnownedSlice();
             }
@@ -1425,7 +1425,7 @@ void JSONBuilder::endArray(SourceLoc loc)
 void JSONBuilder::addQuotedKey(const UnownedStringSlice& key, SourceLoc loc)
 {
     // We need to decode
-    m_work.Clear();
+    m_work.clear();
     StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
     StringEscapeUtil::appendUnquoted(handler, key, m_work);
     addUnquotedKey(m_work.getUnownedSlice(), loc);

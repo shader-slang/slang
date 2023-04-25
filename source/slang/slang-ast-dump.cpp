@@ -27,7 +27,7 @@ struct ASTDumpContext
         {
             if (m_context->m_scopeWriteCount == 0)
             {
-                m_context->m_buf.Clear();
+                m_context->m_buf.clear();
             }
             m_context->m_scopeWriteCount++;
         }
@@ -276,7 +276,7 @@ struct ASTDumpContext
 
     Index getObjectIndex(const ReflectClassInfo& typeInfo, NodeBase* obj)
     {
-        Index* indexPtr = m_objectMap.TryGetValueOrAdd(obj, m_objects.getCount());
+        Index* indexPtr = m_objectMap.tryGetValueOrAdd(obj, m_objects.getCount());
         if (indexPtr)
         {
             return *indexPtr;
@@ -394,8 +394,8 @@ struct ASTDumpContext
 
         for (auto iter : dict)
         {
-            const auto& key = iter.Key;
-            const auto& value = iter.Value;
+            const auto& key = iter.key;
+            const auto& value = iter.value;
 
             dump(key);
             m_writer->emit(" : ");
@@ -416,8 +416,8 @@ struct ASTDumpContext
 
         for (auto iter : dict)
         {
-            const auto& key = iter.Key;
-            const auto& value = iter.Value;
+            const auto& key = iter.key;
+            const auto& value = iter.value;
 
             dump(key);
             m_writer->emit(" : ");
@@ -434,7 +434,7 @@ struct ASTDumpContext
     {
         StringBuilder sb;
         sb << declRef;
-        m_writer->emit(sb.ToString());
+        m_writer->emit(sb.toString());
     }
 
     void dump(const DeclCheckStateExt& extState)
@@ -446,14 +446,14 @@ struct ASTDumpContext
 
     void dump(TextureFlavor texFlavor)
     {
-        m_buf.Clear();
+        m_buf.clear();
         m_buf << "TextureFlavor{" << Index(texFlavor.flavor) << "}";
         m_writer->emit(m_buf);
     }
 
     void dump(FeedbackType::Kind kind)
     {
-        m_buf.Clear();
+        m_buf.clear();
         const char* name = nullptr;
         switch (kind)
         {

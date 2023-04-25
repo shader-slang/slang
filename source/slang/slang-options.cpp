@@ -819,7 +819,7 @@ struct OptionsParser
                 continue;
             }
 
-            buf.Clear();
+            buf.clear();
 
             buf << diagnostic->id << " : ";
             NameConventionUtil::convert(NameStyle::Camel, UnownedStringSlice(diagnostic->name), NameConvention::LowerKabab, buf);
@@ -1999,7 +1999,7 @@ struct OptionsParser
                         continue;
 
                     int targetIndex = 0;
-                    if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
+                    if( !mapFormatToTargetIndex.tryGetValue(impliedFormat, targetIndex) )
                     {
                         targetIndex = (int) rawTargets.getCount();
 
@@ -2026,7 +2026,7 @@ struct OptionsParser
             {
                 auto format = rawTargets[targetIndex].format;
 
-                if( mapFormatToTargetIndex.ContainsKey(format) )
+                if( mapFormatToTargetIndex.containsKey(format) )
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::duplicateTargets, format);
                 }
@@ -2272,7 +2272,7 @@ struct OptionsParser
                     //
                     sink->diagnose(SourceLoc(), Diagnostics::cannotDeduceOutputFormatFromPath, rawOutput.path);
                 }
-                else if( mapFormatToTargetIndex.TryGetValue(rawOutput.impliedFormat, targetIndex) )
+                else if( mapFormatToTargetIndex.tryGetValue(rawOutput.impliedFormat, targetIndex) )
                 {
                     rawOutput.targetIndex = targetIndex;
                 }
@@ -2330,7 +2330,7 @@ struct OptionsParser
             auto targetID = rawTargets[rawOutput.targetIndex].targetID;
             auto target = requestImpl->getLinkage()->targets[targetID];
             RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-            if( !requestImpl->m_targetInfos.TryGetValue(target, targetInfo) )
+            if( !requestImpl->m_targetInfos.tryGetValue(target, targetInfo) )
             {
                 targetInfo = new EndToEndCompileRequest::TargetInfo();
                 requestImpl->m_targetInfos[target] = targetInfo;
@@ -2356,7 +2356,7 @@ struct OptionsParser
                 auto entryPointReq = requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
 
                 //String outputPath;
-                if (targetInfo->entryPointOutputPaths.ContainsKey(entryPointID))
+                if (targetInfo->entryPointOutputPaths.containsKey(entryPointID))
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::duplicateOutputPathsForEntryPointAndTarget, entryPointReq->getName(), target->getTarget());
                 }
@@ -2390,7 +2390,7 @@ SlangResult parseOptions(
     if (sink->getErrorCount() > 0)
     {
         // Put the errors in the diagnostic 
-        compileRequest->m_diagnosticOutput = sink->outputBuffer.ProduceString();
+        compileRequest->m_diagnosticOutput = sink->outputBuffer.produceString();
     }
 
     return res;

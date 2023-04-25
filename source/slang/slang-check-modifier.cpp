@@ -697,7 +697,7 @@ namespace Slang
                     return false;
                 }
             }
-            comInterfaceAttr->guid = resultGUID.ToString();
+            comInterfaceAttr->guid = resultGUID.toString();
             if (comInterfaceAttr->guid.getLength() != 32)
             {
                 getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);

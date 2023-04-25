@@ -70,7 +70,7 @@ void StringSlicePool::_set(const ThisType& rhs)
         m_slices[i] = dstSlice;
 
         // Add to the map
-        m_map.Add(dstSlice, Handle(i));
+        m_map.add(dstSlice, Handle(i));
 
         // Skip to next slices storage
         dst += sliceSize + 1;
@@ -109,7 +109,7 @@ bool StringSlicePool::operator==(const ThisType& rhs) const
 
 void StringSlicePool::clear()
 {
-    m_map.Clear();
+    m_map.clear();
     m_arena.deallocateAll();
 
     switch (m_style)
@@ -123,7 +123,7 @@ void StringSlicePool::clear()
             m_slices[1] = UnownedStringSlice::fromLiteral("");
             
             // Add the empty entry
-            m_map.Add(m_slices[1], kEmptyHandle);
+            m_map.add(m_slices[1], kEmptyHandle);
             break;
         }
         case Style::Empty:
@@ -145,7 +145,7 @@ void StringSlicePool::swapWith(ThisType& rhs)
 
 StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
 {
-    const Handle* handlePtr = m_map.TryGetValue(slice);
+    const Handle* handlePtr = m_map.tryGetValue(slice);
     if (handlePtr)
     {
         return *handlePtr;
@@ -157,13 +157,13 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
     const auto index = m_slices.getCount();
 
     m_slices.add(scopePath);
-    m_map.Add(scopePath, Handle(index));
+    m_map.add(scopePath, Handle(index));
     return Handle(index);
 }
 
 bool StringSlicePool::findOrAdd(const Slice& slice, Handle& outHandle)
 {
-    const Handle* handlePtr = m_map.TryGetValue(slice);
+    const Handle* handlePtr = m_map.tryGetValue(slice);
     if (handlePtr)
     {
         outHandle = *handlePtr;
@@ -177,7 +177,7 @@ bool StringSlicePool::findOrAdd(const Slice& slice, Handle& outHandle)
 
     // Add using the arenas copy
     Handle newHandle = Handle(m_slices.getCount());
-    m_map.Add(scopeSlice, newHandle);
+    m_map.add(scopeSlice, newHandle);
 
     // Add to slices list
     m_slices.add(scopeSlice);
@@ -226,7 +226,7 @@ StringSlicePool::Handle StringSlicePool::add(const char* chars)
 
 Index StringSlicePool::findIndex(const Slice& slice) const
 {
-    const Handle* handlePtr = m_map.TryGetValue(slice);
+    const Handle* handlePtr = m_map.tryGetValue(slice);
     return handlePtr ? Index(*handlePtr) : -1;
 }
 

@@ -121,7 +121,7 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
 
     IRFunc* func = nullptr;
     
-    if (IRFunc** funcPtr = entry.m_funcs.TryGetValue(referencedType))
+    if (IRFunc** funcPtr = entry.m_funcs.tryGetValue(referencedType))
     {
         func = *funcPtr;
     }
@@ -146,7 +146,7 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
         _addDecorations(kind, func);
 
         // Add to the map
-        entry.m_funcs.Add(referencedType, func);
+        entry.m_funcs.add(referencedType, func);
     }
     SLANG_ASSERT(func);
 

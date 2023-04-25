@@ -20,7 +20,7 @@ namespace Slang
     extern _EndLine EndLine;
 
     // in-place reversion, works only for ascii string
-    inline void ReverseInternalAscii(char * buffer, int length)
+    inline void reverseInplaceAscii(char* buffer, int length)
     {
         int i, j;
         char c;
@@ -32,13 +32,17 @@ namespace Slang
         }
     }
     template<typename IntType>
-    inline int IntToAscii(char * buffer, IntType val, int radix)
+    inline int intToAscii(char* buffer, IntType val, int radix)
     {
         int i = 0;
         IntType sign;
+        
         sign = val;
         if (sign < 0)
+        {
             val = (IntType)(0 - val);
+        }
+
         do
         {
             int digit = (val % radix);
@@ -47,18 +51,23 @@ namespace Slang
             else
                 buffer[i++] = (char)(digit - 10 + 'A');
         } while ((val /= radix) > 0);
+
         if (sign < 0)
             buffer[i++] = '-';
+
+        // Put in normal character order
+        reverseInplaceAscii(buffer, i);
+
         buffer[i] = '\0';
         return i;
     }
 
-    inline bool IsUtf8LeadingByte(char ch)
+    SLANG_FORCE_INLINE bool isUtf8LeadingByte(char ch)
     {
         return (((unsigned char)ch) & 0xC0) == 0xC0;
     }
 
-    inline bool IsUtf8ContinuationByte(char ch)
+    SLANG_FORCE_INLINE bool isUtf8ContinuationByte(char ch)
     {
         return (((unsigned char)ch) & 0xC0) == 0x80;
     }
@@ -451,10 +460,11 @@ namespace Slang
             : m_buffer(buffer)
         {}
 
-        static String fromWString(const wchar_t * wstr);
-        static String fromWString(const wchar_t * wstr, const wchar_t * wend);
+        static String fromWString(const wchar_t* wstr);
+        static String fromWString(const wchar_t* wstr, const wchar_t* wend);
         static String fromWChar(const wchar_t ch);
         static String fromUnicodePoint(Char32 codePoint);
+
         String()
         {
         }
@@ -466,11 +476,11 @@ namespace Slang
 
         SLANG_FORCE_INLINE StringRepresentation* getStringRepresentation() const { return m_buffer; }
 
-        const char * begin() const
+        const char* begin() const
         {
             return getData();
         }
-        const char * end() const
+        const char* end() const
         {
             return getData() + getLength();
         }
@@ -479,10 +489,11 @@ namespace Slang
         void append(uint32_t value, int radix = 10);
         void append(int64_t value, int radix = 10);
         void append(uint64_t value, int radix = 10);
-        void append(float val, const char * format = "%g");
-        void append(double val, const char * format = "%g");
+        void append(float val, const char* format = "%g");
+        void append(double val, const char* format = "%g");
 
         void append(char const* str);
+        void append(char const* str, size_t len);
         void append(const char* textBegin, char const* textEnd);
         void append(char chr);
         void append(String const& str);
@@ -498,25 +509,11 @@ namespace Slang
         String(const char* str)
         {
             append(str);
-#if 0
-            if (str)
-            {
-                buffer = StringRepresentation::createWithLength(strlen(str));
-                memcpy(buffer.Ptr(), str, getLength() + 1);
-            }
-#endif
+
         }
         String(const char* textBegin, char const* textEnd)
         {
             append(textBegin, textEnd);
-#if 0
-            if (textBegin != textEnd)
-            {
-                buffer = StringRepresentation::createWithLength(textEnd - textBegin);
-                memcpy(buffer.Ptr(), textBegin, getLength());
-                buffer->getData()[getLength()] = 0;
-            }
-#endif
         }
 
         // Make all String ctors from a numeric explicit, to avoid unexpected/unnecessary conversions
@@ -536,33 +533,22 @@ namespace Slang
         {
             append(val, radix);
         }
-        explicit String(float val, const char * format = "%g")
+        explicit String(float val, const char* format = "%g")
         {
             append(val, format);
         }
-        explicit String(double val, const char * format = "%g")
+        explicit String(double val, const char* format = "%g")
         {
             append(val, format);
         }
 
         explicit String(char chr)
         {
-            append(chr);
-#if 0
-            if (chr)
-            {
-                buffer = StringRepresentation::createWithLength(1);
-                buffer->getData()[0] = chr;
-                buffer->getData()[1] = 0;
-            }
-#endif
+            appendChar(chr);
         }
         String(String const& str)
         {
             m_buffer = str.m_buffer;
-#if 0
-            this->operator=(str);
-#endif
         }
         String(String&& other)
         {
@@ -584,12 +570,12 @@ namespace Slang
             m_buffer.setNull(); 
         }
 
-        String & operator=(const String & str)
+        String& operator=(const String& str)
         {
             m_buffer = str.m_buffer;
             return *this;
         }
-        String & operator=(String&& other)
+        String& operator=(String&& other)
         {
             m_buffer = _Move(other.m_buffer);
             return *this;
@@ -678,7 +664,7 @@ namespace Slang
 
         OSString toWString(Index* len = 0) const;
 
-        bool equals(const String & str, bool caseSensitive = true)
+        bool equals(const String& str, bool caseSensitive = true)
         {
             if (caseSensitive)
                 return (strcmp(begin(), str.begin()) == 0);
@@ -691,36 +677,36 @@ namespace Slang
 #endif
             }
         }
-        bool operator==(const char * strbuffer) const
+        bool operator==(const char* strbuffer) const
         {
             return (strcmp(begin(), strbuffer) == 0);
         }
 
-        bool operator==(const String & str) const
+        bool operator==(const String& str) const
         {
             return (strcmp(begin(), str.begin()) == 0);
         }
-        bool operator!=(const char * strbuffer) const
+        bool operator!=(const char* strbuffer) const
         {
             return (strcmp(begin(), strbuffer) != 0);
         }
-        bool operator!=(const String & str) const
+        bool operator!=(const String& str) const
         {
             return (strcmp(begin(), str.begin()) != 0);
         }
-        bool operator>(const String & str) const
+        bool operator>(const String& str) const
         {
             return (strcmp(begin(), str.begin()) > 0);
         }
-        bool operator<(const String & str) const
+        bool operator<(const String& str) const
         {
             return (strcmp(begin(), str.begin()) < 0);
         }
-        bool operator>=(const String & str) const
+        bool operator>=(const String& str) const
         {
             return (strcmp(begin(), str.begin()) >= 0);
         }
-        bool operator<=(const String & str) const
+        bool operator<=(const String& str) const
         {
             return (strcmp(begin(), str.begin()) <= 0);
         }
@@ -750,7 +736,7 @@ namespace Slang
             return result;
         }
 
-        Index indexOf(const char * str, Index id) const // String str
+        Index indexOf(const char* str, Index id) const // String str
         {
             if (id >= getLength())
                 return Index(-1);
@@ -759,17 +745,17 @@ namespace Slang
             return res;
         }
 
-        Index indexOf(const String & str, Index id) const
+        Index indexOf(const String& str, Index id) const
         {
             return indexOf(str.begin(), id);
         }
 
-        Index indexOf(const char * str) const
+        Index indexOf(const char* str) const
         {
             return indexOf(str, 0);
         }
 
-        Index indexOf(const String & str) const
+        Index indexOf(const String& str) const
         {
             return indexOf(str.begin(), 0);
         }
@@ -804,15 +790,13 @@ namespace Slang
             const Index length = getLength();
             const char* data = getData();
 
-            // TODO(JS): If we know Index is signed we can do this a bit more simply
-
-            for (Index i = length; i > 0; i--)
-                if (data[i - 1] == ch)
-                    return i - 1;
+            for (Index i = length - 1; i >= 0; --i)
+                if (data[i] == ch)
+                    return i;
             return Index(-1);
         }
 
-        bool startsWith(const char * str) const // String str
+        bool startsWith(const char* str) const 
         {
             if (!m_buffer)
                 return false;
@@ -833,7 +817,7 @@ namespace Slang
             return startsWith(str.begin());
         }
 
-        bool endsWith(char const * str)  const // String str
+        bool endsWith(char const* str)  const // String str
         {
             if (!m_buffer)
                 return false;
@@ -850,17 +834,17 @@ namespace Slang
             return true;
         }
 
-        bool endsWith(const String & str) const
+        bool endsWith(const String& str) const
         {
             return endsWith(str.begin());
         }
 
-        bool contains(const char * str) const // String str
+        bool contains(const char* str) const // String str
         {
             return m_buffer && indexOf(str) != Index(-1); 
         }
 
-        bool contains(const String & str) const
+        bool contains(const String& str) const
         {
             return contains(str.begin());
         }
@@ -881,166 +865,83 @@ namespace Slang
     private:
         enum { InitialSize = 1024 };
     public:
+        typedef String Super;
+        using Super::append;
+
         explicit StringBuilder(UInt bufferSize = InitialSize)
         {
             ensureUniqueStorageWithCapacity(bufferSize);
         }
-        void EnsureCapacity(UInt size)
+
+        void ensureCapacity(UInt size)
         {
             ensureUniqueStorageWithCapacity(size);
         }
-        StringBuilder & operator << (char ch)
+        StringBuilder& operator << (char ch)
         {
-            Append(&ch, 1);
+            appendChar(ch);
             return *this;
         }
-        StringBuilder & operator << (Int32 val)
+        StringBuilder& operator << (Int32 val)
         {
-            Append(val);
+            append(val);
             return *this;
         }
-        StringBuilder & operator << (UInt32 val)
+        StringBuilder& operator << (UInt32 val)
         {
-            Append(val);
+            append(val);
             return *this;
         }
-        StringBuilder & operator << (Int64 val)
+        StringBuilder& operator << (Int64 val)
         {
-            Append(val);
+            append(val);
             return *this;
         }
-        StringBuilder & operator << (UInt64 val)
+        StringBuilder& operator << (UInt64 val)
         {
-            Append(val);
+            append(val);
             return *this;
         }
-        StringBuilder & operator << (float val)
+        StringBuilder& operator << (float val)
         {
-            Append(val);
+            append(val);
             return *this;
         }
-        StringBuilder & operator << (double val)
+        StringBuilder& operator << (double val)
         {
-            Append(val);
+            append(val);
             return *this;
         }
-        StringBuilder & operator << (const char * str)
+        StringBuilder& operator << (const char* str)
         {
-            Append(str, strlen(str));
+            append(str, strlen(str));
             return *this;
         }
-        StringBuilder & operator << (const String & str)
-        {
-            Append(str);
-            return *this;
-        }
-        StringBuilder & operator << (UnownedStringSlice const& str)
+        StringBuilder& operator << (const String& str)
         {
             append(str);
             return *this;
         }
-        StringBuilder & operator << (const _EndLine)
+        StringBuilder& operator << (UnownedStringSlice const& str)
         {
-            Append('\n');
+            append(str);
             return *this;
         }
-        void Append(char ch)
+        StringBuilder& operator << (const _EndLine)
         {
-            Append(&ch, 1);
-        }
-        void Append(float val)
-        {
-            char buf[128];
-            sprintf_s(buf, 128, "%g", val);
-            int len = (int)strnlen_s(buf, 128);
-            Append(buf, len);
-        }
-        void Append(double val)
-        {
-            char buf[128];
-            sprintf_s(buf, 128, "%g", val);
-            int len = (int)strnlen_s(buf, 128);
-            Append(buf, len);
-        }
-        void Append(Int32 value, int radix = 10)
-        {
-            char vBuffer[33];
-            int len = IntToAscii(vBuffer, value, radix);
-            ReverseInternalAscii(vBuffer, len);
-            Append(vBuffer);
-        }
-        void Append(UInt32 value, int radix = 10)
-        {
-            char vBuffer[33];
-            int len = IntToAscii(vBuffer, value, radix);
-            ReverseInternalAscii(vBuffer, len);
-            Append(vBuffer);
-        }
-        void Append(Int64 value, int radix = 10)
-        {
-            char vBuffer[65];
-            int len = IntToAscii(vBuffer, value, radix);
-            ReverseInternalAscii(vBuffer, len);
-            Append(vBuffer);
-        }
-        void Append(UInt64 value, int radix = 10)
-        {
-            char vBuffer[65];
-            int len = IntToAscii(vBuffer, value, radix);
-            ReverseInternalAscii(vBuffer, len);
-            Append(vBuffer);
-        }
-        void Append(const String & str)
-        {
-            Append(str.getBuffer(), str.getLength());
-        }
-        void Append(const char * str)
-        {
-            Append(str, strlen(str));
-        }
-        void Append(const char * str, UInt strLen)
-        {
-            append(str, str + strLen);
+            appendChar('\n');
+            return *this;
         }
 
-#if 0
-        int Capacity()
-        {
-            return bufferSize;
-        }
-
-        char * Buffer()
-        {
-            return buffer;
-        }
-
-        int Length()
-        {
-            return length;
-        }
-#endif
-
-        String ToString()
+        String toString()
         {
             return *this;
         }
 
-        String ProduceString()
+        String produceString()
         {
             return *this;
         }
-
-#if 0
-        String GetSubString(int start, int count)
-        {
-            String rs;
-            rs.buffer = new char[count + 1];
-            rs.length = count;
-            strncpy_s(rs.buffer.Ptr(), count + 1, buffer + start, count);
-            rs.buffer[count] = 0;
-            return rs;
-        }
-#endif
 
 #if 0
         void Remove(int id, int len)
@@ -1059,16 +960,16 @@ namespace Slang
 #endif
         friend std::ostream& operator<< (std::ostream& stream, const String& s);
 
-        void Clear()
+        void clear()
         {
             m_buffer.setNull();
         }
     };
 
-    int StringToInt(const String & str, int radix = 10);
-    unsigned int StringToUInt(const String & str, int radix = 10);
-    double StringToDouble(const String & str);
-    float StringToFloat(const String & str);
+    int stringToInt(const String& str, int radix = 10);
+    unsigned int stringToUInt(const String& str, int radix = 10);
+    double stringToDouble(const String& str);
+    float stringToFloat(const String& str);
 }
 
 std::ostream& operator<< (std::ostream& stream, const Slang::String& s);

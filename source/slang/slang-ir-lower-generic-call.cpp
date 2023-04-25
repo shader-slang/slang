@@ -134,11 +134,11 @@ namespace Slang
             IRInst* requirementKey,
             IRInst* requirementVal)
         {
-            if (auto func = sharedContext->mapInterfaceRequirementKeyToDispatchMethods.TryGetValue(requirementKey))
+            if (auto func = sharedContext->mapInterfaceRequirementKeyToDispatchMethods.tryGetValue(requirementKey))
                 return *func;
             auto dispatchFunc =
                 _createInterfaceDispatchMethod(builder, interfaceType, requirementKey, requirementVal);
-            sharedContext->mapInterfaceRequirementKeyToDispatchMethods.AddIfNotExists(
+            sharedContext->mapInterfaceRequirementKeyToDispatchMethods.addIfNotExists(
                 requirementKey, dispatchFunc);
             return dispatchFunc;
         }
@@ -355,7 +355,7 @@ namespace Slang
                 IRInst* inst = sharedContext->workList.getLast();
 
                 sharedContext->workList.removeLast();
-                sharedContext->workListSet.Remove(inst);
+                sharedContext->workListSet.remove(inst);
 
                 processInst(inst);
 
