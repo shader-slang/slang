@@ -167,7 +167,7 @@ namespace Slang
             append(digest.data, sizeof(digest.data));
         }
 
-        template<typename T, typename std::enable_if<std::is_pod<T>::value, int>::type = 0>
+        template<typename T, std::enable_if_t<std::has_unique_object_representations_v<T>, int> = 0>
         void append(const List<T>& list)
         {
             append(list.getBuffer(), list.getCount() * sizeof(T));

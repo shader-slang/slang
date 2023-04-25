@@ -96,7 +96,7 @@ namespace Slang
 
     IROpInfo getIROpInfo(IROp opIn)
     {
-        const int op = opIn & kIROpMeta_OpMask;
+        const int op = opIn & kIROpMask_OpMask;
         if (op < kIROpCount)
         {
             // It's a main op
@@ -6563,8 +6563,8 @@ namespace Slang
             return false;
         }
 
-        const IROp opA = IROp(a->getOp() & kIROpMeta_OpMask);
-        const IROp opB = IROp(b->getOp() & kIROpMeta_OpMask);
+        const IROp opA = IROp(a->getOp() & kIROpMask_OpMask);
+        const IROp opB = IROp(b->getOp() & kIROpMask_OpMask);
 
         if (opA != opB)
         {
