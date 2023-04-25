@@ -584,12 +584,12 @@ namespace Slang
             m_buffer.setNull(); 
         }
 
-        String & operator=(const String & str)
+        String& operator=(const String& str)
         {
             m_buffer = str.m_buffer;
             return *this;
         }
-        String & operator=(String&& other)
+        String& operator=(String&& other)
         {
             m_buffer = _Move(other.m_buffer);
             return *this;
@@ -678,7 +678,7 @@ namespace Slang
 
         OSString toWString(Index* len = 0) const;
 
-        bool equals(const String & str, bool caseSensitive = true)
+        bool equals(const String& str, bool caseSensitive = true)
         {
             if (caseSensitive)
                 return (strcmp(begin(), str.begin()) == 0);
@@ -691,36 +691,36 @@ namespace Slang
 #endif
             }
         }
-        bool operator==(const char * strbuffer) const
+        bool operator==(const char* strbuffer) const
         {
             return (strcmp(begin(), strbuffer) == 0);
         }
 
-        bool operator==(const String & str) const
+        bool operator==(const String& str) const
         {
             return (strcmp(begin(), str.begin()) == 0);
         }
-        bool operator!=(const char * strbuffer) const
+        bool operator!=(const char* strbuffer) const
         {
             return (strcmp(begin(), strbuffer) != 0);
         }
-        bool operator!=(const String & str) const
+        bool operator!=(const String& str) const
         {
             return (strcmp(begin(), str.begin()) != 0);
         }
-        bool operator>(const String & str) const
+        bool operator>(const String& str) const
         {
             return (strcmp(begin(), str.begin()) > 0);
         }
-        bool operator<(const String & str) const
+        bool operator<(const String& str) const
         {
             return (strcmp(begin(), str.begin()) < 0);
         }
-        bool operator>=(const String & str) const
+        bool operator>=(const String& str) const
         {
             return (strcmp(begin(), str.begin()) >= 0);
         }
-        bool operator<=(const String & str) const
+        bool operator<=(const String& str) const
         {
             return (strcmp(begin(), str.begin()) <= 0);
         }
@@ -750,7 +750,7 @@ namespace Slang
             return result;
         }
 
-        Index indexOf(const char * str, Index id) const // String str
+        Index indexOf(const char* str, Index id) const // String str
         {
             if (id >= getLength())
                 return Index(-1);
@@ -759,17 +759,17 @@ namespace Slang
             return res;
         }
 
-        Index indexOf(const String & str, Index id) const
+        Index indexOf(const String& str, Index id) const
         {
             return indexOf(str.begin(), id);
         }
 
-        Index indexOf(const char * str) const
+        Index indexOf(const char* str) const
         {
             return indexOf(str, 0);
         }
 
-        Index indexOf(const String & str) const
+        Index indexOf(const String& str) const
         {
             return indexOf(str.begin(), 0);
         }
@@ -812,7 +812,7 @@ namespace Slang
             return Index(-1);
         }
 
-        bool startsWith(const char * str) const // String str
+        bool startsWith(const char* str) const // String str
         {
             if (!m_buffer)
                 return false;
@@ -833,7 +833,7 @@ namespace Slang
             return startsWith(str.begin());
         }
 
-        bool endsWith(char const * str)  const // String str
+        bool endsWith(char const* str)  const // String str
         {
             if (!m_buffer)
                 return false;
@@ -850,17 +850,17 @@ namespace Slang
             return true;
         }
 
-        bool endsWith(const String & str) const
+        bool endsWith(const String& str) const
         {
             return endsWith(str.begin());
         }
 
-        bool contains(const char * str) const // String str
+        bool contains(const char* str) const // String str
         {
             return m_buffer && indexOf(str) != Index(-1); 
         }
 
-        bool contains(const String & str) const
+        bool contains(const String& str) const
         {
             return contains(str.begin());
         }
@@ -885,61 +885,62 @@ namespace Slang
         {
             ensureUniqueStorageWithCapacity(bufferSize);
         }
-        void EnsureCapacity(UInt size)
+
+        void ensureCapacity(UInt size)
         {
             ensureUniqueStorageWithCapacity(size);
         }
-        StringBuilder & operator << (char ch)
+        StringBuilder& operator << (char ch)
         {
             Append(&ch, 1);
             return *this;
         }
-        StringBuilder & operator << (Int32 val)
+        StringBuilder& operator << (Int32 val)
         {
             Append(val);
             return *this;
         }
-        StringBuilder & operator << (UInt32 val)
+        StringBuilder& operator << (UInt32 val)
         {
             Append(val);
             return *this;
         }
-        StringBuilder & operator << (Int64 val)
+        StringBuilder& operator << (Int64 val)
         {
             Append(val);
             return *this;
         }
-        StringBuilder & operator << (UInt64 val)
+        StringBuilder& operator << (UInt64 val)
         {
             Append(val);
             return *this;
         }
-        StringBuilder & operator << (float val)
+        StringBuilder& operator << (float val)
         {
             Append(val);
             return *this;
         }
-        StringBuilder & operator << (double val)
+        StringBuilder& operator << (double val)
         {
             Append(val);
             return *this;
         }
-        StringBuilder & operator << (const char * str)
+        StringBuilder& operator << (const char * str)
         {
             Append(str, strlen(str));
             return *this;
         }
-        StringBuilder & operator << (const String & str)
+        StringBuilder& operator << (const String & str)
         {
             Append(str);
             return *this;
         }
-        StringBuilder & operator << (UnownedStringSlice const& str)
+        StringBuilder& operator << (UnownedStringSlice const& str)
         {
             append(str);
             return *this;
         }
-        StringBuilder & operator << (const _EndLine)
+        StringBuilder& operator << (const _EndLine)
         {
             Append('\n');
             return *this;
@@ -990,15 +991,15 @@ namespace Slang
             ReverseInternalAscii(vBuffer, len);
             Append(vBuffer);
         }
-        void Append(const String & str)
+        void Append(const String& str)
         {
             Append(str.getBuffer(), str.getLength());
         }
-        void Append(const char * str)
+        void Append(const char* str)
         {
             Append(str, strlen(str));
         }
-        void Append(const char * str, UInt strLen)
+        void Append(const char* str, UInt strLen)
         {
             append(str, str + strLen);
         }
@@ -1065,10 +1066,10 @@ namespace Slang
         }
     };
 
-    int StringToInt(const String & str, int radix = 10);
-    unsigned int StringToUInt(const String & str, int radix = 10);
-    double StringToDouble(const String & str);
-    float StringToFloat(const String & str);
+    int StringToInt(const String& str, int radix = 10);
+    unsigned int StringToUInt(const String& str, int radix = 10);
+    double StringToDouble(const String& str);
+    float StringToFloat(const String& str);
 }
 
 std::ostream& operator<< (std::ostream& stream, const Slang::String& s);
