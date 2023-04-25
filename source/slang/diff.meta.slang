@@ -25,12 +25,6 @@ attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
-
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
-
 __generic<T>
 __magic_type(TensorViewType)
 __intrinsic_type($(kIROp_TensorViewType))
