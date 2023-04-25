@@ -741,6 +741,24 @@ void moveParams(IRBlock* dest, IRBlock* src)
     }
 }
 
+void removePhiArgs(IRInst* phiParam)
+{
+    auto block = cast<IRBlock>(phiParam->getParent());
+    UInt paramIndex = 0;
+    for (auto p = block->getFirstParam(); p; p = p->getNextParam())
+    {
+        if (p == phiParam)
+            break;
+        paramIndex++;
+    }
+    for (auto predBlock : block->getPredecessors())
+    {
+        auto termInst = as<IRUnconditionalBranch>(predBlock->getTerminator());
+        SLANG_ASSERT(paramIndex < termInst->getArgCount());
+        termInst->removeArgument(paramIndex);
+    }
+}
+
 struct GenericChildrenMigrationContextImpl
 {
     IRCloneEnv cloneEnv;

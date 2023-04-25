@@ -200,6 +200,8 @@ IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 
 void moveParams(IRBlock* dest, IRBlock* src);
+
+void removePhiArgs(IRInst* phiParam);
 }
 
 #endif

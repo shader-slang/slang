@@ -1868,6 +1868,48 @@ IRUse* findUniqueStoredVal(IRVar* var)
     }
 }
 
+// Given a local var that is supposed to have a unique write, find the last inst
+// that writes to it. Note: if var is intended for an inout argument, it will
+// have exactly one store that sets its initial value and one call that writes
+// the final value to it, this method will return the call inst for this case.
+IRUse* findLatestUniqueWriteUse(IRVar* var)
+{
+    IRUse* storeUse = nullptr;
+    // If no unique store found, try to look for a call.
+    for (auto use = var->firstUse; use; use = use->nextUse)
+    {
+        if (auto callInst = as<IRCall>(use->getUser()))
+        {
+            SLANG_RELEASE_ASSERT(!storeUse);
+            storeUse = use;
+        }
+    }
+    return findUniqueStoredVal(var);
+}
+
+// Given a local var that is supposed to have a unique write, find the last inst
+// that writes to it. Note: if var is intended for an inout argument, it will
+// have exactly one store that sets its initial value and one call that writes
+// the final value to it, this method will return the store inst for this case.
+IRUse* findEarliestUniqueWriteUse(IRVar* var)
+{
+    IRUse* storeUse = findUniqueStoredVal(var);
+    if (storeUse)
+        return storeUse;
+
+    // If no unique store found, try to look for a call.
+    for (auto use = var->firstUse; use; use = use->nextUse)
+    {
+        if (auto callInst = as<IRCall>(use->getUser()))
+        {
+            SLANG_RELEASE_ASSERT(!storeUse);
+            storeUse = use;
+        }
+    }
+    return storeUse;
+}
+
+
 bool isDerivativeContextVar(IRVar* var)
 {
     return var->findDecoration<IRBackwardDerivativePrimalContextDecoration>();
