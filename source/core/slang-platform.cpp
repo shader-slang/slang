@@ -49,7 +49,7 @@ namespace Slang
 {
     StringBuilder builder;
     calcPlatformPath(path, builder);
-    return builder.ToString();
+    return builder.toString();
 }
 
 #ifdef _WIN32

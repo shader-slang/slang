@@ -39,7 +39,7 @@ namespace Misc {
             sb << FileName;
             if (Line != -1)
                 sb << "(" << Line << ")";
-            return sb.ProduceString();
+            return sb.produceString();
         }
         CodePosition() = default;
         CodePosition(int line, int col, int pos, String fileName)
@@ -281,7 +281,7 @@ namespace Misc {
         {
             if (text[i] == c)
             {
-                auto str = sb.ToString();
+                auto str = sb.toString();
                 if (str.getLength() != 0)
                     result.add(str);
                 sb.clear();
@@ -289,7 +289,7 @@ namespace Misc {
             else
                 sb << text[i];
         }
-        auto lastStr = sb.ToString();
+        auto lastStr = sb.toString();
         if (lastStr.getLength())
             result.add(lastStr);
         return result;

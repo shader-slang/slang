@@ -15,7 +15,7 @@ ImplicitDirectoryCollector::ImplicitDirectoryCollector(const String& canonicalPa
         StringBuilder buffer;
         buffer << canonicalPath;
         buffer.append('/');
-        m_prefix = buffer.ProduceString();
+        m_prefix = buffer.produceString();
     }
 }
 

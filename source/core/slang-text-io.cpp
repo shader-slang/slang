@@ -156,7 +156,7 @@ SlangResult StreamReader::readToEnd(String& outString)
 			sb.append(ch);
 	}
 
-	outString = sb.ProduceString();
+	outString = sb.produceString();
     return SLANG_OK;
 }
 

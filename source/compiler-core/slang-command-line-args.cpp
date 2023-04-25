@@ -38,7 +38,7 @@ void CommandLineArgs::setArgs(const char*const* args, size_t argCount)
         buf << " ";
     }
 
-    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), buf.ProduceString());
+    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), buf.produceString());
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc::fromRaw(0));
 
     SLANG_UNUSED(sourceView);

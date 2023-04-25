@@ -347,12 +347,12 @@ static String _formatDocumentation(String doc)
     if (parameterDocSB.getLength())
     {
         result << "**Parameters**  \n";
-        result << parameterDocSB.ProduceString() << "\n\n";
+        result << parameterDocSB.produceString() << "\n\n";
     }
     if (returnDocSB.getLength())
     {
         result << "**Returns**  \n";
-        result << returnDocSB.ProduceString();
+        result << returnDocSB.produceString();
     }
 
     if (!hasDoxygen)
@@ -364,7 +364,7 @@ static String _formatDocumentation(String doc)
             result << lines[i] << "  \n";
         }
     }
-    return result.ProduceString();
+    return result.produceString();
 }
 
 static void _tryGetDocumentation(StringBuilder& sb, WorkspaceVersion* workspace, Decl* decl)
@@ -597,7 +597,7 @@ SlangResult LanguageServer::hover(
     else
     {
         hover.contents.kind = "markdown";
-        hover.contents.value = sb.ProduceString();
+        hover.contents.value = sb.produceString();
         m_connection->sendResult(&hover, responseId);
         return SLANG_OK;
     }
@@ -819,7 +819,7 @@ SlangResult LanguageServer::completion(
     StringBuilder newText;
     newText << originalText.getUnownedSlice().head(cursorOffset + 1) << "#?"
         << originalText.getUnownedSlice().tail(cursorOffset + 1);
-    doc->setText(newText.ProduceString());
+    doc->setText(newText.produceString());
     auto restoreDocText = makeDeferred([&]() { doc->setText(originalText); });
 
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
@@ -885,7 +885,7 @@ SlangResult LanguageServer::completionResolve(
         resolvedItem.detail = getDeclSignatureString(declRef, version);
         StringBuilder docSB;
         _tryGetDocumentation(docSB, version, declRef.getDecl());
-        resolvedItem.documentation.value = docSB.ProduceString();
+        resolvedItem.documentation.value = docSB.produceString();
         resolvedItem.documentation.kind = "markdown";
     }
     m_connection->sendResult(&resolvedItem, responseId);
@@ -1001,7 +1001,7 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
         auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRefExpr->declRef.getLoc(), SourceLocType::Actual);
         _tryGetDocumentation(docSB, version, declRefExpr->declRef.getDecl());
         appendDefinitionLocation(docSB, m_workspace, humaneLoc);
-        *outDocumentation = docSB.ProduceString();
+        *outDocumentation = docSB.produceString();
     }
 
     return printer.getString();
@@ -1026,7 +1026,7 @@ String LanguageServer::getDeclRefSignature(DeclRef<Decl> declRef, String* outDoc
         auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRef.getLoc(), SourceLocType::Actual);
         _tryGetDocumentation(docSB, version, declRef.getDecl());
         appendDefinitionLocation(docSB, m_workspace, humaneLoc);
-        *outDocumentation = docSB.ProduceString();
+        *outDocumentation = docSB.produceString();
     }
     return printer.getString();
 }
@@ -1658,7 +1658,7 @@ SlangResult LanguageServer::tryGetMacroHoverInfo(
         version->linkage->getSourceManager()->getHumaneLoc(def->loc, SourceLocType::Actual);
     appendDefinitionLocation(sb, m_workspace, humaneLoc);
     hover.contents.kind = "markdown";
-    hover.contents.value = sb.ProduceString();
+    hover.contents.value = sb.produceString();
     m_connection->sendResult(&hover, responseId);
     return SLANG_OK;
 }
@@ -1985,7 +1985,7 @@ SlangResult LanguageServer::execute()
             StringBuilder msgBuilder;
             msgBuilder << "Server processed " << commands.getCount() << " commands, executed in "
                        << String(int(workTime * 1000)) << "ms";
-            logMessage(3, msgBuilder.ProduceString());
+            logMessage(3, msgBuilder.produceString());
         }
 
         m_connection->getUnderlyingConnection()->waitForResult(1000);

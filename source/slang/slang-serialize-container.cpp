@@ -387,7 +387,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                     buf << "tu" << out.modules.getCount();
                     if (!astBuilder)
                     {
-                        astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.ProduceString());
+                        astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.produceString());
                     }
 
                     DefaultSerialObjectFactory objectFactory(astBuilder);

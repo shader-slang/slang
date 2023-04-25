@@ -192,7 +192,7 @@ namespace Slang
         sb.append(path.getBuffer(), dotPos);
         sb.append('.');
         sb.append(newExt);
-        return sb.ProduceString();
+        return sb.produceString();
     }
 
     /* static */ Index Path::findLastSeparatorIndex(UnownedStringSlice const& path)
@@ -338,7 +338,7 @@ namespace Slang
 
         StringBuilder sb;
         combineIntoBuilder(path1.getUnownedSlice(), path2.getUnownedSlice(), sb);
-        return sb.ProduceString();
+        return sb.produceString();
     }
     String Path::combine(const String& path1, const String& path2, const String& path3)
     {
@@ -346,7 +346,7 @@ namespace Slang
         sb.append(path1);
         append(sb, path2.getUnownedSlice());
         append(sb, path3.getUnownedSlice());
-        return sb.ProduceString();
+        return sb.produceString();
     }
 
     /* static */ bool Path::isDriveSpecification(const UnownedStringSlice& element)
@@ -546,7 +546,7 @@ namespace Slang
         // Reconstruct the string
         StringBuilder builder;
         join(splitPath.getBuffer(), splitPath.getCount(), builder);
-        return builder.ToString();
+        return builder.toString();
     }
 
     bool Path::createDirectory(const String& path)
@@ -1059,7 +1059,7 @@ namespace Slang
                 i++;
             }
         }
-        return sb.ProduceString();
+        return sb.produceString();
     }
 
     StringSlice URI::getProtocol() const

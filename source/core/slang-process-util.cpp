@@ -28,7 +28,7 @@ static String _getText(const ConstArrayView<Byte>& bytes)
 {
     StringBuilder buf;
     StringUtil::appendStandardLines(UnownedStringSlice((const char*)bytes.begin(), (const char*)bytes.end()), buf);
-    return buf.ProduceString();
+    return buf.produceString();
 }
 
 /* static */SlangResult ProcessUtil::readUntilTermination(Process* process, ExecuteResult& outExecuteResult)

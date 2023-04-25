@@ -5881,7 +5881,7 @@ namespace Slang
             StringBuilder sb;
             scrubName(nameHint, sb);
 
-            String key = sb.ProduceString();
+            String key = sb.produceString();
             UInt count = 0;
             context->uniqueNameCounters.tryGetValue(key, count);
 
@@ -5891,14 +5891,14 @@ namespace Slang
             {
                 sb.append(count);
             }
-            return sb.ProduceString();
+            return sb.produceString();
         }
         else
         {
             StringBuilder sb;
             auto id = context->uniqueIDCounter++;
             sb.append(id);
-            return sb.ProduceString();
+            return sb.produceString();
         }
     }
 

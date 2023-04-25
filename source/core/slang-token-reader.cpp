@@ -336,7 +336,7 @@ namespace Misc {
         auto InsertToken = [&](TokenType type)
         {
             derivative = LexDerivative::None;
-            tokenList.add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, int(pos), file, tokenFlags));
+            tokenList.add(Token(type, tokenBuilder.toString(), tokenLine, tokenCol, int(pos), file, tokenFlags));
             tokenFlags = 0;
             tokenBuilder.clear();
         };
@@ -456,7 +456,7 @@ namespace Misc {
                 }
                 else
                 {
-                    auto tokenStr = tokenBuilder.ToString();
+                    auto tokenStr = tokenBuilder.toString();
 #if 0
                     if (tokenStr == "#line_reset#")
                     {
@@ -491,7 +491,7 @@ namespace Misc {
                 else
                 {
                     //do token analyze
-                    ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, (int)(pos - tokenBuilder.getLength()), file);
+                    ParseOperators(tokenBuilder.toString(), tokenList, tokenFlags, tokenLine, tokenCol, (int)(pos - tokenBuilder.getLength()), file);
                     tokenBuilder.clear();
                     state = State::Start;
                 }
@@ -537,7 +537,7 @@ namespace Misc {
                     if (derivative == LexDerivative::Line)
                     {
                         derivative = LexDerivative::None;
-                        line = StringToInt(tokenBuilder.ToString()) - 1;
+                        line = StringToInt(tokenBuilder.toString()) - 1;
                         col = 0;
                         tokenBuilder.clear();
                     }
@@ -615,7 +615,7 @@ namespace Misc {
                     if (derivative == LexDerivative::File)
                     {
                         derivative = LexDerivative::None;
-                        file = tokenBuilder.ToString();
+                        file = tokenBuilder.toString();
                         tokenBuilder.clear();
                     }
                     else

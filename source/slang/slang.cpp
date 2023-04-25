@@ -2726,7 +2726,7 @@ SlangResult EndToEndCompileRequest::executeActions()
 {
     SlangResult res = executeActionsInner();
 
-    m_diagnosticOutput = getSink()->outputBuffer.ProduceString();
+    m_diagnosticOutput = getSink()->outputBuffer.produceString();
     return res;
 }
 
@@ -3120,7 +3120,7 @@ RefPtr<Module> Linkage::findOrImportModule(
             sb.append(c);
         }
         sb.append(".slang");
-        fileName = sb.ProduceString();
+        fileName = sb.produceString();
     }
     else
     {
@@ -5108,7 +5108,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(SourceLoc(), Diagnostics::compilationAborted);
     }
-    m_diagnosticOutput = getSink()->outputBuffer.ProduceString();
+    m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
 #else
     // When debugging, we probably don't want to filter out any errors, since

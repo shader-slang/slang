@@ -436,7 +436,7 @@ static void formatDiagnostic(
                 // Set up the diagnostic.
                 Diagnostic initiationDiagnostic;
                 initiationDiagnostic.ErrorID = diagnosticInfo.id;
-                initiationDiagnostic.Message = msg.ProduceString();
+                initiationDiagnostic.Message = msg.produceString();
                 initiationDiagnostic.loc = sourceView->getInitiatingSourceLoc();
                 initiationDiagnostic.severity = diagnosticInfo.severity;
 
@@ -615,7 +615,7 @@ void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int
 
         Diagnostic diagnostic;
         diagnostic.ErrorID = info.id;
-        diagnostic.Message = sb.ProduceString();
+        diagnostic.Message = sb.produceString();
         diagnostic.loc = pos;
         diagnostic.severity = info.severity;
 

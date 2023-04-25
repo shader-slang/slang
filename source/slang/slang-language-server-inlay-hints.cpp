@@ -65,7 +65,7 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                         else if (param->hasModifier<RefModifier>()) lblSb << "ref ";
                         lblSb << name->text;
                         lblSb << ":";
-                        hint.label = lblSb.ProduceString();
+                        hint.label = lblSb.produceString();
                         result.add(hint);
                     }
                     i++;
@@ -104,7 +104,7 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                 hint.kind = LanguageServerProtocol::kInlayHintKindType;
                 StringBuilder lblSb;
                 lblSb << ": " << varDecl->type.type->toString();
-                hint.label = lblSb.ProduceString();
+                hint.label = lblSb.produceString();
 
                 LanguageServerProtocol::TextEdit edit;
                 edit.range.start = hint.position;

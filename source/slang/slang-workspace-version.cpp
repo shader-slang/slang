@@ -56,7 +56,7 @@ void Workspace::changeDoc(const String& path, LanguageServerProtocol::Range rang
         newText << text;
         if (endOffset != -1)
             newText << originalText.tail(endOffset);
-        changeDoc(doc.Ptr(), newText.ProduceString());
+        changeDoc(doc.Ptr(), newText.produceString());
     }
 }
 

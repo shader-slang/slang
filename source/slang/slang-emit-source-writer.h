@@ -63,7 +63,7 @@ public:
     void advanceToSourceLocationIfValid(const SourceLoc& sourceLocation);
 
         /// Get the content as a string
-    String getContent() { return m_builder.ProduceString(); }
+    String getContent() { return m_builder.produceString(); }
         /// Clear the content
     void clearContent() { m_builder.clear(); }
         /// Get the content as a string and clear the internal representation

@@ -2436,7 +2436,7 @@ static String getNameForNameHint(
     sb.append(".");
     sb.append(leafName->text);
 
-    return sb.ProduceString();
+    return sb.produceString();
 }
 
 /// Try to add an appropriate name hint to the instruction,

@@ -923,12 +923,12 @@ namespace Slang
             return *this;
         }
 
-        String ToString()
+        String toString()
         {
             return *this;
         }
 
-        String ProduceString()
+        String produceString()
         {
             return *this;
         }

@@ -283,7 +283,7 @@ struct App
         processInputFile(outputFile, Slang::UnownedStringSlice(inputPath));
 
         fprintf(outputFile, ";\n");
-        fprintf(outputFile, "return sb.ProduceString();\n}\n");
+        fprintf(outputFile, "return sb.produceString();\n}\n");
     }
 };
 

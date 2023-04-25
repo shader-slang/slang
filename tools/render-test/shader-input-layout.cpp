@@ -434,7 +434,7 @@ namespace renderer_test
                 sb << parseTypeName(parser);
                 sb << ">";
                 parser.Read(">");
-                return sb.ProduceString();
+                return sb.produceString();
             }
             return typeName;
         }

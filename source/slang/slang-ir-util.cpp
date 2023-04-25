@@ -266,7 +266,7 @@ String dumpIRToString(IRInst* root)
     options.flags = IRDumpOptions::Flag::DumpDebugIds;
 #endif
     dumpIR(root, options, nullptr, &writer);
-    return sb.ToString();
+    return sb.toString();
 }
 
 void copyNameHintDecoration(IRInst* dest, IRInst* src)

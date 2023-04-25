@@ -878,7 +878,7 @@ namespace Slang
             if(c == quote)
             {
                 SLANG_ASSERT(cursor == end);
-                return valueBuilder.ProduceString();
+                return valueBuilder.produceString();
             }
 
             // Characters that don't being escape sequences are easy;

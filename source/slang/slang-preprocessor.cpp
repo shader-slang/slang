@@ -1833,7 +1833,7 @@ Token MacroInvocation::_readTokenImpl()
                 //
                 PathInfo pathInfo = PathInfo::makeTokenPaste();       
                 SourceManager* sourceManager = m_preprocessor->getSourceManager();
-                SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, pastedContent.ProduceString());
+                SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, pastedContent.produceString());
                 SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, tokenPasteLoc);
 
                 Lexer lexer;
@@ -4098,7 +4098,7 @@ TokenList preprocessSource(
         sb << t.Content;
     }
 
-    String s = sb.ProduceString();
+    String s = sb.produceString();
 #endif
 
     return tokens;

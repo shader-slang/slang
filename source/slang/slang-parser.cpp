@@ -1195,7 +1195,7 @@ namespace Slang
                     sb << parser->ReadToken(TokenType::Identifier).getContent();
                 }
 
-                moduleNameAndLoc.name = getName(parser, sb.ProduceString());
+                moduleNameAndLoc.name = getName(parser, sb.produceString());
             }
 
             decl->moduleNameAndLoc = moduleNameAndLoc;
@@ -5819,7 +5819,7 @@ namespace Slang
                         token = parser->tokenReader.advanceToken();
                         sb << getStringLiteralTokenValue(token);
                     }
-                    constExpr->value = sb.ProduceString();
+                    constExpr->value = sb.produceString();
                 }
 
                 return constExpr;

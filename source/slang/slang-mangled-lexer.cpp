@@ -219,7 +219,7 @@ String MangledLexer::unescapeString(UnownedStringSlice str)
             cursor++;
         }
     }
-    return sb.ProduceString();
+    return sb.produceString();
 }
 
 UInt MangledLexer::readParamCount()

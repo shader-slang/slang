@@ -351,7 +351,7 @@ static String _scrubName(const String& in)
         builder.appendChar(c);
     }
 
-    return builder.ProduceString();
+    return builder.produceString();
 }
 
 /* static */SlangResult ReproUtil::store(EndToEndCompileRequest* request, OffsetContainer& inOutContainer, Offset32Ptr<RequestState>& outRequest)

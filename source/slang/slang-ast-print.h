@@ -103,7 +103,7 @@ public:
     void reset() { m_builder.clear(); }
 
         /// Get the current string
-    String getString() { return m_builder.ProduceString(); }
+    String getString() { return m_builder.produceString(); }
 
         /// Get contents as a slice
     UnownedStringSlice getSlice() const { return m_builder.getUnownedSlice(); }

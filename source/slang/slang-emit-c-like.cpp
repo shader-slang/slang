@@ -853,14 +853,14 @@ String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)
         sb.append("_");
     }
 
-    String key = sb.ProduceString();
+    String key = sb.produceString();
     
     UInt& countRef = m_uniqueNameCounters.getOrAddValue(key, 0);
     const UInt count = countRef;
     countRef = count + 1;
 
     sb.append(Int32(count));
-    return sb.ProduceString();
+    return sb.produceString();
 }
 
 String CLikeSourceEmitter::generateName(IRInst* inst)
@@ -931,7 +931,7 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     sb << "_S";
     sb << Int32(getID(inst));
 
-    return sb.ProduceString();
+    return sb.produceString();
 }
 
 String CLikeSourceEmitter::getName(IRInst* inst)
