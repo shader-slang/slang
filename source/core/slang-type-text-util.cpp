@@ -189,7 +189,8 @@ struct DebugInfoFormatTable
     x(FXC,              "fxc") \
     x(DXC,              "dxc") \
     x(GLSLANG,          "glslang") \
-    x(LLVM,             "LLVM/Clang")
+    x(LLVM,             "LLVM/Clang") \
+    x(GENERIC_C_CPP,    "Generic C/C++ compiler")
 
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough type)
 {

@@ -29,7 +29,10 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-core-diagnostics.h"
 
+#include "../core/slang-string-slice-pool.h"
 #include "../core/slang-char-util.h"
+
+#include "../core/slang-command-options.h"
 
 #include <assert.h>
 
@@ -516,6 +519,264 @@ struct OptionsParser
         return SLANG_OK;
     }
 
+    static void _initOptions(CommandOptions& options)
+    {
+        typedef CommandOptions::Flag::Enum Flag;
+
+        options.addCategory("General", "General options");
+        options.addCategory("Target", "Target code generation options");
+        options.addCategory("Downstream", "Downstream compiler options");
+        options.addCategory("Debugging", "Compiler debugging/instrumentation options");
+        options.addCategory("Experimental", "Experimental options (use at your own risk)");
+        options.addCategory("Internal", "Internal-use options (use at your own risk)");
+        options.addCategory("Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        options.setCategory("General");
+
+        options.add("-D",           "-D<name>[=<value>], -D <name>[=<value>]", "Insert a preprocessor macro.", Flag::CanPrefix);
+        options.add("-depfile",     "-depfile <path>", "Save the source file dependency list in a file.");
+        options.add("-entry",       "-entry <name>",
+            "Specify the name of an entry-point function.\n"
+            "Multiple -entry options may be used in a single invocation.\n"
+            "If no -entry options are given, compiler will use [shader(...)]\n"
+            "attributes to detect entry points.\n");
+
+        options.add("-h,-help,--help", nullptr, "Print this message.");
+        
+        options.add("-I", "-I<path>, -I <path>", 
+            "Add a path to be used in resolving '#include'\n"
+            "and 'import' operations.\n", 
+            Flag::CanPrefix);
+
+        options.add("-lang", "-lang <language>", 
+            "Set the language for the following input files.\n"
+            "Accepted languages are:\n"
+            "   c, cpp, c++, cxx, slang, glsl, hlsl, cu, cuda\n");
+        options.add("-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major.");
+        options.add("-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major.");
+        options.add("-module-name", "-module-name <name>", 
+            "Set the module name to use when compiling multiple\n"
+            ".slang source files into a single module.\n");
+
+        options.add("-o", "-o <path>", 
+            "Specify a path where generated output should be written.\n"
+            "If no -target or -stage is specified, one may be inferred\n"
+            "from file extension (see File Extensions).\n"
+            "If multiple -target options and a single -entry are present, each -o\n"
+            "associates with the first -target to its left.\n"
+            "Otherwise, if multiple -entry options are present, each -o associates\n"
+            "with the first -entry to its left, and with the -target that matches\n"
+            "the one inferred from <path>.\n");
+
+        options.add("-profile", "-profile <profile>[+<capability>...]",
+            "Specify the shader profile for code generation.\n"
+            "Accepted profiles are:\n"
+            "  sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
+            "  glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
+            "Additional profiles that include -stage information:\n"
+            "  {vs,hs,ds,gs,ps}_<version>\n"
+            "See -capability for information on <capability>\n"
+            "When multiple -target options are present, each -profile associates\n"
+            "with the first -target to its left.\n");
+
+        options.add("-stage", "-stage <name>",
+            "Specify the stage of an entry-point function.\n"
+            "Accepted stages are:\n"
+            "  vertex, hull, domain, geometry, fragment, compute,\n"
+            "  raygeneration, intersection, anyhit, closesthit, miss, callable\n"
+            "When multiple -entry options are present, each -stage associated with\n"
+            "the first -entry to its left.\n"
+            "May be omitted if entry-point function has a [shader(...)] attribute;\n"
+            "otherwise required for each -entry option.\n");
+
+        options.add("-target", "-target <format>", 
+            "Specifies the format in which code should be generated.\n"
+            "Accepted formats are:\n"
+            "  glsl, hlsl, spirv, spirv-assembly, dxbc,\n"
+            "  dxbc-assembly, dxil, dxil-assembly\n");
+
+        options.add("-v,-version", nullptr, "Display the build version.");
+
+        options.add("-warnings-as-errors", "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]", 
+            "all - Treat all warnings as errors.\n"
+            "<id>[,<id>...]: Treat specific warning ids as errors.\n");
+
+        options.add("-warnings-disable", "-warnings-disable <id>[,<id>...]", "Disable specific warning ids.");
+        options.add("-W", "-W<id>", "Enable a warning with the specified id.", Flag::IsPrefix);
+
+        options.add("-dump-warning-diagnostics", nullptr, "Dump to output list of warning diagnostic numeric and name ids.");
+        options.add("--", nullptr, "Treat the rest of the command line as input files.");
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        options.setCategory("Target");
+
+        options.add("-capability", "-capability <capability>[+<capability>...]",
+            "Add optional capabilities to a code generation target. See Capabilities below.");
+        options.add("-default-image-format-unknown", nullptr,
+            "Set the format of R/W images with unspecified format to 'unknown'. Otherwise try to guess the format.");
+        options.add("-disable-dynamic-dispatch", nullptr, "Disables generating dynamic dispatch code.");
+        options.add("-disable-specialization", nullptr, "Disables generics and specialization pass.");
+
+        options.add("-fp-mode,-floating-point-mode", "-fp-mode <mode>, -floating-point-mode <mode>",
+            "Accepted modes are:\n"
+            "precise : Disable optimization that could change the output of floating-\n"
+            "          point computations, including around infinities, NaNs, denormalized\n"
+            "          values, and negative zero. Prefer the most precise versions of special\n"
+            "          functions supported by the target.\n"
+            "fast :    Allow optimizations that may change results of floating-point\n"
+            "          computations. Prefer the fastest version of special functions supported\n"
+            "          by the target.\n");
+
+        options.add("-g", "-g, -g<N>", 
+            "Include debug information in the generated code, where possible.\n"
+            "N is the amount of information, 0..3, unspecified means 2\n",
+            Flag::CanPrefix);
+
+        options.add("-line-directive-mode", "-line-directive-mode <mode>", 
+            "Sets how the `#line` directives should be produced. Available options are:\n"
+            "  none       : Don't emit `#line` directives at all\n"
+            "  source-map : Use source map to track line associations (doen't emit #line)\n"
+            "  default    : Default behavior\n"
+            "If not specified, default behavior is to use C-style `#line` directives\n"
+            "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives\n"
+            "for GLSL output.\n");
+
+        options.add("-O", "-O<N>", 
+            "Set the optimization level.\n"
+            "N is the amount of optimization, 0..3, default is 1\n",
+            Flag::CanPrefix);
+
+        options.add("-obfuscate", nullptr, "Remove all source file information from outputs.");
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Downstream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        options.setCategory("Downstream");
+
+        {
+            StringBuilder names;
+            StringBuilder description;
+            
+            description << "Specify path to a downstream <compiler>\n"
+                "executable or library. Accepted compilers are:\n";
+
+            for (Index i = SLANG_PASS_THROUGH_NONE + 1; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
+            {
+                auto compilerName = TypeTextUtil::getPassThroughName(SlangPassThrough(i));
+            
+                if (names.getLength())
+                {
+                    names << ",";
+                }
+                names << "-" << compilerName << "-path";
+
+                auto human = TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough(i));
+
+                if (human != compilerName)
+                {
+                    description << "  " << compilerName << " - " << human << "\n";
+                }
+                else
+                {
+                    description << "  " << compilerName << "\n";
+                }
+            }
+            options.add(names.getBuffer(), "-<compiler>-path <path>", description.getBuffer());
+        }
+         
+        options.add("-default-downstream-compiler", "-default-downstream-compiler <language> <compiler>",
+            "Set a default compiler for the given language. See -lang for the list of languages.");
+
+        options.add("-X", "-X<compiler> <option>", "Pass arguments to downstream <compiler>");
+
+        {
+            StringBuilder description;
+            description << "Pass the input through mostly unmodified to the \n"
+                "existing compiler <name>. Accepted compilers are:\n";
+
+            List<UnownedStringSlice> names;
+            for (Index i = SLANG_PASS_THROUGH_NONE + 1; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
+            {
+                names.add(TypeTextUtil::getPassThroughName(SlangPassThrough(i)));
+            }
+            StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), description);
+            description << "\n";
+            options.add("-pass-through", "-pass-through <name>", description.getBuffer());
+        }
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Debugging !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        options.setCategory("Debugging");
+
+        options.add("-dump-ast", nullptr, "Dump the AST to a .slang-ast file next to the input.");
+        options.add("-dump-intermediate-prefix", "-dump-intermediate-prefix <prefix>", 
+            "File name prefix for -dump-intermediates \n"
+            "      outputs, default is 'slang-dump-'\n");
+        options.add("-dump-intermediates", nullptr, "Dump intermediate outputs for debugging.");
+        options.add("-dump-ir", nullptr, "Dump the IR for debugging.");
+        options.add("-dump-ir-ids", nullptr, "Dump the IDs with -dump-ir (debug builds only)");
+        options.add("-dump-repro", nullptr, "Dump a `.slang-repro` file that can be used to reproduce\n"
+            "a compilation on another machine.\n");
+
+         options.add("-dump-repro-on-error", nullptr, "Dump `.slang-repro` file on any compilation error.");
+         options.add("-E,-output-preprocessor", nullptr, "Output the preprocessing result and exit.");
+         options.add("-extract-repro", "-extract-repro <name>", "Extract the repro files into a folder.");
+         options.add("-load-repro", "-load-repro <name>", "Load repro");
+         options.add("-load-repro-directory", "-load-repro-directory <path>", "Use repro along specified path");
+         options.add("-no-codegen", nullptr, "Skip the code generation step, just check the code and generate layout.");
+         options.add("-output-includes", nullptr, "Print the hierarchy of the processed source files.");
+
+         options.add("-repro-file-system", "-repro-file-system <name>", "Use a repro as a file system");
+         options.add("-serial-ir", nullptr, "Serialize the IR between front-end and back-end.");
+         options.add("-skip-codegen", nullptr, "Skip the code generation phase.");
+         options.add("-validate-ir", nullptr, "Validate the IR between the phases.");
+         options.add("-verbose-paths", nullptr, "Display more detailed paths in diagnostic output.");
+         options.add("-verify-debug-serial-ir", nullptr, "Verify IR in the front-end.");
+
+         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+         options.setCategory("Experimental");
+
+         options.add("-emit-spirv-directly", nullptr, 
+             "Generate SPIR-V output directly (otherwise through \n"
+             "GLSL and using the glslang compiler)\n");
+         options.add("-file-system", "-file-system <fs>", 
+             "Set the filesystem hook to use for a compile request.\n"
+             "Accepted file systems: default, load-file, os\n");
+         options.add("-heterogeneous", nullptr, "Output heterogeneity-related code.");
+         options.add("-no-mangle", nullptr, "Do as little mangling of names as possible.");
+
+         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Internal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+         options.setCategory("Internal");
+
+         options.add("-archive-type", "-archive-type <type>", 
+             "Set the archive type for -save-stdlib. Default is zip.\n"
+             "Accepted archive types: zip, riff, riff-deflate, riff-lz4\n");
+
+         options.add("-compile-stdlib", nullptr, "Compile the StdLib from embedded sources.\n"
+             "Will return a failure if there is already a StdLib available.\n");
+
+         options.add("-doc", nullptr, "Write documentation for -compile-stdlib");
+         options.add("-ir-compression", "-ir-compression <type>", 
+             "Set compression for IR and AST outputs.\n"
+             "Accepted compression types: none, lite\n");
+         options.add("-load-stdlib", "-load-stdlib <filename>", "Load the StdLib from file.");
+         options.add("-r", "-r <name>", "reference module <name>");
+         options.add("-save-stdlib", "-save-stdlib <filename>", "Save the StdLib modules to an archive file.");
+         options.add("-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output\n"
+             "      the data as a C array.\n");
+         options.add("-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.");
+
+         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Depreciated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+         options.setCategory("Depreciated");
+
+         options.add("-parameter-blocks-use-register-spaces", nullptr, "Parameter blocks will use register spaces");
+    }
+
     static char const* getHelpText()
     {
 #ifdef _WIN32
@@ -687,7 +948,6 @@ struct OptionsParser
             "  -save-stdlib-bin-source <filename>: Same as -save-stdlib but output\n"
             "      the data as a C array.\n"
             "  -track-liveness: Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.\n"
-            "  -source-map: Enables outputting of a source map. Note this is *distinct* from line-directive-mode.\n"
             "\n"
             "Deprecated options (allowed but ignored; may be removed in future):\n"
             "\n"
@@ -1696,7 +1956,16 @@ struct OptionsParser
                 }
                 else if (argValue == "-h" || argValue == "-help" || argValue == "--help")
                 {
-                    sink->diagnoseRaw(Severity::Note, getHelpText());
+                    StringBuilder buf;
+                    CommandOptions options;
+                    _initOptions(options);
+
+                    options.appendDescription(buf);
+
+                    sink->diagnoseRaw(Severity::Note, buf.getBuffer());
+                    
+
+                    //sink->diagnoseRaw(Severity::Note, getHelpText());
                     return SLANG_FAIL;
                 }
                 else if( argValue == "-emit-spirv-directly" )
