@@ -359,12 +359,10 @@ workspace "slang"
     -- Disable some warnings
     filter { "toolset:clang or gcc*" }
         buildoptions { "-Wno-switch", "-Wno-parentheses" }
+    filter { "toolset:gcc*", "language:C++" }
+        buildoptions { "-Wno-class-memaccess" }
     filter { "toolset:clang or gcc*", "language:C++" }
-        buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }
-    filter { "toolset:gcc*" }
-        buildoptions { "-Wno-maybe-uninitialized" }
-    filter { "toolset:clang" }
-        buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option" }
+        buildoptions { "-Wno-reorder", "-Wno-invalid-offsetof" }
 
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
