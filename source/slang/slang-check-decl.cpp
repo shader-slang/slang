@@ -4739,11 +4739,6 @@ namespace Slang
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         auto newContext = withParentFunc(decl);
-        if (auto name = decl->getName())
-        {
-            if (name->text == "run")
-                printf("break");
-        }
         if (newContext.getParentDifferentiableAttribute())
         {
             // Register additional types outside the function body first.
