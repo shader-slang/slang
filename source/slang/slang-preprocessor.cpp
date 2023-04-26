@@ -3499,7 +3499,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
             _handleDefaultLineDirective(context);
             return;
         }
-        /* else, fall through to: */
+        [[fallthrough]];
     default:
         _diagnoseInvalidLineDirective(context);
         return;

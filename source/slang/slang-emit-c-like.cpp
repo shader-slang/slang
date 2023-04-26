@@ -582,12 +582,12 @@ void CLikeSourceEmitter::emitStringLiteral(String const& value)
             m_writer->emit(buffer);
             break;
 
-        case '\"': m_writer->emit("\\\"");
-        case '\'': m_writer->emit("\\\'");
-        case '\\': m_writer->emit("\\\\");
-        case '\n': m_writer->emit("\\n");
-        case '\r': m_writer->emit("\\r");
-        case '\t': m_writer->emit("\\t");
+        case '\"': m_writer->emit("\\\""); break;
+        case '\'': m_writer->emit("\\\'"); break;
+        case '\\': m_writer->emit("\\\\"); break;
+        case '\n': m_writer->emit("\\n"); break;
+        case '\r': m_writer->emit("\\r"); break;
+        case '\t': m_writer->emit("\\t"); break;
         }
     }
     m_writer->emit("\"");

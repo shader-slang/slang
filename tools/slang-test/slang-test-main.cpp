@@ -222,7 +222,7 @@ void skipToEndOfLine(char const** ioCursor)
                     cursor++;
                 }
             }
-            ; // fall through to:
+            [[fallthrough]];
         case 0:
             *ioCursor = cursor;
             return;

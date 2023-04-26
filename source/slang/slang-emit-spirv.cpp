@@ -2281,6 +2281,7 @@ struct SPIRVEmitContext
                     element1,
                     element2);
             }
+            break;
         case SpvSnippet::ASMType::Int:
             result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
             break;

@@ -361,7 +361,7 @@ workspace "slang"
         buildoptions { "-fms-extensions" }
 
     filter { "toolset:gcc*" }
-        buildoptions { "-Wno-implicit-fallthrough", "-Wno-maybe-uninitialized" }
+        buildoptions { "-Wno-maybe-uninitialized" }
 
 
     filter { "toolset:clang" }

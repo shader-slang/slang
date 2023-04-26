@@ -411,6 +411,8 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
             return differentiateType(builder, origType);
         else if (as<IRWitnessTableType>(primalType->getDataType()))
             return (IRType*)primalType;
+        else
+            return nullptr;
 
     case kIROp_ArrayType:
     {

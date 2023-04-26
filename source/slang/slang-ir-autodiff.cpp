@@ -487,6 +487,8 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(IRBuilder* build
             return differentiateType(builder, primalType);
         else if (as<IRWitnessTableType>(primalType->getDataType()))
             return (IRType*)primalType;
+        else
+            return nullptr;
 
     case kIROp_ArrayType:
     {
@@ -1400,6 +1402,7 @@ struct AutoDiffPass : public InstPassBase
             for (UInt i = 0; i < type->getOperandCount(); i++)
                 if (!isTypeFullyDifferentiated(type->getOperand(i)))
                     return false;
+            [[fallthrough]];
         default:
             fullyDifferentiatedInsts.add(type);
             return true;

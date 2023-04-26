@@ -197,7 +197,7 @@ struct DebugInfoFormatTable
 
     switch (type)
     {
-        default:    /* fall-through to none */
+        default: [[fallthrough]]; /* fall-through to none */
         SLANG_PASS_THROUGH_HUMAN_TEXT(SLANG_PASS_THROUGH_HUMAN_CASE)
     }
 }
