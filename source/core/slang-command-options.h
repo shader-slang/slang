@@ -57,6 +57,7 @@ struct CommandOptions
     void addValue(const UnownedStringSlice& name);
     void addValue(const UnownedStringSlice& name, const UnownedStringSlice& description); 
     void addValue(const char* name, const char* description);
+    void addValue(const char* name);
     void addValue(const UnownedStringSlice* names, Count namesCount);
 
         /// Finds the category by name or -1 if not found

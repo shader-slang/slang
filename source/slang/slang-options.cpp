@@ -634,6 +634,40 @@ struct OptionsParser
             options.addValue("GL_EXT_fragment_shader_barycentric", "enables the GL_EXT_fragment_shader_barycentric extension");
         }
 
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! extension !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        {
+            options.addCategory(CategoryKind::Value, "file-extension",
+                "A <language>, <format>, and/or <stage> may be inferred from the "
+                "extension of an input or -o path");
+
+            options.addValue("hlsl,fx", "hlsl");
+            options.addValue("dxbc");
+            options.addValue("dxbc-asm", "dxbc-assembly");
+            options.addValue("dxil");
+            options.addValue("dxil-asm", "dxil-assembly");
+            options.addValue("glsl");
+            options.addValue("vert", "glsl (vertex)");
+            options.addValue("frag", "glsl (fragment)");
+            options.addValue("geom", "glsl (geoemtry)");
+            options.addValue("tesc", "glsl (hull)");
+            options.addValue("tese", "glsl (domain)");
+            options.addValue("comp", "glsl (compute)");
+            options.addValue("slang");
+            options.addValue("spv", "SPIR-V");
+            options.addValue("spv-asm", "SPIR-V assembly");
+            options.addValue("c");
+            options.addValue("cpp,c++,cxx", "C++");
+            options.addValue("exe", "executable");
+            options.addValue("dll,so", "sharedlibrary/dll");
+            options.addValue("cu", "CUDA");
+            options.addValue("ptx", "PTX");
+            options.addValue("obj,o", "object-code");
+            options.addValue("zip", "container");
+            options.addValue("slang-module,slang-library", "Slang Module/Library");
+            options.addValue("dir", "Container as a directory");
+        }
+
         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
         options.setCategory("General");
@@ -663,7 +697,7 @@ struct OptionsParser
         options.add("-o", "-o <path>", 
             "Specify a path where generated output should be written.\n"
             "If no -target or -stage is specified, one may be inferred "
-            "from file extension (see File Extensions). "
+            "from file extension (see <file-extension>). "
             "If multiple -target options and a single -entry are present, each -o "
             "associates with the first -target to its left. "
             "Otherwise, if multiple -entry options are present, each -o associates "

@@ -189,6 +189,11 @@ void CommandOptions::addValue(const char* name, const char* description)
     addValue(UnownedStringSlice(name), UnownedStringSlice(description));
 }
 
+void CommandOptions::addValue(const char* name)
+{
+    addValue(UnownedStringSlice(name));
+}
+
 Index CommandOptions::addCategory(CategoryKind kind, const char* name, const char* description)
 {
     const UnownedStringSlice nameSlice(name);
