@@ -22,9 +22,11 @@ struct InOutPair
 // - ns: The list of nodes for which we should return the eventual output of
 //       their transfer function. The closure of predecessor nodes must be
 //       finite. Should not contain duplicates.
-// - strictlyDependsOn:
+// - isSuccessor:
 //      A function f(x, y) which returns true if x depends on the output of y
-//      and y does not depend on x (and thus y should be evaluated before x)
+//      and y does not depend on x. If this returns true then y will be
+//      evaluated before x and the fixed point will be reached with fewer
+//      recomputations.
 // - maxNumUpdates:
 //      (optional) the upper limit for how many times to evaluate the
 //      transfer function at each node.
@@ -37,7 +39,7 @@ template<typename T, typename P>
 List<InOutPair<typename T::Domain>> dataFlow(
     T& context,
     List<typename T::Node> ns,
-    P strictlyDependsOn,
+    P isSuccessor,
     typename T::Domain initialInput = T::Domain::bottom(),
     UInt maxNumUpdates = std::numeric_limits<UInt>::max())
 {
@@ -59,7 +61,7 @@ List<InOutPair<typename T::Domain>> dataFlow(
     // well as if it should be recomputed
     // TODO: We could prune known-stable nodes from this dictionary as we go...
     Dictionary<Node, Info> infos;
-    std::priority_queue<Node, std::vector<Node>, P> workQueue(strictlyDependsOn);
+    std::priority_queue<Node, std::vector<Node>, P> workQueue(isSuccessor);
 
     // Construct our work queue
     List<Node> dependencies = ns;

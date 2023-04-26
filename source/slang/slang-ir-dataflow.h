@@ -30,13 +30,13 @@ namespace Slang
         typename T::Domain initialInput = T::Domain::bottom())
     {
         static_assert(std::is_base_of_v<BasicBlockForwardDataFlow, T>);
-        auto dependsOn = [&reachability](IRBlock* x, IRBlock* y){
+        auto isSuccessor = [&reachability](IRBlock* x, IRBlock* y){
             return reachability.isBlockReachable(y, x) && !reachability.isBlockReachable(x, y);
         };
         return dataFlow(
             context,
             blocksToQuery,
-            dependsOn,
+            isSuccessor,
             initialInput);
     }
 
@@ -48,13 +48,13 @@ namespace Slang
         typename T::Domain initialInput = T::Domain::bottom())
     {
         static_assert(std::is_base_of_v<BasicBlockBackwardDataFlow, T>);
-        auto dependsOn = [&reachability](IRBlock* y, IRBlock* x){
+        auto isSuccessor = [&reachability](IRBlock* y, IRBlock* x){
             return reachability.isBlockReachable(y, x) && !reachability.isBlockReachable(x, y);
         };
         return dataFlow(
             context,
             blocksToQuery,
-            dependsOn,
+            isSuccessor,
             initialInput);
     }
 }
