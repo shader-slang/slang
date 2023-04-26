@@ -2346,23 +2346,27 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module)
 {
-    for (auto inst : module->getModuleInst()->getChildren())
+    // Go through all the top-level children of module's module inst,
+    // and remove any specialization dictionary insts.
+    //
+
+    auto moduleInst = module->getModuleInst();
+    IRInst* next = nullptr;
+    for(auto inst = moduleInst->getFirstChild(); inst; inst = next)
     {
-        for (auto decor = inst->getFirstDecoration(); decor; )
+        next = inst->getNextInst();
+
+        switch(inst->getOp())
         {
-            auto next = decor->getNextDecoration();
-            switch (decor->getOp())
-            {
-            case kIROp_ExistentialFuncSpecializationDictionary:
-            case kIROp_ExistentialTypeSpecializationDictionary:
-            case kIROp_GenericSpecializationDictionary:
-            case kIROp_DispatchFuncDecoration:
-                decor->removeAndDeallocate();
-                break;
-            default:
-                break;
-            }
-            decor = next;
+        default:
+            break;
+
+        case kIROp_ExistentialFuncSpecializationDictionary:
+        case kIROp_ExistentialTypeSpecializationDictionary:
+        case kIROp_GenericSpecializationDictionary:
+        case kIROp_DispatchFuncDecoration:
+            inst->removeAndDeallocate();
+            break;
         }
     }
 }
