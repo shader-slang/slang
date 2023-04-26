@@ -2169,6 +2169,10 @@ static LegalVal legalizeInst(
             inst->replaceUsesWith(newInst);
             inst->removeFromParent();
             context->replacedInstructions.add(inst);
+            for (auto child : inst->getDecorationsAndChildren())
+            {
+                child->insertAtEnd(newInst);
+            }
             return LegalVal::simple(newInst);
         }
         return LegalVal::simple(inst);
@@ -3730,6 +3734,11 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
         return isResourceType(type);
     }
 
+    bool isSimpleType(IRType*) override
+    {
+        return false;
+    }
+
     LegalType createLegalUniformBufferType(
         IROp        op,
         LegalType   legalElementType) override
@@ -3761,6 +3770,11 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
         return as<IRPseudoPtrType>(type) != nullptr;
     }
 
+    bool isSimpleType(IRType*) override
+    {
+        return false;
+    }
+
     LegalType createLegalUniformBufferType(
         IROp        op,
         LegalType   legalElementType) override
@@ -3779,6 +3793,9 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
     }
 };
 
+// This customization of type legalization is used to remove empty
+// structs from cpp/cuda programs if the empty type isn't used in
+// a public function signature.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
     IREmptyTypeLegalizationContext(IRModule* module)
@@ -3787,6 +3804,26 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSpecialType(IRType*) override
     {
+        return false;
+    }
+
+    bool isSimpleType(IRType* type) override
+    {
+        // If type is used as public interface, then treat it as simple.
+        for (auto decor : type->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_LayoutDecoration:
+            case kIROp_PublicDecoration:
+            case kIROp_ExternCppDecoration:
+            case kIROp_DllImportDecoration:
+            case kIROp_DllExportDecoration:
+            case kIROp_HLSLExportDecoration:
+            case kIROp_BinaryInterfaceTypeDecoration:
+                return true;
+            }
+        }
         return false;
     }
 
