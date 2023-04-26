@@ -6,6 +6,12 @@ standard output = {
 #extension GL_EXT_spirv_intrinsics : require
 layout(row_major) uniform;
 layout(row_major) buffer;
+layout(std430, binding = 1) buffer _S1 {
+    int _data[];
+} anotherBuffer_0;
+layout(std430, binding = 0) buffer _S2 {
+    int _data[];
+} outputBuffer_0;
 spirv_instruction(id = 256)
 void livenessStart_0(spirv_by_reference uint _0, spirv_literal int _1);
 
@@ -20,17 +26,17 @@ void livenessEnd_1(spirv_by_reference uint _0, spirv_literal int _1);
 
 int someSlowFunc_0(int a_0)
 {
-    uint _S1 = uint(a_0);
-    int _S2 = a_0 * 20;
+    uint _S3 = uint(a_0);
+    int _S4 = a_0 * 20;
     uint v_0;
     livenessStart_0(v_0, 0);
-    v_0 = _S1;
+    v_0 = _S3;
     int i_0;
     livenessStart_1(i_0, 0);
     i_0 = 0;
     for(;;)
     {
-        if(i_0 < _S2)
+        if(i_0 < _S4)
         {
         }
         else
@@ -38,13 +44,13 @@ int someSlowFunc_0(int a_0)
             livenessEnd_0(i_0, 0);
             break;
         }
-        uint _S3 = v_0 >> 1;
-        uint _S4 = v_0;
+        uint _S5 = v_0 >> 1;
+        uint _S6 = v_0;
         livenessEnd_1(v_0, 0);
-        uint _S5 = (_S3 | _S4 << 31) * uint(i_0);
+        uint _S7 = (_S5 | _S6 << 31) * uint(i_0);
         int i_1 = i_0 + 1;
         livenessStart_0(v_0, 0);
-        v_0 = _S5;
+        v_0 = _S7;
         i_0 = i_1;
     }
     return int(v_0);
@@ -59,14 +65,11 @@ struct SomeStruct_0
 
 SomeStruct_0 makeSomeStruct_0()
 {
-    const int  _S6[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    SomeStruct_0 s_0 = { 0, 0, _S6 };
+    const int  _S8[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    SomeStruct_0 s_0 = { 0, 0, _S8 };
     return s_0;
 }
 
-layout(std430, binding = 1) buffer _S7 {
-    int _data[];
-} anotherBuffer_0;
 int doThing_0(SomeStruct_0 s_1)
 {
     return s_1.x_0 * 2 + 1;
@@ -74,14 +77,11 @@ int doThing_0(SomeStruct_0 s_1)
 
 int somethingElse_0(inout SomeStruct_0 s_2)
 {
-    int _S8 = s_2.x_0 + 1;
-    s_2.x_0 = _S8;
-    return _S8;
+    int _S9 = s_2.x_0 + 1;
+    s_2.x_0 = _S9;
+    return _S9;
 }
 
-layout(std430, binding = 0) buffer _S9 {
-    int _data[];
-} outputBuffer_0;
 spirv_instruction(id = 256)
 void livenessStart_2(spirv_by_reference SomeStruct_0 _0, spirv_literal int _1);
 
