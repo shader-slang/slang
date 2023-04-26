@@ -128,7 +128,6 @@ struct CommandOptionsWriter
 
     void _appendWithWrap(Count indentCount, List<UnownedStringSlice>& slices, const UnownedStringSlice& delimit);
     void _appendWithWrap(Count indentCount, List<UnownedStringSlice>& lines);
-    void _flushWords(Count indentCount, List<UnownedStringSlice>& ioWords);
     void _requireIndent(Count indentCount);
 
     UnownedStringSlice m_indentSlice;

@@ -436,44 +436,29 @@ void CommandOptionsWriter::_requireIndent(Count indentCount)
     }
 }
 
-void CommandOptionsWriter::_flushWords(Count indentCount, List<UnownedStringSlice>& ioWords)
-{
-    // Flush
-    if (ioWords.getCount() > 0)
-    {
-        _requireIndent(indentCount);
-
-        _appendWithWrap(indentCount, ioWords, toSlice(" "));
-        ioWords.clear();
-        m_builder << "\n";
-    }
-}
-
 void CommandOptionsWriter::_appendWithWrap(Count indentCount, List<UnownedStringSlice>& lines)
 {
     List<UnownedStringSlice> words;
-    List<UnownedStringSlice> lineWords;
 
     for (auto line : lines)
     {
         if (line.trim().getLength() == 0 || line.startsWith(toSlice(" ")))
         {
-            // Flush
-            _flushWords(indentCount, words);
-            
             // Append the line as is after the indent
             _requireIndent(indentCount);
             m_builder << line << "\n";
         }
         else
         {
-            lineWords.clear();
-            StringUtil::split(line, ' ', lineWords);
-            words.addRange(lineWords);
+            words.clear();
+            StringUtil::split(line, ' ', words);
+
+            _requireIndent(indentCount);
+
+            _appendWithWrap(indentCount, words, toSlice(" "));
+            m_builder << "\n";
         }
     }
-
-    _flushWords(indentCount, words);
 }
 
 void CommandOptionsWriter::_appendWithWrap(Count indentCount, List<UnownedStringSlice>& slices, const UnownedStringSlice& delimit)

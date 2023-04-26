@@ -642,33 +642,33 @@ struct OptionsParser
         options.add("-depfile",     "-depfile <path>", "Save the source file dependency list in a file.");
         options.add("-entry",       "-entry <name>",
             "Specify the name of an entry-point function.\n"
-            "Multiple -entry options may be used in a single invocation.\n"
-            "If no -entry options are given, compiler will use [shader(...)]\n"
-            "attributes to detect entry points.\n");
+            "Multiple -entry options may be used in a single invocation. "
+            "If no -entry options are given, compiler will use [shader(...)] "
+            "attributes to detect entry points.");
 
         options.add("-h,-help,--help", nullptr, "Print this message.");
         
         options.add("-I", "-I<path>, -I <path>", 
-            "Add a path to be used in resolving '#include'\n"
-            "and 'import' operations.\n", 
+            "Add a path to be used in resolving '#include' "
+            "and 'import' operations.", 
             Flag::CanPrefix);
 
         options.add("-lang", "-lang <language>", "Set the language for the following input files.");
         options.add("-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major.");
         options.add("-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major.");
         options.add("-module-name", "-module-name <name>", 
-            "Set the module name to use when compiling multiple\n"
-            ".slang source files into a single module.\n");
+            "Set the module name to use when compiling multiple "
+            ".slang source files into a single module.");
 
         options.add("-o", "-o <path>", 
             "Specify a path where generated output should be written.\n"
-            "If no -target or -stage is specified, one may be inferred\n"
-            "from file extension (see File Extensions).\n"
-            "If multiple -target options and a single -entry are present, each -o\n"
-            "associates with the first -target to its left.\n"
-            "Otherwise, if multiple -entry options are present, each -o associates\n"
-            "with the first -entry to its left, and with the -target that matches\n"
-            "the one inferred from <path>.\n");
+            "If no -target or -stage is specified, one may be inferred "
+            "from file extension (see File Extensions). "
+            "If multiple -target options and a single -entry are present, each -o "
+            "associates with the first -target to its left. "
+            "Otherwise, if multiple -entry options are present, each -o associates "
+            "with the first -entry to its left, and with the -target that matches "
+            "the one inferred from <path>.");
 
         options.add("-profile", "-profile <profile>[+<capability>...]",
             "Specify the shader profile for code generation.\n"
@@ -678,15 +678,15 @@ struct OptionsParser
             "Additional profiles that include -stage information:\n"
             "  {vs,hs,ds,gs,ps}_<version>\n"
             "See -capability for information on <capability>\n"
-            "When multiple -target options are present, each -profile associates\n"
-            "with the first -target to its left.\n");
+            "When multiple -target options are present, each -profile associates"
+            "with the first -target to its left.");
 
         options.add("-stage", "-stage <stage>",
             "Specify the stage of an entry-point function.\n"
-            "When multiple -entry options are present, each -stage associated with\n"
-            "the first -entry to its left.\n"
-            "May be omitted if entry-point function has a [shader(...)] attribute;\n"
-            "otherwise required for each -entry option.\n");
+            "When multiple -entry options are present, each -stage associated with "
+            "the first -entry to its left. "
+            "May be omitted if entry-point function has a [shader(...)] attribute; "
+            "otherwise required for each -entry option.");
 
         options.add("-target", "-target <target>", "Specifies the format in which code should be generated.");
 
@@ -725,13 +725,13 @@ struct OptionsParser
             "  none       : Don't emit `#line` directives at all\n"
             "  source-map : Use source map to track line associations (doen't emit #line)\n"
             "  default    : Default behavior\n"
-            "If not specified, default behavior is to use C-style `#line` directives\n"
-            "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives\n"
-            "for GLSL output.\n");
+            "If not specified, default behavior is to use C-style `#line` directives "
+            "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives "
+            "for GLSL output.");
 
         options.add("-O", "-O<N>", 
             "Set the optimization level.\n"
-            "N is the amount of optimization, 0..3, default is 1\n",
+            "N is the amount of optimization, 0..3, default is 1",
             Flag::CanPrefix);
 
         options.add("-obfuscate", nullptr, "Remove all source file information from outputs.");
@@ -754,7 +754,7 @@ struct OptionsParser
             }
 
             options.add(names.getBuffer(), "-<compiler>-path <path>", 
-                "Specify path to a downstream <compiler>\n"
+                "Specify path to a downstream <compiler> "
                 "executable or library.\n");
         }
          
@@ -773,11 +773,11 @@ struct OptionsParser
 
         options.add("-dump-ast", nullptr, "Dump the AST to a .slang-ast file next to the input.");
         options.add("-dump-intermediate-prefix", "-dump-intermediate-prefix <prefix>", 
-            "File name prefix for -dump-intermediates outputs, default is 'slang-dump-'\n");
+            "File name prefix for -dump-intermediates outputs, default is 'slang-dump-'");
         options.add("-dump-intermediates", nullptr, "Dump intermediate outputs for debugging.");
         options.add("-dump-ir", nullptr, "Dump the IR for debugging.");
         options.add("-dump-ir-ids", nullptr, "Dump the IDs with -dump-ir (debug builds only)");
-        options.add("-dump-repro", nullptr, "Dump a `.slang-repro` file that can be used to reproduce\n"
+        options.add("-dump-repro", nullptr, "Dump a `.slang-repro` file that can be used to reproduce "
             "a compilation on another machine.\n");
 
          options.add("-dump-repro-on-error", nullptr, "Dump `.slang-repro` file on any compilation error.");
@@ -800,11 +800,11 @@ struct OptionsParser
          options.setCategory("Experimental");
 
          options.add("-emit-spirv-directly", nullptr, 
-             "Generate SPIR-V output directly (otherwise through \n"
-             "GLSL and using the glslang compiler)\n");
+             "Generate SPIR-V output directly (otherwise through "
+             "GLSL and using the glslang compiler)");
          options.add("-file-system", "-file-system <fs>", 
              "Set the filesystem hook to use for a compile request.\n"
-             "Accepted file systems: default, load-file, os\n");
+             "Accepted file systems: default, load-file, os");
          options.add("-heterogeneous", nullptr, "Output heterogeneity-related code.");
          options.add("-no-mangle", nullptr, "Do as little mangling of names as possible.");
 
@@ -814,17 +814,17 @@ struct OptionsParser
 
          options.add("-archive-type", "-archive-type <archive-type>", "Set the archive type for -save-stdlib. Default is zip.");
 
-         options.add("-compile-stdlib", nullptr, "Compile the StdLib from embedded sources.\n"
-             "Will return a failure if there is already a StdLib available.\n");
+         options.add("-compile-stdlib", nullptr, "Compile the StdLib from embedded sources. "
+             "Will return a failure if there is already a StdLib available.");
 
          options.add("-doc", nullptr, "Write documentation for -compile-stdlib");
          options.add("-ir-compression", "-ir-compression <type>", 
              "Set compression for IR and AST outputs.\n"
-             "Accepted compression types: none, lite\n");
+             "Accepted compression types: none, lite");
          options.add("-load-stdlib", "-load-stdlib <filename>", "Load the StdLib from file.");
          options.add("-r", "-r <name>", "reference module <name>");
          options.add("-save-stdlib", "-save-stdlib <filename>", "Save the StdLib modules to an archive file.");
-         options.add("-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output\n"
+         options.add("-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output "
              "the data as a C array.\n");
          options.add("-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.");
 
