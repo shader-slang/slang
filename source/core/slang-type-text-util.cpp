@@ -20,16 +20,16 @@ namespace Slang
     x(Float64, double) 
 
 #define SLANG_PASS_THROUGH_TYPES(x) \
-        x(none, NONE) \
-        x(fxc, FXC) \
-        x(dxc, DXC) \
-        x(glslang, GLSLANG) \
-        x(visualstudio, VISUAL_STUDIO) \
-        x(clang, CLANG) \
-        x(gcc, GCC) \
-        x(genericcpp, GENERIC_C_CPP) \
-        x(nvrtc, NVRTC) \
-        x(llvm, LLVM)
+        x("none", NONE, "Unknown") \
+        x("fxc", FXC, "fxc") \
+        x("dxc", DXC, "dxc") \
+        x("glslang", GLSLANG, "glslang") \
+        x("visualstudio,vs", VISUAL_STUDIO, "Visual Studio") \
+        x("clang", CLANG, "Clang") \
+        x("gcc", GCC, "GCC") \
+        x("genericcpp,c,cpp", GENERIC_C_CPP, "Generic C/C++ compiler") \
+        x("nvrtc", NVRTC, "NVRTC (Cuda compiler)") \
+        x("llvm", LLVM, "LLVM/Clang")
 
 #define SLANG_DEBUG_INFO_FORMATS(x) \
     x(default-format, DEFAULT) \
@@ -54,15 +54,9 @@ static const ScalarTypeInfo s_scalarTypeInfos[] =
     SLANG_SCALAR_TYPES(SLANG_SCALAR_TYPE_INFO)
 };
 
-struct CompileTargetInfo
-{
-    SlangCompileTarget target;          ///< The target
-    const char* extensions;             ///< Comma delimited list of extensions associated with the target
-    const char* names;                  ///< Comma delimited list of names associated with the target. NOTE! First name is taken as the normal display name.
-};
 
 // Make sure to keep this table in sync with that in slang/slang-options.cpp getHelpText
-static const CompileTargetInfo s_compileTargetInfos[] = 
+static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
 {
     { SLANG_TARGET_UNKNOWN, "",                                                 "unknown"},
     { SLANG_TARGET_NONE,    "",                                                 "none"},
@@ -88,17 +82,25 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable" },
     { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code" },
     { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable" },
-
-
 };
 
-struct ArchiveTypeInfo
+static const TypeTextUtil::LanguageInfo s_languageInfos[] = 
 {
-    SlangArchiveType type;
-    UnownedStringSlice text;
+    { SLANG_SOURCE_LANGUAGE_C, "c,C" },
+    { SLANG_SOURCE_LANGUAGE_CPP, "cpp,c++,C++,cxx" },
+    { SLANG_SOURCE_LANGUAGE_SLANG, "slang" },
+    { SLANG_SOURCE_LANGUAGE_GLSL, "glsl" },
+    { SLANG_SOURCE_LANGUAGE_HLSL, "hlsl" },
+    { SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda" },
 };
 
-static const ArchiveTypeInfo s_archiveTypeInfos[] =
+static const TypeTextUtil::CompilerInfo s_compilerInfos[] = 
+{
+    #define SLANG_PASS_THROUGH_INFO(x, y, human) { SLANG_PASS_THROUGH_##y, x, human },
+    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_INFO)
+};
+
+static const TypeTextUtil::ArchiveTypeInfo s_archiveTypeInfos[] =
 {
     { SLANG_ARCHIVE_TYPE_RIFF_DEFLATE, UnownedStringSlice::fromLiteral("riff-deflate")},
     { SLANG_ARCHIVE_TYPE_RIFF_LZ4, UnownedStringSlice::fromLiteral("riff-lz4")},
@@ -108,13 +110,34 @@ static const ArchiveTypeInfo s_archiveTypeInfos[] =
 
 } // anonymous
 
+/* static */ConstArrayView<TypeTextUtil::CompileTargetInfo> TypeTextUtil::getCompileTargetInfos()
+{
+    return makeConstArrayView(s_compileTargetInfos);
+}
+
+/* static */ConstArrayView<TypeTextUtil::LanguageInfo> TypeTextUtil::getLanguageInfos()
+{
+    return makeConstArrayView(s_languageInfos);
+}
+
+/* static */ConstArrayView<TypeTextUtil::CompilerInfo> TypeTextUtil::getCompilerInfos()
+{
+    return makeConstArrayView(s_compilerInfos);
+}
+
+/* static */ConstArrayView<TypeTextUtil::ArchiveTypeInfo> TypeTextUtil::getArchiveTypeInfos()
+{
+    return makeConstArrayView(s_archiveTypeInfos);
+}
+
+
 /* static */SlangArchiveType TypeTextUtil::findArchiveType(const UnownedStringSlice& slice)
 {
-    for (const auto& entry : s_archiveTypeInfos)
+    for (const auto& info : s_archiveTypeInfos)
     {
-        if (slice == entry.text)
+        if (slice == info.name)
         {
-            return entry.type;
+            return info.type;
         }
     }
     return SLANG_ARCHIVE_TYPE_UNDEFINED;
@@ -180,80 +203,52 @@ struct DebugInfoFormatTable
     return slang::TypeReflection::ScalarType::None;
 }
 
-#define SLANG_PASS_THROUGH_HUMAN_TEXT(x) \
-    x(NONE,             "Unknown") \
-    x(VISUAL_STUDIO,    "Visual Studio") \
-    x(GCC,              "GCC") \
-    x(CLANG,            "Clang") \
-    x(NVRTC,            "NVRTC") \
-    x(FXC,              "fxc") \
-    x(DXC,              "dxc") \
-    x(GLSLANG,          "glslang") \
-    x(LLVM,             "LLVM/Clang") \
-    x(GENERIC_C_CPP,    "Generic C/C++ compiler")
 
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough type)
 {
-#define SLANG_PASS_THROUGH_HUMAN_CASE(value, text)  case SLANG_PASS_THROUGH_##value: return UnownedStringSlice::fromLiteral(text); 
-
-    switch (type)
+    for (auto info : getCompilerInfos())
     {
-        default:    /* fall-through to none */
-        SLANG_PASS_THROUGH_HUMAN_TEXT(SLANG_PASS_THROUGH_HUMAN_CASE)
+        if (info.compiler == type)
+        {
+            return UnownedStringSlice(info.humanName);
+        }
     }
+    return UnownedStringSlice("unknown");
 }
 
 /* static */SlangResult TypeTextUtil::findPassThroughFromHumanText(const UnownedStringSlice& inText, SlangPassThrough& outPassThrough)
 {
-    #define SLANG_PASS_THROUGH_HUMAN_IF(value, text)  if (inText == UnownedStringSlice::fromLiteral(text)) { outPassThrough = SLANG_PASS_THROUGH_##value; return SLANG_OK; } else
-    SLANG_PASS_THROUGH_HUMAN_TEXT(SLANG_PASS_THROUGH_HUMAN_IF)
+    for (auto info : getCompilerInfos())
+    {
+        if (inText == info.humanName)
+        {
+            outPassThrough = info.compiler;
+            return SLANG_OK;
+        }
+    }
     return SLANG_FAIL;
 }
 
 /* static */SlangSourceLanguage TypeTextUtil::findSourceLanguage(const UnownedStringSlice& text)
 {
-    if (text == "c" || text == "C")
+    for (auto& info : getLanguageInfos())
     {
-        return SLANG_SOURCE_LANGUAGE_C;
-    }
-    else if (text == "cpp" || text == "c++" || text == "C++" || text == "cxx")
-    {
-        return SLANG_SOURCE_LANGUAGE_CPP;
-    }
-    else if (text == "slang")
-    {
-        return SLANG_SOURCE_LANGUAGE_SLANG;
-    }
-    else if (text == "glsl")
-    {
-        return SLANG_SOURCE_LANGUAGE_GLSL;
-    }
-    else if (text == "hlsl")
-    {
-        return SLANG_SOURCE_LANGUAGE_HLSL;
-    }
-    else if (text == "cu" || text == "cuda")
-    {
-        return SLANG_SOURCE_LANGUAGE_CUDA;
+        if (StringUtil::indexOfInSplit(UnownedStringSlice(info.names), ',', text) >= 0)
+        {
+            return info.language;
+        }
     }
     return SLANG_SOURCE_LANGUAGE_UNKNOWN;
 }
 
 /* static */SlangPassThrough TypeTextUtil::findPassThrough(const UnownedStringSlice& slice)
 {
-#define SLANG_PASS_THROUGH_NAME_TO_TYPE(x, y) \
-    if (slice == UnownedStringSlice::fromLiteral(#x)) return SLANG_PASS_THROUGH_##y;
-
-    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_NAME_TO_TYPE)
-
-    // Other options
-    if (slice == "c" || slice == "cpp")
+    for (auto info : getCompilerInfos())
     {
-        return SLANG_PASS_THROUGH_GENERIC_C_CPP;
-    }
-    else if (slice == "vs")
-    {
-        return SLANG_PASS_THROUGH_VISUAL_STUDIO;
+        if (StringUtil::indexOfInSplit(UnownedStringSlice(info.names), ',', slice) >= 0)
+        {
+            return info.compiler;
+        }
     }
 
     return SLANG_PASS_THROUGH_NONE;
@@ -272,13 +267,12 @@ struct DebugInfoFormatTable
 
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughName(SlangPassThrough passThru)
 {
-#define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
-    case SLANG_PASS_THROUGH_##y: return UnownedStringSlice::fromLiteral(#x);
-
-    switch (passThru)
+    for (auto info : getCompilerInfos())
     {
-        SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_TO_NAME)
-        default: break;
+        if (info.compiler == passThru)
+        {
+            return StringUtil::getAtInSplit(UnownedStringSlice(info.names), ',', 0);
+        }
     }
     return UnownedStringSlice::fromLiteral("unknown");
 }

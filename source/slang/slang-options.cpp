@@ -522,14 +522,117 @@ struct OptionsParser
     static void _initOptions(CommandOptions& options)
     {
         typedef CommandOptions::Flag::Enum Flag;
+        typedef CommandOptions::CategoryKind CategoryKind;
 
-        options.addCategory("General", "General options");
-        options.addCategory("Target", "Target code generation options");
-        options.addCategory("Downstream", "Downstream compiler options");
-        options.addCategory("Debugging", "Compiler debugging/instrumentation options");
-        options.addCategory("Experimental", "Experimental options (use at your own risk)");
-        options.addCategory("Internal", "Internal-use options (use at your own risk)");
-        options.addCategory("Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
+        options.addCategory(CategoryKind::Option, "General", "General options");
+        options.addCategory(CategoryKind::Option, "Target", "Target code generation options");
+        options.addCategory(CategoryKind::Option, "Downstream", "Downstream compiler options");
+        options.addCategory(CategoryKind::Option, "Debugging", "Compiler debugging/instrumentation options");
+        options.addCategory(CategoryKind::Option, "Experimental", "Experimental options (use at your own risk)");
+        options.addCategory(CategoryKind::Option, "Internal", "Internal-use options (use at your own risk)");
+        options.addCategory(CategoryKind::Option, "Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! compiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        {
+            options.addCategory(CategoryKind::Value, "compiler", "Downstream Compilers (aka Pass through)");
+            for (auto info : TypeTextUtil::getCompilerInfos())
+            {
+                options.addValue(UnownedStringSlice(info.names), UnownedStringSlice(info.humanName));   
+            }
+        }
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        {
+            options.addCategory(CategoryKind::Value, "target", "Target");
+            for (const auto& info : TypeTextUtil::getCompileTargetInfos())
+            {
+                options.addValue(UnownedStringSlice(info.names));
+            }
+        }
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! language !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        {
+            options.addCategory(CategoryKind::Value, "language", "Language");
+            for (const auto& info : TypeTextUtil::getLanguageInfos())
+            {
+                options.addValue(UnownedStringSlice(info.names));
+            }
+        }
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! fp-mode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        {
+            options.addCategory(CategoryKind::Value, "fp-mode", "Floating Point Mode");
+            
+            options.addValue("precise", 
+                "Disable optimization that could change the output of floating-"
+                "point computations, including around infinities, NaNs, denormalized "
+                "values, and negative zero. Prefer the most precise versions of special "
+                "functions supported by the target.");
+            options.addValue("fast", 
+                "Allow optimizations that may change results of floating-point "
+                "computations. Prefer the fastest version of special functions supported "
+                "by the target.");
+        }
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! archive-type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        {
+            options.addCategory(CategoryKind::Value, "archive-type", "Archive Type");
+
+            for (auto info : TypeTextUtil::getArchiveTypeInfos())
+            {
+                options.addValue(UnownedStringSlice(info.name));
+            }
+        }
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! stage !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        {
+            options.addCategory(CategoryKind::Value, "stage", "Stage");
+            auto stageInfos = getStageInfos();
+
+            List<StageInfo> infos;
+            infos.addRange(stageInfos.getBuffer(), stageInfos.getCount());
+
+            infos.sort([](const StageInfo& a, const StageInfo& b) -> bool { return Index(a.stage) < Index(b.stage); });
+
+            List<UnownedStringSlice> names;
+
+            const Count count = infos.getCount();
+            Index i = 0;
+            while (i < count)
+            {
+                names.clear();
+                const auto stage = infos[i].stage;
+                names.add(UnownedStringSlice(infos[i++].name));
+
+                for (; i < count && infos[i].stage == stage; ++i)
+                {
+                    names.add(UnownedStringSlice(infos[i].name));
+                }
+                options.addValue(names.getBuffer(), names.getCount());
+            }
+        }
+
+        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! capabilities !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+        {
+            options.addCategory(CategoryKind::Value, "capability", 
+                "A capability describes an optional feature that a target may or "
+                "may not support. When a -capability is specified, the compiler "
+                "may assume that the target supports that capability, and generate "
+                "code accordingly.");
+                
+            options.addValue("spirv_1_{ 0,1,2,3,4,5 }", "minimum supported SPIR - V version");
+            options.addValue("GL_NV_ray_tracing", "enables the GL_NV_ray_tracing extension");
+            options.addValue("GL_EXT_ray_tracing", "enables the GL_EXT_ray_tracing extension");
+            options.addValue("GL_NV_fragment_shader_barycentric", "enables the GL_NV_fragment_shader_barycentric extension");
+            options.addValue("GL_EXT_fragment_shader_barycentric", "enables the GL_EXT_fragment_shader_barycentric extension");
+        }
 
         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -550,10 +653,7 @@ struct OptionsParser
             "and 'import' operations.\n", 
             Flag::CanPrefix);
 
-        options.add("-lang", "-lang <language>", 
-            "Set the language for the following input files.\n"
-            "Accepted languages are:\n"
-            "   c, cpp, c++, cxx, slang, glsl, hlsl, cu, cuda\n");
+        options.add("-lang", "-lang <language>", "Set the language for the following input files.");
         options.add("-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major.");
         options.add("-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major.");
         options.add("-module-name", "-module-name <name>", 
@@ -581,21 +681,14 @@ struct OptionsParser
             "When multiple -target options are present, each -profile associates\n"
             "with the first -target to its left.\n");
 
-        options.add("-stage", "-stage <name>",
+        options.add("-stage", "-stage <stage>",
             "Specify the stage of an entry-point function.\n"
-            "Accepted stages are:\n"
-            "  vertex, hull, domain, geometry, fragment, compute,\n"
-            "  raygeneration, intersection, anyhit, closesthit, miss, callable\n"
             "When multiple -entry options are present, each -stage associated with\n"
             "the first -entry to its left.\n"
             "May be omitted if entry-point function has a [shader(...)] attribute;\n"
             "otherwise required for each -entry option.\n");
 
-        options.add("-target", "-target <format>", 
-            "Specifies the format in which code should be generated.\n"
-            "Accepted formats are:\n"
-            "  glsl, hlsl, spirv, spirv-assembly, dxbc,\n"
-            "  dxbc-assembly, dxil, dxil-assembly\n");
+        options.add("-target", "-target <target>", "Specifies the format in which code should be generated.");
 
         options.add("-v,-version", nullptr, "Display the build version.");
 
@@ -620,22 +713,14 @@ struct OptionsParser
         options.add("-disable-dynamic-dispatch", nullptr, "Disables generating dynamic dispatch code.");
         options.add("-disable-specialization", nullptr, "Disables generics and specialization pass.");
 
-        options.add("-fp-mode,-floating-point-mode", "-fp-mode <mode>, -floating-point-mode <mode>",
-            "Accepted modes are:\n"
-            "precise : Disable optimization that could change the output of floating-\n"
-            "          point computations, including around infinities, NaNs, denormalized\n"
-            "          values, and negative zero. Prefer the most precise versions of special\n"
-            "          functions supported by the target.\n"
-            "fast :    Allow optimizations that may change results of floating-point\n"
-            "          computations. Prefer the fastest version of special functions supported\n"
-            "          by the target.\n");
+        options.add("-fp-mode,-floating-point-mode", "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>", "Control floating point optimizations");
 
         options.add("-g", "-g, -g<N>", 
             "Include debug information in the generated code, where possible.\n"
             "N is the amount of information, 0..3, unspecified means 2\n",
             Flag::CanPrefix);
 
-        options.add("-line-directive-mode", "-line-directive-mode <mode>", 
+        options.add("-line-directive-mode", "-line-directive-mode <line-directive-mode>", 
             "Sets how the `#line` directives should be produced. Available options are:\n"
             "  none       : Don't emit `#line` directives at all\n"
             "  source-map : Use source map to track line associations (doen't emit #line)\n"
@@ -657,63 +742,38 @@ struct OptionsParser
 
         {
             StringBuilder names;
-            StringBuilder description;
-            
-            description << "Specify path to a downstream <compiler>\n"
-                "executable or library. Accepted compilers are:\n";
-
-            for (Index i = SLANG_PASS_THROUGH_NONE + 1; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
+            for (auto info : TypeTextUtil::getCompilerInfos())
             {
-                auto compilerName = TypeTextUtil::getPassThroughName(SlangPassThrough(i));
-            
+                auto name = StringUtil::getAtInSplit(UnownedStringSlice(info.names), ',', 0);
+
                 if (names.getLength())
                 {
                     names << ",";
                 }
-                names << "-" << compilerName << "-path";
-
-                auto human = TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough(i));
-
-                if (human != compilerName)
-                {
-                    description << "  " << compilerName << " - " << human << "\n";
-                }
-                else
-                {
-                    description << "  " << compilerName << "\n";
-                }
+                names << "-" << name << "-path";
             }
-            options.add(names.getBuffer(), "-<compiler>-path <path>", description.getBuffer());
+
+            options.add(names.getBuffer(), "-<compiler>-path <path>", 
+                "Specify path to a downstream <compiler>\n"
+                "executable or library.\n");
         }
          
         options.add("-default-downstream-compiler", "-default-downstream-compiler <language> <compiler>",
             "Set a default compiler for the given language. See -lang for the list of languages.");
 
         options.add("-X", "-X<compiler> <option>", "Pass arguments to downstream <compiler>");
-
-        {
-            StringBuilder description;
-            description << "Pass the input through mostly unmodified to the \n"
-                "existing compiler <name>. Accepted compilers are:\n";
-
-            List<UnownedStringSlice> names;
-            for (Index i = SLANG_PASS_THROUGH_NONE + 1; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
-            {
-                names.add(TypeTextUtil::getPassThroughName(SlangPassThrough(i)));
-            }
-            StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), description);
-            description << "\n";
-            options.add("-pass-through", "-pass-through <name>", description.getBuffer());
-        }
-
+        
+        options.add("-pass-through", "-pass-through <compiler>", 
+                "Pass the input through mostly unmodified to the \n"
+                "existing compiler <compiler>.");
+        
         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Debugging !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
         options.setCategory("Debugging");
 
         options.add("-dump-ast", nullptr, "Dump the AST to a .slang-ast file next to the input.");
         options.add("-dump-intermediate-prefix", "-dump-intermediate-prefix <prefix>", 
-            "File name prefix for -dump-intermediates \n"
-            "      outputs, default is 'slang-dump-'\n");
+            "File name prefix for -dump-intermediates outputs, default is 'slang-dump-'\n");
         options.add("-dump-intermediates", nullptr, "Dump intermediate outputs for debugging.");
         options.add("-dump-ir", nullptr, "Dump the IR for debugging.");
         options.add("-dump-ir-ids", nullptr, "Dump the IDs with -dump-ir (debug builds only)");
@@ -752,9 +812,7 @@ struct OptionsParser
 
          options.setCategory("Internal");
 
-         options.add("-archive-type", "-archive-type <type>", 
-             "Set the archive type for -save-stdlib. Default is zip.\n"
-             "Accepted archive types: zip, riff, riff-deflate, riff-lz4\n");
+         options.add("-archive-type", "-archive-type <archive-type>", "Set the archive type for -save-stdlib. Default is zip.");
 
          options.add("-compile-stdlib", nullptr, "Compile the StdLib from embedded sources.\n"
              "Will return a failure if there is already a StdLib available.\n");
@@ -767,7 +825,7 @@ struct OptionsParser
          options.add("-r", "-r <name>", "reference module <name>");
          options.add("-save-stdlib", "-save-stdlib <filename>", "Save the StdLib modules to an archive file.");
          options.add("-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output\n"
-             "      the data as a C array.\n");
+             "the data as a C array.\n");
          options.add("-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.");
 
          /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Depreciated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -1960,9 +2018,10 @@ struct OptionsParser
                     CommandOptions options;
                     _initOptions(options);
 
-                    options.appendDescription(buf);
+                    CommandOptionsWriter writer;
+                    writer.appendDescription(options);
 
-                    sink->diagnoseRaw(Severity::Note, buf.getBuffer());
+                    sink->diagnoseRaw(Severity::Note, writer.getBuilder().getBuffer());
                     
 
                     //sink->diagnoseRaw(Severity::Note, getHelpText());

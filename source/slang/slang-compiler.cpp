@@ -372,13 +372,9 @@ namespace Slang
         }
     }
 
-    static const struct
+    static const StageInfo kStages[] = 
     {
-        char const* name;
-        Stage       stage;
-    } kStages[] =
-    {
-    #define PROFILE_STAGE(ID, NAME, ENUM) \
+        #define PROFILE_STAGE(ID, NAME, ENUM) \
             { #NAME,    Stage::ID },
 
         #define PROFILE_STAGE_ALIAS(ID, NAME, VAL) \
@@ -386,6 +382,11 @@ namespace Slang
 
         #include "slang-profile-defs.h"
     };
+
+    ConstArrayView<StageInfo> getStageInfos()
+    {
+        return makeConstArrayView(kStages);
+    }
 
     Stage findStageByName(String const& name)
     {

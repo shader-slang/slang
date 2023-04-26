@@ -11,8 +11,15 @@ struct CommandOptions
 {
     typedef uint32_t Flags;
 
+    enum class CategoryKind
+    {
+        Option,             ///< Command line option
+        Value,              ///< One of a set of values
+    };
+
     struct Category
     {
+        CategoryKind kind;
         UnownedStringSlice name;
         UnownedStringSlice description;
     };
@@ -28,27 +35,43 @@ struct CommandOptions
 
     struct Option
     {
-        UnownedStringSlice name;                ///< The (default) name for the option. Options can have multiple names
+        UnownedStringSlice names;               ///< Comma delimited list of names, first name is the default 
         UnownedStringSlice usage;               ///< Describes usage, can be empty
         UnownedStringSlice description;         ///< A description of usage
 
         Index startNameIndex = -1;
         Index endNameIndex = -1;
 
-        Index categoryIndex = -1;                    ///< Category this option belongs to
-        Flags flags = 0;                            ///< Flags about this option
+        Index categoryIndex = -1;               ///< Category this option belongs to
+        Flags flags = 0;                        ///< Flags about this option
     };
 
         /// Add a category
-    Index addCategory(const char* name, const char* description);
+    Index addCategory(CategoryKind kind, const char* name, const char* description);
         /// Use an already known category. It's an error if the category isn't found
     void setCategory(const char* name);
 
     void add(const char* name, const char* usage, const char* description, Flags flags = 0);
     void add(const UnownedStringSlice* names, Count namesCount, const char* usage, const char* description, Flags flags = 0);
 
-        /// Appends a description of all of the options
-    void appendDescription(StringBuilder& buf);
+    void addValue(const UnownedStringSlice& name);
+    void addValue(const UnownedStringSlice& name, const UnownedStringSlice& description); 
+    void addValue(const char* name, const char* description);
+    void addValue(const UnownedStringSlice* names, Count namesCount);
+
+        /// Finds the category by name or -1 if not found
+    Index findCategoryByName(const UnownedStringSlice& name) const;
+
+        /// Get the categories
+    const List<Category>& getCategories() const { return m_categories; }
+
+        /// Get all the options
+    const List<Option>& getOptions() const { return m_options; }
+
+        /// Find all of the categories in the usage slice
+    void findCategoryIndicesFromUsage(const UnownedStringSlice& usageSlice, List<Index>& outCategories) const;
+        /// Get all the option names associated with a category index
+    void getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const;
 
     /// Ctor
     CommandOptions() :
@@ -60,8 +83,12 @@ struct CommandOptions
         /// Returns name in the m_optionPool or -1 on error
     Index _addOptionName(const UnownedStringSlice& name, Flags flags);
  
+    Index _addOption(const UnownedStringSlice& name, const Option& inOption);
     Index _addOption(const UnownedStringSlice* names, Count namesCount, const Option& option);
 
+    Index _addValue(const UnownedStringSlice& name, const Option& inOption);
+
+    
     UnownedStringSlice _addString(const char* text);
     UnownedStringSlice _addString(const UnownedStringSlice& slice);
 
@@ -79,6 +106,35 @@ struct CommandOptions
     StringSlicePool m_optionPool;            ///< Only holds options, and handle therefore matches up to m_entries 
 
     MemoryArena m_arena;                        ///< For other misc storage
+};
+
+struct CommandOptionsWriter
+{
+    typedef CommandOptions::CategoryKind CategoryKind;
+    
+        /// Appends a description of all of the options
+    void appendDescription(const CommandOptions& options);
+
+        /// Get the builder that string is being written to
+    StringBuilder& getBuilder() { return m_builder; }
+
+        /// Ctor 
+    CommandOptionsWriter():
+        m_indentSlice(toSlice("  "))
+    {
+    }
+
+    Count _getCurrentLineLength();
+
+    void _appendWithWrap(Count indentCount, List<UnownedStringSlice>& slices, const UnownedStringSlice& delimit);
+    void _appendWithWrap(Count indentCount, List<UnownedStringSlice>& lines);
+    void _flushWords(Count indentCount, List<UnownedStringSlice>& ioWords);
+    void _requireIndent(Count indentCount);
+
+    UnownedStringSlice m_indentSlice;
+    Count m_lineLength = 80;
+
+    StringBuilder m_builder;
 };
 
 } // namespace Slang

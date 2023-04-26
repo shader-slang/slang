@@ -4,7 +4,7 @@
 #include "../../slang.h"
 
 #include "slang-string.h"
-
+#include "slang-array-view.h"
 
 namespace Slang
 {
@@ -12,6 +12,39 @@ namespace Slang
 /// Utility class to allow conversion of types (such as enums) to and from text types
 struct TypeTextUtil
 {
+    struct CompileTargetInfo
+    {
+        SlangCompileTarget target;          ///< The target
+        const char* extensions;             ///< Comma delimited list of extensions associated with the target
+        const char* names;                  ///< Comma delimited list of names associated with the target. NOTE! First name is taken as the normal display name.
+    };
+    struct LanguageInfo
+    {
+        SlangSourceLanguage language;       ///< The language
+        const char* names;                  ///< Comma delimited list of names
+    };
+    struct CompilerInfo
+    {
+        SlangPassThrough compiler;          ///< The compiler
+        const char* names;                  ///< Comma delimited list of names
+        const char* humanName;              ///< Human readable name
+    };
+    struct ArchiveTypeInfo
+    {
+        SlangArchiveType type;
+        UnownedStringSlice name;
+    };
+
+        /// Get the compile target infos
+    static ConstArrayView<CompileTargetInfo> getCompileTargetInfos();
+        /// Get the language infos
+    static ConstArrayView<LanguageInfo> getLanguageInfos();
+        /// Get the compiler infos
+    static ConstArrayView<CompilerInfo> getCompilerInfos();
+        
+        /// Get the archive type infos
+    static ConstArrayView<ArchiveTypeInfo> getArchiveTypeInfos();
+
         /// Get the scalar type as text.
     static Slang::UnownedStringSlice getScalarTypeName(slang::TypeReflection::ScalarType scalarType);
 
