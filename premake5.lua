@@ -351,19 +351,18 @@ workspace "slang"
     filter { "toolset:clang or gcc*" }
         -- Makes all symbols hidden by default unless explicitly 'exported'
         buildoptions { "-fvisibility=hidden" } 
-        -- Warnings
-        buildoptions { "-Wno-switch", "-Wno-parentheses" }
-    filter { "toolset:clang or gcc*", "language:C++" }
-        buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }
 
-    filter { "files:source/compiler-core/slang-dxc-compiler.cpp", "toolset:clang or gcc" }
+    filter { "toolset:clang or gcc*", "files:source/compiler-core/slang-dxc-compiler.cpp" }
         -- For the DXC headers
         buildoptions { "-fms-extensions" }
 
+    -- Disable some warnings
+    filter { "toolset:clang or gcc*" }
+        buildoptions { "-Wno-switch", "-Wno-parentheses" }
+    filter { "toolset:clang or gcc*", "language:C++" }
+        buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }
     filter { "toolset:gcc*" }
         buildoptions { "-Wno-maybe-uninitialized" }
-
-
     filter { "toolset:clang" }
         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option" }
 
