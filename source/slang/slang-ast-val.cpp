@@ -35,7 +35,7 @@ String Val::toString()
 {
     StringBuilder builder;
     toText(builder);
-    return builder;
+    return std::move(builder);
 }
 
 HashCode Val::getHashCode()

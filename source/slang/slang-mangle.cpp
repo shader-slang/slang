@@ -634,7 +634,7 @@ namespace Slang
         builder << "_Sh";
         builder.append(uint64_t(hash), 16);
 
-        return builder;
+        return std::move(builder);
     }
 
 }

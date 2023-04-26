@@ -1277,7 +1277,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         StringBuilder builder;
         toText(builder);
-        return builder;
+        return std::move(builder);
     }
 
     // Prints a partially qualified type name with generic substitutions.

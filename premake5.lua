@@ -364,7 +364,7 @@ workspace "slang"
     filter { "toolset:gcc*" }
         buildoptions { "-Wno-maybe-uninitialized" }
     filter { "toolset:clang" }
-        buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option" }
+        buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option" }
 
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
