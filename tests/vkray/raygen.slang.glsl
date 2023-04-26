@@ -4,7 +4,7 @@ layout(row_major) uniform;
 layout(row_major) buffer;
 struct ReflectionRay_0
 {
-    float color_0;
+    float color_1;
 };
 
 layout(location = 0)
@@ -31,7 +31,7 @@ uniform texture2D samplerNormal_0;
 struct Light_0
 {
     vec4 position_0;
-    vec4 color_1;
+    vec4 color_0;
 };
 
 struct Uniforms_0
@@ -121,11 +121,11 @@ void main()
     {
         atten_0 = _S11;
     }
-    vec3 color_2 = ubo_0._data.light_0.color_1.xyz * saturate_0(dot(N_0, L_0)) * atten_0;
+    vec3 color_2 = ubo_0._data.light_0.color_0.xyz * saturate_0(dot(N_0, L_0)) * atten_0;
 
     ReflectionRay_0 reflectionRay_0;
     TraceRay_1(as_0, 1U, 255U, 0U, 0U, 2U, ray_0, reflectionRay_0);
-    vec3 color_3 = color_2 + reflectionRay_0.color_0;
+    vec3 color_3 = color_2 + reflectionRay_0.color_1;
     uvec3 _S12 = ((gl_LaunchIDEXT));
     imageStore((outputImage_0), ivec2((uvec2(ivec2(_S12.xy)))), vec4(color_3, 1.0));
     return;
