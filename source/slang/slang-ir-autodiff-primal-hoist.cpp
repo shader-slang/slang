@@ -1425,7 +1425,7 @@ enum CheckpointPreference
 
 static CheckpointPreference getCheckpointPreference(IRInst* callee)
 {
-    callee = getResolvedInstForDecorations(callee);
+    callee = getResolvedInstForDecorations(callee, true);
     for (auto decor : callee->getDecorations())
     {
         switch (decor->getOp())
