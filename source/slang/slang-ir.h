@@ -1938,7 +1938,7 @@ IRInst* findSpecializeReturnVal(IRSpecialize* specialize);
 // then try to chase down the generic being specialized, and what
 // it seems to return).
 //
-IRInst* getResolvedInstForDecorations(IRInst* inst);
+IRInst* getResolvedInstForDecorations(IRInst* inst, bool resolveThroughDifferentiation = false);
 
 // The IR module itself is represented as an instruction, which
 // serves at the root of the tree of all instructions in the module.

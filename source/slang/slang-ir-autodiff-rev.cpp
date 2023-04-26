@@ -142,6 +142,13 @@ namespace Slang
         builder->setInsertBefore(existingPrimalFunc);
 
         builder->setInsertInto(existingPrimalFunc);
+
+        auto checkpointHint = udf->findDecoration<IRCheckpointHintDecoration>();
+        if (!checkpointHint)
+            checkpointHint = originalFunc->findDecoration<IRCheckpointHintDecoration>();
+        if (checkpointHint)
+            builder->addDecoration(existingPrimalFunc, checkpointHint->getOp());
+
         builder->emitBlock();
         params = _defineFuncParams(builder, as<IRFunc>(existingPrimalFunc));
         params.removeLast();
@@ -759,6 +766,14 @@ namespace Slang
 
         auto primalFuncGeneric = hoistValueFromGeneric(*builder, extractedPrimalFunc, specializedFunc, true);
         builder->setInsertBefore(primalFunc);
+        
+        // Copy over checkpoint preference hints.
+        {
+            auto diffPrimalFunc = getResolvedInstForDecorations(primalFuncGeneric, true);
+            auto checkpointHint = primalFunc->findDecoration<IRCheckpointHintDecoration>();
+            if (checkpointHint)
+                builder->addDecoration(diffPrimalFunc, checkpointHint->getOp());
+        }
 
         if (auto existingDecor = primalFunc->findDecoration<IRBackwardDerivativePrimalDecoration>())
         {
