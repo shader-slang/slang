@@ -2169,7 +2169,7 @@ static LegalVal legalizeInst(
             inst->replaceUsesWith(newInst);
             inst->removeFromParent();
             context->replacedInstructions.add(inst);
-            for (auto child : inst->getChildren())
+            for (auto child : inst->getDecorationsAndChildren())
             {
                 child->insertAtEnd(newInst);
             }
