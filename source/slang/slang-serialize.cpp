@@ -636,7 +636,7 @@ size_t SerialInfo::Entry::calcSize(SerialClasses* serialClasses) const
             size_t alignment = getAlignment(entry->info);
             size_t size = sizeof(ObjectEntry) + serialClass->size;
 
-            size = (size + alignment - 1) & ~(alignment - 1);
+            size = size + (alignment - 1) & ~(alignment - 1);
             return size;
         }
         

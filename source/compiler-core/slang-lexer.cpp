@@ -331,9 +331,9 @@ namespace Slang
         for(;;)
         {
             int c = _peek(lexer);
-            if((('a' <= c ) && (c <= 'z'))
-                || (('A' <= c) && (c <= 'Z'))
-                || (('0' <= c) && (c <= '9'))
+            if(('a' <= c ) && (c <= 'z')
+                || ('A' <= c) && (c <= 'Z')
+                || ('0' <= c) && (c <= '9')
                 || (c == '_'))
             {
                 _advance(lexer);
@@ -402,9 +402,9 @@ namespace Slang
             int c = _peek(lexer);
 
             // Accept any alphanumeric character, plus underscores.
-            if((('a' <= c ) && (c <= 'z'))
-                || (('A' <= c) && (c <= 'Z'))
-                || (('0' <= c) && (c <= '9'))
+            if(('a' <= c ) && (c <= 'z')
+                || ('A' <= c) && (c <= 'Z')
+                || ('0' <= c) && (c <= '9')
                 || (c == '_'))
             {
                 _advance(lexer);
@@ -758,9 +758,9 @@ namespace Slang
                     for(;;)
                     {
                         int d = _peek(lexer);
-                        if((('0' <= d) && (d <= '9'))
-                            || (('a' <= d) && (d <= 'f'))
-                            || (('A' <= d) && (d <= 'F')))
+                        if(('0' <= d) && (d <= '9')
+                            || ('a' <= d) && (d <= 'f')
+                            || ('A' <= d) && (d <= 'F'))
                         {
                             _advance(lexer);
                             continue;

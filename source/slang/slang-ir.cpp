@@ -6931,8 +6931,8 @@ namespace Slang
         this->removeFromParent();
 
         SLANG_ASSERT(inParent);
-        SLANG_ASSERT(!inPrev || ((inPrev->getNextInst() == inNext) && (inPrev->getParent() == inParent)));
-        SLANG_ASSERT(!inNext || ((inNext->getPrevInst() == inPrev) && (inNext->getParent() == inParent)));
+        SLANG_ASSERT(!inPrev || (inPrev->getNextInst() == inNext) && (inPrev->getParent() == inParent));
+        SLANG_ASSERT(!inNext || (inNext->getPrevInst() == inPrev) && (inNext->getParent() == inParent));
 
         if( inPrev )
         {

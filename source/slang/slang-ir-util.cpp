@@ -394,10 +394,10 @@ bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IR
         return false;
 
     // A param and a var can never alias.
-    if ((addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
-         addr2->getOp() == kIROp_Var) ||
-        (addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
-         addr2->getParent() == func->getFirstBlock()))
+    if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
+        addr2->getOp() == kIROp_Var ||
+        addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
+        addr2->getParent() == func->getFirstBlock())
         return false;
     return true;
 }

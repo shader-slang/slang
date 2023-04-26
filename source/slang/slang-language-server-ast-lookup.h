@@ -21,11 +21,11 @@ struct Loc
     Int col;
     bool operator<(const Loc& other)
     {
-        return line < other.line || (line == other.line && col < other.col);
+        return line < other.line || line == other.line && col < other.col;
     }
     bool operator<=(const Loc& other)
     {
-        return line < other.line || (line == other.line && col <= other.col);
+        return line < other.line || line == other.line && col <= other.col;
     }
     static Loc fromSourceLoc(SourceManager* manager, SourceLoc loc, String* outFileName = nullptr);
 };

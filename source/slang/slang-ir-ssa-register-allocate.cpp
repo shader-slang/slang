@@ -90,7 +90,7 @@ struct RegisterAllocateContext
         auto name1 = inst1->findDecoration<IRNameHintDecoration>();
         auto name2 = inst2->findDecoration<IRNameHintDecoration>();
         
-        if ((name1 && !name2) || (!name1 && name2))
+        if (name1 && !name2 || !name1 && name2)
             return false;
 
         if (!name1 || !name2)

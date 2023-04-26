@@ -528,8 +528,8 @@ namespace Slang
             return;
         if (stepSize->value > 0)
         {
-            if ((sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Greater) ||
-                (sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Less))
+            if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Greater ||
+                sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Less)
             {
                 getSink()->diagnose(stmt->sideEffectExpression, Diagnostics::forLoopChangingIterationVariableInOppsoiteDirection, initialVar);
                 return;
@@ -537,8 +537,8 @@ namespace Slang
         }
         else if (stepSize->value < 0)
         {
-            if ((sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Less) ||
-                (sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Greater))
+            if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Less ||
+                sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Greater)
             {
                 getSink()->diagnose(stmt->sideEffectExpression, Diagnostics::forLoopChangingIterationVariableInOppsoiteDirection, initialVar);
                 return;
