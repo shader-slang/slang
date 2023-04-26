@@ -1115,6 +1115,9 @@ LegalType legalizeTypeImpl(
     //
     if(type->findDecoration<IRTargetIntrinsicDecoration>())
         return LegalType::simple(type);
+    
+    if (context->isSimpleType(type))
+        return LegalType::simple(type);
 
     context->builder->setInsertBefore(type);
 

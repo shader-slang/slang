@@ -7478,7 +7478,7 @@ namespace Slang
         return nullptr;
     }
 
-    IRInst* getResolvedInstForDecorations(IRInst* inst)
+    IRInst* getResolvedInstForDecorations(IRInst* inst, bool resolveThroughDifferentiation)
     {
         IRInst* candidate = inst;
         for(;;)
@@ -7487,6 +7487,20 @@ namespace Slang
             {
                 candidate = specInst->getBase();
                 continue;
+            }
+            if (resolveThroughDifferentiation)
+            {
+                switch (candidate->getOp())
+                {
+                case kIROp_ForwardDifferentiate:
+                case kIROp_BackwardDifferentiate:
+                case kIROp_BackwardDifferentiatePrimal:
+                case kIROp_BackwardDifferentiatePropagate:
+                    candidate = candidate->getOperand(0);
+                    continue;
+                default:
+                    break;
+                }
             }
             if( auto genericInst = as<IRGeneric>(candidate) )
             {
