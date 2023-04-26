@@ -3141,3 +3141,9 @@ attribute_syntax [payload] : PayloadAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;

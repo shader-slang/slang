@@ -640,6 +640,12 @@ struct IRTypeLegalizationContext
         /// types will get moved out of the `struc` itself.
     virtual bool isSpecialType(IRType* type) = 0;
 
+        /// Customization point to decide what types are "simple."
+        ///
+        /// When a type is "simple" it means that it should not be changed
+        /// during legalization.
+    virtual bool isSimpleType(IRType* type) = 0;
+
         /// Customization point to construct uniform-buffer/block types.
         ///
         /// This function will only be called if `legalElementType` is

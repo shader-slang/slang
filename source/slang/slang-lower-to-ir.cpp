@@ -8848,6 +8848,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
             }
+            else if (as<PreferCheckpointAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_PreferCheckpointDecoration);
+            }
+            else if (as<PreferRecomputeAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_PreferRecomputeDecoration);
+            }
         }
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function

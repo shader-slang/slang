@@ -635,6 +635,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
     INST(NameHintDecoration,                nameHint,               1, 0)
 
+    // Marks a type as being used as binary interface (e.g. shader parameters).
+    // This prevents the legalizeEmptyType() pass from eliminating it on C++/CUDA targets.
+    INST(BinaryInterfaceTypeDecoration,     BinaryInterfaceType, 0, 0)
+
     /**  The decorated _instruction_ is transitory. Such a decoration should NEVER be found on an output instruction a module. 
         Typically used mark an instruction so can be specially handled - say when creating a IRConstant literal, and the payload of 
         needs to be special cased for lookup. */
@@ -845,6 +849,15 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// Treat a function as differentiable function, or an IRCall as a call to a differentiable function.
     INST(TreatAsDifferentiableDecoration, treatAsDifferentiableDecoration, 0, 0)
+
+
+        /// Hint that the result from a call to the decorated function should be stored in backward prop function.
+    INST(PreferCheckpointDecoration, PreferCheckpointDecoration, 0, 0)
+
+        /// Hint that the result from a call to the decorated function should be recomputed in backward prop function.
+    INST(PreferRecomputeDecoration, PreferRecomputeDecoration, 0, 0)
+
+    INST_RANGE(CheckpointHintDecoration, PreferCheckpointDecoration, PreferRecomputeDecoration)
 
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.

@@ -1078,6 +1078,16 @@ class CudaHostAttribute : public Attribute
     SLANG_AST_CLASS(CudaHostAttribute)
 };
 
+class PreferRecomputeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(PreferRecomputeAttribute)
+};
+
+class PreferCheckpointAttribute : public Attribute
+{
+    SLANG_AST_CLASS(PreferCheckpointAttribute)
+};
+
 class DerivativeMemberAttribute : public Attribute
 {
     SLANG_AST_CLASS(DerivativeMemberAttribute)

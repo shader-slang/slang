@@ -12,6 +12,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-init-local-var.h"
 
 namespace Slang
 {
@@ -1593,6 +1594,8 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     removeLinkageDecorations(func);
 
     performForceInlining(func);
+    
+    initializeLocalVariables(autoDiffSharedContext->moduleInst->getModule(), func);
 
     AutoDiffAddressConversionPolicy cvtPolicty;
     cvtPolicty.diffTypeContext = &differentiableTypeConformanceContext;
