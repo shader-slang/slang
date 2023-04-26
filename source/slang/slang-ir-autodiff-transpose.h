@@ -1151,8 +1151,8 @@ struct DiffTransposePass
                 auto pairType = as<IRDifferentialPairType>(arg->getDataType());
                 auto var = builder->emitVar(arg->getDataType());
 
-                auto diffType = (IRType*)diffTypeContext.getDifferentialForType(builder, pairType->getValueType());
-                auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, pairType->getValueType());
+                auto diffType = (IRType*)diffTypeContext.getDiffTypeFromPairType(builder, pairType);
+                auto zeroMethod = diffTypeContext.getDiffZeroMethodFromPairType(builder, pairType);
                 SLANG_ASSERT(zeroMethod);
                 auto diffZero = builder->emitCallInst(
                     diffType,
