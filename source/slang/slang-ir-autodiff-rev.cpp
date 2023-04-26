@@ -769,7 +769,7 @@ namespace Slang
         
         // Copy over checkpoint preference hints.
         {
-            auto diffPrimalFunc = getResolvedInstForDecorations(primalFuncGeneric);
+            auto diffPrimalFunc = getResolvedInstForDecorations(primalFuncGeneric, true);
             auto checkpointHint = primalFunc->findDecoration<IRCheckpointHintDecoration>();
             if (checkpointHint)
                 builder->addDecoration(diffPrimalFunc, checkpointHint->getOp());
