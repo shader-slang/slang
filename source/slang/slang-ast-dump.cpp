@@ -241,11 +241,10 @@ struct ASTDumpContext
         return (v < 10) ? char(v + '0') : char('a' + v - 10);
     }
 
-    static bool _isPrintableChar(char c)
+    static bool _charNeedsEscaping(char c)
     {
-        // (8-bit, signed) char maxes out here, so no need for two comparisons.
-        static_assert(std::numeric_limits<char>::max() <= 0x80);
-        return c >= 0x20;
+        // Escape everything except the printable characters (except DEL)
+        return c < 0x20 || c >= 0x7F;
     }
 
     void dump(const UnownedStringSlice& slice)
@@ -256,7 +255,7 @@ struct ASTDumpContext
         buf.appendChar('\"');
         for (const char c : slice)
         {
-            if (_isPrintableChar(c))
+            if (!_charNeedsEscaping(c))
             {
                 buf << c;
             }
