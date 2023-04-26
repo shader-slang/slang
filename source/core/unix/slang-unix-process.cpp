@@ -100,7 +100,7 @@ UnixProcess::UnixProcess(pid_t pid, Stream* const* streams):
     // Set to an 'odd value'
     m_returnValue = -1;
 
-    for (UIndex i = 0; i < SLANG_COUNT_OF(m_streams); ++i)
+    for (Index i = 0; i < SLANG_COUNT_OF(m_streams); ++i)
     {
         m_streams[i] = streams[i];
     }

@@ -154,7 +154,7 @@ Type* SharedASTBuilder::getDiffInterfaceType()
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..
-    for (UIndex i = 0; i < SLANG_COUNT_OF(m_builtinTypes); ++i)
+    for (Index i = 0; i < SLANG_COUNT_OF(m_builtinTypes); ++i)
     {
         m_builtinTypes[i] = nullptr;
     }

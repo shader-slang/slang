@@ -171,7 +171,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
             char* dst = buf.prepareForAppend(charsCount);
 
-            for (UIndex i = 0; i < SLANG_COUNT_OF(data); ++i)
+            for (Index i = 0; i < SLANG_COUNT_OF(data); ++i)
             {
                 dst[i * 2 + 0] = CharUtil::getHexChar(data[i] & 0xf);
                 dst[i * 2 + 1] = CharUtil::getHexChar(data[i] >> 4);
