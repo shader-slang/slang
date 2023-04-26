@@ -1,7 +1,7 @@
 // slang-ast-dump.cpp
 #include "slang-ast-dump.h"
 #include <assert.h>
-#include <cctype>
+#include <limits>
 
 #include "slang-compiler.h"
 
@@ -241,6 +241,13 @@ struct ASTDumpContext
         return (v < 10) ? char(v + '0') : char('a' + v - 10);
     }
 
+    static bool _isPrintableChar(char c)
+    {
+        // (8-bit, signed) char maxes out here, so no need for two comparisons.
+        static_assert(std::numeric_limits<char>::max() <= 0x80);
+        return c >= 0x20;
+    }
+
     void dump(const UnownedStringSlice& slice)
     {
         
@@ -249,7 +256,7 @@ struct ASTDumpContext
         buf.appendChar('\"');
         for (const char c : slice)
         {
-            if (std::isprint(c))
+            if (_isPrintableChar(c))
             {
                 buf << c;
             }
