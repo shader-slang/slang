@@ -408,7 +408,11 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                     // in a primal block.
                     while (auto iuse = inst->firstUse)
                     {
-                        builder.setInsertBefore(iuse->getUser());
+                        auto user = iuse->getUser();
+                        if (as<IRDecoration>(user))
+                            user = user->getParent();
+                        if (!user) continue;
+                        builder.setInsertBefore(user);
                         auto val = builder.emitFieldExtract(
                             inst->getFullType(),
                             intermediateVar,

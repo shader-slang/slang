@@ -354,7 +354,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     }
 }
 
-static IRInst* _getRootAddr(IRInst* addr)
+IRInst* getRootAddr(IRInst* addr)
 {
     for (;;)
     {
@@ -379,8 +379,8 @@ bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IR
         return true;
 
     // Two variables can never alias.
-    addr1 = _getRootAddr(addr1);
-    addr2 = _getRootAddr(addr2);
+    addr1 = getRootAddr(addr1);
+    addr2 = getRootAddr(addr2);
 
     // Global addresses can alias with anything.
     if (!isChildInstOf(addr1, func))
@@ -436,7 +436,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
 
             // If addr is a global variable, calling a function may change its value.
             // So we need to return true here to be conservative.
-            if (!isChildInstOf(_getRootAddr(addr), func))
+            if (!isChildInstOf(getRootAddr(addr), func))
             {
                 auto callee = call->getCallee();
                 if (callee &&
