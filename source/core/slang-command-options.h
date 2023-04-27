@@ -11,6 +11,27 @@ struct CommandOptions
 {
     typedef uint32_t Flags;
 
+    enum class LookupKind : int32_t
+    {
+        Category = -2,              ///< Lookup a category name
+        Option   = -1,              ///< Lookup an option name (all options use the same lookup index even if in different categories)
+        Base     =  0,              ///< Lookup via category index
+    };
+
+        /// A key type that uses the combination of the lookup kind and a name index.
+        /// Maps to a target index that could be a category or an option index.
+    struct NameKey
+    {
+        typedef NameKey ThisType;
+
+        SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return kind == rhs.kind && nameIndex == rhs.nameIndex; }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        HashCode getHashCode() const { return combineHash(Slang::getHashCode(kind), Slang::getHashCode(nameIndex)); }
+
+        LookupKind kind;            ///< The kind of lookup
+        Index nameIndex;            ///< The name index in the pool
+    };
+
     enum class CategoryKind
     {
         Option,             ///< Command line option
@@ -22,6 +43,10 @@ struct CommandOptions
         CategoryKind kind;
         UnownedStringSlice name;
         UnownedStringSlice description;
+
+        // Holds the span that defines all of the options associated with the category
+        Index optionStartIndex = 0;
+        Index optionEndIndex = 0;
     };
 
     struct Flag
@@ -38,9 +63,6 @@ struct CommandOptions
         UnownedStringSlice names;               ///< Comma delimited list of names, first name is the default 
         UnownedStringSlice usage;               ///< Describes usage, can be empty
         UnownedStringSlice description;         ///< A description of usage
-
-        Index startNameIndex = -1;
-        Index endNameIndex = -1;
 
         Index categoryIndex = -1;               ///< Category this option belongs to
         Flags flags = 0;                        ///< Flags about this option
@@ -60,8 +82,18 @@ struct CommandOptions
     void addValue(const char* name);
     void addValue(const UnownedStringSlice* names, Count namesCount);
 
+        /// Get the target index based off the name and the kind
+    Index findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name) const;
+
         /// Finds the category by name or -1 if not found
-    Index findCategoryByName(const UnownedStringSlice& name) const;
+    Index findCategoryByName(const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind::Category, name); }
+        /// Finds the option index by name or -1 if not found
+    Index findOptionByName(const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind::Option, name); }
+        /// Find the option index of a value, using it's category index and the name
+    Index findValueByName(Index categoryIndex, const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind(categoryIndex), name); }
+
+        /// Given a category index returns all the options associated.
+    ConstArrayView<Option> getOptionsForCategory(Index categoryIndex) const;
 
         /// Get the categories
     const List<Category>& getCategories() const { return m_categories; }
@@ -76,20 +108,21 @@ struct CommandOptions
 
     /// Ctor
     CommandOptions() :
-        m_optionPool(StringSlicePool::Style::Default),
+        m_pool(StringSlicePool::Style::Default),
         m_arena(1024 * 2)
     {
     }
 
         /// Returns name in the m_optionPool or -1 on error
-    Index _addOptionName(const UnownedStringSlice& name, Flags flags);
- 
+    SlangResult _addOptionName(const UnownedStringSlice& name, Flags flags, Index targetIndex);
+    SlangResult _addValueName(const UnownedStringSlice& name, Index categoryIndex, Index targetIndex);
+    SlangResult _addName(LookupKind kind, const UnownedStringSlice& name, Index targetIndex);
+
     Index _addOption(const UnownedStringSlice& name, const Option& inOption);
     Index _addOption(const UnownedStringSlice* names, Count namesCount, const Option& option);
 
     Index _addValue(const UnownedStringSlice& name, const Option& inOption);
 
-    
     UnownedStringSlice _addString(const char* text);
     UnownedStringSlice _addString(const UnownedStringSlice& slice);
 
@@ -97,14 +130,12 @@ struct CommandOptions
 
     List<Category> m_categories;
 
-    // We can have a map from pool entries to the actual options.
-    List<Index> m_optionMap;
-
     // Holds a bit for all valid prefix sizes. Max prefix size is therefore 32 chars
     uint32_t m_prefixSizes = 0;
 
-    List<Option> m_options;                  ///< All of the entries describing each of the options
-    StringSlicePool m_optionPool;            ///< Only holds options, and handle therefore matches up to m_entries 
+    List<Option> m_options;                 ///< All of the entries describing each of the options
+    StringSlicePool m_pool;                 ///< Only holds options, and handle therefore matches up to m_entries 
+    Dictionary<NameKey, Index> m_nameMap;   ///< Maps a name to an option index
 
     MemoryArena m_arena;                        ///< For other misc storage
 };

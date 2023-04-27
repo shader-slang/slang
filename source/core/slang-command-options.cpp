@@ -7,16 +7,25 @@
 
 namespace Slang {
    
-Index CommandOptions::_addOptionName(const UnownedStringSlice& name, Flags flags)
+SlangResult CommandOptions::_addName(LookupKind kind, const UnownedStringSlice& name, Index targetIndex)
 {
-    StringSlicePool::Handle handle;
-    if (m_optionPool.findOrAdd(name, handle))
+    NameKey nameKey;
+    nameKey.kind = kind;
+    nameKey.nameIndex = (Index)m_pool.add(name);
+
+    if (m_nameMap.tryGetValueOrAdd(nameKey, targetIndex))
     {
         SLANG_ASSERT(!"Option is already added!");
-        return -1;
+        return SLANG_FAIL;
     }
+    return SLANG_OK;
+}
 
-    // Add to prefix 
+SlangResult CommandOptions::_addOptionName(const UnownedStringSlice& name, Flags flags, Index targetIndex)
+{
+    SLANG_RETURN_ON_FAIL(_addName(LookupKind::Option, name, targetIndex));
+
+    // Add to prefix flags
     if (flags & (Flag::CanPrefix | Flag::IsPrefix))
     {
         const auto length = name.getLength();
@@ -24,7 +33,12 @@ Index CommandOptions::_addOptionName(const UnownedStringSlice& name, Flags flags
         m_prefixSizes |= uint32_t(1) << length;
     }
 
-    return Index(handle);
+    return SLANG_OK;
+}
+
+SlangResult CommandOptions::_addValueName(const UnownedStringSlice& name, Index categoryIndex, Index optionIndex)
+{
+    return _addName(LookupKind(categoryIndex), name, optionIndex);
 }
 
 UnownedStringSlice CommandOptions::_addString(const char* text)
@@ -58,7 +72,23 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
         return -1;
     }
 
-    const auto& cat = m_categories[inOption.categoryIndex];
+    auto& cat = m_categories[inOption.categoryIndex];
+
+    // If there are already options associated with this category, we have to be in the run of the last ones added
+    if (cat.optionStartIndex != cat.optionEndIndex)
+    {
+        // If we aren't at the end then this is an error
+        if (cat.optionEndIndex != m_options.getCount())
+        {
+            return -1;
+        }
+    }
+    else
+    {
+        // Move to the end of the option list
+        cat.optionStartIndex = m_options.getCount();
+        cat.optionEndIndex = cat.optionStartIndex;
+    }
 
     Option option(inOption);
 
@@ -66,42 +96,23 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
 
     if (cat.kind == CategoryKind::Option)
     {
-        const auto startIndex = _addOptionName(names[0], inOption.flags);
-
-        for (Index i = 1; i < namesCount; ++i)
+        for (Index i = 0; i < namesCount; ++i)
         {
-            const auto curIndex = _addOptionName(names[i], inOption.flags);
-            // Make sure it's what we expect
-            SLANG_ASSERT(startIndex + i == curIndex);
+            _addOptionName(names[i], inOption.flags, optionIndex);
         }
-
-        const Index endIndex = startIndex + namesCount;
-        
+    }
+    else
+    {
+        for (Index i = 0; i < namesCount; ++i)
         {
-            const Count oldCount = m_optionMap.getCount();
-
-            m_optionMap.setCount(endIndex);
-            auto dst = m_optionMap.getBuffer();
-
-            for (Index i = oldCount; i < startIndex; ++i)
-            {
-                dst[i] = -1;
-            }
-            for (Index i = startIndex; i < endIndex; ++i)
-            {
-                dst[i] = optionIndex;
-            }
+            _addValueName(names[i], inOption.categoryIndex, optionIndex); 
         }
-
-    
-        option.startNameIndex = startIndex;
-        option.endNameIndex = endIndex;
     }
 
     if (namesCount == 1 && cat.kind == CategoryKind::Option)
     {
         // We already have storage on the slice
-        option.names = m_optionPool.getSlice(StringSlicePool::Handle(option.startNameIndex));
+        option.names = m_pool.addAndGetSlice(names[0]);
     }
     else
     {
@@ -113,6 +124,10 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
     }
 
     m_options.add(option);
+
+    // Set the end index
+    cat.optionEndIndex = m_options.getCount();
+
     return optionIndex;
 }
 
@@ -198,13 +213,11 @@ Index CommandOptions::addCategory(CategoryKind kind, const char* name, const cha
 {
     const UnownedStringSlice nameSlice(name);
 
-    for (auto& category : m_categories)
+    const auto categoryIndex = m_categories.getCount();
+
+    if (SLANG_FAILED(_addName(LookupKind::Category, nameSlice, categoryIndex)))
     {
-        if (category.name == nameSlice)
-        {
-            SLANG_ASSERT(!"Already has category");
-            return -1;
-        }
+        return -1;
     }
 
     Category cat;
@@ -212,11 +225,11 @@ Index CommandOptions::addCategory(CategoryKind kind, const char* name, const cha
     cat.name = _addString(nameSlice);
     cat.description = _addString(description);
 
-    m_currentCategoryIndex = m_categories.getCount();
+    m_currentCategoryIndex = categoryIndex;
 
     m_categories.add(cat);
 
-    return m_currentCategoryIndex;
+    return categoryIndex;
 }
 
 void CommandOptions::setCategory(const char* name)
@@ -238,30 +251,39 @@ void CommandOptions::setCategory(const char* name)
     m_currentCategoryIndex = -1;
 }
 
-Index CommandOptions::findCategoryByName(const UnownedStringSlice& name) const
+Index CommandOptions::findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name) const
 {
-    for (Index i = 0; i < m_categories.getCount(); ++i)
+    const auto nameIndex = m_pool.findIndex(name);
+    // If the name isn't in the pool then there isn't a category with this name
+    if (nameIndex < 0)
     {
-        const auto& cat = m_categories[i];
-        if (cat.name == name)
-        {
-            return i;
-        }
+        return -1;
     }
+
+    NameKey key;
+    key.kind = kind;
+    key.nameIndex = nameIndex;
+
+    if (auto ptr = m_nameMap.tryGetValue(key))
+    {
+        return *ptr;
+    }
+
     return -1;
+}
+
+ConstArrayView<CommandOptions::Option> CommandOptions::getOptionsForCategory(Index categoryIndex) const
+{
+    const auto& cat = m_categories[categoryIndex];
+    return makeConstArrayView(m_options.getBuffer() + cat.optionEndIndex, cat.optionEndIndex - cat.optionStartIndex);
 }
 
 void CommandOptions::getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const
 {
-    // This is inefficient, but gets the job done..
-    for (auto& option : m_options)
+    outNames.clear();
+    for (const auto& option : getOptionsForCategory(categoryIndex))
     {
-        if (option.categoryIndex == categoryIndex)
-        {
-            List<UnownedStringSlice> names;
-            StringUtil::split(option.names, ',', names);
-            outNames.addRange(names);
-        }
+        StringUtil::appendSplit(option.names, ',', outNames);
     }
 }
 
