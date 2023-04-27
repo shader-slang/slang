@@ -2361,7 +2361,7 @@ void finalizeSpecialization(IRModule* module)
         default:
             break;
 
-        case kIROP_StructKey:
+        case kIROp_StructKey:
             for (auto decor = inst->getFirstDecoration(); decor; )
             {
                 auto nextDecor = decor->getNextDecoration();
