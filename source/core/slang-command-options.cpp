@@ -355,13 +355,8 @@ void CommandOptionsWriter::appendDescription(const CommandOptions& options)
             m_builder << "\n\n";
         }
 
-        for (auto& option : options.getOptions())
+        for (auto& option : options.getOptionsForCategory(categoryIndex))
         {
-            if (option.categoryIndex != categoryIndex)
-            {
-                continue;
-            }
-
             m_builder << m_indentSlice;
 
             if (option.usage.getLength())
