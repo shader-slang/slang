@@ -351,6 +351,10 @@ struct ASTDumpContext
     {
         m_writer->emit((int)kind);
     }
+    void dump(MarkupVisibility v)
+    {
+        m_writer->emit((int)v);
+    }
     void dump(const String& string)
     {
         dump(string.getUnownedSlice());

@@ -14,12 +14,8 @@ namespace Slang {
 class ASTMarkup : public RefObject
 {
 public:
-    struct Entry
-    {
-        NodeBase* m_node;                                           ///< The node this documentation is associated with
-        String m_markup;                                            ///< The raw contents of of markup associated with the decoration
-        MarkupVisibility m_visibility = MarkupVisibility::Public;   ///< How visible this decl is
-    };
+
+    typedef MarkupEntry Entry;
 
         /// Adds an entry, returns the reference to pre-existing node if there is one
     Entry& addEntry(NodeBase* base);
@@ -28,6 +24,9 @@ public:
 
         /// Get list of all of the entries in source order
     const List<Entry>& getEntries() const { return m_entries; }
+
+        /// Attaches the markup to the AST nodes.
+    void attachToAST();
 
 protected:
 
@@ -57,6 +56,17 @@ SLANG_INLINE ASTMarkup::Entry* ASTMarkup::getEntry(NodeBase* base)
 {
     Index* indexPtr = m_entryMap.tryGetValue(base);
     return (indexPtr) ? &m_entries[*indexPtr] : nullptr;
+}
+
+SLANG_INLINE void ASTMarkup::attachToAST()
+{
+    for (auto& entry : m_entries)
+    {
+        if (auto decl = as<Decl>(entry.m_node))
+        {
+            decl->markup = new MarkupEntry(entry);
+        }
+    }
 }
 
 /* Extracts documentation markup from source. 

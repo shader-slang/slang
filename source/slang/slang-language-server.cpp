@@ -422,8 +422,16 @@ static void _tryGetDocumentation(StringBuilder& sb, WorkspaceVersion* workspace,
     auto definingModule = getModuleDecl(decl);
     if (definingModule)
     {
-        auto markupAST = workspace->getOrCreateMarkupAST(definingModule);
-        auto markupEntry = markupAST->getEntry(decl);
+        MarkupEntry* markupEntry = nullptr;
+        if (decl->markup)
+        {
+            markupEntry = decl->markup;
+        }
+        else
+        {
+            auto markupAST = workspace->getOrCreateMarkupAST(definingModule);
+            markupEntry = markupAST->getEntry(decl);
+        }
         if (markupEntry)
         {
             sb << "\n";
