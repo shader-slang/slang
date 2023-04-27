@@ -160,7 +160,7 @@ static void _addOptions(const ConstArrayView<Option>& options, CommandOptions& c
     }
 }
 
-static void _initOptions(CommandOptions& options)
+void initCommandOptions(CommandOptions& options)
 {
     typedef CommandOptions::Flag::Enum Flag;
     typedef CommandOptions::CategoryKind CategoryKind;
@@ -1203,9 +1203,9 @@ struct OptionsParser
         slang::CompileStdLibFlags compileStdLibFlags = 0;
         bool hasLoadedRepro = false;
 
-        CommandOptions options;
-        _initOptions(options);
-
+        // Get the options on the session
+        CommandOptions& options = asInternal(session)->m_commandOptions;
+        
         auto frontEndReq = requestImpl->getFrontEndReq();
 
         while (reader.hasArg())
@@ -1461,20 +1461,19 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Disable, sink));
                     break;
                 }
+                case OptionKind::DisableWarning:
+                {
+                    // 5 because -Wno-
+                    auto name = argValue.getUnownedSlice().tail(5);
+                    SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Disable, sink));
+                    break;
+                }
                 case OptionKind::EnableWarning:
                 {
-                    auto name = argValue.getUnownedSlice().tail(2);
-
-                    // If prefixed with 'no-', disable the warning
-                    if (name.startsWith(toSlice("no-")))
-                    {
-                        SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name.tail(3), Severity::Warning, Severity::Disable, sink));
-                    }
-                    else
-                    {
-                        // Enable the warning
-                        SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning, sink));
-                    }
+                    // 2 because -W
+                    auto name = argValue.getUnownedSlice().tail(5);
+                    // Enable the warning
+                    SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning, sink));
                     break;
                 }
                 case OptionKind::VerifyDebugSerialIr: frontEndReq->verifyDebugSerialization = true; break;
@@ -2642,7 +2641,6 @@ struct OptionsParser
         return (sink->getErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
     }
 };
-
 
 SlangResult parseOptions(
     SlangCompileRequest*    inCompileRequest,
