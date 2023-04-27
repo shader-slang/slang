@@ -218,19 +218,19 @@ static bool isBoolType(Type* t)
 
 String getDeclKindString(DeclRef<Decl> declRef)
 {
-    if (auto param = declRef.as<ParamDecl>())
+    if (declRef.as<ParamDecl>())
     {
         return "(parameter) ";
     }
-    else if (auto genParam = declRef.as<GenericTypeParamDecl>())
+    else if (declRef.as<GenericTypeParamDecl>())
     {
         return "(generic type parameter) ";
     }
-    else if (auto genValParam = declRef.as<GenericValueParamDecl>())
+    else if (declRef.as<GenericValueParamDecl>())
     {
         return "(generic value parameter) ";
     }
-    else if (auto attr = declRef.as<AttributeDecl>())
+    else if (declRef.as<AttributeDecl>())
     {
         return "(attribute) ";
     }
