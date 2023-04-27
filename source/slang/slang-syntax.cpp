@@ -1413,6 +1413,17 @@ Decl* getParentDecl(Decl* decl)
     return decl;
 }
 
+Decl* getParentFunc(Decl* decl)
+{
+    while (decl)
+    {
+        if (as<FunctionDeclBase>(decl))
+            return decl;
+        decl = decl->parentDecl;
+    }
+    return nullptr;
+}
+
 static const ImageFormatInfo kImageFormatInfos[] =
 {
 #define SLANG_IMAGE_FORMAT_INFO(TYPE, COUNT, SIZE) SLANG_SCALAR_TYPE_##TYPE, uint8_t(COUNT), uint8_t(SIZE)

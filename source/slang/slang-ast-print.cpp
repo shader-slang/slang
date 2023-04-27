@@ -168,7 +168,9 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
     // If the parent declaration is a generic, then we need to print out its
     // signature
-    if (parentGenericDeclRef)
+    if (parentGenericDeclRef && 
+        !declRef.as<GenericValueParamDecl>() &&
+        !declRef.as<GenericTypeParamDecl>())
     {
         auto genSubst = as<GenericSubstitution>(declRef.substitutions.substitutions);
         if (genSubst)
