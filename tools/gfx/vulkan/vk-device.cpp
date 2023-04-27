@@ -640,6 +640,11 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceExtensions.add(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
             m_features.add("barycentrics");
         }
+        if (extensionNames.contains(VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME))
+        {
+            deviceExtensions.add(VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME);
+            m_features.add("shader-subgroup-partitioned");
+        }
     }
     if (m_api.m_module->isSoftware())
     {
