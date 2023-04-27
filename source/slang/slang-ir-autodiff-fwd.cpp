@@ -955,7 +955,7 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
             builder->getTypeKind(), diffBaseSpecialize->getBase(), args.getCount(), args.getBuffer());
         return InstPair(primalSpecialize, diffSpecialize);
     }
-    else if (_isDifferentiableFunc(genericInnerVal))
+    else if (_isDifferentiableFunc(genericInnerVal) || as<IRFuncType>(genericInnerVal))
     {
         List<IRInst*> args;
         for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
