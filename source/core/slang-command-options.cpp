@@ -124,7 +124,7 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
                 return -1;
             }
         }
-        if (SLANG_FAILED(_addUserValue(LookupKind::Category, inOption.userValue, optionIndex)))
+        if (SLANG_FAILED(_addUserValue(LookupKind::Option, inOption.userValue, optionIndex)))
         {
             return -1;
         }
@@ -163,7 +163,7 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
     return optionIndex;
 }
 
-void CommandOptions::add(const char* name, const char* usage, const char* description, Flags flags)
+void CommandOptions::add(const char* name, const char* usage, const char* description, UserValue userValue, Flags flags)
 {
     const UnownedStringSlice nameSlice(name);
 
@@ -171,6 +171,7 @@ void CommandOptions::add(const char* name, const char* usage, const char* descri
     option.categoryIndex = m_currentCategoryIndex;
     option.usage = _addString(usage);
     option.description = _addString(UnownedStringSlice(description));
+    option.userValue = userValue;
     option.flags = flags;
 
     if (nameSlice.indexOf(',') >= 0)
@@ -186,13 +187,14 @@ void CommandOptions::add(const char* name, const char* usage, const char* descri
     }
 }
 
-void CommandOptions::add(const UnownedStringSlice* names, Count namesCount, const char* usage, const char* description, Flags flags)
+void CommandOptions::add(const UnownedStringSlice* names, Count namesCount, const char* usage, const char* description, UserValue userValue, Flags flags)
 {
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
     option.usage = _addString(usage);
     option.description = _addString(UnownedStringSlice(description));
     option.flags = flags;
+    option.userValue = userValue;
 
     _addOption(names, namesCount, option);
 }
@@ -205,25 +207,28 @@ Index CommandOptions::_addValue(const UnownedStringSlice& name, const Option& in
     return _addOption(name, inOption);
 }
 
-void CommandOptions::addValue(const UnownedStringSlice& name)
+void CommandOptions::addValue(const UnownedStringSlice& name, UserValue userValue)
 {
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
+    option.userValue = userValue;
     _addValue(name, option);
 }
 
-void CommandOptions::addValue(const UnownedStringSlice& name, const UnownedStringSlice& description)
+void CommandOptions::addValue(const UnownedStringSlice& name, const UnownedStringSlice& description, UserValue userValue)
 {
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
     option.description = _addString(description);
+    option.userValue = userValue;
     _addValue(name, option);
 }
 
-void CommandOptions::addValue(const UnownedStringSlice* names, Count namesCount)
+void CommandOptions::addValue(const UnownedStringSlice* names, Count namesCount, UserValue userValue)
 {
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
+    option.userValue = userValue;
 
     SLANG_ASSERT(m_currentCategoryIndex >= 0);
     SLANG_ASSERT(m_categories[m_currentCategoryIndex].kind == CategoryKind::Value);
@@ -231,17 +236,17 @@ void CommandOptions::addValue(const UnownedStringSlice* names, Count namesCount)
     _addOption(names, namesCount, option);
 }
 
-void CommandOptions::addValue(const char* name, const char* description)
+void CommandOptions::addValue(const char* name, const char* description, UserValue userValue)
 {
-    addValue(UnownedStringSlice(name), UnownedStringSlice(description));
+    addValue(UnownedStringSlice(name), UnownedStringSlice(description), userValue);
 }
 
-void CommandOptions::addValue(const char* name)
+void CommandOptions::addValue(const char* name, UserValue userValue)
 {
-    addValue(UnownedStringSlice(name));
+    addValue(UnownedStringSlice(name), userValue);
 }
 
-Index CommandOptions::addCategory(CategoryKind kind, const char* name, const char* description)
+Index CommandOptions::addCategory(CategoryKind kind, const char* name, const char* description, UserValue userValue)
 {
     const UnownedStringSlice nameSlice(name);
 
@@ -250,6 +255,11 @@ Index CommandOptions::addCategory(CategoryKind kind, const char* name, const cha
     if (SLANG_FAILED(_addName(LookupKind::Category, nameSlice, categoryIndex)))
     {
         return -1;
+    }
+
+    if (userValue != kInvalidUserValue)
+    {
+        _addUserValue(LookupKind::Category, userValue, categoryIndex);
     }
 
     Category cat;
@@ -316,6 +326,17 @@ Index CommandOptions::findTargetIndexByUserValue(LookupKind kind, UserValue user
     }
 
     return -1;
+}
+
+Index CommandOptions::findOptionByCategoryUserValue(UserValue categoryUserValue, const UnownedStringSlice& name) const
+{
+    Index categoryIndex = findTargetIndexByUserValue(LookupKind::Category, categoryUserValue);
+    if (categoryIndex < 0)
+    {
+        return -1;
+    }
+
+    return findValueByName(categoryIndex, name);
 }
 
 Index CommandOptions::findOptionByName(const UnownedStringSlice& name) const

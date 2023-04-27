@@ -22,11 +22,10 @@ struct CommandOptions
         Base     =  0,              ///< Lookup via category index
     };
 
-
     enum class CategoryKind
     {
-        Option,             ///< Command line option
-        Value,              ///< One of a set of values
+        Option,             ///< Command line option (like "-D")
+        Value,              ///< One of a set of values (such as an enum or some other kind of list of values)
     };
 
     struct Category
@@ -64,18 +63,18 @@ struct CommandOptions
     };
 
         /// Add a category
-    Index addCategory(CategoryKind kind, const char* name, const char* description);
+    Index addCategory(CategoryKind kind, const char* name, const char* description, UserValue userValue = kInvalidUserValue);
         /// Use an already known category. It's an error if the category isn't found
     void setCategory(const char* name);
 
-    void add(const char* name, const char* usage, const char* description, Flags flags = 0);
-    void add(const UnownedStringSlice* names, Count namesCount, const char* usage, const char* description, Flags flags = 0);
+    void add(const char* name, const char* usage, const char* description, UserValue userValue = kInvalidUserValue, Flags flags = 0);
+    void add(const UnownedStringSlice* names, Count namesCount, const char* usage, const char* description, UserValue userValue = kInvalidUserValue, Flags flags = 0);
 
-    void addValue(const UnownedStringSlice& name);
-    void addValue(const UnownedStringSlice& name, const UnownedStringSlice& description); 
-    void addValue(const char* name, const char* description);
-    void addValue(const char* name);
-    void addValue(const UnownedStringSlice* names, Count namesCount);
+    void addValue(const UnownedStringSlice& name, UserValue userValue = kInvalidUserValue);
+    void addValue(const UnownedStringSlice& name, const UnownedStringSlice& description, UserValue userValue = kInvalidUserValue); 
+    void addValue(const char* name, const char* description, UserValue userValue = kInvalidUserValue);
+    void addValue(const char* name, UserValue userValue = kInvalidUserValue);
+    void addValue(const UnownedStringSlice* names, Count namesCount, UserValue userValue = kInvalidUserValue);
 
         /// Get the target index based off the name and the kind
     Index findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name) const;
@@ -96,6 +95,10 @@ struct CommandOptions
         /// Get a value associated with a category
     Index findValueByUserValue(Index categoryIndex, UserValue userValue) const { return findTargetIndexByUserValue(LookupKind(categoryIndex), userValue); }
 
+        /// Given a category user value, find the associated name
+        /// Returns -1 if not found
+    Index findOptionByCategoryUserValue(UserValue categoryUserValue, const UnownedStringSlice& name) const;
+
         /// Given a category index returns all the options associated.
     ConstArrayView<Option> getOptionsForCategory(Index categoryIndex) const;
 
@@ -104,6 +107,9 @@ struct CommandOptions
 
         /// Get all the options
     const List<Option>& getOptions() const { return m_options; }
+
+        /// Get the option at the specified index
+    const Option& getOptionAt(Index index) const { return m_options[index]; }
 
         /// Find all of the categories in the usage slice
     void findCategoryIndicesFromUsage(const UnownedStringSlice& usageSlice, List<Index>& outCategories) const;
