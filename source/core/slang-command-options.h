@@ -33,6 +33,12 @@ struct CommandOptions
         Value,              ///< One of a set of values (such as an enum or some other kind of list of values)
     };
 
+    struct ValuePair
+    {
+        const char* name;
+        const char* description;
+    };
+
     struct Category
     {
         UserValue userValue = kInvalidUserValue;
@@ -80,6 +86,8 @@ struct CommandOptions
     void addValue(const char* name, const char* description, UserValue userValue = kInvalidUserValue);
     void addValue(const char* name, UserValue userValue = kInvalidUserValue);
     void addValue(const UnownedStringSlice* names, Count namesCount, UserValue userValue = kInvalidUserValue);
+
+    void addValues(const ValuePair* pairs, Count pairsCount);
 
         /// Get the target index based off the name and the kind
     Index findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name) const;

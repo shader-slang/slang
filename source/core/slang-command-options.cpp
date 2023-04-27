@@ -231,6 +231,16 @@ Index CommandOptions::_addValue(const UnownedStringSlice& name, const Option& in
     return _addOption(name, inOption);
 }
 
+
+void CommandOptions::addValues(const ValuePair* pairs, Count pairsCount)
+{
+    for (auto& pair : makeConstArrayView(pairs, pairsCount))
+    {
+        addValue(pair.name, pair.description);
+    }
+}
+
+
 void CommandOptions::addValue(const UnownedStringSlice& name, UserValue userValue)
 {
     Option option;
@@ -260,9 +270,18 @@ void CommandOptions::addValue(const UnownedStringSlice* names, Count namesCount,
     _addOption(names, namesCount, option);
 }
 
-void CommandOptions::addValue(const char* name, const char* description, UserValue userValue)
+void CommandOptions::addValue(const char* inName, const char* description, UserValue userValue)
 {
-    addValue(UnownedStringSlice(name), UnownedStringSlice(description), userValue);
+    const UnownedStringSlice name(inName);
+
+    if (description)
+    {
+        addValue(name, UnownedStringSlice(description), userValue);
+    }
+    else
+    {
+        addValue(name, userValue);
+    }
 }
 
 void CommandOptions::addValue(const char* name, UserValue userValue)

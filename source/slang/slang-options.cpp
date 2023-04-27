@@ -65,6 +65,7 @@ enum class OptionKind
     DisableWarning,
     DumpWarningDiagnostics,
     InputFilesRemain,
+    EmitIr,
 
     // Target
 
@@ -77,7 +78,7 @@ enum class OptionKind
     LineDirectiveMode,
     Optimization,
     Obfuscate,
-
+    
     // Downstream
 
     CompilerPath,
@@ -138,7 +139,6 @@ struct Option
     const char* description = nullptr;
 };
 
-
 enum class ValueCategory
 {
     Compiler,
@@ -147,6 +147,7 @@ enum class ValueCategory
     FloatingPointMode,
     ArchiveType,
     Stage,
+    LineDirectiveMode,
 };
 
 } // anonymous
@@ -262,6 +263,18 @@ static void _initOptions(CommandOptions& options)
         }
     }
 
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! line-directive-mode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "line-directive-mode", "Line Directive Mode", UserValue(ValueCategory::LineDirectiveMode));
+
+        options.addValue("none", "Don't emit `#line` directives at all", UserValue(SLANG_LINE_DIRECTIVE_MODE_NONE));
+        options.addValue("source-map", "Use source map to track line associations (doen't emit #line)", UserValue(SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP));
+        options.addValue("default", "Default behavior", UserValue(SLANG_LINE_DIRECTIVE_MODE_DEFAULT));
+        options.addValue("standard", "Emit standard C-style `#line` directives.", UserValue(SLANG_LINE_DIRECTIVE_MODE_STANDARD));
+        options.addValue("glsl", "Emit GLSL-style directives with file *number* instead of name.", UserValue(SLANG_LINE_DIRECTIVE_MODE_GLSL));
+    }
+
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! capabilities !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
     {
@@ -291,31 +304,35 @@ static void _initOptions(CommandOptions& options)
         // TODO(JS): It's concevable that these are enumerated via some other system
         // rather than just being listed here
 
-        options.addValue("hlsl,fx", "hlsl");
-        options.addValue("dxbc");
-        options.addValue("dxbc-asm", "dxbc-assembly");
-        options.addValue("dxil");
-        options.addValue("dxil-asm", "dxil-assembly");
-        options.addValue("glsl");
-        options.addValue("vert", "glsl (vertex)");
-        options.addValue("frag", "glsl (fragment)");
-        options.addValue("geom", "glsl (geoemtry)");
-        options.addValue("tesc", "glsl (hull)");
-        options.addValue("tese", "glsl (domain)");
-        options.addValue("comp", "glsl (compute)");
-        options.addValue("slang");
-        options.addValue("spv", "SPIR-V");
-        options.addValue("spv-asm", "SPIR-V assembly");
-        options.addValue("c");
-        options.addValue("cpp,c++,cxx", "C++");
-        options.addValue("exe", "executable");
-        options.addValue("dll,so", "sharedlibrary/dll");
-        options.addValue("cu", "CUDA");
-        options.addValue("ptx", "PTX");
-        options.addValue("obj,o", "object-code");
-        options.addValue("zip", "container");
-        options.addValue("slang-module,slang-library", "Slang Module/Library");
-        options.addValue("dir", "Container as a directory");
+        const CommandOptions::ValuePair pairs[] = 
+        {
+            {"hlsl,fx", "hlsl"},
+            {"dxbc"},
+            {"dxbc-asm", "dxbc-assembly"},
+            {"dxil"},
+            {"dxil-asm", "dxil-assembly"},
+            {"glsl"},
+            {"vert", "glsl (vertex)"},
+            {"frag", "glsl (fragment)"},
+            {"geom", "glsl (geoemtry)"},
+            {"tesc", "glsl (hull)"},
+            {"tese", "glsl (domain)"},
+            {"comp", "glsl (compute)"},
+            {"slang"},
+            {"spv", "SPIR-V"},
+            {"spv-asm", "SPIR-V assembly"},
+            {"c"},
+            {"cpp,c++,cxx", "C++"},
+            {"exe", "executable"},
+            {"dll,so", "sharedlibrary/dll"},
+            {"cu", "CUDA"},
+            {"ptx", "PTX"},
+            {"obj,o", "object-code"},
+            {"zip", "container"},
+            {"slang-module,slang-library", "Slang Module/Library"},
+            {"dir", "Container as a directory"},
+        };
+        options.addValues(pairs, SLANG_COUNT_OF(pairs));
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -331,6 +348,7 @@ static void _initOptions(CommandOptions& options)
         "Multiple -entry options may be used in a single invocation. "
         "If no -entry options are given, compiler will use [shader(...)] "
         "attributes to detect entry points."},
+        { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", nullptr, "Print this message." },
         { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
         "Add a path to be used in resolving '#include' "
@@ -398,9 +416,6 @@ static void _initOptions(CommandOptions& options)
         "N is the amount of information, 0..3, unspecified means 2\n" },
         { OptionKind::LineDirectiveMode, "-line-directive-mode", "-line-directive-mode <line-directive-mode>", 
         "Sets how the `#line` directives should be produced. Available options are:\n"
-        "  none       : Don't emit `#line` directives at all\n"
-        "  source-map : Use source map to track line associations (doen't emit #line)\n"
-        "  default    : Default behavior\n"
         "If not specified, default behavior is to use C-style `#line` directives "
         "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives "
         "for GLSL output." },
@@ -504,7 +519,8 @@ static void _initOptions(CommandOptions& options)
     const Option internalOpts[] = 
     {
         { OptionKind::ArchiveType, "-archive-type", "-archive-type <archive-type>", "Set the archive type for -save-stdlib. Default is zip." },
-        { OptionKind::CompileStdLib, "-compile-stdlib", nullptr, "Compile the StdLib from embedded sources. "
+        { OptionKind::CompileStdLib, "-compile-stdlib", nullptr, 
+        "Compile the StdLib from embedded sources. "
         "Will return a failure if there is already a StdLib available."},
         { OptionKind::Doc, "-doc", nullptr, "Write documentation for -compile-stdlib" },
         { OptionKind::IrCompression,"-ir-compression", "-ir-compression <type>", 
@@ -529,7 +545,6 @@ static void _initOptions(CommandOptions& options)
     };
     _addOptions(makeConstArrayView(depreciatedOpts), options);
 }
-
 
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact);
 
@@ -1325,6 +1340,27 @@ struct OptionsParser
         return SLANG_OK;
     }
 
+    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, CommandOptions& cmdOptions, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
+    {
+        const auto optionIndex = cmdOptions.findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), arg.value.getUnownedSlice());
+        if (optionIndex < 0)
+        {            
+            const auto categoryIndex = cmdOptions.findCategoryByUserValue(CommandOptions::UserValue(valueCategory));
+            SLANG_ASSERT(categoryIndex >= 0);
+
+            List<UnownedStringSlice> names;
+            cmdOptions.getCategoryOptionNames(categoryIndex, names);
+
+            StringBuilder buf;
+            StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
+
+            sink->diagnose(arg.loc, Diagnostics::unknownCommandLineValue, buf);
+            return SLANG_FAIL;
+        }
+
+        outValue = cmdOptions.getOptionAt(optionIndex).userValue;
+        return SLANG_OK;
+    }
     SlangResult parse(
         int             argc,
         char const* const*  argv)
@@ -1391,23 +1427,39 @@ struct OptionsParser
         slang::CompileStdLibFlags compileStdLibFlags = 0;
         bool hasLoadedRepro = false;
 
+        CommandOptions options;
+        _initOptions(options);
+
+        auto frontEndReq = requestImpl->getFrontEndReq();
+
         while (reader.hasArg())
         {
             auto arg = reader.getArgAndAdvance();
             const auto& argValue = arg.value;
 
-            if (argValue[0] == '-')
+            // If it's not an option we assume it's a path
+            if (argValue[0] != '-')
             {
-                if(argValue == "-no-mangle" )
-                {
-                    flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
-                }
-                else if (argValue == toSlice("-emit-ir"))
-                {
-                    // Enable emitting IR
-                    requestImpl->m_emitIr = true;
-                }
-                else if (argValue == "-load-stdlib")
+                SLANG_RETURN_ON_FAIL(addInputPath(argValue.getBuffer()));
+                continue;
+            }
+
+            const Index optionIndex = options.findOptionByName(argValue.getUnownedSlice());
+
+            if (optionIndex < 0)
+            {
+                sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
+                // TODO: print a usage message
+                return SLANG_FAIL;
+            }
+
+            const auto optionKind = OptionKind(options.getOptionAt(optionIndex).userValue);
+
+            switch (optionKind)
+            {
+                case OptionKind::NoMangle: flags |= SLANG_COMPILE_FLAG_NO_MANGLING; break;
+                case OptionKind::EmitIr: requestImpl->m_emitIr = true; break;
+                case OptionKind::LoadStdLib:
                 {
                     CommandLineArg fileName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
@@ -1416,24 +1468,19 @@ struct OptionsParser
                     ScopedAllocation contents;
                     SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                     SLANG_RETURN_ON_FAIL(session->loadStdLib(contents.getData(), contents.getSizeInBytes()));
+                    break;
                 }
-                else if (argValue == "-compile-stdlib")
-                {
-                    compileStdLib = true;
-                }
-                else if (argValue == "-archive-type")
+                case OptionKind::CompileStdLib: compileStdLib = true; break;
+                case OptionKind::ArchiveType:
                 {
                     CommandLineArg archiveTypeName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(archiveTypeName));
-
-                    archiveType = TypeTextUtil::findArchiveType(archiveTypeName.value.getUnownedSlice());
-                    if (archiveType == SLANG_ARCHIVE_TYPE_UNDEFINED)
-                    {
-                        sink->diagnose(archiveTypeName.loc, Diagnostics::unknownArchiveType, archiveTypeName.value);
-                        return SLANG_FAIL;
-                    }
+                    CommandOptions::UserValue value;
+                    SLANG_RETURN_ON_FAIL(_getValue(ValueCategory::ArchiveType, archiveTypeName, options, sink, value)); 
+                    archiveType = SlangArchiveType(value);
+                    break;
                 }
-                else if (argValue == "-save-stdlib")
+                case OptionKind::SaveStdLib:
                 {
                     CommandLineArg fileName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
@@ -1442,8 +1489,9 @@ struct OptionsParser
 
                     SLANG_RETURN_ON_FAIL(session->saveStdLib(archiveType, blob.writeRef()));
                     SLANG_RETURN_ON_FAIL(File::writeAllBytes(fileName.value, blob->getBufferPointer(), blob->getBufferSize()));
+                    break;
                 }
-                else if (argValue == "-save-stdlib-bin-source")
+                case OptionKind::SaveStdLibBinSource:
                 {
                     CommandLineArg fileName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
@@ -1458,61 +1506,45 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(HexDumpUtil::dumpSourceBytes((const uint8_t*)blob->getBufferPointer(), blob->getBufferSize(), 16, &writer));
 
                     File::writeAllText(fileName.value, builder);
+                    break;
                 }
-                else if (argValue == "-no-codegen")
+                case OptionKind::NoCodeGen: flags |= SLANG_COMPILE_FLAG_NO_CODEGEN; break;
+                case OptionKind::DumpIntermediates: compileRequest->setDumpIntermediates(true); break;
+                case OptionKind::DumpIrIds:
                 {
-                    flags |= SLANG_COMPILE_FLAG_NO_CODEGEN;
+                    frontEndReq->m_irDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
+                    break;
                 }
-                else if (argValue == "-dump-intermediates")
-                {
-                    compileRequest->setDumpIntermediates(true);
-                }
-                else if (argValue == "-dump-ir-ids")
-                {
-                    requestImpl->getFrontEndReq()->m_irDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
-                }
-                else if (argValue == "-dump-intermediate-prefix")
+                case OptionKind::DumpIntermediatePrefix:
                 {
                     CommandLineArg prefix;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(prefix));
                     requestImpl->m_dumpIntermediatePrefix = prefix.value;
+                    break;
                 }
-                else if (argValue == "-output-includes")
-                {
-                    requestImpl->getFrontEndReq()->outputIncludes = true;
-                }
-                else if(argValue == "-dump-ir" )
-                {
-                    requestImpl->getFrontEndReq()->shouldDumpIR = true;
-                }
-                else if (argValue == "-E" || argValue == "-output-preprocessor")
-                {
-                    requestImpl->getFrontEndReq()->outputPreprocessor = true;
-                }
-                else if (argValue == "-dump-ast")
-                {
-                    requestImpl->getFrontEndReq()->shouldDumpAST = true;
-                }
-                else if (argValue == "-doc")
+                case OptionKind::OutputIncludes: frontEndReq->outputIncludes = true; break;
+                case OptionKind::DumpIr: frontEndReq->shouldDumpIR = true; break;
+                case OptionKind::PreprocessorOutput: frontEndReq->outputPreprocessor = true; break;
+                case OptionKind::DumpAst: frontEndReq->shouldDumpAST = true; break;
+                case OptionKind::Doc:
                 {
                     // If compiling stdlib is enabled, will write out documentation
                     compileStdLibFlags |= slang::CompileStdLibFlag::WriteDocumentation;
 
                     // Enable writing out documentation on the req
-                    requestImpl->getFrontEndReq()->shouldDocument = true;
+                    frontEndReq->shouldDocument = true;
+                    break;
                 }
-                else if (argValue == "-dump-repro")
+                case OptionKind::DumpRepro:
                 {
                     CommandLineArg dumpRepro;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(dumpRepro));
                     requestImpl->m_dumpRepro = dumpRepro.value;
                     compileRequest->enableReproCapture();
+                    break;
                 }
-                else if (argValue == "-dump-repro-on-error")
-                {
-                    requestImpl->m_dumpReproOnError = true;
-                }
-                else if (argValue == "-extract-repro")
+                case OptionKind::DumpReproOnError: requestImpl->m_dumpReproOnError = true; break;
+                case OptionKind::ExtractRepro:
                 {
                     CommandLineArg reproName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
@@ -1525,15 +1557,17 @@ struct OptionsParser
                             return res;
                         }
                     }
+                    break;
                 }
-                else if (argValue == "-module-name")
+                case OptionKind::ModuleName:
                 {
                     CommandLineArg moduleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(moduleName));
 
                     compileRequest->setDefaultModuleName(moduleName.value.getBuffer());
+                    break;
                 }
-                else if(argValue == "-load-repro")
+                case OptionKind::LoadRepro:
                 {
                     CommandLineArg reproName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
@@ -1567,15 +1601,17 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, requestImpl));
 
                     hasLoadedRepro = true;
+                    break;
                 }
-                else if (argValue == "-load-repro-directory")
+                case OptionKind::LoadReproDirectory:
                 {
                     CommandLineArg reproDirectory;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproDirectory));
 
                     SLANG_RETURN_ON_FAIL(_compileReproDirectory(session, requestImpl, reproDirectory.value, sink));
+                    break;
                 }
-                else if (argValue == "-repro-file-system")
+                case OptionKind::ReproFileSystem:
                 {
                     CommandLineArg reproName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
@@ -1617,32 +1653,15 @@ struct OptionsParser
 
                     // Set as the file system
                     compileRequest->setFileSystem(fileSystem);
+                    break;
                 }
-                else if (argValue == "-serial-ir")
-                {
-                    requestImpl->getFrontEndReq()->useSerialIRBottleneck = true;
-                }
-                else if (argValue == "-disable-specialization")
-                {
-                    requestImpl->disableSpecialization = true;
-                }
-                else if (argValue == "-disable-dynamic-dispatch")
-                {
-                    requestImpl->disableDynamicDispatch = true;
-                }
-                else if (argValue == "-track-liveness")
-                {
-                    requestImpl->setTrackLiveness(true);
-                }
-                else if (argValue == "-verbose-paths")
-                {
-                    requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
-                }
-                else if (argValue == "-dump-warning-diagnostics")
-                {
-                    _dumpDiagnostics(Severity::Warning, sink);
-                }
-                else if (argValue == "-warnings-as-errors")
+                case OptionKind::SerialIr: frontEndReq->useSerialIRBottleneck = true; break;
+                case OptionKind::DisableSpecialization: requestImpl->disableSpecialization = true; break;
+                case OptionKind::DisableDynamicDispatch: requestImpl->disableDynamicDispatch = true; break;
+                case OptionKind::TrackLiveness: requestImpl->setTrackLiveness(true); break;
+                case OptionKind::VerbosePaths: requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath); break;
+                case OptionKind::DumpWarningDiagnostics: _dumpDiagnostics(Severity::Warning, sink); break;
+                case OptionKind::WarningsAsErrors:
                 {
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
@@ -1657,14 +1676,16 @@ struct OptionsParser
                     {
                         SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Error, sink));
                     }
+                    break;
                 }
-                else if (argValue == "-warnings-disable")
+                case OptionKind::DisableWarnings:
                 {
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
                     SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Disable, sink));
+                    break;
                 }
-                else if (argValue.startsWith(toSlice("-W")))
+                case OptionKind::EnableWarning:
                 {
                     auto name = argValue.getUnownedSlice().tail(2);
 
@@ -1678,31 +1699,25 @@ struct OptionsParser
                         // Enable the warning
                         SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning, sink));
                     }
+                    break;
                 }
-                else if (argValue == "-verify-debug-serial-ir")
+                case OptionKind::VerifyDebugSerialIr: frontEndReq->verifyDebugSerialization = true; break;
+                case OptionKind::ValidateIr: frontEndReq->shouldValidateIR = true; break;
+                case OptionKind::SkipCodeGen: requestImpl->m_shouldSkipCodegen = true; break;
+                case OptionKind::ParameterBlocksUseRegisterSpaces: 
                 {
-                    requestImpl->getFrontEndReq()->verifyDebugSerialization = true;
+                    getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES; 
+                    break;
                 }
-                else if(argValue == "-validate-ir" )
-                {
-                    requestImpl->getFrontEndReq()->shouldValidateIR = true;
-                }
-                else if(argValue == "-skip-codegen" )
-                {
-                    requestImpl->m_shouldSkipCodegen = true;
-                }
-                else if(argValue == "-parameter-blocks-use-register-spaces" )
-                {
-                    getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
-                }
-                else if (argValue == "-ir-compression")
+                case OptionKind::IrCompression:
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
                     SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(name.value.getUnownedSlice(), requestImpl->getLinkage()->serialCompressionType));
+                    break;
                 }
-                else if (argValue == "-target")
+                case OptionKind::Target:
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -1719,12 +1734,14 @@ struct OptionsParser
                     rawTarget.format = CodeGenTarget(format);
 
                     rawTargets.add(rawTarget);
+                    break;
                 }
-                // A "profile" can specify both a general capability level for
-                // a target, and also (as a legacy/compatibility feature) a
-                // specific stage to use for an entry point.
-                else if (argValue == "-profile")
+                case OptionKind::Profile:
                 {
+                    // A "profile" can specify both a general capability level for
+                    // a target, and also (as a legacy/compatibility feature) a
+                    // specific stage to use for an entry point.
+
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
 
@@ -1779,8 +1796,10 @@ struct OptionsParser
 
                         addCapabilityAtom(getCurrentTarget(), atom);
                     }
+
+                    break;
                 }
-                else if( argValue == "-capability" )
+                case OptionKind::Capability:
                 {
                     // The `-capability` option is similar to `-profile` but does not set the actual profile
                     // for a target (it just adds capabilities).
@@ -1808,8 +1827,9 @@ struct OptionsParser
 
                         addCapabilityAtom(getCurrentTarget(), atom);
                     }
+                    break;
                 }
-                else if (argValue == "-stage")
+                case OptionKind::Stage:
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -1824,8 +1844,9 @@ struct OptionsParser
                     {
                         setStage(getCurrentEntryPoint(), stage);
                     }
+                    break;
                 }
-                else if (argValue == "-entry")
+                case OptionKind::EntryPointName:
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -1835,8 +1856,9 @@ struct OptionsParser
                     rawEntryPoint.translationUnitIndex = currentTranslationUnitIndex;
 
                     rawEntryPoints.add(rawEntryPoint);
+                    break;
                 }
-                else if (argValue == "-lang")
+                case OptionKind::Language:
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -1855,8 +1877,9 @@ struct OptionsParser
                             SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer(), sourceLanguage));
                         }
                     }
+                    break;
                 }
-                else if (argValue == "-pass-through")
+                case OptionKind::PassThrough:
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -1869,8 +1892,9 @@ struct OptionsParser
                     }
 
                     compileRequest->setPassThrough(passThrough);
+                    break;
                 }
-                else if (argValue.getLength() >= 2 && argValue[1] == 'D')
+                case OptionKind::MacroDefine:
                 {
                     // The value to be defined might be part of the same option, as in:
                     //     -DFOO
@@ -1891,7 +1915,7 @@ struct OptionsParser
                     const Index equalIndex = slice.indexOf('=');
 
                     // Now set the preprocessor define
-              
+
                     if (equalIndex >= 0)
                     {
                         // If we found an `=`, we split the string...
@@ -1902,8 +1926,9 @@ struct OptionsParser
                         // If there was no `=`, then just #define it to an empty string
                         compileRequest->addPreprocessorDefine(String(slice).getBuffer(), "");
                     }
+                    break;
                 }
-                else if (argValue.getLength() >= 2 && argValue[1] == 'I')
+                case OptionKind::Include:
                 {
                     // The value to be defined might be part of the same option, as in:
                     //     -IFOO
@@ -1921,18 +1946,19 @@ struct OptionsParser
                     }
 
                     compileRequest->addSearchPath(String(slice).getBuffer());
+                    break;
                 }
-                //
-                // A `-o` option is used to specify a desired output file.
-                else if (argValue == "-o")
+                case OptionKind::Output:
                 {
+                    //
+                    // A `-o` option is used to specify a desired output file.
                     CommandLineArg outputPath;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(outputPath));
 
                     addOutputPath(outputPath.value.getBuffer());
+                    break;
                 }
-                // A -depfile option is used to specify the file name where the dependency lists will be written
-                else if (argValue == "-depfile")
+                case OptionKind::DepFile:
                 {
                     CommandLineArg dependencyPath;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(dependencyPath));
@@ -1946,65 +1972,33 @@ struct OptionsParser
                         sink->diagnose(dependencyPath.loc, Diagnostics::duplicateDependencyOutputPaths);
                         return SLANG_FAIL;
                     }
+                    break;
                 }
-                else if(argValue == "-matrix-layout-row-major")
+                case OptionKind::MatrixLayoutRow:       defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_RowMajor); break;
+                case OptionKind::MatrixLayoutColumn:    defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor); break;            
+                case OptionKind::LineDirectiveMode:
                 {
-                    defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_RowMajor);
+                    CommandLineArg lineDirectiveName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(lineDirectiveName));
+                    CommandOptions::UserValue value;
+                    SLANG_RETURN_ON_FAIL(_getValue(ValueCategory::LineDirectiveMode, lineDirectiveName, options, sink, value)); 
+
+                    compileRequest->setLineDirectiveMode(SlangLineDirectiveMode(value));
+                    break;
                 }
-                else if(argValue == "-matrix-layout-column-major")
+                case OptionKind::FloatingPointMode:
                 {
-                    defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor);
-                }
-                else if(argValue == "-line-directive-mode")
-                {
-                    CommandLineArg name;
-                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
+                    CommandLineArg floatMode;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(floatMode));
+                    CommandOptions::UserValue value;
+                    SLANG_RETURN_ON_FAIL(_getValue(ValueCategory::FloatingPointMode, floatMode, options, sink, value)); 
 
-                    SlangLineDirectiveMode mode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
-
-                    if(name.value == toSlice("none"))
-                    {
-                        mode = SLANG_LINE_DIRECTIVE_MODE_NONE;
-                    }
-                    else if (name.value == toSlice("source-map"))
-                    {
-                        mode = SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP;
-                    }
-                    else if (name.value == toSlice("default"))
-                    {
-                        mode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
-                    }
-                    else
-                    {
-                        sink->diagnose(name.loc, Diagnostics::unknownLineDirectiveMode, name.value);
-                        return SLANG_FAIL;
-                    }
-
-                    compileRequest->setLineDirectiveMode(mode);
-                }
-                else if( argValue == "-fp-mode" || argValue == "-floating-point-mode" )
-                {
-                    CommandLineArg name;
-                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
-
-                    FloatingPointMode mode = FloatingPointMode::Default;
-                    if(name.value == "fast")
-                    {
-                        mode = FloatingPointMode::Fast;
-                    }
-                    else if(name.value == "precise")
-                    {
-                        mode = FloatingPointMode::Precise;
-                    }
-                    else
-                    {
-                        sink->diagnose(name.loc, Diagnostics::unknownFloatingPointMode, name.value);
-                        return SLANG_FAIL;
-                    }
+                    const auto mode = FloatingPointMode(value);
 
                     setFloatingPointMode(getCurrentTarget(), mode);
+                    break;
                 }
-                else if( argValue.getLength() >= 2 && argValue[1] == 'O' )
+                case OptionKind::Optimization:
                 {
                     UnownedStringSlice levelSlice = argValue.getUnownedSlice().tail(2);
                     SlangOptimizationLevel level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
@@ -2025,12 +2019,13 @@ struct OptionsParser
                     }
                  
                     compileRequest->setOptimizationLevel(level);
+                    break;
                 }
-                // Note: unlike with `-O` above, we have to consider that other
-                // options might have names that start with `-g` and so cannot
-                // just detect it as a prefix.
-                else if (argValue.startsWith("-g"))
+                case OptionKind::DebugInformation:
                 {
+                    // Note: unlike with `-O` above, we have to consider that other
+                    // options might have names that start with `-g` and so cannot
+                    // just detect it as a prefix.
                     if (argValue == toSlice("-g"))
                     {
                         // The default is standard
@@ -2089,16 +2084,11 @@ struct OptionsParser
                        
                         compileRequest->setDebugInfoFormat(format);
                     }
+                    break;
                 }
-                else if( argValue == "-default-image-format-unknown" )
-                {
-                    requestImpl->useUnknownImageFormatAsDefault = true;
-                }
-                else if (argValue == "-obfuscate")
-                {
-                    requestImpl->getLinkage()->m_obfuscateCode = true;
-                }
-                else if (argValue == "-file-system")
+                case OptionKind::DefaultImageFormatUnknown: requestImpl->useUnknownImageFormatAsDefault = true; break;
+                case OptionKind::Obfuscate: requestImpl->getLinkage()->m_obfuscateCode = true; break;
+                case OptionKind::FileSystem:
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -2122,8 +2112,9 @@ struct OptionsParser
                         sink->diagnose(name.loc, Diagnostics::unknownFileSystemOption, name.value);
                         return SLANG_FAIL;
                     }
+                    break;
                 }
-                else if (argValue == "-r")
+                case OptionKind::ReferenceModule:
                 {
                     CommandLineArg referenceModuleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
@@ -2184,47 +2175,27 @@ struct OptionsParser
                     artifact->addRepresentation(fileRep);
 
                     SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, artifact));
+                    break;
                 }
-                else if (argValue == "-v" || argValue == "-version")
+                case OptionKind::Version:
                 {
                     sink->diagnoseRaw(Severity::Note, session->getBuildTagString());
+                    break;
                 }
-                else if (argValue == "-h" || argValue == "-help" || argValue == "--help")
+                case OptionKind::Help:
                 {
                     StringBuilder buf;
-                    CommandOptions options;
-                    _initOptions(options);
-
+                    
                     CommandOptionsWriter writer;
                     writer.appendDescription(options);
 
                     sink->diagnoseRaw(Severity::Note, writer.getBuilder().getBuffer());
-                    
-                    // Test it out
-                    {
-                        auto optionIndex = options.findOptionByName(toSlice("-O2"));
-                        auto optionKind = OptionKind(options.getOptionAt(optionIndex).userValue);
-
-                        SLANG_UNUSED(optionIndex);
-                        SLANG_UNUSED(optionKind);
-                    }
-
-                    {
-                        auto optionIndex = options.findOptionByCategoryUserValue(CommandOptions::UserValue(ValueCategory::Stage), toSlice("fragment"));
-                        auto optionStage = Stage(options.getOptionAt(optionIndex).userValue);
-
-                        SLANG_UNUSED(optionIndex);
-                        SLANG_UNUSED(optionStage);
-                    }
-
-                    //sink->diagnoseRaw(Severity::Note, getHelpText());
+       
                     return SLANG_FAIL;
                 }
-                else if( argValue == "-emit-spirv-directly" )
-                {
-                    getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
-                }
-                else if (argValue == "-default-downstream-compiler")
+                case OptionKind::EmitSpirvDirectly: getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY; break;
+             
+                case OptionKind::DefaultDownstreamCompiler:
                 {
                     CommandLineArg sourceLanguageArg, compilerArg;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(sourceLanguageArg));
@@ -2249,53 +2220,54 @@ struct OptionsParser
                         sink->diagnose(arg.loc, Diagnostics::unableToSetDefaultDownstreamCompiler, compilerArg.value, sourceLanguageArg.value);
                         return SLANG_FAIL;
                     }
+                    break;
                 }       
-                else if (argValue == "--")
+                case OptionKind::CompilerPath:
                 {
-                    // The `--` option causes us to stop trying to parse options,
-                    // and treat the rest of the command line as input file names:
-                    while (reader.hasArg())
+                    const Index index = argValue.lastIndexOf('-');
+                    if (index >= 0)
                     {
-                        SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer()));
+                        CommandLineArg name;
+                        SLANG_RETURN_ON_FAIL(reader.expectArg(name));
+
+                        UnownedStringSlice passThroughSlice = argValue.getUnownedSlice().head(index).tail(1);
+
+                        // Skip the initial -, up to the last -
+                        SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+                        if (SLANG_SUCCEEDED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
+                        {
+                            session->setDownstreamCompilerPath(passThrough, name.value.getBuffer());
+                            continue;
+                        }
+                        else
+                        {
+                            sink->diagnose(arg.loc, Diagnostics::unknownDownstreamCompiler, passThroughSlice);
+                            return SLANG_FAIL;
+                        }
                     }
                     break;
                 }
-                else
-                {
-                    if (argValue.endsWith("-path"))
-                    {
-                        const Index index = argValue.lastIndexOf('-');
-                        if (index >= 0)
-                        {
-                            CommandLineArg name;
-                            SLANG_RETURN_ON_FAIL(reader.expectArg(name));
-
-                            UnownedStringSlice passThroughSlice = argValue.getUnownedSlice().head(index).tail(1);
-
-                            // Skip the initial -, up to the last -
-                            SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                            if (SLANG_SUCCEEDED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
-                            {
-                                session->setDownstreamCompilerPath(passThrough, name.value.getBuffer());
-                                continue;
-                            }
-                            else
-                            {
-                                sink->diagnose(arg.loc, Diagnostics::unknownDownstreamCompiler, passThroughSlice);
-                                return SLANG_FAIL;
-                            }
-                        }
-                    }
-
-                    sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
-                    // TODO: print a usage message
-                    return SLANG_FAIL;
-                }
+                default: break;
             }
-            else
+
+            // Special case so we can break out of the loop
+
+            if (optionKind == OptionKind::InputFilesRemain)
             {
-                SLANG_RETURN_ON_FAIL(addInputPath(argValue.getBuffer()));
+                // The `--` option causes us to stop trying to parse options,
+                // and treat the rest of the command line as input file names:
+                while (reader.hasArg())
+                {
+                    SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer()));
+                }
+
+                /* TODO(JS): Arggghhh ! We can't use a break here, we want to leave the loop */
+                break;
             }
+
+            sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
+            // TODO: print a usage message
+            return SLANG_FAIL;
         }
 
         if (compileStdLib)
