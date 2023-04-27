@@ -278,7 +278,6 @@ struct DumpVisitor : public RiffContainer::Visitor
 /* static */SlangResult RiffUtil::read(Stream* stream, RiffContainer& outContainer)
 {
     typedef RiffContainer::ScopeChunk ScopeChunk;
-    typedef RiffContainer::ScopeChunk ScopeContainer;
     outContainer.reset();
 
     size_t remaining;
@@ -773,7 +772,8 @@ void RiffContainer::endChunk()
     size_t chunkPayloadSize;
 
     // The chunk we are popping 
-    Chunk* chunk = nullptr;
+    // Only keep track of this in debug builds
+    [[maybe_unused]] Chunk* chunk = nullptr;
 
     ListChunk* parent;
     if (m_dataChunk)

@@ -2281,6 +2281,7 @@ struct SPIRVEmitContext
                     element1,
                     element2);
             }
+            break;
         case SpvSnippet::ASMType::Int:
             result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
             break;
@@ -2359,7 +2360,7 @@ struct SPIRVEmitContext
                     emitOperand(kResultID);
                     break;
                 case SpvSnippet::ASMOperandType::ResultTypeId:
-                    if (operand.content != -1)
+                    if (operand.content != 0xFFFFFFFF)
                     {
                         emitOperand(context.qualifiedResultTypes[(SpvStorageClass)operand.content]
                                         .getValue());
@@ -2731,7 +2732,7 @@ struct SPIRVEmitContext
         {
             elementType = vectorType->getElementType();
         }
-        else if (auto matrixType = as<IRMatrixType>(inst->getDataType()))
+        else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             //TODO: implement.
             SLANG_ASSERT(!"unimplemented: matrix arithemetic");

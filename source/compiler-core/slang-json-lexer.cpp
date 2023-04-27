@@ -156,7 +156,6 @@ JSONTokenType JSONLexer::advance()
                 {
                     // Line comment
                     cursor = _lexLineComment(cursor);
-                    break;
                 }
                 else if (nextChar == '*')
                 {
@@ -166,8 +165,12 @@ JSONTokenType JSONLexer::advance()
                     {
                         return _setInvalidToken();
                     }
-                    break;
                 }
+                else
+                {
+                    return _setInvalidToken();
+                }
+                break;
             }
             case ' ':
             case '\t':

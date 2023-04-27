@@ -889,7 +889,7 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     }
     // We start by emitting the result type and function name.
     //
-    if (IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+    if (IREntryPointDecoration* const entryPointDecor = func->findDecoration<IREntryPointDecoration>())
     {
         // Note: we currently emit multiple functions to represent an entry point
         // on CPU/CUDA, and these all bottleneck through the actual `IRFunc`

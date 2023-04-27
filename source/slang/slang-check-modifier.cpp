@@ -500,7 +500,7 @@ namespace Slang
                 return false;
             }
         }
-        else if (auto unrollAttr = as<UnrollAttribute>(attr))
+        else if (const auto unrollAttr = as<UnrollAttribute>(attr))
         {
             // Check has an argument. We need this because default behavior is to give an error
             // if an attribute has arguments, but not handled explicitly (and the default param will come through
@@ -532,7 +532,7 @@ namespace Slang
                 }
             }
         }
-        else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
+        else if (const auto userDefAttr = as<UserDefinedAttribute>(attr))
         {
             // check arguments against attribute parameters defined in attribClassDecl
             Index paramIndex = 0;
@@ -704,7 +704,7 @@ namespace Slang
                 return false;
             }
         }
-        else if (auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
+        else if (const auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
         {
             auto varDecl = as<VarDeclBase>(attrTarget);
             if (!varDecl)
@@ -801,7 +801,7 @@ namespace Slang
             {
                 // We didn't have enough arguments for the
                 // number of parameters declared.
-                if(auto defaultArg = paramDecl->initExpr)
+                if(const auto defaultArg = paramDecl->initExpr)
                 {
                     // The attribute declaration provided a default,
                     // so we should use that.
@@ -884,7 +884,7 @@ namespace Slang
             }
         }
 
-        if (auto externModifier = as<ExternModifier>(m))
+        if (const auto externModifier = as<ExternModifier>(m))
         {
             if (auto varDecl = as<VarDeclBase>(syntaxNode))
             {

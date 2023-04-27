@@ -290,7 +290,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
     append(format, args, builder);
     va_end(args);
 
-    return builder;
+    return std::move(builder);
 }
 
 /* static */UnownedStringSlice StringUtil::getSlice(ISlangBlob* blob)
@@ -342,7 +342,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     }
 
     builder.appendInPlace(dstChars, numChars);
-    return builder;
+    return std::move(builder);
 }
 
 /* static */String StringUtil::calcCharReplaced(const String& string, char fromChar, char toChar)

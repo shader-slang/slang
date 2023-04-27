@@ -87,7 +87,7 @@ namespace Slang
         MD5();
 
         void init();
-        void update(const void* data, SlangInt size);
+        void update(const void* data, SlangSizeT size);
         Digest finalize();
 
         static Digest compute(const void* data, SlangInt size);
@@ -110,7 +110,7 @@ namespace Slang
         SHA1();
 
         void init();
-        void update(const void* data, SlangInt size);
+        void update(const void* data, SlangSizeT size);
         Digest finalize();
 
         static Digest compute(const void* data, SlangInt size);

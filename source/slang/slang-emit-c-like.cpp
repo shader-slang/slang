@@ -582,12 +582,12 @@ void CLikeSourceEmitter::emitStringLiteral(String const& value)
             m_writer->emit(buffer);
             break;
 
-        case '\"': m_writer->emit("\\\"");
-        case '\'': m_writer->emit("\\\'");
-        case '\\': m_writer->emit("\\\\");
-        case '\n': m_writer->emit("\\n");
-        case '\r': m_writer->emit("\\r");
-        case '\t': m_writer->emit("\\t");
+        case '\"': m_writer->emit("\\\""); break;
+        case '\'': m_writer->emit("\\\'"); break;
+        case '\\': m_writer->emit("\\\\"); break;
+        case '\n': m_writer->emit("\\n"); break;
+        case '\r': m_writer->emit("\\r"); break;
+        case '\t': m_writer->emit("\\t"); break;
         }
     }
     m_writer->emit("\"");
@@ -3094,7 +3094,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if(auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
+    if(const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
     {
         return;
     }
@@ -3143,7 +3143,7 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
 {
     // If the selected `class` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if (auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
+    if (const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
     {
         return;
     }

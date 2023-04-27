@@ -822,7 +822,7 @@ namespace Slang
         {
             return SLANG_FAIL;
         }
-        if (resSize >= bufferSize)
+        if (size_t(resSize) >= bufferSize)
         {
             return SLANG_E_BUFFER_TOO_SMALL;
         }

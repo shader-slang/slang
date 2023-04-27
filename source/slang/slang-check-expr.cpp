@@ -933,7 +933,7 @@ namespace Slang
                     return type;
                 }
             }
-            if (auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterface())))
+            if (const auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterface())))
             {
                 auto diffTypeLookupResult = lookUpMember(
                     getASTBuilder(),
@@ -1128,7 +1128,7 @@ namespace Slang
         {
             binding->type = type;
 
-            if (auto body = binding->body)
+            if (const auto body = binding->body)
             {
                 binding = as<LetExpr>(binding->body);
                 SLANG_ASSERT(binding);
@@ -1158,7 +1158,7 @@ namespace Slang
     {
         // TODO: we may want other cases here...
 
-        if (auto errorType = as<ErrorType>(expr->type))
+        if (const auto errorType = as<ErrorType>(expr->type))
             return true;
 
         return false;
@@ -2637,7 +2637,7 @@ namespace Slang
         //
         if( auto declRefType = as<DeclRefType>(typeExp.type) )
         {
-            if(auto structDeclRef = as<StructDecl>(declRefType->declRef))
+            if(const auto structDeclRef = as<StructDecl>(declRefType->declRef))
             {
                 if( expr->arguments.getCount() == 1 )
                 {
@@ -3056,7 +3056,6 @@ namespace Slang
         int elementIndices[4];
         int elementCount = 0;
 
-        bool elementUsed[4] = { false, false, false, false };
         bool anyDuplicates = false;
         bool anyError = false;
         if (memberRefExpr->name == getSession()->getCompletionRequestTokenName())
@@ -3444,7 +3443,7 @@ namespace Slang
         {
             return _lookupStaticMember(expr, expr->baseExpression);
         }
-        else if(auto typeType = as<TypeType>(baseType))
+        else if(const auto typeType = as<TypeType>(baseType))
         {
             return _lookupStaticMember(expr, expr->baseExpression);
         }
@@ -3507,11 +3506,11 @@ namespace Slang
         {
             auto containerDecl = scope->containerDecl;
 
-            if( auto ctorDecl = as<ConstructorDecl>(containerDecl) )
+            if( const auto ctorDecl = as<ConstructorDecl>(containerDecl) )
             {
                 expr->type.isLeftValue = true;
             }
-            else if( auto setterDecl = as<SetterDecl>(containerDecl) )
+            else if( const auto setterDecl = as<SetterDecl>(containerDecl) )
             {
                 expr->type.isLeftValue = true;
             }
@@ -3655,18 +3654,18 @@ namespace Slang
     {
         SLANG_UNUSED(type);
 
-        if( auto unormModifier = as<UNormModifier>(modifier) )
+        if( const auto unormModifier = as<UNormModifier>(modifier) )
         {
             // TODO: validate that `type` is either `float` or a vector of `float`s
             return m_astBuilder->getUNormModifierVal();
 
         }
-        else if( auto snormModifier = as<SNormModifier>(modifier) )
+        else if( const auto snormModifier = as<SNormModifier>(modifier) )
         {
             // TODO: validate that `type` is either `float` or a vector of `float`s
             return m_astBuilder->getSNormModifierVal();
         }
-        else if (auto noDiffModifier = as<NoDiffModifier>(modifier))
+        else if (const auto noDiffModifier = as<NoDiffModifier>(modifier))
         {
             return m_astBuilder->getNoDiffModifierVal();
         }

@@ -820,7 +820,7 @@ void collectInstsToRemove(
         case kIROp_FieldAddress:
             {
                 auto  ptrArg = ii->getOperand(0);
-                if (auto var = asPromotableVarAccessChain(context, ptrArg))
+                if (const auto var = asPromotableVarAccessChain(context, ptrArg))
                 {
                     context->instsToRemove.add(ii);
                 }

@@ -363,7 +363,7 @@ ${{{{
 }}}}
     ,  __BuiltinSignedArithmeticType
 ${{{{
-        ; // fall through to:
+        ; // fall through
     case BaseType::UInt8:
     case BaseType::UInt16:
     case BaseType::UInt:
@@ -373,7 +373,7 @@ ${{{{
     ,  __BuiltinArithmeticType
     ,  __BuiltinIntegerType
 ${{{{
-        ; // fall through to:
+        ; // fall through
     case BaseType::Bool:
 }}}}
     ,  __BuiltinLogicalType

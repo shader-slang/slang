@@ -640,7 +640,7 @@ SlangResult LanguageServer::hover(
     {
         if (auto declRefExpr = as<DeclRefExpr>(expr))
             return fillDeclRefHoverInfo(declRefExpr->declRef);
-        if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
+        if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
         {
             String documentation;
             String signature = getExprDeclSignature(expr, &documentation, nullptr);
@@ -2080,7 +2080,6 @@ SlangResult LanguageServer::execute()
     {
         // Consume all messages first.
         commands.clear();
-        auto start = platform::PerformanceCounter::now();
         while (true)
         {
             m_connection->tryReadMessage();
@@ -2088,13 +2087,15 @@ SlangResult LanguageServer::execute()
                 break;
             parseNextMessage();
         }
-        auto parseEnd = platform::PerformanceCounter::now();
+
+        auto workStart = platform::PerformanceCounter::now();
+
         processCommands();
 
         // Report diagnostics if it hasn't been updated for a while.
         update();
 
-        auto workTime = platform::PerformanceCounter::getElapsedTimeInSeconds(parseEnd);
+        auto workTime = platform::PerformanceCounter::getElapsedTimeInSeconds(workStart);
 
         if (commands.getCount() > 0 && m_initialized && m_traceOptions != TraceOptions::Off)
         {

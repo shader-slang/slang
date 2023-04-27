@@ -299,7 +299,8 @@ convention for interface methods.
 #endif
 
 // Use for getting the amount of members of a standard C array.
-#define SLANG_COUNT_OF(x) (sizeof(x)/sizeof(x[0]))
+// Use 0[x] here to catch the case where x has an overloaded subscript operator
+#define SLANG_COUNT_OF(x) (SlangSSizeT(sizeof(x)/sizeof(0[x])))
 /// SLANG_INLINE exists to have a way to inline consistent with SLANG_ALWAYS_INLINE
 #define SLANG_INLINE inline
 
@@ -525,11 +526,13 @@ extern "C"
     typedef int64_t    SlangInt;
     typedef uint64_t   SlangUInt;
 
+    typedef int64_t    SlangSSizeT;
     typedef uint64_t   SlangSizeT;
 #else
     typedef int32_t    SlangInt;
     typedef uint32_t   SlangUInt;
 
+    typedef int32_t    SlangSSizeT;
     typedef uint32_t   SlangSizeT;
 #endif
 

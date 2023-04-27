@@ -323,7 +323,6 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
 
 Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialData::Inst>& instsIn, List<uint8_t>& encodeArrayOut)
 {
-    typedef IRSerialBinary Bin;
     typedef IRSerialData::Inst::PayloadType PayloadType;
 
     if (compressionType != SerialCompressionType::VariableByteLite)
@@ -417,7 +416,6 @@ Result _writeInstArrayChunk(SerialCompressionType compressionType, FourCC chunkI
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
 
-    typedef IRSerialBinary Bin;
     if (array.getCount() == 0)
     {
         return SLANG_OK;
@@ -509,7 +507,6 @@ static Result _decodeInsts(SerialCompressionType compressionType, const uint8_t*
 {
     const uint8_t* encodeEnd = encodeCur + encodeInSize;
 
-    typedef IRSerialBinary Bin;
     typedef IRSerialData::Inst::PayloadType PayloadType;
 
     if (compressionType != SerialCompressionType::VariableByteLite)
@@ -678,7 +675,8 @@ static Result _readInstArrayChunk(SerialCompressionType containerCompressionType
 
 Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSourceLocReader* sourceLocReader, RefPtr<IRModule>& outModule)
 {
-    typedef Ser::Inst::PayloadType PayloadType;
+    // Only used in debug builds
+    [[maybe_unused]] typedef Ser::Inst::PayloadType PayloadType;
 
     m_serialData = &data;
 

@@ -21,7 +21,7 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
         {
             for (auto field : structType->getFields())
             {
-                if (auto arrayType = as<IRArrayType>(field->getFieldType()))
+                if (const auto arrayType = as<IRArrayType>(field->getFieldType()))
                 {
                     return true;
                 }

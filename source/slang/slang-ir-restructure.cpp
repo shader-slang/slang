@@ -251,7 +251,7 @@ namespace Slang
                 // information that can inform our control-flow restructuring pass.
                 //
                 SLANG_UNEXPECTED("unhandled terminator instruction opcode");
-                ; // fall through to:
+                [[fallthrough]];
             case kIROp_Unreachable:
             case kIROp_MissingReturn:
             case kIROp_Return:

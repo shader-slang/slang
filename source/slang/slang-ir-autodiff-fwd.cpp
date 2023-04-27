@@ -55,7 +55,7 @@ void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFu
 
     for (auto param : primalFunc->getParams())
     {
-        transcribeFuncParam(&builder, param, param->getFullType()).differential;
+        transcribeFuncParam(&builder, param, param->getFullType());
     }
     List<IRParam*> diffParams;
     for (auto param : diffFunc->getParams())
@@ -131,7 +131,7 @@ InstPair ForwardDiffTranscriber::transcribeUndefined(IRBuilder* builder, IRInst*
 {
     auto primalVal = maybeCloneForPrimalInst(builder, origInst);
 
-    if (IRType* diffType = differentiateType(builder, origInst->getFullType()))
+    if (IRType* const diffType = differentiateType(builder, origInst->getFullType()))
     {
         auto dzero = getDifferentialZeroOfType(builder, origInst->getFullType());
         if (dzero)
@@ -393,7 +393,7 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
             else 
             {
                 auto operandDataType = origConstruct->getOperand(ii)->getDataType();
-                if (auto diffOperandType = differentiateType(builder, operandDataType))
+                if (const auto diffOperandType = differentiateType(builder, operandDataType))
                 {
                     operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
                     diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
@@ -1083,7 +1083,7 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
             diffAccessChain.add(key);
         }
     }
-    if (auto diffType = differentiateType(builder, originalInst->getDataType()))
+    if (const auto diffType = differentiateType(builder, originalInst->getDataType()))
     {
         auto diffBase = findOrTranscribeDiffInst(builder, origBase);
         if (!diffBase)
@@ -1483,13 +1483,9 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
 {
     IRBuilder builder = *inBuilder;
 
-    IRFunc* primalFunc = origFunc;
-
     maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
 
     differentiableTypeConformanceContext.setFunc(origFunc);
-
-    primalFunc = origFunc;
 
     auto diffFunc = builder.createFunc();
 
@@ -1553,7 +1549,7 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     List<IRParam*> params;
     for (auto param : firstBlock->getParams())
     {
-        if (auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
+        if (const auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
         {
             params.add(param);
         }

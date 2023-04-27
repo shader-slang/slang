@@ -398,7 +398,7 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
             m_builder << " ";
         }
     }
-    else if (auto propertyDecl = as<PropertyDecl>(decl))
+    else if (const auto propertyDecl = as<PropertyDecl>(decl))
     {
         m_builder << "property ";
     }
@@ -426,7 +426,7 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
             m_builder << " ";
         }
     }
-    else if (auto assocType = as<AssocTypeDecl>(decl))
+    else if (const auto assocType = as<AssocTypeDecl>(decl))
     {
         m_builder << "associatedtype ";
     }
