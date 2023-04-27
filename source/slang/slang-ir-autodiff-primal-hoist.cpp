@@ -1426,6 +1426,20 @@ static CheckpointPreference getCheckpointPreference(IRInst* callee)
     return CheckpointPreference::None;
 }
 
+static bool isGlobalAddress(IRInst* inst)
+{
+    auto root = getRootAddr(inst);
+    if (root)
+    {
+        if (as<IRParameterGroupType>(root->getDataType()))
+        {
+            return true;
+        }
+        return as<IRModuleInst>(root->getParent()) != nullptr;
+    }
+    return false;
+}
+
 static bool shouldStoreInst(IRInst* inst)
 {
     if (!inst->getDataType())
@@ -1511,6 +1525,12 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_GetTupleElement:
         return false;
 
+    case kIROp_Load:
+        // Never store a load of a global parameter/variable.
+        if (isGlobalAddress(as<IRLoad>(inst)->getPtr()))
+            return false;
+        break;
+
     case kIROp_Call:
         // If the callee prefers recompute policy, don't store.
         if (getCheckpointPreference(inst->getOperand(0)) == CheckpointPreference::PreferRecompute)
@@ -1533,7 +1553,9 @@ bool canRecompute(IRUse* use)
     if (auto load = as<IRLoad>(use->get()))
     {
         // Generally, we cannot recompute a load(ptr), since ptr may be modified
-        // afterwards. The exceptions are a load of an inout param, since the
+        // afterwards.
+        // 
+        // The exceptions are a load of an inout param or global param, since the
         // propagation function never actually writes to the primal part of the
         // inout param, and we can always just read the original param.
 
@@ -1544,6 +1566,14 @@ bool canRecompute(IRUse* use)
             {
                 return (block == block->getParent()->getFirstBlock());
             }
+        }
+        else if (ptr->getOp() == kIROp_GlobalParam)
+        {
+            return true;
+        }
+        else if (as<IRParameterGroupType>(ptr->getDataType()))
+        {
+            return true;
         }
         return false;
     }
@@ -1579,7 +1609,9 @@ HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
     else
     {
         if (shouldStoreInst(use->get()))
+        {
             return HoistResult::store(use->get());
+        }
         else
         {
             // We may not be able to recompute due to limitations of
