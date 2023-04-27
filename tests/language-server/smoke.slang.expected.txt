@@ -6,7 +6,7 @@ getSum: 2  ,.;:()[]<>{}*&^%!-=+|/?
 range: 24,26 - 24,31
 content:
 ```
-Pair.T Pair<Pair.T, Pair.U>.first
+(field) Pair.T Pair<Pair.T, Pair.U>.first
 ```
 
 

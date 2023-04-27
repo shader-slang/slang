@@ -18,6 +18,7 @@ struct A : IFoo
     }
 }
 
+// A normal function that calls doSomething().
 float original<T : IFoo>(T p, float x)
 {
     p.doSomething();
