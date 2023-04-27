@@ -411,6 +411,12 @@ public:
         return dispatchIfNotNull(expr->originalExpr);
     }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
+    bool visitfuncTypeExpr(FuncTypeExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->negative.exp))
+            return true;
+        return dispatchIfNotNull(expr->positive.exp);
+    }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
     bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {

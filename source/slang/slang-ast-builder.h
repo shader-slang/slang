@@ -367,6 +367,8 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
+    Type* getUnaryFuncType(Type* negative, Type* positive);
+
     TypeType* getTypeType(Type* type);
 
         /// Helpers to get type info from the SharedASTBuilder

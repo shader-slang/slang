@@ -236,6 +236,12 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base.exp);
         }
+        void visitFuncTypeExpr(FuncTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->negative.exp);
+            dispatchIfNotNull(expr->positive.exp);
+        }
         void visitPointerTypeExpr(PointerTypeExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

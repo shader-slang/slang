@@ -1138,6 +1138,21 @@ namespace Slang
         AddOverloadCandidate(context, candidate);
     }
 
+    void SemanticsVisitor::AddFuncExprOverloadCandidate(
+        FuncType*        funcType,
+        OverloadResolveContext& context,
+        Expr* expr)
+    {
+        SLANG_ASSERT(expr);
+        OverloadCandidate candidate;
+        candidate.flavor = OverloadCandidate::Flavor::Expr;
+        candidate.funcType = funcType;
+        candidate.resultType = funcType->getResultType();
+        candidate.exprVal = expr;
+
+        AddOverloadCandidate(context, candidate);
+    }
+
     void SemanticsVisitor::AddCtorOverloadCandidate(
         LookupResultItem            typeItem,
         Type*                type,
@@ -1431,6 +1446,18 @@ namespace Slang
         {
             auto type = DeclRefType::create(m_astBuilder, genericTypeParamDeclRef);
             AddTypeOverloadCandidates(type, context);
+        }
+        else if( auto localDeclRef = item.declRef.as<ParamDecl>() )
+        {
+            // We could probably be broader than just parameters here
+            // eventually.
+            // Limit it for now though to make the specialization easier
+            ensureDecl(localDeclRef, DeclCheckState::CanUseFuncSignature);
+            const auto type = localDeclRef.getDecl()->getType();
+            if(const auto funType = as<FuncType>(type))
+                AddFuncExprOverloadCandidate(funType, context, context.originalExpr->functionExpr);
+            else
+                SLANG_UNREACHABLE("Trying to find overload for non-function typed parameter");
         }
         else
         {

@@ -4829,16 +4829,35 @@ namespace Slang
             // a conjunction type expression.
 
             auto loc = peekToken(parser).loc;
-            if(!AdvanceIf(parser, TokenType::OpBitAnd))
+            if(AdvanceIf(parser, TokenType::OpBitAnd))
+            {
+                auto rightExpr = _parsePostfixTypeExpr(parser);
+
+                auto andExpr = parser->astBuilder->create<AndTypeExpr>();
+                andExpr->loc = loc;
+                andExpr->left = TypeExp(leftExpr);
+                andExpr->right = TypeExp(rightExpr);
+                leftExpr = andExpr;
+            }
+            else if(AdvanceIf(parser, TokenType::RightArrow))
+            {
+                // TODO(Ellie): These should associate to the right!
+                // TODO(Ellie): Although conjunction types and function types
+                // can't be used together, we could probably do better re
+                // parsing precedence
+
+                auto rightExpr = _parsePostfixTypeExpr(parser);
+
+                auto funcExpr = parser->astBuilder->create<FuncTypeExpr>();
+                funcExpr->loc = loc;
+                funcExpr->negative = TypeExp(leftExpr);
+                funcExpr->positive = TypeExp(rightExpr);
+                leftExpr = funcExpr;
+            }
+            else
+            {
                 break;
-
-            auto rightExpr = _parsePostfixTypeExpr(parser);
-
-            auto andExpr = parser->astBuilder->create<AndTypeExpr>();
-            andExpr->loc = loc;
-            andExpr->left = TypeExp(leftExpr);
-            andExpr->right = TypeExp(rightExpr);
-            leftExpr = andExpr;
+            }
         }
 
         return leftExpr;

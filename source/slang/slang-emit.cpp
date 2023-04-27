@@ -12,6 +12,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-defunctionalization.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-eliminate-phis.h"
@@ -615,6 +616,13 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    // Few of our targets support higher order functions, and
+    // we don't have the backend code to emit higher order functions for those
+    // which do.
+    // Specialize away these parameters
+    // TODO: We should implement a proper defunctionalization pass
+    specializeHigherOrderParameters(codeGenContext, irModule);
 
     // For all targets, we translate load/store operations
     // of aggregate types from/to byte-address buffers into

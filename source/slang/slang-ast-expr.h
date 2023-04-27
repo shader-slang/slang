@@ -545,6 +545,16 @@ class PointerTypeExpr : public Expr
     TypeExp base;
 };
 
+    /// A type expression that represents a (unary, for now) function type,
+    /// e.g. int -> float
+class FuncTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(FuncTypeExpr);
+
+    TypeExp negative;
+    TypeExp positive;
+};
+
     /// An expression that applies a generic to arguments for some,
     /// but not all, of its explicit parameters.
     ///

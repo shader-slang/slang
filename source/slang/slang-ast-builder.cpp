@@ -428,6 +428,13 @@ Val* ASTBuilder::getNoDiffModifierVal()
     return getOrCreate<NoDiffModifierVal>();
 }
 
+Type* ASTBuilder::getUnaryFuncType(Type* negative, Type* positive)
+{
+    auto errorType = getOrCreate<BottomType>();
+    auto type = getOrCreate<FuncType>(negative, positive, errorType);
+    return type;
+}
+
 TypeType* ASTBuilder::getTypeType(Type* type)
 {
     return getOrCreate<TypeType>(type);

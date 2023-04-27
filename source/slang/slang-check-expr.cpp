@@ -3677,4 +3677,21 @@ namespace Slang
         }
     }
 
+    Expr* SemanticsExprVisitor::visitFuncTypeExpr(FuncTypeExpr* expr)
+    {
+        // The input and output to a function type must both be types
+        expr->negative = CheckProperType(expr->negative);
+        expr->positive = CheckProperType(expr->positive);
+
+        // TODO: Kind checking? Where are we stopping someone passing
+        // constraints around as value-inhabitable types
+
+        // The result of this expression is a `FuncType`, which we need
+        // to wrap in a `TypeType` to indicate that the result is the type
+        // itself and not a value of that type.
+        auto funcType = m_astBuilder->getUnaryFuncType(expr->negative.type, expr->positive.type);
+        expr->type = m_astBuilder->getTypeType(funcType);
+
+        return expr;
+    }
 }

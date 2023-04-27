@@ -664,6 +664,11 @@ class FuncType : public Type
 {
     SLANG_AST_CLASS(FuncType)
 
+    // Construct a unary function
+    FuncType(Type* paramType, Type* resultType, Type* errorType)
+        : paramTypes{{paramType}}, resultType{resultType}, errorType{errorType}
+    {}
+
     // TODO: We may want to preserve parameter names
     // in the list here, just so that we can print
     // out friendly names when printing a function
