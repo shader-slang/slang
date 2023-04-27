@@ -421,7 +421,7 @@ namespace Slang
                     {
                         primalArg = builder.emitLoad(param);
                     }
-                    if (auto diffPairType = as<IRDifferentialPairType>(primalArg->getDataType()))
+                    if (const auto diffPairType = as<IRDifferentialPairType>(primalArg->getDataType()))
                     {
                         primalArg = builder.emitDifferentialPairGetPrimal(primalArg);
                     }
@@ -544,7 +544,7 @@ namespace Slang
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
 
         IRCFGNormalizationPass cfgPass = {this->getSink()};
-        normalizeCFG(autoDiffSharedContext->moduleInst->getModule(), func);
+        normalizeCFG(autoDiffSharedContext->moduleInst->getModule(), func, cfgPass);
 
         return SLANG_OK;
     }

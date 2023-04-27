@@ -1106,7 +1106,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* extensionExternMemberModifier)
     {
-        if (auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
+        if (const auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
         {
             if (auto originalVarDecl = extensionExternMemberModifier->originalDecl.as<VarDeclBase>())
             {
@@ -1275,7 +1275,7 @@ namespace Slang
             }
         }
 
-        if (auto interfaceDecl = as<InterfaceDecl>(varDecl->parentDecl))
+        if (const auto interfaceDecl = as<InterfaceDecl>(varDecl->parentDecl))
         {
             if (auto basicType = as<BasicExpressionType>(varDecl->getType()))
             {
@@ -2339,7 +2339,7 @@ namespace Slang
 
             if(auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
             {
-                auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
+                [[maybe_unused]] auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
                 SLANG_ASSERT(satisfyingTypeParamDeclRef);
 
                 // There are no additional checks we need to make on plain old
@@ -2349,7 +2349,6 @@ namespace Slang
                 // then this is possibly where we'd want to check that the kinds of
                 // the two parameters match.
                 //
-                SLANG_UNUSED(satisfyingGenericDeclRef);
             }
             else if (auto requiredValueParamDeclRef = requiredMemberDeclRef.as<GenericValueParamDecl>())
             {
@@ -3961,7 +3960,7 @@ namespace Slang
                             getSink()->diagnose(inheritanceDecl, Diagnostics::interfaceInheritingComMustBeCom);
                         }
                     }
-                    else if (auto structDecl = as<StructDecl>(superTypeDecl))
+                    else if (const auto structDecl = as<StructDecl>(superTypeDecl))
                     {
                         getSink()->diagnose(inheritanceDecl, Diagnostics::structCannotImplementComInterface);
                     }
@@ -4042,12 +4041,12 @@ namespace Slang
         // confirm that the type actually provides whatever
         // those clauses require.
 
-        if (auto interfaceDecl = as<InterfaceDecl>(decl))
+        if (const auto interfaceDecl = as<InterfaceDecl>(decl))
         {
             // Don't check that an interface conforms to the
             // things it inherits from.
         }
-        else if (auto assocTypeDecl = as<AssocTypeDecl>(decl))
+        else if (const auto assocTypeDecl = as<AssocTypeDecl>(decl))
         {
             // Don't check that an associated type decl conforms to the
             // things it inherits from.
@@ -4165,7 +4164,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if( auto baseErrorType = as<ErrorType>(baseType) )
+            if( const auto baseErrorType = as<ErrorType>(baseType) )
             {
                 continue;
             }
@@ -4233,7 +4232,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if( auto baseErrorType = as<ErrorType>(baseType) )
+            if( const auto baseErrorType = as<ErrorType>(baseType) )
             {
                 continue;
             }
@@ -4302,7 +4301,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if (auto baseErrorType = as<ErrorType>(baseType))
+            if (const auto baseErrorType = as<ErrorType>(baseType))
             {
                 continue;
             }
@@ -4443,7 +4442,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if( auto baseErrorType = as<ErrorType>(baseType) )
+            if( const auto baseErrorType = as<ErrorType>(baseType) )
             {
                 continue;
             }
@@ -4756,7 +4755,7 @@ namespace Slang
             m_parentDifferentiableAttr = oldAttr;
         }
 
-        if (auto body = decl->body)
+        if (const auto body = decl->body)
         {
             checkStmt(decl->body, newContext);
         }
@@ -4821,9 +4820,9 @@ namespace Slang
             Decl* leftParam = leftParams[pp];
             Decl* rightParam = rightParams[pp];
 
-            if (auto leftTypeParam = as<GenericTypeParamDecl>(leftParam))
+            if (const auto leftTypeParam = as<GenericTypeParamDecl>(leftParam))
             {
-                if (auto rightTypeParam = as<GenericTypeParamDecl>(rightParam))
+                if (const auto rightTypeParam = as<GenericTypeParamDecl>(rightParam))
                 {
                     // Right now any two type parameters are a match.
                     // Names are irrelevant to matching, and any constraints
@@ -5828,7 +5827,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if( auto baseErrorType = as<ErrorType>(baseType) )
+            if( const auto baseErrorType = as<ErrorType>(baseType) )
             {
                 continue;
             }

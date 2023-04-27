@@ -128,9 +128,7 @@ void ErrorType::_toTextOverride(StringBuilder& out)
 
 bool ErrorType::_equalsImplOverride(Type* type)
 {
-    if (auto errorType = as<ErrorType>(type))
-        return true;
-    return false;
+    return as<ErrorType>(type);
 }
 
 Type* ErrorType::_createCanonicalTypeOverride()
@@ -154,9 +152,7 @@ void BottomType::_toTextOverride(StringBuilder& out) { out << toSlice("never"); 
 
 bool BottomType::_equalsImplOverride(Type* type)
 {
-    if (auto bottomType = as<BottomType>(type))
-        return true;
-    return false;
+    return as<BottomType>(type);
 }
 
 Type* BottomType::_createCanonicalTypeOverride() { return this; }

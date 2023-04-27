@@ -2820,7 +2820,7 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             {
                 if( auto existentialTypeLayout = as<IRExistentialTypeLayout>(elementTypeLayout) )
                 {
-                    if( auto pendingTypeLayout = existentialTypeLayout->getPendingDataTypeLayout() )
+                    if( const auto pendingTypeLayout = existentialTypeLayout->getPendingDataTypeLayout() )
                     {
                         SLANG_ASSERT(tupleInfo->elements.getCount() == 1);
 

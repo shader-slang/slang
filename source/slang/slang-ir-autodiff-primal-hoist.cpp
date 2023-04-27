@@ -546,20 +546,6 @@ void applyCheckpointSet(
 {
     for (auto use : pendingUses)
         cloneCtx->pendingUses.add(use);
-    
-    // Populate the clone context with all the primal uses that we may need to replace with
-    // cloned versions. That way any insts we clone into the diff block will automatically replace
-    // their uses.
-    //
-    auto addPrimalUsesToCloneContext = [&](IRInst* inst)
-    {
-        UIndex opIndex = 0;
-        for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
-        {   
-            if (!isDifferentialInst(operand->get()))
-                cloneCtx->pendingUses.add(operand);
-        }
-    };
 
     // Go back over the insts and move/clone them accoridngly.
     auto paramPreludeBlock = getParamPreludeBlock(func);
@@ -933,7 +919,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
         for (auto instToStore : instSet)
         {
             IRBlock* defBlock = nullptr;
-            if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+            if (const auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
                 auto varInst = as<IRVar>(instToStore);
                 auto storeUse = findEarliestUniqueWriteUse(varInst);
@@ -998,7 +984,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     defBlockIndices.clear();
                 }
             }
-            if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+            if (const auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
                 IRVar* varToStore = as<IRVar>(instToStore);
                 SLANG_RELEASE_ASSERT(varToStore);
@@ -1388,7 +1374,7 @@ static bool isIntermediateContextType(IRType* type)
 static bool shouldStoreVar(IRVar* var)
 {
     // Always store intermediate context var.
-    if (auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+    if (const auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
     {
         // If we are specializing a callee's intermediate context with types that can't be stored,
         // we can't store the entire context.

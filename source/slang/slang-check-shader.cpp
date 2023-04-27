@@ -1160,7 +1160,6 @@ namespace Slang
         for(Index ii = 0; ii < argCount; ++ii )
         {
             auto argExpr = argExprs[ii];
-            auto paramInfo = componentType->getSpecializationParam(ii);
 
             SpecializationArg arg;
             arg.val = semanticsVisitor.ExtractGenericArgVal(argExpr);

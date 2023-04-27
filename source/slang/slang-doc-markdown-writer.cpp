@@ -493,8 +493,6 @@ static void _addRequirementFromTargetToken(const Token& tok, List<DocMarkdownWri
 
 static void _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& ioReqs)
 {
-    typedef DocMarkdownWriter::Requirement Requirement;
-
     StringBuilder buf;
 
     if (auto spirvRequiredModifier = decl->findModifier<RequiredSPIRVVersionModifier>())
@@ -527,7 +525,7 @@ static void _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& i
         _addRequirement(CodeGenTarget::GLSL, buf, ioReqs);
     }
 
-    if (auto requiresNVAPIAttribute = decl->findModifier<RequiresNVAPIAttribute>())
+    if (const auto requiresNVAPIAttribute = decl->findModifier<RequiresNVAPIAttribute>())
     {
         _addRequirement(CodeGenTarget::HLSL, "NVAPI", ioReqs);
     }

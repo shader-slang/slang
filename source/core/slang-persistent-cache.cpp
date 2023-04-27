@@ -226,7 +226,7 @@ String PersistentCache::getEntryFileName(const Key& key)
 {
     StringBuilder str;
     str << m_cacheDirectory << "/" << key.toString();
-    return str;
+    return std::move(str);
 }
 
 struct CacheIndexHeader

@@ -1208,7 +1208,7 @@ namespace Slang
     IRGlobalValueWithCode* IRInsertLoc::getFunc() const
     {
         auto pp = getParent();
-        if (auto block = as<IRBlock>(pp))
+        if (const auto block = as<IRBlock>(pp))
         {
             pp = pp->getParent();
         }
@@ -1710,7 +1710,9 @@ namespace Slang
         Int const*              listArgCounts,
         IRInst* const* const*   listArgs)
     {
-        m_dedupContext->getInstReplacementMap().tryGetValue((IRInst*)(type), *(IRInst**)&type);
+        IRInst* instReplacement = type;
+        m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
+        type = (IRType*)instReplacement;
 
         if (getIROpInfo(op).flags & kIROpFlag_Hoistable)
         {
@@ -4699,7 +4701,7 @@ namespace Slang
         {
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
         }
-        else if (auto basicType = as<IRBasicType>(basePtrType->getValueType()))
+        else if (const auto basicType = as<IRBasicType>(basePtrType->getValueType()))
         {
             // HLSL support things like float.x, in which case we just return the base pointer.
             return basePtr;
@@ -6495,7 +6497,7 @@ namespace Slang
     {
         StringBuilder sb;
         printSlangIRAssembly(sb, module, options, sourceManager);
-        return sb;
+        return std::move(sb);
     }
 
     void dumpIR(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer)

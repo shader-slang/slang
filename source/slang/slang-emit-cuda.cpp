@@ -519,7 +519,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 m_writer->emit(")");
                 return true;
             }
-            else if (auto matrixType = as<IRMatrixType>(inst->getDataType()))
+            else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
             {
                 m_writer->emit("make");
                 emitType(inst->getDataType());

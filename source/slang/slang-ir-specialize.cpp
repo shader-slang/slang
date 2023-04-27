@@ -409,7 +409,7 @@ struct SpecializationContext
                         decor->getOp() == kIROp_UserDefinedBackwardDerivativeDecoration)
                     {
                         // If we already have a diff func on this specialize, skip.
-                        if (auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
+                        if (const auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
                         {
                             continue;
                         }
@@ -1051,7 +1051,7 @@ struct SpecializationContext
                     // A subscript operation on mutable buffers returns a ptr type instead of a value type.
                     // We need to make sure the pointer-ness is preserved correctly.
                     auto innerResultType = elementType;
-                    if (auto ptrResultType = as<IRPtrType>(inst->getDataType()))
+                    if (const auto ptrResultType = as<IRPtrType>(inst->getDataType()))
                     {
                         innerResultType = builder.getPtrType(elementType);
                     }

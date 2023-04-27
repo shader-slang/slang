@@ -100,11 +100,11 @@ namespace Slang
             expr = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
         }
 
-        if (auto typeType = as<TypeType>(expr->type))
+        if (const auto typeType = as<TypeType>(expr->type))
         {
             return expr;
         }
-        else if (auto errorType = as<ErrorType>(expr->type))
+        else if (const auto errorType = as<ErrorType>(expr->type))
         {
             return expr;
         }
@@ -162,7 +162,7 @@ namespace Slang
         {
             return typeType->type;
         }
-        else if (auto errorType = as<ErrorType>(exp->type))
+        else if (const auto errorType = as<ErrorType>(exp->type))
         {
             return exp->type.type;
         }
@@ -397,7 +397,7 @@ namespace Slang
             {
                 return leftVar->declRef.equals(rightVar->declRef);
             }
-            else if (auto rightPoly = as<PolynomialIntVal>(right))
+            else if (const auto rightPoly = as<PolynomialIntVal>(right))
             {
                 return right->equalsVal(leftVar);
             }

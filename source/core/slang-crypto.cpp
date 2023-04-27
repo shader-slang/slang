@@ -75,10 +75,11 @@ void MD5::init()
     m_d = 0x10325476;
 }
 
-void MD5::update(const void* data, SlangInt size)
+void MD5::update(const void* data, SlangSizeT size)
 {
     uint32_t saved_lo;
-    SlangInt used, available;
+    uint32_t used;
+    uint32_t available;
 
     saved_lo = m_lo;
     if ((m_lo = (saved_lo + size) & 0x1fffffff) < saved_lo)
@@ -330,7 +331,7 @@ void SHA1::init()
     m_state[4] = 0xc3d2e1f0;
 }
 
-void SHA1::update(const void* data, SlangInt len)
+void SHA1::update(const void* data, SlangSizeT len)
 {
     if (!data || len <= 0)
     {

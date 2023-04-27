@@ -56,7 +56,7 @@ UnownedStringSlice RenderApiUtil::getApiName(RenderApiType type)
 {
     using namespace Slang;
     List<UnownedStringSlice> namesList;
-    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+    for (Index j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
     {
         const auto& apiInfo = RenderApiUtil::s_infos[j];
         const UnownedStringSlice names(apiInfo.names);
@@ -218,7 +218,7 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
 /* static */RenderApiType RenderApiUtil::findRenderApiType(const Slang::UnownedStringSlice& text)
 {
     using namespace Slang;
-    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+    for (Index j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
     {
         const auto& apiInfo = RenderApiUtil::s_infos[j];
         if (StringUtil::indexOfInSplit(UnownedStringSlice(apiInfo.names), ',', text) >= 0)
@@ -233,7 +233,7 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
 /* static */RenderApiType RenderApiUtil::findImplicitLanguageRenderApiType(const Slang::UnownedStringSlice& text)
 {
     using namespace Slang;
-    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+    for (Index j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
     {
         const auto& apiInfo = RenderApiUtil::s_infos[j];
         if (StringUtil::indexOfInSplit(UnownedStringSlice(apiInfo.languageNames), ',', text) >= 0)
