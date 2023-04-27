@@ -712,7 +712,7 @@ struct OptionsParser
             "Additional profiles that include -stage information:\n"
             "  {vs,hs,ds,gs,ps}_<version>\n"
             "See -capability for information on <capability>\n"
-            "When multiple -target options are present, each -profile associates"
+            "When multiple -target options are present, each -profile associates "
             "with the first -target to its left.");
 
         options.add("-stage", "-stage <stage>",

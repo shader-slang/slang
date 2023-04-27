@@ -4,6 +4,7 @@
 
 #include "slang-string-util.h"
 #include "slang-char-util.h"
+#include "slang-byte-encode-util.h"
 
 namespace Slang {
    
@@ -39,6 +40,26 @@ SlangResult CommandOptions::_addOptionName(const UnownedStringSlice& name, Flags
 SlangResult CommandOptions::_addValueName(const UnownedStringSlice& name, Index categoryIndex, Index optionIndex)
 {
     return _addName(LookupKind(categoryIndex), name, optionIndex);
+}
+
+SlangResult CommandOptions::_addUserValue(LookupKind kind, UserValue userValue, Index targetIndex)
+{
+    // If it's invalid we don't need to add it
+    if (userValue == kInvalidUserValue)
+    {
+        return SLANG_OK;
+    }
+
+    UserValueKey userValueKey;
+    userValueKey.kind = kind;
+    userValueKey.userValue = userValue;
+
+    if (m_userValueMap.tryGetValueOrAdd(userValueKey, targetIndex))
+    {
+        SLANG_ASSERT(!"UserValue is already used for this kind!");
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
 }
 
 UnownedStringSlice CommandOptions::_addString(const char* text)
@@ -98,7 +119,14 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
     {
         for (Index i = 0; i < namesCount; ++i)
         {
-            _addOptionName(names[i], inOption.flags, optionIndex);
+            if (SLANG_FAILED(_addOptionName(names[i], inOption.flags, optionIndex)))
+            {
+                return -1;
+            }
+        }
+        if (SLANG_FAILED(_addUserValue(LookupKind::Category, inOption.userValue, optionIndex)))
+        {
+            return -1;
         }
     }
     else
@@ -107,9 +135,13 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
         {
             _addValueName(names[i], inOption.categoryIndex, optionIndex); 
         }
+        if (SLANG_FAILED(_addUserValue(LookupKind(inOption.categoryIndex), inOption.userValue, optionIndex)))
+        {
+            return -1;
+        }
     }
 
-    if (namesCount == 1 && cat.kind == CategoryKind::Option)
+    if (namesCount == 1)
     {
         // We already have storage on the slice
         option.names = m_pool.addAndGetSlice(names[0]);
@@ -126,8 +158,8 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
     m_options.add(option);
 
     // Set the end index
-    cat.optionEndIndex = m_options.getCount();
-
+    cat.optionEndIndex = optionIndex + 1;
+    
     return optionIndex;
 }
 
@@ -272,10 +304,65 @@ Index CommandOptions::findTargetIndexByName(LookupKind kind, const UnownedString
     return -1;
 }
 
+Index CommandOptions::findTargetIndexByUserValue(LookupKind kind, UserValue userValue) const
+{
+    UserValueKey key;
+    key.kind = kind;
+    key.userValue = userValue;
+
+    if (auto ptr = m_userValueMap.tryGetValue(key))
+    {
+        return *ptr;
+    }
+
+    return -1;
+}
+
+Index CommandOptions::findOptionByName(const UnownedStringSlice& name) const
+{
+    {
+        auto index = findTargetIndexByName(LookupKind::Option, name);
+        if (index >= 0)
+        {
+            return index;
+        }
+    }
+
+    // We need to search for partials
+    auto prefixSizes = m_prefixSizes;
+
+    while (prefixSizes)
+    {
+        auto prefixSize = ByteEncodeUtil::calcMsb32(prefixSizes);
+
+        if (prefixSize < name.getLength())
+        {
+            // Look it up
+            const auto index = findTargetIndexByName(LookupKind::Option, name.head(prefixSize));
+            if (index >= 0)
+            {
+                auto& option = m_options[index];
+
+                // If the option accepts prefixes, we return the index
+                if (option.flags & (Flag::CanPrefix || Flag::IsPrefix))
+                {
+                    return index;
+                }
+            }
+        }
+
+        // Remove the bit
+        prefixSizes &= ~(uint32_t(1) << prefixSize);
+    }
+
+    // Was not found
+    return -1;
+}
+
 ConstArrayView<CommandOptions::Option> CommandOptions::getOptionsForCategory(Index categoryIndex) const
 {
     const auto& cat = m_categories[categoryIndex];
-    return makeConstArrayView(m_options.getBuffer() + cat.optionEndIndex, cat.optionEndIndex - cat.optionStartIndex);
+    return makeConstArrayView(m_options.getBuffer() + cat.optionStartIndex, cat.optionEndIndex - cat.optionStartIndex);
 }
 
 void CommandOptions::getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const

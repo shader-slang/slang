@@ -11,6 +11,10 @@ struct CommandOptions
 {
     typedef uint32_t Flags;
 
+    typedef int32_t UserIndex;
+    enum class UserValue : UserIndex;
+    static const UserValue kInvalidUserValue = UserValue(0x80000000);
+
     enum class LookupKind : int32_t
     {
         Category = -2,              ///< Lookup a category name
@@ -18,19 +22,6 @@ struct CommandOptions
         Base     =  0,              ///< Lookup via category index
     };
 
-        /// A key type that uses the combination of the lookup kind and a name index.
-        /// Maps to a target index that could be a category or an option index.
-    struct NameKey
-    {
-        typedef NameKey ThisType;
-
-        SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return kind == rhs.kind && nameIndex == rhs.nameIndex; }
-        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-        HashCode getHashCode() const { return combineHash(Slang::getHashCode(kind), Slang::getHashCode(nameIndex)); }
-
-        LookupKind kind;            ///< The kind of lookup
-        Index nameIndex;            ///< The name index in the pool
-    };
 
     enum class CategoryKind
     {
@@ -40,6 +31,8 @@ struct CommandOptions
 
     struct Category
     {
+        UserValue userValue = kInvalidUserValue;
+
         CategoryKind kind;
         UnownedStringSlice name;
         UnownedStringSlice description;
@@ -64,6 +57,8 @@ struct CommandOptions
         UnownedStringSlice usage;               ///< Describes usage, can be empty
         UnownedStringSlice description;         ///< A description of usage
 
+        UserValue userValue = kInvalidUserValue;
+
         Index categoryIndex = -1;               ///< Category this option belongs to
         Flags flags = 0;                        ///< Flags about this option
     };
@@ -84,13 +79,22 @@ struct CommandOptions
 
         /// Get the target index based off the name and the kind
     Index findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name) const;
+        /// Given a kind and a user value lookup the target index
+    Index findTargetIndexByUserValue(LookupKind kind, UserValue userValue) const;
 
         /// Finds the category by name or -1 if not found
     Index findCategoryByName(const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind::Category, name); }
         /// Finds the option index by name or -1 if not found
-    Index findOptionByName(const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind::Option, name); }
+    Index findOptionByName(const UnownedStringSlice& name) const;
         /// Find the option index of a value, using it's category index and the name
     Index findValueByName(Index categoryIndex, const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind(categoryIndex), name); }
+
+        /// Get the category index from a user value
+    Index findCategoryByUserValue(UserValue userValue) const { return findTargetIndexByUserValue(LookupKind::Category, userValue); }
+        /// Can only get options 
+    Index findOptionByUserValue(UserValue userValue) const { return findTargetIndexByUserValue(LookupKind::Option, userValue); }
+        /// Get a value associated with a category
+    Index findValueByUserValue(Index categoryIndex, UserValue userValue) const { return findTargetIndexByUserValue(LookupKind(categoryIndex), userValue); }
 
         /// Given a category index returns all the options associated.
     ConstArrayView<Option> getOptionsForCategory(Index categoryIndex) const;
@@ -118,6 +122,8 @@ struct CommandOptions
     SlangResult _addValueName(const UnownedStringSlice& name, Index categoryIndex, Index targetIndex);
     SlangResult _addName(LookupKind kind, const UnownedStringSlice& name, Index targetIndex);
 
+    SlangResult _addUserValue(LookupKind kind, UserValue userValue, Index targetIndex);
+
     Index _addOption(const UnownedStringSlice& name, const Option& inOption);
     Index _addOption(const UnownedStringSlice* names, Count namesCount, const Option& option);
 
@@ -126,6 +132,33 @@ struct CommandOptions
     UnownedStringSlice _addString(const char* text);
     UnownedStringSlice _addString(const UnownedStringSlice& slice);
 
+    /// A key type that uses the combination of the lookup kind and a name index.
+    /// Maps to a target index that could be a category or an option index.
+    struct NameKey
+    {
+        typedef NameKey ThisType;
+
+        SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return kind == rhs.kind && nameIndex == rhs.nameIndex; }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        HashCode getHashCode() const { return combineHash(Slang::getHashCode(kind), Slang::getHashCode(nameIndex)); }
+
+        LookupKind kind;            ///< The kind of lookup
+        Index nameIndex;            ///< The name index in the pool
+    };
+
+
+    struct UserValueKey
+    {
+        typedef UserValueKey ThisType;
+
+        SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return kind == rhs.kind && userValue == rhs.userValue; }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        HashCode getHashCode() const { return combineHash(Slang::getHashCode(kind), Slang::getHashCode(userValue)); }
+
+        LookupKind kind;            ///< The kind of lookup
+        UserValue userValue;        ///< The user value
+    };
+
     Index m_currentCategoryIndex = -1;
 
     List<Category> m_categories;
@@ -133,11 +166,12 @@ struct CommandOptions
     // Holds a bit for all valid prefix sizes. Max prefix size is therefore 32 chars
     uint32_t m_prefixSizes = 0;
 
-    List<Option> m_options;                 ///< All of the entries describing each of the options
-    StringSlicePool m_pool;                 ///< Only holds options, and handle therefore matches up to m_entries 
-    Dictionary<NameKey, Index> m_nameMap;   ///< Maps a name to an option index
+    List<Option> m_options;                         ///< All of the entries describing each of the options
+    StringSlicePool m_pool;                         ///< Only holds options, and handle therefore matches up to m_entries 
+    Dictionary<NameKey, Index> m_nameMap;           ///< Maps a name to an option index
+    Dictionary<UserValueKey, Index> m_userValueMap; ///< Maps a user value (for a kind) to an index
 
-    MemoryArena m_arena;                        ///< For other misc storage
+    MemoryArena m_arena;                            ///< For other misc storage
 };
 
 struct CommandOptionsWriter
