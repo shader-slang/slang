@@ -655,13 +655,6 @@ struct DiffTransposePass
             subBuilder.addBackwardDerivativePrimalReturnDecoration(branch, retVal);
         }
 
-        // TODO: Should move this to before all the transposition, but a lot of the
-        // transposition logic seems to access the parent of blocks to find the func.
-        // Replace those uses.
-        //
-        for (auto block : workList)
-            block->removeFromParent();
-
         // At this point, the only block left without terminator insts
         // should be the last one. Add a void return to complete it.
         // 
@@ -1101,7 +1094,7 @@ struct DiffTransposePass
         };
         List<DiffValWriteBack> writebacks;
 
-        auto baseFnType = as<IRFuncType>(baseFn->getDataType());
+        auto baseFnType = as<IRFuncType>(getResolvedInstForDecorations(baseFn->getDataType()));
 
         SLANG_RELEASE_ASSERT(baseFnType);
         SLANG_RELEASE_ASSERT(fwdCall->getArgCount() == baseFnType->getParamCount());

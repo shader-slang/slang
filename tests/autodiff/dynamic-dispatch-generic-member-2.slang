@@ -32,10 +32,9 @@ struct B : IInterface
 };
 
 [BackwardDifferentiable]
-float test(IInterface obj, float x)
+float test(IFoo foo, IInterface obj, float x)
 {
-    A objA;
-    return obj.calc(objA, x) * x;
+    return obj.calc(foo, x) * x;
 }
 
 //TEST_INPUT: type_conformance A:IFoo = 0
@@ -45,7 +44,8 @@ float test(IInterface obj, float x)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     var obj = createDynamicObject<IInterface>(dispatchThreadID.x, 1); // B
+    var foo = createDynamicObject<IFoo>(0, 0); // A
     var p = diffPair(3.0);
-    __bwd_diff(test)(obj, p, 1.0);
+    __bwd_diff(test)(foo, obj, p, 1.0);
     outputBuffer[0] = p.d;
 }
