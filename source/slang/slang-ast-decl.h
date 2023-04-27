@@ -526,6 +526,9 @@ class AttributeDecl : public ContainerDecl
 class DerivativeRequirementDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(DerivativeRequirementDecl)
+    
+    // The original requirement decl.
+    Decl* originalRequirementDecl = nullptr;
 };
 
 // A reference to a synthesized decl representing a differentiable function requirement, this decl will

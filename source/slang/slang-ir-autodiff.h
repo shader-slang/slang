@@ -177,6 +177,10 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getDiffTypeWitnessFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
 
+    IRInst* getDiffZeroMethodFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
+
+    IRInst* getDiffAddMethodFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
+
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable interface.
     // Note that inside a generic block, this will be a witness table lookup instruction

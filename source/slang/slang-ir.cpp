@@ -7067,6 +7067,8 @@ namespace Slang
     // and then destroy it (it had better have no uses!)
     void IRInst::removeAndDeallocate()
     {
+        removeAndDeallocateAllDecorationsAndChildren();
+
         if (auto module = getModule())
         {
             if (getIROpInfo(getOp()).isHoistable())
@@ -7080,7 +7082,6 @@ namespace Slang
             module->getDeduplicationContext()->getInstReplacementMap().remove(this);
         }
         removeArguments();
-        removeAndDeallocateAllDecorationsAndChildren();
         removeFromParent();
 
         // Run destructor to be sure...
