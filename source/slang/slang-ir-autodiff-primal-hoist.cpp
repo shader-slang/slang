@@ -1044,13 +1044,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 for (auto use : outOfScopeUses)
                 {
                     List<IndexTrackingInfo> useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
-                    if (isLoopCounter)
-                    {
-                        // The use site of a primal loop counter should be right before we enter the
-                        // loop, and therefore its index count should equal to defBlockIndices.getCount()
-                        // after we remove the first index from defBlockIndices.
-                        SLANG_RELEASE_ASSERT(useBlockIndices.getCount() == defBlockIndices.getCount());
-                    }
                     setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
                     builder.replaceOperand(use, loadIndexedValue(&builder, localVar, defBlockIndices, useBlockIndices));
                 }
