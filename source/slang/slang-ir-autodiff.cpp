@@ -1858,6 +1858,9 @@ IRUse* findUniqueStoredVal(IRVar* var)
         {
             if (const auto callInst = as<IRCall>(use->getUser()))
             {
+                // Ignore uses from differential blocks.
+                if (callInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
+                    continue;
                 // Should not see more than one IRCall. If we do
                 // we'll need to pick the primal call.
                 // 
@@ -1874,6 +1877,9 @@ IRUse* findUniqueStoredVal(IRVar* var)
         {
             if (const auto storeInst = as<IRStore>(use->getUser()))
             {
+                // Ignore uses from differential blocks.
+                if (storeInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
+                    continue;
                 // Should not see more than one IRStore
                 SLANG_RELEASE_ASSERT(!storeUse);
                 storeUse = use;
@@ -1890,15 +1896,18 @@ IRUse* findUniqueStoredVal(IRVar* var)
 IRUse* findLatestUniqueWriteUse(IRVar* var)
 {
     IRUse* storeUse = nullptr;
-    // If no unique store found, try to look for a call.
     for (auto use = var->firstUse; use; use = use->nextUse)
     {
         if (const auto callInst = as<IRCall>(use->getUser()))
         {
+            // Ignore uses from differential blocks.
+            if (callInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
+                continue;
             SLANG_RELEASE_ASSERT(!storeUse);
             storeUse = use;
         }
     }
+    // If no unique call found, try to look for a store.
     return findUniqueStoredVal(var);
 }
 
@@ -1917,6 +1926,9 @@ IRUse* findEarliestUniqueWriteUse(IRVar* var)
     {
         if (const auto callInst = as<IRCall>(use->getUser()))
         {
+            // Ignore uses from differential blocks.
+            if (callInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
+                continue;
             SLANG_RELEASE_ASSERT(!storeUse);
             storeUse = use;
         }
