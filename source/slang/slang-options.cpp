@@ -38,6 +38,499 @@
 
 namespace Slang {
 
+namespace { // anonymous
+
+// All of the options are given an unique enum
+enum class OptionKind
+{
+    // General
+
+    MacroDefine,
+    DepFile,
+    EntryPointName,
+    Help,
+    Include,
+    Language,
+    MatrixLayoutColumn,
+    MatrixLayoutRow,
+    ModuleName,
+    Output,
+    Profile,
+    Stage,
+    Target,
+    Version,
+    WarningsAsErrors,
+    DisableWarnings,
+    EnableWarning,
+    DisableWarning,
+    DumpWarningDiagnostics,
+    InputFilesRemain,
+
+    // Target
+
+    Capability,
+    DefaultImageFormatUnknown,
+    DisableDynamicDispatch,
+    DisableSpecialization,
+    FloatingPointMode,
+    DebugInformation,
+    LineDirectiveMode,
+    Optimization,
+    Obfuscate,
+
+    // Downstream
+
+    CompilerPath,
+    DefaultDownstreamCompiler,
+    DownstreamArgs,
+    PassThrough,
+
+    // Debugging
+
+    DumpAst,
+    DumpIntermediatePrefix,
+    DumpIntermediates,
+    DumpIr,
+    DumpIrIds,
+    DumpRepro,
+    DumpReproOnError,
+    PreprocessorOutput,
+    ExtractRepro,
+    LoadRepro,
+    LoadReproDirectory,
+    NoCodeGen,
+    OutputIncludes,
+    ReproFileSystem,
+    SerialIr,
+    SkipCodeGen,
+    ValidateIr,
+    VerbosePaths,
+    VerifyDebugSerialIr,
+
+    // Experimental
+
+    EmitSpirvDirectly,
+    FileSystem,
+    Heterogeneous,
+    NoMangle,
+
+    // Internal
+
+    ArchiveType,
+    CompileStdLib,
+    Doc,
+    IrCompression,
+    LoadStdLib,
+    ReferenceModule,
+    SaveStdLib,
+    SaveStdLibBinSource,
+    TrackLiveness,
+
+    // Depreciated
+    ParameterBlocksUseRegisterSpaces,
+};
+
+struct Option
+{
+    OptionKind optionKind;
+    const char* name;
+    const char* usage = nullptr;
+    const char* description = nullptr;
+};
+
+
+enum class ValueCategory
+{
+    Compiler,
+    Target,
+    Language,
+    FloatingPointMode,
+    ArchiveType,
+    Stage,
+};
+
+} // anonymous
+
+static void _addOptions(const ConstArrayView<Option>& options, CommandOptions& cmdOptions)
+{
+    for (auto& opt : options)
+    {
+        cmdOptions.add(opt.name, opt.usage, opt.description, CommandOptions::UserValue(opt.optionKind));
+    }
+}
+
+static void _initOptions(CommandOptions& options)
+{
+    typedef CommandOptions::Flag::Enum Flag;
+    typedef CommandOptions::CategoryKind CategoryKind;
+    typedef CommandOptions::UserValue UserValue;
+
+    options.addCategory(CategoryKind::Option, "General", "General options");
+    options.addCategory(CategoryKind::Option, "Target", "Target code generation options");
+    options.addCategory(CategoryKind::Option, "Downstream", "Downstream compiler options");
+    options.addCategory(CategoryKind::Option, "Debugging", "Compiler debugging/instrumentation options");
+    options.addCategory(CategoryKind::Option, "Experimental", "Experimental options (use at your own risk)");
+    options.addCategory(CategoryKind::Option, "Internal", "Internal-use options (use at your own risk)");
+    options.addCategory(CategoryKind::Option, "Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! compiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "compiler", "Downstream Compilers (aka Pass through)", UserValue(ValueCategory::Compiler));
+        for (auto info : TypeTextUtil::getCompilerInfos())
+        {
+            options.addValue(UnownedStringSlice(info.names), UnownedStringSlice(info.humanName), UserValue(info.compiler));   
+        }
+    }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "target", "Target", UserValue(ValueCategory::Target));
+        for (const auto& info : TypeTextUtil::getCompileTargetInfos())
+        {
+            options.addValue(info.names, UserValue(info.target));
+        }
+    }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! language !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "language", "Language", UserValue(ValueCategory::Language));
+        for (const auto& info : TypeTextUtil::getLanguageInfos())
+        {
+            options.addValue(info.names, UserValue(info.language));
+        }
+    }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! fp-mode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "fp-mode", "Floating Point Mode", UserValue(ValueCategory::FloatingPointMode));
+
+        options.addValue("precise", 
+            "Disable optimization that could change the output of floating-"
+            "point computations, including around infinities, NaNs, denormalized "
+            "values, and negative zero. Prefer the most precise versions of special "
+            "functions supported by the target.",
+            UserValue(FloatingPointMode::Precise));
+        options.addValue("fast", 
+            "Allow optimizations that may change results of floating-point "
+            "computations. Prefer the fastest version of special functions supported "
+            "by the target.", 
+            UserValue(FloatingPointMode::Fast));
+        options.addValue("default", "Default floating point mode", UserValue(FloatingPointMode::Default));
+    }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! archive-type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "archive-type", "Archive Type", UserValue(ValueCategory::ArchiveType));
+
+        for (auto info : TypeTextUtil::getArchiveTypeInfos())
+        {
+            options.addValue(info.name, UserValue(info.type));
+        }
+    }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! stage !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "stage", "Stage", UserValue(ValueCategory::Stage));
+        auto stageInfos = getStageInfos();
+
+        List<StageInfo> infos;
+        infos.addRange(stageInfos.getBuffer(), stageInfos.getCount());
+
+        infos.sort([](const StageInfo& a, const StageInfo& b) -> bool { return Index(a.stage) < Index(b.stage); });
+
+        List<UnownedStringSlice> names;
+
+        const Count count = infos.getCount();
+        Index i = 0;
+        while (i < count)
+        {
+            names.clear();
+            const auto stage = infos[i].stage;
+            names.add(UnownedStringSlice(infos[i++].name));
+
+            for (; i < count && infos[i].stage == stage; ++i)
+            {
+                names.add(UnownedStringSlice(infos[i].name));
+            }
+            options.addValue(names.getBuffer(), names.getCount(), UserValue(stage));
+        }
+    }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! capabilities !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "capability", 
+            "A capability describes an optional feature that a target may or "
+            "may not support. When a -capability is specified, the compiler "
+            "may assume that the target supports that capability, and generate "
+            "code accordingly.");
+
+        // TODO(JS):
+        // Ideally we'd add these directly from the capability system
+
+        options.addValue("spirv_1_{ 0,1,2,3,4,5 }", "minimum supported SPIR - V version");
+        options.addValue("GL_NV_ray_tracing", "enables the GL_NV_ray_tracing extension");
+        options.addValue("GL_EXT_ray_tracing", "enables the GL_EXT_ray_tracing extension");
+        options.addValue("GL_NV_fragment_shader_barycentric", "enables the GL_NV_fragment_shader_barycentric extension");
+        options.addValue("GL_EXT_fragment_shader_barycentric", "enables the GL_EXT_fragment_shader_barycentric extension");
+    }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! extension !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "file-extension",
+            "A <language>, <format>, and/or <stage> may be inferred from the "
+            "extension of an input or -o path");
+
+        // TODO(JS): It's concevable that these are enumerated via some other system
+        // rather than just being listed here
+
+        options.addValue("hlsl,fx", "hlsl");
+        options.addValue("dxbc");
+        options.addValue("dxbc-asm", "dxbc-assembly");
+        options.addValue("dxil");
+        options.addValue("dxil-asm", "dxil-assembly");
+        options.addValue("glsl");
+        options.addValue("vert", "glsl (vertex)");
+        options.addValue("frag", "glsl (fragment)");
+        options.addValue("geom", "glsl (geoemtry)");
+        options.addValue("tesc", "glsl (hull)");
+        options.addValue("tese", "glsl (domain)");
+        options.addValue("comp", "glsl (compute)");
+        options.addValue("slang");
+        options.addValue("spv", "SPIR-V");
+        options.addValue("spv-asm", "SPIR-V assembly");
+        options.addValue("c");
+        options.addValue("cpp,c++,cxx", "C++");
+        options.addValue("exe", "executable");
+        options.addValue("dll,so", "sharedlibrary/dll");
+        options.addValue("cu", "CUDA");
+        options.addValue("ptx", "PTX");
+        options.addValue("obj,o", "object-code");
+        options.addValue("zip", "container");
+        options.addValue("slang-module,slang-library", "Slang Module/Library");
+        options.addValue("dir", "Container as a directory");
+    }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("General");
+
+    const Option generalOpts[] = 
+    {
+        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]", "Insert a preprocessor macro." },
+        { OptionKind::DepFile,      "-depfile", "-depfile <path>", "Save the source file dependency list in a file." },
+        { OptionKind::EntryPointName, "-entry", "-entry <name>", 
+        "Specify the name of an entry-point function.\n"
+        "Multiple -entry options may be used in a single invocation. "
+        "If no -entry options are given, compiler will use [shader(...)] "
+        "attributes to detect entry points."},
+        { OptionKind::Help,         "-h,-help,--help", nullptr, "Print this message." },
+        { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
+        "Add a path to be used in resolving '#include' "
+        "and 'import' operations."},
+        { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
+        { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
+        { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
+        { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
+        "Set the module name to use when compiling multiple .slang source files into a single module."},
+        { OptionKind::Output, "-o", "-o <path>", 
+        "Specify a path where generated output should be written.\n"
+        "If no -target or -stage is specified, one may be inferred "
+        "from file extension (see <file-extension>). "
+        "If multiple -target options and a single -entry are present, each -o "
+        "associates with the first -target to its left. "
+        "Otherwise, if multiple -entry options are present, each -o associates "
+        "with the first -entry to its left, and with the -target that matches "
+        "the one inferred from <path>."},
+        { OptionKind::Profile, "-profile", "-profile <profile>[+<capability>...]",
+        "Specify the shader profile for code generation.\n"
+        "Accepted profiles are:\n"
+        "  sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
+        "  glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
+        "Additional profiles that include -stage information:\n"
+        "  {vs,hs,ds,gs,ps}_<version>\n"
+        "See -capability for information on <capability>\n"
+        "When multiple -target options are present, each -profile associates "
+        "with the first -target to its left."},
+        { OptionKind::Stage, "-stage", "-stage <stage>",
+        "Specify the stage of an entry-point function.\n"
+        "When multiple -entry options are present, each -stage associated with "
+        "the first -entry to its left.\n"
+        "May be omitted if entry-point function has a [shader(...)] attribute; "
+        "otherwise required for each -entry option."},
+        { OptionKind::Target, "-target", "-target <target>", "Specifies the format in which code should be generated."},
+        { OptionKind::Version, "-v,-version", nullptr, "Display the build version."},
+        { OptionKind::WarningsAsErrors, "-warnings-as-errors", "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]", 
+        "all - Treat all warnings as errors.\n"
+        "<id>[,<id>...]: Treat specific warning ids as errors.\n"},
+        { OptionKind::DisableWarnings, "-warnings-disable", "-warnings-disable <id>[,<id>...]", "Disable specific warning ids."},
+        { OptionKind::EnableWarning, "-W...", "-W<id>", "Enable a warning with the specified id."},
+        { OptionKind::DisableWarning, "-Wno-...", "-Wno-<id>", "Disable warning with <id>"},
+        { OptionKind::DumpWarningDiagnostics, "-dump-warning-diagnostics", nullptr, "Dump to output list of warning diagnostic numeric and name ids." },
+        { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."}
+    };
+
+    _addOptions(makeConstArrayView(generalOpts), options);
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("Target");
+
+    const Option targetOpts[] = 
+    {
+        { OptionKind::Capability, "-capability", "-capability <capability>[+<capability>...]",
+        "Add optional capabilities to a code generation target. See Capabilities below."},
+        { OptionKind::DefaultImageFormatUnknown, "-default-image-format-unknown", nullptr,
+        "Set the format of R/W images with unspecified format to 'unknown'. Otherwise try to guess the format."},
+        { OptionKind::DisableDynamicDispatch, "-disable-dynamic-dispatch", nullptr, "Disables generating dynamic dispatch code." },
+        { OptionKind::DisableSpecialization, "-disable-specialization", nullptr, "Disables generics and specialization pass." },
+        { OptionKind::FloatingPointMode, "-fp-mode,-floating-point-mode", "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>", 
+        "Control floating point optimizations"},
+        { OptionKind::DebugInformation, "-g...", "-g, -g<N>", 
+        "Include debug information in the generated code, where possible.\n"
+        "N is the amount of information, 0..3, unspecified means 2\n" },
+        { OptionKind::LineDirectiveMode, "-line-directive-mode", "-line-directive-mode <line-directive-mode>", 
+        "Sets how the `#line` directives should be produced. Available options are:\n"
+        "  none       : Don't emit `#line` directives at all\n"
+        "  source-map : Use source map to track line associations (doen't emit #line)\n"
+        "  default    : Default behavior\n"
+        "If not specified, default behavior is to use C-style `#line` directives "
+        "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives "
+        "for GLSL output." },
+        { OptionKind::Optimization, "-O...", "-O<N>", 
+        "Set the optimization level.\n"
+        "N is the amount of optimization, 0..3, default is 1" },
+        { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
+    };
+
+    _addOptions(makeConstArrayView(targetOpts), options);
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Downstream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("Downstream");
+
+    {
+        StringBuilder names;
+        for (auto info : TypeTextUtil::getCompilerInfos())
+        {
+            auto name = StringUtil::getAtInSplit(UnownedStringSlice(info.names), ',', 0);
+
+            if (names.getLength())
+            {
+                names << ",";
+            }
+            names << "-" << name << "-path";
+        }
+
+        options.add(names.getBuffer(), "-<compiler>-path <path>", 
+            "Specify path to a downstream <compiler> "
+            "executable or library.\n", 
+            UserValue(OptionKind::CompilerPath));
+    }
+
+    const Option downstreamOpts[] = 
+    {
+        { OptionKind::DefaultDownstreamCompiler, "-default-downstream-compiler", "-default-downstream-compiler <language> <compiler>",
+        "Set a default compiler for the given language. See -lang for the list of languages." },
+        { OptionKind::DownstreamArgs, "-X", "-X<compiler> <option> -X<compiler>... <options> -X.", 
+        "Pass arguments to downstream <compiler>. Just -X<compiler> passes just the next argument "
+        "to the downstream compiler. -X<compiler>... options -X. will pass *all* of the options "
+        "inbetween the opening -X and -X. to the downstream compiler."},
+        { OptionKind::PassThrough, "-pass-through", "-pass-through <compiler>", 
+        "Pass the input through mostly unmodified to the \n"
+        "existing compiler <compiler>." },
+    };
+
+    _addOptions(makeConstArrayView(downstreamOpts), options);
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Debugging !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("Debugging");
+
+    const Option debuggingOpts[] = 
+    {
+        { OptionKind::DumpAst, "-dump-ast", nullptr, "Dump the AST to a .slang-ast file next to the input." },
+        { OptionKind::DumpIntermediatePrefix, "-dump-intermediate-prefix", "-dump-intermediate-prefix <prefix>", 
+        "File name prefix for -dump-intermediates outputs, default is 'slang-dump-'"},
+        { OptionKind::DumpIntermediates, "-dump-intermediates", nullptr, "Dump intermediate outputs for debugging." },
+        { OptionKind::DumpIr, "-dump-ir", nullptr, "Dump the IR for debugging." },
+        { OptionKind::DumpIrIds, "-dump-ir-ids", nullptr, "Dump the IDs with -dump-ir (debug builds only)" },
+        { OptionKind::DumpRepro, "-dump-repro", nullptr, "Dump a `.slang-repro` file that can be used to reproduce "
+        "a compilation on another machine.\n"},
+        { OptionKind::DumpReproOnError, "-dump-repro-on-error", nullptr, "Dump `.slang-repro` file on any compilation error." },
+        { OptionKind::PreprocessorOutput, "-E,-output-preprocessor", nullptr, "Output the preprocessing result and exit." },
+        { OptionKind::ExtractRepro, "-extract-repro", "-extract-repro <name>", "Extract the repro files into a folder." },
+        { OptionKind::LoadReproDirectory, "-load-repro-directory", "-load-repro-directory <path>", "Use repro along specified path" },
+        { OptionKind::LoadRepro, "-load-repro", "-load-repro <name>", "Load repro"},
+        { OptionKind::NoCodeGen, "-no-codegen", nullptr, "Skip the code generation step, just check the code and generate layout." },
+        { OptionKind::OutputIncludes, "-output-includes", nullptr, "Print the hierarchy of the processed source files." },
+        { OptionKind::ReproFileSystem, "-repro-file-system", "-repro-file-system <name>", "Use a repro as a file system" },
+        { OptionKind::SerialIr, "-serial-ir", nullptr, "Serialize the IR between front-end and back-end." },
+        { OptionKind::SkipCodeGen, "-skip-codegen", nullptr, "Skip the code generation phase." },
+        { OptionKind::ValidateIr, "-validate-ir", nullptr, "Validate the IR between the phases." },
+        { OptionKind::VerbosePaths, "-verbose-paths", nullptr, "Display more detailed paths in diagnostic output." },
+        { OptionKind::VerifyDebugSerialIr, "-verify-debug-serial-ir", nullptr, "Verify IR in the front-end." }
+    };
+    _addOptions(makeConstArrayView(debuggingOpts), options);
+    
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("Experimental");
+
+    const Option experimentalOpts[] = 
+    {
+        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr, 
+        "Generate SPIR-V output directly (otherwise through "
+        "GLSL and using the glslang compiler)"},
+        { OptionKind::FileSystem, "-file-system", "-file-system <fs>", 
+        "Set the filesystem hook to use for a compile request.\n"
+        "Accepted file systems: default, load-file, os" },
+        { OptionKind::Heterogeneous, "-heterogeneous", nullptr, "Output heterogeneity-related code." },
+        { OptionKind::NoMangle, "-no-mangle", nullptr, "Do as little mangling of names as possible." }
+    };
+    _addOptions(makeConstArrayView(experimentalOpts), options);
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Internal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("Internal");
+
+    const Option internalOpts[] = 
+    {
+        { OptionKind::ArchiveType, "-archive-type", "-archive-type <archive-type>", "Set the archive type for -save-stdlib. Default is zip." },
+        { OptionKind::CompileStdLib, "-compile-stdlib", nullptr, "Compile the StdLib from embedded sources. "
+        "Will return a failure if there is already a StdLib available."},
+        { OptionKind::Doc, "-doc", nullptr, "Write documentation for -compile-stdlib" },
+        { OptionKind::IrCompression,"-ir-compression", "-ir-compression <type>", 
+        "Set compression for IR and AST outputs.\n"
+        "Accepted compression types: none, lite"},
+        { OptionKind::LoadStdLib, "-load-stdlib", "-load-stdlib <filename>", "Load the StdLib from file." },
+        { OptionKind::ReferenceModule, "-r", "-r <name>", "reference module <name>" },
+        { OptionKind::SaveStdLib, "-save-stdlib", "-save-stdlib <filename>", "Save the StdLib modules to an archive file." },
+        { OptionKind::SaveStdLibBinSource, "-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output "
+        "the data as a C array.\n"},
+        { OptionKind::TrackLiveness, "-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness." },
+    };
+    _addOptions(makeConstArrayView(internalOpts), options);
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Depreciated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("Depreciated");
+
+    const Option depreciatedOpts[] = 
+    {
+        { OptionKind::ParameterBlocksUseRegisterSpaces, "-parameter-blocks-use-register-spaces", nullptr, "Parameter blocks will use register spaces" },
+    };
+    _addOptions(makeConstArrayView(depreciatedOpts), options);
+}
+
+
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact);
 
 struct OptionsParser
@@ -517,493 +1010,6 @@ struct OptionsParser
         }
 
         return SLANG_OK;
-    }
-
-    // All of the options are given an unique enum
-    enum class OptionKind
-    {
-        // General
-
-        MacroDefine,
-        DepFile,
-        EntryPointName,
-        Help,
-        Include,
-        Language,
-        MatrixLayoutColumn,
-        MatrixLayoutRow,
-        ModuleName,
-        Output,
-        Profile,
-        Stage,
-        Target,
-        Version,
-        WarningsAsErrors,
-        DisableWarnings,
-        EnableWarning,
-        DisableWarning,
-        DumpWarningDiagnostics,
-        InputFilesRemain,
-
-        // Target
-
-        Capability,
-        DefaultImageFormatUnknown,
-        DisableDynamicDispatch,
-        DisableSpecialization,
-        FloatingPointMode,
-        DebugInformation,
-        LineDirectiveMode,
-        Optimization,
-        Obfuscate,
-
-        // Downstream
-    
-        CompilerPath,
-        DefaultDownstreamCompiler,
-        DownstreamArgs,
-        PassThrough,
-
-        // Debugging
-
-        DumpAst,
-        DumpIntermediatePrefix,
-        DumpIntermediates,
-        DumpIr,
-        DumpIrIds,
-        DumpRepro,
-        DumpReproOnError,
-        PreprocessorOutput,
-        ExtractRepro,
-        LoadRepro,
-        LoadReproDirectory,
-        NoCodeGen,
-        OutputIncludes,
-        ReproFileSystem,
-        SerialIr,
-        SkipCodeGen,
-        ValidateIr,
-        VerbosePaths,
-        VerifyDebugSerialIr,
-    
-        // Experimental
-
-        EmitSpirvDirectly,
-        FileSystem,
-        Heterogeneous,
-        NoMangle,
-
-        // Internal
-
-        ArchiveType,
-        CompileStdLib,
-        Doc,
-        IrCompression,
-        LoadStdLib,
-        ReferenceModule,
-        SaveStdLib,
-        SaveStdLibBinSource,
-        TrackLiveness,
-
-        // Depreciated
-        ParameterBlocksUseRegisterSpaces,
-    };
-
-    enum class ValueCategory
-    {
-        Compiler,
-        Target,
-        Language,
-        FloatingPointMode,
-        ArchiveType,
-        Stage,
-    };
-
-    static void _initOptions(CommandOptions& options)
-    {
-        typedef CommandOptions::Flag::Enum Flag;
-        typedef CommandOptions::CategoryKind CategoryKind;
-        typedef CommandOptions::UserValue UserValue;
-
-        options.addCategory(CategoryKind::Option, "General", "General options");
-        options.addCategory(CategoryKind::Option, "Target", "Target code generation options");
-        options.addCategory(CategoryKind::Option, "Downstream", "Downstream compiler options");
-        options.addCategory(CategoryKind::Option, "Debugging", "Compiler debugging/instrumentation options");
-        options.addCategory(CategoryKind::Option, "Experimental", "Experimental options (use at your own risk)");
-        options.addCategory(CategoryKind::Option, "Internal", "Internal-use options (use at your own risk)");
-        options.addCategory(CategoryKind::Option, "Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! compiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        {
-            options.addCategory(CategoryKind::Value, "compiler", "Downstream Compilers (aka Pass through)", UserValue(ValueCategory::Compiler));
-            for (auto info : TypeTextUtil::getCompilerInfos())
-            {
-                options.addValue(UnownedStringSlice(info.names), UnownedStringSlice(info.humanName), UserValue(info.compiler));   
-            }
-        }
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        {
-            options.addCategory(CategoryKind::Value, "target", "Target", UserValue(ValueCategory::Target));
-            for (const auto& info : TypeTextUtil::getCompileTargetInfos())
-            {
-                options.addValue(info.names, UserValue(info.target));
-            }
-        }
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! language !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        {
-            options.addCategory(CategoryKind::Value, "language", "Language", UserValue(ValueCategory::Language));
-            for (const auto& info : TypeTextUtil::getLanguageInfos())
-            {
-                options.addValue(info.names, UserValue(info.language));
-            }
-        }
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! fp-mode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        {
-            options.addCategory(CategoryKind::Value, "fp-mode", "Floating Point Mode", UserValue(ValueCategory::FloatingPointMode));
-            
-            options.addValue("precise", 
-                "Disable optimization that could change the output of floating-"
-                "point computations, including around infinities, NaNs, denormalized "
-                "values, and negative zero. Prefer the most precise versions of special "
-                "functions supported by the target.",
-                UserValue(FloatingPointMode::Precise));
-            options.addValue("fast", 
-                "Allow optimizations that may change results of floating-point "
-                "computations. Prefer the fastest version of special functions supported "
-                "by the target.", 
-                UserValue(FloatingPointMode::Fast));
-            options.addValue("default", "Default floating point mode", UserValue(FloatingPointMode::Default));
-        }
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! archive-type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        {
-            options.addCategory(CategoryKind::Value, "archive-type", "Archive Type", UserValue(ValueCategory::ArchiveType));
-
-            for (auto info : TypeTextUtil::getArchiveTypeInfos())
-            {
-                options.addValue(info.name, UserValue(info.type));
-            }
-        }
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! stage !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        {
-            options.addCategory(CategoryKind::Value, "stage", "Stage", UserValue(ValueCategory::Stage));
-            auto stageInfos = getStageInfos();
-
-            List<StageInfo> infos;
-            infos.addRange(stageInfos.getBuffer(), stageInfos.getCount());
-
-            infos.sort([](const StageInfo& a, const StageInfo& b) -> bool { return Index(a.stage) < Index(b.stage); });
-
-            List<UnownedStringSlice> names;
-
-            const Count count = infos.getCount();
-            Index i = 0;
-            while (i < count)
-            {
-                names.clear();
-                const auto stage = infos[i].stage;
-                names.add(UnownedStringSlice(infos[i++].name));
-
-                for (; i < count && infos[i].stage == stage; ++i)
-                {
-                    names.add(UnownedStringSlice(infos[i].name));
-                }
-                options.addValue(names.getBuffer(), names.getCount(), UserValue(stage));
-            }
-        }
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! capabilities !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        {
-            options.addCategory(CategoryKind::Value, "capability", 
-                "A capability describes an optional feature that a target may or "
-                "may not support. When a -capability is specified, the compiler "
-                "may assume that the target supports that capability, and generate "
-                "code accordingly.");
-         
-            // TODO(JS):
-            // Ideally we'd add these directly from the capability system
-
-            options.addValue("spirv_1_{ 0,1,2,3,4,5 }", "minimum supported SPIR - V version");
-            options.addValue("GL_NV_ray_tracing", "enables the GL_NV_ray_tracing extension");
-            options.addValue("GL_EXT_ray_tracing", "enables the GL_EXT_ray_tracing extension");
-            options.addValue("GL_NV_fragment_shader_barycentric", "enables the GL_NV_fragment_shader_barycentric extension");
-            options.addValue("GL_EXT_fragment_shader_barycentric", "enables the GL_EXT_fragment_shader_barycentric extension");
-        }
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! extension !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        {
-            options.addCategory(CategoryKind::Value, "file-extension",
-                "A <language>, <format>, and/or <stage> may be inferred from the "
-                "extension of an input or -o path");
-
-            // TODO(JS): It's concevable that these are enumerated via some other system
-            // rather than just being listed here
-
-            options.addValue("hlsl,fx", "hlsl");
-            options.addValue("dxbc");
-            options.addValue("dxbc-asm", "dxbc-assembly");
-            options.addValue("dxil");
-            options.addValue("dxil-asm", "dxil-assembly");
-            options.addValue("glsl");
-            options.addValue("vert", "glsl (vertex)");
-            options.addValue("frag", "glsl (fragment)");
-            options.addValue("geom", "glsl (geoemtry)");
-            options.addValue("tesc", "glsl (hull)");
-            options.addValue("tese", "glsl (domain)");
-            options.addValue("comp", "glsl (compute)");
-            options.addValue("slang");
-            options.addValue("spv", "SPIR-V");
-            options.addValue("spv-asm", "SPIR-V assembly");
-            options.addValue("c");
-            options.addValue("cpp,c++,cxx", "C++");
-            options.addValue("exe", "executable");
-            options.addValue("dll,so", "sharedlibrary/dll");
-            options.addValue("cu", "CUDA");
-            options.addValue("ptx", "PTX");
-            options.addValue("obj,o", "object-code");
-            options.addValue("zip", "container");
-            options.addValue("slang-module,slang-library", "Slang Module/Library");
-            options.addValue("dir", "Container as a directory");
-        }
-
-#if 0
-        struct Option
-        {
-            OptionKind optionKind;
-            CommandOptions::Flags flags = 0;
-            const char* name;
-            const char* usage = nullptr;
-            const char* description = nullptr;
-        };
-#endif
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        options.setCategory("General");
-
-        options.add("-D?...",           "-D<name>[=<value>], -D <name>[=<value>]", "Insert a preprocessor macro.", UserValue(OptionKind::MacroDefine));
-        options.add("-depfile",     "-depfile <path>", "Save the source file dependency list in a file.", UserValue(OptionKind::DepFile));
-        options.add("-entry",       "-entry <name>",
-            "Specify the name of an entry-point function.\n"
-            "Multiple -entry options may be used in a single invocation. "
-            "If no -entry options are given, compiler will use [shader(...)] "
-            "attributes to detect entry points.",
-            UserValue(OptionKind::EntryPointName));
-
-        options.add("-h,-help,--help", nullptr, "Print this message.", UserValue(OptionKind::Help));
-        
-        options.add("-I?...", "-I<path>, -I <path>", 
-            "Add a path to be used in resolving '#include' "
-            "and 'import' operations.", 
-            UserValue(OptionKind::Include));
-
-        options.add("-lang", "-lang <language>", "Set the language for the following input files.", UserValue(OptionKind::Language));
-        options.add("-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major.", UserValue(OptionKind::MatrixLayoutColumn));
-        options.add("-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major.", UserValue(OptionKind::MatrixLayoutRow));
-        options.add("-module-name", "-module-name <name>", 
-            "Set the module name to use when compiling multiple .slang source files into a single module.", UserValue(OptionKind::ModuleName));
-
-        options.add("-o", "-o <path>", 
-            "Specify a path where generated output should be written.\n"
-            "If no -target or -stage is specified, one may be inferred "
-            "from file extension (see <file-extension>). "
-            "If multiple -target options and a single -entry are present, each -o "
-            "associates with the first -target to its left. "
-            "Otherwise, if multiple -entry options are present, each -o associates "
-            "with the first -entry to its left, and with the -target that matches "
-            "the one inferred from <path>.",
-            UserValue(OptionKind::Output));
-
-        options.add("-profile", "-profile <profile>[+<capability>...]",
-            "Specify the shader profile for code generation.\n"
-            "Accepted profiles are:\n"
-            "  sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
-            "  glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
-            "Additional profiles that include -stage information:\n"
-            "  {vs,hs,ds,gs,ps}_<version>\n"
-            "See -capability for information on <capability>\n"
-            "When multiple -target options are present, each -profile associates "
-            "with the first -target to its left.",
-            UserValue(OptionKind::Profile));
-
-        options.add("-stage", "-stage <stage>",
-            "Specify the stage of an entry-point function.\n"
-            "When multiple -entry options are present, each -stage associated with "
-            "the first -entry to its left.\n"
-            "May be omitted if entry-point function has a [shader(...)] attribute; "
-            "otherwise required for each -entry option.",
-            UserValue(OptionKind::Stage));
-
-        options.add("-target", "-target <target>", "Specifies the format in which code should be generated.", UserValue(OptionKind::Target));
-
-        options.add("-v,-version", nullptr, "Display the build version.", UserValue(OptionKind::Version));
-
-        options.add("-warnings-as-errors", "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]", 
-            "all - Treat all warnings as errors.\n"
-            "<id>[,<id>...]: Treat specific warning ids as errors.\n",
-            UserValue(OptionKind::WarningsAsErrors));
-
-        options.add("-warnings-disable", "-warnings-disable <id>[,<id>...]", "Disable specific warning ids.", UserValue(OptionKind::DisableWarnings));
-        options.add("-W...", "-W<id>", "Enable a warning with the specified id.", UserValue(OptionKind::EnableWarning));
-        options.add("-Wno-...", "-Wno-<id>", "Disable warning with <id>", UserValue(OptionKind::DisableWarning));
-
-        options.add("-dump-warning-diagnostics", nullptr, "Dump to output list of warning diagnostic numeric and name ids.", UserValue(OptionKind::DumpWarningDiagnostics));
-        options.add("--", nullptr, "Treat the rest of the command line as input files.", UserValue(OptionKind::InputFilesRemain));
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        options.setCategory("Target");
-
-        options.add("-capability", "-capability <capability>[+<capability>...]",
-            "Add optional capabilities to a code generation target. See Capabilities below.", UserValue(OptionKind::Capability));
-        options.add("-default-image-format-unknown", nullptr,
-            "Set the format of R/W images with unspecified format to 'unknown'. Otherwise try to guess the format.", UserValue(OptionKind::DefaultImageFormatUnknown));
-        options.add("-disable-dynamic-dispatch", nullptr, "Disables generating dynamic dispatch code.", UserValue(OptionKind::DisableDynamicDispatch));
-        options.add("-disable-specialization", nullptr, "Disables generics and specialization pass.", UserValue(OptionKind::DisableSpecialization));
-
-        options.add("-fp-mode,-floating-point-mode", "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>", "Control floating point optimizations", 
-            UserValue(OptionKind::FloatingPointMode));
-
-        options.add("-g...", "-g, -g<N>", 
-            "Include debug information in the generated code, where possible.\n"
-            "N is the amount of information, 0..3, unspecified means 2\n",
-            UserValue(OptionKind::DebugInformation));
-
-        options.add("-line-directive-mode", "-line-directive-mode <line-directive-mode>", 
-            "Sets how the `#line` directives should be produced. Available options are:\n"
-            "  none       : Don't emit `#line` directives at all\n"
-            "  source-map : Use source map to track line associations (doen't emit #line)\n"
-            "  default    : Default behavior\n"
-            "If not specified, default behavior is to use C-style `#line` directives "
-            "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives "
-            "for GLSL output.",
-            UserValue(OptionKind::LineDirectiveMode));
-
-        options.add("-O...", "-O<N>", 
-            "Set the optimization level.\n"
-            "N is the amount of optimization, 0..3, default is 1",
-            UserValue(OptionKind::Optimization));
-
-        options.add("-obfuscate", nullptr, "Remove all source file information from outputs.", UserValue(OptionKind::Obfuscate));
-
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Downstream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        options.setCategory("Downstream");
-
-        {
-            StringBuilder names;
-            for (auto info : TypeTextUtil::getCompilerInfos())
-            {
-                auto name = StringUtil::getAtInSplit(UnownedStringSlice(info.names), ',', 0);
-
-                if (names.getLength())
-                {
-                    names << ",";
-                }
-                names << "-" << name << "-path";
-            }
-
-            options.add(names.getBuffer(), "-<compiler>-path <path>", 
-                "Specify path to a downstream <compiler> "
-                "executable or library.\n", 
-                UserValue(OptionKind::CompilerPath));
-        }
-        
-        options.add("-default-downstream-compiler", "-default-downstream-compiler <language> <compiler>",
-            "Set a default compiler for the given language. See -lang for the list of languages.",
-            UserValue(OptionKind::DefaultDownstreamCompiler));
-
-        options.add("-X", "-X<compiler> <option> -X<compiler>... <options> -X.", 
-            "Pass arguments to downstream <compiler>. Just -X<compiler> passes just the next argument "
-            "to the downstream compiler. -X<compiler>... options -X. will pass *all* of the options "
-            "inbetween the opening -X and -X. to the downstream compiler.",
-            UserValue(OptionKind::DownstreamArgs));
-        
-        options.add("-pass-through", "-pass-through <compiler>", 
-                "Pass the input through mostly unmodified to the \n"
-                "existing compiler <compiler>.",
-            UserValue(OptionKind::PassThrough));
-        
-        /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Debugging !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-        options.setCategory("Debugging");
-
-        options.add("-dump-ast", nullptr, "Dump the AST to a .slang-ast file next to the input.", UserValue(OptionKind::DumpAst));
-        options.add("-dump-intermediate-prefix", "-dump-intermediate-prefix <prefix>", 
-            "File name prefix for -dump-intermediates outputs, default is 'slang-dump-'", UserValue(OptionKind::DumpIntermediatePrefix));
-        options.add("-dump-intermediates", nullptr, "Dump intermediate outputs for debugging.", UserValue(OptionKind::DumpIntermediates));
-        options.add("-dump-ir", nullptr, "Dump the IR for debugging.", UserValue(OptionKind::DumpIr));
-        options.add("-dump-ir-ids", nullptr, "Dump the IDs with -dump-ir (debug builds only)", UserValue(OptionKind::DumpIrIds));
-        options.add("-dump-repro", nullptr, "Dump a `.slang-repro` file that can be used to reproduce "
-            "a compilation on another machine.\n", UserValue(OptionKind::DumpRepro));
-
-         options.add("-dump-repro-on-error", nullptr, "Dump `.slang-repro` file on any compilation error.", UserValue(OptionKind::DumpReproOnError));
-         options.add("-E,-output-preprocessor", nullptr, "Output the preprocessing result and exit.", UserValue(OptionKind::PreprocessorOutput));
-         options.add("-extract-repro", "-extract-repro <name>", "Extract the repro files into a folder.", UserValue(OptionKind::ExtractRepro));
-         options.add("-load-repro", "-load-repro <name>", "Load repro", UserValue(OptionKind::LoadRepro));
-         options.add("-load-repro-directory", "-load-repro-directory <path>", "Use repro along specified path", UserValue(OptionKind::LoadReproDirectory));
-         options.add("-no-codegen", nullptr, "Skip the code generation step, just check the code and generate layout.", UserValue(OptionKind::NoCodeGen));
-         options.add("-output-includes", nullptr, "Print the hierarchy of the processed source files.", UserValue(OptionKind::OutputIncludes));
-
-         options.add("-repro-file-system", "-repro-file-system <name>", "Use a repro as a file system", UserValue(OptionKind::ReproFileSystem));
-         options.add("-serial-ir", nullptr, "Serialize the IR between front-end and back-end.", UserValue(OptionKind::SerialIr));
-         options.add("-skip-codegen", nullptr, "Skip the code generation phase.", UserValue(OptionKind::SkipCodeGen));
-         options.add("-validate-ir", nullptr, "Validate the IR between the phases.", UserValue(OptionKind::ValidateIr));
-         options.add("-verbose-paths", nullptr, "Display more detailed paths in diagnostic output.", UserValue(OptionKind::VerbosePaths));
-         options.add("-verify-debug-serial-ir", nullptr, "Verify IR in the front-end.", UserValue(OptionKind::VerifyDebugSerialIr));
-
-         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-         options.setCategory("Experimental");
-
-         options.add("-emit-spirv-directly", nullptr, 
-             "Generate SPIR-V output directly (otherwise through "
-             "GLSL and using the glslang compiler)", UserValue(OptionKind::EmitSpirvDirectly));
-         options.add("-file-system", "-file-system <fs>", 
-             "Set the filesystem hook to use for a compile request.\n"
-             "Accepted file systems: default, load-file, os", UserValue(OptionKind::FileSystem));
-         options.add("-heterogeneous", nullptr, "Output heterogeneity-related code.", UserValue(OptionKind::Heterogeneous));
-         options.add("-no-mangle", nullptr, "Do as little mangling of names as possible.", UserValue(OptionKind::NoMangle));
-
-         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Internal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-         options.setCategory("Internal");
-
-         options.add("-archive-type", "-archive-type <archive-type>", "Set the archive type for -save-stdlib. Default is zip.", UserValue(OptionKind::ArchiveType));
-
-         options.add("-compile-stdlib", nullptr, "Compile the StdLib from embedded sources. "
-             "Will return a failure if there is already a StdLib available.", UserValue(OptionKind::CompileStdLib));
-
-         options.add("-doc", nullptr, "Write documentation for -compile-stdlib", UserValue(OptionKind::Doc));
-         options.add("-ir-compression", "-ir-compression <type>", 
-             "Set compression for IR and AST outputs.\n"
-             "Accepted compression types: none, lite",
-             UserValue(OptionKind::IrCompression));
-         options.add("-load-stdlib", "-load-stdlib <filename>", "Load the StdLib from file.", UserValue(OptionKind::LoadStdLib));
-         options.add("-r", "-r <name>", "reference module <name>", UserValue(OptionKind::ReferenceModule));
-         options.add("-save-stdlib", "-save-stdlib <filename>", "Save the StdLib modules to an archive file.", UserValue(OptionKind::SaveStdLib));
-         options.add("-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output "
-             "the data as a C array.\n", UserValue(OptionKind::SaveStdLibBinSource));
-         options.add("-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.",
-             UserValue(OptionKind::TrackLiveness));
-
-         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Depreciated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-         options.setCategory("Depreciated");
-
-         options.add("-parameter-blocks-use-register-spaces", nullptr, "Parameter blocks will use register spaces", UserValue(OptionKind::ParameterBlocksUseRegisterSpaces));
     }
 
     static char const* getHelpText()
