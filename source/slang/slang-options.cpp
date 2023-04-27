@@ -1027,230 +1027,6 @@ struct OptionsParser
         return SLANG_OK;
     }
 
-    static char const* getHelpText()
-    {
-#ifdef _WIN32
-#define EXECUTABLE_EXTENSION ".exe"
-#else
-#define EXECUTABLE_EXTENSION ""
-#endif
-
-        return
-            "Usage: slangc" EXECUTABLE_EXTENSION " [options...] [--] <input files>\n"
-            "\n"
-            "General options:\n"
-            "\n"
-            "  -D<name>[=<value>], -D <name>[=<value>]: Insert a preprocessor macro.\n"
-            "  -depfile <path>: Save the source file dependency list in a file.\n"
-            "  -entry <name>: Specify the name of an entry-point function.\n"
-            "    Multiple -entry options may be used in a single invocation.\n"
-            "    If no -entry options are given, compiler will use [shader(...)]\n"
-            "    attributes to detect entry points.\n"
-            "  -h, -help, --help: Print this message.\n"
-            "  -I<path>, -I <path>: Add a path to be used in resolving '#include'\n"
-            "    and 'import' operations.\n"
-            "  -lang <language>: Set the language for the following input files.\n"
-            "    Accepted languages are:\n"
-            "      c, cpp, c++, cxx, slang, glsl, hlsl, cu, cuda\n"
-            "  -matrix-layout-column-major: Set the default matrix layout to column-major.\n"
-            "  -matrix-layout-row-major: Set the default matrix layout to row-major.\n"
-            "  -module-name <name>: Set the module name to use when compiling multiple\n"
-            "    .slang source files into a single module.\n"
-            "  -o <path>: Specify a path where generated output should be written.\n"
-            "    If no -target or -stage is specified, one may be inferred\n"
-            "    from file extension (see File Extensions).\n"
-            "    If multiple -target options and a single -entry are present, each -o\n"
-            "    associates with the first -target to its left.\n"
-            "    Otherwise, if multiple -entry options are present, each -o associates\n"
-            "    with the first -entry to its left, and with the -target that matches\n"
-            "    the one inferred from <path>.\n"
-            "  -profile <profile>[+<capability>...]: Specify the shader profile for code\n"
-            "    generation.\n"
-            "    Accepted profiles are:\n"
-            "      sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
-            "      glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
-            "    Additional profiles that include -stage information:\n"
-            "      {vs,hs,ds,gs,ps}_<version>\n"
-            "    See -capability for information on <capability>\n"
-            "    When multiple -target options are present, each -profile associates\n"
-            "    with the first -target to its left.\n"
-            "  -stage <name>: Specify the stage of an entry-point function.\n"
-            "    Accepted stages are:\n"
-            "      vertex, hull, domain, geometry, fragment, compute,\n"
-            "      raygeneration, intersection, anyhit, closesthit, miss, callable\n"
-            "    When multiple -entry options are present, each -stage associated with\n"
-            "    the first -entry to its left.\n"
-            "    May be omitted if entry-point function has a [shader(...)] attribute;\n"
-            "    otherwise required for each -entry option.\n"
-            "  -target <format>: Specifies the format in which code should be generated.\n"
-            "    Accepted formats are:\n"
-            "      glsl, hlsl, spirv, spirv-assembly, dxbc,\n"
-            "      dxbc-assembly, dxil, dxil-assembly\n"
-            "  -v, -version: Display the build version.\n"
-            "  -warnings-as-errors all: Treat all warnings as errors.\n"
-            "  -warnings-as-errors <id>[,<id>...]: Treat specific warning ids as errors.\n"
-            "  -warnings-disable <id>[,<id>...]: Disable specific warning ids.\n"
-            "  -W<id>: Enable a warning with the specified id.\n"
-            "  -Wno-<id>: Disable a warning with the specified id.\n"
-            "  -dump-warning-diagnostics: Dump to output list of warning diagnostic numeric and name ids.\n"
-            "  --: Treat the rest of the command line as input files.\n"
-            "\n"
-            "Target code generation options:\n"
-            "\n"
-            "  -capability <capability>[+<capability>...]: Add optional capabilities\n"
-            "    to a code generation target. See Capabilities below.\n"
-            "  -default-image-format-unknown: Set the format of R/W images with unspecified\n"
-            "    format to 'unknown'. Otherwise try to guess the format.\n"
-            "  -disable-dynamic-dispatch: Disables generating dynamic dispatch code.\n"
-            "  -disable-specialization: Disables generics and specialization pass.\n"
-            "  -fp-mode <mode>, -floating-point-mode <mode>: Set the floating point mode.\n"
-            "    Accepted modes are:\n"
-            "      precise : Disable optimization that could change the output of floating-\n"
-            "        point computations, including around infinities, NaNs, denormalized\n"
-            "        values, and negative zero. Prefer the most precise versions of special\n"
-            "        functions supported by the target.\n"
-            "      fast : Allow optimizations that may change results of floating-point\n"
-            "        computations. Prefer the fastest version of special functions supported\n"
-            "        by the target.\n"
-            "  -g, -g<N>: Include debug information in the generated code, where possible.\n"
-            "    N is the amount of information, 0..3, unspecified means 2\n"
-            "  -line-directive-mode <mode>: Sets how the `#line` directives should be\n"
-            "      produced. Available options are:\n"
-            "        none : Don't emit `#line` directives at all\n"
-            "        source-map : Use source map to track line associations (doen't emit #line)\n"
-            "        default : Default behavior\n"
-            "      If not specified, default behavior is to use C-style `#line` directives\n"
-            "      for HLSL and C/C++ output, and traditional GLSL-style `#line` directives\n"
-            "      for GLSL output.\n"
-            "  -O<N>: Set the optimization level.\n"
-            "    N is the amount of optimization, 0..3, default is 1\n"
-            "  -obfuscate: Remove all source file information from outputs.\n"
-            "\n"
-            "Downstream compiler options:\n"
-            "\n"
-            "  -<compiler>-path: Specify path to a downstream <compiler>\n"
-            "    executable or library. Accepted compilers are:\n"
-            "      fxc (d3dcompiler_47.dll)\n"
-            "      dxc (dxcompiler.*)\n"
-            "      glslang (slang-glslang.*)\n"
-            "      vs = visualstudio (cl.exe)\n"
-            "      clang\n"
-            "      gcc (g++)\n"
-            "      c = cpp = genericcpp\n"
-            "      nvrtc\n"
-            "      llvm\n"
-            "  -default-downstream-compiler <language> <compiler>: Set a default compiler\n"
-            "      for the given language. See -lang for the list of languages.\n"
-            "  -X<compiler> <option>: Pass arguments to downstream <compiler>.\n"
-            "\n"
-            "Compiler debugging/instrumentation options:\n"
-            "\n"
-            "  -dump-ast: Dump the AST to a .slang-ast file next to the input.\n"
-            "  -dump-intermediate-prefix <prefix>: File name prefix for -dump-intermediates \n"
-            "      outputs, default is 'slang-dump-'\n"
-            "  -dump-intermediates: Dump intermediate outputs for debugging.\n"
-            "  -dump-ir: Dump the IR for debugging.\n"
-            "  -dump-ir-ids: Dump the IDs with -dump-ir (debug builds only)\n"
-            "  -dump-repro: Dump a `.slang-repro` file that can be used to reproduce\n"
-            "    a compilation on another machine.\n"
-            "  -dump-repro-on-error: Dump `.slang-repro` file on any compilation error.\n"
-            "  -E, -output-preprocessor: Output the preprocessing result and exit.\n"
-            "  -extract-repro <name>: Extract the repro files into a folder.\n"
-            "  -load-repro <name>\n"
-            "  -load-repro-directory <path>\n"
-            "  -no-codegen: Skip the code generation step, just check the code and\n"
-            "      generate layout.\n"
-            "  -output-includes: Print the hierarchy of the processed source files.\n"
-            "  -pass-through <name>: Pass the input through mostly unmodified to the \n"
-            "      existing compiler <name>. Accepted compilers are:\n"
-            "      fxc, glslang, dxc\n"
-            "  -repro-file-system <name>\n"
-            "  -serial-ir: Serialize the IR between front-end and back-end.\n"
-            "  -skip-codegen: Skip the code generation phase.\n"
-            "  -validate-ir: Validate the IR between the phases.\n"
-            "  -verbose-paths: Display more detailed paths in diagnostic output.\n"
-            "  -verify-debug-serial-ir: Verify IR in the front-end.\n"
-            "\n"
-            "Experimental options (use at your own risk):\n"
-            "\n"
-            "  -emit-spirv-directly: Generate SPIR-V output directly (otherwise through \n"
-            "      GLSL and using the glslang compiler)\n"
-            "  -file-system <fs>: Set the filesystem hook to use for a compile request.\n"
-            "    Accepted file systems:\n"
-            "      default, load-file, os\n"
-            "  -heterogeneous: Output heterogeneity-related code.\n"
-            "  -no-mangle: Do as little mangling of names as possible.\n"
-            "\n"
-            "Internal-use options (use at your own risk):\n"
-            "\n"
-            "  -archive-type <type>: Set the archive type for -save-stdlib. Default is zip.\n"
-            "    Accepted archive types:\n"
-            "      zip, riff, riff-deflate, riff-lz4\n"
-            "  -compile-stdlib: Compile the StdLib from embedded sources.\n"
-            "      Will return a failure if there is already a StdLib available.\n"
-            "  -doc: Write documentation for -compile-stdlib\n"
-            "  -ir-compression <type>: Set compression for IR and AST outputs.\n"
-            "      Accepted compression types:\n"
-            "      none, lite\n"
-            "  -load-stdlib <filename>: Load the StdLib from file.\n"
-            "  -r <name>: reference module <name>\n"
-            "  -save-stdlib <filename>: Save the StdLib modules to an archive file.\n"
-            "  -save-stdlib-bin-source <filename>: Same as -save-stdlib but output\n"
-            "      the data as a C array.\n"
-            "  -track-liveness: Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.\n"
-            "\n"
-            "Deprecated options (allowed but ignored; may be removed in future):\n"
-            "\n"
-            "  -parameter-blocks-use-register-spaces\n"
-            "\n"
-            "File Extensions:\n"
-            "\n"
-            "  A <language>, <format>, and/or <stage> may be inferred from the\n"
-            "  extension of an input or -o path:\n"
-            "\n"
-            "    extension           | language/format | stage\n"
-            "    ====================|=================|======\n"
-            "      .hlsl, .fx        -> hlsl\n"
-            "      .dxbc             -> dxbc\n"
-            "      .dxbc-asm         -> dxbc-assembly\n"
-            "      .dxil             -> dxil\n"
-            "      .dxil-asm         -> dxil-assembly\n"
-            "      .glsl             -> glsl\n"
-            "      .vert             -> glsl            vertex\n"
-            "      .frag             -> glsl            fragment\n"
-            "      .geom             -> glsl            geoemtry\n"
-            "      .tesc             -> glsl            hull\n"
-            "      .tese             -> glsl            domain\n"
-            "      .comp             -> glsl            compute\n"
-            "      .slang            -> slang\n"
-            "      .spv              -> spirv\n"
-            "      .spv-asm          -> spirv-assembly\n"
-            "      .c                -> c\n"
-            "      .cpp, .c++, .cxx  -> c++\n"
-            "      .exe              -> executable\n"
-            "      .dll, .so         -> sharedlibrary\n"
-            "      .cu               -> cuda\n"
-            "      .ptx              -> ptx\n"
-            "      .obj, .o          -> object-code\n"
-            "\n"
-            "Capabilities:\n"
-            "\n"
-            "  A capability describes an optional feature that a target may or\n"
-            "  may not support. When a -capability is specified, the compiler\n"
-            "  may assume that the target supports that capability, and generate\n"
-            "  code accordingly.\n"
-            "  Currently defined capabilities are:\n"
-            "\n"
-            "    spirv_1_{0,1,2,3,4,5}   - minimum supported SPIR-V version\n"
-            "    GL_NV_ray_tracing       - enables the GL_NV_ray_tracing extension\n"
-            "    GL_EXT_ray_tracing      - enables the GL_EXT_ray_tracing extension\n"
-            "    GL_NV_fragment_shader_barycentric  - enables the GL_NV_fragment_shader_barycentric extension\n"
-            "    GL_EXT_fragment_shader_barycentric - enables the GL_EXT_fragment_shader_barycentric extension\n"
-            "\n";
-
-#undef EXECUTABLE_EXTENSION
-    }
-
     // Pass Severity::Disabled to allow any original severity
     SlangResult _overrideDiagnostics(const UnownedStringSlice& identifierList, Severity originalSeverity, Severity overrideSeverity, DiagnosticSink* sink)
     {
@@ -2184,13 +1960,18 @@ struct OptionsParser
                 }
                 case OptionKind::Help:
                 {
-                    StringBuilder buf;
-                    
                     CommandOptionsWriter writer;
-                    writer.appendDescription(options);
+                    auto& buf = writer.getBuilder();
 
+                    auto ext = "";
+#if SLANG_WINDOWS_FAMILY
+                    ext = ".exe";
+#endif
+
+                    buf << "Usage: slangc" << ext << " [options...] [--] <input files>\n";
+
+                    writer.appendDescription(options);
                     sink->diagnoseRaw(Severity::Note, writer.getBuilder().getBuffer());
-       
                     return SLANG_FAIL;
                 }
                 case OptionKind::EmitSpirvDirectly: getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY; break;
@@ -2251,7 +2032,6 @@ struct OptionsParser
             }
 
             // Special case so we can break out of the loop
-
             if (optionKind == OptionKind::InputFilesRemain)
             {
                 // The `--` option causes us to stop trying to parse options,
@@ -2260,11 +2040,10 @@ struct OptionsParser
                 {
                     SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer()));
                 }
-
-                /* TODO(JS): Arggghhh ! We can't use a break here, we want to leave the loop */
                 break;
             }
 
+            // Hmmm, we do know what the option is but couldn't handle
             sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
             // TODO: print a usage message
             return SLANG_FAIL;
