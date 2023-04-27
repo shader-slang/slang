@@ -2361,10 +2361,25 @@ void finalizeSpecialization(IRModule* module)
         default:
             break;
 
+        case kIROP_StructKey:
+            for (auto decor = inst->getFirstDecoration(); decor; )
+            {
+                auto nextDecor = decor->getNextDecoration();
+                switch (decor->getOp())
+                {
+                case kIROp_DispatchFuncDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                default:
+                    break;
+                }
+                decor = nextDecor;
+            }
+            break;
+
         case kIROp_ExistentialFuncSpecializationDictionary:
         case kIROp_ExistentialTypeSpecializationDictionary:
         case kIROp_GenericSpecializationDictionary:
-        case kIROp_DispatchFuncDecoration:
             inst->removeAndDeallocate();
             break;
         }
