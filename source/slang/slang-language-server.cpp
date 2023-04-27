@@ -250,9 +250,7 @@ String getDeclKindString(DeclRef<Decl> declRef)
         const char* scopeKind = "";
         if (parent.as<NamespaceDeclBase>())
             scopeKind = "global ";
-        else if (parent.as<GenericDecl>())
-            scopeKind = "generic ";
-        else if (parent.as<CallableDecl>())
+        else if (getParentDecl(declRef.getDecl()))
             scopeKind = "local ";
         StringBuilder sb;
         sb << "(";
