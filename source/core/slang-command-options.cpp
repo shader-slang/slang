@@ -163,26 +163,50 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
     return optionIndex;
 }
 
-void CommandOptions::add(const char* name, const char* usage, const char* description, UserValue userValue, Flags flags)
+static void _handlePostFix(UnownedStringSlice& ioSlice, CommandOptions::Flags& ioFlags)
 {
-    const UnownedStringSlice nameSlice(name);
+    if (ioSlice.endsWith(toSlice("...")))
+    {
+        if (ioSlice.endsWith(toSlice("?...")))
+        {
+            ioFlags |= CommandOptions::Flag::CanPrefix;
+            ioSlice = ioSlice.head(ioSlice.getLength() - 4);
+        }
+        else
+        {
+            ioFlags |= CommandOptions::Flag::IsPrefix;
+            ioSlice = ioSlice.head(ioSlice.getLength() - 3);
+        }
+    }
+}
+
+void CommandOptions::add(const char* inName, const char* usage, const char* description, UserValue userValue)
+{
+    UnownedStringSlice nameSlice(inName);
 
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
     option.usage = _addString(usage);
     option.description = _addString(UnownedStringSlice(description));
     option.userValue = userValue;
-    option.flags = flags;
+    option.flags = 0;
 
     if (nameSlice.indexOf(',') >= 0)
     {
         List<UnownedStringSlice> names;
         StringUtil::split(nameSlice, ',', names);
 
+        for (auto& name : names)
+        {
+            _handlePostFix(name, option.flags);
+        }
+
         _addOption(names.getBuffer(), names.getCount(), option);
     }
     else
     {
+        _handlePostFix(nameSlice, option.flags);
+
         _addOption(&nameSlice, 1, option);
     }
 }
@@ -365,7 +389,7 @@ Index CommandOptions::findOptionByName(const UnownedStringSlice& name) const
                 auto& option = m_options[index];
 
                 // If the option accepts prefixes, we return the index
-                if (option.flags & (Flag::CanPrefix || Flag::IsPrefix))
+                if (option.flags & (Flag::CanPrefix | Flag::IsPrefix))
                 {
                     return index;
                 }

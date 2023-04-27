@@ -730,7 +730,10 @@ struct OptionsParser
                 "may not support. When a -capability is specified, the compiler "
                 "may assume that the target supports that capability, and generate "
                 "code accordingly.");
-                
+         
+            // TODO(JS):
+            // Ideally we'd add these directly from the capability system
+
             options.addValue("spirv_1_{ 0,1,2,3,4,5 }", "minimum supported SPIR - V version");
             options.addValue("GL_NV_ray_tracing", "enables the GL_NV_ray_tracing extension");
             options.addValue("GL_EXT_ray_tracing", "enables the GL_EXT_ray_tracing extension");
@@ -744,6 +747,9 @@ struct OptionsParser
             options.addCategory(CategoryKind::Value, "file-extension",
                 "A <language>, <format>, and/or <stage> may be inferred from the "
                 "extension of an input or -o path");
+
+            // TODO(JS): It's concevable that these are enumerated via some other system
+            // rather than just being listed here
 
             options.addValue("hlsl,fx", "hlsl");
             options.addValue("dxbc");
@@ -772,11 +778,22 @@ struct OptionsParser
             options.addValue("dir", "Container as a directory");
         }
 
+#if 0
+        struct Option
+        {
+            OptionKind optionKind;
+            CommandOptions::Flags flags = 0;
+            const char* name;
+            const char* usage = nullptr;
+            const char* description = nullptr;
+        };
+#endif
+
         /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
         options.setCategory("General");
 
-        options.add("-D",           "-D<name>[=<value>], -D <name>[=<value>]", "Insert a preprocessor macro.", UserValue(OptionKind::MacroDefine), Flag::CanPrefix);
+        options.add("-D?...",           "-D<name>[=<value>], -D <name>[=<value>]", "Insert a preprocessor macro.", UserValue(OptionKind::MacroDefine));
         options.add("-depfile",     "-depfile <path>", "Save the source file dependency list in a file.", UserValue(OptionKind::DepFile));
         options.add("-entry",       "-entry <name>",
             "Specify the name of an entry-point function.\n"
@@ -787,11 +804,10 @@ struct OptionsParser
 
         options.add("-h,-help,--help", nullptr, "Print this message.", UserValue(OptionKind::Help));
         
-        options.add("-I", "-I<path>, -I <path>", 
+        options.add("-I?...", "-I<path>, -I <path>", 
             "Add a path to be used in resolving '#include' "
             "and 'import' operations.", 
-            UserValue(OptionKind::Include),
-            Flag::CanPrefix);
+            UserValue(OptionKind::Include));
 
         options.add("-lang", "-lang <language>", "Set the language for the following input files.", UserValue(OptionKind::Language));
         options.add("-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major.", UserValue(OptionKind::MatrixLayoutColumn));
@@ -840,8 +856,8 @@ struct OptionsParser
             UserValue(OptionKind::WarningsAsErrors));
 
         options.add("-warnings-disable", "-warnings-disable <id>[,<id>...]", "Disable specific warning ids.", UserValue(OptionKind::DisableWarnings));
-        options.add("-W", "-W<id>", "Enable a warning with the specified id.", UserValue(OptionKind::EnableWarning), Flag::IsPrefix);
-        options.add("-Wno-", "-Wno-<id>", "Disable warning with <id>", UserValue(OptionKind::DisableWarning), Flag::IsPrefix);
+        options.add("-W...", "-W<id>", "Enable a warning with the specified id.", UserValue(OptionKind::EnableWarning));
+        options.add("-Wno-...", "-Wno-<id>", "Disable warning with <id>", UserValue(OptionKind::DisableWarning));
 
         options.add("-dump-warning-diagnostics", nullptr, "Dump to output list of warning diagnostic numeric and name ids.", UserValue(OptionKind::DumpWarningDiagnostics));
         options.add("--", nullptr, "Treat the rest of the command line as input files.", UserValue(OptionKind::InputFilesRemain));
@@ -860,11 +876,10 @@ struct OptionsParser
         options.add("-fp-mode,-floating-point-mode", "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>", "Control floating point optimizations", 
             UserValue(OptionKind::FloatingPointMode));
 
-        options.add("-g", "-g, -g<N>", 
+        options.add("-g...", "-g, -g<N>", 
             "Include debug information in the generated code, where possible.\n"
             "N is the amount of information, 0..3, unspecified means 2\n",
-            UserValue(OptionKind::DebugInformation),
-            Flag::CanPrefix);
+            UserValue(OptionKind::DebugInformation));
 
         options.add("-line-directive-mode", "-line-directive-mode <line-directive-mode>", 
             "Sets how the `#line` directives should be produced. Available options are:\n"
@@ -876,11 +891,10 @@ struct OptionsParser
             "for GLSL output.",
             UserValue(OptionKind::LineDirectiveMode));
 
-        options.add("-O", "-O<N>", 
+        options.add("-O...", "-O<N>", 
             "Set the optimization level.\n"
             "N is the amount of optimization, 0..3, default is 1",
-            UserValue(OptionKind::Optimization),
-            Flag::CanPrefix);
+            UserValue(OptionKind::Optimization));
 
         options.add("-obfuscate", nullptr, "Remove all source file information from outputs.", UserValue(OptionKind::Obfuscate));
 
@@ -2189,6 +2203,13 @@ struct OptionsParser
                         SLANG_UNUSED(optionKind);
                     }
 
+                    {
+                        auto optionIndex = options.findOptionByCategoryUserValue(CommandOptions::UserValue(ValueCategory::Stage), toSlice("fragment"));
+                        auto optionStage = Stage(options.getOptionAt(optionIndex).userValue);
+
+                        SLANG_UNUSED(optionIndex);
+                        SLANG_UNUSED(optionStage);
+                    }
 
                     //sink->diagnoseRaw(Severity::Note, getHelpText());
                     return SLANG_FAIL;

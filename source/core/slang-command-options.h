@@ -7,6 +7,11 @@
 namespace Slang
 {
 
+/* For convenience we encode within "names" flags. 
+"-D..." means that -D *must* be followed by the value
+"-D?..." means that -D *can* be a prefix, or it might be followed with the arg
+*/
+
 struct CommandOptions
 {
     typedef uint32_t Flags;
@@ -67,7 +72,7 @@ struct CommandOptions
         /// Use an already known category. It's an error if the category isn't found
     void setCategory(const char* name);
 
-    void add(const char* name, const char* usage, const char* description, UserValue userValue = kInvalidUserValue, Flags flags = 0);
+    void add(const char* name, const char* usage, const char* description, UserValue userValue = kInvalidUserValue);
     void add(const UnownedStringSlice* names, Count namesCount, const char* usage, const char* description, UserValue userValue = kInvalidUserValue, Flags flags = 0);
 
     void addValue(const UnownedStringSlice& name, UserValue userValue = kInvalidUserValue);
@@ -151,7 +156,6 @@ struct CommandOptions
         LookupKind kind;            ///< The kind of lookup
         Index nameIndex;            ///< The name index in the pool
     };
-
 
     struct UserValueKey
     {
