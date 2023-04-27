@@ -7429,7 +7429,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                if (auto callableDecl = as<CallableDecl>(requirementDecl))
+                CallableDecl* callableDecl = nullptr;
+                if (auto genDecl = as<GenericDecl>(requirementDecl))
+                    callableDecl = as<CallableDecl>(genDecl->inner);
+                else
+                    callableDecl = as<CallableDecl>(requirementDecl);
+                if (callableDecl)
                 {
                     // Differentiable functions has additional requirements for the derivatives.
                     for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
@@ -8369,7 +8374,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl, bool emitBody = true)
     {
 
-        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
+        IRGeneric* outerGeneric = nullptr;
+        
+        if (auto derivativeRequirement = as<DerivativeRequirementDecl>(decl))
+            outerGeneric = emitOuterGenerics(subContext, derivativeRequirement->originalRequirementDecl, derivativeRequirement->originalRequirementDecl);
+        else
+            outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         // need to create an IR function here
 

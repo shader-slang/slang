@@ -210,8 +210,8 @@ struct DiffUnzipPass
         auto baseFn = _getOriginalFunc(mixedCall);
         SLANG_RELEASE_ASSERT(baseFn);
 
-        auto primalFuncType = autodiffContext->transcriberSet.primalTranscriber->differentiateFunctionType(
-            primalBuilder, baseFn, as<IRFuncType>(baseFn->getDataType()));
+        auto primalFuncType = autodiffContext->transcriberSet.primalTranscriber->transcribe(
+                    primalBuilder, baseFn->getDataType());
 
         IRInst* intermediateType = nullptr;
 
@@ -251,12 +251,12 @@ struct DiffUnzipPass
             intermediateVar = primalBuilder->emitVar((IRType*)intermediateType);
             primalBuilder->markInstAsPrimal(intermediateVar);
         }
-        
+
         IRInst* primalFn = nullptr;
         if (intermediateVar)
         {
             primalBuilder->addBackwardDerivativePrimalContextDecoration(intermediateVar, intermediateVar);
-            primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst(primalFuncType, baseFn);
+            primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst((IRType*)primalFuncType, baseFn);
         }
         else
         {
@@ -298,7 +298,10 @@ struct DiffUnzipPass
             primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
         primalBuilder->markInstAsPrimal(primalVal);
 
-        SLANG_RELEASE_ASSERT(mixedCall->getArgCount() <= primalFuncType->getParamCount());
+        auto resolvedPrimalFuncType = as<IRFuncType>(getResolvedInstForDecorations(primalFuncType));
+        SLANG_RELEASE_ASSERT(resolvedPrimalFuncType);
+
+        SLANG_RELEASE_ASSERT(mixedCall->getArgCount() <= resolvedPrimalFuncType->getParamCount());
 
         List<IRInst*> diffArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
@@ -316,7 +319,7 @@ struct DiffUnzipPass
                 // If arg is a mixed differential (pair), it should have already been split.
                 SLANG_ASSERT(primalArg);
                 SLANG_ASSERT(diffArg);
-                auto primalParamType = primalFuncType->getParamType(ii);
+                auto primalParamType = resolvedPrimalFuncType->getParamType(ii);
                 
                 if (const auto outType = as<IROutType>(primalParamType))
                 {

@@ -1273,7 +1273,7 @@ namespace Slang
 
             return InstPair(primalSpecialize, diffSpecialize);
         }
-        else if (isBackwardDifferentiableFunc(genericInnerVal))
+        else if (isBackwardDifferentiableFunc(genericInnerVal) || as<IRFuncType>(genericInnerVal))
         {
             List<IRInst*> args;
             for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)

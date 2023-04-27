@@ -6,6 +6,9 @@ standard output = {
 #extension GL_EXT_spirv_intrinsics : require
 layout(row_major) uniform;
 layout(row_major) buffer;
+layout(std430, binding = 0) buffer _S1 {
+    int _data[];
+} outputBuffer_0;
 spirv_instruction(id = 256)
 void livenessStart_0(spirv_by_reference int  _0[2], spirv_literal int _1);
 
@@ -40,7 +43,7 @@ int calcThing_0(int offset_0)
             livenessEnd_0(k_0, 0);
             break;
         }
-        bool _S1 = (k_0 + 7) % 5 == 4;
+        bool _S2 = (k_0 + 7) % 5 == 4;
         int k_1 = k_0 + 1;
         int i_0;
         livenessStart_1(i_0, 0);
@@ -59,10 +62,10 @@ int calcThing_0(int offset_0)
             i_0 = i_0 + 1;
         }
         livenessEnd_0(k_0, 0);
-        int _S2 = total_0;
+        int _S3 = total_0;
         livenessEnd_0(total_0, 0);
-        int total_1 = _S2 + another_0[k_0 & 1];
-        if(_S1)
+        int total_1 = _S3 + another_0[k_0 & 1];
+        if(_S2)
         {
             livenessEnd_1(another_0, 0);
             return 1;
@@ -83,9 +86,6 @@ int calcThing_0(int offset_0)
     return total_0;
 }
 
-layout(std430, binding = 0) buffer _S3 {
-    int _data[];
-} outputBuffer_0;
 layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {

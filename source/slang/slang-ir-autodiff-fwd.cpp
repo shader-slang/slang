@@ -955,7 +955,7 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(IRBuilder* builder, IRSpec
             builder->getTypeKind(), diffBaseSpecialize->getBase(), args.getCount(), args.getBuffer());
         return InstPair(primalSpecialize, diffSpecialize);
     }
-    else if (_isDifferentiableFunc(genericInnerVal))
+    else if (_isDifferentiableFunc(genericInnerVal) || as<IRFuncType>(genericInnerVal))
     {
         List<IRInst*> args;
         for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
@@ -1378,6 +1378,19 @@ InstPair ForwardDiffTranscriber::transcribeMakeExistential(IRBuilder* builder, I
     }
 
     return InstPair(primalResult, diffResult);
+}
+
+InstPair ForwardDiffTranscriber::transcribeDefaultConstruct(IRBuilder* builder, IRInst* origInst)
+{
+    IRInst* primalConstruct = maybeCloneForPrimalInst(builder, origInst);
+
+    IRInst* diffConstruct = nullptr;
+
+    if (auto diffType = differentiateType(builder, origInst->getDataType()))
+    {
+        diffConstruct = builder->emitDefaultConstructRaw(diffType);
+    }
+    return InstPair(primalConstruct, diffConstruct);
 }
 
 InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, IRInst* origInst)
@@ -1808,6 +1821,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_WrapExistential:
         return transcribeWrapExistential(builder, origInst);
+
+    case kIROp_DefaultConstruct:
+        return transcribeDefaultConstruct(builder, origInst);
 
     case kIROp_undefined:
         return transcribeUndefined(builder, origInst);

@@ -458,6 +458,18 @@ IRInst* DifferentiableTypeConformanceContext::getDiffTypeWitnessFromPairType(IRB
     return _getDiffTypeWitnessFromPairType(sharedContext, builder, type);
 }
 
+IRInst* DifferentiableTypeConformanceContext::getDiffZeroMethodFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type)
+{
+    auto witnessTable = type->getWitness();
+    return _lookupWitness(builder, witnessTable, sharedContext->zeroMethodStructKey);
+}
+
+IRInst* DifferentiableTypeConformanceContext::getDiffAddMethodFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type)
+{
+    auto witnessTable = type->getWitness();
+    return _lookupWitness(builder, witnessTable, sharedContext->addMethodStructKey);
+}
+
 void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
 {
     for (auto globalInst : sharedContext->moduleInst->getChildren())

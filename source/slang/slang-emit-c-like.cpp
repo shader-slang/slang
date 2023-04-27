@@ -3771,12 +3771,28 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
 
     for(auto inst : module->getGlobalInsts())
     {
+        // Emit all resource-typed objects first. This is to avoid an odd scenario in HLSL
+        // where not using a resource type in a resource definition before the same type
+        // is used for a function parameter causes HLSL to complain about an 'incomplete type'
+        // 
+        if ( isResourceType(inst->getDataType()) )
+        {
+            ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
+        }
+    }
+
+    for(auto inst : module->getGlobalInsts())
+    {
         if( as<IRType>(inst) )
         {
             // Don't emit a type unless it is actually used or is marked public.
             if (!inst->findDecoration<IRPublicDecoration>())
                 continue;
         }
+
+        // Skip resource types in this pass.
+        if ( isResourceType(inst->getDataType()) )
+            continue;
 
         ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
     }

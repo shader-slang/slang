@@ -350,6 +350,7 @@ struct WitnessLookupLoweringContext
             {
                 if (auto specialize = as<IRSpecialize>(use->getUser()))
                 {
+                    builder.setInsertBefore(use->getUser());
                     List<IRInst*> args;
                     for (UInt i = 0; i < specialize->getArgCount(); i++)
                         args.add(specialize->getArg(i));
