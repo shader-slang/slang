@@ -129,6 +129,8 @@ enum class OptionKind
 
     // Depreciated
     ParameterBlocksUseRegisterSpaces,
+
+    CountOf,
 };
 
 struct Option
@@ -544,6 +546,10 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::ParameterBlocksUseRegisterSpaces, "-parameter-blocks-use-register-spaces", nullptr, "Parameter blocks will use register spaces" },
     };
     _addOptions(makeConstArrayView(depreciatedOpts), options);
+
+    // We can now check that the whole range is available. If this fails it means there 
+    // is an enum in the list that hasn't been setup as an option!
+    SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Option, UserValue(0), UserValue(OptionKind::CountOf)));
 }
 
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact);
@@ -2027,25 +2033,24 @@ struct OptionsParser
                     }
                     break;
                 }
-                default: break;
-            }
-
-            // Special case so we can break out of the loop
-            if (optionKind == OptionKind::InputFilesRemain)
-            {
-                // The `--` option causes us to stop trying to parse options,
-                // and treat the rest of the command line as input file names:
-                while (reader.hasArg())
+                case OptionKind::InputFilesRemain:
                 {
-                    SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer()));
+                    // The `--` option causes us to stop trying to parse options,
+                    // and treat the rest of the command line as input file names:
+                    while (reader.hasArg())
+                    {
+                        SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer()));
+                    }
+                    break;
+                } 
+                default:
+                {
+                    // Hmmm, we looked up and produced a valid enum, but it wasn't handled in the switch... 
+                    sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
+                    // TODO: print a usage message
+                    return SLANG_FAIL;
                 }
-                break;
             }
-
-            // Hmmm, we do know what the option is but couldn't handle
-            sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
-            // TODO: print a usage message
-            return SLANG_FAIL;
         }
 
         if (compileStdLib)

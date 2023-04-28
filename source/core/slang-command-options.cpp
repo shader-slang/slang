@@ -475,6 +475,68 @@ void CommandOptions::findCategoryIndicesFromUsage(const UnownedStringSlice& slic
     }
 }
 
+Count CommandOptions::getOptionCountInRange(Index categoryIndex, UserValue start, UserValue nonInclEnd) const
+{
+    const UserIndex startIndex = UserIndex(start);
+    const UserIndex endIndex = UserIndex(nonInclEnd);
+
+    Count count = 0;
+
+    for (auto& opt : getOptionsForCategory(categoryIndex))
+    {
+        const auto val = opt.userValue;
+        if (val == kInvalidUserValue)
+        {
+            continue;
+        }
+
+        const auto valIndex = UserIndex(val);
+        count += Index(valIndex >= startIndex && valIndex < endIndex);
+    }
+
+    return count;
+}
+
+Count CommandOptions::getOptionCountInRange(LookupKind kind, UserValue start, UserValue nonInclEnd) const
+{
+    Index count = 0;
+
+    if (kind == LookupKind::Option)
+    {
+        // If we are lookup up options, then we iterate over all option categories
+        const auto catCount = m_categories.getCount();
+        for (Index categoryIndex = 0; categoryIndex < catCount; ++categoryIndex)
+        {
+            if (m_categories[categoryIndex].kind == CategoryKind::Option)
+            {
+                count += getOptionCountInRange(categoryIndex, start, nonInclEnd);
+            }
+        }
+    }
+    else if (Index(kind) >= 0)
+    {
+        // It's a regular category
+        count = getOptionCountInRange(Index(kind), start, nonInclEnd);
+    }
+
+    return count;
+}
+
+
+bool CommandOptions::hasContiguousUserValueRange(LookupKind kind, UserValue start, UserValue nonInclEnd) const
+{
+    const Count rangeCount = Count(nonInclEnd) - Count(start);
+    SLANG_ASSERT(rangeCount >= 0);
+
+    if (rangeCount <= 0)
+    {
+        return true;
+    }
+
+    const Count count = getOptionCountInRange(kind, start, nonInclEnd);
+    return rangeCount == count;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! CommandOptionsWriter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void CommandOptionsWriter::appendDescription(const CommandOptions& options)

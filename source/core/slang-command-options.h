@@ -128,6 +128,17 @@ struct CommandOptions
     void findCategoryIndicesFromUsage(const UnownedStringSlice& usageSlice, List<Index>& outCategories) const;
         /// Get all the option names associated with a category index
     void getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const;
+    
+        /// Set up a lookup kind from a category index
+    static LookupKind makeLookupKind(Index categoryIndex) { return LookupKind(categoryIndex); }
+
+        /// Returns true, if all values from [start, end) are found for the kind
+    bool hasContiguousUserValueRange(LookupKind kind, UserValue start, UserValue nonInclEnd) const;
+
+        /// Returns the number of options in the range 
+    Count getOptionCountInRange(Index categoryIndex, UserValue start, UserValue nonInclEnd) const;
+    Count getOptionCountInRange(LookupKind kind, UserValue start, UserValue nonInclEnd) const;
+
 
     /// Ctor
     CommandOptions() :
