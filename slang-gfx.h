@@ -2058,7 +2058,7 @@ struct AdapterLUID
 
     bool operator==(const AdapterLUID& other) const
     {
-        for (int i = 0; i < sizeof(AdapterLUID::luid); ++i)
+        for (size_t i = 0; i < sizeof(AdapterLUID::luid); ++i)
             if (luid[i] != other.luid[i])
                 return false;
         return true;
