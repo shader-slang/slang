@@ -390,7 +390,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
             {
                 if (auto var = as<IRVar>(result.instToRecompute))
                 {
-                    IRUse* storeUse = findUniqueStoredVal(var);
+                    IRUse* storeUse = findLatestUniqueWriteUse(var);
                     if (storeUse)
                         workList.add(storeUse);
                 }
@@ -1300,101 +1300,6 @@ void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)
     return;
 }
 
-static bool doesInstHaveDiffUse(IRInst* inst)
-{
-    bool hasDiffUser = false;
-
-    for (auto use = inst->firstUse; use; use = use->nextUse)
-    {
-        auto user = use->getUser();
-        if (isDiffInst(user))
-        {
-            // Ignore uses that is a return or MakeDiffPair
-            switch (user->getOp())
-            {
-            case kIROp_Return:
-                continue;
-            case kIROp_MakeDifferentialPair:
-                if (!user->hasMoreThanOneUse() && user->firstUse &&
-                    user->firstUse->getUser()->getOp() == kIROp_Return)
-                    continue;
-                break;
-            default:
-                break;
-            }
-            hasDiffUser = true;
-            break;
-        }
-    }
-
-    return hasDiffUser;
-}
-
-static bool doesInstHaveStore(IRInst* inst)
-{
-    SLANG_RELEASE_ASSERT(as<IRPtrTypeBase>(inst->getDataType()));
-
-    for (auto use = inst->firstUse; use; use = use->nextUse)
-    {
-        if (as<IRStore>(use->getUser()))
-            return true;
-
-        if (as<IRPtrTypeBase>(use->getUser()->getDataType()))
-        {
-            if (doesInstHaveStore(use->getUser()))
-                return true;
-        }
-    }
-
-    return false;
-}
-
-static bool isIntermediateContextType(IRType* type)
-{
-    switch (type->getOp())
-    {
-    case kIROp_BackwardDiffIntermediateContextType:
-        return true;
-    case kIROp_PtrType:
-        return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());
-    case kIROp_ArrayType:
-        return isIntermediateContextType(as<IRArrayType>(type)->getElementType());
-    }
-
-    return false;
-}
-
-static bool shouldStoreVar(IRVar* var)
-{
-    // Always store intermediate context var.
-    if (const auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
-    {
-        // If we are specializing a callee's intermediate context with types that can't be stored,
-        // we can't store the entire context.
-        if (auto spec = as<IRSpecialize>(as<IRPtrTypeBase>(var->getDataType())->getValueType()))
-        {
-            for (UInt i = 0; i < spec->getArgCount(); i++)
-            {
-                if (!canTypeBeStored(spec->getArg(i)))
-                    return false;
-            }
-        }
-        return true;
-    }
-
-    if (isIntermediateContextType(var->getDataType()))
-    {
-        return true;
-    }
-
-    // For now the store policy is simple, we use two conditions:
-    // 1. Is the var used in a differential block and,
-    // 2. Does the var have a store
-    // 
-
-    return (doesInstHaveDiffUse(var) && doesInstHaveStore(var) && canTypeBeStored(as<IRPtrTypeBase>(var->getDataType())->getValueType()));
-}
-
 enum CheckpointPreference
 {
     None,
@@ -1539,6 +1444,40 @@ static bool shouldStoreInst(IRInst* inst)
         return false;
 
     return true;
+}
+
+static bool shouldStoreVar(IRVar* var)
+{
+    if (const auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+    {
+        // If we are specializing a callee's intermediate context with types that can't be stored,
+        // we can't store the entire context.
+        if (auto spec = as<IRSpecialize>(as<IRPtrTypeBase>(var->getDataType())->getValueType()))
+        {
+            for (UInt i = 0; i < spec->getArgCount(); i++)
+            {
+                if (!canTypeBeStored(spec->getArg(i)))
+                    return false;
+            }
+        }
+    }
+
+    auto storeUse = findLatestUniqueWriteUse(var);
+    if (storeUse)
+    {
+        if (!canTypeBeStored(as<IRPtrTypeBase>(var->getDataType())->getValueType()))
+            return false;
+        if (auto callUser = as<IRCall>(storeUse->getUser()))
+        {
+            // If the var is being written to by a call, the decision
+            // of the var will be the same as the decision for the call.
+            return shouldStoreInst(callUser);
+        }
+        // Default behavior is to store if we can.
+        return true;
+    }
+    // If the var has never been written to, don't store it.
+    return false;
 }
 
 bool canRecompute(IRUse* use)
