@@ -622,8 +622,9 @@ void CommandOptionsWriter::appendDescription(const CommandOptions& options)
             }
             else
             {
-                m_builder << category.description;
+                m_builder << category.name;
             }
+
             const auto length = m_builder.getLength() - count;
             m_builder << "\n";
 
@@ -631,9 +632,8 @@ void CommandOptionsWriter::appendDescription(const CommandOptions& options)
        
             m_builder << "\n\n";
 
-            // If it's a value type, output it's description
-            if (category.kind == CategoryKind::Value && 
-                category.description.getLength() > 0)
+            // If there is a description output it
+            if (category.description.getLength() > 0)
             {
                 _appendText(0, category.description);
                 m_builder << "\n";
