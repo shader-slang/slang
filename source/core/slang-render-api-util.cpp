@@ -261,9 +261,6 @@ static bool _canLoadSharedLibrary(const char* libName)
 
 /* static */bool RenderApiUtil::calcHasApi(RenderApiType type)
 {
-    const char* d3d12LibName = SLANG_ENABLE_VKD3D ? "vkd3d-proton-d3d12" : "d3d12";
-    const char* d3d11LibName = SLANG_ENABLE_DXVK ? "dxvk_d3d11" : "d3d11";
-
     switch (type)
     {
 #if SLANG_WINDOWS_FAMILY
@@ -275,8 +272,8 @@ static bool _canLoadSharedLibrary(const char* libName)
 #endif
 
 #if SLANG_ENABLE_DIRECTX
-        case RenderApiType::D3D11:  return _canLoadSharedLibrary(d3d11LibName);
-        case RenderApiType::D3D12:  return _canLoadSharedLibrary(d3d12LibName);
+        case RenderApiType::D3D11:  return _canLoadSharedLibrary(SLANG_ENABLE_DXVK ? "dxvk_d3d11" : "d3d11");
+        case RenderApiType::D3D12:  return _canLoadSharedLibrary(SLANG_ENABLE_VKD3D ? "vkd3d-proton-d3d12" : "d3d12");
 #endif
 
         case RenderApiType::CPU:    return true;
