@@ -2253,7 +2253,7 @@ namespace Slang
         SLANG_ASSERT(originalType->errorType->equals(m_astBuilder->getBottomType()));
         jvpType->errorType = originalType->errorType;
 
-        for (UInt i = 0; i < originalType->getParamCount(); i++)
+        for (Index i = 0; i < originalType->getParamCount(); i++)
         {
             if(auto jvpParamType = _toDifferentialParamType(originalType->getParamType(i)))
                 jvpType->paramTypes.add(jvpParamType);
@@ -2278,7 +2278,7 @@ namespace Slang
         SLANG_ASSERT(originalType->errorType->equals(m_astBuilder->getBottomType()));
         type->errorType = originalType->errorType;
 
-        for (UInt i = 0; i < originalType->getParamCount(); i++)
+        for (Index i = 0; i < originalType->getParamCount(); i++)
         {
             if (auto outType = as<OutType>(originalType->getParamType(i)))
             {

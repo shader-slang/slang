@@ -1897,9 +1897,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRFuncType* visitFuncType(FuncType* type)
     {
         IRType* resultType = lowerType(context, type->getResultType());
-        UInt paramCount = type->getParamCount();
+        Index paramCount = type->getParamCount();
         List<IRType*> paramTypes;
-        for (UInt pp = 0; pp < paramCount; ++pp)
+        for (Index pp = 0; pp < paramCount; ++pp)
         {
             paramTypes.add(lowerType(context, type->getParamType(pp)));
         }
@@ -3930,7 +3930,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<OutArgumentFixup>* ioFixups)
     {
         Count argCount = expr->arguments.getCount();
-        SLANG_ASSERT(argCount == static_cast<Count>(funcType->getParamCount()));
+        SLANG_ASSERT(argCount == funcType->getParamCount());
 
         for(Index i = 0; i < argCount; ++i)
         {

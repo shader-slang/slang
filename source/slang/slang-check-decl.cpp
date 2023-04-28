@@ -5587,7 +5587,7 @@ namespace Slang
             return;
         decl->returnType.type = funcType->getResultType();
         decl->errorType.type = funcType->getErrorType();
-        for (UInt i = 0; i < funcType->getParamCount(); i++)
+        for (Index i = 0; i < funcType->getParamCount(); i++)
         {
             auto paramType = funcType->getParamType(i);
             if (auto dirType = as<ParamDirectionType>(paramType))
