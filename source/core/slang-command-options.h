@@ -234,6 +234,8 @@ struct CommandOptionsWriter
     void _appendWithWrap(Count indentCount, List<UnownedStringSlice>& slices, const UnownedStringSlice& delimit);
     void _appendWithWrap(Count indentCount, List<UnownedStringSlice>& lines);
     void _requireIndent(Count indentCount);
+    void _appendText(Count indentCount, const UnownedStringSlice& text);
+
 
     UnownedStringSlice m_indentSlice;
     Count m_lineLength = 80;

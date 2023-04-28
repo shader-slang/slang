@@ -630,6 +630,14 @@ void CommandOptionsWriter::appendDescription(const CommandOptions& options)
             m_builder.appendRepeatedChar('=', length);
        
             m_builder << "\n\n";
+
+            // If it's a value type, output it's description
+            if (category.kind == CategoryKind::Value && 
+                category.description.getLength() > 0)
+            {
+                _appendText(0, category.description);
+                m_builder << "\n";
+            }
         }
 
         for (auto& option : options.getOptionsForCategory(categoryIndex))
@@ -656,16 +664,7 @@ void CommandOptionsWriter::appendDescription(const CommandOptions& options)
             
             m_builder << ": ";
 
-            List<UnownedStringSlice> lines;
-            StringUtil::calcLines(option.description, lines);
-                
-            // Remove very last line if it's empty
-            if (lines.getCount() > 1 && lines.getLast().trim().getLength() == 0)
-            {
-                lines.removeLast();
-            }
-
-            _appendWithWrap(2, lines);
+            _appendText(2, option.description);
 
             if (option.usage.getLength())
             {
@@ -691,6 +690,20 @@ void CommandOptionsWriter::appendDescription(const CommandOptions& options)
 
         m_builder << "\n";
     }
+}
+
+void CommandOptionsWriter::_appendText(Count indentCount, const UnownedStringSlice& text)
+{
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(text, lines);
+
+    // Remove very last line if it's empty
+    if (lines.getCount() > 1 && lines.getLast().trim().getLength() == 0)
+    {
+        lines.removeLast();
+    }
+
+    _appendWithWrap(indentCount, lines);
 }
 
 Count CommandOptionsWriter::_getCurrentLineLength()
@@ -759,6 +772,8 @@ void CommandOptionsWriter::_appendWithWrap(Count indentCount, List<UnownedString
         }
     }
 }
+
+
 
 void CommandOptionsWriter::_appendWithWrap(Count indentCount, List<UnownedStringSlice>& slices, const UnownedStringSlice& delimit)
 {

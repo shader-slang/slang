@@ -179,7 +179,6 @@ void initCommandOptions(CommandOptions& options)
     options.addCategory(CategoryKind::Option, "Internal", "Internal-use options (use at your own risk)");
     options.addCategory(CategoryKind::Option, "Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
 
-    
     // Do the easy ones
     {
         options.addCategory(CategoryKind::Value, "compiler", "Downstream Compilers (aka Pass through)", UserValue(ValueCategory::Compiler));
@@ -232,14 +231,31 @@ void initCommandOptions(CommandOptions& options)
             "may assume that the target supports that capability, and generate "
             "code accordingly.");
 
-        // TODO(JS):
-        // Ideally we'd add these directly from the capability system
+        List<UnownedStringSlice> names;
+        getCapabilityAtomNames(names);
 
+        // We'll just add to keep the list more simple...
         options.addValue("spirv_1_{ 0,1,2,3,4,5 }", "minimum supported SPIR - V version");
-        options.addValue("GL_NV_ray_tracing", "enables the GL_NV_ray_tracing extension");
-        options.addValue("GL_EXT_ray_tracing", "enables the GL_EXT_ray_tracing extension");
-        options.addValue("GL_NV_fragment_shader_barycentric", "enables the GL_NV_fragment_shader_barycentric extension");
-        options.addValue("GL_EXT_fragment_shader_barycentric", "enables the GL_EXT_fragment_shader_barycentric extension");
+
+        for (auto name : names)
+        {
+            if (name.startsWith("__") || 
+                name.startsWith("spirv_1_"))
+            {
+                continue;
+            }
+            else if (name.startsWith("GL_"))
+            {
+                // We'll assume it is an extension..
+                StringBuilder buf;
+                buf << "enables the " << name << " extension";
+                options.addValue(name, buf.getUnownedSlice());
+            }
+            else
+            {
+                options.addValue(name);
+            }
+        }
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! extension !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -499,7 +515,6 @@ void initCommandOptions(CommandOptions& options)
     // is an enum in the list that hasn't been setup as an option!
     SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Option, UserValue(0), UserValue(OptionKind::CountOf)));
     SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Category, UserValue(0), UserValue(ValueCategory::CountOf)));
-
 }
 
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact);
