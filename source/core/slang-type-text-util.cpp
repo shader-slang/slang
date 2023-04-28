@@ -99,14 +99,15 @@ static const NameValue s_archiveTypeInfos[] =
     { SLANG_ARCHIVE_TYPE_RIFF, "riff"},
 };
 
-static const NameValue s_debugInfoFormatInfos[] = 
+
+static const NamesDescriptionValue s_debugInfoFormatInfos[] = 
 {
-    { SLANG_DEBUG_INFO_FORMAT_DEFAULT, "default-format" },
-    { SLANG_DEBUG_INFO_FORMAT_C7, "c7" },
-    { SLANG_DEBUG_INFO_FORMAT_PDB, "pdb" },
-    { SLANG_DEBUG_INFO_FORMAT_STABS, "stabs" },
-    { SLANG_DEBUG_INFO_FORMAT_COFF, "coff" },
-    { SLANG_DEBUG_INFO_FORMAT_DWARF, "dwarf" },
+    { SLANG_DEBUG_INFO_FORMAT_DEFAULT,  "default-format", "Use the default debugging format for the target" },
+    { SLANG_DEBUG_INFO_FORMAT_C7,       "c7",           "CodeView C7 format (typically means debugging infomation is embedded in the binary)" },
+    { SLANG_DEBUG_INFO_FORMAT_PDB,      "pdb",          "Program database" },
+    { SLANG_DEBUG_INFO_FORMAT_STABS,    "stabs",        "STABS debug format" },
+    { SLANG_DEBUG_INFO_FORMAT_COFF,     "coff",         "COFF debug format" },
+    { SLANG_DEBUG_INFO_FORMAT_DWARF,    "dwarf",        "DWARF debug format"},
 };
 
 static const NamesDescriptionValue s_lineDirectiveInfos[] = 
@@ -155,7 +156,7 @@ static const NamesDescriptionValue s_floatingPointModes[] =
     return makeConstArrayView(s_archiveTypeInfos);
 }
 
-/* static */ConstArrayView<NameValue> TypeTextUtil::getDebugInfoFormatInfos()
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getDebugInfoFormatInfos()
 {
     return makeConstArrayView(s_debugInfoFormatInfos);
 }
@@ -220,7 +221,7 @@ static const NamesDescriptionValue s_floatingPointModes[] =
 
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough type)
 {
-    return NameValueUtil::findDescription(getCompilerInfos(), type, toSlice("unknown"));
+    return NameValueUtil::findName(getCompilerInfos(), type, toSlice("unknown"));
 }
 
 /* static */SlangSourceLanguage TypeTextUtil::findSourceLanguage(const UnownedStringSlice& text)

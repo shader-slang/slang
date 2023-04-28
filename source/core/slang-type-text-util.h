@@ -31,7 +31,7 @@ struct TypeTextUtil
         /// Get the archive type infos
     static ConstArrayView<NameValue> getArchiveTypeInfos();
         /// Get the debug format types
-    static ConstArrayView<NameValue> getDebugInfoFormatInfos();
+    static ConstArrayView<NamesDescriptionValue> getDebugInfoFormatInfos();
 
     static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
 

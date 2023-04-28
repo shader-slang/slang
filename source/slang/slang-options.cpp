@@ -455,7 +455,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::SerialIr, "-serial-ir", nullptr, "Serialize the IR between front-end and back-end." },
         { OptionKind::SkipCodeGen, "-skip-codegen", nullptr, "Skip the code generation phase." },
         { OptionKind::ValidateIr, "-validate-ir", nullptr, "Validate the IR between the phases." },
-        { OptionKind::VerbosePaths, "-verbose-paths", nullptr, "Display more detailed paths in diagnostic output." },
+        { OptionKind::VerbosePaths, "-verbose-paths", nullptr, "When displaying diagnostic output aim to display more detailed path information. "
+        "In practice this is typically the complete 'canonical' path to the source file used." },
         { OptionKind::VerifyDebugSerialIr, "-verify-debug-serial-ir", nullptr, "Verify IR in the front-end." }
     };
     _addOptions(makeConstArrayView(debuggingOpts), options);
