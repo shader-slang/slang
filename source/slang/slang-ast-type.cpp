@@ -548,7 +548,7 @@ bool FuncType::_equalsImplOverride(Type * type)
         if (paramCount != otherParamCount)
             return false;
 
-        for (UInt pp = 0; pp < paramCount; ++pp)
+        for (Index pp = 0; pp < paramCount; ++pp)
         {
             auto paramType = getParamType(pp);
             auto otherParamType = funcType->getParamType(pp);
@@ -622,9 +622,9 @@ Type* FuncType::_createCanonicalTypeOverride()
 HashCode FuncType::_getHashCodeOverride()
 {
     HashCode hashCode = getResultType()->getHashCode();
-    UInt paramCount = getParamCount();
+    Index paramCount = getParamCount();
     hashCode = combineHash(hashCode, Slang::getHashCode(paramCount));
-    for (UInt pp = 0; pp < paramCount; ++pp)
+    for (Index pp = 0; pp < paramCount; ++pp)
     {
         hashCode = combineHash(
             hashCode,

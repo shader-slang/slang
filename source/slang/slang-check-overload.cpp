@@ -98,7 +98,7 @@ namespace Slang
         OverloadResolveContext&		context,
         OverloadCandidate const&	candidate)
     {
-        UInt argCount = context.getArgCount();
+        Count argCount = context.getArgCount();
         ParamCounts paramCounts = { 0, 0 };
         switch (candidate.flavor)
         {
@@ -1559,7 +1559,7 @@ namespace Slang
                 // Extract parameter list from processed type.
                 List<Type*> paramTypes;
 
-                for (UIndex ii = 0; ii < diffFuncType->getParamCount(); ii++)
+                for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
                     paramTypes.add(removeParamDirType(diffFuncType->getParamType(ii)));
 
                 // Try to infer generic arguments, based on the updated context.
@@ -1682,7 +1682,7 @@ namespace Slang
         for (Index i = 0; i < expr->arguments.getCount(); i++)
         {
             auto& arg = expr->arguments[i];
-            if (funcType && i < (Index)funcType->getParamCount())
+            if (funcType && i < funcType->getParamCount())
             {
                 if (funcType->getParamDirection(i) == kParameterDirection_Out)
                     continue;
