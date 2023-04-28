@@ -5,6 +5,7 @@
 
 #include "slang-string.h"
 #include "slang-array-view.h"
+#include "slang-name-value.h"
 
 namespace Slang
 {
@@ -18,32 +19,22 @@ struct TypeTextUtil
         const char* extensions;             ///< Comma delimited list of extensions associated with the target
         const char* names;                  ///< Comma delimited list of names associated with the target. NOTE! First name is taken as the normal display name.
     };
-    struct LanguageInfo
-    {
-        SlangSourceLanguage language;       ///< The language
-        const char* names;                  ///< Comma delimited list of names
-    };
-    struct CompilerInfo
-    {
-        SlangPassThrough compiler;          ///< The compiler
-        const char* names;                  ///< Comma delimited list of names
-        const char* humanName;              ///< Human readable name
-    };
-    struct ArchiveTypeInfo
-    {
-        SlangArchiveType type;
-        UnownedStringSlice name;
-    };
-
+    
         /// Get the compile target infos
     static ConstArrayView<CompileTargetInfo> getCompileTargetInfos();
+
         /// Get the language infos
-    static ConstArrayView<LanguageInfo> getLanguageInfos();
+    static ConstArrayView<NamesValue> getLanguageInfos();
         /// Get the compiler infos
-    static ConstArrayView<CompilerInfo> getCompilerInfos();
-        
+    static ConstArrayView<NamesDescriptionValue> getCompilerInfos();
         /// Get the archive type infos
-    static ConstArrayView<ArchiveTypeInfo> getArchiveTypeInfos();
+    static ConstArrayView<NameValue> getArchiveTypeInfos();
+        /// Get the debug format types
+    static ConstArrayView<NameValue> getDebugInfoFormatInfos();
+
+    static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
+
+    static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
 
         /// Get the scalar type as text.
     static Slang::UnownedStringSlice getScalarTypeName(slang::TypeReflection::ScalarType scalarType);
@@ -59,9 +50,7 @@ struct TypeTextUtil
 
         /// As human readable text
     static UnownedStringSlice getPassThroughAsHumanText(SlangPassThrough type);
-        /// Gets pass through from human text (as from getPassThroughAsHumanText)
-    static SlangResult findPassThroughFromHumanText(const UnownedStringSlice& text, SlangPassThrough& outPassThrough);
-
+    
         /// Given a source language name returns a source language. Name here is distinct from extension
     static SlangSourceLanguage findSourceLanguage(const UnownedStringSlice& text);
 

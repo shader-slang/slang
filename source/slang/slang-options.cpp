@@ -150,6 +150,9 @@ enum class ValueCategory
     ArchiveType,
     Stage,
     LineDirectiveMode,
+    DebugInfoFormat,
+
+    CountOf,
 };
 
 } // anonymous
@@ -176,63 +179,35 @@ void initCommandOptions(CommandOptions& options)
     options.addCategory(CategoryKind::Option, "Internal", "Internal-use options (use at your own risk)");
     options.addCategory(CategoryKind::Option, "Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
 
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! compiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
+    
+    // Do the easy ones
     {
         options.addCategory(CategoryKind::Value, "compiler", "Downstream Compilers (aka Pass through)", UserValue(ValueCategory::Compiler));
-        for (auto info : TypeTextUtil::getCompilerInfos())
-        {
-            options.addValue(UnownedStringSlice(info.names), UnownedStringSlice(info.humanName), UserValue(info.compiler));   
-        }
+        options.addValues(TypeTextUtil::getCompilerInfos());
+    
+        options.addCategory(CategoryKind::Value, "language", "Language", UserValue(ValueCategory::Language));
+        options.addValues(TypeTextUtil::getLanguageInfos());
+
+        options.addCategory(CategoryKind::Value, "archive-type", "Archive Type", UserValue(ValueCategory::ArchiveType));
+        options.addValues(TypeTextUtil::getArchiveTypeInfos());
+
+        options.addCategory(CategoryKind::Value, "line-directive-mode", "Line Directive Mode", UserValue(ValueCategory::LineDirectiveMode));
+        options.addValues(TypeTextUtil::getLineDirectiveInfos());
+
+        options.addCategory(CategoryKind::Value, "debug-info-format", "Debug Info Format", UserValue(ValueCategory::DebugInfoFormat));
+        options.addValues(TypeTextUtil::getDebugInfoFormatInfos());
+
+        options.addCategory(CategoryKind::Value, "fp-mode", "Floating Point Mode", UserValue(ValueCategory::FloatingPointMode));
+        options.addValues(TypeTextUtil::getFloatingPointModeInfos());
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
     {
         options.addCategory(CategoryKind::Value, "target", "Target", UserValue(ValueCategory::Target));
-        for (const auto& info : TypeTextUtil::getCompileTargetInfos())
+        for (auto opt : TypeTextUtil::getCompileTargetInfos())
         {
-            options.addValue(info.names, UserValue(info.target));
-        }
-    }
-
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! language !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-    {
-        options.addCategory(CategoryKind::Value, "language", "Language", UserValue(ValueCategory::Language));
-        for (const auto& info : TypeTextUtil::getLanguageInfos())
-        {
-            options.addValue(info.names, UserValue(info.language));
-        }
-    }
-
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! fp-mode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-    {
-        options.addCategory(CategoryKind::Value, "fp-mode", "Floating Point Mode", UserValue(ValueCategory::FloatingPointMode));
-
-        options.addValue("precise", 
-            "Disable optimization that could change the output of floating-"
-            "point computations, including around infinities, NaNs, denormalized "
-            "values, and negative zero. Prefer the most precise versions of special "
-            "functions supported by the target.",
-            UserValue(FloatingPointMode::Precise));
-        options.addValue("fast", 
-            "Allow optimizations that may change results of floating-point "
-            "computations. Prefer the fastest version of special functions supported "
-            "by the target.", 
-            UserValue(FloatingPointMode::Fast));
-        options.addValue("default", "Default floating point mode", UserValue(FloatingPointMode::Default));
-    }
-
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! archive-type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-    {
-        options.addCategory(CategoryKind::Value, "archive-type", "Archive Type", UserValue(ValueCategory::ArchiveType));
-
-        for (auto info : TypeTextUtil::getArchiveTypeInfos())
-        {
-            options.addValue(info.name, UserValue(info.type));
+            options.addValue(opt.names, UserValue(opt.target));
         }
     }
 
@@ -240,41 +215,12 @@ void initCommandOptions(CommandOptions& options)
 
     {
         options.addCategory(CategoryKind::Value, "stage", "Stage", UserValue(ValueCategory::Stage));
-        auto stageInfos = getStageInfos();
-
-        List<StageInfo> infos;
-        infos.addRange(stageInfos.getBuffer(), stageInfos.getCount());
-
-        infos.sort([](const StageInfo& a, const StageInfo& b) -> bool { return Index(a.stage) < Index(b.stage); });
-
-        List<UnownedStringSlice> names;
-
-        const Count count = infos.getCount();
-        Index i = 0;
-        while (i < count)
+        List<NameValue> opts;
+        for (auto& info: getStageInfos())
         {
-            names.clear();
-            const auto stage = infos[i].stage;
-            names.add(UnownedStringSlice(infos[i++].name));
-
-            for (; i < count && infos[i].stage == stage; ++i)
-            {
-                names.add(UnownedStringSlice(infos[i].name));
-            }
-            options.addValue(names.getBuffer(), names.getCount(), UserValue(stage));
+            opts.add({ValueInt(info.stage), info.name });
         }
-    }
-
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! line-directive-mode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-    {
-        options.addCategory(CategoryKind::Value, "line-directive-mode", "Line Directive Mode", UserValue(ValueCategory::LineDirectiveMode));
-
-        options.addValue("none", "Don't emit `#line` directives at all", UserValue(SLANG_LINE_DIRECTIVE_MODE_NONE));
-        options.addValue("source-map", "Use source map to track line associations (doen't emit #line)", UserValue(SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP));
-        options.addValue("default", "Default behavior", UserValue(SLANG_LINE_DIRECTIVE_MODE_DEFAULT));
-        options.addValue("standard", "Emit standard C-style `#line` directives.", UserValue(SLANG_LINE_DIRECTIVE_MODE_STANDARD));
-        options.addValue("glsl", "Emit GLSL-style directives with file *number* instead of name.", UserValue(SLANG_LINE_DIRECTIVE_MODE_GLSL));
+        options.addValuesWithAliases(opts.getArrayView());
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! capabilities !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -413,9 +359,11 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DisableSpecialization, "-disable-specialization", nullptr, "Disables generics and specialization pass." },
         { OptionKind::FloatingPointMode, "-fp-mode,-floating-point-mode", "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>", 
         "Control floating point optimizations"},
-        { OptionKind::DebugInformation, "-g...", "-g, -g<N>", 
+        { OptionKind::DebugInformation, "-g...", "-g, -g<N>, -g<debug-info-format>", 
         "Include debug information in the generated code, where possible.\n"
-        "N is the amount of information, 0..3, unspecified means 2\n" },
+        "N is the amount of information, 0..3, unspecified means 2\n" 
+        "<debug-info-format> specifies a debugging info format\n"
+        "It is valid to have multiple -g options, such as a level and a <debug-info-format>" },
         { OptionKind::LineDirectiveMode, "-line-directive-mode", "-line-directive-mode <line-directive-mode>", 
         "Sets how the `#line` directives should be produced. Available options are:\n"
         "If not specified, default behavior is to use C-style `#line` directives "
@@ -550,6 +498,8 @@ void initCommandOptions(CommandOptions& options)
     // We can now check that the whole range is available. If this fails it means there 
     // is an enum in the list that hasn't been setup as an option!
     SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Option, UserValue(0), UserValue(OptionKind::CountOf)));
+    SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Category, UserValue(0), UserValue(ValueCategory::CountOf)));
+
 }
 
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact);

@@ -3,6 +3,7 @@
 
 #include "slang-basic.h"
 #include "slang-string-slice-pool.h"
+#include "slang-name-value.h"
 
 namespace Slang
 {
@@ -87,7 +88,16 @@ struct CommandOptions
     void addValue(const char* name, UserValue userValue = kInvalidUserValue);
     void addValue(const UnownedStringSlice* names, Count namesCount, UserValue userValue = kInvalidUserValue);
 
+        /// Add values (without UserValue association)
     void addValues(const ValuePair* pairs, Count pairsCount);
+
+        /// Add values
+    void addValues(const ConstArrayView<NameValue>& values);
+    void addValues(const ConstArrayView<NamesValue>& values);
+    void addValues(const ConstArrayView<NamesDescriptionValue>& values);
+
+        /// Sometimes values are listed with *names* per value. This method will take into account the aliases
+    void addValuesWithAliases(const ConstArrayView<NameValue>& values);
 
         /// Get the target index based off the name and the kind
     Index findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name) const;

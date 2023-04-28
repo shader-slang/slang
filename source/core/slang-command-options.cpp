@@ -231,7 +231,6 @@ Index CommandOptions::_addValue(const UnownedStringSlice& name, const Option& in
     return _addOption(name, inOption);
 }
 
-
 void CommandOptions::addValues(const ValuePair* pairs, Count pairsCount)
 {
     for (auto& pair : makeConstArrayView(pairs, pairsCount))
@@ -240,6 +239,56 @@ void CommandOptions::addValues(const ValuePair* pairs, Count pairsCount)
     }
 }
 
+void CommandOptions::addValues(const ConstArrayView<NameValue>& values)
+{
+    for (const auto& value : values)
+    {
+        addValue(value.name, UserValue(value.value));
+    }
+}
+
+void CommandOptions::addValues(const ConstArrayView<NamesValue>& values)
+{
+    for (const auto& value : values)
+    {
+        addValue(value.names, UserValue(value.value));
+    }
+}
+
+void CommandOptions::addValues(const ConstArrayView<NamesDescriptionValue>& values)
+{
+    for (const auto& value : values)
+    {
+        addValue(value.names, value.description, UserValue(value.value));
+    }
+}
+
+void CommandOptions::addValuesWithAliases(const ConstArrayView<NameValue>& inValues)
+{
+    List<NameValue> values;
+    values.addRange(inValues.getBuffer(), inValues.getCount());
+
+    values.sort([](const NameValue& a, const NameValue& b) -> bool { return a.value < b.value; });
+
+    List<UnownedStringSlice> names;
+
+    const Count count = values.getCount();
+    Index i = 0;
+    while (i < count)
+    {
+        names.clear();
+
+        const auto value = values[i].value;
+        names.add(UnownedStringSlice(values[i++].name));
+
+        for (; i < count && values[i].value == value; ++i)
+        {
+            names.add(UnownedStringSlice(values[i].name));
+        }
+
+        addValue(names.getBuffer(), names.getCount(), UserValue(value));
+    }
+}
 
 void CommandOptions::addValue(const UnownedStringSlice& name, UserValue userValue)
 {
@@ -309,6 +358,7 @@ Index CommandOptions::addCategory(CategoryKind kind, const char* name, const cha
     cat.kind = kind;
     cat.name = _addString(nameSlice);
     cat.description = _addString(description);
+    cat.userValue = userValue;
 
     m_currentCategoryIndex = categoryIndex;
 
@@ -501,6 +551,20 @@ Count CommandOptions::getOptionCountInRange(LookupKind kind, UserValue start, Us
 {
     Index count = 0;
 
+    if (kind == LookupKind::Category)
+    {
+        const UserIndex startIndex = UserIndex(start);
+        const UserIndex endIndex = UserIndex(nonInclEnd);
+
+        for (auto& cat : m_categories)
+        {
+            if (cat.userValue != kInvalidUserValue)
+            {
+                const auto valIndex = UserIndex(cat.userValue);
+                count += Index(valIndex >= startIndex && valIndex < endIndex);
+            }
+        }
+    }
     if (kind == LookupKind::Option)
     {
         // If we are lookup up options, then we iterate over all option categories
