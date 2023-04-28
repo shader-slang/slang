@@ -208,7 +208,7 @@ void initCommandOptions(CommandOptions& options)
         options.addCategory(CategoryKind::Value, "target", "Target", UserValue(ValueCategory::Target));
         for (auto opt : TypeTextUtil::getCompileTargetInfos())
         {
-            options.addValue(opt.names, UserValue(opt.target));
+            options.addValue(opt.names, opt.description, UserValue(opt.target));
         }
     }
 

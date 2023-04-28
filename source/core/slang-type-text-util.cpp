@@ -42,28 +42,28 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
 {
     { SLANG_TARGET_UNKNOWN, "",                                                 "unknown"},
     { SLANG_TARGET_NONE,    "",                                                 "none"},
-    { SLANG_HLSL,           "hlsl,fx",                                          "hlsl"},
-    { SLANG_DXBC,           "dxbc",                                             "dxbc"},
-    { SLANG_DXBC_ASM,       "dxbc-asm",                                         "dxbc-asm,dxbc-assembly" },
-    { SLANG_DXIL,           "dxil",                                             "dxil" },
-    { SLANG_DXIL_ASM,       "dxil-asm",                                         "dxil-asm,dxil-assembly" },
-    { SLANG_GLSL,           "glsl,vert,frag,geom,tesc,tese,comp",               "glsl" },
-    { SLANG_GLSL_VULKAN,    "",                                                 "glsl-vulkan" },
-    { SLANG_GLSL_VULKAN_ONE_DESC, "",                                           "glsl-vulkan-one-desc" },
-    { SLANG_SPIRV,          "spv",                                              "spirv"},
-    { SLANG_SPIRV_ASM,      "spv-asm",                                          "spirv-asm,spirv-assembly" },
-    { SLANG_C_SOURCE,       "c",                                                "c" },
-    { SLANG_CPP_SOURCE,     "cpp,c++,cxx",                                      "cpp,c++,cxx" },
-    { SLANG_CPP_PYTORCH_BINDING, "cpp,c++,cxx",                                 "torch,torch-binding,torch-cpp,torch-cpp-binding" },
-    { SLANG_HOST_CPP_SOURCE, "cpp,c++,cxx",                                     "host-cpp,host-c++,host-cxx"},
-    { SLANG_HOST_EXECUTABLE,"exe",                                              "exe,executable" },
-    { SLANG_SHADER_SHARED_LIBRARY, "dll,so",                                    "sharedlib,sharedlibrary,dll" },
-    { SLANG_CUDA_SOURCE,    "cu",                                               "cuda,cu"  },
-    { SLANG_PTX,            "ptx",                                              "ptx" },
-    { SLANG_CUDA_OBJECT_CODE, "obj,o",                                          "cuobj,cubin" },
-    { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable" },
-    { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code" },
-    { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable" },
+    { SLANG_HLSL,           "hlsl,fx",                                          "hlsl",                     "HLSL source code"},
+    { SLANG_DXBC,           "dxbc",                                             "dxbc",                     "DirectX shader bytecode binary"},
+    { SLANG_DXBC_ASM,       "dxbc-asm",                                         "dxbc-asm,dxbc-assembly",   "DirectX shader bytecode assembly" },
+    { SLANG_DXIL,           "dxil",                                             "dxil",                     "DirectX Intermediate Language binary" },
+    { SLANG_DXIL_ASM,       "dxil-asm",                                         "dxil-asm,dxil-assembly",   "DirectX Intermediate Language assembly"},
+    { SLANG_GLSL,           "glsl,vert,frag,geom,tesc,tese,comp",               "glsl",                     "GLSL source code" },
+    { SLANG_GLSL_VULKAN,    "",                                                 "glsl-vulkan",              "GLSL Vulkan source code" },
+    { SLANG_GLSL_VULKAN_ONE_DESC, "",                                           "glsl-vulkan-one-desc",     "GLSL Vulkan source code" },
+    { SLANG_SPIRV,          "spv",                                              "spirv",                    "SPIR-V binary"},
+    { SLANG_SPIRV_ASM,      "spv-asm",                                          "spirv-asm,spirv-assembly", "SPIR-V assembly" },
+    { SLANG_C_SOURCE,       "c",                                                "c",                        "C source code" },
+    { SLANG_CPP_SOURCE,     "cpp,c++,cxx",                                      "cpp,c++,cxx",              "C++ source code" },
+    { SLANG_CPP_PYTORCH_BINDING, "cpp,c++,cxx",                                 "torch,torch-binding,torch-cpp,torch-cpp-binding", "C++ for pytorch binding" },
+    { SLANG_HOST_CPP_SOURCE, "cpp,c++,cxx",                                     "host-cpp,host-c++,host-cxx", "C++ source for host execution"},
+    { SLANG_HOST_EXECUTABLE,"exe",                                              "exe,executable",           "Executable binary" },
+    { SLANG_SHADER_SHARED_LIBRARY, "dll,so",                                    "sharedlib,sharedlibrary,dll", "Shared library/Dll" },
+    { SLANG_CUDA_SOURCE,    "cu",                                               "cuda,cu",                  "CUDA source code"  },
+    { SLANG_PTX,            "ptx",                                              "ptx",                      "PTX assembly" },
+    { SLANG_CUDA_OBJECT_CODE, "obj,o",                                          "cuobj,cubin",              "CUDA binary" },
+    { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable",   "Host callable" },
+    { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code",              "Object code" },
+    { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable",       "Host callable for host execution" },
 };
 
 static const NamesValue s_languageInfos[] = 
@@ -75,23 +75,20 @@ static const NamesValue s_languageInfos[] =
     { SLANG_SOURCE_LANGUAGE_HLSL, "hlsl" },
     { SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda" },
 };
-
-#define SLANG_PASS_THROUGH_TYPES(x) \
-        x("none", NONE, "Unknown") \
-        x("fxc", FXC, "fxc") \
-        x("dxc", DXC, "dxc") \
-        x("glslang", GLSLANG, "glslang") \
-        x("visualstudio,vs", VISUAL_STUDIO, "Visual Studio") \
-        x("clang", CLANG, "Clang") \
-        x("gcc", GCC, "GCC") \
-        x("genericcpp,c,cpp", GENERIC_C_CPP, "Generic C/C++ compiler") \
-        x("nvrtc", NVRTC, "NVRTC (Cuda compiler)") \
-        x("llvm", LLVM, "LLVM/Clang")
+    
 
 static const NamesDescriptionValue s_compilerInfos[] = 
 {
-    #define SLANG_PASS_THROUGH_INFO(x, y, human) { SLANG_PASS_THROUGH_##y, x, human },
-    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_INFO)
+    { SLANG_PASS_THROUGH_NONE,      "none",     "Unknown" },
+    { SLANG_PASS_THROUGH_FXC,       "fxc",      "FXC HLSL compiler" },
+    { SLANG_PASS_THROUGH_DXC,       "dxc",      "DXC HLSL compiler" },
+    { SLANG_PASS_THROUGH_GLSLANG,   "glslang",  "GLSLANG GLSL compiler" },
+    { SLANG_PASS_THROUGH_VISUAL_STUDIO, "visualstudio,vs", "Visual Studio C/C++ compiler" },
+    { SLANG_PASS_THROUGH_CLANG,     "clang",    "Clang C/C++ compiler" },
+    { SLANG_PASS_THROUGH_GCC,       "gcc",      "GCC C/C++ compiler" },
+    { SLANG_PASS_THROUGH_GENERIC_C_CPP, "genericcpp,c,cpp", "A generic C++ compiler (can be any one of visual studio, clang or gcc depending on system and availability)" },
+    { SLANG_PASS_THROUGH_NVRTC,     "nvrtc",     "NVRTC CUDA compiler" },
+    { SLANG_PASS_THROUGH_LLVM,      "llvm",     "LLVM/Clang `slang-llvm`" },
 };
 
 static const NameValue s_archiveTypeInfos[] =
