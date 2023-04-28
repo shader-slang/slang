@@ -1094,8 +1094,6 @@ namespace Slang
         Modifier** modifierLink = &modifiers.first;
         for (;;)
         {
-            SourceLoc loc = parser->tokenReader.peekLoc();
-
             switch (peekTokenType(parser))
             {
             default:
@@ -5433,7 +5431,7 @@ namespace Slang
                 // The reason for the restriction (which perhaps can be broadened), is we don't
                 // want the interpretation of something in parentheses to be determined by something as common as + or - whitespace.
 
-                if (auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
+                if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
                 {
                     // Apply the heuristic:
                     TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();

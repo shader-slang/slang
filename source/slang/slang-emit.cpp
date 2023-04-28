@@ -294,6 +294,7 @@ Result linkAndOptimizeIR(
 
         case CodeGenTarget::CPPSource:
             passOptions.alwaysCreateCollectedParam = true;
+            [[fallthrough]];
         default:
             collectEntryPointUniformParams(irModule, passOptions);
         #if 0

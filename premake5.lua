@@ -351,21 +351,18 @@ workspace "slang"
     filter { "toolset:clang or gcc*" }
         -- Makes all symbols hidden by default unless explicitly 'exported'
         buildoptions { "-fvisibility=hidden" } 
-        -- Warnings
-        buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses" }
-    filter { "toolset:clang or gcc*", "language:C++" }
-        buildoptions { "-Wno-reorder", "-Wno-class-memaccess", "-Wno-invalid-offsetof" }
 
-    filter { "files:source/compiler-core/slang-dxc-compiler.cpp", "toolset:clang or gcc" }
+    filter { "toolset:clang or gcc*", "files:source/compiler-core/slang-dxc-compiler.cpp" }
         -- For the DXC headers
         buildoptions { "-fms-extensions" }
 
-    filter { "toolset:gcc*" }
-        buildoptions { "-Wno-implicit-fallthrough", "-Wno-maybe-uninitialized" }
-
-
-    filter { "toolset:clang" }
-        buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option" }
+    -- Disable some warnings
+    filter { "toolset:clang or gcc*" }
+        buildoptions { "-Wno-switch", "-Wno-parentheses" }
+    filter { "toolset:gcc*", "language:C++" }
+        buildoptions { "-Wno-class-memaccess" }
+    filter { "toolset:clang or gcc*", "language:C++" }
+        buildoptions { "-Wno-reorder", "-Wno-invalid-offsetof" }
 
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,

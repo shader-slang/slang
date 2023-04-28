@@ -546,20 +546,6 @@ void applyCheckpointSet(
 {
     for (auto use : pendingUses)
         cloneCtx->pendingUses.add(use);
-    
-    // Populate the clone context with all the primal uses that we may need to replace with
-    // cloned versions. That way any insts we clone into the diff block will automatically replace
-    // their uses.
-    //
-    auto addPrimalUsesToCloneContext = [&](IRInst* inst)
-    {
-        UIndex opIndex = 0;
-        for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
-        {   
-            if (!isDifferentialInst(operand->get()))
-                cloneCtx->pendingUses.add(operand);
-        }
-    };
 
     // Go back over the insts and move/clone them accoridngly.
     auto paramPreludeBlock = getParamPreludeBlock(func);
@@ -933,7 +919,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
         for (auto instToStore : instSet)
         {
             IRBlock* defBlock = nullptr;
-            if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+            if (const auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
                 auto varInst = as<IRVar>(instToStore);
                 auto storeUse = findEarliestUniqueWriteUse(varInst);
@@ -998,7 +984,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     defBlockIndices.clear();
                 }
             }
-            if (auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+            if (const auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
             {
                 IRVar* varToStore = as<IRVar>(instToStore);
                 SLANG_RELEASE_ASSERT(varToStore);
@@ -1058,13 +1044,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 for (auto use : outOfScopeUses)
                 {
                     List<IndexTrackingInfo> useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
-                    if (isLoopCounter)
-                    {
-                        // The use site of a primal loop counter should be right before we enter the
-                        // loop, and therefore its index count should equal to defBlockIndices.getCount()
-                        // after we remove the first index from defBlockIndices.
-                        SLANG_RELEASE_ASSERT(useBlockIndices.getCount() == defBlockIndices.getCount());
-                    }
                     setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
                     builder.replaceOperand(use, loadIndexedValue(&builder, localVar, defBlockIndices, useBlockIndices));
                 }
@@ -1388,7 +1367,7 @@ static bool isIntermediateContextType(IRType* type)
 static bool shouldStoreVar(IRVar* var)
 {
     // Always store intermediate context var.
-    if (auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+    if (const auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
     {
         // If we are specializing a callee's intermediate context with types that can't be stored,
         // we can't store the entire context.
@@ -1438,6 +1417,20 @@ static CheckpointPreference getCheckpointPreference(IRInst* callee)
         }
     }
     return CheckpointPreference::None;
+}
+
+static bool isGlobalAddress(IRInst* inst)
+{
+    auto root = getRootAddr(inst);
+    if (root)
+    {
+        if (as<IRParameterGroupType>(root->getDataType()))
+        {
+            return true;
+        }
+        return as<IRModuleInst>(root->getParent()) != nullptr;
+    }
+    return false;
 }
 
 static bool shouldStoreInst(IRInst* inst)
@@ -1525,6 +1518,12 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_GetTupleElement:
         return false;
 
+    case kIROp_Load:
+        // Never store a load of a global parameter/variable.
+        if (isGlobalAddress(as<IRLoad>(inst)->getPtr()))
+            return false;
+        break;
+
     case kIROp_Call:
         // If the callee prefers recompute policy, don't store.
         if (getCheckpointPreference(inst->getOperand(0)) == CheckpointPreference::PreferRecompute)
@@ -1547,7 +1546,9 @@ bool canRecompute(IRUse* use)
     if (auto load = as<IRLoad>(use->get()))
     {
         // Generally, we cannot recompute a load(ptr), since ptr may be modified
-        // afterwards. The exceptions are a load of an inout param, since the
+        // afterwards.
+        // 
+        // The exceptions are a load of an inout param or global param, since the
         // propagation function never actually writes to the primal part of the
         // inout param, and we can always just read the original param.
 
@@ -1558,6 +1559,14 @@ bool canRecompute(IRUse* use)
             {
                 return (block == block->getParent()->getFirstBlock());
             }
+        }
+        else if (ptr->getOp() == kIROp_GlobalParam)
+        {
+            return true;
+        }
+        else if (as<IRParameterGroupType>(ptr->getDataType()))
+        {
+            return true;
         }
         return false;
     }
@@ -1593,7 +1602,9 @@ HoistResult DefaultCheckpointPolicy::classify(IRUse* use)
     else
     {
         if (shouldStoreInst(use->get()))
+        {
             return HoistResult::store(use->get());
+        }
         else
         {
             // We may not be able to recompute due to limitations of

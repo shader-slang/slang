@@ -189,7 +189,7 @@ namespace Slang
         // "dummy" entry points we create for pass-through
         // compilation will not have an associated module.
         //
-        if( auto module = getModule() )
+        if( const auto module = getModule() )
         {
             return 1;
         }
@@ -241,7 +241,7 @@ namespace Slang
 
     List<SourceFile*> const& EntryPoint::getFileDependencies()
     {
-        if(auto module = getModule())
+        if(const auto module = getModule())
             return getModule()->getFileDependencies();
         
         static List<SourceFile*> empty;
@@ -851,7 +851,7 @@ namespace Slang
                 {
                     builder << ";" << _getDisplayPath(sink, sourceFiles[i]);
                 }
-                return builder;
+                return std::move(builder);
             }
         }
     }
@@ -1528,7 +1528,7 @@ namespace Slang
                     SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, outArtifact));
                     return SLANG_OK;
                 }
-                /* fall through to: */
+                [[fallthrough]];
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::PTX:

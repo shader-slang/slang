@@ -128,9 +128,7 @@ void ErrorType::_toTextOverride(StringBuilder& out)
 
 bool ErrorType::_equalsImplOverride(Type* type)
 {
-    if (auto errorType = as<ErrorType>(type))
-        return true;
-    return false;
+    return as<ErrorType>(type);
 }
 
 Type* ErrorType::_createCanonicalTypeOverride()
@@ -154,9 +152,7 @@ void BottomType::_toTextOverride(StringBuilder& out) { out << toSlice("never"); 
 
 bool BottomType::_equalsImplOverride(Type* type)
 {
-    if (auto bottomType = as<BottomType>(type))
-        return true;
-    return false;
+    return as<BottomType>(type);
 }
 
 Type* BottomType::_createCanonicalTypeOverride() { return this; }
@@ -552,7 +548,7 @@ bool FuncType::_equalsImplOverride(Type * type)
         if (paramCount != otherParamCount)
             return false;
 
-        for (UInt pp = 0; pp < paramCount; ++pp)
+        for (Index pp = 0; pp < paramCount; ++pp)
         {
             auto paramType = getParamType(pp);
             auto otherParamType = funcType->getParamType(pp);
@@ -626,9 +622,9 @@ Type* FuncType::_createCanonicalTypeOverride()
 HashCode FuncType::_getHashCodeOverride()
 {
     HashCode hashCode = getResultType()->getHashCode();
-    UInt paramCount = getParamCount();
+    Index paramCount = getParamCount();
     hashCode = combineHash(hashCode, Slang::getHashCode(paramCount));
-    for (UInt pp = 0; pp < paramCount; ++pp)
+    for (Index pp = 0; pp < paramCount; ++pp)
     {
         hashCode = combineHash(
             hashCode,

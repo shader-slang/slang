@@ -2,7 +2,7 @@
 range: 7,4 - 7,9
 content:
 ```
-int value
+(global variable) int value
 ```
 
 #1: Ordindary comment for `value`.  

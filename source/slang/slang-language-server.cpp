@@ -216,6 +216,51 @@ static bool isBoolType(Type* t)
     return basicType->baseType == BaseType::Bool;
 }
 
+String getDeclKindString(DeclRef<Decl> declRef)
+{
+    if (declRef.as<ParamDecl>())
+    {
+        return "(parameter) ";
+    }
+    else if (declRef.as<GenericTypeParamDecl>())
+    {
+        return "(generic type parameter) ";
+    }
+    else if (declRef.as<GenericValueParamDecl>())
+    {
+        return "(generic value parameter) ";
+    }
+    else if (auto varDecl = declRef.as<VarDeclBase>())
+    {
+        auto parent = declRef.getParent();
+        if (as<GenericDecl>(parent))
+            parent = parent.getParent();
+        if (parent.as<InterfaceDecl>())
+        {
+            return "(associated constant) ";
+        }
+        else if (parent.as<AggTypeDeclBase>())
+        {
+            return "(field) ";
+        }
+        const char* scopeKind = "";
+        if (parent.as<NamespaceDeclBase>())
+            scopeKind = "global ";
+        else if (getParentDecl(declRef.getDecl()))
+            scopeKind = "local ";
+        StringBuilder sb;
+        sb << "(";
+        sb << scopeKind;
+        if (varDecl.as<LetDecl>())
+            sb << "value";
+        else
+            sb << "variable";
+        sb << ") ";
+        return sb.produceString();
+    }
+    return String();
+}
+
 String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
 {
     if (declRef.getDecl())
@@ -225,6 +270,7 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
             astBuilder,
             ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
                 ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+        printer.getStringBuilder() << getDeclKindString(declRef);
         printer.addDeclSignature(declRef);
         if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
         {
@@ -372,8 +418,16 @@ static void _tryGetDocumentation(StringBuilder& sb, WorkspaceVersion* workspace,
     auto definingModule = getModuleDecl(decl);
     if (definingModule)
     {
-        auto markupAST = workspace->getOrCreateMarkupAST(definingModule);
-        auto markupEntry = markupAST->getEntry(decl);
+        MarkupEntry* markupEntry = nullptr;
+        if (decl->markup)
+        {
+            markupEntry = decl->markup;
+        }
+        else
+        {
+            auto markupAST = workspace->getOrCreateMarkupAST(definingModule);
+            markupEntry = markupAST->getEntry(decl);
+        }
         if (markupEntry)
         {
             sb << "\n";
@@ -496,6 +550,72 @@ SlangResult LanguageServer::hover(
             
             _tryGetDocumentation(sb, version, declRef.getDecl());
 
+            if (auto funcDecl = as<FunctionDeclBase>(declRef.getDecl()))
+            {
+                DiagnosticSink sink;
+                SharedSemanticsContext semanticContext(version->linkage, getModule(funcDecl), &sink);
+                SemanticsVisitor semanticsVisitor(&semanticContext);
+
+                auto assocDecls = semanticContext.getAssociatedDeclsForDecl(funcDecl);
+                Decl* bwdDiff = nullptr;
+                Decl* fwdDiff = nullptr;
+                Decl* primalSubst = nullptr;
+                auto getDeclFromExpr = [&](Expr* expr) -> Decl*
+                {
+                    if (auto declRefExpr = as<DeclRefExpr>(expr))
+                        return declRefExpr->declRef.getDecl();
+                    return nullptr;
+                };
+                for (auto& assocDecl : assocDecls)
+                {
+                    if (assocDecl->kind == DeclAssociationKind::ForwardDerivativeFunc)
+                        fwdDiff = assocDecl->decl;
+                    else if (assocDecl->kind == DeclAssociationKind::BackwardDerivativeFunc)
+                        bwdDiff = assocDecl->decl;
+                    else if (assocDecl->kind == DeclAssociationKind::PrimalSubstituteFunc)
+                        primalSubst = assocDecl->decl;
+                }
+                bool isBackwardDifferentiable = false;
+                bool isForwardDifferentiable = false;
+                for (auto modifier : funcDecl->modifiers)
+                {
+                    if (auto bwdDiffModifier = as<BackwardDerivativeAttribute>(modifier))
+                        bwdDiff = getDeclFromExpr(bwdDiffModifier->funcExpr);
+                    else if (auto fwdDiffModifier = as<ForwardDerivativeAttribute>(modifier))
+                        fwdDiff = getDeclFromExpr(fwdDiffModifier->funcExpr);
+                    else if (auto primalSubstModifier = as<PrimalSubstituteAttribute>(modifier))
+                        primalSubst = getDeclFromExpr(primalSubstModifier->funcExpr);
+                    else if (as<ForwardDifferentiableAttribute>(modifier))
+                        isForwardDifferentiable = true;
+                    else if (as<BackwardDifferentiableAttribute>(modifier))
+                        isBackwardDifferentiable = true;
+                }
+                if (primalSubst)
+                {
+                    for (auto modifier : primalSubst->modifiers)
+                    {
+                        if (as<ForwardDifferentiableAttribute>(modifier))
+                            isForwardDifferentiable = true;
+                        else if (as<BackwardDifferentiableAttribute>(modifier))
+                            isBackwardDifferentiable = true;
+                    }
+                }
+                if (isBackwardDifferentiable)
+                {
+                    sb << "\nForward and backward differentiable\n\n";
+                }
+                if (isForwardDifferentiable)
+                {
+                    sb << "\nForward differentiable\n\n";
+                }
+                if (fwdDiff && fwdDiff->getName())
+                    sb << "Forward derivative: `" << fwdDiff->getName()->text << "`\n\n";
+                if (bwdDiff && bwdDiff->getName())
+                    sb << "Backward derivative: `" << bwdDiff->getName()->text << "`\n\n";
+                if (primalSubst && primalSubst->getName())
+                    sb << "Primal substitute: `" << primalSubst->getName()->text << "`\n\n";
+            }
+
             auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
                 declRef.getLoc(), SourceLocType::Actual);
             appendDefinitionLocation(sb, m_workspace, humaneLoc);
@@ -524,7 +644,7 @@ SlangResult LanguageServer::hover(
     {
         if (auto declRefExpr = as<DeclRefExpr>(expr))
             return fillDeclRefHoverInfo(declRefExpr->declRef);
-        if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
+        if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
         {
             String documentation;
             String signature = getExprDeclSignature(expr, &documentation, nullptr);
@@ -588,6 +708,10 @@ SlangResult LanguageServer::hover(
     else if (auto decl = as<Decl>(leafNode))
     {
         fillDeclRefHoverInfo(DeclRef<Decl>(decl, nullptr));
+    }
+    else if (auto attr = as<Attribute>(leafNode))
+    {
+        fillDeclRefHoverInfo(DeclRef<Decl>(attr->attributeDecl, nullptr));
     }
     if (sb.getLength() == 0)
     {
@@ -835,7 +959,7 @@ SlangResult LanguageServer::completion(
         return SLANG_OK;
     }
 
-    // Don't general completion suggestions after typing '['.
+    // Don't generate completion suggestions after typing '['.
     if (args.context.triggerKind ==
         LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
         args.context.triggerCharacter == "[")
@@ -1964,7 +2088,6 @@ SlangResult LanguageServer::execute()
     {
         // Consume all messages first.
         commands.clear();
-        auto start = platform::PerformanceCounter::now();
         while (true)
         {
             m_connection->tryReadMessage();
@@ -1972,13 +2095,15 @@ SlangResult LanguageServer::execute()
                 break;
             parseNextMessage();
         }
-        auto parseEnd = platform::PerformanceCounter::now();
+
+        auto workStart = platform::PerformanceCounter::now();
+
         processCommands();
 
         // Report diagnostics if it hasn't been updated for a while.
         update();
 
-        auto workTime = platform::PerformanceCounter::getElapsedTimeInSeconds(parseEnd);
+        auto workTime = platform::PerformanceCounter::getElapsedTimeInSeconds(workStart);
 
         if (commands.getCount() > 0 && m_initialized && m_traceOptions != TraceOptions::Off)
         {

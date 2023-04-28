@@ -162,7 +162,7 @@ inline IRInst* unwrapAttributedType(IRInst* type)
 
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
 void copyNameHintDecoration(IRInst* dest, IRInst* src);
-
+IRInst* getRootAddr(IRInst* addrInst);
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
 String dumpIRToString(IRInst* root);

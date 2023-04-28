@@ -128,7 +128,7 @@ public:
         }
         else
         {
-            if (auto thatGenParam = as<GenericParamIntVal>(other.param))
+            if (const auto thatGenParam = as<GenericParamIntVal>(other.param))
             {
                 return false;
             }
@@ -143,7 +143,7 @@ public:
         {
             if (auto thatGenParam = as<GenericParamIntVal>(other.param))
             {
-                if (param->equalsVal(other.param) && power == other.power)
+                if (thisGenParam->equalsVal(thatGenParam) && power == other.power)
                     return true;
             }
             return false;

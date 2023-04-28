@@ -7,15 +7,17 @@ standard output = {
 layout(row_major) uniform;
 layout(row_major) buffer;
 
-#line 5 0
+#line 12 0
+layout(std430, binding = 0) buffer _S1 {
+    uint _data[];
+} resultBuffer_0;
+
+#line 5
 spirv_instruction(id = 1, set = "NonSemantic.DebugBreak")
 void _spvDebugBreak_0(int _0);
 
 
-#line 12
-layout(std430, binding = 0) buffer _S1 {
-    uint _data[];
-} resultBuffer_0;
+#line 15
 layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {

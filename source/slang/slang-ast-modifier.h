@@ -577,7 +577,9 @@ class AttributeTargetModifier : public Modifier
 class AttributeBase : public Modifier 
 {
     SLANG_AST_CLASS(AttributeBase)
- 
+    
+    AttributeDecl* attributeDecl = nullptr;
+
     List<Expr*> args;
 };
 

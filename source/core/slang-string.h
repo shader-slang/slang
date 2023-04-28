@@ -583,6 +583,10 @@ namespace Slang
         char operator[](Index id) const
         {
             SLANG_ASSERT(id >= 0 && id < getLength());
+            // Silence a pedantic warning on GCC
+#if __GNUC__
+            if(id < 0) __builtin_unreachable();
+#endif
             return begin()[id];
         }
 

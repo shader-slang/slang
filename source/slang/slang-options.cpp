@@ -713,7 +713,7 @@ struct OptionsParser
             { ".comp", Profile::GLSL_Compute } 
         };
 
-        for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
+        for (Index i = 0; i < SLANG_COUNT_OF(entries); ++i)
         {
             const Entry& entry = entries[i];
             if (path.endsWith(entry.ext))
@@ -756,7 +756,7 @@ struct OptionsParser
 
         };
 
-        for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
+        for (Index i = 0; i < SLANG_COUNT_OF(entries); ++i)
         {
             const Entry& entry = entries[i];
             if (path.endsWith(entry.ext))

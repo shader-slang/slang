@@ -7,8 +7,7 @@ struct DiffPairLoweringPass : InstPassBase
 {
     DiffPairLoweringPass(AutoDiffSharedContext* context) :
         InstPassBase(context->moduleInst->getModule()), 
-        pairBuilderStorage(context),
-        autodiffContext(context)
+        pairBuilderStorage(context)
     { 
         pairBuilder = &pairBuilderStorage;
     }
@@ -148,8 +147,6 @@ struct DiffPairLoweringPass : InstPassBase
     }
 
     private: 
-    
-    AutoDiffSharedContext* autodiffContext;
     
     DifferentialPairTypeBuilder* pairBuilder;
 
