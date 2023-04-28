@@ -100,6 +100,64 @@ namespace Slang {
     return defaultDescription;
 }
 
+/* static */ void NameValueUtil::appendNames(NameKind kind, const ConstArrayView<NameValue>& opts, List<UnownedStringSlice>& out)
+{
+    SLANG_UNUSED(kind);
+    for (auto& opt : opts)
+    {
+        out.add(UnownedStringSlice(opt.name));
+    }
+}
+
+static void _appendNames(NameValueUtil::NameKind kind, const char* names, List<UnownedStringSlice>& out)
+{
+    if (kind == NameValueUtil::NameKind::All)
+    {
+        StringUtil::appendSplit(UnownedStringSlice(names), ',', out);
+    }
+    else
+    {
+        out.add(StringUtil::getAtInSplit(UnownedStringSlice(names), ',', 0));
+    }
+}
+
+/* static */ void NameValueUtil::appendNames(NameKind kind, const ConstArrayView<NamesValue>& opts, List<UnownedStringSlice>& out)
+{
+    for (auto& opt : opts)
+    {
+        _appendNames(kind, opt.names, out);
+    }
+}
+
+/* static */ void NameValueUtil::appendNames(NameKind kind, const ConstArrayView<NamesDescriptionValue>& opts, List<UnownedStringSlice>& out)
+{
+    for (auto& opt : opts)
+    {
+        _appendNames(kind, opt.names, out);
+    }
+}
+
+/* static */ List<UnownedStringSlice> NameValueUtil::getNames(NameKind kind, const ConstArrayView<NameValue>& opts)
+{
+    List<UnownedStringSlice> names;
+    appendNames(kind, opts, names);
+    return names;
+}
+
+/* static */ List<UnownedStringSlice> NameValueUtil::getNames(NameKind kind, const ConstArrayView<NamesValue>& opts)
+{
+    List<UnownedStringSlice> names;
+    appendNames(kind, opts, names);
+    return names;
+}
+
+/* static */ List<UnownedStringSlice> NameValueUtil::getNames(NameKind kind, const ConstArrayView<NamesDescriptionValue>& opts)
+{
+    List<UnownedStringSlice> names;
+    appendNames(kind, opts, names);
+    return names;
+}
+
 } // namespace Slang
 
 

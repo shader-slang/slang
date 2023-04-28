@@ -400,17 +400,14 @@ void initCommandOptions(CommandOptions& options)
     options.setCategory("Downstream");
 
     {
+        auto namesList = NameValueUtil::getNames(NameValueUtil::NameKind::First, TypeTextUtil::getCompilerInfos());
         StringBuilder names;
-        for (auto info : TypeTextUtil::getCompilerInfos())
+        for (auto name : namesList)
         {
-            auto name = StringUtil::getAtInSplit(UnownedStringSlice(info.names), ',', 0);
-
-            if (names.getLength())
-            {
-                names << ",";
-            }
-            names << "-" << name << "-path";
+            names << "-" << name << "-path,";
         }
+        // remove last ,
+        names.reduceLength(names.getLength() - 1);
 
         options.add(names.getBuffer(), "-<compiler>-path <path>", 
             "Specify path to a downstream <compiler> "

@@ -33,6 +33,12 @@ struct NamesDescriptionValue
 
 struct NameValueUtil
 {
+    enum class NameKind
+    {
+        First,              ///< Only the first name if there is more than one
+        All,                ///< All valid associated names
+    };
+
         /// Use the default type to infer the actual type desired
     template <typename T>
     static T findValue(const ConstArrayView<NameValue>& opts, const UnownedStringSlice& slice, T defaultValue) { return (T)findValue(opts, slice, ValueInt(defaultValue)); }
@@ -51,6 +57,16 @@ struct NameValueUtil
     static UnownedStringSlice findName(const ConstArrayView<NamesValue>& opts, ValueInt value, const UnownedStringSlice& defaultName = UnownedStringSlice());
     static UnownedStringSlice findName(const ConstArrayView<NamesDescriptionValue>& opts, ValueInt value, const UnownedStringSlice& defaultName = UnownedStringSlice());
 
+        /// Append all the names from opts to out
+    static void appendNames(NameKind kind, const ConstArrayView<NameValue>& opts, List<UnownedStringSlice>& out);
+    static void appendNames(NameKind kind, const ConstArrayView<NamesValue>& opts, List<UnownedStringSlice>& out);
+    static void appendNames(NameKind kind, const ConstArrayView<NamesDescriptionValue>& opts, List<UnownedStringSlice>& out);
+
+        /// Return the list of all valid names
+    static List<UnownedStringSlice> getNames(NameKind kind, const ConstArrayView<NameValue>& opts);
+    static List<UnownedStringSlice> getNames(NameKind kind, const ConstArrayView<NamesValue>& opts);
+    static List<UnownedStringSlice> getNames(NameKind kind, const ConstArrayView<NamesDescriptionValue>& opts);
+    
         /// Get the description
     static UnownedStringSlice findDescription(const ConstArrayView<NamesDescriptionValue>& opts, ValueInt value, const UnownedStringSlice& defaultDescription = UnownedStringSlice());
 };
