@@ -780,6 +780,7 @@ namespace Slang
         attr->keywordName  = uncheckedAttr->keywordName;
         attr->args  = uncheckedAttr->args;
         attr->loc   = uncheckedAttr->loc;
+        attr->attributeDecl = attrDecl;
 
         // We will start with checking steps that can be applied independent
         // of the concrete attribute type that was selected. These only need

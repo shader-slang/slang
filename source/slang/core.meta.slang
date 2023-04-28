@@ -112,12 +112,13 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
-/// Modifer to mark a function for forward-mode differentiation.
+/// Marks a function for forward-mode differentiation.
 /// i.e. the compiler will automatically generate a new function
 /// that computes the jacobian-vector product of the original.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 
+/// Marks a function for backward-mode differentiation.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
 

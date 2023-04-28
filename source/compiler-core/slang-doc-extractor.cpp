@@ -638,6 +638,12 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle se
         {
             return _findMarkup(info, Location::Before, out);
         }
+        case SearchStyle::Attribute:
+        {
+            FindInfo newInfo = info;
+            newInfo.tokenIndex -= 2;
+            return _findMarkup(newInfo, Location::Before, out);
+        }
         case SearchStyle::Variable:
         {
             Location locs[] = { Location::Before, Location::AfterSemicolon };

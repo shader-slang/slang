@@ -366,6 +366,8 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
                     continue;
                 if (as<SpecializedForTargetModifier>(modifier))
                     continue;
+                if (as<AttributeTargetModifier>(modifier))
+                    continue;
             }
             // Don't print out attributes.
             if (as<AttributeBase>(modifier))
@@ -429,6 +431,10 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     else if (const auto assocType = as<AssocTypeDecl>(decl))
     {
         m_builder << "associatedtype ";
+    }
+    else if (const auto attribute = as<AttributeDecl>(decl))
+    {
+        m_builder << "attribute ";
     }
 }
 

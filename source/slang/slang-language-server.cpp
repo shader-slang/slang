@@ -230,10 +230,6 @@ String getDeclKindString(DeclRef<Decl> declRef)
     {
         return "(generic value parameter) ";
     }
-    else if (declRef.as<AttributeDecl>())
-    {
-        return "(attribute) ";
-    }
     else if (auto varDecl = declRef.as<VarDeclBase>())
     {
         auto parent = declRef.getParent();
@@ -713,6 +709,10 @@ SlangResult LanguageServer::hover(
     {
         fillDeclRefHoverInfo(DeclRef<Decl>(decl, nullptr));
     }
+    else if (auto attr = as<Attribute>(leafNode))
+    {
+        fillDeclRefHoverInfo(DeclRef<Decl>(attr->attributeDecl, nullptr));
+    }
     if (sb.getLength() == 0)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -959,7 +959,7 @@ SlangResult LanguageServer::completion(
         return SLANG_OK;
     }
 
-    // Don't general completion suggestions after typing '['.
+    // Don't generate completion suggestions after typing '['.
     if (args.context.triggerKind ==
         LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
         args.context.triggerCharacter == "[")
