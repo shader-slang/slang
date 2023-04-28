@@ -1126,12 +1126,12 @@ struct OptionsParser
 
     void _appendUsageTitle(StringBuilder& out)
     {
-        out << "Usage: slangc" << Process::getExecutableSuffix() << " [options...] [--] <input files>\n\n";
+        out << "Usage: slangc [options...] [--] <input files>\n\n";
     }
     void _appendMinimalUsage(StringBuilder& out)
     {
         _appendUsageTitle(out);
-        out << "For help: slangc" << Process::getExecutableSuffix() << " -h\n";
+        out << "For help: slangc -h\n";
     }
     void _outputMinimalUsage(DiagnosticSink* sink)
     {
