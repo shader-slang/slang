@@ -421,6 +421,21 @@ Index CommandOptions::findTargetIndexByUserValue(LookupKind kind, UserValue user
     return -1;
 }
 
+Index CommandOptions::findCategoryByCaseInsensitiveName(const UnownedStringSlice& slice) const
+{
+    const Count count = m_categories.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        const auto& cat = m_categories[i];
+
+        if (cat.name.caseInsensitiveEquals(slice))
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
 Index CommandOptions::findOptionByCategoryUserValue(UserValue categoryUserValue, const UnownedStringSlice& name) const
 {
     Index categoryIndex = findTargetIndexByUserValue(LookupKind::Category, categoryUserValue);
@@ -603,6 +618,90 @@ bool CommandOptions::hasContiguousUserValueRange(LookupKind kind, UserValue star
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! CommandOptionsWriter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+void CommandOptionsWriter::appendDescriptionForCategory(const CommandOptions& options, Index categoryIndex)
+{
+    const auto& categories = options.getCategories();
+
+    const auto& category = categories[categoryIndex];
+    
+    // Header
+    {
+        const auto count = m_builder.getLength();
+        if (category.kind == CategoryKind::Value)
+        {
+            m_builder << "<" << category.name << ">";
+        }
+        else
+        {
+            m_builder << category.name;
+        }
+
+        const auto length = m_builder.getLength() - count;
+        m_builder << "\n";
+
+        m_builder.appendRepeatedChar('=', length);
+
+        m_builder << "\n\n";
+
+        // If there is a description output it
+        if (category.description.getLength() > 0)
+        {
+            _appendText(0, category.description);
+            m_builder << "\n";
+        }
+    }
+
+    for (auto& option : options.getOptionsForCategory(categoryIndex))
+    {
+        m_builder << m_indentSlice;
+
+        if (option.usage.getLength())
+        {
+            m_builder << option.usage;
+        }
+        else
+        {
+            List<UnownedStringSlice> names;
+            StringUtil::split(option.names, ',', names);
+
+            _appendWithWrap(1, names, toSlice(", "));
+        }
+
+        if (option.description.getLength() == 0)
+        {
+            m_builder << "\n";
+            continue;
+        }
+
+        m_builder << ": ";
+
+        _appendText(2, option.description);
+
+        if (option.usage.getLength())
+        {
+            List<Index> usageCategoryIndices;
+            options.findCategoryIndicesFromUsage(option.usage, usageCategoryIndices);
+
+            for (auto usageCategoryIndex : usageCategoryIndices)
+            {
+                auto& usageCat = categories[usageCategoryIndex];
+
+                m_builder << m_indentSlice << m_indentSlice;
+                m_builder << "<" << usageCat.name << "> can be: ";
+
+                List<UnownedStringSlice> optionNames;
+                options.getCategoryOptionNames(usageCategoryIndex, optionNames);
+
+                _appendWithWrap(2, optionNames, toSlice(", "));
+
+                m_builder << "\n";
+            }
+        }
+    }
+
+    m_builder << "\n";
+}
+
 void CommandOptionsWriter::appendDescription(const CommandOptions& options)
 {
     // Go through categories in order
@@ -611,84 +710,7 @@ void CommandOptionsWriter::appendDescription(const CommandOptions& options)
 
     for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
     {
-        const auto& category = categories[categoryIndex];
-        
-        // Header
-        {
-            const auto count = m_builder.getLength();
-            if (category.kind == CategoryKind::Value)
-            {
-                m_builder << "<" << category.name << ">";
-            }
-            else
-            {
-                m_builder << category.name;
-            }
-
-            const auto length = m_builder.getLength() - count;
-            m_builder << "\n";
-
-            m_builder.appendRepeatedChar('=', length);
-       
-            m_builder << "\n\n";
-
-            // If there is a description output it
-            if (category.description.getLength() > 0)
-            {
-                _appendText(0, category.description);
-                m_builder << "\n";
-            }
-        }
-
-        for (auto& option : options.getOptionsForCategory(categoryIndex))
-        {
-            m_builder << m_indentSlice;
-
-            if (option.usage.getLength())
-            {
-                m_builder << option.usage;
-            }
-            else
-            {
-                List<UnownedStringSlice> names;
-                StringUtil::split(option.names, ',', names);
-
-                _appendWithWrap(1, names, toSlice(", "));
-            }
-           
-            if (option.description.getLength() == 0)
-            {
-                m_builder << "\n";
-                continue;
-            }
-            
-            m_builder << ": ";
-
-            _appendText(2, option.description);
-
-            if (option.usage.getLength())
-            {
-                List<Index> usageCategoryIndices;
-                options.findCategoryIndicesFromUsage(option.usage, usageCategoryIndices);
-
-                for (auto usageCategoryIndex : usageCategoryIndices)
-                {
-                    auto& usageCat = categories[usageCategoryIndex];
-
-                    m_builder << m_indentSlice << m_indentSlice;
-                    m_builder << "<" << usageCat.name << "> can be: ";
-
-                    List<UnownedStringSlice> optionNames;
-                    options.getCategoryOptionNames(usageCategoryIndex, optionNames);
-
-                    _appendWithWrap(2, optionNames, toSlice(", "));
-
-                    m_builder << "\n";
-                }
-            }
-        }
-
-        m_builder << "\n";
+        appendDescriptionForCategory(options, categoryIndex);
     }
 }
 

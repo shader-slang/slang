@@ -122,6 +122,9 @@ struct CommandOptions
         /// Returns -1 if not found
     Index findOptionByCategoryUserValue(UserValue categoryUserValue, const UnownedStringSlice& name) const;
 
+        /// Find a category by case insensitive name. Returns -1 if not found
+    Index findCategoryByCaseInsensitiveName(const UnownedStringSlice& slice) const;
+    
         /// Given a category index returns all the options associated.
     ConstArrayView<Option> getOptionsForCategory(Index categoryIndex) const;
 
@@ -217,6 +220,8 @@ struct CommandOptionsWriter
 {
     typedef CommandOptions::CategoryKind CategoryKind;
     
+        /// Append descirption for a category
+    void appendDescriptionForCategory(const CommandOptions& options, Index categoryIndex);
         /// Appends a description of all of the options
     void appendDescription(const CommandOptions& options);
 

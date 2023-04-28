@@ -171,6 +171,8 @@ void initCommandOptions(CommandOptions& options)
     typedef CommandOptions::CategoryKind CategoryKind;
     typedef CommandOptions::UserValue UserValue;
 
+    // Add all the option categories
+
     options.addCategory(CategoryKind::Option, "General", "General options");
     options.addCategory(CategoryKind::Option, "Target", "Target code generation options");
     options.addCategory(CategoryKind::Option, "Downstream", "Downstream compiler options");
@@ -313,7 +315,7 @@ void initCommandOptions(CommandOptions& options)
         "If no -entry options are given, compiler will use [shader(...)] "
         "attributes to detect entry points."},
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
-        { OptionKind::Help,         "-h,-help,--help", nullptr, "Print this message." },
+        { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
         { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
         "Add a path to be used in resolving '#include' "
         "and 'import' operations."},
@@ -1087,11 +1089,13 @@ struct OptionsParser
         return SLANG_OK;
     }
 
-    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, CommandOptions& cmdOptions, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
+    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
     {
+        auto& cmdOptions = asInternal(session)->m_commandOptions;
+
         const auto optionIndex = cmdOptions.findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), arg.value.getUnownedSlice());
         if (optionIndex < 0)
-        {            
+        {                
             const auto categoryIndex = cmdOptions.findCategoryByUserValue(CommandOptions::UserValue(valueCategory));
             SLANG_ASSERT(categoryIndex >= 0);
 
@@ -1108,6 +1112,14 @@ struct OptionsParser
         outValue = cmdOptions.getOptionAt(optionIndex).userValue;
         return SLANG_OK;
     }
+    SlangResult _expectValue(ValueCategory valueCategory, CommandLineReader& reader, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
+    {
+        CommandLineArg arg;
+        SLANG_RETURN_ON_FAIL(reader.expectArg(arg));
+        SLANG_RETURN_ON_FAIL(_getValue(valueCategory, arg, sink, outValue));
+        return SLANG_OK;
+    }
+
     SlangResult parse(
         int             argc,
         char const* const*  argv)
@@ -1220,10 +1232,8 @@ struct OptionsParser
                 case OptionKind::CompileStdLib: compileStdLib = true; break;
                 case OptionKind::ArchiveType:
                 {
-                    CommandLineArg archiveTypeName;
-                    SLANG_RETURN_ON_FAIL(reader.expectArg(archiveTypeName));
                     CommandOptions::UserValue value;
-                    SLANG_RETURN_ON_FAIL(_getValue(ValueCategory::ArchiveType, archiveTypeName, options, sink, value)); 
+                    SLANG_RETURN_ON_FAIL(_expectValue(ValueCategory::ArchiveType, reader, sink, value)); 
                     archiveType = SlangArchiveType(value);
                     break;
                 }
@@ -1724,24 +1734,16 @@ struct OptionsParser
                 case OptionKind::MatrixLayoutColumn:    defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor); break;            
                 case OptionKind::LineDirectiveMode:
                 {
-                    CommandLineArg lineDirectiveName;
-                    SLANG_RETURN_ON_FAIL(reader.expectArg(lineDirectiveName));
                     CommandOptions::UserValue value;
-                    SLANG_RETURN_ON_FAIL(_getValue(ValueCategory::LineDirectiveMode, lineDirectiveName, options, sink, value)); 
-
+                    SLANG_RETURN_ON_FAIL(_expectValue(ValueCategory::LineDirectiveMode, reader, sink, value)); 
                     compileRequest->setLineDirectiveMode(SlangLineDirectiveMode(value));
                     break;
                 }
                 case OptionKind::FloatingPointMode:
                 {
-                    CommandLineArg floatMode;
-                    SLANG_RETURN_ON_FAIL(reader.expectArg(floatMode));
                     CommandOptions::UserValue value;
-                    SLANG_RETURN_ON_FAIL(_getValue(ValueCategory::FloatingPointMode, floatMode, options, sink, value)); 
-
-                    const auto mode = FloatingPointMode(value);
-
-                    setFloatingPointMode(getCurrentTarget(), mode);
+                    SLANG_RETURN_ON_FAIL(_expectValue(ValueCategory::FloatingPointMode, reader, sink, value)); 
+                    setFloatingPointMode(getCurrentTarget(), FloatingPointMode(value));
                     break;
                 }
                 case OptionKind::Optimization:
@@ -1930,18 +1932,41 @@ struct OptionsParser
                 }
                 case OptionKind::Help:
                 {
+                    
+                    Index categoryIndex = -1;
+
+                    if (reader.hasArg())
+                    {
+                        auto catArg = reader.getArgAndAdvance();
+
+                        categoryIndex = options.findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+                        if (categoryIndex)
+                        {
+                            sink->diagnose(catArg.loc, Diagnostics::unknownHelpCategory);
+                            return SLANG_FAIL;
+                        }
+                    }
+
                     CommandOptionsWriter writer;
                     auto& buf = writer.getBuilder();
 
-                    auto ext = "";
+                    if (categoryIndex < 0)
+                    {
+                        auto ext = "";
 #if SLANG_WINDOWS_FAMILY
-                    ext = ".exe";
+                        ext = ".exe";
 #endif
 
-                    buf << "Usage: slangc" << ext << " [options...] [--] <input files>\n";
-
-                    writer.appendDescription(options);
-                    sink->diagnoseRaw(Severity::Note, writer.getBuilder().getBuffer());
+                        buf << "Usage: slangc" << ext << " [options...] [--] <input files>\n";
+                        writer.appendDescription(options);
+                    }
+                    else
+                    {
+                        writer.appendDescriptionForCategory(options, categoryIndex);
+                    }
+                    
+                    sink->diagnoseRaw(Severity::Note, buf.getBuffer());
+                 
                     return SLANG_FAIL;
                 }
                 case OptionKind::EmitSpirvDirectly: getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY; break;
