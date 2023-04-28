@@ -674,7 +674,7 @@ struct SubresourceRange
 class ITextureResource: public IResource
 {
 public:
-    static const Size kRemainingTextureSize = 0xFFFFFFFF;
+    static const GfxCount kRemainingTextureSize = 0xffffffff;
     struct Offset3D
     {
         GfxIndex x = 0;
