@@ -422,7 +422,7 @@ void initCommandOptions(CommandOptions& options)
     {
         { OptionKind::DefaultDownstreamCompiler, "-default-downstream-compiler", "-default-downstream-compiler <language> <compiler>",
         "Set a default compiler for the given language. See -lang for the list of languages." },
-        { OptionKind::DownstreamArgs, "-X", "-X<compiler> <option> -X<compiler>... <options> -X.", 
+        { OptionKind::DownstreamArgs, "-X...", "-X<compiler> <option> -X<compiler>... <options> -X.", 
         "Pass arguments to downstream <compiler>. Just -X<compiler> passes just the next argument "
         "to the downstream compiler. -X<compiler>... options -X. will pass *all* of the options "
         "inbetween the opening -X and -X. to the downstream compiler."},
@@ -1098,6 +1098,10 @@ struct OptionsParser
         {                
             const auto categoryIndex = cmdOptions.findCategoryByUserValue(CommandOptions::UserValue(valueCategory));
             SLANG_ASSERT(categoryIndex >= 0);
+            if (categoryIndex < 0)
+            {
+                return SLANG_FAIL;
+            }
 
             List<UnownedStringSlice> names;
             cmdOptions.getCategoryOptionNames(categoryIndex, names);
@@ -1118,6 +1122,24 @@ struct OptionsParser
         SLANG_RETURN_ON_FAIL(reader.expectArg(arg));
         SLANG_RETURN_ON_FAIL(_getValue(valueCategory, arg, sink, outValue));
         return SLANG_OK;
+    }
+
+    void _appendUsageTitle(StringBuilder& out)
+    {
+        out << "Usage: slangc" << Process::getExecutableSuffix() << " [options...] [--] <input files>\n\n";
+    }
+    void _appendMinimalUsage(StringBuilder& out)
+    {
+        _appendUsageTitle(out);
+        out << "For help: slangc" << Process::getExecutableSuffix() << " -h\n";
+    }
+    void _outputMinimalUsage(DiagnosticSink* sink)
+    {
+        // Output usage info
+        StringBuilder buf;
+        _appendMinimalUsage(buf);
+
+        sink->diagnoseRaw(Severity::Note, buf.getUnownedSlice());
     }
 
     SlangResult parse(
@@ -1208,7 +1230,7 @@ struct OptionsParser
             if (optionIndex < 0)
             {
                 sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
-                // TODO: print a usage message
+                _outputMinimalUsage(sink);
                 return SLANG_FAIL;
             }
 
@@ -1952,12 +1974,7 @@ struct OptionsParser
 
                     if (categoryIndex < 0)
                     {
-                        auto ext = "";
-#if SLANG_WINDOWS_FAMILY
-                        ext = ".exe";
-#endif
-
-                        buf << "Usage: slangc" << ext << " [options...] [--] <input files>\n";
+                        _appendUsageTitle(buf);
                         writer.appendDescription(options);
                     }
                     else
@@ -2037,7 +2054,8 @@ struct OptionsParser
                 {
                     // Hmmm, we looked up and produced a valid enum, but it wasn't handled in the switch... 
                     sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
-                    // TODO: print a usage message
+
+                    _outputMinimalUsage(sink);
                     return SLANG_FAIL;
                 }
             }
