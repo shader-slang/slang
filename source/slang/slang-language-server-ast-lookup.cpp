@@ -653,6 +653,12 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                     context.results.add(result);
                     return true;
                 }
+                for (auto arg : attribute->args)
+                {
+                    ASTLookupExprVisitor exprVisitor(&context);
+                    if (exprVisitor.dispatchIfNotNull(arg))
+                        return true;
+                }
             }
         }
         if (auto container = as<ContainerDecl>(node))

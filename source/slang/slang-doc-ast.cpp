@@ -36,6 +36,10 @@ namespace Slang {
     {
         return SearchStyle::GenericParam;
     }
+    else if (as<AttributeDecl>(decl))
+    {
+        return SearchStyle::Attribute;
+    }
     else
     {
         // If can't determine just allow before
@@ -53,6 +57,8 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
     // If we don't have a loc, we have no way of locating documentation.
     if (decl->loc.isValid() || decl->nameAndLoc.loc.isValid())
     {
+        if (as<AttributeDecl>(decl))
+            printf("dd");
         outDecls.add(decl);
     }
 

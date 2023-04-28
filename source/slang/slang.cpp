@@ -4543,6 +4543,11 @@ void Session::addBuiltinSource(
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();
     auto moduleDecl = module->getModuleDecl();
 
+    // Extact documentation markup.
+    ASTMarkup markup;
+    ASTMarkupUtil::extract(moduleDecl, sourceManager, &sink, &markup);
+    markup.attachToAST();
+
     // Put in the loaded module map
     linkage->mapNameToLoadedModules.add(moduleName, module);
 

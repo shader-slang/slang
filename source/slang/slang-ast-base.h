@@ -407,6 +407,8 @@ public:
 
     NameLoc nameAndLoc;
 
+    RefPtr<MarkupEntry> markup;
+
     Name*     getName()       { return nameAndLoc.name; }
     SourceLoc getNameLoc()    { return nameAndLoc.loc ; }
     NameLoc   getNameAndLoc() { return nameAndLoc     ; }
