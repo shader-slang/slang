@@ -1980,17 +1980,26 @@ struct OptionsParser
                         }
                     }
 
-                    CommandOptionsWriter writer(helpStyle, &options);
-                    auto& buf = writer.getBuilder();
+                    CommandOptionsWriter::Options writerOptions;
+                    writerOptions.style = helpStyle;
+
+                    auto writer = CommandOptionsWriter::create(writerOptions);
+
+                    auto& buf = writer->getBuilder();
 
                     if (categoryIndex < 0)
                     {
-                        _appendUsageTitle(buf);
-                        writer.appendDescription();
+                        // If it's the text style we can inject usage at the top
+                        if (helpStyle == CommandOptionsWriter::Style::Text)
+                        {
+                            _appendUsageTitle(buf);
+                        }
+
+                        writer->appendDescription(&options);
                     }
                     else
                     {
-                        writer.appendDescriptionForCategory(categoryIndex);
+                        writer->appendDescriptionForCategory(&options, categoryIndex);
                     }
                     
                     sink->diagnoseRaw(Severity::Note, buf.getBuffer());
