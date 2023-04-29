@@ -47,6 +47,9 @@ Result FenceImpl::setCurrentValue(uint64_t value)
 
 Result FenceImpl::getSharedHandle(InteropHandle* outHandle)
 {
+#if !SLANG_WINDOWS_FAMILY
+    return SLANG_E_NOT_IMPLEMENTED;
+#else
     // Check if a shared handle already exists.
     if (sharedHandle.handleValue != 0)
     {
@@ -61,6 +64,7 @@ Result FenceImpl::getSharedHandle(InteropHandle* outHandle)
     outHandle->api = InteropHandleAPI::D3D12;
     sharedHandle = *outHandle;
     return SLANG_OK;
+#endif
 }
 
 Result FenceImpl::getNativeHandle(InteropHandle* outNativeHandle)

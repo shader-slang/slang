@@ -30,6 +30,9 @@ Result TextureResourceImpl::getNativeResourceHandle(InteropHandle* outHandle)
 
 Result TextureResourceImpl::getSharedHandle(InteropHandle* outHandle)
 {
+#if !SLANG_WINDOWS_FAMILY
+    return SLANG_E_NOT_IMPLEMENTED;
+#else
     // Check if a shared handle already exists for this resource.
     if (sharedHandle.handleValue != 0)
     {
@@ -45,6 +48,7 @@ Result TextureResourceImpl::getSharedHandle(InteropHandle* outHandle)
         pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
     outHandle->api = InteropHandleAPI::D3D12;
     return SLANG_OK;
+#endif
 }
 
 Result TextureResourceImpl::setDebugName(const char* name)
