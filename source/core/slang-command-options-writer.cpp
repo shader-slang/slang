@@ -22,6 +22,18 @@ class MarkdownCommandOptionsWriter : public CommandOptionsWriter
 public:
     typedef CommandOptionsWriter Super;
 
+    typedef uint32_t LinkFlags;
+    struct LinkFlag
+    {
+        enum Enum 
+        {
+            Category = 0x1,
+            Option   = 0x2,
+
+            All = Category | Option,
+        };
+    };
+
     MarkdownCommandOptionsWriter(const Options& options):
         Super(options)
     {
@@ -32,10 +44,10 @@ protected:
     virtual void appendDescriptionForCategoryImpl(Index categoryIndex) SLANG_OVERRIDE;
     virtual void appendDescriptionImpl() SLANG_OVERRIDE;
 
-    void _appendParagraph(const UnownedStringSlice& text);
-    void _appendParagraph(const ConstArrayView<UnownedStringSlice>& words);
+    void _appendParagraph(const UnownedStringSlice& text, LinkFlags flags = LinkFlag::All);
+    void _appendParagraph(const ConstArrayView<UnownedStringSlice>& words, LinkFlags flags = LinkFlag::All);
 
-    void _appendMaybeLink(const UnownedStringSlice& word); 
+    void _appendMaybeLink(const UnownedStringSlice& word, LinkFlags linkFlags); 
 
     void _appendText(const UnownedStringSlice& text);
     void _appendDescriptionForCategory(Index categoryIndex);
@@ -137,11 +149,11 @@ void MarkdownCommandOptionsWriter::_appendQuickLinks()
     m_builder << "\n";
 }
 
-void MarkdownCommandOptionsWriter::_appendParagraph(const UnownedStringSlice& text)
+void MarkdownCommandOptionsWriter::_appendParagraph(const UnownedStringSlice& text, LinkFlags linkFlags)
 {
     List<UnownedStringSlice> words;
     StringUtil::splitOnWhitespace(text, words);
-    _appendParagraph(words.getArrayView());
+    _appendParagraph(words.getArrayView(), linkFlags);
 }
 
 static bool _isEndPunctionation(char c)
@@ -164,51 +176,54 @@ static UnownedStringSlice _trimPunctuation(const UnownedStringSlice& word)
     return UnownedStringSlice(start, end);
 }
 
-void MarkdownCommandOptionsWriter::_appendMaybeLink(const UnownedStringSlice& inWord)
+void MarkdownCommandOptionsWriter::_appendMaybeLink(const UnownedStringSlice& inWord, LinkFlags linkFlags)
 {
-    auto trimmedWord = _trimPunctuation(inWord);
-
-    if (trimmedWord.getLength())
+    if (linkFlags)
     {
-        Index index = -1;
-        NameKey nameKey;
+        auto trimmedWord = _trimPunctuation(inWord);
 
-        // Look for options
-        if (trimmedWord[0] == '-')
+        if (trimmedWord.getLength())
         {
-            index = m_commandOptions->findTargetIndexByName(LookupKind::Option, trimmedWord, &nameKey);
-        }
-        else if (trimmedWord[0] == '<' && trimmedWord[trimmedWord.getLength() - 1] == '>')
-        {
-            index = m_commandOptions->findTargetIndexByName(LookupKind::Category, trimmedWord.subString(1, trimmedWord.getLength() - 2), &nameKey);
-        }
+            Index index = -1;
+            NameKey nameKey;
+
+            // Look for options
+            if (trimmedWord[0] == '-' && (linkFlags & LinkFlag::Option))
+            {
+                index = m_commandOptions->findTargetIndexByName(LookupKind::Option, trimmedWord, &nameKey);
+            }
+            else if (trimmedWord[0] == '<' && trimmedWord[trimmedWord.getLength() - 1] == '>' && (linkFlags & LinkFlag::Category))
+            {
+                index = m_commandOptions->findTargetIndexByName(LookupKind::Category, trimmedWord.subString(1, trimmedWord.getLength() - 2), &nameKey);
+            }
         
-        if (index > 0)
-        {
-            // Append before the link
-            _appendEscapedMarkdown(UnownedStringSlice(inWord.begin(), trimmedWord.begin()), m_builder);
+            if (index > 0)
+            {
+                // Append before the link
+                _appendEscapedMarkdown(UnownedStringSlice(inWord.begin(), trimmedWord.begin()), m_builder);
 
-            // Make into a link
-            m_builder << "[";
-            _appendEscapedMarkdown(trimmedWord, m_builder);
-            m_builder << "](#" << _getLinkName(nameKey, index) << ")";
+                // Make into a link
+                m_builder << "[";
+                _appendEscapedMarkdown(trimmedWord, m_builder);
+                m_builder << "](#" << _getLinkName(nameKey, index) << ")";
 
-            // Append after the link
-            _appendEscapedMarkdown(UnownedStringSlice(trimmedWord.end(), inWord.end()), m_builder);
-            return;
+                // Append after the link
+                _appendEscapedMarkdown(UnownedStringSlice(trimmedWord.end(), inWord.end()), m_builder);
+                return;
+            }
         }
     }
 
     _appendEscapedMarkdown(inWord, m_builder);
 }
 
-void MarkdownCommandOptionsWriter::_appendParagraph(const ConstArrayView<UnownedStringSlice>& words)
+void MarkdownCommandOptionsWriter::_appendParagraph(const ConstArrayView<UnownedStringSlice>& words, LinkFlags linkFlags)
 {
-    if (m_hasLinks)
+    if (m_hasLinks && linkFlags)
     {
         for (auto word : words)
         {
-            _appendMaybeLink(word);
+            _appendMaybeLink(word, linkFlags);
             m_builder << " ";
         }
     }
