@@ -32,9 +32,16 @@ protected:
     virtual void appendDescriptionForCategoryImpl(Index categoryIndex) SLANG_OVERRIDE;
     virtual void appendDescriptionImpl() SLANG_OVERRIDE;
 
+    void _appendParagraph(const UnownedStringSlice& text);
+    void _appendParagraph(const ConstArrayView<UnownedStringSlice>& words);
+
+    void _appendMaybeLink(const UnownedStringSlice& word); 
+
     void _appendText(const UnownedStringSlice& text);
     void _appendDescriptionForCategory(Index categoryIndex);
     UnownedStringSlice _getLinkName(CommandOptions::LookupKind kind, Index index);
+    UnownedStringSlice _getLinkName(const NameKey& key, Index index);
+    
 
     bool m_hasLinks = false;
     Dictionary<NameKey, StringSlicePool::Handle> m_linkMap;
@@ -80,7 +87,6 @@ static bool _needsMarkdownEscape(const UnownedStringSlice& text)
     return false;
 }
 
-
 void _appendEscapedMarkdown(const UnownedStringSlice& text, StringBuilder& ioBuf)
 {
     if (_needsMarkdownEscape(text))
@@ -105,6 +111,80 @@ void _appendEscapedMarkdown(const UnownedStringSlice& text, StringBuilder& ioBuf
     }
 }
 
+void MarkdownCommandOptionsWriter::_appendParagraph(const UnownedStringSlice& text)
+{
+    List<UnownedStringSlice> words;
+    StringUtil::splitOnWhitespace(text, words);
+    _appendParagraph(words.getArrayView());
+}
+
+static bool _isEndPunctionation(char c)
+{
+    return c == '.' || c == ')';
+}
+
+static bool _isStartPunctionation(char c)
+{
+    return c == '(';
+}
+
+static UnownedStringSlice _trimPunctuation(const UnownedStringSlice& word)
+{
+    const char* start = word.begin();
+    const char* end = word.end();
+
+    while (start < end && _isStartPunctionation(*start)) start++;
+    while (end > start && _isEndPunctionation(end[-1])) --end;
+    return UnownedStringSlice(start, end);
+}
+
+void MarkdownCommandOptionsWriter::_appendMaybeLink(const UnownedStringSlice& inWord)
+{
+    auto trimmedWord = _trimPunctuation(inWord);
+
+    if (trimmedWord.getLength() && trimmedWord[0] == '-')
+    {
+        // This could be a command line switch
+        const auto optionIndex = m_commandOptions->findOptionByName(trimmedWord);
+        
+        if (optionIndex >= 0)
+        {
+            // Append before the link
+            _appendEscapedMarkdown(UnownedStringSlice(inWord.begin(), trimmedWord.begin()), m_builder);
+
+            // Make into a link
+            m_builder << "[";
+            _appendEscapedMarkdown(trimmedWord, m_builder);
+            m_builder << "](#" << _getLinkName(m_commandOptions->getNameKeyForOption(optionIndex), optionIndex) << ")";
+
+            // Append after the link
+            _appendEscapedMarkdown(UnownedStringSlice(trimmedWord.end(), inWord.end()), m_builder);
+            return;
+        }
+    }
+
+    _appendEscapedMarkdown(inWord, m_builder);
+}
+
+void MarkdownCommandOptionsWriter::_appendParagraph(const ConstArrayView<UnownedStringSlice>& words)
+{
+    if (m_hasLinks)
+    {
+        for (auto word : words)
+        {
+            _appendMaybeLink(word);
+            m_builder << " ";
+        }
+    }
+    else
+    {
+        for (auto word : words)
+        {
+            _appendEscapedMarkdown(word, m_builder);
+            m_builder << " ";
+        }
+    }
+}
 
 void MarkdownCommandOptionsWriter::_appendText(const UnownedStringSlice& text)
 {
@@ -119,7 +199,7 @@ void MarkdownCommandOptionsWriter::_appendText(const UnownedStringSlice& text)
         }
         else
         {
-            _appendEscapedMarkdown(line, m_builder);
+            _appendParagraph(line);
             m_builder << "\n\n";
         }
     }
@@ -218,13 +298,7 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
             if (isValue)
             {
                 m_builder << ": ";
-                List<UnownedStringSlice> words;
-                StringUtil::splitOnWhitespace(option.description, words);
-                for (auto word : words)
-                {
-                    _appendEscapedMarkdown(word, m_builder);
-                    m_builder << " ";
-                }
+                _appendParagraph(option.description);
             }
             else
             {
@@ -238,39 +312,25 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
     m_builder << "\n";
 }
 
-UnownedStringSlice MarkdownCommandOptionsWriter::_getLinkName(CommandOptions::LookupKind kind, Index index)
+UnownedStringSlice MarkdownCommandOptionsWriter::_getLinkName(const NameKey& key, Index index)
 {
-    NameKey key;
-    key.kind = kind;
-    key.nameIndex = index;
-
     if (auto ptr = m_linkMap.tryGetValue(key))
     {
         return m_pool.getSlice(*ptr);
     }
 
-    auto& options = *m_commandOptions;
+    UnownedStringSlice prefix = (key.kind == CommandOptions::LookupKind::Category) ?
+        m_commandOptions->getFirstNameForCategory(index) :
+        m_commandOptions->getFirstNameForOption(index);
+    prefix = prefix.trim('-');
 
-    UnownedStringSlice prefix;
+    if (prefix.getLength() == 0)
+    {
+        prefix = toSlice("id");
+    }
 
     StringBuilder buf;
-    if (kind == CommandOptions::LookupKind::Category)
-    {
-        prefix = options.getCategories()[index].name;
-    }
-    else if (kind == CommandOptions::LookupKind::Option)
-    {
-        prefix = StringUtil::getAtInSplit(UnownedStringSlice(options.getOptionAt(index).names), ',', 0);
-    }
-
-    if (prefix.startsWith(toSlice("-")))
-    {
-        buf << prefix.tail(1);
-    }
-    else
-    {
-        buf << prefix;
-    }
+    buf << prefix;
 
     const auto bufLen = buf.getLength();
 
@@ -293,6 +353,19 @@ UnownedStringSlice MarkdownCommandOptionsWriter::_getLinkName(CommandOptions::Lo
     m_linkMap.add(key, handle);
 
     return m_pool.getSlice(handle);
+}
+
+UnownedStringSlice MarkdownCommandOptionsWriter::_getLinkName(CommandOptions::LookupKind kind, Index index)
+{
+    auto& options = *m_commandOptions;
+
+    // Set up the name key 
+    const auto key = (kind == LookupKind::Category) ? 
+        options.getNameKeyForCategory(index) : 
+        options.getNameKeyForOption(index);
+    
+    return _getLinkName(key, index);
+
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TextCommandOptionsWriter !!!!!!!!!!!!!!!!!!!!!!!!!!! */

@@ -1994,6 +1994,21 @@ struct OptionsParser
                         {
                             _appendUsageTitle(buf);
                         }
+                        else
+                        {
+                            // NOTE! We need this preamble because if we have links,
+                            // we have to make sure the first thing in markdown *isn't* <>
+
+                            buf << "# Slang Command Line Options\n\n";
+                            buf << "*Usage:*\n";
+                            buf << "```\n";
+                            buf << "slangc [options...] [--] <input files>\n\n";
+                            buf << "# For help\n";
+                            buf << "slangc -h\n\n";
+                            buf << "# To generate this file\n";
+                            buf << "slangc -help-style markdown -h\n";
+                            buf << "```\n";
+                        }
 
                         writer->appendDescription(&options);
                     }

@@ -88,6 +88,16 @@ struct CommandOptions
         Flags flags = 0;                        ///< Flags about this option
     };
 
+        /// Get the first name
+    UnownedStringSlice getFirstNameForOption(Index optionIndex);
+        /// Get the first name for the category
+    UnownedStringSlice getFirstNameForCategory(Index categoryIndex);
+
+        /// Get a name key for an opton
+    NameKey getNameKeyForOption(Index optionIndex);
+        /// Get a name key for a category
+    NameKey getNameKeyForCategory(Index optionIndex);
+
         /// Add a category
     Index addCategory(CategoryKind kind, const char* name, const char* description, UserValue userValue = kInvalidUserValue);
         /// Use an already known category. It's an error if the category isn't found

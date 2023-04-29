@@ -7,7 +7,37 @@
 #include "slang-byte-encode-util.h"
 
 namespace Slang {
-   
+
+UnownedStringSlice CommandOptions::getFirstNameForOption(Index optionIndex)
+{
+    const auto& opt = m_options[optionIndex];
+    return StringUtil::getAtInSplit(opt.names, ',', 0);
+}
+
+UnownedStringSlice CommandOptions::getFirstNameForCategory(Index categoryIndex)
+{
+    const auto& cat = m_categories[categoryIndex];
+    return cat.name;
+}
+
+CommandOptions::NameKey CommandOptions::getNameKeyForOption(Index optionIndex)
+{
+    const auto& opt = m_options[optionIndex];
+    const auto& cat = m_categories[opt.categoryIndex];
+    NameKey key;
+    key.nameIndex = m_pool.findIndex(getFirstNameForOption(optionIndex));
+    key.kind = (cat.kind == CategoryKind::Option) ? LookupKind::Option : makeLookupKind(opt.categoryIndex);
+    return key;
+}
+
+CommandOptions::NameKey CommandOptions::getNameKeyForCategory(Index categoryIndex)
+{
+    NameKey key;
+    key.nameIndex = m_pool.findIndex(getFirstNameForCategory(categoryIndex));
+    key.kind = LookupKind::Category;
+    return key;
+}
+
 SlangResult CommandOptions::_addName(LookupKind kind, const UnownedStringSlice& name, Index targetIndex)
 {
     NameKey nameKey;
