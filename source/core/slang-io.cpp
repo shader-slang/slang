@@ -124,9 +124,11 @@ namespace Slang
         builder << "/tmp/" << inPrefix << "-XXXXXX";
 
         List<char> buffer;
-        buffer.setCount(builder.getLength() + 1);
-        ::memcpy(buffer.getBuffer(), builder.getBuffer(), builder.getLength());
-        buffer[builder.getLength()] = 0;
+        auto copySize = builder.getLength();
+        buffer.setCount(copySize + 1);
+        SLANG_ASSERT(copySize < PTRDIFF_MAX); // Shhh gcc, it's ok, we're not copying 9000 Petabytes
+        ::memcpy(buffer.getBuffer(), builder.getBuffer(), copySize);
+        buffer[copySize] = 0;
 
         int handle = mkstemp(buffer.getBuffer());
         if (handle == -1)
