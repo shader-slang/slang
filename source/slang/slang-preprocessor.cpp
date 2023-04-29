@@ -3426,7 +3426,7 @@ static String _readDirectiveMessage(PreprocessorDirectiveContext* context)
         result.append(token.getContent());
     }
 
-    return std::move(result);
+    return result;
 }
 
 // Handle a `#warning` directive

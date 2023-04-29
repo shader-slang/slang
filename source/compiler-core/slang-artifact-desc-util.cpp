@@ -945,7 +945,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 {
     StringBuilder buf;
     appendText(desc, buf);
-    return std::move(buf);
+    return buf;
 }
 
 } // namespace Slang

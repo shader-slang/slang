@@ -851,7 +851,7 @@ namespace Slang
                 {
                     builder << ";" << _getDisplayPath(sink, sourceFiles[i]);
                 }
-                return std::move(builder);
+                return builder;
             }
         }
     }
