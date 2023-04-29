@@ -32,7 +32,7 @@
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-char-util.h"
 
-#include "../core/slang-command-options.h"
+#include "../core/slang-command-options-writer.h"
 
 #include <assert.h>
 
@@ -49,6 +49,7 @@ enum class OptionKind
     DepFile,
     EntryPointName,
     Help,
+    HelpStyle,
     Include,
     Language,
     MatrixLayoutColumn,
@@ -151,6 +152,7 @@ enum class ValueCategory
     Stage,
     LineDirectiveMode,
     DebugInfoFormat,
+    HelpStyle,
 
     CountOf,
 };
@@ -200,6 +202,9 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(CategoryKind::Value, "fp-mode", "Floating Point Mode", UserValue(ValueCategory::FloatingPointMode));
         options.addValues(TypeTextUtil::getFloatingPointModeInfos());
+
+        options.addCategory(CategoryKind::Value, "help-style", "Help Style", UserValue(ValueCategory::HelpStyle));
+        options.addValues(CommandOptionsWriter::getStyleInfos());
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -316,6 +321,7 @@ void initCommandOptions(CommandOptions& options)
         "attributes to detect entry points."},
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
+        { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style", "Help formatting style" },
         { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
         "Add a path to be used in resolving '#include' "
         "and 'import' operations."},
@@ -1208,7 +1214,8 @@ struct OptionsParser
 
         // Get the options on the session
         CommandOptions& options = asInternal(session)->m_commandOptions;
-        
+        CommandOptionsWriter::Style helpStyle = CommandOptionsWriter::Style::Text; 
+
         auto frontEndReq = requestImpl->getFrontEndReq();
 
         while (reader.hasArg())
@@ -1950,9 +1957,15 @@ struct OptionsParser
                     sink->diagnoseRaw(Severity::Note, session->getBuildTagString());
                     break;
                 }
+                case OptionKind::HelpStyle:
+                {
+                    CommandOptions::UserValue value;
+                    SLANG_RETURN_ON_FAIL(_expectValue(ValueCategory::HelpStyle, reader, sink, value));
+                    helpStyle = CommandOptionsWriter::Style(value);
+                    break;
+                }
                 case OptionKind::Help:
                 {
-                    
                     Index categoryIndex = -1;
 
                     if (reader.hasArg())
@@ -1967,17 +1980,17 @@ struct OptionsParser
                         }
                     }
 
-                    CommandOptionsWriter writer;
+                    CommandOptionsWriter writer(helpStyle, &options);
                     auto& buf = writer.getBuilder();
 
                     if (categoryIndex < 0)
                     {
                         _appendUsageTitle(buf);
-                        writer.appendDescription(options);
+                        writer.appendDescription();
                     }
                     else
                     {
-                        writer.appendDescriptionForCategory(options, categoryIndex);
+                        writer.appendDescriptionForCategory(categoryIndex);
                     }
                     
                     sink->diagnoseRaw(Severity::Note, buf.getBuffer());

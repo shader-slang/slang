@@ -503,10 +503,10 @@ void CommandOptions::getCategoryOptionNames(Index categoryIndex, List<UnownedStr
     }
 }
 
-void CommandOptions::findCategoryIndicesFromUsage(const UnownedStringSlice& slice, List<Index>& outCategories) const
+void CommandOptions::splitUsage(const UnownedStringSlice& usageSlice, List<UnownedStringSlice>& outSlices) const
 {
-    const auto* cur = slice.begin();
-    const auto* end = slice.end();
+    const auto* cur = usageSlice.begin();
+    const auto* end = usageSlice.end();
 
     while (cur < end)
     {
@@ -522,20 +522,36 @@ void CommandOptions::findCategoryIndicesFromUsage(const UnownedStringSlice& slic
             {
                 cur++;
             }
-            
+
             // If we hit closing > we want to lookup
             if (cur < end && *cur == '>')
             {
                 const UnownedStringSlice categoryName(start, cur);
 
                 Index categoryIndex = findCategoryByName(categoryName);
-                if (categoryIndex >= 0 && outCategories.indexOf(categoryIndex) < 0)
+                if (categoryIndex >= 0)
                 {
-                    outCategories.add(categoryIndex);
+                    outSlices.add(categoryName);
                 }
             }
 
             cur++;
+        }
+    }
+}
+
+
+void CommandOptions::findCategoryIndicesFromUsage(const UnownedStringSlice& slice, List<Index>& outCategories) const
+{
+    List<UnownedStringSlice> categoryNames;
+    splitUsage(slice, categoryNames);
+
+    for (auto name : categoryNames)
+    {
+        Index categoryIndex = findCategoryByName(name);
+        if (categoryIndex >= 0 && outCategories.indexOf(categoryIndex) < 0)
+        {
+            outCategories.add(categoryIndex);
         }
     }
 }
@@ -614,227 +630,6 @@ bool CommandOptions::hasContiguousUserValueRange(LookupKind kind, UserValue star
 
     const Count count = getOptionCountInRange(kind, start, nonInclEnd);
     return rangeCount == count;
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!! CommandOptionsWriter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-void CommandOptionsWriter::appendDescriptionForCategory(const CommandOptions& options, Index categoryIndex)
-{
-    const auto& categories = options.getCategories();
-
-    const auto& category = categories[categoryIndex];
-    
-    // Header
-    {
-        const auto count = m_builder.getLength();
-        if (category.kind == CategoryKind::Value)
-        {
-            m_builder << "<" << category.name << ">";
-        }
-        else
-        {
-            m_builder << category.name;
-        }
-
-        const auto length = m_builder.getLength() - count;
-        m_builder << "\n";
-
-        m_builder.appendRepeatedChar('=', length);
-
-        m_builder << "\n\n";
-
-        // If there is a description output it
-        if (category.description.getLength() > 0)
-        {
-            _appendText(0, category.description);
-            m_builder << "\n";
-        }
-    }
-
-    for (auto& option : options.getOptionsForCategory(categoryIndex))
-    {
-        m_builder << m_indentSlice;
-
-        if (option.usage.getLength())
-        {
-            m_builder << option.usage;
-        }
-        else
-        {
-            List<UnownedStringSlice> names;
-            StringUtil::split(option.names, ',', names);
-
-            _appendWithWrap(1, names, toSlice(", "));
-        }
-
-        if (option.description.getLength() == 0)
-        {
-            m_builder << "\n";
-            continue;
-        }
-
-        m_builder << ": ";
-
-        _appendText(2, option.description);
-
-        if (option.usage.getLength())
-        {
-            List<Index> usageCategoryIndices;
-            options.findCategoryIndicesFromUsage(option.usage, usageCategoryIndices);
-
-            for (auto usageCategoryIndex : usageCategoryIndices)
-            {
-                auto& usageCat = categories[usageCategoryIndex];
-
-                m_builder << m_indentSlice << m_indentSlice;
-                m_builder << "<" << usageCat.name << "> can be: ";
-
-                List<UnownedStringSlice> optionNames;
-                options.getCategoryOptionNames(usageCategoryIndex, optionNames);
-
-                _appendWithWrap(2, optionNames, toSlice(", "));
-
-                m_builder << "\n";
-            }
-        }
-    }
-
-    m_builder << "\n";
-}
-
-void CommandOptionsWriter::appendDescription(const CommandOptions& options)
-{
-    // Go through categories in order
-
-    const auto& categories = options.getCategories();
-
-    for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
-    {
-        appendDescriptionForCategory(options, categoryIndex);
-    }
-}
-
-void CommandOptionsWriter::_appendText(Count indentCount, const UnownedStringSlice& text)
-{
-    List<UnownedStringSlice> lines;
-    StringUtil::calcLines(text, lines);
-
-    // Remove very last line if it's empty
-    if (lines.getCount() > 1 && lines.getLast().trim().getLength() == 0)
-    {
-        lines.removeLast();
-    }
-
-    _appendWithWrap(indentCount, lines);
-}
-
-Count CommandOptionsWriter::_getCurrentLineLength()
-{
-    // Work out the current line length
-    const char* start = m_builder.begin();
-    const char* cur = m_builder.end();
-
-    Count lineLength = 0;
-
-    if (cur > start)
-    {
-        for (--cur; cur > start; --cur)
-        {
-            const auto c = *cur;
-            if (c == '\n' || c == '\r')
-            {
-                ++cur;
-                break;
-            }
-        }
-
-        lineLength = Count(ptrdiff_t(m_builder.end() - cur));
-    }
-
-    return lineLength;
-}
-
-void CommandOptionsWriter::_requireIndent(Count indentCount)
-{
-    const auto length = m_builder.getLength();
-    if (length)
-    {
-        const auto c = m_builder[length - 1];
-        if (c == '\n' || c == '\r')
-        {
-            for (Index j = 0; j < indentCount; j++)
-            {
-                m_builder.append(m_indentSlice);
-            }
-        }
-    }
-}
-
-void CommandOptionsWriter::_appendWithWrap(Count indentCount, List<UnownedStringSlice>& lines)
-{
-    List<UnownedStringSlice> words;
-
-    for (auto line : lines)
-    {
-        if (line.trim().getLength() == 0 || line.startsWith(toSlice(" ")))
-        {
-            // Append the line as is after the indent
-            _requireIndent(indentCount);
-            m_builder << line << "\n";
-        }
-        else
-        {
-            words.clear();
-            StringUtil::split(line, ' ', words);
-
-            _requireIndent(indentCount);
-
-            _appendWithWrap(indentCount, words, toSlice(" "));
-            m_builder << "\n";
-        }
-    }
-}
-
-
-
-void CommandOptionsWriter::_appendWithWrap(Count indentCount, List<UnownedStringSlice>& slices, const UnownedStringSlice& delimit)
-{
-    Count lineLength = _getCurrentLineLength();
-
-    const auto count = slices.getCount();
-
-    for (Index i = 0; i < count; ++i)
-    {
-        auto slice = slices[i];
-
-        auto sliceLength = slice.getLength();
-
-        if (i < count - 1)
-        {
-            sliceLength += delimit.getLength();
-        }
-
-        // If out of space onto the next line
-        if (lineLength + sliceLength > m_lineLength)
-        {
-            m_builder.append("\n");
-
-            lineLength = indentCount * m_indentSlice.getLength();
-
-            for (Index j = 0; j < indentCount; j++)
-            {
-                m_builder.append(m_indentSlice);
-            }
-        }
-
-        m_builder.append(slice);
-        if (i < count - 1)
-        {
-            m_builder.append(delimit);
-        }
-
-        lineLength += sliceLength;
-    }
 }
 
 } // namespace Slang

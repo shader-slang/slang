@@ -28,6 +28,20 @@ struct CommandOptions
         Base     =  0,              ///< Lookup via category index
     };
 
+       /// A key type that uses the combination of the lookup kind and a name index.
+       /// Maps to a target index that could be a category or an option index.
+    struct NameKey
+    {
+        typedef NameKey ThisType;
+
+        SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return kind == rhs.kind && nameIndex == rhs.nameIndex; }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        HashCode getHashCode() const { return combineHash(Slang::getHashCode(kind), Slang::getHashCode(nameIndex)); }
+
+        LookupKind kind;            ///< The kind of lookup
+        Index nameIndex;            ///< The name index in the pool
+    };
+
     enum class CategoryKind
     {
         Option,             ///< Command line option (like "-D")
@@ -139,6 +153,10 @@ struct CommandOptions
 
         /// Find all of the categories in the usage slice
     void findCategoryIndicesFromUsage(const UnownedStringSlice& usageSlice, List<Index>& outCategories) const;
+
+        /// Splits usage into category slices
+    void splitUsage(const UnownedStringSlice& usageSlice, List<UnownedStringSlice>& outSlices) const;
+
         /// Get all the option names associated with a category index
     void getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const;
     
@@ -160,6 +178,7 @@ struct CommandOptions
     {
     }
 
+    protected:
         /// Returns name in the m_optionPool or -1 on error
     SlangResult _addOptionName(const UnownedStringSlice& name, Flags flags, Index targetIndex);
     SlangResult _addValueName(const UnownedStringSlice& name, Index categoryIndex, Index targetIndex);
@@ -175,20 +194,7 @@ struct CommandOptions
     UnownedStringSlice _addString(const char* text);
     UnownedStringSlice _addString(const UnownedStringSlice& slice);
 
-    /// A key type that uses the combination of the lookup kind and a name index.
-    /// Maps to a target index that could be a category or an option index.
-    struct NameKey
-    {
-        typedef NameKey ThisType;
-
-        SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return kind == rhs.kind && nameIndex == rhs.nameIndex; }
-        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-        HashCode getHashCode() const { return combineHash(Slang::getHashCode(kind), Slang::getHashCode(nameIndex)); }
-
-        LookupKind kind;            ///< The kind of lookup
-        Index nameIndex;            ///< The name index in the pool
-    };
-
+   
     struct UserValueKey
     {
         typedef UserValueKey ThisType;
@@ -214,38 +220,6 @@ struct CommandOptions
     Dictionary<UserValueKey, Index> m_userValueMap; ///< Maps a user value (for a kind) to an index
 
     MemoryArena m_arena;                            ///< For other misc storage
-};
-
-struct CommandOptionsWriter
-{
-    typedef CommandOptions::CategoryKind CategoryKind;
-    
-        /// Append descirption for a category
-    void appendDescriptionForCategory(const CommandOptions& options, Index categoryIndex);
-        /// Appends a description of all of the options
-    void appendDescription(const CommandOptions& options);
-
-        /// Get the builder that string is being written to
-    StringBuilder& getBuilder() { return m_builder; }
-
-        /// Ctor 
-    CommandOptionsWriter():
-        m_indentSlice(toSlice("  "))
-    {
-    }
-
-    Count _getCurrentLineLength();
-
-    void _appendWithWrap(Count indentCount, List<UnownedStringSlice>& slices, const UnownedStringSlice& delimit);
-    void _appendWithWrap(Count indentCount, List<UnownedStringSlice>& lines);
-    void _requireIndent(Count indentCount);
-    void _appendText(Count indentCount, const UnownedStringSlice& text);
-
-
-    UnownedStringSlice m_indentSlice;
-    Count m_lineLength = 80;
-
-    StringBuilder m_builder;
 };
 
 } // namespace Slang
