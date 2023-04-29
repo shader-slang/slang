@@ -236,19 +236,19 @@ namespace Slang
         Dictionary<IRInst*, InversionInfo> invInfoMap;
     };
 
-    struct Use
+    struct UseOrPseudoUse
     {
         IRUse* irUse = nullptr;
         IRInst* user;
         IRInst* usedVal;
-        Use() = default;
-        Use(IRUse* use)
+        UseOrPseudoUse() = default;
+        UseOrPseudoUse(IRUse* use)
         {
             user = use->getUser();
             usedVal = use->get();
             irUse = use;
         }
-        Use(IRInst* inUser, IRInst* inUsedVal)
+        UseOrPseudoUse(IRInst* inUser, IRInst* inUsedVal)
         {
             irUse = nullptr;
             user = inUser;
@@ -258,7 +258,7 @@ namespace Slang
         {
             return combineHash(Slang::getHashCode(user), Slang::getHashCode(usedVal));
         }
-        bool operator==(const Use& other) const
+        bool operator==(const UseOrPseudoUse& other) const
         {
             return user == other.user && usedVal == other.usedVal;
         }
@@ -297,7 +297,7 @@ namespace Slang
         // 
         virtual void preparePolicy(IRGlobalValueWithCode* func) = 0;
 
-        virtual HoistResult classify(Use diffBlockUse) = 0;
+        virtual HoistResult classify(UseOrPseudoUse diffBlockUse) = 0;
 
      protected:
 
@@ -313,7 +313,7 @@ namespace Slang
         { }
 
         virtual void preparePolicy(IRGlobalValueWithCode* func);
-        virtual HoistResult classify(Use use);
+        virtual HoistResult classify(UseOrPseudoUse use);
     };
 
     RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func);

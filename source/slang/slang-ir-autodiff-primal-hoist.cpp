@@ -266,8 +266,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
     RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
 
-    List<Use> workList;
-    HashSet<Use> processedUses;
+    List<UseOrPseudoUse> workList;
+    HashSet<UseOrPseudoUse> processedUses;
     HashSet<IRUse*> usesToReplace;
 
     auto addPrimalOperandsToWorkList = [&](IRInst* inst)
@@ -396,7 +396,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                         // we treat as if there is a pseudo-use of the store/call to compute
                         // the var inst, i.e. the var depends on the store/call, despite
                         // the IR's def-use chain doesn't reflect this.
-                        workList.add(Use(var, storeUse->getUser()));
+                        workList.add(UseOrPseudoUse(var, storeUse->getUser()));
                     }
                 }
                 else
@@ -1462,7 +1462,7 @@ static bool shouldStoreVar(IRVar* var)
     return false;
 }
 
-bool canRecompute(Use use)
+bool canRecompute(UseOrPseudoUse use)
 {
     if (auto load = as<IRLoad>(use.usedVal))
     {
@@ -1508,7 +1508,7 @@ bool canRecompute(Use use)
     return true;
 }
 
-HoistResult DefaultCheckpointPolicy::classify(Use use)
+HoistResult DefaultCheckpointPolicy::classify(UseOrPseudoUse use)
 {
     // Store all that we can.. by default, classify will only be called on relevant differential
     // uses (or on uses in a 'recompute' inst)
