@@ -87,15 +87,12 @@ namespace Slang
 
 
 #ifdef _DEBUG
-#define SLANG_EXPECT(VALUE, MSG) if(VALUE) {} else SLANG_ASSERT_FAILURE(MSG)
 #define SLANG_ASSERT(VALUE) SLANG_EXPECT(VALUE, #VALUE)
 #else
-#define SLANG_EXPECT(VALUE, MSG) do {} while(0)
 #define SLANG_ASSERT(VALUE) do {} while(0)
 #endif
 
 #define SLANG_RELEASE_ASSERT(VALUE) if(VALUE) {} else SLANG_ASSERT_FAILURE(#VALUE)
-#define SLANG_RELEASE_EXPECT(VALUE, WHAT) if(VALUE) {} else SLANG_UNEXPECTED(WHAT)
 
 template<typename T> void slang_use_obj(T&) {}
 
