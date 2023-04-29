@@ -330,9 +330,7 @@ Pass arguments to downstream [&lt;compiler&gt;](#compiler). Just [-X&lt;compiler
 
 **-pass-through &lt;[compiler](#compiler)&gt;**
 
-Pass the input through mostly unmodified to the 
-
-existing compiler [&lt;compiler&gt;](#compiler). 
+Pass the input through mostly unmodified to the existing compiler [&lt;compiler&gt;](#compiler). 
 
 
 
@@ -719,7 +717,7 @@ A capability describes an optional feature that a target may or may not support.
 <a id="file-extension"></a>
 # file-extension
 
-A &lt;language&gt;, &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
+A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 
 * `hlsl`, `fx` : hlsl 
 * `dxbc` 

@@ -430,7 +430,7 @@ void initCommandOptions(CommandOptions& options)
         "to the downstream compiler. -X<compiler>... options -X. will pass *all* of the options "
         "inbetween the opening -X and -X. to the downstream compiler."},
         { OptionKind::PassThrough, "-pass-through", "-pass-through <compiler>", 
-        "Pass the input through mostly unmodified to the \n"
+        "Pass the input through mostly unmodified to the "
         "existing compiler <compiler>." },
     };
 

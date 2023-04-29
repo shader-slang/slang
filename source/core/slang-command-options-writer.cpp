@@ -146,12 +146,12 @@ void MarkdownCommandOptionsWriter::_appendParagraph(const UnownedStringSlice& te
 
 static bool _isEndPunctionation(char c)
 {
-    return c == '.' || c == ')';
+    return c == '.' || c == ')' || c == ',';
 }
 
 static bool _isStartPunctionation(char c)
 {
-    return c == '(';
+    return c == '(' || c == ',';
 }
 
 static UnownedStringSlice _trimPunctuation(const UnownedStringSlice& word)
