@@ -124,24 +124,11 @@ struct RegisterAllocateContext
             return false;
         auto branch = as<IRUnconditionalBranch>(branchUse->getUser());
         auto branchTarget = branch->getTargetBlock();
-        /*bool isLoopHeader = false;
-        for (auto targetUse = branchTarget->firstUse; targetUse; targetUse = targetUse->nextUse)
-        {
-            if (auto loop = as<IRLoop>(targetUse->getUser()))
-            {
-                if (loop->getTargetBlock() == branchTarget)
-                {
-                    isLoopHeader = true;
-                    break;
-                }
-            }
-        }
-        if (!isLoopHeader)
-            return false;*/
+
         if (param->getParent() != branchTarget)
             return false;
         auto paramIndex = getParamIndexInBlock(param);
-        if (paramIndex >= branch->getArgCount() || paramIndex == -1)
+        if (paramIndex >= (int)branch->getArgCount() || paramIndex == -1)
             return false;
         if (branch->getArg(paramIndex) != phiArg)
             return false;
