@@ -363,7 +363,8 @@ SlangResult FXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
 {
     ComPtr<ISlangSharedLibrary> library;
 
-    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "d3dcompiler_47", library));
+    const char* const libName = "d3dcompiler_47";
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, libName, library));
 
     SLANG_ASSERT(library);
     if (!library)
