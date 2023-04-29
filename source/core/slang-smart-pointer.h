@@ -162,25 +162,12 @@ namespace Slang
             return Slang::getHashCode(pointer);
         }
 
-        bool operator==(const T * ptr) const
+        // auto operator<=>(const RefPtr<T>&) const = default;
+        //
+        auto operator<=>(const T* ptr) const
         {
-            return pointer == ptr;
+            return pointer <=> ptr;
         }
-
-        bool operator!=(const T * ptr) const
-        {
-            return pointer != ptr;
-        }
-
-		bool operator==(RefPtr<T> const& ptr) const
-		{
-			return pointer == ptr.pointer;
-		}
-
-		bool operator!=(RefPtr<T> const& ptr) const
-		{
-			return pointer != ptr.pointer;
-		}
 
         template<typename U>
         RefPtr<U> dynamicCast() const

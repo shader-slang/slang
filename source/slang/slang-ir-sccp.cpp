@@ -97,16 +97,7 @@ struct SCCPContext
         // downstream dependencies if our knowledge about
         // an instruction hasn't actually changed.
         //
-        bool operator==(LatticeVal const& that)
-        {
-            return this->flavor == that.flavor
-                && this->value == that.value;
-        }
-
-        bool operator!=(LatticeVal const& that)
-        {
-            return !( *this == that );
-        }
+        auto operator<=>(const LatticeVal&) const = default;
     };
 
     static bool isEvaluableOpCode(IROp op)
