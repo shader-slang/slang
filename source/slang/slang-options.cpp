@@ -1973,7 +1973,7 @@ struct OptionsParser
                         auto catArg = reader.getArgAndAdvance();
 
                         categoryIndex = options.findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
-                        if (categoryIndex)
+                        if (categoryIndex < 0)
                         {
                             sink->diagnose(catArg.loc, Diagnostics::unknownHelpCategory);
                             return SLANG_FAIL;
