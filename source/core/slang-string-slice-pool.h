@@ -89,9 +89,8 @@ public:
     {
         SLANG_ASSERT(
             m_style == Style::Default &&
-            // TODO(C++20), use bit_cast here
-            HandleIntegral(handle) <= HandleIntegral(std::numeric_limits<Index>::max()));
-        return Index(handle) < kDefaultHandlesCount;
+            static_cast<Index>(handle) > 0);
+        return static_cast<Index>(handle) < kDefaultHandlesCount;
     }
 
         /// Convert a handle to and index. (A handle is just an index!) 
