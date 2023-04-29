@@ -1473,7 +1473,20 @@ struct SPIRVEmitContext
         //
         for( auto irBlock : irFunc->getBlocks() )
         {
-            emitInst(spvFunc, irBlock, SpvOpLabel, kResultID);
+            auto spvBlock = emitInst(spvFunc, irBlock, SpvOpLabel, kResultID);
+            if (irBlock == irFunc->getFirstBlock())
+            {
+                // OpVariable
+                // All variables used in the function must be declared before anything else.
+                for (auto block : irFunc->getBlocks())
+                {
+                    for (auto inst : block->getChildren())
+                    {
+                        if (as<IRVar>(inst))
+                            emitLocalInst(spvBlock, inst);
+                    }
+                }
+            }
 
             // In addition to normal basic blocks,
             // all loops gets a header block.
@@ -1517,6 +1530,9 @@ struct SPIRVEmitContext
                 // Any instructions local to the block will be emitted as children
                 // of the block.
                 //
+                // Skip vars because they are already emitted.
+                if (as<IRVar>(irInst))
+                    continue;
                 emitLocalInst(spvBlock, irInst);
                 if (irInst->getOp() == kIROp_loop)
                     pendingLoopInsts.add(as<IRLoop>(irInst));

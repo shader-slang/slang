@@ -34,8 +34,8 @@ struct GraphicsSubmitter : public Submitter
     virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override;
     virtual void setRootDescriptorTable(
         int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override;
-    void setRootSignature(ID3D12RootSignature* rootSignature);
-    void setRootConstants(
+    virtual void setRootSignature(ID3D12RootSignature* rootSignature) override;
+    virtual void setRootConstants(
         Index rootParamIndex,
         Index dstOffsetIn32BitValues,
         Index countOf32BitValues,
@@ -57,8 +57,8 @@ struct ComputeSubmitter : public Submitter
     virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override;
     virtual void setRootDescriptorTable(
         int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override;
-    void setRootSignature(ID3D12RootSignature* rootSignature);
-    void setRootConstants(
+    virtual void setRootSignature(ID3D12RootSignature* rootSignature) override;
+    virtual void setRootConstants(
         Index rootParamIndex,
         Index dstOffsetIn32BitValues,
         Index countOf32BitValues,

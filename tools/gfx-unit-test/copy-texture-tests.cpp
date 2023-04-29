@@ -744,12 +744,23 @@ namespace gfx_test
     template<typename T>
     void copyTextureTestImpl(IDevice* device, UnitTestContext* context)
     {
+        const bool isVkd3d = SLANG_ENABLE_VKD3D &&
+            strcmp(device->getDeviceInfo().apiName, "Direct3D 12") == 0;
+
         // Skip Type::Unknown and Type::Buffer as well as Format::Unknown
         // TODO: Add support for TextureCube
         for (uint32_t i = 2; i < (uint32_t)ITextureResource::Type::_Count - 1; ++i)
         {
             for (uint32_t j = 1; j < (uint32_t)Format::_Count; ++j)
             {
+                // Fails validation VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251
+                if(isVkd3d && ((Format)j == Format::R32G32B32_TYPELESS ||
+                               (Format)j == Format::R32G32B32_FLOAT ||
+                               (Format)j == Format::R32G32B32_UINT ||
+                               (Format)j == Format::R32G32B32_SINT))
+                {
+                    continue;
+                }
                 auto type = (ITextureResource::Type)i;
                 auto format = (Format)j;
                 auto validationFormat = getValidationTextureFormat(format);

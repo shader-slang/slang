@@ -1082,6 +1082,10 @@ static SlangResult _setSessionPrelude(const Options& options, const char* exePat
     // Let's see if we need to set up special prelude for HLSL
     if (options.nvapiExtnSlot.getLength())
     {
+#if !SLANG_WINDOWS_FAMILY
+        // NVAPI is currently only available on Windows
+        return SLANG_E_NOT_AVAILABLE;
+#else
         // We want to set the path to NVAPI
         String rootPath;
         SLANG_RETURN_ON_FAIL(TestToolUtil::getRootPath(exePath, rootPath));
@@ -1098,6 +1102,7 @@ static SlangResult _setSessionPrelude(const Options& options, const char* exePat
         buf << "\n\n";
 
         session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
+#endif
     }
     else
     {

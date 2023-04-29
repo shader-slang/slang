@@ -80,3 +80,5 @@ build/**/*.log
 
 .cache
 vkd3d-proton.cache
+*_d3d11.log
+*_dxgi.log

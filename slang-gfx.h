@@ -674,7 +674,7 @@ struct SubresourceRange
 class ITextureResource: public IResource
 {
 public:
-    static const Size kRemainingTextureSize = 0xFFFFFFFF;
+    static const GfxCount kRemainingTextureSize = 0xffffffff;
     struct Offset3D
     {
         GfxIndex x = 0;
@@ -2058,7 +2058,7 @@ struct AdapterLUID
 
     bool operator==(const AdapterLUID& other) const
     {
-        for (int i = 0; i < sizeof(AdapterLUID::luid); ++i)
+        for (size_t i = 0; i < sizeof(AdapterLUID::luid); ++i)
             if (luid[i] != other.luid[i])
                 return false;
         return true;
