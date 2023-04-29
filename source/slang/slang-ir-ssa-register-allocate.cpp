@@ -5,7 +5,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-dominators.h"
-
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -91,13 +91,65 @@ struct RegisterAllocateContext
         auto name2 = inst2->findDecoration<IRNameHintDecoration>();
         
         if (name1 && !name2 || !name1 && name2)
-            return false;
+            return true;
 
         if (!name1 || !name2)
             return true;
         if (name1->getName() != name2->getName())
             return false;
 
+        return true;
+    }
+
+    bool isUseOfParamAfterPhiAssignment(IRDominatorTree* dom, IRUse* useToTest, IRInst* phiParam, IRInst* phiArg)
+    {
+        IRParam* param = as<IRParam>(phiParam);
+        if (!param)
+            return false;
+        IRUse* branchUse = nullptr;
+        for (auto use = phiArg->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser()->getOp() == kIROp_unconditionalBranch)
+            {
+                if (!branchUse)
+                    branchUse = use;
+                else
+                {
+                    // If arg is being used in more than one branch, don't handle it.
+                    return false;
+                }
+            }
+        }
+        if (!branchUse)
+            return false;
+        auto branch = as<IRUnconditionalBranch>(branchUse->getUser());
+        auto branchTarget = branch->getTargetBlock();
+        /*bool isLoopHeader = false;
+        for (auto targetUse = branchTarget->firstUse; targetUse; targetUse = targetUse->nextUse)
+        {
+            if (auto loop = as<IRLoop>(targetUse->getUser()))
+            {
+                if (loop->getTargetBlock() == branchTarget)
+                {
+                    isLoopHeader = true;
+                    break;
+                }
+            }
+        }
+        if (!isLoopHeader)
+            return false;*/
+        if (param->getParent() != branchTarget)
+            return false;
+        auto paramIndex = getParamIndexInBlock(param);
+        if (paramIndex >= branch->getArgCount() || paramIndex == -1)
+            return false;
+        if (branch->getArg(paramIndex) != phiArg)
+            return false;
+
+        // If we reach here, then phiArg is indeed used as arg for phiParam.
+        // We will allow any use of phiParam when phiArg isn't live.
+        if (dom->dominates(phiArg, useToTest->getUser()))
+            return false;
         return true;
     }
 
@@ -167,11 +219,12 @@ struct RegisterAllocateContext
                         if (!dominatingInstSet.contains(existingInst))
                             continue;
 
-                        // If `existingInst` does dominate `inst`, we need to check all
-                        // its use sites U to see if there is a path from `inst` to U.
-                        // The idea is that is `existingInst` is never used anywhere after
-                        // `inst`, then its lifetime ended before `inst` is defined, so it
-                        // is still fine to place them in the same register.
+                        // In the general case, we need to check all its use
+                        // sites U to see if there is a path from `inst` to U.
+                        // The idea is that is `existingInst` is never used
+                        // anywhere after `inst`, then its lifetime ended before
+                        // `inst` is defined, so it is still fine to place them
+                        // in the same register.
                         for (auto use = existingInst->firstUse; use; use = use->nextUse)
                         {
                             if (use->getUser() == inst)
@@ -180,6 +233,14 @@ struct RegisterAllocateContext
                             if (!canCoalesce(existingInst, inst) ||
                                 reachabilityContext.isInstReachable(inst, use->getUser()))
                             {
+                                // We found a use of `existingInst` (U) where
+                                // there is a path from `inst` to U.
+                                // Generally this means that existingInst and inst interfere.
+                                // However, an exception is that existingInst is a PhiParam,
+                                // and inst is an arg to that param, and use happens after
+                                // the phi assignment.
+                                if (isUseOfParamAfterPhiAssignment(dom, use, existingInst, inst))
+                                    continue;
                                 hasInterference = true;
                                 goto endRegInstCheck;
                             }

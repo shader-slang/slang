@@ -134,21 +134,6 @@ public:
         return false;
     }
 
-    int getParamIndexInBlock(IRParam* paramInst)
-    {
-        auto block = as<IRBlock>(paramInst->getParent());
-        if (!block)
-            return -1;
-        int paramIndex = 0;
-        for (auto param : block->getParams())
-        {
-            if (param == paramInst)
-                return paramIndex;
-            paramIndex++;
-        }
-        return -1;
-    }
-
     bool isInstInFunc(IRInst* inst, IRInst* func)
     {
         while (inst)

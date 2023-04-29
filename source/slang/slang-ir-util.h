@@ -202,6 +202,9 @@ IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 void moveParams(IRBlock* dest, IRBlock* src);
 
 void removePhiArgs(IRInst* phiParam);
+
+int getParamIndexInBlock(IRParam* paramInst);
+
 }
 
 #endif
