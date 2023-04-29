@@ -78,28 +78,18 @@ int calcThing_0(int offset_0)
             }
             int modRange_0 = i_0 % 3;
             another_0[i_0 & 1] = another_0[i_0 & 1] + modRange_0;
-            int _S5;
             if(modRange_0 != 0)
             {
-                int _S6 = _S4;
-                livenessEnd_0(_S4, 0);
-                int _S7 = _S6 + 1;
-                livenessStart_1(_S5, 0);
-                _S5 = _S7;
+                _S4 = _S4 + 1;
             }
             else
             {
-                int _S8 = _S4;
-                livenessEnd_0(_S4, 0);
-                livenessStart_1(_S5, 0);
-                _S5 = _S8;
             }
+            int _S5 = _S4;
+            livenessEnd_0(_S4, 0);
             idx_0[modRange_0] = idx_0[modRange_0] + (_S5 + i_0);
             i_0 = i_0 + 1;
             livenessStart_1(_S4, 0);
-            int _S9 = _S5;
-            livenessEnd_0(_S5, 0);
-            _S4 = _S9;
         }
         livenessEnd_0(_S2, 0);
         livenessEnd_0(k_0, 0);
@@ -110,34 +100,34 @@ int calcThing_0(int offset_0)
             livenessEnd_2(another_0, 0);
             return total_0;
         }
-        int _S10 = idx_0[0] + idx_0[1];
-        int _S11 = idx_0[2];
+        int _S6 = idx_0[0] + idx_0[1];
+        int _S7 = idx_0[2];
         livenessEnd_1(idx_0, 0);
-        int _S12 = _S10 + _S11;
-        int _S13 = total_0;
+        int _S8 = _S6 + _S7;
+        int _S9 = total_0;
         livenessEnd_0(total_0, 0);
-        int total_1 = _S13 + _S12;
+        int total_1 = _S9 + _S8;
         livenessStart_1(k_0, 0);
         k_0 = k_1;
         livenessStart_1(_S2, 0);
-        int _S14 = _S4;
+        int _S10 = _S4;
         livenessEnd_0(_S4, 0);
-        _S2 = _S14;
+        _S2 = _S10;
         livenessStart_1(total_0, 0);
         total_0 = total_1;
     }
     livenessEnd_2(another_0, 0);
-    int _S15 = total_0;
+    int _S11 = total_0;
     livenessEnd_0(total_0, 0);
-    return - _S15;
+    return - _S11;
 }
 
 layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
-    int _S16 = calcThing_0(index_0);
-    ((outputBuffer_0)._data[(uint(index_0))]) = _S16;
+    int _S12 = calcThing_0(index_0);
+    ((outputBuffer_0)._data[(uint(index_0))]) = _S12;
     return;
 }
 
