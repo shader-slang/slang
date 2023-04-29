@@ -80,10 +80,8 @@ namespace Slang
 // TODO: Shouldn't these be SLANG_ prefixed?
 #ifdef _MSC_VER
 #define UNREACHABLE_RETURN(x)
-#define UNREACHABLE(x)
 #else
 #define UNREACHABLE_RETURN(x) return x;
-#define UNREACHABLE(x) x;
 #endif
 
 }
