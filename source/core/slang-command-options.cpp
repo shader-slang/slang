@@ -416,7 +416,52 @@ void CommandOptions::setCategory(const char* name)
     m_currentCategoryIndex = -1;
 }
 
-Index CommandOptions::findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name) const
+Index CommandOptions::findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name, NameKey* outNameKey) const
+{
+    // Look up directly
+    {
+        auto index = _findTargetIndexByName(kind, name, outNameKey);
+        if (index >= 0)
+        {
+            return index;
+        }
+    }
+
+    // Special case options, which can have prefix styles
+    if (kind == LookupKind::Option)
+    {
+        auto prefixSizes = m_prefixSizes;
+
+        while (prefixSizes)
+        {
+            auto prefixSize = ByteEncodeUtil::calcMsb32(prefixSizes);
+
+            if (prefixSize < name.getLength())
+            {
+                // Look it up
+                const auto index = _findTargetIndexByName(kind, name.head(prefixSize), outNameKey);
+                if (index >= 0)
+                {
+                    auto& option = m_options[index];
+
+                    // If the option accepts prefixes, we return the index
+                    if (option.flags & (Flag::CanPrefix | Flag::IsPrefix))
+                    {
+                        return index;
+                    }
+                }
+            }
+
+            // Remove the bit
+            prefixSizes &= ~(uint32_t(1) << prefixSize);
+        }
+    }
+
+    // Was not found
+    return -1;
+}
+
+Index CommandOptions::_findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name, NameKey* outNameKey) const
 {
     const auto nameIndex = m_pool.findIndex(name);
     // If the name isn't in the pool then there isn't a category with this name
@@ -431,6 +476,10 @@ Index CommandOptions::findTargetIndexByName(LookupKind kind, const UnownedString
 
     if (auto ptr = m_nameMap.tryGetValue(key))
     {
+        if (outNameKey)
+        {
+            *outNameKey = key;
+        }
         return *ptr;
     }
 
@@ -475,47 +524,6 @@ Index CommandOptions::findOptionByCategoryUserValue(UserValue categoryUserValue,
     }
 
     return findValueByName(categoryIndex, name);
-}
-
-Index CommandOptions::findOptionByName(const UnownedStringSlice& name) const
-{
-    {
-        auto index = findTargetIndexByName(LookupKind::Option, name);
-        if (index >= 0)
-        {
-            return index;
-        }
-    }
-
-    // We need to search for partials
-    auto prefixSizes = m_prefixSizes;
-
-    while (prefixSizes)
-    {
-        auto prefixSize = ByteEncodeUtil::calcMsb32(prefixSizes);
-
-        if (prefixSize < name.getLength())
-        {
-            // Look it up
-            const auto index = findTargetIndexByName(LookupKind::Option, name.head(prefixSize));
-            if (index >= 0)
-            {
-                auto& option = m_options[index];
-
-                // If the option accepts prefixes, we return the index
-                if (option.flags & (Flag::CanPrefix | Flag::IsPrefix))
-                {
-                    return index;
-                }
-            }
-        }
-
-        // Remove the bit
-        prefixSizes &= ~(uint32_t(1) << prefixSize);
-    }
-
-    // Was not found
-    return -1;
 }
 
 ConstArrayView<CommandOptions::Option> CommandOptions::getOptionsForCategory(Index categoryIndex) const

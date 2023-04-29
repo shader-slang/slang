@@ -124,14 +124,14 @@ struct CommandOptions
     void addValuesWithAliases(const ConstArrayView<NameValue>& values);
 
         /// Get the target index based off the name and the kind
-    Index findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name) const;
+    Index findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name, NameKey* outNameKey = nullptr) const;
         /// Given a kind and a user value lookup the target index
     Index findTargetIndexByUserValue(LookupKind kind, UserValue userValue) const;
 
         /// Finds the category by name or -1 if not found
     Index findCategoryByName(const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind::Category, name); }
         /// Finds the option index by name or -1 if not found
-    Index findOptionByName(const UnownedStringSlice& name) const;
+    Index findOptionByName(const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind::Option, name); }
         /// Find the option index of a value, using it's category index and the name
     Index findValueByName(Index categoryIndex, const UnownedStringSlice& name) const { return findTargetIndexByName(LookupKind(categoryIndex), name); }
 
@@ -204,7 +204,8 @@ struct CommandOptions
     UnownedStringSlice _addString(const char* text);
     UnownedStringSlice _addString(const UnownedStringSlice& slice);
 
-   
+    Index _findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name, NameKey* outNameKey) const;
+
     struct UserValueKey
     {
         typedef UserValueKey ThisType;

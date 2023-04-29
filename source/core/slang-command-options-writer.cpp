@@ -168,12 +168,22 @@ void MarkdownCommandOptionsWriter::_appendMaybeLink(const UnownedStringSlice& in
 {
     auto trimmedWord = _trimPunctuation(inWord);
 
-    if (trimmedWord.getLength() && trimmedWord[0] == '-')
+    if (trimmedWord.getLength())
     {
-        // This could be a command line switch
-        const auto optionIndex = m_commandOptions->findOptionByName(trimmedWord);
+        Index index = -1;
+        NameKey nameKey;
+
+        // Look for options
+        if (trimmedWord[0] == '-')
+        {
+            index = m_commandOptions->findTargetIndexByName(LookupKind::Option, trimmedWord, &nameKey);
+        }
+        else if (trimmedWord[0] == '<' && trimmedWord[trimmedWord.getLength() - 1] == '>')
+        {
+            index = m_commandOptions->findTargetIndexByName(LookupKind::Category, trimmedWord.subString(1, trimmedWord.getLength() - 2), &nameKey);
+        }
         
-        if (optionIndex >= 0)
+        if (index > 0)
         {
             // Append before the link
             _appendEscapedMarkdown(UnownedStringSlice(inWord.begin(), trimmedWord.begin()), m_builder);
@@ -181,7 +191,7 @@ void MarkdownCommandOptionsWriter::_appendMaybeLink(const UnownedStringSlice& in
             // Make into a link
             m_builder << "[";
             _appendEscapedMarkdown(trimmedWord, m_builder);
-            m_builder << "](#" << _getLinkName(m_commandOptions->getNameKeyForOption(optionIndex), optionIndex) << ")";
+            m_builder << "](#" << _getLinkName(nameKey, index) << ")";
 
             // Append after the link
             _appendEscapedMarkdown(UnownedStringSlice(trimmedWord.end(), inWord.end()), m_builder);

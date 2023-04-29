@@ -124,7 +124,7 @@ Set the module name to use when compiling multiple .slang source files into a si
 
 Specify a path where generated output should be written. 
 
-If no [-target](#target-1) or [-stage](#stage-1) is specified, one may be inferred from file extension (see &lt;file-extension&gt;). If multiple [-target](#target-1) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target-1) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target-1) that matches the one inferred from &lt;path&gt;. 
+If no [-target](#target-1) or [-stage](#stage-1) is specified, one may be inferred from file extension (see [&lt;file-extension&gt;](#file-extension)). If multiple [-target](#target-1) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target-1) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target-1) that matches the one inferred from &lt;path&gt;. 
 
 
 <a id="profile"></a>
@@ -141,7 +141,7 @@ Accepted profiles are:
 Additional profiles that include [-stage](#stage-1) information: 
 
 >   {vs,hs,ds,gs,ps}_<version>
-See [-capability](#capability-1) for information on &lt;capability&gt; 
+See [-capability](#capability-1) for information on [&lt;capability&gt;](#capability) 
 
 When multiple [-target](#target-1) options are present, each [-profile](#profile) associates with the first [-target](#target-1) to its left. 
 
@@ -263,9 +263,9 @@ Include debug information in the generated code, where possible.
 
 N is the amount of information, 0..3, unspecified means 2 
 
-&lt;debug-info-format&gt; specifies a debugging info format 
+[&lt;debug-info-format&gt;](#debug-info-format) specifies a debugging info format 
 
-It is valid to have multiple [-g](#g) options, such as a level and a &lt;debug-info-format&gt; 
+It is valid to have multiple [-g](#g) options, such as a level and a [&lt;debug-info-format&gt;](#debug-info-format) 
 
 
 <a id="line-directive-mode-1"></a>
@@ -304,7 +304,7 @@ Downstream compiler options
 
 **-&lt;[compiler](#compiler)&gt;-path &lt;path&gt;**
 
-Specify path to a downstream &lt;compiler&gt; executable or library. 
+Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library. 
 
 
 
@@ -322,7 +322,7 @@ Set a default compiler for the given language. See [-lang](#lang) for the list o
 
 **-X&lt;[compiler](#compiler)&gt; &lt;option&gt; -X&lt;[compiler](#compiler)&gt;... &lt;options&gt; -X.**
 
-Pass arguments to downstream &lt;compiler&gt;. Just [-X&lt;compiler&gt;](#X) passes just the next argument to the downstream compiler. [-X&lt;compiler&gt;](#X)... options [-X](#X). will pass *all* of the options inbetween the opening [-X](#X) and [-X](#X). to the downstream compiler. 
+Pass arguments to downstream [&lt;compiler&gt;](#compiler). Just [-X&lt;compiler&gt;](#X) passes just the next argument to the downstream compiler. [-X&lt;compiler&gt;](#X)... options [-X](#X). will pass *all* of the options inbetween the opening [-X](#X) and [-X](#X). to the downstream compiler. 
 
 
 <a id="pass-through"></a>
@@ -332,7 +332,7 @@ Pass arguments to downstream &lt;compiler&gt;. Just [-X&lt;compiler&gt;](#X) pas
 
 Pass the input through mostly unmodified to the 
 
-existing compiler &lt;compiler&gt;. 
+existing compiler [&lt;compiler&gt;](#compiler). 
 
 
 
@@ -719,7 +719,7 @@ A capability describes an optional feature that a target may or may not support.
 <a id="file-extension"></a>
 # file-extension
 
-A &lt;language&gt;, &lt;format&gt;, and/or &lt;stage&gt; may be inferred from the extension of an input or [-o](#o) path 
+A &lt;language&gt;, &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 
 * `hlsl`, `fx` : hlsl 
 * `dxbc` 
