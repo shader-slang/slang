@@ -13,6 +13,7 @@
 #include "../compiler-core/slang-command-line-args.h"
 
 #include "../core/slang-std-writers.h"
+#include "../core/slang-command-options.h"
 
 #include "../../slang-com-ptr.h"
 
@@ -3004,6 +3005,9 @@ namespace Slang
         ComPtr<IDownstreamCompiler> m_downstreamCompilers[int(PassThroughMode::CountOf)];        ///< A downstream compiler for a pass through
         DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
         Name* m_completionTokenName = nullptr; ///< The name of a completion request token.
+
+            /// For parsing command line options
+        CommandOptions m_commandOptions;
 
     private:
 

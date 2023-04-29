@@ -290,6 +290,7 @@
     <ClInclude Include="..\..\..\source\core\slang-chunked-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-com-object.h" />
     <ClInclude Include="..\..\..\source\core\slang-command-line.h" />
+    <ClInclude Include="..\..\..\source\core\slang-command-options.h" />
     <ClInclude Include="..\..\..\source\core\slang-common.h" />
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-crypto.h" />
@@ -310,6 +311,7 @@
     <ClInclude Include="..\..\..\source\core\slang-math.h" />
     <ClInclude Include="..\..\..\source\core\slang-memory-arena.h" />
     <ClInclude Include="..\..\..\source\core\slang-memory-file-system.h" />
+    <ClInclude Include="..\..\..\source\core\slang-name-value.h" />
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h" />
     <ClInclude Include="..\..\..\source\core\slang-persistent-cache.h" />
     <ClInclude Include="..\..\..\source\core\slang-platform.h" />
@@ -355,6 +357,7 @@
     <ClCompile Include="..\..\..\source\core\slang-char-encode.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-command-line.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-command-options.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-crypto.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-deflate-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-file-system.cpp" />
@@ -366,6 +369,7 @@
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-file-system.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-name-value.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-persistent-cache.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp" />

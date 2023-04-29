@@ -76,8 +76,6 @@ DIAGNOSTIC(    19, Error, unknownSourceLanguage, "unknown source language '$0'")
 DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)")
 DIAGNOSTIC(    22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
-DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'")
-DIAGNOSTIC(    25, Error, unknownFloatingPointMode, "unknown floating-point mode '$0'")
 DIAGNOSTIC(    26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
 DIAGNOSTIC(    27, Error, unknownDebugInfoLevel, "unknown debug info level '$0'")
 
@@ -103,6 +101,9 @@ DIAGNOSTIC(    50, Error, duplicateTargets, "the target '$0' has been specified 
 
 DIAGNOSTIC(    60, Error, cannotDeduceOutputFormatFromPath, "cannot infer an output format from the output path '$0'")
 DIAGNOSTIC(    61, Error, cannotMatchOutputFileToTarget, "no specified '-target' option matches the output path '$0', which implies the '$1' format")
+
+DIAGNOSTIC(    62, Error, unknownCommandLineValue, "unknown value for option. Valid values are '$0'")
+DIAGNOSTIC(    63, Error, unknownHelpCategory, "unknown help category")
 
 DIAGNOSTIC(    70, Error, cannotMatchOutputFileToEntryPoint, "the output path '$0' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point")
 

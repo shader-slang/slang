@@ -4,7 +4,8 @@
 #include "../../slang.h"
 
 #include "slang-string.h"
-
+#include "slang-array-view.h"
+#include "slang-name-value.h"
 
 namespace Slang
 {
@@ -12,6 +13,30 @@ namespace Slang
 /// Utility class to allow conversion of types (such as enums) to and from text types
 struct TypeTextUtil
 {
+    struct CompileTargetInfo
+    {
+        SlangCompileTarget target;          ///< The target
+        const char* extensions;             ///< Comma delimited list of extensions associated with the target
+        const char* names;                  ///< Comma delimited list of names associated with the target. NOTE! First name is taken as the normal display name.
+        const char* description;            ///< Description, can be null
+    };
+    
+        /// Get the compile target infos
+    static ConstArrayView<CompileTargetInfo> getCompileTargetInfos();
+
+        /// Get the language infos
+    static ConstArrayView<NamesValue> getLanguageInfos();
+        /// Get the compiler infos
+    static ConstArrayView<NamesDescriptionValue> getCompilerInfos();
+        /// Get the archive type infos
+    static ConstArrayView<NameValue> getArchiveTypeInfos();
+        /// Get the debug format types
+    static ConstArrayView<NamesDescriptionValue> getDebugInfoFormatInfos();
+
+    static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
+
+    static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
+
         /// Get the scalar type as text.
     static Slang::UnownedStringSlice getScalarTypeName(slang::TypeReflection::ScalarType scalarType);
 
@@ -26,9 +51,7 @@ struct TypeTextUtil
 
         /// As human readable text
     static UnownedStringSlice getPassThroughAsHumanText(SlangPassThrough type);
-        /// Gets pass through from human text (as from getPassThroughAsHumanText)
-    static SlangResult findPassThroughFromHumanText(const UnownedStringSlice& text, SlangPassThrough& outPassThrough);
-
+    
         /// Given a source language name returns a source language. Name here is distinct from extension
     static SlangSourceLanguage findSourceLanguage(const UnownedStringSlice& text);
 

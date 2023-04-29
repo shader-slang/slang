@@ -50,6 +50,7 @@ namespace Slang
 #define PROFILE_STAGE(TAG, NAME, VAL) TAG = VAL,
 #define PROFILE_STAGE_ALIAS(TAG, NAME, VAL) TAG = VAL,
 #include "slang-profile-defs.h"
+        
     };
 
     const char* getStageName(Stage stage);
@@ -110,7 +111,14 @@ namespace Slang
         RawVal raw = Unknown;
     };
 
+    struct StageInfo
+    {
+        const char* name;
+        Stage stage;
+    };
 
+        /// Note! There can be multiple stages with the same name
+    ConstArrayView<StageInfo> getStageInfos();
 
     Stage findStageByName(String const& name);
 

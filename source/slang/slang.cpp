@@ -132,6 +132,7 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
+    
     _initCodeGenTransitionMap();
 
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
@@ -143,6 +144,9 @@ void Session::init()
     m_completionTokenName = getNamePool()->getName("#?");
 
     m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
+
+    // Set up the command line options
+    initCommandOptions(m_commandOptions);
 
     // Set up shared AST builder
     m_sharedASTBuilder = new SharedASTBuilder;
