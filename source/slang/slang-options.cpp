@@ -342,10 +342,10 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Profile, "-profile", "-profile <profile>[+<capability>...]",
         "Specify the shader profile for code generation.\n"
         "Accepted profiles are:\n"
-        "  sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
-        "  glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
+        "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
+        "* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
         "Additional profiles that include -stage information:\n"
-        "  {vs,hs,ds,gs,ps}_<version>\n"
+        "* {vs,hs,ds,gs,ps}_<version>\n"
         "See -capability for information on <capability>\n"
         "When multiple -target options are present, each -profile associates "
         "with the first -target to its left."},

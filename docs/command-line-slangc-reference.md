@@ -136,11 +136,14 @@ Specify the shader profile for code generation.
 
 Accepted profiles are: 
 
->   sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}
->   glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}
+* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6} 
+
+* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460} 
+
 Additional profiles that include [-stage](#stage-1) information: 
 
->   {vs,hs,ds,gs,ps}_<version>
+* {vs,hs,ds,gs,ps}_&lt;version&gt; 
+
 See [-capability](#capability-1) for information on [&lt;capability&gt;](#capability) 
 
 When multiple [-target](#target-1) options are present, each [-profile](#profile) associates with the first [-target](#target-1) to its left. 
