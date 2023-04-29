@@ -78,7 +78,7 @@ Print this message, or help in specified category.
 <a id="help-style-1"></a>
 ## -help-style
 
-**-help-style &lt;help-style**
+**-help-style &lt;[help-style](#help-style)&gt;**
 
 Help formatting style 
 

@@ -321,7 +321,7 @@ void initCommandOptions(CommandOptions& options)
         "attributes to detect entry points."},
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
-        { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style", "Help formatting style" },
+        { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style>", "Help formatting style" },
         { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
         "Add a path to be used in resolving '#include' "
         "and 'import' operations."},
