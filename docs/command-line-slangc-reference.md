@@ -10,6 +10,27 @@ slangc -h
 # To generate this file
 slangc -help-style markdown -h
 ```
+## Quick Links
+
+* [General](#General)
+* [Target](#Target)
+* [Downstream](#Downstream)
+* [Debugging](#Debugging)
+* [Experimental](#Experimental)
+* [Internal](#Internal)
+* [Depreciated](#Depreciated)
+* [compiler](#compiler)
+* [language](#language)
+* [archive-type](#archive-type)
+* [line-directive-mode](#line-directive-mode)
+* [debug-info-format](#debug-info-format)
+* [fp-mode](#fp-mode)
+* [help-style](#help-style)
+* [target](#target)
+* [stage](#stage)
+* [capability](#capability)
+* [file-extension](#file-extension)
+
 <a id="General"></a>
 # General
 
@@ -54,7 +75,7 @@ Emit IR typically as a '.slang-module' when outputting to a container.
 Print this message, or help in specified category. 
 
 
-<a id="help-style"></a>
+<a id="help-style-1"></a>
 ## -help-style
 
 **-help-style &lt;help-style**
@@ -103,7 +124,7 @@ Set the module name to use when compiling multiple .slang source files into a si
 
 Specify a path where generated output should be written. 
 
-If no [-target](#target) or [-stage](#stage) is specified, one may be inferred from file extension (see &lt;file-extension&gt;). If multiple [-target](#target) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target) that matches the one inferred from &lt;path&gt;. 
+If no [-target](#target-1) or [-stage](#stage-1) is specified, one may be inferred from file extension (see &lt;file-extension&gt;). If multiple [-target](#target-1) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target-1) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target-1) that matches the one inferred from &lt;path&gt;. 
 
 
 <a id="profile"></a>
@@ -117,30 +138,30 @@ Accepted profiles are:
 
 >   sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}
 >   glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}
-Additional profiles that include [-stage](#stage) information: 
+Additional profiles that include [-stage](#stage-1) information: 
 
 >   {vs,hs,ds,gs,ps}_<version>
 See [-capability](#capability-1) for information on &lt;capability&gt; 
 
-When multiple [-target](#target) options are present, each [-profile](#profile) associates with the first [-target](#target) to its left. 
+When multiple [-target](#target-1) options are present, each [-profile](#profile) associates with the first [-target](#target-1) to its left. 
 
 
-<a id="stage"></a>
+<a id="stage-1"></a>
 ## -stage
 
-**-stage &lt;[stage](#stage-1)&gt;**
+**-stage &lt;[stage](#stage)&gt;**
 
 Specify the stage of an entry-point function. 
 
-When multiple [-entry](#entry) options are present, each [-stage](#stage) associated with the first [-entry](#entry) to its left. 
+When multiple [-entry](#entry) options are present, each [-stage](#stage-1) associated with the first [-entry](#entry) to its left. 
 
 May be omitted if entry-point function has a \[shader(...)\] attribute; otherwise required for each [-entry](#entry) option. 
 
 
-<a id="target"></a>
+<a id="target-1"></a>
 ## -target
 
-**-target &lt;[target](#target-1)&gt;**
+**-target &lt;[target](#target)&gt;**
 
 Specifies the format in which code should be generated. 
 
@@ -225,10 +246,10 @@ Disables generating dynamic dispatch code.
 Disables generics and specialization pass. 
 
 
-<a id="fp-mode"></a>
+<a id="fp-mode-1"></a>
 ## -fp-mode, -floating-point-mode
 
-**-fp-mode &lt;[fp-mode](#fp-mode-1)&gt;, -floating-point-mode &lt;[fp-mode](#fp-mode-1)&gt;**
+**-fp-mode &lt;[fp-mode](#fp-mode)&gt;, -floating-point-mode &lt;[fp-mode](#fp-mode)&gt;**
 
 Control floating point optimizations 
 
@@ -247,10 +268,10 @@ N is the amount of information, 0..3, unspecified means 2
 It is valid to have multiple [-g](#g) options, such as a level and a &lt;debug-info-format&gt; 
 
 
-<a id="line-directive-mode"></a>
+<a id="line-directive-mode-1"></a>
 ## -line-directive-mode
 
-**-line-directive-mode &lt;[line-directive-mode](#line-directive-mode-1)&gt;**
+**-line-directive-mode &lt;[line-directive-mode](#line-directive-mode)&gt;**
 
 Sets how the `#line` directives should be produced. Available options are: 
 
@@ -469,10 +490,10 @@ Do as little mangling of names as possible.
 
 Internal-use options (use at your own risk) 
 
-<a id="archive-type"></a>
+<a id="archive-type-1"></a>
 ## -archive-type
 
-**-archive-type &lt;[archive-type](#archive-type-1)&gt;**
+**-archive-type &lt;[archive-type](#archive-type)&gt;**
 
 Set the archive type for [-save-stdlib](#save-stdlib). Default is zip. 
 
@@ -576,7 +597,7 @@ Language
 * `hlsl` 
 * `cu`, `cuda` 
 
-<a id="archive-type-1"></a>
+<a id="archive-type"></a>
 # archive-type
 
 Archive Type 
@@ -586,7 +607,7 @@ Archive Type
 * `zip` 
 * `riff` 
 
-<a id="line-directive-mode-1"></a>
+<a id="line-directive-mode"></a>
 # line-directive-mode
 
 Line Directive Mode 
@@ -609,7 +630,7 @@ Debug Info Format
 * `coff` : COFF debug format 
 * `dwarf` : DWARF debug format 
 
-<a id="fp-mode-1"></a>
+<a id="fp-mode"></a>
 # fp-mode
 
 Floating Point Mode 
@@ -618,7 +639,7 @@ Floating Point Mode
 * `fast` : Allow optimizations that may change results of floating-point computations. Prefer the fastest version of special functions supported by the target. 
 * `default` : Default floating point mode 
 
-<a id="help-style-1"></a>
+<a id="help-style"></a>
 # help-style
 
 Help Style 
@@ -627,7 +648,7 @@ Help Style
 * `markdown` : Markdown 
 * `no-link-markdown` : Markdown without links 
 
-<a id="target-1"></a>
+<a id="target"></a>
 # target
 
 Target 
@@ -657,7 +678,7 @@ Target
 * `object-code` : Object code 
 * `host-host-callable` : Host callable for host execution 
 
-<a id="stage-1"></a>
+<a id="stage"></a>
 # stage
 
 Stage 

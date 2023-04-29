@@ -42,6 +42,7 @@ protected:
     UnownedStringSlice _getLinkName(CommandOptions::LookupKind kind, Index index);
     UnownedStringSlice _getLinkName(const NameKey& key, Index index);
     
+    void _appendQuickLinks();
 
     bool m_hasLinks = false;
     Dictionary<NameKey, StringSlicePool::Handle> m_linkMap;
@@ -54,9 +55,15 @@ void MarkdownCommandOptionsWriter::appendDescriptionForCategoryImpl(Index catego
     _appendDescriptionForCategory(categoryIndex);
 }
 
+
 void MarkdownCommandOptionsWriter::appendDescriptionImpl()
 {
     m_hasLinks = _hasLinks(m_options.style);
+
+    if (m_hasLinks)
+    {
+        _appendQuickLinks();
+    }
 
     // Go through categories in order
     const auto& categories = m_commandOptions->getCategories();
@@ -109,6 +116,25 @@ void _appendEscapedMarkdown(const UnownedStringSlice& text, StringBuilder& ioBuf
     {
         ioBuf << text;
     }
+}
+
+void MarkdownCommandOptionsWriter::_appendQuickLinks()
+{
+    const auto& categories = m_commandOptions->getCategories();
+    const auto count = categories.getCount();
+
+    m_builder << "## Quick Links\n\n";
+
+    for (Index categoryIndex = 0; categoryIndex < count; ++categoryIndex)
+    {
+        const auto& cat = categories[categoryIndex];
+
+        m_builder << "* [";
+        _appendEscapedMarkdown(cat.name, m_builder);
+        m_builder << "](#" << _getLinkName(LookupKind::Category, categoryIndex) << ")\n";
+    }
+
+    m_builder << "\n";
 }
 
 void MarkdownCommandOptionsWriter::_appendParagraph(const UnownedStringSlice& text)
