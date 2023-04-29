@@ -4,7 +4,7 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <dxgidebug.h>
-#if SLANG_ENABLE_FXC
+#if SLANG_ENABLE_DXBC_SUPPORT
 #include <d3dcompiler.h>
 #endif
 
@@ -418,6 +418,9 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 //
 /* static */Result D3DUtil::compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName, ComPtr<ID3DBlob>& shaderBlobOut)
 {
+#if !SLANG_ENABLE_DXBC_SUPPORT
+    return SLANG_E_NOT_IMPLEMENTED;
+#else
     // Rather than statically link against the `d3dcompile` library, we
     // dynamically load it.
     //
@@ -425,9 +428,6 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     // shader bytecode as part of an offline process, rather than doing it
     // on-the-fly like this
     //
-#if !SLANG_ENABLE_FXC
-    return SLANG_E_NOT_IMPLEMENTED;
-#else
     static pD3DCompile compileFunc = nullptr;
     if (!compileFunc)
     {
@@ -475,13 +475,15 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     {
         ::fputs((const char*)errorBlob->GetBufferPointer(), stderr);
         ::fflush(stderr);
+#if SLANG_WINDOWS_FAMILY
         ::OutputDebugStringA((const char*)errorBlob->GetBufferPointer());
+#endif
     }
 
     SLANG_RETURN_ON_FAIL(hr);
     shaderBlobOut.swap(shaderBlob);
     return SLANG_OK;
-#endif // SLANG_ENABLE_FXC
+#endif // SLANG_ENABLE_DXBC_SUPPORT
 }
 
 /* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
@@ -512,7 +514,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 
     typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY)(REFIID riid, void   **ppFactory);
-    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
+    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, void **ppFactory);
 
     {
         auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory2");
