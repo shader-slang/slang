@@ -76,6 +76,7 @@ namespace Slang
     template <typename T>
     SLANG_FORCE_INLINE T* clone(IClonable* clonable) { return (T*)clonable->clone(T::getTypeGuid()); }
 
+}
 
 // TODO: Shouldn't these be SLANG_ prefixed?
 #ifdef _MSC_VER
@@ -84,7 +85,6 @@ namespace Slang
 #define UNREACHABLE_RETURN(x) return x;
 #endif
 
-}
 
 #ifdef _DEBUG
 #define SLANG_EXPECT(VALUE, MSG) if(VALUE) {} else SLANG_ASSERT_FAILURE(MSG)
