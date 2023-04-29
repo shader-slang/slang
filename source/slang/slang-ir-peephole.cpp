@@ -228,6 +228,12 @@ struct PeepholeContext : InstPassBase
             {
                 return tryReplace(inst->getOperand(0));
             }
+            else if (inst->getOperand(0) == inst->getOperand(1))
+            {
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                return tryReplace(builder.emitDefaultConstruct(inst->getDataType()));
+            }
             break;
         case kIROp_Mul:
             if (isOne(inst->getOperand(0)))

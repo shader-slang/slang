@@ -89,7 +89,7 @@ public:
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
+    virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
     virtual SLANG_NO_THROW void SLANG_MCALL
         writeTimestamp(IQueryPool* pool, GfxIndex index) override;
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
@@ -337,7 +337,7 @@ public:
         GfxCount width,
         GfxCount height,
         GfxCount depth) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
+    virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
 };
 #endif
 

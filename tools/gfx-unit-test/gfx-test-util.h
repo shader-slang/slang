@@ -108,6 +108,12 @@ namespace gfx_test
             SLANG_IGNORE_TEST
         }
 #endif
+        // Skip d3d11 tests when we don't have DXBC support as they're bound to
+        // fail without a backend compiler
+        if (api == Slang::RenderApiFlag::D3D11 && !SLANG_ENABLE_DXBC_SUPPORT)
+        {
+            SLANG_IGNORE_TEST
+        }
         try
         {
             renderDocBeginFrame();

@@ -97,6 +97,11 @@ namespace gfx_test
             Slang::makeArray<float>(11.0f, 12.0f, 13.0f, 14.0f));
     }
 
+    SLANG_UNIT_TEST(computeSmokeD3D12)
+    {
+        runTestImpl(computeSmokeTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
     SLANG_UNIT_TEST(computeSmokeD3D11)
     {
         runTestImpl(computeSmokeTestImpl, unitTestContext, Slang::RenderApiFlag::D3D11);
