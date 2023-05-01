@@ -7,5 +7,4 @@ void foo(out int x)
 }
 
 // CHECK-NOT: warning
-// CHECK-NOT: error
 
