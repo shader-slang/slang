@@ -40,6 +40,11 @@ public:
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) override;
+    SLANG_NO_THROW Result SLANG_MCALL createBufferResourceImpl(
+        const IBufferResource::Desc& desc,
+        VkBufferUsageFlags additionalUsageFlag,
+        const void* initData,
+        IBufferResource** outResource);
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
         InteropHandle handle,
         const IBufferResource::Desc& srcDesc,

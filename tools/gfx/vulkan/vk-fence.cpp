@@ -26,7 +26,7 @@ FenceImpl::~FenceImpl()
 
 Result FenceImpl::init(const IFence::Desc& desc)
 {
-    if (!m_device->m_api.m_extendedFeatures.timelineFeatures.timelineSemaphore)
+    if (!m_device->m_api.m_extendedFeatures.vulkan12Features.timelineSemaphore)
         return SLANG_E_NOT_AVAILABLE;
 
     VkSemaphoreTypeCreateInfo timelineCreateInfo;

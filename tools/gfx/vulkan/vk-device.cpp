@@ -390,10 +390,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.inlineUniformBlockFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.inlineUniformBlockFeatures;
 
-        // Buffer device address features
-        extendedFeatures.bufferDeviceAddressFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &extendedFeatures.bufferDeviceAddressFeatures;
-
         // Ray query features
         extendedFeatures.rayQueryFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.rayQueryFeatures;
@@ -406,29 +402,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.accelerationStructureFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.accelerationStructureFeatures;
 
-        // Subgroup features
-        extendedFeatures.shaderSubgroupExtendedTypeFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &extendedFeatures.shaderSubgroupExtendedTypeFeatures;
-
         // Extended dynamic states
         extendedFeatures.extendedDynamicStateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.extendedDynamicStateFeatures;
 
-        // Timeline Semaphore
-        extendedFeatures.timelineFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &extendedFeatures.timelineFeatures;
-
-        // Float16
-        extendedFeatures.float16Features.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &extendedFeatures.float16Features;
-
         // 16-bit storage
         extendedFeatures.storage16BitFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.storage16BitFeatures;
-
-        // Atomic64
-        extendedFeatures.atomicInt64Features.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &extendedFeatures.atomicInt64Features;
 
         // robustness2 features
         extendedFeatures.robustness2Features.pNext = deviceFeatures2.pNext;
@@ -470,15 +450,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             m_features.add("int16");
         }
         // If we have float16 features then enable
-        if (extendedFeatures.float16Features.shaderFloat16)
+        if (extendedFeatures.vulkan12Features.shaderFloat16)
         {
-            // Link into the creation features
-            extendedFeatures.float16Features.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.float16Features;
-
-            // Add the Float16 extension
-            deviceExtensions.add(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
-
             // We have half support
             m_features.add("half");
         }
@@ -496,13 +469,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             m_features.add("16-bit-storage");
         }
 
-        if (extendedFeatures.atomicInt64Features.shaderBufferInt64Atomics)
+        if (extendedFeatures.vulkan12Features.shaderBufferInt64Atomics)
         {
-            // Link into the creation features
-            extendedFeatures.atomicInt64Features.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.atomicInt64Features;
-
-            deviceExtensions.add(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
             m_features.add("atomic-int64");
         }
 
@@ -516,12 +484,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             m_features.add("atomic-float");
         }
 
-        if (extendedFeatures.timelineFeatures.timelineSemaphore)
+        if (extendedFeatures.vulkan12Features.timelineSemaphore)
         {
-            // Link into the creation features
-            extendedFeatures.timelineFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.timelineFeatures;
-            deviceExtensions.add(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
             m_features.add("timeline-semaphore");
         }
 
@@ -534,12 +498,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             m_features.add("extended-dynamic-states");
         }
 
-        if (extendedFeatures.shaderSubgroupExtendedTypeFeatures.shaderSubgroupExtendedTypes)
+        if (extendedFeatures.vulkan12Features.shaderSubgroupExtendedTypes)
         {
-            extendedFeatures.shaderSubgroupExtendedTypeFeatures.pNext =
-                (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.shaderSubgroupExtendedTypeFeatures;
-            deviceExtensions.add(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
             m_features.add("shader-subgroup-extended-types");
         }
 
@@ -570,12 +530,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             m_features.add("sm_6_6");
         }
 
-        if (extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
+        if (extendedFeatures.vulkan12Features.bufferDeviceAddress)
         {
-            extendedFeatures.bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.bufferDeviceAddressFeatures;
-            deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-
             m_features.add("buffer-device-address");
         }
 
@@ -1529,14 +1485,23 @@ Result DeviceImpl::createTextureResource(
 Result DeviceImpl::createBufferResource(
     const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
+    return createBufferResourceImpl(descIn, 0, initData, outResource);
+}
+
+Result DeviceImpl::createBufferResourceImpl(
+    const IBufferResource::Desc& descIn,
+    VkBufferUsageFlags additionalUsageFlag,
+    const void* initData,
+    IBufferResource** outResource)
+{
     BufferResource::Desc desc = fixupBufferDesc(descIn);
 
     const Size bufferSize = desc.sizeInBytes;
 
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
-    VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.allowedStates);
-    if (m_api.m_extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
+    VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.allowedStates) | additionalUsageFlag;
+    if (m_api.m_extendedFeatures.vulkan12Features.bufferDeviceAddress)
     {
         usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
