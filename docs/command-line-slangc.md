@@ -7,7 +7,7 @@ The `slangc` command-line tool is used to compile or cross-compile shader source
 slangc [<options>] <file1> [<file2>...]
 ```
 
-See [the command line option reference](command-line-slangc-reference.md) for most up to date information. 
+See [the command line option reference](command-line-slangc-reference.md) for the most up to date information. 
 
 Simple Examples
 ---------------
