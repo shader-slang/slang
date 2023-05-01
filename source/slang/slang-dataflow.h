@@ -69,7 +69,7 @@ List<InOutPair<typename T::Domain>> dataFlow(
     // Add our roots to the dependencies to explore
     for(auto n : dependencies)
     {
-        infos.Add(n, initialInfo);
+        infos.add(n, initialInfo);
         workQueue.push(n);
     }
     // Explore the dependencies, adding children as we go
@@ -82,7 +82,7 @@ List<InOutPair<typename T::Domain>> dataFlow(
         // dependencies to explore.
         for(const auto& p : context.predecessors(n))
         {
-            if(infos.AddIfNotExists(p, initialInfo))
+            if(infos.addIfNotExists(p, initialInfo))
             {
                 dependencies.add(p);
                 workQueue.push(p);
@@ -105,7 +105,7 @@ List<InOutPair<typename T::Domain>> dataFlow(
     {
         Node n = workQueue.top();
         workQueue.pop();
-        auto& info = *infos.TryGetValue(n);
+        auto& info = *infos.tryGetValue(n);
         info.dirty = false;
 
         const bool outputChanged = context.transfer(n, info.out, info.in);
@@ -117,7 +117,7 @@ List<InOutPair<typename T::Domain>> dataFlow(
 
         for(auto s : context.successors(n))
         {
-            auto* sInfo = infos.TryGetValue(s);
+            auto* sInfo = infos.tryGetValue(s);
             // If this isn't in our dependency set, skip
             if(!sInfo)
                 continue;
@@ -142,7 +142,7 @@ List<InOutPair<typename T::Domain>> dataFlow(
     ret.reserve(ns.getCount());
     for(auto n : ns)
     {
-        auto& sInfo = *infos.TryGetValue(n);
+        auto& sInfo = *infos.tryGetValue(n);
         ret.add(InOutPair<Domain>{std::move(sInfo.in), std::move(sInfo.out)});
     }
     return ret;
