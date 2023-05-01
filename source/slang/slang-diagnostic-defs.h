@@ -656,12 +656,6 @@ DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in 
 DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
 DIAGNOSTIC(41012, Error, typeCannotBePackedIntoAnyValue, "type '$0' contains fields that cannot be packed into an AnyValue.")
 
-DIAGNOSTIC(41015, Error, usingUninitializedValue, "use of uninitialized value '$0'")
-DIAGNOSTIC(41016, Warning, returningWithUninitializedOut, "returning without initializing out parameter '$0'")
-DIAGNOSTIC(41017, Warning, returningWithPartiallyUninitializedOut, "returning without fully initializing out parameter '$0'")
-DIAGNOSTIC(41018, Warning, maybeUsingUninitializedValue, "use of possibly uninitialized value '$0'")
-DIAGNOSTIC(41019, Warning, returningWithMaybeUninitializedOut, "possibly returning without initializing out parameter '$0'")
-
 DIAGNOSTIC(41020, Error, lossOfDerivativeDueToCallOfNonDifferentiableFunction, "derivative cannot be propagated through call to non-$1-differentiable function `$0`, use 'no_diff' to clarify intention.")
 DIAGNOSTIC(41024, Error, lossOfDerivativeAssigningToNonDifferentiableLocation, "derivative is lost during assignment to non-differentiable location, use 'detach()' to clarify intention.")
 DIAGNOSTIC(41025, Error, lossOfDerivativeUsingNonDifferentiableLocationAsOutArg, "derivative is lost when passing a non-differentiable location to an `out` or `inout` parameter, consider passing a temporary variable instead.")
@@ -669,7 +663,14 @@ DIAGNOSTIC(41021, Error, differentiableFuncMustHaveOutput, "a differentiable fun
 DIAGNOSTIC(41022, Error, differentiableFuncMustHaveInput, "a differentiable function must have at least one differentiable input.")
 DIAGNOSTIC(41023, Error, getStringHashMustBeOnStringLiteral, "getStringHash can only be called when argument is statically resolvable to a string literal")
 
-DIAGNOSTIC(41024, Warning, returningWithMaybePartiallyUninitializedOut, "possibly returning without fully initializing out parameter '$0'")
+DIAGNOSTIC(41100, Error,   usingUninitializedValue,                     "use of uninitialized value '$0'")
+DIAGNOSTIC(41101, Warning, usingPartiallyUninitializedValue,            "use of partially initialized value '$0'")
+DIAGNOSTIC(41102, Warning, usingMaybeUninitializedValue,                "use of possibly uninitialized value '$0'")
+DIAGNOSTIC(41103, Warning, usingMaybePartiallyUninitializedValue,       "use of possibly partially uninitialized value '$0'")
+DIAGNOSTIC(41104, Warning, returningWithUninitializedOut,               "returning without initializing out parameter '$0'")
+DIAGNOSTIC(41105, Warning, returningWithPartiallyUninitializedOut,      "returning without fully initializing out parameter '$0'")
+DIAGNOSTIC(41106, Warning, returningWithMaybeUninitializedOut,          "returning possibly without initializing out parameter '$0'")
+DIAGNOSTIC(41107, Warning, returningWithMaybePartiallyUninitializedOut, "returning possibly without fully initializing out parameter '$0'")
 
 DIAGNOSTIC(41901, Error, unsupportedUseOfLValueForAutoDiff, "unsupported use of L-value for auto differentiation.")
 DIAGNOSTIC(41902, Error, cannotDifferentiateDynamicallyIndexedData, "cannot auto-differentiate mixed read/write access to dynamically indexed data in '$0'.")

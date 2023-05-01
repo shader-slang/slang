@@ -3,48 +3,102 @@
 #include "slang-ir-dataflow.h"
 #include "slang-ir-util.h"
 #include "slang-ir-reachability.h"
+#include "slang-product-lattice.h"
+#include <limits>
 
 namespace Slang
 {
     class DiagnosticSink;
     struct IRModule;
 
-
-    static void checkForUsingUninitializedOutParam(
-        IRFunc* func,
-        DiagnosticSink* sink,
-        ReachabilityContext& reachability,
-        IRParam* param)
+    namespace UninitializedDetail
     {
+        enum V
+        {
+            Bottom             = 0b00,
+            Initialized        = 0b01,
+            Uninitialized      = 0b10,
+            MaybeUninitialized = 0b11,
+        };
+
+        // Our join semilattice to dataflow over
+        // struct Initialization
+        // {
+        //     bool join(Initialization other)
+        //     {
+        //         V joined = V(v | other.v);
+        //         if(joined != v)
+        //         {
+        //             v = joined;
+        //             return true;
+        //         }
+        //         return false;
+        //     }
+        //     static auto bottom() { return Initialization{Bottom}; }
+        //
+        //     V v;
+        // };
+
         // Our join semilattice to dataflow over
         struct Initialization
         {
-            enum V
-            {
-                Bottom             = 0b00,
-                Initialized        = 0b01,
-                Uninitialized      = 0b10,
-                MaybeUninitialized = 0b11,
-            };
             bool join(Initialization other)
             {
-                V joined = V(v | other.v);
+                bool changed = false;
+                auto joined = v | other.v;
                 if(joined != v)
                 {
                     v = joined;
-                    return true;
+                    changed = true;
                 }
-                return false;
+                return changed;
             }
-            static auto bottom() { return Initialization{Bottom}; }
+            static auto bottom() { return Initialization{0}; }
+            static auto allUninitialized() { return Initialization{0xAAAAAAAAAAAAAAAA}; }
+            V getElem(int i) const
+            {
+                SLANG_ASSERT(i < maxElements);
+                return V((v >> i*2) & 0b11);
+            }
+            void joinElem(int i, V o)
+            {
+                SLANG_ASSERT(i < maxElements);
+                v |= (o << i*2);
+            }
+            void setElem(int i, V o)
+            {
+                SLANG_ASSERT(i < maxElements);
+                v &= ~(0b11 << i*2);
+                v |= o << i*2;
+            }
 
-            V v;
+            // Keep track of the 32 most significant elements
+            // If there are more than 32 elements, track the first 31 and the
+            // remainder.
+            uint64_t v;
+            static const int maxElements = std::numeric_limits<uint64_t>::digits / 2;
+            static const int overflowElementIndex = maxElements - 1;
+
+            // Hierarchical structs probably permit a more elaborate
+            // representation...
+        };
+
+        struct LeafRange
+        {
+            Index begin;
+            Index end;
         };
 
         struct StoreSite
         {
             IRInst* storeInst;
-            IRInst* address;
+            LeafRange storeRange;
+        };
+
+        struct LoadSite
+        {
+            LeafRange loadRange;
+            uint64_t initializationState;
         };
 
         // Our dataflow context
@@ -60,103 +114,175 @@ namespace Slang
                 Initialization next = in;
                 // No need to check anything if it's already initialized, it can't
                 // become uninitialized
-                if(in.v != Initialization::Initialized)
+                for(auto i = bb->getFirstInst(); i; i = i->getNextInst())
                 {
-                    for( auto i = bb->getFirstInst(); i; i = i->getNextInst() )
+                    for(const auto& s : stores)
                     {
-                        for(const auto& s : stores)
+                        if(i == s.storeInst)
                         {
-                            if(i == s.storeInst)
-                            {
-                                next.v = Initialization::Initialized;
-                            }
+                            for(Index m = s.storeRange.begin; m < s.storeRange.end; ++m)
+                                next.setElem(m, Initialized);
                         }
                     }
+                    if(auto l = loadsAndReturns.tryGetValue(i))
+                        l->initializationState = next.v;
                 }
                 return out.join(next);
             }
             const List<StoreSite>& stores;
+            const Dictionary<IRInst*, LoadSite>& loadsAndReturns;
         };
 
-        // Collect all sub-addresses from the param.
-        // TODO: Currently a write to any of these makes us assume that the
-        // whole value is written to, we should be more precise here.
-        List<IRInst*> addresses;
-        addresses.add(param);
-        List<StoreSite> stores;
-        for (Index i = 0; i < addresses.getCount(); i++)
+        // A tree stored in preorder
+        template<typename T>
+        struct Branch
         {
-            auto addr = addresses[i];
-            for (auto use = addr->firstUse; use; use = use->nextUse)
-            {
-                switch (use->getUser()->getOp())
-                {
-                case kIROp_GetElementPtr:
-                case kIROp_FieldAddress:
-                    addresses.add(use->getUser());
-                    break;
-                case kIROp_Store:
-                case kIROp_SwizzledStore:
-                    // If we see a store of this address, add it to stores set.
-                    if (use == use->getUser()->getOperands())
-                        stores.add(StoreSite{ use->getUser(), addr });
-                    break;
-                case kIROp_Call:
-                    // If we see a call using this address, treat it as a store.
-                    stores.add(StoreSite{ use->getUser(), addr });
-                    break;
-                }
-            }
-        }
+            // The index of the next sibling
+            // leaf nodes are those which point directly to the next index
+            Index next;
+            T data;
+        };
+
+        struct NestingMember 
+        {
+            IRStructKey* key;
+            // If we imagine a totally flat struct, these indices represent the
+            // range of leaves this member encompasses.
+            LeafRange leafRange;
+        };
+
+        using MemberTree = List<Branch<NestingMember>>;
 
         //
-        // Get the list of blocks where this value is used, i.e. any loads or
-        // returns from its addresses.
+        // Perform a preorder traversal over the struct hierarchy
+        // Maintain a tree in 'memberTree' which will allow us to construct
+        // initialization state for portions of a struct
         //
-        List<IRInst*> loadsAndReturns;
+        static MemberTree flattenStruct(IRType* type)
+        {
+            MemberTree tree;
+            Index leafIndex = 0;
+            auto walkStructType = [&](auto& go, IRType* t) -> Branch<NestingMember>&
+            {
+                Index i = tree.getCount();
+                tree.add(Branch<NestingMember>{0, {nullptr, {leafIndex, leafIndex}}});
+                if(auto structType = as<IRStructType>(t))
+                {
+                    for(auto field : structType->getFields())
+                        go(go, field->getFieldType()).data.key = field->getKey();
+                }
+                else
+                {
+                    leafIndex++;
+                }
+                tree[i].next = tree.getCount();
+                tree[i].data.leafRange.end = leafIndex;
+                return tree[i];
+            };
+            walkStructType(walkStructType, type);
+            return tree;
+        }
+
+    }
+
+    static void checkForUsingUninitializedOutParam(
+        IRFunc* func,
+        DiagnosticSink* sink,
+        ReachabilityContext& reachability,
+        IRParam* param)
+    {
+        using namespace UninitializedDetail;
+
+        auto outType = as<IROutType>(param->getDataType());
+        SLANG_ASSERT(outType);
+        auto type = outType->getValueType();
+
+        const auto memberTree = flattenStruct(type);
+        const LeafRange everythingRange = memberTree[0].data.leafRange;
+
+        // Collect all sub-addresses from the param.
+        List<StoreSite> stores;
+        Dictionary<IRInst*, LoadSite> loadsAndReturns;
         List<IRBlock*> loadingBlocks;
-        for (auto addr : addresses)
+        auto walkAddressUses = [&](auto& go, IRInst* addr, const Index addrMemberIndex) -> void
         {
             for (auto use = addr->firstUse; use; use = use->nextUse)
             {
-                if (auto load = as<IRLoad>(use->getUser()))
-                {
-                    loadsAndReturns.add(load);
-                    IRBlock* bb = as<IRBlock>(load->getParent());
-                    if(bb && !loadingBlocks.contains(bb))
-                        loadingBlocks.add(bb);
-                }
+                instMatch_(use->getUser(),
+                    [&](IRFieldAddress* fa)
+                    {
+                        auto key = as<IRStructKey>(fa->getField());
+                        // TODO: Is this assert correct?
+                        SLANG_ASSERT(key);
+
+                        // Move to the children
+                        Index childMemberIndex = addrMemberIndex + 1;
+                        SLANG_ASSERT(childMemberIndex < memberTree.getCount());
+                        while(memberTree[childMemberIndex].data.key != key)
+                        {
+                            childMemberIndex = memberTree[childMemberIndex].next;
+                            SLANG_ASSERT(childMemberIndex < memberTree.getCount());
+                        }
+                        int i = Initialization::overflowElementIndex;
+                        return go(go, use->getUser(), childMemberIndex);
+                    },
+                    [&](IRGetElementPtr*)
+                    {
+                        // SLANG_ASSERT(!"TODO");
+                    },
+                    [&](IRStore* store)
+                    {
+                        if(addr == store->getPtr())
+                            stores.add({store, memberTree[addrMemberIndex].data.leafRange});
+                    },
+                    [&](IRSwizzledStore* store)
+                    {
+                        if(addr == store->getDest())
+                            stores.add({store, memberTree[addrMemberIndex].data.leafRange});
+                    },
+                    [&](IRCall* call)
+                    {
+                        // TODO: Take into account the polarity of this argument
+                        stores.add({call, memberTree[addrMemberIndex].data.leafRange});
+                    },
+                    [&](IRLoad* load)
+                    {
+                        IRBlock* bb = as<IRBlock>(load->getParent());
+                        SLANG_ASSERT(bb);
+                        if(!loadingBlocks.contains(bb))
+                            loadingBlocks.add(bb);
+                        loadsAndReturns.add(load, {memberTree[addrMemberIndex].data.leafRange, Uninitialized});
+                    },
+                    [&](IRInst*)
+                    {
+                        SLANG_UNREACHABLE("Non-exhaustive patterns in walkAddressUses");
+                    }
+                );
             }
-        }
+        };
+        walkAddressUses(walkAddressUses, param, 0);
+
+        // Also add a reference to the whole value on each return
         for(auto bb : func->getBlocks())
         {
             auto t = bb->getTerminator();
             if (t->m_op == kIROp_Return)
             {
-                loadsAndReturns.add(t);
                 if(!loadingBlocks.contains(bb))
                     loadingBlocks.add(bb);
+                loadsAndReturns.add(t, {everythingRange, Uninitialized});
             }
         }
 
         //
         // Run the dataflow analysis
         //
-        UninitializedDataFlow context{{}, stores};
-        auto ios = basicBlockForwardDataFlow(
+        UninitializedDataFlow context{{}, stores, loadsAndReturns};
+        basicBlockForwardDataFlow(
             context,
             loadingBlocks,
             reachability,
-            Initialization{Initialization::Uninitialized});
-
-        // Sort the instructions under investigation so we don't have to walk
-        // the whole basic block list for each one
-        loadsAndReturns.sort([&](IRInst* x, IRInst* y){
-            IRInst* bx = x->getParent();
-            IRInst* by = y->getParent();
-            return loadingBlocks.indexOf(bx) < loadingBlocks.indexOf(by);
-        });
-        int bbIndex = 0;
+            Initialization::allUninitialized());
 
         //
         // Walk over all of our instructions under investigation,
@@ -166,55 +292,40 @@ namespace Slang
         //
         for(auto l : loadsAndReturns)
         {
-            IRBlock* bb = as<IRBlock>(l->getParent());
-            if(loadingBlocks[bbIndex] != bb)
-                bbIndex++;
-            SLANG_ASSERT(loadingBlocks[bbIndex] == bb);
+            uint64_t status = l.value.initializationState;
+            auto range = l.value.loadRange;
 
-            const auto& io = ios[bbIndex];
-            SLANG_ASSERT(io.in.v != Initialization::Bottom);
-            if(io.in.v == Initialization::Initialized)
+            bool areAllLeavesInitialized = true;
+            bool areNoLeavesInitialized = true;
+            bool areAnyLeavesMaybeUninitialized = false;
+            for(Index i = range.begin; i < range.end; ++i)
+            {
+                const auto leaf = (status >> (i * 2)) & 0b11;
+                const bool isLeafInitialized = leaf == Initialized;
+                const bool isLeafMaybeUninitialized = leaf == MaybeUninitialized;
+                areAllLeavesInitialized = areAllLeavesInitialized && isLeafInitialized;
+                areNoLeavesInitialized = areNoLeavesInitialized && !isLeafInitialized;
+                areAnyLeavesMaybeUninitialized = areAnyLeavesMaybeUninitialized || isLeafMaybeUninitialized;
+            }
+
+            // If this is guaranteed initialized, no need to do anything
+            if(areAllLeavesInitialized)
                 continue;
 
-            auto diag = [&](){
-                sink->diagnose(
-                    l,
-                    l->m_op == kIROp_Return
-                        ? (io.in.v == Initialization::Uninitialized
-                            ? Diagnostics::returningWithUninitializedOut
-                            : Diagnostics::returningWithMaybeUninitializedOut)
-                        : (io.in.v == Initialization::Uninitialized
-                            ? Diagnostics::usingUninitializedValue
-                            : Diagnostics::maybeUsingUninitializedValue),
-                    param);
-            };
-
-            // The easy case, the initialization state didn't change during
-            // this BB
-            if(io.in.v == io.out.v)
-            {
-                diag();
-            }
-            // Otherwise, walk and find the place where it changed (only care
-            // about loads here, as the return is necessarily after any
-            // possible store)
-            else if(!as<IRTerminatorInst>(l))
-            {
-                bool stored = false;
-                for(IRInst* i = bb->getFirstInst(); i != l && !stored; i = i->getNextInst())
-                {
-                    if(i == l)
-                        diag();
-                    for(const auto& s : stores)
-                    {
-                        if(i == s.storeInst)
-                        {
-                            stored = true;
-                            break;
-                        }
-                    }
-                }
-            }
+            const bool isReturn = as<IRReturn>(l.key);
+            const bool isMaybe = areAnyLeavesMaybeUninitialized;
+            const bool isPartially = !areAllLeavesInitialized && !areNoLeavesInitialized;
+            const auto d =
+                  !isReturn && !isMaybe && !isPartially ? Diagnostics::usingUninitializedValue
+                : !isReturn && !isMaybe &&  isPartially ? Diagnostics::usingPartiallyUninitializedValue
+                : !isReturn &&  isMaybe && !isPartially ? Diagnostics::usingMaybeUninitializedValue
+                : !isReturn &&  isMaybe &&  isPartially ? Diagnostics::usingMaybePartiallyUninitializedValue
+                :  isReturn && !isMaybe && !isPartially ? Diagnostics::returningWithUninitializedOut
+                :  isReturn && !isMaybe &&  isPartially ? Diagnostics::returningWithPartiallyUninitializedOut
+                :  isReturn &&  isMaybe && !isPartially ? Diagnostics::returningWithMaybeUninitializedOut
+                :  isReturn &&  isMaybe &&  isPartially ? Diagnostics::returningWithMaybePartiallyUninitializedOut
+                : (SLANG_UNREACHABLE("impossible"), Diagnostics::internalCompilerError);
+            sink->diagnose(l.key, d, param);
         }
     }
 
