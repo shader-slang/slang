@@ -124,6 +124,16 @@ Result DeviceImpl::getNativeDeviceHandles(InteropHandles* outHandles)
     return SLANG_OK;
 }
 
+template<typename T>
+static bool _hasAnySetBits(const T& val, size_t offset)
+{
+    uint32_t result = 0;
+    const uint32_t* ptr = reinterpret_cast<const uint32_t*>(&val);
+    for (size_t i = offset; i < sizeof(val) / 4; i++)
+        result |= ptr[i];
+    return result != 0;
+}
+
 Result DeviceImpl::initVulkanInstanceAndDevice(
     const InteropHandle* handles, bool useValidationLayer)
 {
@@ -435,6 +445,12 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.atomicFloatFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.atomicFloatFeatures;
 
+        if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
+        {
+            extendedFeatures.vulkan12Features.pNext = deviceFeatures2.pNext;
+            deviceFeatures2.pNext = &extendedFeatures.vulkan12Features;
+        }
+
         m_api.vkGetPhysicalDeviceFeatures2(m_api.m_physicalDevice, &deviceFeatures2);
 
         if (deviceFeatures2.features.shaderResourceMinLod)
@@ -587,6 +603,14 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceCreateInfo.pNext = &extendedFeatures.clockFeatures;
 
             m_features.add("realtime-clock");
+        }
+
+        if (_hasAnySetBits(
+                extendedFeatures.vulkan12Features,
+                offsetof(VkPhysicalDeviceVulkan12Features, pNext) + sizeof(void*)))
+        {
+            extendedFeatures.vulkan12Features.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.vulkan12Features;
         }
 
         VkPhysicalDeviceProperties2 extendedProps = {

@@ -275,6 +275,10 @@ struct VulkanExtendedFeatureProperties
     VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures = { 
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR
     };
+
+    // Vulkan 1.2 features.
+    VkPhysicalDeviceVulkan12Features vulkan12Features = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
 };
 
 struct VulkanApi
