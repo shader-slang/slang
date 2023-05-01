@@ -26,6 +26,8 @@ slangc -help-style markdown -h
 * [debug-info-format](#debug-info-format)
 * [fp-mode](#fp-mode)
 * [help-style](#help-style)
+* [optimization-level](#optimization-level)
+* [debug-level](#debug-level)
 * [target](#target)
 * [stage](#stage)
 * [capability](#capability)
@@ -260,15 +262,15 @@ Control floating point optimizations
 <a id="g"></a>
 ## -g
 
-**-g, -g&lt;N&gt;, -g&lt;[debug-info-format](#debug-info-format)&gt;**
+**-g, -g&lt;[debug-info-format](#debug-info-format)&gt;, -g&lt;[debug-level](#debug-level)&gt;**
 
 Include debug information in the generated code, where possible. 
 
-N is the amount of information, 0..3, unspecified means 2 
+[&lt;debug-level&gt;](#debug-level) is the amount of information, 0..3, unspecified means 2 
 
 [&lt;debug-info-format&gt;](#debug-info-format) specifies a debugging info format 
 
-It is valid to have multiple [-g](#g) options, such as a level and a [&lt;debug-info-format&gt;](#debug-info-format) 
+It is valid to have multiple [-g](#g) options, such as a [&lt;debug-level&gt;](#debug-level) and a [&lt;debug-info-format&gt;](#debug-info-format) 
 
 
 <a id="line-directive-mode-1"></a>
@@ -284,11 +286,9 @@ If not specified, default behavior is to use C-style `#line` directives for HLSL
 <a id="O"></a>
 ## -O
 
-**-O&lt;N&gt;**
+**-O&lt;[optimization-level](#optimization-level)&gt;**
 
 Set the optimization level. 
-
-N is the amount of optimization, 0..3, default is 1 
 
 
 <a id="obfuscate"></a>
@@ -648,6 +648,26 @@ Help Style
 * `text` : Text suitable for output to a terminal 
 * `markdown` : Markdown 
 * `no-link-markdown` : Markdown without links 
+
+<a id="optimization-level"></a>
+# optimization-level
+
+Optimization Level 
+
+* `0`, `none` : Disable all optimizations 
+* `1`, `default` : Enable a default level of optimization.This is the default if no [-o](#o) options are used. 
+* `2`, `high` : Enable aggressive optimizations for speed. 
+* `3`, `maximal` : Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size. 
+
+<a id="debug-level"></a>
+# debug-level
+
+Debug Level 
+
+* `0`, `none` : Don't emit debug information at all. 
+* `1`, `minimal` : Emit as little debug information as possible, while still supporting stack traces. 
+* `2`, `standard` : Emit whatever is the standard level of debug information for each target. 
+* `3`, `maximal` : Emit as much debug information as possible for each target. 
 
 <a id="target"></a>
 # target

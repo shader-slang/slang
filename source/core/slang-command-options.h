@@ -169,7 +169,8 @@ struct CommandOptions
 
         /// Get all the option names associated with a category index
     void getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const;
-    
+    void appendCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const;
+
         /// Set up a lookup kind from a category index
     static LookupKind makeLookupKind(Index categoryIndex) { return LookupKind(categoryIndex); }
 

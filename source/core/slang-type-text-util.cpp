@@ -7,9 +7,6 @@
 namespace Slang
 {
 
-
-
-
 namespace { // anonymous
 
 #define SLANG_SCALAR_TYPES(x) \
@@ -134,6 +131,22 @@ static const NamesDescriptionValue s_floatingPointModes[] =
     "Default floating point mode" }
 };
 
+static const NamesDescriptionValue s_optimizationLevels[] =
+{
+    { SLANG_OPTIMIZATION_LEVEL_NONE,    "0,none",       "Disable all optimizations" },
+    { SLANG_OPTIMIZATION_LEVEL_DEFAULT, "1,default",    "Enable a default level of optimization.This is the default if no -o options are used." },
+    { SLANG_OPTIMIZATION_LEVEL_HIGH,    "2,high",       "Enable aggressive optimizations for speed." },
+    { SLANG_OPTIMIZATION_LEVEL_MAXIMAL, "3,maximal",    "Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size." },
+};
+
+static const NamesDescriptionValue s_debugLevels[] =
+{
+    { SLANG_DEBUG_INFO_LEVEL_NONE,      "0,none",       "Don't emit debug information at all." }, 
+    { SLANG_DEBUG_INFO_LEVEL_MINIMAL,   "1,minimal",    "Emit as little debug information as possible, while still supporting stack traces." },
+    { SLANG_DEBUG_INFO_LEVEL_STANDARD,  "2,standard",   "Emit whatever is the standard level of debug information for each target." },
+    { SLANG_DEBUG_INFO_LEVEL_MAXIMAL,   "3,maximal",    "Emit as much debug information as possible for each target." },
+};
+
 } // anonymous
 
 /* static */ConstArrayView<TypeTextUtil::CompileTargetInfo> TypeTextUtil::getCompileTargetInfos()
@@ -169,6 +182,16 @@ static const NamesDescriptionValue s_floatingPointModes[] =
 /* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFloatingPointModeInfos()
 {
     return makeConstArrayView(s_floatingPointModes);
+}
+
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getOptimizationLevelInfos()
+{
+    return makeConstArrayView(s_optimizationLevels);
+}
+
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getDebugLevelInfos()
+{
+    return makeConstArrayView(s_debugLevels);
 }
 
 /* static */SlangArchiveType TypeTextUtil::findArchiveType(const UnownedStringSlice& slice)

@@ -32,6 +32,8 @@
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-char-util.h"
 
+#include "../core/slang-name-value.h"
+
 #include "../core/slang-command-options-writer.h"
 
 #include <assert.h>
@@ -153,6 +155,8 @@ enum class ValueCategory
     LineDirectiveMode,
     DebugInfoFormat,
     HelpStyle,
+    OptimizationLevel,
+    DebugLevel, 
 
     CountOf,
 };
@@ -205,6 +209,12 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(CategoryKind::Value, "help-style", "Help Style", UserValue(ValueCategory::HelpStyle));
         options.addValues(CommandOptionsWriter::getStyleInfos());
+
+        options.addCategory(CategoryKind::Value, "optimization-level", "Optimization Level", UserValue(ValueCategory::OptimizationLevel));
+        options.addValues(TypeTextUtil::getOptimizationLevelInfos());
+
+        options.addCategory(CategoryKind::Value, "debug-level", "Debug Level", UserValue(ValueCategory::DebugLevel));
+        options.addValues(TypeTextUtil::getDebugLevelInfos());
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -383,19 +393,17 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DisableSpecialization, "-disable-specialization", nullptr, "Disables generics and specialization pass." },
         { OptionKind::FloatingPointMode, "-fp-mode,-floating-point-mode", "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>", 
         "Control floating point optimizations"},
-        { OptionKind::DebugInformation, "-g...", "-g, -g<N>, -g<debug-info-format>", 
+        { OptionKind::DebugInformation, "-g...", "-g, -g<debug-info-format>, -g<debug-level>", 
         "Include debug information in the generated code, where possible.\n"
-        "N is the amount of information, 0..3, unspecified means 2\n" 
+        "<debug-level> is the amount of information, 0..3, unspecified means 2\n" 
         "<debug-info-format> specifies a debugging info format\n"
-        "It is valid to have multiple -g options, such as a level and a <debug-info-format>" },
+        "It is valid to have multiple -g options, such as a <debug-level> and a <debug-info-format>" },
         { OptionKind::LineDirectiveMode, "-line-directive-mode", "-line-directive-mode <line-directive-mode>", 
         "Sets how the `#line` directives should be produced. Available options are:\n"
         "If not specified, default behavior is to use C-style `#line` directives "
         "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives "
         "for GLSL output." },
-        { OptionKind::Optimization, "-O...", "-O<N>", 
-        "Set the optimization level.\n"
-        "N is the amount of optimization, 0..3, default is 1" },
+        { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
         { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
     };
 
@@ -1093,11 +1101,11 @@ struct OptionsParser
         return SLANG_OK;
     }
 
-    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
+    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, const UnownedStringSlice& name, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
     {
         auto& cmdOptions = asInternal(session)->m_commandOptions;
 
-        const auto optionIndex = cmdOptions.findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), arg.value.getUnownedSlice());
+        const auto optionIndex = cmdOptions.findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), name);
         if (optionIndex < 0)
         {                
             const auto categoryIndex = cmdOptions.findCategoryByUserValue(CommandOptions::UserValue(valueCategory));
@@ -1120,6 +1128,46 @@ struct OptionsParser
         outValue = cmdOptions.getOptionAt(optionIndex).userValue;
         return SLANG_OK;
     }
+
+    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
+    {
+        return _getValue(valueCategory, arg, arg.value.getUnownedSlice(), sink, outValue);
+    }
+
+    SlangResult _getValue(const ConstArrayView<ValueCategory>& valueCategories, const CommandLineArg& arg, const UnownedStringSlice& name, DiagnosticSink* sink, ValueCategory& outCat, CommandOptions::UserValue& outValue)
+    {
+        auto& cmdOptions = asInternal(session)->m_commandOptions;
+
+        for (auto valueCategory : valueCategories)
+        {
+            const auto optionIndex = cmdOptions.findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), name);
+            if (optionIndex >= 0)
+            {
+                outCat = valueCategory;
+                outValue = cmdOptions.getOptionAt(optionIndex).userValue;
+                return SLANG_OK;
+            }
+        }
+
+        List<UnownedStringSlice> names;
+        for (auto valueCategory : valueCategories)
+        { 
+            const auto categoryIndex = cmdOptions.findCategoryByUserValue(CommandOptions::UserValue(valueCategory));
+            SLANG_ASSERT(categoryIndex >= 0);
+            if (categoryIndex < 0)
+            {
+                return SLANG_FAIL;
+            }
+            cmdOptions.appendCategoryOptionNames(categoryIndex, names);
+        }
+
+        StringBuilder buf;
+        StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
+
+        sink->diagnose(arg.loc, Diagnostics::unknownCommandLineValue, buf);
+        return SLANG_FAIL;
+    }
+
     SlangResult _expectValue(ValueCategory valueCategory, CommandLineReader& reader, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
     {
         CommandLineArg arg;
@@ -1778,86 +1826,45 @@ struct OptionsParser
                     UnownedStringSlice levelSlice = argValue.getUnownedSlice().tail(2);
                     SlangOptimizationLevel level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
 
-                    const char c = levelSlice.getLength() == 1 ? levelSlice[0] : 0;
-
-                    switch (c)
+                    if (levelSlice.getLength())
                     {
-                        case '0':   level = SLANG_OPTIMIZATION_LEVEL_NONE;      break;
-                        case '1':   level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;   break;
-                        case '2':   level = SLANG_OPTIMIZATION_LEVEL_HIGH;      break;
-                        case '3':   level = SLANG_OPTIMIZATION_LEVEL_MAXIMAL;   break;
-                        default:
-                        {
-                            sink->diagnose(arg.loc, Diagnostics::unknownOptimiziationLevel, arg.value);
-                            return SLANG_FAIL;
-                        }
+                        CommandOptions::UserValue value;
+                        SLANG_RETURN_ON_FAIL(_getValue(ValueCategory::OptimizationLevel, arg, levelSlice, sink, value));
+                        level = SlangOptimizationLevel(value);
                     }
-                 
+
                     compileRequest->setOptimizationLevel(level);
                     break;
                 }
                 case OptionKind::DebugInformation:
                 {
+                    auto name = argValue.getUnownedSlice().tail(2);
+
                     // Note: unlike with `-O` above, we have to consider that other
                     // options might have names that start with `-g` and so cannot
                     // just detect it as a prefix.
-                    if (argValue == toSlice("-g"))
+                    if (name.getLength() == 0)
                     {
                         // The default is standard
                         compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
                     }
-                    else if (argValue.getLength() == 3 && argValue[2] >= '0' && argValue[2] <= '3')
+                    else 
                     {
-                        // Extract the digit into an index
-                        const Index levelIndex = argValue[2] - '0';
-                        SLANG_ASSERT(levelIndex >= 0 && levelIndex <= 3);
+                        CommandOptions::UserValue value;
+                        ValueCategory valueCat;
+                        ValueCategory valueCats[] = { ValueCategory::DebugLevel, ValueCategory::DebugInfoFormat };
+                        SLANG_RETURN_ON_FAIL(_getValue(makeConstArrayView(valueCats), arg, name, sink, valueCat, value));
 
-                        // Map indices to enum values
-                        const SlangDebugInfoLevel levels[] = 
+                        if (valueCat == ValueCategory::DebugLevel)
                         {
-                            SLANG_DEBUG_INFO_LEVEL_NONE,
-                            SLANG_DEBUG_INFO_LEVEL_MINIMAL,
-                            SLANG_DEBUG_INFO_LEVEL_STANDARD,
-                            SLANG_DEBUG_INFO_LEVEL_MAXIMAL
-                        };
-
-                        const auto level = levels[levelIndex];
-                        compileRequest->setDebugInfoLevel(level);
-                    }
-                    else
-                    {
-                        // Perhaps it's trying to specify a format
-                        auto formatName = argValue.getUnownedSlice().tail(2);
-
-                        SlangDebugInfoFormat format;
-                        if (SLANG_FAILED(TypeTextUtil::findDebugInfoFormat(formatName, format)))
-                        {
-                            List<String> debugOptions;
-
-                            debugOptions.add(toSlice("-g"));
-
-                            for (Int i = 0; i <= 3; ++i)
-                            {
-                                StringBuilder buf;
-                                buf << toSlice("-g") << i;
-                                debugOptions.add(buf);
-                            }
-
-                            for (Index i = 0; i < SLANG_DEBUG_INFO_FORMAT_COUNT_OF; ++i)
-                            {
-                                StringBuilder buf;
-                                buf << toSlice("-g") << TypeTextUtil::getDebugInfoFormatName(SlangDebugInfoFormat(i));
-                                debugOptions.add(buf);
-                            }
-
-                            StringBuilder buf;
-                            StringUtil::join(debugOptions, toSlice(", "), buf);
-
-                            sink->diagnose(arg.loc, Diagnostics::unknownDebugOption, buf);
-                            return SLANG_FAIL;
+                            const auto level = (SlangDebugInfoLevel)value;
+                            compileRequest->setDebugInfoLevel(level);
                         }
-                       
-                        compileRequest->setDebugInfoFormat(format);
+                        else
+                        {
+                            const auto debugFormat = (SlangDebugInfoFormat)value;
+                            compileRequest->setDebugInfoFormat(debugFormat);
+                        }
                     }
                     break;
                 }

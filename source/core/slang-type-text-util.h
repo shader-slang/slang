@@ -33,9 +33,13 @@ struct TypeTextUtil
         /// Get the debug format types
     static ConstArrayView<NamesDescriptionValue> getDebugInfoFormatInfos();
 
+    static ConstArrayView<NamesDescriptionValue> getDebugLevelInfos();
+
     static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
 
     static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
+
+    static ConstArrayView<NamesDescriptionValue> getOptimizationLevelInfos();
 
         /// Get the scalar type as text.
     static Slang::UnownedStringSlice getScalarTypeName(slang::TypeReflection::ScalarType scalarType);

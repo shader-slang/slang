@@ -77,7 +77,6 @@ DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "wh
 DIAGNOSTIC(    22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(    26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
-DIAGNOSTIC(    27, Error, unknownDebugInfoLevel, "unknown debug info level '$0'")
 
 DIAGNOSTIC(    28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
 

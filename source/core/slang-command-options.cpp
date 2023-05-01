@@ -110,7 +110,16 @@ UnownedStringSlice CommandOptions::_addString(const UnownedStringSlice& slice)
 
 Index CommandOptions::_addOption(const UnownedStringSlice& name, const Option& inOption)
 {
-    return _addOption(&name, 1, inOption);
+    if (name.indexOf(',') < 0)
+    {
+        return _addOption(&name, 1, inOption);
+    }
+    else
+    {
+        List<UnownedStringSlice> names;
+        StringUtil::split(name, ',', names);
+        return _addOption(names.getBuffer(), names.getCount(), inOption);
+    }
 }
 
 Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCount, const Option& inOption)
@@ -532,13 +541,19 @@ ConstArrayView<CommandOptions::Option> CommandOptions::getOptionsForCategory(Ind
     return makeConstArrayView(m_options.getBuffer() + cat.optionStartIndex, cat.optionEndIndex - cat.optionStartIndex);
 }
 
-void CommandOptions::getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const
+
+void CommandOptions::appendCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const
 {
-    outNames.clear();
     for (const auto& option : getOptionsForCategory(categoryIndex))
     {
         StringUtil::appendSplit(option.names, ',', outNames);
     }
+}
+
+void CommandOptions::getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const
+{
+    outNames.clear();
+    appendCategoryOptionNames(categoryIndex, outNames);
 }
 
 void CommandOptions::splitUsage(const UnownedStringSlice& usageSlice, List<UnownedStringSlice>& outSlices) const
