@@ -127,11 +127,10 @@ Result DeviceImpl::getNativeDeviceHandles(InteropHandles* outHandles)
 template<typename T>
 static bool _hasAnySetBits(const T& val, size_t offset)
 {
-    uint32_t result = 0;
-    const uint32_t* ptr = reinterpret_cast<const uint32_t*>(&val);
-    for (size_t i = offset; i < sizeof(val) / 4; i++)
-        result |= ptr[i];
-    return result != 0;
+    const uint8_t* ptr = reinterpret_cast<const uint8_t*>(&val);
+    for (size_t i = offset; i < sizeof(val); i++)
+        if (ptr[i]) return true;
+    return false;
 }
 
 Result DeviceImpl::initVulkanInstanceAndDevice(
