@@ -15,6 +15,9 @@
 
 namespace Slang {
 
+
+
+
 struct ParameterInfo;
 
 // Information on ranges of registers already claimed/used
@@ -334,22 +337,6 @@ struct EntryPointParameterBindingContext
     UsedRangeSet usedRangeSet;
 };
 
-struct VulkanShiftOptions
-{
-    enum class Kind
-    {
-        CountOf,
-    };
-
-    static ConstArrayView<NamesDescriptionValue> getKindInfos();
-
-    VulkanShiftOptions()
-    {
-        for (auto& shift : m_shifts) shift = 0;
-    }
-
-    Index m_shifts[Count(Kind::CountOf)] = { 0 };
-};
 
 // State that is shared during parameter binding,
 // across all translation units

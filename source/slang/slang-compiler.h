@@ -1531,10 +1531,37 @@ namespace Slang
         Binary = SLANG_WRITER_MODE_BINARY,
     };
 
+    /*
+        https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#descriptors
+        */
+    struct VulkanShiftOptions
+    {
+        // {b|s|t|u} 
+        enum class Kind
+        {
+            Buffer,             ///< Buffer 
+            Sampler,            ///< Sampler
+            Texture,            ///< Texture
+            Uniform,            ///< Uniform
+
+            CountOf,
+        };
+
+        void setShift(Kind kind, Index shift) { m_shifts[Index(kind)] = shift; }
+
+        static ConstArrayView<NamesDescriptionValue> getKindInfos();
+
+        Index m_globalsBinding = -1;
+        Index m_globalsSpace = -1;
+
+        Index m_shifts[Count(Kind::CountOf)] = { -1 };
+    };
+
         /// A request to generate output in some target format.
     class TargetRequest : public RefObject
     {
     public:
+        
         TargetRequest(Linkage* linkage, CodeGenTarget format);
 
         void addTargetFlags(SlangTargetFlags flags)
@@ -1575,6 +1602,9 @@ namespace Slang
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
 
+        void setVulkanShiftOptions(const VulkanShiftOptions& opts) { vulkanShiftOptions = opts; }
+        const VulkanShiftOptions& getVulkanShiftOptions() const { return vulkanShiftOptions; }
+
         bool shouldDumpIntermediates() { return dumpIntermediates; }
 
         void setTrackLiveness(bool enable) { enableLivenessTracking = enable; }
@@ -1612,6 +1642,8 @@ namespace Slang
         bool                    dumpIntermediates = false;
         bool                    forceGLSLScalarBufferLayout = false;
         bool                    enableLivenessTracking = false;
+
+        VulkanShiftOptions      vulkanShiftOptions;
     };
 
         /// Are we generating code for a D3D API?
@@ -1850,7 +1882,7 @@ namespace Slang
             Type* const*    args,
             DiagnosticSink* sink);
 
-            /// Add a mew target and return its index.
+            /// Add a new target and return its index.
         UInt addTarget(
             CodeGenTarget   target);
 
@@ -2618,6 +2650,8 @@ namespace Slang
         virtual SLANG_NO_THROW SlangDiagnosticFlags SLANG_MCALL getDiagnosticFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
+
+        void setVulkanShiftOptions(int targetIndex, const VulkanShiftOptions& vulkanShiftOptions);
 
         EndToEndCompileRequest(
             Session* session);

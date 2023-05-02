@@ -61,6 +61,28 @@ extern Slang::String get_slang_hlsl_prelude();
 
 namespace Slang {
 
+
+namespace { // anonymous
+
+typedef VulkanShiftOptions::Kind ShiftKind;
+
+/* {b|s|t|u} */
+
+static NamesDescriptionValue s_vulkanShiftKinds[] =
+{
+    { ValueInt(ShiftKind::Buffer),  "b", "Vulkan Buffer resource" },
+    { ValueInt(ShiftKind::Sampler), "s", "Vulkan Sampler resource" },
+    { ValueInt(ShiftKind::Texture), "t", "Vulkan Sampler resource" },
+    { ValueInt(ShiftKind::Uniform), "u", "Vulkan Uniform resource" },
+};
+
+} // anonymous
+
+/* static */ConstArrayView<NamesDescriptionValue> VulkanShiftOptions::getKindInfos()
+{
+    return makeConstArrayView(s_vulkanShiftKinds);
+}
+
 /* static */const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOf)] =
 {
     { 0, 0, uint8_t(BaseType::Void) },
@@ -4670,6 +4692,11 @@ int EndToEndCompileRequest::addCodeGenTarget(SlangCompileTarget target)
 void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID profile)
 {
     getLinkage()->targets[targetIndex]->setTargetProfile(Profile(profile));
+}
+
+void EndToEndCompileRequest::setVulkanShiftOptions(int targetIndex, const VulkanShiftOptions& vulkanShiftOptions)
+{
+    getLinkage()->targets[targetIndex]->setVulkanShiftOptions(vulkanShiftOptions);
 }
 
 void EndToEndCompileRequest::setTargetFlags(int targetIndex, SlangTargetFlags flags)
