@@ -563,7 +563,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
             // things by introducing padding into the declaration
             // (padding insertion would probably be best done at
             // the IR level).
-            bool useExplicitOffsets = getTargetReq()->getGLSLUseExplictOffsets();
+            bool useExplicitOffsets = false;
             if (useExplicitOffsets)
             {
                 _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_enhanced_layouts"));

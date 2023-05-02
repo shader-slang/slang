@@ -291,13 +291,6 @@ SLANG_API void spSetTargetForceGLSLScalarBufferLayout(
     request->setTargetForceGLSLScalarBufferLayout(targetIndex, forceScalarLayout);
 }
 
-SLANG_API void spSetTargetGLSLUseExplicitOffsets(
-    slang::ICompileRequest* request, int targetIndex, bool useExplicitOffsets)
-{
-    SLANG_ASSERT(request);
-    request->setTargetGLSLUseExplicitOffsets(targetIndex, useExplicitOffsets);
-}
-
 SLANG_API void spSetTargetLineDirectiveMode(
     slang::ICompileRequest* request,
     int targetIndex,

@@ -82,7 +82,6 @@ enum class OptionKind
     Optimization,
     Obfuscate,
     GLSLForceScalarLayout,
-    GLSLExplicitOffsets,
     EnableEffectAnnotations,
     
     // Downstream
@@ -422,10 +421,6 @@ void initCommandOptions(CommandOptions& options)
          "-force-glsl-scalar-layout",
          nullptr,
          "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
-        { OptionKind::GLSLExplicitOffsets,
-         "-glsl-explicit-uniform-offset",
-         nullptr,
-         "Include explicit uniform offsets in glsl output."},
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations",
          "Enables support for legacy effect annotation syntax."},
@@ -671,7 +666,6 @@ struct OptionsParser
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
         bool                forceGLSLScalarLayout = false;
-        bool                glslUseExplicitOffset = false;
         List<CapabilityAtom> capabilityAtoms;
 
         // State for tracking command-line errors
@@ -1851,11 +1845,6 @@ struct OptionsParser
                     getCurrentTarget()->forceGLSLScalarLayout = true;
                     break;
                 }
-                case OptionKind::GLSLExplicitOffsets:
-                {
-                    getCurrentTarget()->glslUseExplicitOffset = true;
-                    break;
-                }
                 case OptionKind::EnableEffectAnnotations:
                 {
                     compileRequest->setEnableEffectAnnotations(true);
@@ -2558,10 +2547,6 @@ struct OptionsParser
             if (rawTarget.forceGLSLScalarLayout)
             {
                 compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
-            }
-            if (rawTarget.glslUseExplicitOffset)
-            {
-                compileRequest->setTargetGLSLUseExplicitOffsets(targetID, true);
             }
         }
 

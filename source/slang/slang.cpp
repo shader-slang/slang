@@ -989,9 +989,6 @@ void Linkage::addTarget(
     target->setTargetProfile(Profile(desc.profile));
     target->setLineDirectiveMode(LineDirectiveMode(desc.lineDirectiveMode));
     target->setForceGLSLScalarBufferLayout(desc.forceGLSLScalarBufferLayout);
-    
-    if (desc.structureSize > offsetof(slang::TargetDesc, glslUseExplicitOffsets))
-        target->setForceGLSLScalarBufferLayout(desc.glslUseExplicitOffsets);
 }
 
 #if 0
@@ -4690,12 +4687,6 @@ void EndToEndCompileRequest::setTargetForceGLSLScalarBufferLayout(int targetInde
 {
     getLinkage()->targets[targetIndex]->setForceGLSLScalarBufferLayout(value);
 }
-
-void EndToEndCompileRequest::setTargetGLSLUseExplicitOffsets(int targetIndex, bool useExplicitOffsets)
-{
-    getLinkage()->targets[targetIndex]->setGLSLUseExplicitOffsets(useExplicitOffsets);
-}
-
 
 void EndToEndCompileRequest::setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode  mode)
 {

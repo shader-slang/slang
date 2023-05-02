@@ -1562,10 +1562,6 @@ namespace Slang
         {
             forceGLSLScalarBufferLayout = value;
         }
-        void setGLSLUseExplicitOffsets(bool value)
-        {
-            glslUseExplicitOffsets = value;
-        }
 
         void addCapability(CapabilityAtom capability);
 
@@ -1593,7 +1589,6 @@ namespace Slang
         SlangTargetFlags getTargetFlags() { return targetFlags; }
         CapabilitySet getTargetCaps();
         bool getForceGLSLScalarBufferLayout() { return forceGLSLScalarBufferLayout; }
-        bool getGLSLUseExplictOffsets() { return glslUseExplicitOffsets; }
         Session* getSession();
         MatrixLayoutMode getDefaultMatrixLayoutMode();
 
@@ -1616,7 +1611,6 @@ namespace Slang
         bool                    dumpIntermediates = false;
         bool                    forceGLSLScalarBufferLayout = false;
         bool                    enableLivenessTracking = false;
-        bool                    glslUseExplicitOffsets = false;
     };
 
         /// Are we generating code for a D3D API?
@@ -2574,7 +2568,6 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGLSLUseExplicitOffsets(int targetIndex, bool useExplicitOffsets) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
