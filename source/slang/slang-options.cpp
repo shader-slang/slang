@@ -1537,7 +1537,7 @@ struct OptionsParser
                 case OptionKind::EnableWarning:
                 {
                     // 2 because -W
-                    auto name = argValue.getUnownedSlice().tail(5);
+                    auto name = argValue.getUnownedSlice().tail(2);
                     // Enable the warning
                     SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning, sink));
                     break;
