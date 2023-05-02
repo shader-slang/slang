@@ -5,6 +5,8 @@
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
+#include "../core/slang-name-value.h"
+
 #include "../compiler-core/slang-artifact-desc-util.h"
 
 #include "slang-ir-string-hash.h"
@@ -330,6 +332,23 @@ struct EntryPointParameterBindingContext
 {
     // What ranges of resources bindings are already claimed for this translation unit
     UsedRangeSet usedRangeSet;
+};
+
+struct VulkanShiftOptions
+{
+    enum class Kind
+    {
+        CountOf,
+    };
+
+    static ConstArrayView<NamesDescriptionValue> getKindInfos();
+
+    VulkanShiftOptions()
+    {
+        for (auto& shift : m_shifts) shift = 0;
+    }
+
+    Index m_shifts[Count(Kind::CountOf)] = { 0 };
 };
 
 // State that is shared during parameter binding,
