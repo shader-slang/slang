@@ -70,14 +70,12 @@ DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'")
 DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'")
 DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
-DIAGNOSTIC(    18, Error, unknownFileSystemOption, "unknown file-system option '$0'")
 DIAGNOSTIC(    19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)")
 DIAGNOSTIC(    22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(    26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
-DIAGNOSTIC(    27, Error, unknownDebugInfoLevel, "unknown debug info level '$0'")
 
 DIAGNOSTIC(    28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
 

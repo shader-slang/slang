@@ -35,6 +35,34 @@ namespace Slang {
     return areAllEqual(slicesA, slicesB, equalFn);
 }
 
+/* static */void StringUtil::appendSplitOnWhitespace(const UnownedStringSlice& in, List<UnownedStringSlice>& outSlices)
+{
+    const char* start = in.begin();
+    const char* end = in.end();
+
+    // Skip any at the start
+    while (start < end && CharUtil::isWhitespace(*start)) start++;
+    
+    while (start < end)
+    {
+        // Find all the non white space in a run
+        const char* cur = start;
+        while (cur < end && !CharUtil::isWhitespace(*cur))
+        {
+            cur++;
+        }
+
+        // Add to output
+        outSlices.add(UnownedStringSlice(start, cur));
+
+        // Find the next start
+        start = cur + 1;
+
+        // Skip the split
+        while (start < end && CharUtil::isWhitespace(*start)) start++;
+    }
+}
+
 /* static */void StringUtil::appendSplit(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& outSlices)
 {
     const char* start = in.begin();
@@ -111,6 +139,12 @@ namespace Slang {
 {
     outSlices.clear();
     appendSplit(in, splitSlice, outSlices);
+}
+
+/* static */void StringUtil::splitOnWhitespace(const UnownedStringSlice& in, List<UnownedStringSlice>& outSlices)
+{
+    outSlices.clear();
+    appendSplitOnWhitespace(in, outSlices);
 }
 
 /* static */Index StringUtil::split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices)
