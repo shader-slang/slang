@@ -81,7 +81,10 @@ enum class OptionKind
     LineDirectiveMode,
     Optimization,
     Obfuscate,
-    
+
+    VulkanBindShift,
+    VulkanBindGlobals,
+
     // Downstream
 
     CompilerPath,
@@ -158,6 +161,7 @@ enum class ValueCategory
     OptimizationLevel,
     DebugLevel, 
     FileSystemType,
+    VulkanShift,
 
     CountOf,
 };
@@ -174,6 +178,7 @@ SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
 SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
+SLANG_GET_VALUE_CATEGORY(VulkanShift, VulkanShiftOptions::Kind)
 
 } // anonymous
 
@@ -256,6 +261,13 @@ void initCommandOptions(CommandOptions& options)
         options.addValuesWithAliases(opts.getArrayView());
     }
 
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! vulkan-shift !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(CategoryKind::Value, "vulkan-shift", "Vulkan Shift", UserValue(ValueCategory::VulkanShift));
+        options.addValues(VulkanShiftOptions::getKindInfos());
+    }
+    
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! capabilities !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
     {
@@ -427,10 +439,32 @@ void initCommandOptions(CommandOptions& options)
         "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives "
         "for GLSL output." },
         { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
-        { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
+        { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },   
+        { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
+        "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>. See HLSL global variables and Vulkan binding for explanation and examples."
+        },
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
+
+    {
+        StringBuilder names;
+        for (auto nameSlice : NameValueUtil::getNames(NameValueUtil::NameKind::All, VulkanShiftOptions::getKindInfos()))
+        {
+            // -fvk-{b|s|t|u}-shift
+            names << "-fvk-" << nameSlice << "-shift,";
+        }
+        // remove last ,
+        names.reduceLength(names.getLength() - 1);
+        options.add(names.getBuffer(), "-vk-<vulkan-shift>-shift <N> <space>", 
+            "Shifts by N the inferred binding numbers for all resources in b-type registers of space <space>. "
+            "Specifically, for a resouce attached with :register(bX, <space>) but not [vk::binding(...)], "
+            "sets its Vulkan descriptor set to <space> and binding number to X + N. If you need to shift the "
+            "inferred binding numbers for more than one space, provide more than one such option. "
+            "If more than one such option is provided for the same space, the last one takes effect. "
+            "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>.", 
+            UserValue(OptionKind::VulkanBindShift));
+    }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Downstream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -724,6 +758,7 @@ struct OptionsParser
     SlangResult _getValue(const ConstArrayView<ValueCategory>& valueCategories, const CommandLineArg& arg, const UnownedStringSlice& name, ValueCategory& outCat, CommandOptions::UserValue& outValue);
     
     SlangResult _expectValue(ValueCategory valueCategory, CommandOptions::UserValue& outValue);
+    SlangResult _expectInt(const CommandLineArg& arg, Int& outInt);
 
     template <typename T>
     SlangResult _expectValue(T& ioValue)
@@ -733,7 +768,6 @@ struct OptionsParser
         ioValue = T(value);
         return SLANG_OK;
     }
-
 
     void _appendUsageTitle(StringBuilder& out);
     void _appendMinimalUsage(StringBuilder& out);
@@ -1254,6 +1288,7 @@ void OptionsParser::_appendMinimalUsage(StringBuilder& out)
     out << "For help: slangc -h\n";
 }
 
+
 SlangResult OptionsParser::_getValue(ValueCategory valueCategory, const CommandLineArg& arg, const UnownedStringSlice& name, CommandOptions::UserValue& outValue)
 {
     const auto optionIndex = m_cmdOptions->findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), name);
@@ -1324,6 +1359,21 @@ SlangResult OptionsParser::_expectValue(ValueCategory valueCategory, CommandOpti
     CommandLineArg arg;
     SLANG_RETURN_ON_FAIL(m_reader.expectArg(arg));
     SLANG_RETURN_ON_FAIL(_getValue(valueCategory, arg, outValue));
+    return SLANG_OK;
+}
+
+SlangResult OptionsParser::_expectInt(const CommandLineArg& initArg, Int& outInt)
+{
+    SLANG_UNUSED(initArg);
+
+    CommandLineArg arg;
+    SLANG_RETURN_ON_FAIL(m_reader.expectArg(arg));
+    
+    if (SLANG_FAILED(StringUtil::parseInt(arg.value.getUnownedSlice(), outInt)))
+    {
+        m_sink->diagnose(arg.loc, Diagnostics::expectingAnInteger);
+        return SLANG_FAIL;
+    }
     return SLANG_OK;
 }
 
@@ -1876,6 +1926,39 @@ SlangResult OptionsParser::_parse(
                 rawTarget.format = CodeGenTarget(format);
 
                 m_rawTargets.add(rawTarget);
+                break;
+            }
+            case OptionKind::VulkanBindShift:
+            {
+                // -fvk-{b|s|t|u}-shift
+                const auto slice = arg.value.getUnownedSlice().subString(5, 1);
+                VulkanShiftOptions::Kind kind;
+                SLANG_RETURN_ON_FAIL(_getValue(arg, slice, kind));
+
+                Int shift;
+                SLANG_RETURN_ON_FAIL(_expectInt(arg, shift));
+                
+                if (m_reader.hasArg() && m_reader.peekArg().value == toSlice("all"))
+                {
+                    m_vulkanShiftOptions.setAllShift(kind, shift);
+                }
+                else
+                {
+                    Int set;
+                    SLANG_RETURN_ON_FAIL(_expectInt(arg, set));
+                    m_vulkanShiftOptions.setShift(kind, set, shift);
+                }
+                break;
+            }
+            case OptionKind::VulkanBindGlobals:
+            {
+                // -fvk-bind-globals N M
+                Int binding, bindingSet;
+                SLANG_RETURN_ON_FAIL(_expectInt(arg, binding));
+                SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSet));
+
+                m_vulkanShiftOptions.m_globalsBindingSet = bindingSet;
+                m_vulkanShiftOptions.m_globalsBinding = binding;
                 break;
             }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;
