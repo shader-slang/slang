@@ -35,6 +35,9 @@ Result BufferResourceImpl::getNativeResourceHandle(InteropHandle* outHandle)
 
 Result BufferResourceImpl::getSharedHandle(InteropHandle* outHandle)
 {
+#if !SLANG_WINDOWS_FAMILY
+    return SLANG_E_NOT_IMPLEMENTED;
+#else
     // Check if a shared handle already exists for this resource.
     if (sharedHandle.handleValue != 0)
     {
@@ -51,6 +54,7 @@ Result BufferResourceImpl::getSharedHandle(InteropHandle* outHandle)
     outHandle->api = InteropHandleAPI::D3D12;
     sharedHandle = *outHandle;
     return SLANG_OK;
+#endif
 }
 
 Result BufferResourceImpl::map(MemoryRange* rangeToRead, void** outPointer)

@@ -582,12 +582,12 @@ void CLikeSourceEmitter::emitStringLiteral(String const& value)
             m_writer->emit(buffer);
             break;
 
-        case '\"': m_writer->emit("\\\"");
-        case '\'': m_writer->emit("\\\'");
-        case '\\': m_writer->emit("\\\\");
-        case '\n': m_writer->emit("\\n");
-        case '\r': m_writer->emit("\\r");
-        case '\t': m_writer->emit("\\t");
+        case '\"': m_writer->emit("\\\""); break;
+        case '\'': m_writer->emit("\\\'"); break;
+        case '\\': m_writer->emit("\\\\"); break;
+        case '\n': m_writer->emit("\\n"); break;
+        case '\r': m_writer->emit("\\r"); break;
+        case '\t': m_writer->emit("\\t"); break;
         }
     }
     m_writer->emit("\"");
@@ -3094,7 +3094,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if(auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
+    if(const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
     {
         return;
     }
@@ -3143,7 +3143,7 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
 {
     // If the selected `class` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if (auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
+    if (const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
     {
         return;
     }
@@ -3771,12 +3771,28 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
 
     for(auto inst : module->getGlobalInsts())
     {
+        // Emit all resource-typed objects first. This is to avoid an odd scenario in HLSL
+        // where not using a resource type in a resource definition before the same type
+        // is used for a function parameter causes HLSL to complain about an 'incomplete type'
+        // 
+        if ( isResourceType(inst->getDataType()) )
+        {
+            ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
+        }
+    }
+
+    for(auto inst : module->getGlobalInsts())
+    {
         if( as<IRType>(inst) )
         {
             // Don't emit a type unless it is actually used or is marked public.
             if (!inst->findDecoration<IRPublicDecoration>())
                 continue;
         }
+
+        // Skip resource types in this pass.
+        if ( isResourceType(inst->getDataType()) )
+            continue;
 
         ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
     }

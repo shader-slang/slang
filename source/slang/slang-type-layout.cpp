@@ -1471,7 +1471,7 @@ static LayoutSize GetElementCount(IntVal* val)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->value));
     }
-    else if( auto varRefVal = as<GenericParamIntVal>(val) )
+    else if(const auto varRefVal = as<GenericParamIntVal>(val))
     {
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
@@ -1483,7 +1483,7 @@ static LayoutSize GetElementCount(IntVal* val)
         //
         return 0;
     }
-    else if (auto polyIntVal = as<PolynomialIntVal>(val))
+    else if (const auto polyIntVal = as<PolynomialIntVal>(val))
     {
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
@@ -1734,7 +1734,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     bool anyHit = false;
     for (auto oldResInfo : oldTypeLayout->resourceInfos)
     {
-        if (auto offsetResInfo = offsetVarLayout->FindResourceInfo(oldResInfo.kind))
+        if (const auto offsetResInfo = offsetVarLayout->FindResourceInfo(oldResInfo.kind))
         {
             anyHit = true;
             break;
@@ -1746,7 +1746,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
         {
             for (auto oldResInfo : oldPendingTypeLayout->resourceInfos)
             {
-                if (auto offsetResInfo = pendingOffsetVarLayout->FindResourceInfo(oldResInfo.kind))
+                if (const auto offsetResInfo = pendingOffsetVarLayout->FindResourceInfo(oldResInfo.kind))
                 {
                     anyHit = true;
                     break;
@@ -1878,7 +1878,7 @@ IRTypeLayout* applyOffsetToTypeLayout(
     bool anyHit = false;
     for (auto oldResInfo : oldTypeLayout->getSizeAttrs())
     {
-        if (auto offsetResInfo = offsetVarLayout->findOffsetAttr(oldResInfo->getResourceKind()))
+        if (const auto offsetResInfo = offsetVarLayout->findOffsetAttr(oldResInfo->getResourceKind()))
         {
             anyHit = true;
             break;
@@ -3439,7 +3439,7 @@ static TypeLayoutResult _createTypeLayout(
 
         return TypeLayoutResult(typeLayout, info);
     }
-    else if (auto samplerStateType = as<SamplerStateType>(type))
+    else if (const auto samplerStateType = as<SamplerStateType>(type))
     {
         return createSimpleTypeLayout(
             rules->GetObjectLayout(ShaderParameterKind::SamplerState),
@@ -4023,7 +4023,7 @@ static TypeLayoutResult _createTypeLayout(
 
         return createSimpleTypeLayout(
             SimpleLayoutInfo(),
-            type,
+            errorType,
             rules);
     }
     else if( auto taggedUnionType = as<TaggedUnionType>(type) )

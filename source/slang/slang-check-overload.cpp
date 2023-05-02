@@ -98,7 +98,7 @@ namespace Slang
         OverloadResolveContext&		context,
         OverloadCandidate const&	candidate)
     {
-        UInt argCount = context.getArgCount();
+        Count argCount = context.getArgCount();
         ParamCounts paramCounts = { 0, 0 };
         switch (candidate.flavor)
         {
@@ -158,7 +158,7 @@ namespace Slang
 
         auto decl = candidate.item.declRef.decl;
 
-        if(auto prefixExpr = as<PrefixExpr>(expr))
+        if(const auto prefixExpr = as<PrefixExpr>(expr))
         {
             if(decl->hasModifier<PrefixModifier>())
                 return true;
@@ -171,7 +171,7 @@ namespace Slang
 
             return false;
         }
-        else if(auto postfixExpr = as<PostfixExpr>(expr))
+        else if(const auto postfixExpr = as<PostfixExpr>(expr))
         {
             if(decl->hasModifier<PostfixModifier>())
                 return true;
@@ -1007,7 +1007,8 @@ namespace Slang
         if (context.bestCandidates.getCount() != 0)
         {
             // We have multiple candidates right now, so filter them.
-            bool anyFiltered = false;
+            // This is only used in an assert in debug builds
+            [[maybe_unused]] bool anyFiltered = false;
             // Note that we are querying the list length on every iteration,
             // because we might remove things.
             for (Index cc = 0; cc < context.bestCandidates.getCount(); ++cc)
@@ -1214,7 +1215,6 @@ namespace Slang
         // generic itself.
         //
         Substitutions* substForInnerDecl = genericDeclRef.substitutions;
-        Count knownGenericArgCount = 0;
         //
         // In the case where we have explicit/known arguments,
         // we will use those as our baseline substitutions.
@@ -1222,7 +1222,6 @@ namespace Slang
         if (substWithKnownGenericArgs)
         {
             substForInnerDecl = substWithKnownGenericArgs;
-            knownGenericArgCount = substWithKnownGenericArgs->getArgs().getCount();
         }
 
         auto innerDecl = getInner(genericDeclRef);
@@ -1375,11 +1374,6 @@ namespace Slang
         auto genericDeclRef = genericItem.declRef.as<GenericDecl>();
         SLANG_ASSERT(genericDeclRef);
 
-        if (substWithKnownGenericArgs)
-        {
-            substWithKnownGenericArgs = substWithKnownGenericArgs;
-        }
-
         // Try to infer generic arguments, based on the context
         DeclRef<Decl> innerRef = inferGenericArguments(genericDeclRef, context, substWithKnownGenericArgs);
 
@@ -1412,8 +1406,6 @@ namespace Slang
         LookupResultItem        item,
         OverloadResolveContext& context)
     {
-        auto declRef = item.declRef;
-
         if (auto funcDeclRef = item.declRef.as<CallableDecl>())
         {
             AddFuncOverloadCandidate(item, funcDeclRef, context);
@@ -1560,23 +1552,14 @@ namespace Slang
             }
             else if (auto baseFuncGenericDeclRef = funcDeclRefExpr->declRef.as<GenericDecl>())
             {
-                // Get inner function
-                DeclRef<Decl> unspecializedInnerRef = DeclRef<Decl>(
-                    getInner(baseFuncGenericDeclRef),
-                    baseFuncGenericDeclRef.substitutions);
-
                 // Process func type to generate JVP func type.
                 auto diffFuncType = as<FuncType>(expr->type.type);
-                if (!diffFuncType)
-                {
-                    // This shouldn't happen, but we check to be safe.
-                    return;
-                }
+                SLANG_ASSERT(diffFuncType);
 
                 // Extract parameter list from processed type.
                 List<Type*> paramTypes;
 
-                for (UIndex ii = 0; ii < diffFuncType->getParamCount(); ii++)
+                for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
                     paramTypes.add(removeParamDirType(diffFuncType->getParamType(ii)));
 
                 // Try to infer generic arguments, based on the updated context.
@@ -1699,7 +1682,7 @@ namespace Slang
         for (Index i = 0; i < expr->arguments.getCount(); i++)
         {
             auto& arg = expr->arguments[i];
-            if (funcType && i < (Index)funcType->getParamCount())
+            if (funcType && i < funcType->getParamCount())
             {
                 if (funcType->getParamDirection(i) == kParameterDirection_Out)
                     continue;

@@ -99,6 +99,7 @@ public:
         Before,             ///< Only allows before
         Function,           ///< Function/method
         GenericParam,       ///< Generic parameter
+        Attribute,          ///< Attribute definition
     };
 
         /// An input search item

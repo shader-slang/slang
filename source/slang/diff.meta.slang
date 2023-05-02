@@ -25,6 +25,7 @@ attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 
+/// Represents a GPU view of a tensor.
 __generic<T>
 __magic_type(TensorViewType)
 __intrinsic_type($(kIROp_TensorViewType))
@@ -231,6 +232,7 @@ extension TensorView<float>
     void InterlockedCompareExchange(vector<uint, N> index, float compare, float val);
 }
 
+/// Represents the handle of a Torch tensor object.
 __generic<T>
 __intrinsic_type($(kIROp_TorchTensorType))
 struct TorchTensor
@@ -294,10 +296,12 @@ struct TorchTensor
 __target_intrinsic(cpp, "AT_CUDA_CHECK(cudaStreamSynchronize(at::cuda::getCurrentCUDAStream()))")
 void syncTorchCudaStream();
 
+/// Constructs a `DifferentialPair` value from a primal value and a differential value.
 __generic<T: IDifferentiable>
 __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
 DifferentialPair<T> diffPair(T primal, T.Differential diff);
 
+/// Constructs a `DifferentialPair` value from a primal value and a zero differential value.
 __generic<T: IDifferentiable>
 [__unsafeForceInlineEarly]
 DifferentialPair<T> diffPair(T primal)
@@ -812,7 +816,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     }
 #define SIMPLE_UNARY_DERIVATIVE_IMPL(NAME, DIFF_FUNC) UNARY_DERIVATIVE_IMPL(NAME, ReturnType.dmul(DIFF_FUNC, dpx.d), ReturnType.dmul(DIFF_FUNC, dOut))
 
-// Detach and set derivatives to zero
+/// Detach and set derivatives to zero.
 __generic<T : IDifferentiable>
 __intrinsic_op($(kIROp_DetachDerivative))
 T detach(T x);

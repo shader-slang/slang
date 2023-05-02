@@ -117,6 +117,15 @@ static CapabilityAtomInfo const& _getInfo(CapabilityAtom atom)
     return kCapabilityAtoms[Int(atom)];
 }
 
+void getCapabilityAtomNames(List<UnownedStringSlice>& ioNames)
+{
+    ioNames.setCount(Count(CapabilityAtom::Count));
+    for (Index i = 0; i < Count(CapabilityAtom::Count); ++i)
+    {
+        ioNames[i] = UnownedStringSlice(_getInfo(CapabilityAtom(i)).name);
+    }
+}
+
 CapabilityAtom findCapabilityAtom(UnownedStringSlice const& name)
 {
     // For now we are implementing a linear search over the

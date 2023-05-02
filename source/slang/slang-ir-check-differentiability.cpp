@@ -134,21 +134,6 @@ public:
         return false;
     }
 
-    int getParamIndexInBlock(IRParam* paramInst)
-    {
-        auto block = as<IRBlock>(paramInst->getParent());
-        if (!block)
-            return -1;
-        int paramIndex = 0;
-        for (auto param : block->getParams())
-        {
-            if (param == paramInst)
-                return paramIndex;
-            paramIndex++;
-        }
-        return -1;
-    }
-
     bool isInstInFunc(IRInst* inst, IRInst* func)
     {
         while (inst)
@@ -269,8 +254,8 @@ public:
             case kIROp_FloatLit:
                 return true;
             case kIROp_Call:
-                return inst->findDecoration<IRTreatAsDifferentiableDecoration>() || isDifferentiableFunc(as<IRCall>(inst)->getCallee(), requiredDiffLevel)
-                    && isDifferentiableType(diffTypeContext, inst->getFullType());
+                return inst->findDecoration<IRTreatAsDifferentiableDecoration>() ||
+                    isDifferentiableFunc(as<IRCall>(inst)->getCallee(), requiredDiffLevel) && isDifferentiableType(diffTypeContext, inst->getFullType());
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination address.
                 // Just assume it is producing diff if the dest address can hold a derivative.

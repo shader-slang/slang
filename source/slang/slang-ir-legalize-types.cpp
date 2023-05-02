@@ -2169,6 +2169,10 @@ static LegalVal legalizeInst(
             inst->replaceUsesWith(newInst);
             inst->removeFromParent();
             context->replacedInstructions.add(inst);
+            for (auto child : inst->getDecorationsAndChildren())
+            {
+                child->insertAtEnd(newInst);
+            }
             return LegalVal::simple(newInst);
         }
         return LegalVal::simple(inst);
@@ -2816,7 +2820,7 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             {
                 if( auto existentialTypeLayout = as<IRExistentialTypeLayout>(elementTypeLayout) )
                 {
-                    if( auto pendingTypeLayout = existentialTypeLayout->getPendingDataTypeLayout() )
+                    if( const auto pendingTypeLayout = existentialTypeLayout->getPendingDataTypeLayout() )
                     {
                         SLANG_ASSERT(tupleInfo->elements.getCount() == 1);
 

@@ -1,6 +1,8 @@
 // slang-fxc-compiler.cpp
 #include "slang-fxc-compiler.h"
 
+#if SLANG_ENABLE_DXBC_SUPPORT
+
 #include "../core/slang-common.h"
 #include "../../slang-com-helper.h"
 
@@ -28,27 +30,19 @@
 #ifdef _WIN32
 #   include <windows.h>
 #   include <d3dcompiler.h>
-
-#   ifndef SLANG_ENABLE_DXBC_SUPPORT
-#       define SLANG_ENABLE_DXBC_SUPPORT 1
-#   endif
 #endif
 
-#ifndef SLANG_ENABLE_DXBC_SUPPORT
-#   define SLANG_ENABLE_DXBC_SUPPORT 0
+// Some of the `D3DCOMPILE_*` constants aren't available in all
+// versions of `d3dcompiler.h`, so we define them here just in case
+#ifndef D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES
+#   define D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES (1 << 20)
 #endif
 
-#if SLANG_ENABLE_DXBC_SUPPORT
-    // Some of the `D3DCOMPILE_*` constants aren't available in all
-    // versions of `d3dcompiler.h`, so we define them here just in case
-#   ifndef D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES
-#       define D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES (1 << 20)
-#   endif
-
-#   ifndef D3DCOMPILE_ALL_RESOURCES_BOUND
-#       define D3DCOMPILE_ALL_RESOURCES_BOUND (1 << 21)
-#   endif
+#ifndef D3DCOMPILE_ALL_RESOURCES_BOUND
+#   define D3DCOMPILE_ALL_RESOURCES_BOUND (1 << 21)
 #endif
+
+#endif // SLANG_ENABLE_DXBC_SUPPORT
 
 namespace Slang
 {
@@ -369,7 +363,8 @@ SlangResult FXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
 {
     ComPtr<ISlangSharedLibrary> library;
 
-    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "d3dcompiler_47", library));
+    const char* const libName = "d3dcompiler_47";
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, libName, library));
 
     SLANG_ASSERT(library);
     if (!library)
@@ -396,6 +391,6 @@ SlangResult FXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
     return SLANG_E_NOT_AVAILABLE;
 }
 
-#endif // SLANG_ENABLE_DXBC_SUPPORT
+#endif // else SLANG_ENABLE_DXBC_SUPPORT
 
 }

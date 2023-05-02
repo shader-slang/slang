@@ -35,10 +35,36 @@ namespace Slang {
     return areAllEqual(slicesA, slicesB, equalFn);
 }
 
-/* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& outSlices)
+/* static */void StringUtil::appendSplitOnWhitespace(const UnownedStringSlice& in, List<UnownedStringSlice>& outSlices)
 {
-    outSlices.clear();
+    const char* start = in.begin();
+    const char* end = in.end();
 
+    // Skip any at the start
+    while (start < end && CharUtil::isWhitespace(*start)) start++;
+    
+    while (start < end)
+    {
+        // Find all the non white space in a run
+        const char* cur = start;
+        while (cur < end && !CharUtil::isWhitespace(*cur))
+        {
+            cur++;
+        }
+
+        // Add to output
+        outSlices.add(UnownedStringSlice(start, cur));
+
+        // Find the next start
+        start = cur + 1;
+
+        // Skip the split
+        while (start < end && CharUtil::isWhitespace(*start)) start++;
+    }
+}
+
+/* static */void StringUtil::appendSplit(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& outSlices)
+{
     const char* start = in.begin();
     const char* end = in.end();
 
@@ -59,16 +85,14 @@ namespace Slang {
     }
 }
 
-/* static */void StringUtil::split(const UnownedStringSlice& in, const UnownedStringSlice& splitSlice, List<UnownedStringSlice>& outSlices)
+/* static */void StringUtil::appendSplit(const UnownedStringSlice& in, const UnownedStringSlice& splitSlice, List<UnownedStringSlice>& outSlices)
 {
     const Index splitLen = splitSlice.getLength();
 
     if (splitLen == 1)
     {
-        return split(in, splitSlice[0], outSlices);
+        return appendSplit(in, splitSlice[0], outSlices);
     }
-
-    outSlices.clear();
 
     SLANG_ASSERT(splitLen > 0);
     if (splitLen <= 0)
@@ -96,13 +120,31 @@ namespace Slang {
 
             cur++;
         }
-      
+
         // Add to output
         outSlices.add(UnownedStringSlice(start, cur));
 
         // Skip the split, if at end we are okay anyway
         start = cur + splitLen;
     }
+}
+
+/* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& outSlices)
+{
+    outSlices.clear();
+    appendSplit(in, splitChar, outSlices);
+}
+
+/* static */void StringUtil::split(const UnownedStringSlice& in, const UnownedStringSlice& splitSlice, List<UnownedStringSlice>& outSlices)
+{
+    outSlices.clear();
+    appendSplit(in, splitSlice, outSlices);
+}
+
+/* static */void StringUtil::splitOnWhitespace(const UnownedStringSlice& in, List<UnownedStringSlice>& outSlices)
+{
+    outSlices.clear();
+    appendSplitOnWhitespace(in, outSlices);
 }
 
 /* static */Index StringUtil::split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices)
@@ -290,7 +332,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
     append(format, args, builder);
     va_end(args);
 
-    return builder;
+    return std::move(builder);
 }
 
 /* static */UnownedStringSlice StringUtil::getSlice(ISlangBlob* blob)
@@ -342,7 +384,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     }
 
     builder.appendInPlace(dstChars, numChars);
-    return builder;
+    return std::move(builder);
 }
 
 /* static */String StringUtil::calcCharReplaced(const String& string, char fromChar, char toChar)

@@ -3342,7 +3342,6 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
         macro->flavor = MacroDefinition::Flavor::ObjectLike;
     }
 
-    auto nameLoc = NameLoc(nameToken);
     macro->nameAndLoc = NameLoc(nameToken);
 
     context->m_preprocessor->globalEnv.macros[name] = macro;
@@ -3418,7 +3417,7 @@ static String _readDirectiveMessage(PreprocessorDirectiveContext* context)
         result.append(token.getContent());
     }
 
-    return result;
+    return std::move(result);
 }
 
 // Handle a `#warning` directive
@@ -3500,7 +3499,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
             _handleDefaultLineDirective(context);
             return;
         }
-        /* else, fall through to: */
+        [[fallthrough]];
     default:
         _diagnoseInvalidLineDirective(context);
         return;

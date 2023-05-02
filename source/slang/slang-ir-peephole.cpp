@@ -228,6 +228,12 @@ struct PeepholeContext : InstPassBase
             {
                 return tryReplace(inst->getOperand(0));
             }
+            else if (inst->getOperand(0) == inst->getOperand(1))
+            {
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                return tryReplace(builder.emitDefaultConstruct(inst->getDataType()));
+            }
             break;
         case kIROp_Mul:
             if (isOne(inst->getOperand(0)))
@@ -502,7 +508,7 @@ struct PeepholeContext : InstPassBase
                         }
                     }
                 }
-                else if (auto structKey = as<IRStructKey>(key))
+                else if (const auto structKey = as<IRStructKey>(key))
                 {
                     auto oldVal = inst->getOperand(0);
                     if (oldVal->getOp() == kIROp_MakeStruct)

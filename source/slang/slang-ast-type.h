@@ -674,8 +674,8 @@ class FuncType : public Type
     Type* resultType = nullptr;
     Type* errorType = nullptr;
 
-    UInt getParamCount() { return paramTypes.getCount(); }
-    Type* getParamType(UInt index) { return paramTypes[index]; }
+    Index getParamCount() { return paramTypes.getCount(); }
+    Type* getParamType(Index index) { return paramTypes[index]; }
     Type* getResultType() { return resultType; }
     Type* getErrorType() { return errorType; }
 

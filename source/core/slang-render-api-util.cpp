@@ -56,7 +56,7 @@ UnownedStringSlice RenderApiUtil::getApiName(RenderApiType type)
 {
     using namespace Slang;
     List<UnownedStringSlice> namesList;
-    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+    for (Index j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
     {
         const auto& apiInfo = RenderApiUtil::s_infos[j];
         const UnownedStringSlice names(apiInfo.names);
@@ -218,7 +218,7 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
 /* static */RenderApiType RenderApiUtil::findRenderApiType(const Slang::UnownedStringSlice& text)
 {
     using namespace Slang;
-    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+    for (Index j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
     {
         const auto& apiInfo = RenderApiUtil::s_infos[j];
         if (StringUtil::indexOfInSplit(UnownedStringSlice(apiInfo.names), ',', text) >= 0)
@@ -233,7 +233,7 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
 /* static */RenderApiType RenderApiUtil::findImplicitLanguageRenderApiType(const Slang::UnownedStringSlice& text)
 {
     using namespace Slang;
-    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+    for (Index j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
     {
         const auto& apiInfo = RenderApiUtil::s_infos[j];
         if (StringUtil::indexOfInSplit(UnownedStringSlice(apiInfo.languageNames), ',', text) >= 0)
@@ -245,7 +245,7 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
     return RenderApiType::Unknown;
 }
 
-#if SLANG_WINDOWS_FAMILY
+#if SLANG_ENABLE_DIRECTX
 static bool _canLoadSharedLibrary(const char* libName)
 {
     SharedLibrary::Handle handle;
@@ -266,18 +266,16 @@ static bool _canLoadSharedLibrary(const char* libName)
 #if SLANG_WINDOWS_FAMILY
         case RenderApiType::OpenGl: return _canLoadSharedLibrary("opengl32");
         case RenderApiType::Vulkan: return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
-        case RenderApiType::D3D11:  return _canLoadSharedLibrary("d3d11");
-        case RenderApiType::D3D12:  return _canLoadSharedLibrary("d3d12");
 #elif SLANG_UNIX_FAMILY
-        case RenderApiType::D3D11:  return false;
-        case RenderApiType::D3D12:  return false;
-        // The below can be used once they're confirmed working with gfx
-        // case RenderApiType::D3D11:  return _canLoadSharedLibrary("dxvk_d3d11");
-        // case RenderApiType::D3D12:  return _canLoadSharedLibrary("vkd3d-proton-d3d12");
-
         case RenderApiType::OpenGl: return true;
         case RenderApiType::Vulkan: return true;
 #endif
+
+#if SLANG_ENABLE_DIRECTX
+        case RenderApiType::D3D11:  return _canLoadSharedLibrary(SLANG_ENABLE_DXVK ? "dxvk_d3d11" : "d3d11");
+        case RenderApiType::D3D12:  return _canLoadSharedLibrary(SLANG_ENABLE_VKD3D ? "vkd3d-proton-d3d12" : "d3d12");
+#endif
+
         case RenderApiType::CPU:    return true;
         // We'll assume CUDA is available, and if not, trying to create it will detect it
         case RenderApiType::CUDA:   return true;

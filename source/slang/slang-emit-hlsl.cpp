@@ -898,7 +898,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitHLSLTextureType(texType);
         return;
     }
-    else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
+    else if (const auto textureSamplerType = as<IRTextureSamplerType>(type))
     {
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see combined texture-sampler types");
         return;
@@ -929,7 +929,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
         return;
     }
-    else if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
     {
         switch (type->getOp())
         {
@@ -1039,7 +1039,7 @@ void HLSLSourceEmitter::_emitStageAccessSemantic(IRStageAccessDecoration* decora
 
 void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
 {
-    if( auto payloadDecoration = inst->findDecoration<IRPayloadDecoration>() )
+    if( const auto payloadDecoration = inst->findDecoration<IRPayloadDecoration>() )
     {
         m_writer->emit("[payload] ");
     }
@@ -1235,7 +1235,7 @@ void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 
 void HLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
-    if( auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>() )
+    if( const auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>() )
     {
         // When emitting one of the "magic" NVAPI declarations,
         // we will wrap it in a preprocessor conditional that

@@ -132,6 +132,7 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
+    
     _initCodeGenTransitionMap();
 
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
@@ -143,6 +144,9 @@ void Session::init()
     m_completionTokenName = getNamePool()->getName("#?");
 
     m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
+
+    // Set up the command line options
+    initCommandOptions(m_commandOptions);
 
     // Set up shared AST builder
     m_sharedASTBuilder = new SharedASTBuilder;
@@ -752,7 +756,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
         // We prefer LLVM if it's available
-        if (auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
+        if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
         {
             return SLANG_PASS_THROUGH_LLVM;
         }
@@ -4542,6 +4546,11 @@ void Session::addBuiltinSource(
     // Extract the AST for the code we just parsed
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();
     auto moduleDecl = module->getModuleDecl();
+
+    // Extact documentation markup.
+    ASTMarkup markup;
+    ASTMarkupUtil::extract(moduleDecl, sourceManager, &sink, &markup);
+    markup.attachToAST();
 
     // Put in the loaded module map
     linkage->mapNameToLoadedModules.add(moduleName, module);

@@ -4,7 +4,7 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <dxgidebug.h>
-#if SLANG_ENABLE_FXC
+#if SLANG_ENABLE_DXBC_SUPPORT
 #include <d3dcompiler.h>
 #endif
 
@@ -418,6 +418,9 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 //
 /* static */Result D3DUtil::compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName, ComPtr<ID3DBlob>& shaderBlobOut)
 {
+#if !SLANG_ENABLE_DXBC_SUPPORT
+    return SLANG_E_NOT_IMPLEMENTED;
+#else
     // Rather than statically link against the `d3dcompile` library, we
     // dynamically load it.
     //
@@ -425,21 +428,23 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     // shader bytecode as part of an offline process, rather than doing it
     // on-the-fly like this
     //
-#if !SLANG_ENABLE_FXC
-    return SLANG_E_NOT_IMPLEMENTED;
-#else
     static pD3DCompile compileFunc = nullptr;
     if (!compileFunc)
     {
+        // On Linux, vkd3d-utils isn't suitable as a unix replacement for fxc
+        // due to at least the following missing feature:
+        // https://bugs.winehq.org/show_bug.cgi?id=54872
+
         // TODO(tfoley): maybe want to search for one of a few versions of the DLL
-        HMODULE compilerModule = LoadLibraryA("d3dcompiler_47.dll");
-        if (!compilerModule)
+        const char* const libName = "d3dcompiler_47";
+        SharedLibrary::Handle compilerModule;
+        if (SLANG_FAILED(SharedLibrary::load(libName, compilerModule)))
         {
-            fprintf(stderr, "error: failed load 'd3dcompiler_47.dll'\n");
+            fprintf(stderr, "error: failed to load '%s'\n", libName);
             return SLANG_FAIL;
         }
 
-        compileFunc = (pD3DCompile)GetProcAddress(compilerModule, "D3DCompile");
+        compileFunc = (pD3DCompile)SharedLibrary::findSymbolAddressByName(compilerModule, "D3DCompile");
         if (!compileFunc)
         {
             fprintf(stderr, "error: failed load symbol 'D3DCompile'\n");
@@ -475,28 +480,27 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     {
         ::fputs((const char*)errorBlob->GetBufferPointer(), stderr);
         ::fflush(stderr);
+#if SLANG_WINDOWS_FAMILY
         ::OutputDebugStringA((const char*)errorBlob->GetBufferPointer());
+#endif
     }
 
     SLANG_RETURN_ON_FAIL(hr);
     shaderBlobOut.swap(shaderBlob);
     return SLANG_OK;
-#endif // SLANG_ENABLE_FXC
+#endif // SLANG_ENABLE_DXBC_SUPPORT
 }
 
 /* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
 {
-#if SLANG_ENABLE_DXVK
-    const char* const libPath = "dxvk_dxgi";
-#else
-    const char* const libPath = "dxgi";
-#endif
+    const char* const libName = SLANG_ENABLE_DXVK ? "dxvk_dxgi" : "dxgi";
+
     static SharedLibrary::Handle s_dxgiModule = [&](){
         SharedLibrary::Handle h = nullptr;
-        SharedLibrary::load(libPath, h);
+        SharedLibrary::load(libName, h);
         if (!h)
         {
-            fprintf(stderr, "error: failed to load dll '%s'\n", libPath);
+            fprintf(stderr, "error: failed to load dll '%s'\n", libName);
         }
         return h;
     }();
@@ -512,7 +516,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 
     typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY)(REFIID riid, void   **ppFactory);
-    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
+    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, void **ppFactory);
 
     {
         auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory2");

@@ -1277,7 +1277,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         StringBuilder builder;
         toText(builder);
-        return builder;
+        return std::move(builder);
     }
 
     // Prints a partially qualified type name with generic substitutions.
@@ -1411,6 +1411,17 @@ Decl* getParentDecl(Decl* decl)
     while (as<GenericDecl>(decl))
         decl = decl->parentDecl;
     return decl;
+}
+
+Decl* getParentFunc(Decl* decl)
+{
+    while (decl)
+    {
+        if (as<FunctionDeclBase>(decl))
+            return decl;
+        decl = decl->parentDecl;
+    }
+    return nullptr;
 }
 
 static const ImageFormatInfo kImageFormatInfos[] =

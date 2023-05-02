@@ -85,7 +85,14 @@ public:
     Index getSlicesCount() const { return m_slices.getCount(); }
 
         /// Returns true if the handle is a default one. Only meaningful on a Style::Default.
-    bool isDefaultHandle(Handle handle) const { SLANG_ASSERT(m_style == Style::Default && Index(handle) >= 0); return Index(handle) < kDefaultHandlesCount; }
+    bool isDefaultHandle(Handle handle) const
+    {
+        SLANG_ASSERT(
+            m_style == Style::Default &&
+            // TODO(C++20), use bit_cast here
+            HandleIntegral(handle) <= HandleIntegral(std::numeric_limits<Index>::max()));
+        return Index(handle) < kDefaultHandlesCount;
+    }
 
         /// Convert a handle to and index. (A handle is just an index!) 
     static Index asIndex(Handle handle) { return Index(handle); }

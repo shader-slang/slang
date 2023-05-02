@@ -1473,7 +1473,20 @@ struct SPIRVEmitContext
         //
         for( auto irBlock : irFunc->getBlocks() )
         {
-            emitInst(spvFunc, irBlock, SpvOpLabel, kResultID);
+            auto spvBlock = emitInst(spvFunc, irBlock, SpvOpLabel, kResultID);
+            if (irBlock == irFunc->getFirstBlock())
+            {
+                // OpVariable
+                // All variables used in the function must be declared before anything else.
+                for (auto block : irFunc->getBlocks())
+                {
+                    for (auto inst : block->getChildren())
+                    {
+                        if (as<IRVar>(inst))
+                            emitLocalInst(spvBlock, inst);
+                    }
+                }
+            }
 
             // In addition to normal basic blocks,
             // all loops gets a header block.
@@ -1517,6 +1530,9 @@ struct SPIRVEmitContext
                 // Any instructions local to the block will be emitted as children
                 // of the block.
                 //
+                // Skip vars because they are already emitted.
+                if (as<IRVar>(irInst))
+                    continue;
                 emitLocalInst(spvBlock, irInst);
                 if (irInst->getOp() == kIROp_loop)
                     pendingLoopInsts.add(as<IRLoop>(irInst));
@@ -2281,6 +2297,7 @@ struct SPIRVEmitContext
                     element1,
                     element2);
             }
+            break;
         case SpvSnippet::ASMType::Int:
             result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
             break;
@@ -2359,7 +2376,7 @@ struct SPIRVEmitContext
                     emitOperand(kResultID);
                     break;
                 case SpvSnippet::ASMOperandType::ResultTypeId:
-                    if (operand.content != -1)
+                    if (operand.content != 0xFFFFFFFF)
                     {
                         emitOperand(context.qualifiedResultTypes[(SpvStorageClass)operand.content]
                                         .getValue());
@@ -2731,7 +2748,7 @@ struct SPIRVEmitContext
         {
             elementType = vectorType->getElementType();
         }
-        else if (auto matrixType = as<IRMatrixType>(inst->getDataType()))
+        else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             //TODO: implement.
             SLANG_ASSERT(!"unimplemented: matrix arithemetic");

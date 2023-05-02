@@ -189,7 +189,7 @@ namespace Slang
         // "dummy" entry points we create for pass-through
         // compilation will not have an associated module.
         //
-        if( auto module = getModule() )
+        if( const auto module = getModule() )
         {
             return 1;
         }
@@ -241,7 +241,7 @@ namespace Slang
 
     List<SourceFile*> const& EntryPoint::getFileDependencies()
     {
-        if(auto module = getModule())
+        if(const auto module = getModule())
             return getModule()->getFileDependencies();
         
         static List<SourceFile*> empty;
@@ -372,13 +372,9 @@ namespace Slang
         }
     }
 
-    static const struct
+    static const StageInfo kStages[] = 
     {
-        char const* name;
-        Stage       stage;
-    } kStages[] =
-    {
-    #define PROFILE_STAGE(ID, NAME, ENUM) \
+        #define PROFILE_STAGE(ID, NAME, ENUM) \
             { #NAME,    Stage::ID },
 
         #define PROFILE_STAGE_ALIAS(ID, NAME, VAL) \
@@ -386,6 +382,11 @@ namespace Slang
 
         #include "slang-profile-defs.h"
     };
+
+    ConstArrayView<StageInfo> getStageInfos()
+    {
+        return makeConstArrayView(kStages);
+    }
 
     Stage findStageByName(String const& name)
     {
@@ -850,7 +851,7 @@ namespace Slang
                 {
                     builder << ";" << _getDisplayPath(sink, sourceFiles[i]);
                 }
-                return builder;
+                return std::move(builder);
             }
         }
     }
@@ -1527,7 +1528,7 @@ namespace Slang
                     SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, outArtifact));
                     return SLANG_OK;
                 }
-                /* fall through to: */
+                [[fallthrough]];
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::PTX:

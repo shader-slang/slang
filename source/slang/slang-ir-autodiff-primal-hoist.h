@@ -236,6 +236,34 @@ namespace Slang
         Dictionary<IRInst*, InversionInfo> invInfoMap;
     };
 
+    struct UseOrPseudoUse
+    {
+        IRUse* irUse = nullptr;
+        IRInst* user;
+        IRInst* usedVal;
+        UseOrPseudoUse() = default;
+        UseOrPseudoUse(IRUse* use)
+        {
+            user = use->getUser();
+            usedVal = use->get();
+            irUse = use;
+        }
+        UseOrPseudoUse(IRInst* inUser, IRInst* inUsedVal)
+        {
+            irUse = nullptr;
+            user = inUser;
+            usedVal = inUsedVal;;
+        }
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(user), Slang::getHashCode(usedVal));
+        }
+        bool operator==(const UseOrPseudoUse& other) const
+        {
+            return user == other.user && usedVal == other.usedVal;
+        }
+    };
+
     // Information on a block after it has been split in the unzip step.
     // After unzipping, every block in the original function will have
     // two corresponding blocks in the new function:
@@ -269,7 +297,7 @@ namespace Slang
         // 
         virtual void preparePolicy(IRGlobalValueWithCode* func) = 0;
 
-        virtual HoistResult classify(IRUse* diffBlockUse) = 0;
+        virtual HoistResult classify(UseOrPseudoUse diffBlockUse) = 0;
 
      protected:
 
@@ -285,7 +313,7 @@ namespace Slang
         { }
 
         virtual void preparePolicy(IRGlobalValueWithCode* func);
-        virtual HoistResult classify(IRUse* use);
+        virtual HoistResult classify(UseOrPseudoUse use);
     };
 
     RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func);

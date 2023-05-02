@@ -367,7 +367,7 @@ namespace Slang
             if (outLength)
                 *outLength = length;
 
-            for(int ii = 0; ii < sizeof(wchar_t); ++ii)
+            for(size_t ii = 0; ii < sizeof(wchar_t); ++ii)
                 buf.add(0);
 
             wchar_t* beginData = (wchar_t*)buf.getBuffer();

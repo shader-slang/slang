@@ -409,7 +409,7 @@ struct SpecializationContext
                         decor->getOp() == kIROp_UserDefinedBackwardDerivativeDecoration)
                     {
                         // If we already have a diff func on this specialize, skip.
-                        if (auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
+                        if (const auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
                         {
                             continue;
                         }
@@ -1051,7 +1051,7 @@ struct SpecializationContext
                     // A subscript operation on mutable buffers returns a ptr type instead of a value type.
                     // We need to make sure the pointer-ness is preserved correctly.
                     auto innerResultType = elementType;
-                    if (auto ptrResultType = as<IRPtrType>(inst->getDataType()))
+                    if (const auto ptrResultType = as<IRPtrType>(inst->getDataType()))
                     {
                         innerResultType = builder.getPtrType(elementType);
                     }
@@ -2346,23 +2346,42 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module)
 {
-    for (auto inst : module->getModuleInst()->getChildren())
+    // Go through all the top-level children of module's module inst,
+    // and remove any specialization dictionary insts.
+    //
+
+    auto moduleInst = module->getModuleInst();
+    IRInst* next = nullptr;
+    for(auto inst = moduleInst->getFirstChild(); inst; inst = next)
     {
-        for (auto decor = inst->getFirstDecoration(); decor; )
+        next = inst->getNextInst();
+
+        switch(inst->getOp())
         {
-            auto next = decor->getNextDecoration();
-            switch (decor->getOp())
+        default:
+            break;
+
+        case kIROp_StructKey:
+            for (auto decor = inst->getFirstDecoration(); decor; )
             {
-            case kIROp_ExistentialFuncSpecializationDictionary:
-            case kIROp_ExistentialTypeSpecializationDictionary:
-            case kIROp_GenericSpecializationDictionary:
-            case kIROp_DispatchFuncDecoration:
-                decor->removeAndDeallocate();
-                break;
-            default:
-                break;
+                auto nextDecor = decor->getNextDecoration();
+                switch (decor->getOp())
+                {
+                case kIROp_DispatchFuncDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                default:
+                    break;
+                }
+                decor = nextDecor;
             }
-            decor = next;
+            break;
+
+        case kIROp_ExistentialFuncSpecializationDictionary:
+        case kIROp_ExistentialTypeSpecializationDictionary:
+        case kIROp_GenericSpecializationDictionary:
+            inst->removeAndDeallocate();
+            break;
         }
     }
 }

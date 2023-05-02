@@ -35,7 +35,7 @@ String Val::toString()
 {
     StringBuilder builder;
     toText(builder);
-    return builder;
+    return std::move(builder);
 }
 
 HashCode Val::getHashCode()
@@ -159,11 +159,11 @@ Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet
                 (*ioDiff)++;
                 return genSubst->getArgs()[argIndex];
             }
-            else if (auto typeParam = as<GenericTypeParamDecl>(m))
+            else if (const auto typeParam = as<GenericTypeParamDecl>(m))
             {
                 argIndex++;
             }
-            else if (auto valParam = as<GenericValueParamDecl>(m))
+            else if (const auto valParam = as<GenericValueParamDecl>(m))
             {
                 argIndex++;
             }
@@ -190,11 +190,7 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
 
 bool ErrorIntVal::_equalsValOverride(Val* val)
 {
-    if (auto errorIntVal = as<ErrorIntVal>(val))
-    {
-        return true;
-    }
-    return false;
+    return as<ErrorIntVal>(val);
 }
 
 void ErrorIntVal::_toTextOverride(StringBuilder& out)
@@ -538,7 +534,7 @@ Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBu
     (*ioDiff)++;
 
     ExtractExistentialSubtypeWitness* substValue = astBuilder->create<ExtractExistentialSubtypeWitness>();
-    substValue->declRef = declRef;
+    substValue->declRef = substDeclRef;
     substValue->sub = substSub;
     substValue->sup = substSup;
     return substValue;
@@ -1077,7 +1073,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
     }
     else if (auto val0 = as<IntVal>(op0))
     {
-        if (auto poly1 = as<PolynomialIntVal>(op1))
+        if (const auto poly1 = as<PolynomialIntVal>(op1))
         {
             return mul(astBuilder, op1, op0);
         }

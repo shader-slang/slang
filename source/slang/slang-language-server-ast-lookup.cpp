@@ -182,7 +182,7 @@ public:
             if (expr->declRef.getDecl()->hasModifier<ImplicitConversionModifier>())
                 return false;
             Int declLength = 0;
-            if (auto ctorDecl = as<ConstructorDecl>(expr->declRef.getDecl()))
+            if (const auto ctorDecl = as<ConstructorDecl>(expr->declRef.getDecl()))
             {
                 auto humaneLoc = context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
                 declLength = context->doc->getTokenLength(humaneLoc.line, humaneLoc.column);
@@ -653,12 +653,18 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                     context.results.add(result);
                     return true;
                 }
+                for (auto arg : attribute->args)
+                {
+                    ASTLookupExprVisitor exprVisitor(&context);
+                    if (exprVisitor.dispatchIfNotNull(arg))
+                        return true;
+                }
             }
         }
         if (auto container = as<ContainerDecl>(node))
         {
             bool shouldInspectChildren = true;
-            if (auto genericDecl = as<GenericDecl>(node))
+            if (const auto genericDecl = as<GenericDecl>(node))
             {}
             else if (container->closingSourceLoc.getRaw() >= container->loc.getRaw())
             {

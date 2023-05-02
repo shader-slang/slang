@@ -1654,7 +1654,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         case kIROp_Not:
         {
             IRInst* operand = inst->getOperand(0);
-            if (auto vectorType = as<IRVectorType>(operand->getDataType()))
+            if (const auto vectorType = as<IRVectorType>(operand->getDataType()))
             {
                 EmitOpInfo outerPrec = inOuterPrec;
                 bool needClose = false;
@@ -1719,7 +1719,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 auto prec = getInfo(EmitOp::Postfix);
 
                 EmitOpInfo outerPrec = inOuterPrec;
-                bool needClose = maybeEmitParens(outerPrec, outerPrec);
+                bool needClose = maybeEmitParens(outerPrec, prec);
 
                 m_writer->emit(funcName);
                 m_writer->emit("(");
@@ -1745,7 +1745,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto prec = getInfo(EmitOp::Postfix);
 
             EmitOpInfo outerPrec = inOuterPrec;
-            bool needClose = maybeEmitParens(outerPrec, outerPrec);
+            bool needClose = maybeEmitParens(outerPrec, prec);
 
             // TODO: the GLSL `mod` function amounts to a floating-point
             // modulus rather than a floating-point remainder. We need
@@ -2175,7 +2175,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitGLSLTextureOrTextureSamplerType(imageType, "image");
         return;
     }
-    else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
         // TODO: We desugar global variables with structured-buffer type into GLSL
         // `buffer` declarations, but we don't currently handle structured-buffer types

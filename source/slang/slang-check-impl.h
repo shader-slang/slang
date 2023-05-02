@@ -1574,8 +1574,8 @@ namespace Slang
 
         struct ParamCounts
         {
-            UInt required;
-            UInt allowed;
+            Count required;
+            Count allowed;
         };
 
         // count the number of parameters required/allowed for a callable

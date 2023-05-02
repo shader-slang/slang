@@ -2,7 +2,7 @@
 range: 6,20 - 6,25
 content:
 ```
-int index
+(parameter) int index
 ```
 
 
