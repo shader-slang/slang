@@ -1940,6 +1940,7 @@ SlangResult OptionsParser::_parse(
                 
                 if (m_reader.hasArg() && m_reader.peekArg().value == toSlice("all"))
                 {
+                    m_reader.advance();
                     m_vulkanShiftOptions.setAllShift(kind, shift);
                 }
                 else
