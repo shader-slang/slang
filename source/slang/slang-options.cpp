@@ -700,15 +700,15 @@ struct OptionsParser
     static bool _passThroughRequiresStage(PassThroughMode passThrough);
 
 
-    static SlangResult _compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir, DiagnosticSink* sink);
+    SlangResult _compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir);
 
         // Pass Severity::Disabled to allow any original severity
-    SlangResult _overrideDiagnostics(const UnownedStringSlice& identifierList, Severity originalSeverity, Severity overrideSeverity, DiagnosticSink* sink);
+    SlangResult _overrideDiagnostics(const UnownedStringSlice& identifierList, Severity originalSeverity, Severity overrideSeverity);
 
         // Pass Severity::Disabled to allow any original severity
-    SlangResult _overrideDiagnostic(const UnownedStringSlice& identifier, Severity originalSeverity, Severity overrideSeverity, DiagnosticSink* sink);
+    SlangResult _overrideDiagnostic(const UnownedStringSlice& identifier, Severity originalSeverity, Severity overrideSeverity);
 
-    SlangResult _dumpDiagnostics(Severity originalSeverity, DiagnosticSink* sink);
+    SlangResult _dumpDiagnostics(Severity originalSeverity);
 
     template <typename T>
     SlangResult _getValue(const CommandLineArg& arg, const UnownedStringSlice& name, T& ioValue)
@@ -737,7 +737,7 @@ struct OptionsParser
 
     void _appendUsageTitle(StringBuilder& out);
     void _appendMinimalUsage(StringBuilder& out);
-    void _outputMinimalUsage(DiagnosticSink* sink);
+    void _outputMinimalUsage();
 
     SlangResult _parseReferenceModule(const CommandLineArg& arg);
     SlangResult _parseReproFileSystem(const CommandLineArg& arg);
@@ -1072,7 +1072,7 @@ void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode
     }
 }
 
-/* static */SlangResult OptionsParser::_compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir, DiagnosticSink* sink)
+/* static */SlangResult OptionsParser::_compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir)
 {
     auto stdOut = originalRequest->getWriter(WriterChannel::StdOutput);
 
@@ -1089,7 +1089,7 @@ void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode
         auto requestImpl = asInternal(request);
 
         List<uint8_t> buffer;
-        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, sink, buffer));
+        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, m_sink, buffer));
 
         auto requestState = ReproUtil::getRequest(buffer);
         MemoryOffsetBase base;
@@ -1146,19 +1146,19 @@ void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode
     return SLANG_OK;
 }
 
-SlangResult OptionsParser::_overrideDiagnostics(const UnownedStringSlice& identifierList, Severity originalSeverity, Severity overrideSeverity, DiagnosticSink* sink)
+SlangResult OptionsParser::_overrideDiagnostics(const UnownedStringSlice& identifierList, Severity originalSeverity, Severity overrideSeverity)
 {
     List<UnownedStringSlice> slices;
     StringUtil::split(identifierList, ',', slices);
 
     for (const auto& slice : slices)
     {
-        SLANG_RETURN_ON_FAIL(_overrideDiagnostic(slice, originalSeverity, overrideSeverity, sink));
+        SLANG_RETURN_ON_FAIL(_overrideDiagnostic(slice, originalSeverity, overrideSeverity));
     }
     return SLANG_OK;
 }
 
-SlangResult OptionsParser::_overrideDiagnostic(const UnownedStringSlice& identifier, Severity originalSeverity, Severity overrideSeverity, DiagnosticSink* sink)
+SlangResult OptionsParser::_overrideDiagnostic(const UnownedStringSlice& identifier, Severity originalSeverity, Severity overrideSeverity)
 {
     auto diagnosticsLookup = getDiagnosticsLookup();
 
@@ -1170,7 +1170,7 @@ SlangResult OptionsParser::_overrideDiagnostic(const UnownedStringSlice& identif
     {
         if (SLANG_FAILED(StringUtil::parseInt(identifier, diagnosticId)))
         {
-            sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+            m_sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
             return SLANG_FAIL;
         }
 
@@ -1185,7 +1185,7 @@ SlangResult OptionsParser::_overrideDiagnostic(const UnownedStringSlice& identif
         diagnostic = diagnosticsLookup->findDiagnosticByName(identifier);
         if (!diagnostic)
         {
-            sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+            m_sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
             return SLANG_FAIL;
         }
         diagnosticId = diagnostic->id;
@@ -1197,7 +1197,7 @@ SlangResult OptionsParser::_overrideDiagnostic(const UnownedStringSlice& identif
         // Strictly speaking the diagnostic name is known, but it's not the right severity
         // to be converted from, so it is an 'unknown name' in the context of severity...
         // Or perhaps we want another diagnostic
-        sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+        m_sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
         return SLANG_FAIL;
     }
 
@@ -1207,7 +1207,7 @@ SlangResult OptionsParser::_overrideDiagnostic(const UnownedStringSlice& identif
     return SLANG_OK;
 }
 
-SlangResult OptionsParser::_dumpDiagnostics(Severity originalSeverity, DiagnosticSink* sink)
+SlangResult OptionsParser::_dumpDiagnostics(Severity originalSeverity)
 {
     // Get the diagnostics and dump them
     auto diagnosticsLookup = getDiagnosticsLookup();
@@ -1227,7 +1227,7 @@ SlangResult OptionsParser::_dumpDiagnostics(Severity originalSeverity, Diagnosti
         buf << diagnostic->id << " : ";
         NameConventionUtil::convert(NameStyle::Camel, UnownedStringSlice(diagnostic->name), NameConvention::LowerKabab, buf);
         buf << "\n";
-        sink->diagnoseRaw(Severity::Note, buf.getUnownedSlice());
+        m_sink->diagnoseRaw(Severity::Note, buf.getUnownedSlice());
     }
 
     return SLANG_OK;
@@ -1238,13 +1238,13 @@ void OptionsParser::_appendUsageTitle(StringBuilder& out)
     out << "Usage: slangc [options...] [--] <input files>\n\n";
 }
 
-void OptionsParser::_outputMinimalUsage(DiagnosticSink* sink)
+void OptionsParser::_outputMinimalUsage()
 {
     // Output usage info
     StringBuilder buf;
     _appendMinimalUsage(buf);
 
-    sink->diagnoseRaw(Severity::Note, buf.getUnownedSlice());
+    m_sink->diagnoseRaw(Severity::Note, buf.getUnownedSlice());
 }
 
 void OptionsParser::_appendMinimalUsage(StringBuilder& out)
@@ -1710,7 +1710,7 @@ SlangResult OptionsParser::_parse(
         if (optionIndex < 0)
         {
             m_sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
-            _outputMinimalUsage(m_sink);
+            _outputMinimalUsage();
             return SLANG_FAIL;
         }
 
@@ -1826,7 +1826,7 @@ SlangResult OptionsParser::_parse(
                 CommandLineArg reproDirectory;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(reproDirectory));
 
-                SLANG_RETURN_ON_FAIL(_compileReproDirectory(m_session, m_requestImpl, reproDirectory.value, m_sink));
+                SLANG_RETURN_ON_FAIL(_compileReproDirectory(m_session, m_requestImpl, reproDirectory.value));
                 break;
             }
             case OptionKind::ReproFileSystem: SLANG_RETURN_ON_FAIL(_parseReproFileSystem(arg)); break;
@@ -1835,7 +1835,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::DisableDynamicDispatch: m_requestImpl->disableDynamicDispatch = true; break;
             case OptionKind::TrackLiveness: m_requestImpl->setTrackLiveness(true); break;
             case OptionKind::VerbosePaths: m_requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath); break;
-            case OptionKind::DumpWarningDiagnostics: _dumpDiagnostics(Severity::Warning, m_sink); break;
+            case OptionKind::DumpWarningDiagnostics: _dumpDiagnostics(Severity::Warning); break;
             case OptionKind::WarningsAsErrors:
             {
                 CommandLineArg operand;
@@ -1849,7 +1849,7 @@ SlangResult OptionsParser::_parse(
                 }
                 else
                 {
-                    SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Error, m_sink));
+                    SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Error));
                 }
                 break;
             }
@@ -1857,14 +1857,14 @@ SlangResult OptionsParser::_parse(
             {
                 CommandLineArg operand;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
-                SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Disable, m_sink));
+                SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Disable));
                 break;
             }
             case OptionKind::DisableWarning:
             {
                 // 5 because -Wno-
                 auto name = argValue.getUnownedSlice().tail(5);
-                SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Disable, m_sink));
+                SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Disable));
                 break;
             }
             case OptionKind::EnableWarning:
@@ -1872,7 +1872,7 @@ SlangResult OptionsParser::_parse(
                 // 2 because -W
                 auto name = argValue.getUnownedSlice().tail(2);
                 // Enable the warning
-                SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning, m_sink));
+                SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning));
                 break;
             }
             case OptionKind::VerifyDebugSerialIr: m_frontEndReq->verifyDebugSerialization = true; break;
