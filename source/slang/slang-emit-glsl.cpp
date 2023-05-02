@@ -339,16 +339,25 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     m_writer->emit("_S");
     m_writer->emit(m_uniqueIDCounter++);
 
-    m_writer->emit("\n{\n");
-    m_writer->indent();
 
     auto elementType = type->getElementType();
-
-    emitType(elementType, "_data");
-    m_writer->emit(";\n");
-
-    m_writer->dedent();
-    m_writer->emit("} ");
+    auto structType = as<IRStructType>(elementType);
+    if (as<IRConstantBufferType>(type) && structType)
+    {
+        // We need to emit the fields of the struct as individual variables
+        // in the constant buffer.
+        //
+        emitStructDeclarationsBlock(structType, true);
+    }
+    else
+    {
+        m_writer->emit("\n{\n");
+        m_writer->indent();
+        emitType(elementType, "_data");
+        m_writer->emit(";\n");
+        m_writer->dedent();
+        m_writer->emit("} ");
+    }
 
     m_writer->emit(getName(varDecl));
 
@@ -554,7 +563,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
             // things by introducing padding into the declaration
             // (padding insertion would probably be best done at
             // the IR level).
-            bool useExplicitOffsets = false;
+            bool useExplicitOffsets = getTargetReq()->getGLSLUseExplictOffsets();
             if (useExplicitOffsets)
             {
                 _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_enhanced_layouts"));
@@ -794,7 +803,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         m_writer->emit("out");
         m_writer->emit(" ");
         m_writer->emit(elementTypeName);
-        emitStructDeclarationsBlock(elementType);
+        emitStructDeclarationsBlock(elementType, false);
         m_writer->emit(" ");
         m_writer->emit(name);
         emitArrayBrackets(arrayType);
@@ -1157,7 +1166,7 @@ void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* pa
     //
     _emitType(type, &arrayDeclarator);
 
-    emitSemantics(param);
+    emitSemantics(param, false);
 
     emitLayoutSemantics(param);
 
@@ -2370,6 +2379,17 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
             _maybeEmitGLSLFlatModifier(valueType);
         }
     }
+}
+
+void GLSLSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueType, IRPackOffsetDecoration* decoration)
+{
+    SLANG_UNUSED(varInst);
+    SLANG_UNUSED(valueType);
+
+    _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_enhanced_layouts"));
+    m_writer->emit("layout(offset = ");
+    m_writer->emit(decoration->getRegisterOffset()->getValue() * 16 + decoration->getComponentOffset()->getValue() * 4);
+    m_writer->emit(")\n");
 }
 
 void GLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)

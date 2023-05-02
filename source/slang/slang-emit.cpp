@@ -54,6 +54,7 @@
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
+#include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-pytorch-cpp-binding.h"
@@ -845,6 +846,11 @@ Result linkAndOptimizeIR(
     // If any have survived this far, change them back to regular (decorated)
     // arrays that the emitters can deal with.
     legalizeMeshOutputTypes(irModule);
+
+    if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
+    {
+        legalizeUniformBufferLoad(irModule);
+    }
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.

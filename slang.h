@@ -1542,6 +1542,12 @@ extern "C"
         int targetIndex,
         bool forceScalarLayout);
 
+    /*! @see slang::ICompileRequest::setTargetGLSLUseExplicitOffsets */
+    SLANG_API void spSetTargetGLSLUseExplicitOffsets(
+        slang::ICompileRequest* request,
+        int targetIndex,
+        bool useExplicitOffsets);
+
     /*! @see slang::ICompileRequest::setCodeGenTarget */
     SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
@@ -4122,6 +4128,11 @@ namespace slang
 
             /** Set the debug format to be used for debugging information */
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat debugFormat) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGLSLUseExplicitOffsets(int targetIndex, bool useExplicitOffsets) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setEnableEffectAnnotations(bool value) = 0;
+
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
@@ -4156,6 +4167,10 @@ namespace slang
             /** Whether to force `scalar` layout for glsl shader storage buffers.
             */
         bool forceGLSLScalarBufferLayout = false;
+
+            /** Whether to use explicit offsets for glsl shader storage buffers.
+            */
+        bool glslUseExplicitOffsets = false;
     };
 
     typedef uint32_t SessionFlags;
@@ -4208,6 +4223,8 @@ namespace slang
         SlangInt                        preprocessorMacroCount = 0;
 
         ISlangFileSystem* fileSystem = nullptr;
+
+        bool enableEffectAnnotations = false;
     };
 
     enum class ContainerType

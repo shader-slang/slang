@@ -292,6 +292,7 @@ public:
     void emitType(IRType* type);
     void emitType(IRType* type, Name* name, SourceLoc const& nameLoc);
     void emitType(IRType* type, NameLoc const& nameAndLoc);
+    bool hasExplicitConstantBufferOffset(IRInst* cbufferType);
 
     //
     // Expressions
@@ -363,7 +364,7 @@ public:
     void diagnoseUnhandledInst(IRInst* inst);
     void emitInst(IRInst* inst);
 
-    void emitSemantics(IRInst* inst);
+    void emitSemantics(IRInst* inst, bool allowOffsets = false);
     void emitSemanticsUsingVarLayout(IRVarLayout* varLayout);
 
     void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
@@ -405,7 +406,7 @@ public:
     void emitStruct(IRStructType* structType);
     // This is used independently of `emitStruct` by some GLSL parameter group
     // output functionality
-    void emitStructDeclarationsBlock(IRStructType* structType);
+    void emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout);
     void emitClass(IRClassType* structType);
 
         /// Emit type attributes that should appear after, e.g., a `struct` keyword
@@ -413,7 +414,7 @@ public:
 
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshOutputModifiers(IRInst* varInst);
-
+    virtual void emitPackOffsetModifier(IRInst* /*varInst*/, IRType* /*valueType*/, IRPackOffsetDecoration* /*decoration*/) {};
     
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
@@ -494,10 +495,11 @@ public:
     virtual void emitPreModuleImpl() {}
 
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
-    virtual void emitSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
+    virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) { SLANG_UNUSED(inst); SLANG_UNUSED(allowOffsetLayout); }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitSimpleFuncParamsImpl(IRFunc* func);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
+
     virtual void emitMeshOutputModifiersImpl(IRInst* varInst) { SLANG_UNUSED(varInst) }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }

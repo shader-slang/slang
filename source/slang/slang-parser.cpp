@@ -77,6 +77,11 @@ namespace Slang
         Postfix,
     };
 
+    struct ParserOptions
+    {
+        bool enableEffectAnnotations = false;
+    };
+
     // TODO: implement two pass parsing for file reference and struct type recognition
 
     class Parser
@@ -103,6 +108,7 @@ namespace Slang
         TokenReader tokenReader;
         DiagnosticSink* sink;
         SourceLoc lastErrorLoc;
+        ParserOptions options;
 
         int genericDepth = 0;
 
@@ -150,11 +156,13 @@ namespace Slang
             ASTBuilder* inAstBuilder,
             TokenSpan const& _tokens,
             DiagnosticSink * sink,
-            Scope*           outerScope)
+            Scope*           outerScope,
+            ParserOptions    inOptions)
             : tokenReader(_tokens)
             , astBuilder(inAstBuilder)
             , sink(sink)
             , outerScope(outerScope)
+            , options(inOptions)
         {}
         Parser(const Parser & other) = default;
 
@@ -1750,6 +1758,51 @@ namespace Slang
             case TokenType::LParent:
                 break;
 
+            case TokenType::OpLess:
+                {
+                    if (parser->options.enableEffectAnnotations)
+                    {
+                        // If we are in a context where effect annotations are allowed,
+                        // then we need to disambiguate the content after "<" to see if it
+                        // should be parsed as an annotation or generic argument list.
+                        // If we can determine the content inside a `<>` is an annotation,
+                        // we will skip the tokens inside the angle brackets.
+                        //
+                        if (parser->tokenReader.peekTokenType() == TokenType::OpLess)
+                        {
+                            if (parser->LookAheadToken("let", 1))
+                            {
+                                // If we see `<let` then we are looking at a generic arg list.
+                            }
+                            else if (parser->LookAheadToken(":", 2))
+                            {
+                                // If we see a "< xxx :", we can also parse it as a generic arg list.
+                            }
+                            else
+                            {
+                                // Otherwise, we may be looking at an effect annotation.
+                                // For now we just skip tokens until we see `>`, if we see any `"` in between,
+                                // we can conclude that this is an annocation.
+                                TokenReader tempReader = parser->tokenReader;
+                                bool foundSemicolon = false;
+                                while (tempReader.peekTokenType() != TokenType::OpGreater &&
+                                    tempReader.peekTokenType() != TokenType::EndOfFile)
+                                {
+                                    if (tempReader.peekTokenType() == TokenType::Semicolon)
+                                        foundSemicolon = true;
+                                    tempReader.advanceToken();
+                                }
+                                if (foundSemicolon)
+                                {
+                                    parser->tokenReader = tempReader;
+                                    parser->ReadToken(TokenType::OpGreater);
+                                }
+                            }
+                        }
+                    }
+
+                }
+                break;
             default:
                 break;
             }
@@ -2570,7 +2623,6 @@ namespace Slang
             && !initDeclarator.initializer
             && !initDeclarator.semantics.first)
         {
-            // Looks like a function, so parse it like one.
             UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
             return parseTraditionalFuncDecl(parser, declaratorInfo);
         }
@@ -2714,8 +2766,6 @@ namespace Slang
         parseHLSLRegisterNameAndOptionalComponentMask(parser, semantic);
 
         parser->ReadToken(TokenType::RParent);
-
-        parser->sink->diagnose(semantic, Diagnostics::packOffsetNotSupported);
     }
 
     static RayPayloadAccessSemantic* _parseRayPayloadAccessSemantic(Parser* parser, RayPayloadAccessSemantic* semantic)
@@ -6155,7 +6205,7 @@ namespace Slang
         NamePool*                       namePool,
         SourceLanguage                  sourceLanguage)
     {
-        Parser parser(astBuilder, tokens, sink, outerScope);
+        Parser parser(astBuilder, tokens, sink, outerScope, ParserOptions{});
         parser.currentScope = outerScope;
         parser.namePool = namePool;
         parser.sourceLanguage = sourceLanguage;
@@ -6170,7 +6220,10 @@ namespace Slang
         DiagnosticSink*                 sink,
         Scope*                          outerScope)
     {
-        Parser parser(astBuilder, tokens, sink, outerScope);
+        ParserOptions options = {};
+        options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
+
+        Parser parser(astBuilder, tokens, sink, outerScope, options);
         parser.namePool = translationUnit->getNamePool();
         parser.sourceLanguage = translationUnit->sourceLanguage;
 

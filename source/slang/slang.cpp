@@ -608,6 +608,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     {
         linkage->setFileSystem(desc.fileSystem);
     }
+
+    if (desc.structureSize >= offsetof(slang::SessionDesc, enableEffectAnnotations))
+    {
+        linkage->setEnableEffectAnnotations(desc.enableEffectAnnotations);
+    }
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
@@ -983,6 +989,9 @@ void Linkage::addTarget(
     target->setTargetProfile(Profile(desc.profile));
     target->setLineDirectiveMode(LineDirectiveMode(desc.lineDirectiveMode));
     target->setForceGLSLScalarBufferLayout(desc.forceGLSLScalarBufferLayout);
+    
+    if (desc.structureSize > offsetof(slang::TargetDesc, glslUseExplicitOffsets))
+        target->setForceGLSLScalarBufferLayout(desc.glslUseExplicitOffsets);
 }
 
 #if 0
@@ -4682,6 +4691,12 @@ void EndToEndCompileRequest::setTargetForceGLSLScalarBufferLayout(int targetInde
     getLinkage()->targets[targetIndex]->setForceGLSLScalarBufferLayout(value);
 }
 
+void EndToEndCompileRequest::setTargetGLSLUseExplicitOffsets(int targetIndex, bool useExplicitOffsets)
+{
+    getLinkage()->targets[targetIndex]->setGLSLUseExplicitOffsets(useExplicitOffsets);
+}
+
+
 void EndToEndCompileRequest::setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode  mode)
 {
     getLinkage()->targets[targetIndex]->setFloatingPointMode(FloatingPointMode(mode));
@@ -4802,6 +4817,11 @@ void EndToEndCompileRequest::addSearchPath(const char* path)
 void EndToEndCompileRequest::addPreprocessorDefine(const char* key, const char* value)
 {
     getLinkage()->addPreprocessorDefine(key, value);
+}
+
+void EndToEndCompileRequest::setEnableEffectAnnotations(bool value)
+{
+    getLinkage()->setEnableEffectAnnotations(value);
 }
 
 char const* EndToEndCompileRequest::getDiagnosticOutput()

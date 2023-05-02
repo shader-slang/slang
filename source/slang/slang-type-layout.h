@@ -1138,6 +1138,10 @@ public:
         DeclRef<VarDeclBase>    field,
         TypeLayoutResult        fieldResult);
 
+    RefPtr<VarLayout> addExplicitUniformField(
+        DeclRef<VarDeclBase>    field,
+        TypeLayoutResult        fieldResult);
+
         /// Add a field to the struct type layout.
         ///
         /// One of the `beginLayout*()` functions must have been called previously.

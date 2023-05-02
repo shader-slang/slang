@@ -918,6 +918,40 @@ namespace Slang
                 // See SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute.
             }
         }
+
+        if (auto packOffsetModifier = as<HLSLPackOffsetSemantic>(m))
+        {
+            if (!packOffsetModifier->registerName.getContent().startsWith("c"))
+            {
+                getSink()->diagnose(packOffsetModifier, Diagnostics::unknownRegisterClass, packOffsetModifier->registerName);
+                return m;
+            }
+            auto uniformOffset = stringToInt(packOffsetModifier->registerName.getContent().tail(1)) * 16;
+            if (packOffsetModifier->componentMask.getContentLength())
+            {
+                switch (packOffsetModifier->componentMask.getContent()[0])
+                {
+                case 'x':
+                    uniformOffset += 0;
+                    break;
+                case 'y':
+                    uniformOffset += 4;
+                    break;
+                case 'z':
+                    uniformOffset += 8;
+                    break;
+                case 'w':
+                    uniformOffset += 12;
+                    break;
+                default:
+                    getSink()->diagnose(packOffsetModifier, Diagnostics::invalidComponentMask, packOffsetModifier->componentMask);
+                    break;
+                }
+            }
+            packOffsetModifier->uniformOffset = uniformOffset;
+            return packOffsetModifier;
+        }
+
         // Default behavior is to leave things as they are,
         // and assume that modifiers are mostly already checked.
         //

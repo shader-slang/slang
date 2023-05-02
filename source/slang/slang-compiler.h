@@ -1562,6 +1562,10 @@ namespace Slang
         {
             forceGLSLScalarBufferLayout = value;
         }
+        void setGLSLUseExplicitOffsets(bool value)
+        {
+            glslUseExplicitOffsets = value;
+        }
 
         void addCapability(CapabilityAtom capability);
 
@@ -1589,7 +1593,7 @@ namespace Slang
         SlangTargetFlags getTargetFlags() { return targetFlags; }
         CapabilitySet getTargetCaps();
         bool getForceGLSLScalarBufferLayout() { return forceGLSLScalarBufferLayout; }
-
+        bool getGLSLUseExplictOffsets() { return glslUseExplicitOffsets; }
         Session* getSession();
         MatrixLayoutMode getDefaultMatrixLayoutMode();
 
@@ -1612,6 +1616,7 @@ namespace Slang
         bool                    dumpIntermediates = false;
         bool                    forceGLSLScalarBufferLayout = false;
         bool                    enableLivenessTracking = false;
+        bool                    glslUseExplicitOffsets = false;
     };
 
         /// Are we generating code for a D3D API?
@@ -1755,6 +1760,15 @@ namespace Slang
 
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
+
+        bool getEnableEffectAnnotations()
+        {
+            return m_enableEffectAnnotations;
+        }
+        void setEnableEffectAnnotations(bool value)
+        {
+            m_enableEffectAnnotations = value;
+        }
 
         // Information on the targets we are being asked to
         // generate code for.
@@ -1914,6 +1928,7 @@ namespace Slang
 
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
+        bool m_enableEffectAnnotations = false;
 
         // Modules that have been read in with the -r option
         List<ComPtr<IArtifact>> m_libModules;
@@ -2550,6 +2565,7 @@ namespace Slang
         virtual SLANG_NO_THROW SlangCompileFlags SLANG_MCALL getCompileFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediates(int  enable) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediatePrefix(const char* prefix) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setEnableEffectAnnotations(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setLineDirectiveMode(SlangLineDirectiveMode  mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setCodeGenTarget(SlangCompileTarget target) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW int SLANG_MCALL addCodeGenTarget(SlangCompileTarget target) SLANG_OVERRIDE;
@@ -2558,6 +2574,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGLSLUseExplicitOffsets(int targetIndex, bool useExplicitOffsets) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
