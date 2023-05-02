@@ -806,6 +806,7 @@ struct OptionsParser
     CommandOptionsWriter::Style m_helpStyle = CommandOptionsWriter::Style::Text;
 
     CommandOptions* m_cmdOptions = nullptr;
+    CommandLineContext* m_cmdLineContext = nullptr;
 };
 
 int OptionsParser::addTranslationUnit(
@@ -1646,40 +1647,8 @@ SlangResult OptionsParser::_parse(
     // after some other initialization has been performed.
     m_flags = m_requestImpl->getFrontEndReq()->compileFlags;
 
-    DiagnosticSink* requestSink = m_requestImpl->getSink();
-
-    CommandLineContext* cmdLineContext = m_requestImpl->getLinkage()->m_downstreamArgs.getContext();
-
-    // Why create a new DiagnosticSink?
-    // We *don't* want the lexer that comes as default (it's for Slang source!)
-    // We may want to set flags that are different
-    // We will need to use a new sourceManager that will just last for this parse and will map locs to
-    // source lines.
-    //
-    // The *problem* is that we still need to communicate to the requestSink in some suitable way.
-    //
-    // 1) We could have some kind of scoping mechanism (and only one sink)
-    // 2) We could have a 'parent' diagnostic sink, that if we set we route output too
-    // 3) We use something like the ISlangWriter to always be the thing output too (this has problems because
-    // some code assumes the diagnostics are accessible as a string)
-    //
-    // The solution used here is to have DiagnosticsSink have a 'parent' that also gets diagnostics reported to.
-
-    m_parseSink.init(cmdLineContext->getSourceManager(), nullptr);
-    {
-        m_parseSink.setFlags(requestSink->getFlags());
-        // Allow HumaneLoc - it won't display much for command line parsing - just (1):
-        // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
-        //parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
-        m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
-    }
-
-    // All diagnostics will also be sent to requestSink
-    m_parseSink.setParentSink(requestSink);
-    m_sink = &m_parseSink;
-
     // Set up the args
-    CommandLineArgs args(cmdLineContext);
+    CommandLineArgs args(m_cmdLineContext);
     // Converts input args into args in 'args'.
     // Doing so will allocate some SourceLoc space from the CommandLineContext.
     args.setArgs(argv, argc);
@@ -1692,7 +1661,6 @@ SlangResult OptionsParser::_parse(
 
     m_reader.init(&args, m_sink);
 
-    
     while (m_reader.hasArg())
     {
         auto arg = m_reader.getArgAndAdvance();
@@ -2215,7 +2183,7 @@ SlangResult OptionsParser::_parse(
                 // Hmmm, we looked up and produced a valid enum, but it wasn't handled in the switch... 
                 m_sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
 
-                _outputMinimalUsage(m_sink);
+                _outputMinimalUsage();
                 return SLANG_FAIL;
             }
         }
@@ -2833,13 +2801,46 @@ SlangResult OptionsParser::parse(
 
     m_cmdOptions = &session->m_commandOptions;
 
-    Result res = _parse(argc, argv);
+    DiagnosticSink* requestSink = m_requestImpl->getSink();
 
-    DiagnosticSink* sink = m_requestImpl->getSink();
-    if (sink->getErrorCount() > 0)
+    m_cmdLineContext = m_requestImpl->getLinkage()->m_downstreamArgs.getContext();
+
+    // Why create a new DiagnosticSink?
+    // We *don't* want the lexer that comes as default (it's for Slang source!)
+    // We may want to set flags that are different
+    // We will need to use a new sourceManager that will just last for this parse and will map locs to
+    // source lines.
+    //
+    // The *problem* is that we still need to communicate to the requestSink in some suitable way.
+    //
+    // 1) We could have some kind of scoping mechanism (and only one sink)
+    // 2) We could have a 'parent' diagnostic sink, that if we set we route output too
+    // 3) We use something like the ISlangWriter to always be the thing output too (this has problems because
+    // some code assumes the diagnostics are accessible as a string)
+    //
+    // The solution used here is to have DiagnosticsSink have a 'parent' that also gets diagnostics reported to.
+
+    m_parseSink.init(m_cmdLineContext->getSourceManager(), nullptr);
+    {
+        m_parseSink.setFlags(requestSink->getFlags());
+        // Allow HumaneLoc - it won't display much for command line parsing - just (1):
+        // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
+        //parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
+        m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
+    }
+
+    // All diagnostics will also be sent to requestSink
+    m_parseSink.setParentSink(requestSink);
+    m_sink = &m_parseSink;
+
+    Result res = _parse(argc, argv);
+    
+    m_sink = nullptr;
+
+    if (requestSink->getErrorCount() > 0)
     {
         // Put the errors in the diagnostic 
-        m_requestImpl->m_diagnosticOutput = sink->outputBuffer.produceString();
+        m_requestImpl->m_diagnosticOutput = requestSink->outputBuffer.produceString();
     }
 
     return res;
