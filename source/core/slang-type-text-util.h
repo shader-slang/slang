@@ -13,6 +13,13 @@ namespace Slang
 /// Utility class to allow conversion of types (such as enums) to and from text types
 struct TypeTextUtil
 {
+    enum class FileSystemType
+    {
+        Default,
+        LoadFile,
+        Os,
+    };
+
     struct CompileTargetInfo
     {
         SlangCompileTarget target;          ///< The target
@@ -25,21 +32,23 @@ struct TypeTextUtil
     static ConstArrayView<CompileTargetInfo> getCompileTargetInfos();
 
         /// Get the language infos
-    static ConstArrayView<NamesValue> getLanguageInfos();
+    static ConstArrayView<NamesDescriptionValue> getLanguageInfos();
         /// Get the compiler infos
     static ConstArrayView<NamesDescriptionValue> getCompilerInfos();
         /// Get the archive type infos
-    static ConstArrayView<NameValue> getArchiveTypeInfos();
+    static ConstArrayView<NamesDescriptionValue> getArchiveTypeInfos();
         /// Get the debug format types
     static ConstArrayView<NamesDescriptionValue> getDebugInfoFormatInfos();
-
+        /// Get the debug levels
     static ConstArrayView<NamesDescriptionValue> getDebugLevelInfos();
-
+        /// Get the floating point modes
     static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
-
+        // Get the line directive infos
     static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
-
+        /// Get the optimization level info
     static ConstArrayView<NamesDescriptionValue> getOptimizationLevelInfos();
+        /// Get the file system type infos
+    static ConstArrayView<NamesDescriptionValue> getFileSystemTypeInfos();
 
         /// Get the scalar type as text.
     static Slang::UnownedStringSlice getScalarTypeName(slang::TypeReflection::ScalarType scalarType);

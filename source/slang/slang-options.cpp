@@ -157,6 +157,7 @@ enum class ValueCategory
     HelpStyle,
     OptimizationLevel,
     DebugLevel, 
+    FileSystemType,
 
     CountOf,
 };
@@ -215,6 +216,9 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(CategoryKind::Value, "debug-level", "Debug Level", UserValue(ValueCategory::DebugLevel));
         options.addValues(TypeTextUtil::getDebugLevelInfos());
+
+        options.addCategory(CategoryKind::Value, "file-system-type", "File System Type", UserValue(ValueCategory::FileSystemType));
+        options.addValues(TypeTextUtil::getFileSystemTypeInfos());
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -322,11 +326,15 @@ void initCommandOptions(CommandOptions& options)
 
     const Option generalOpts[] = 
     {
-        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]", "Insert a preprocessor macro." },
+        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]", 
+        "Insert a preprocessor macro.\n" 
+        "The space between - D and <name> is optional. If no <value> is specified, Slang will define the macro with an empty value." },
         { OptionKind::DepFile,      "-depfile", "-depfile <path>", "Save the source file dependency list in a file." },
         { OptionKind::EntryPointName, "-entry", "-entry <name>", 
         "Specify the name of an entry-point function.\n"
+        "When compiling from a single file, this defaults to main if you specify a stage using -stage.\n"
         "Multiple -entry options may be used in a single invocation. "
+        "When they do, the file associated with the entry point will be the first one found when searching to the left in the command line.\n"
         "If no -entry options are given, compiler will use [shader(...)] "
         "attributes to detect entry points."},
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
@@ -366,7 +374,9 @@ void initCommandOptions(CommandOptions& options)
         "May be omitted if entry-point function has a [shader(...)] attribute; "
         "otherwise required for each -entry option."},
         { OptionKind::Target, "-target", "-target <target>", "Specifies the format in which code should be generated."},
-        { OptionKind::Version, "-v,-version", nullptr, "Display the build version."},
+        { OptionKind::Version, "-v,-version", nullptr, 
+            "Display the build version. This is the contents of git describe --tags.\n"
+            "It is typically only set from automated builds(such as distros available on github).A user build will by default be 'unknown'."},
         { OptionKind::WarningsAsErrors, "-warnings-as-errors", "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]", 
         "all - Treat all warnings as errors.\n"
         "<id>[,<id>...]: Treat specific warning ids as errors.\n"},
@@ -439,7 +449,8 @@ void initCommandOptions(CommandOptions& options)
         "inbetween the opening -X and -X. to the downstream compiler."},
         { OptionKind::PassThrough, "-pass-through", "-pass-through <compiler>", 
         "Pass the input through mostly unmodified to the "
-        "existing compiler <compiler>." },
+        "existing compiler <compiler>.\n" 
+        "These are intended for debugging/testing purposes, when you want to be able to see what these existing compilers do with the \"same\" input and options"},
     };
 
     _addOptions(makeConstArrayView(downstreamOpts), options);
@@ -484,9 +495,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr, 
         "Generate SPIR-V output directly (otherwise through "
         "GLSL and using the glslang compiler)"},
-        { OptionKind::FileSystem, "-file-system", "-file-system <fs>", 
-        "Set the filesystem hook to use for a compile request.\n"
-        "Accepted file systems: default, load-file, os" },
+        { OptionKind::FileSystem, "-file-system", "-file-system <file-system-type>", 
+        "Set the filesystem hook to use for a compile request."},
         { OptionKind::Heterogeneous, "-heterogeneous", nullptr, "Output heterogeneity-related code." },
         { OptionKind::NoMangle, "-no-mangle", nullptr, "Do as little mangling of names as possible." }
     };
@@ -1872,27 +1882,15 @@ struct OptionsParser
                 case OptionKind::Obfuscate: requestImpl->getLinkage()->m_obfuscateCode = true; break;
                 case OptionKind::FileSystem:
                 {
-                    CommandLineArg name;
-                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
+                    CommandOptions::UserValue value;
+                    SLANG_RETURN_ON_FAIL(_expectValue(ValueCategory::FileSystemType, reader, sink, value));
+                    typedef TypeTextUtil::FileSystemType FileSystemType;
 
-                    if (name.value == "default")
+                    switch (FileSystemType(value))
                     {
-                        compileRequest->setFileSystem(nullptr);
-                    }
-                    else if (name.value == "load-file")
-                    {
-                        // 'Simple' just implements loadFile interface, so will be wrapped with CacheFileSystem internally
-                        compileRequest->setFileSystem(OSFileSystem::getLoadSingleton());
-                    }
-                    else if (name.value == "os")
-                    {
-                        // 'Immutable' implements the ISlangFileSystemExt interface - and will be used directly
-                        compileRequest->setFileSystem(OSFileSystem::getExtSingleton());
-                    }
-                    else
-                    {
-                        sink->diagnose(name.loc, Diagnostics::unknownFileSystemOption, name.value);
-                        return SLANG_FAIL;
+                        case FileSystemType::Default:   compileRequest->setFileSystem(nullptr); break;
+                        case FileSystemType::LoadFile:  compileRequest->setFileSystem(OSFileSystem::getLoadSingleton()); break;
+                        case FileSystemType::Os:        compileRequest->setFileSystem(OSFileSystem::getExtSingleton()); break;
                     }
                     break;
                 }

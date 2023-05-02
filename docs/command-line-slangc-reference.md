@@ -28,6 +28,7 @@ slangc -help-style markdown -h
 * [help-style](#help-style)
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
+* [file-system-type](#file-system-type)
 * [target](#target)
 * [stage](#stage)
 * [capability](#capability)
@@ -45,6 +46,8 @@ General options
 
 Insert a preprocessor macro. 
 
+The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is specified, Slang will define the macro with an empty value. 
+
 
 <a id="depfile"></a>
 ## -depfile
@@ -61,7 +64,11 @@ Save the source file dependency list in a file.
 
 Specify the name of an entry-point function. 
 
-Multiple [-entry](#entry) options may be used in a single invocation. If no [-entry](#entry) options are given, compiler will use \[shader(...)\] attributes to detect entry points. 
+When compiling from a single file, this defaults to main if you specify a stage using [-stage](#stage-1). 
+
+Multiple [-entry](#entry) options may be used in a single invocation. When they do, the file associated with the entry point will be the first one found when searching to the left in the command line. 
+
+If no [-entry](#entry) options are given, compiler will use \[shader(...)\] attributes to detect entry points. 
 
 
 <a id="emit-ir"></a>
@@ -173,7 +180,9 @@ Specifies the format in which code should be generated.
 
 <a id="v"></a>
 ## -v, -version
-Display the build version. 
+Display the build version. This is the contents of git describe --tags. 
+
+It is typically only set from automated builds(such as distros available on github).A user build will by default be 'unknown'. 
 
 
 <a id="warnings-as-errors"></a>
@@ -335,6 +344,8 @@ Pass arguments to downstream [&lt;compiler&gt;](#compiler). Just [-X&lt;compiler
 
 Pass the input through mostly unmodified to the existing compiler [&lt;compiler&gt;](#compiler). 
 
+These are intended for debugging/testing purposes, when you want to be able to see what these existing compilers do with the "same" input and options 
+
 
 
 <a id="Debugging"></a>
@@ -468,11 +479,9 @@ Generate SPIR-V output directly (otherwise through GLSL and using the glslang co
 <a id="file-system"></a>
 ## -file-system
 
-**-file-system &lt;fs&gt;**
+**-file-system &lt;[file-system-type](#file-system-type)&gt;**
 
 Set the filesystem hook to use for a compile request. 
-
-Accepted file systems: default, load-file, os 
 
 
 <a id="heterogeneous"></a>
@@ -591,22 +600,22 @@ Downstream Compilers (aka Pass through)
 
 Language 
 
-* `c`, `C` 
-* `cpp`, `c++`, `C++`, `cxx` 
-* `slang` 
-* `glsl` 
-* `hlsl` 
-* `cu`, `cuda` 
+* `c`, `C` : C language 
+* `cpp`, `c++`, `C++`, `cxx` : C++ language 
+* `slang` : Slang language 
+* `glsl` : GLSL language 
+* `hlsl` : HLSL language 
+* `cu`, `cuda` : CUDA 
 
 <a id="archive-type"></a>
 # archive-type
 
 Archive Type 
 
-* `riff-deflate` 
-* `riff-lz4` 
-* `zip` 
-* `riff` 
+* `riff-deflate` : Slang RIFF using deflate compression 
+* `riff-lz4` : Slang RIFF using LZ4 compression 
+* `zip` : Zip file 
+* `riff` : Slang RIFF without compression 
 
 <a id="line-directive-mode"></a>
 # line-directive-mode
@@ -668,6 +677,15 @@ Debug Level
 * `1`, `minimal` : Emit as little debug information as possible, while still supporting stack traces. 
 * `2`, `standard` : Emit whatever is the standard level of debug information for each target. 
 * `3`, `maximal` : Emit as much debug information as possible for each target. 
+
+<a id="file-system-type"></a>
+# file-system-type
+
+File System Type 
+
+* `default` : Default fike system. 
+* `load-file` : Just implements loadFile interface, so will be wrapped with CacheFileSystem internally. 
+* `os` : Use the OS based file system directly (without file system caching) 
 
 <a id="target"></a>
 # target

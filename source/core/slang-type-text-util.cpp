@@ -63,17 +63,16 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable",       "Host callable for host execution" },
 };
 
-static const NamesValue s_languageInfos[] = 
+static const NamesDescriptionValue s_languageInfos[] =
 {
-    { SLANG_SOURCE_LANGUAGE_C, "c,C" },
-    { SLANG_SOURCE_LANGUAGE_CPP, "cpp,c++,C++,cxx" },
-    { SLANG_SOURCE_LANGUAGE_SLANG, "slang" },
-    { SLANG_SOURCE_LANGUAGE_GLSL, "glsl" },
-    { SLANG_SOURCE_LANGUAGE_HLSL, "hlsl" },
-    { SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda" },
+    { SLANG_SOURCE_LANGUAGE_C, "c,C", "C language" },
+    { SLANG_SOURCE_LANGUAGE_CPP, "cpp,c++,C++,cxx", "C++ language" },
+    { SLANG_SOURCE_LANGUAGE_SLANG, "slang", "Slang language" },
+    { SLANG_SOURCE_LANGUAGE_GLSL, "glsl", "GLSL language" },
+    { SLANG_SOURCE_LANGUAGE_HLSL, "hlsl", "HLSL language" },
+    { SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda", "CUDA" },
 };
     
-
 static const NamesDescriptionValue s_compilerInfos[] = 
 {
     { SLANG_PASS_THROUGH_NONE,      "none",     "Unknown" },
@@ -88,14 +87,13 @@ static const NamesDescriptionValue s_compilerInfos[] =
     { SLANG_PASS_THROUGH_LLVM,      "llvm",     "LLVM/Clang `slang-llvm`" },
 };
 
-static const NameValue s_archiveTypeInfos[] =
+static const NamesDescriptionValue s_archiveTypeInfos[] =
 {
-    { SLANG_ARCHIVE_TYPE_RIFF_DEFLATE, "riff-deflate"},
-    { SLANG_ARCHIVE_TYPE_RIFF_LZ4, "riff-lz4"},
-    { SLANG_ARCHIVE_TYPE_ZIP, "zip"},
-    { SLANG_ARCHIVE_TYPE_RIFF, "riff"},
+    { SLANG_ARCHIVE_TYPE_RIFF_DEFLATE, "riff-deflate", "Slang RIFF using deflate compression" },
+    { SLANG_ARCHIVE_TYPE_RIFF_LZ4, "riff-lz4", "Slang RIFF using LZ4 compression" },
+    { SLANG_ARCHIVE_TYPE_ZIP, "zip", "Zip file" },
+    { SLANG_ARCHIVE_TYPE_RIFF, "riff", "Slang RIFF without compression" },
 };
-
 
 static const NamesDescriptionValue s_debugInfoFormatInfos[] = 
 {
@@ -147,14 +145,26 @@ static const NamesDescriptionValue s_debugLevels[] =
     { SLANG_DEBUG_INFO_LEVEL_MAXIMAL,   "3,maximal",    "Emit as much debug information as possible for each target." },
 };
 
+static const NamesDescriptionValue s_fileSystemTypes[] =
+{
+    { ValueInt(TypeTextUtil::FileSystemType::Default),     "default",      "Default fike system." },
+    { ValueInt(TypeTextUtil::FileSystemType::LoadFile),    "load-file",    "Just implements loadFile interface, so will be wrapped with CacheFileSystem internally." },
+    { ValueInt(TypeTextUtil::FileSystemType::Os),          "os",           "Use the OS based file system directly (without file system caching)" },
+};
+
 } // anonymous
+
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFileSystemTypeInfos()
+{
+    return makeConstArrayView(s_fileSystemTypes);
+}
 
 /* static */ConstArrayView<TypeTextUtil::CompileTargetInfo> TypeTextUtil::getCompileTargetInfos()
 {
     return makeConstArrayView(s_compileTargetInfos);
 }
 
-/* static */ConstArrayView<NamesValue> TypeTextUtil::getLanguageInfos()
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getLanguageInfos()
 {
     return makeConstArrayView(s_languageInfos);
 }
@@ -164,7 +174,7 @@ static const NamesDescriptionValue s_debugLevels[] =
     return makeConstArrayView(s_compilerInfos);
 }
 
-/* static */ConstArrayView<NameValue> TypeTextUtil::getArchiveTypeInfos()
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getArchiveTypeInfos()
 {
     return makeConstArrayView(s_archiveTypeInfos);
 }
