@@ -306,12 +306,23 @@ Set the optimization level.
 Remove all source file information from outputs. 
 
 
+<a id="force-glsl-scalar-layout"></a>
+## -force-glsl-scalar-layout
+Force using scalar block layout for uniform and shader storage buffers in GLSL output. 
+
+
 <a id="fvk-bind-globals"></a>
 ## -fvk-bind-globals
 
 **-fvk-bind-globals &lt;N&gt; &lt;descriptor-set&gt;**
 
 Places the $Globals cbuffer at descriptor set &lt;descriptor-set&gt; and binding &lt;N&gt;. See HLSL global variables and Vulkan binding for explanation and examples. 
+
+
+<a id="enable-effect-annotations"></a>
+## -enable-effect-annotations
+
+**Enables support for legacy effect annotation syntax.**
 
 
 <a id="fvk-b-shift"></a>
@@ -761,7 +772,7 @@ Vulkan Shift
 
 * `b` : Vulkan Buffer resource 
 * `s` : Vulkan Sampler resource 
-* `t` : Vulkan Sampler resource 
+* `t` : Vulkan Texture resource 
 * `u` : Vulkan Uniform resource 
 
 <a id="capability"></a>
