@@ -1781,8 +1781,8 @@ namespace Slang
                             else
                             {
                                 // Otherwise, we may be looking at an effect annotation.
-                                // For now we just skip tokens until we see `>`, if we see any `"` in between,
-                                // we can conclude that this is an annocation.
+                                // For now we just skip tokens until we see `>`, if we see any `;` in between,
+                                // we can conclude that this is an annotation.
                                 TokenReader tempReader = parser->tokenReader;
                                 bool foundSemicolon = false;
                                 while (tempReader.peekTokenType() != TokenType::OpGreater &&
