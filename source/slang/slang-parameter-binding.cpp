@@ -2340,7 +2340,7 @@ struct ScopeLayoutBuilder
 
     }
 
-    RefPtr<VarLayout> endLayout()
+    RefPtr<VarLayout> endLayout(VarLayout* inVarLayout = nullptr)
     {
         // Finish computing the layout for the ordindary data (if any).
         //
@@ -2366,7 +2366,12 @@ struct ScopeLayoutBuilder
 
         // We now have a bunch of layout information, which we should
         // record into a suitable object that represents the scope
-        RefPtr<VarLayout> scopeVarLayout = new VarLayout();
+        RefPtr<VarLayout> scopeVarLayout = inVarLayout;
+        if (!scopeVarLayout)
+        {
+            scopeVarLayout = new VarLayout();
+        }
+
         scopeVarLayout->typeLayout = scopeTypeLayout;
 
         if( auto pendingTypeLayout = scopeTypeLayout->pendingDataTypeLayout )
@@ -2524,6 +2529,7 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
 
 static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     ParameterBindingContext* context,
+    VarLayout* varLayout,
     UInt space, 
     UInt index)
 {
@@ -2533,16 +2539,14 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
         ->getConstantBufferRules(context->getTargetRequest())
         ->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
 
-    UsedRange range;
-    range.begin = index;
-    range.end = index + 1;
-    range.parameter = nullptr;
+    const Index count = Index(layoutInfo.size.getFiniteValue());
 
-    usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(range);
+    auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
+    SLANG_ASSERT(existingParam == nullptr);
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
-    info.count = 1; 
+    info.count = count;
     info.index = index;
     info.space = space;
     return info;
@@ -3455,6 +3459,79 @@ static void _completeBindings(
     _completeBindings(context, program, &counters);
 }
 
+static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
+{
+    // Next we will look at the global-scope parameters and see if
+    // any of them requires a `register` or `binding` that will
+    // thus need to land in a default space.
+    //
+    for (auto& parameterInfo : sharedContext.parameters)
+    {
+        auto varLayout = parameterInfo->varLayout;
+        SLANG_RELEASE_ASSERT(varLayout);
+
+        // For each parameter, we will look at each resource it consumes.
+        //
+        for (auto resInfo : varLayout->typeLayout->resourceInfos)
+        {
+            // We don't want to consider resource kinds for which
+            // the variable already has an (explicit) binding, since
+            // the space from the explicit binding will be used, so
+            // that a default space isn't needed.
+            //
+            if (parameterInfo->bindingInfo[resInfo.kind].count != 0)
+                continue;
+
+            // We also want to exclude certain resource kinds from
+            // consideration, since parameters using those resource
+            // kinds wouldn't be allocated into the default space
+            // anyway.
+            //
+            switch (resInfo.kind)
+            {
+                case LayoutResourceKind::RegisterSpace:
+                case LayoutResourceKind::PushConstantBuffer:
+                    continue;
+
+                default:
+                    break;
+            }
+
+            // Otherwise, we have a shader parameter that will need
+            // a default space or set to live in.
+            //
+            return true;
+        }
+    }
+
+    // We also need a default space for any entry-point parameters
+    // that consume appropriate resource kinds.
+    //
+    for (auto& entryPoint : sharedContext.programLayout->entryPoints)
+    {
+        auto paramsLayout = entryPoint->parametersLayout;
+        for (auto resInfo : paramsLayout->resourceInfos)
+        {
+            switch (resInfo.kind)
+            {
+                default:
+                    break;
+
+                case LayoutResourceKind::RegisterSpace:
+                case LayoutResourceKind::VaryingInput:
+                case LayoutResourceKind::VaryingOutput:
+                case LayoutResourceKind::HitAttributes:
+                case LayoutResourceKind::RayPayload:
+                    continue;
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
 RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram*  targetProgram,
     DiagnosticSink* sink)
@@ -3618,8 +3695,12 @@ RefPtr<ProgramLayout> generateParameterBindings(
     }
 
     // Global constant buffer binding. 
-    // It's initially invalid
+    // It's initially invalid. (kind = None).
     ParameterBindingAndKindInfo globalConstantBufferBinding;
+
+    // We define this variable early, such that we can create and use when specifying 
+    // a HLSLToVulkan based binding. It can if setup be used on endLayout, called later
+    RefPtr<VarLayout> globalScopeVarLayout;
 
     // If we have a space/binding assigned for use for globals in Vulkan, 
     // we can't use *that* as the default space, so we allocate if
@@ -3627,11 +3708,14 @@ RefPtr<ProgramLayout> generateParameterBindings(
     {
         if (vulkanOptions->hasGlobalsBinding())
         {
+            // Create VarLayout which will be associated with the binding, and setup later
+            globalScopeVarLayout = new VarLayout;
+
             // Allocate the set
             markSpaceUsed(&context, nullptr, vulkanOptions->m_globalsBindingSet);
 
             // Mark the use of this binding
-            globalConstantBufferBinding = _assignConstantBufferBinding(&context, vulkanOptions->m_globalsBindingSet, vulkanOptions->m_globalsBinding);
+            globalConstantBufferBinding = _assignConstantBufferBinding(&context, globalScopeVarLayout, vulkanOptions->m_globalsBindingSet, vulkanOptions->m_globalsBinding);
         }
     }
 
@@ -3649,10 +3733,14 @@ RefPtr<ProgramLayout> generateParameterBindings(
     //
     bool needDefaultConstantBuffer = false;
 
+    // If we have already setup a global constant buffer binding, we don't need a default one
+    // 
     // On a CPU target, it's okay to have global scope parameters that use Uniform resources (because on CPU
     // all resources are 'Uniform')
     // TODO(JS): We'll just assume the same with CUDA target for now..
-    if (!_isCPUTarget(targetReq->getTarget()) && !_isPTXTarget(targetReq->getTarget()))
+    if (globalConstantBufferBinding.kind == LayoutResourceKind::None &&
+        !_isCPUTarget(targetReq->getTarget()) && 
+        !_isPTXTarget(targetReq->getTarget()))
     {
         for( auto& parameterInfo : sharedContext.parameters )
         {
@@ -3676,83 +3764,9 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // As a starting point, we will definitely need a "default" space if
     // we are creating a default constant buffer, since it should get
     // a binding in that "default" space.
-    //
-    // Note: If HLSL->Vulkan binding options, have global bindings set, 
-    // that will consume the set specified, so the default may not be zero if that is already used
-    bool needDefaultSpace = needDefaultConstantBuffer;
-    if (!needDefaultSpace)
-    {
-        // Next we will look at the global-scope parameters and see if
-        // any of them requires a `register` or `binding` that will
-        // thus need to land in a default space.
-        //
-        for (auto& parameterInfo : sharedContext.parameters)
-        {
-            auto varLayout = parameterInfo->varLayout;
-            SLANG_RELEASE_ASSERT(varLayout);
-
-            // For each parameter, we will look at each resource it consumes.
-            //
-            for (auto resInfo : varLayout->typeLayout->resourceInfos)
-            {
-                // We don't want to consider resource kinds for which
-                // the variable already has an (explicit) binding, since
-                // the space from the explicit binding will be used, so
-                // that a default space isn't needed.
-                //
-                if( parameterInfo->bindingInfo[resInfo.kind].count != 0 )
-                    continue;
-
-                // We also want to exclude certain resource kinds from
-                // consideration, since parameters using those resource
-                // kinds wouldn't be allocated into the default space
-                // anyway.
-                //
-                switch( resInfo.kind )
-                {
-                case LayoutResourceKind::RegisterSpace:
-                case LayoutResourceKind::PushConstantBuffer:
-                    continue;
-
-                default:
-                    break;
-                }
-
-                // Otherwise, we have a shader parameter that will need
-                // a default space or set to live in.
-                //
-                needDefaultSpace = true;
-                break;
-            }
-        }
-
-        // We also need a default space for any entry-point parameters
-        // that consume appropriate resource kinds.
-        //
-        for(auto& entryPoint : sharedContext.programLayout->entryPoints)
-        {
-            auto paramsLayout = entryPoint->parametersLayout;
-            for(auto resInfo : paramsLayout->resourceInfos )
-            {
-                switch(resInfo.kind)
-                {
-                default:
-                    break;
-
-                case LayoutResourceKind::RegisterSpace:
-                case LayoutResourceKind::VaryingInput:
-                case LayoutResourceKind::VaryingOutput:
-                case LayoutResourceKind::HitAttributes:
-                case LayoutResourceKind::RayPayload:
-                    continue;
-                }
-
-                needDefaultSpace = true;
-                break;
-            }
-        }
-    }
-
+    
+    const bool needDefaultSpace = needDefaultConstantBuffer || _calcNeedsDefaultSpace(sharedContext);
+    
     // If we need a space for default bindings, then allocate it here.
     if (needDefaultSpace)
     {
@@ -3823,7 +3837,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
         globalScopeLayoutBuilder.addParameter(parameterInfo);
     }
 
-    auto globalScopeVarLayout = globalScopeLayoutBuilder.endLayout();
+    globalScopeVarLayout = globalScopeLayoutBuilder.endLayout(globalScopeVarLayout);
 
     if( globalConstantBufferBinding.count != 0 )
     {
