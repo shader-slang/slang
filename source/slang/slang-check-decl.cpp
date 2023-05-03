@@ -1017,10 +1017,18 @@ namespace Slang
                 {
                     // For completion requests, we skip all funtion bodies except for the one
                     // that the current cursor is in.
+                    auto startingLine = humaneLoc.line;
+                    for (auto modifier : funcDecl->modifiers)
+                    {
+                        auto modifierLoc = getLinkage()->getSourceManager()->getHumaneLoc(
+                            modifier->loc, SourceLocType::Actual);
+                        if (modifierLoc.line < startingLine)
+                            startingLine = modifierLoc.line;
+                    }
                     auto closingLoc = getLinkage()->getSourceManager()->getHumaneLoc(
                         funcDecl->closingSourceLoc, SourceLocType::Actual);
 
-                    if (assistInfo.cursorLine < humaneLoc.line ||
+                    if (assistInfo.cursorLine < startingLine ||
                         assistInfo.cursorLine > closingLoc.line)
                         return true;
                 }
@@ -1905,7 +1913,6 @@ namespace Slang
         {
             DeclCheckState::ModifiersChecked,
             DeclCheckState::ReadyForReference,
-            DeclCheckState::ReadyForLookup,
             DeclCheckState::ReadyForLookup,
             DeclCheckState::Checked
         };
@@ -6921,9 +6928,13 @@ namespace Slang
         auto ctx = visitor->withExprLocalScope(&scope);
         auto subVisitor = SemanticsVisitor(ctx);
         auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
+        attr->funcExpr = checkedFuncExpr;
+        if (attr->args.getCount())
+            attr->args[0] = attr->funcExpr;
         if (auto declRefExpr = as<DeclRefExpr>(checkedFuncExpr))
         {
-            visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+            if (declRefExpr->declRef)
+                visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
         }
         else if (auto overloadedExpr = as<OverloadedExpr>(checkedFuncExpr))
         {
@@ -6945,10 +6956,12 @@ namespace Slang
             if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
             {
                 attr->funcExpr = calleeDeclRef;
+                if (attr->args.getCount())
+                    attr->args[0] = attr->funcExpr;
                 return;
             }
         }
-        
+
         visitor->getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
     }
 
@@ -7082,7 +7095,8 @@ namespace Slang
         DeclRefExpr* calleeDeclRefExpr = nullptr;
         HigherOrderInvokeExpr* higherOrderFuncExpr = visitor->getASTBuilder()->create<TDifferentiateExpr>();
         higherOrderFuncExpr->baseFunction = derivativeOfAttr->funcExpr;
-        higherOrderFuncExpr->loc = derivativeOfAttr->loc;
+        if (derivativeOfAttr->args.getCount() > 0)
+            higherOrderFuncExpr->loc = derivativeOfAttr->args[0]->loc;
         Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(higherOrderFuncExpr, visitor->allowStaticReferenceToNonStaticMember());
         if (!checkedHigherOrderFuncExpr)
         {
@@ -7107,6 +7121,11 @@ namespace Slang
             visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
             return;
         }
+
+        calleeDeclRefExpr->loc = higherOrderFuncExpr->loc;
+        if (derivativeOfAttr->args.getCount() > 0)
+            derivativeOfAttr->args[0] = calleeDeclRefExpr;
+
         calleeDeclRef = calleeDeclRefExpr->declRef;
 
         auto calleeFunc = as<FunctionDeclBase>(calleeDeclRef.getDecl());
