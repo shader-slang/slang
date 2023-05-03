@@ -25,6 +25,8 @@
 #include "slang-syntax.h"
 #include "slang-content-assist-info.h"
 
+#include "slang-vk-layout-options.h"
+
 #include "slang-serialize-ir-types.h"
 
 #include "../compiler-core/slang-artifact-representation-impl.h"
@@ -1531,90 +1533,6 @@ namespace Slang
         Binary = SLANG_WRITER_MODE_BINARY,
     };
 
-    /*
-        https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#descriptors
-        */
-    struct VulkanShiftOptions
-    {
-        // {b|s|t|u} 
-        enum class Kind
-        {
-            Buffer,             ///< Buffer 
-            Sampler,            ///< Sampler
-            Texture,            ///< Texture
-            Uniform,            ///< Uniform
-
-            CountOf,
-        };
-
-        struct Key
-        {
-            typedef Key ThisType;
-
-            bool operator==(const ThisType& rhs) const { return kind == rhs.kind && set == rhs.set; }
-            bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-            HashCode getHashCode() const { return combineHash(Slang::getHashCode(kind), Slang::getHashCode(set)); }
-
-            Kind kind;          ///< The kind this entry is for
-            Index set;          ///< If -1 this is the shift for all of this kind
-        };
-
-            /// Set the the all option for the kind
-        void setAllShift(Kind kind, Index shift) 
-        {
-            // We try to follow the convention, of the *last* entry set is the one used.
-            // If there a "all" set, we remove everything for the kind.
-
-            // Find all the entries for the kind
-            List<Key> keys;
-            for (auto& pair : m_shifts)
-            {
-                if (pair.key.kind == kind)
-                {
-                    keys.add(pair.key);
-                }
-            }
-            // Remove them all
-            for (auto& key : keys)
-            {
-                m_shifts.remove(key);
-            }
-
-            if (shift)
-            {
-                m_shifts.add(Key{kind, -1}, shift);
-            }
-        }
-            /// Set the shift for kind/set
-        void setShift(Kind kind, Index set, Index shift)
-        { 
-            Key key{kind, set};
-            m_shifts.add(key, shift);
-        }    
-            /// Get the shift. If not found returns 0 meaning don't shift
-        Index getShift(Kind kind, Index set) const
-        {
-            if (auto ptr = m_shifts.tryGetValue(Key{kind, set}))
-            {
-                return *ptr;
-            }
-            if (auto ptr = m_shifts.tryGetValue(Key{kind, -1}))
-            {
-                return *ptr;
-            }
-            return 0;
-        }
-
-        static ConstArrayView<NamesDescriptionValue> getKindInfos();
-
-        Index m_globalsBinding = -1;
-        Index m_globalsBindingSet = -1;
-
-            /// Maps a key to the amount of shift
-        Dictionary<Key, Index> m_shifts;
-    };
-
         /// A request to generate output in some target format.
     class TargetRequest : public RefObject
     {
@@ -1660,8 +1578,8 @@ namespace Slang
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
 
-        void setVulkanShiftOptions(const VulkanShiftOptions& opts) { vulkanShiftOptions = opts; }
-        const VulkanShiftOptions& getVulkanShiftOptions() const { return vulkanShiftOptions; }
+        void setVulkanLayoutOptions(VulkanLayoutOptions* opts) { vulkanLayoutOptions = opts; }
+        const VulkanLayoutOptions* getVulkanLayoutOptions() const { return vulkanLayoutOptions; }
 
         bool shouldDumpIntermediates() { return dumpIntermediates; }
 
@@ -1701,7 +1619,7 @@ namespace Slang
         bool                    forceGLSLScalarBufferLayout = false;
         bool                    enableLivenessTracking = false;
 
-        VulkanShiftOptions      vulkanShiftOptions;
+        RefPtr<VulkanLayoutOptions> vulkanLayoutOptions;           ///< Optional vulkan layout options
     };
 
         /// Are we generating code for a D3D API?
@@ -2709,7 +2627,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
 
-        void setVulkanShiftOptions(int targetIndex, const VulkanShiftOptions& vulkanShiftOptions);
+        void setVulkanLayoutOptions(int targetIndex, const VulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
             Session* session);

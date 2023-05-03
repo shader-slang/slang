@@ -493,6 +493,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-type-system-shared.h" />
     <ClInclude Include="..\..\..\source\slang\slang-value-reflect.h" />
     <ClInclude Include="..\..\..\source\slang\slang-visitor.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-vk-layout-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-workspace-version.h" />
   </ItemGroup>
   <ItemGroup>
@@ -685,6 +686,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-type-layout.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-type-system-shared.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-value-reflect.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-vk-layout-options.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-workspace-version.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang.cpp" />
   </ItemGroup>

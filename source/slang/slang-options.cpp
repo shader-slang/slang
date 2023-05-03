@@ -19,6 +19,7 @@
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
+#include "slang-vk-layout-options.h"
 
 #include "../core/slang-castable.h"
 #include "../core/slang-file-system.h"
@@ -265,7 +266,7 @@ void initCommandOptions(CommandOptions& options)
 
     {
         options.addCategory(CategoryKind::Value, "vulkan-shift", "Vulkan Shift", UserValue(ValueCategory::VulkanShift));
-        options.addValues(VulkanShiftOptions::getKindInfos());
+        options.addValues(VulkanLayoutOptions::getKindInfos());
     }
     
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! capabilities !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -805,7 +806,7 @@ struct OptionsParser
 
     SlangCompileFlags m_flags = 0;
 
-    VulkanShiftOptions m_vulkanShiftOptions;
+    RefPtr<VulkanLayoutOptions> m_vulkanLayoutOptions;
 
     List<RawTranslationUnit> m_rawTranslationUnits;
 
@@ -1932,7 +1933,7 @@ SlangResult OptionsParser::_parse(
             {
                 // -fvk-{b|s|t|u}-shift
                 const auto slice = arg.value.getUnownedSlice().subString(5, 1);
-                VulkanShiftOptions::Kind kind;
+                VulkanLayoutOptions::Kind kind;
                 SLANG_RETURN_ON_FAIL(_getValue(arg, slice, kind));
 
                 Int shift;
@@ -1941,13 +1942,13 @@ SlangResult OptionsParser::_parse(
                 if (m_reader.hasArg() && m_reader.peekArg().value == toSlice("all"))
                 {
                     m_reader.advance();
-                    m_vulkanShiftOptions.setAllShift(kind, shift);
+                    m_vulkanLayoutOptions->setAllShift(kind, shift);
                 }
                 else
                 {
                     Int set;
                     SLANG_RETURN_ON_FAIL(_expectInt(arg, set));
-                    m_vulkanShiftOptions.setShift(kind, set, shift);
+                    m_vulkanLayoutOptions->setShift(kind, set, shift);
                 }
                 break;
             }
@@ -1958,8 +1959,8 @@ SlangResult OptionsParser::_parse(
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, binding));
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSet));
 
-                m_vulkanShiftOptions.m_globalsBindingSet = bindingSet;
-                m_vulkanShiftOptions.m_globalsBinding = binding;
+                m_vulkanLayoutOptions->m_globalsBindingSet = Index(bindingSet);
+                m_vulkanLayoutOptions->m_globalsBinding = Index(binding);
                 break;
             }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;
@@ -2271,6 +2272,12 @@ SlangResult OptionsParser::_parse(
                 return SLANG_FAIL;
             }
         }
+    }
+
+    // If there are no layout settings, we don't need to carry this state
+    if (m_vulkanLayoutOptions->isDefault())
+    {
+        m_vulkanLayoutOptions.setNull();
     }
 
     if (m_compileStdLib)
@@ -2679,7 +2686,7 @@ SlangResult OptionsParser::_parse(
         int targetID = m_compileRequest->addCodeGenTarget(SlangCompileTarget(rawTarget.format));
         rawTarget.targetID = targetID;
 
-        m_requestImpl->setVulkanShiftOptions(targetID, m_vulkanShiftOptions);
+        m_requestImpl->setVulkanLayoutOptions(targetID, m_vulkanLayoutOptions);
 
         if (rawTarget.profileVersion != ProfileVersion::Unknown)
         {
@@ -2882,6 +2889,8 @@ SlangResult OptionsParser::parse(
 
     m_session = session;
     m_frontEndReq = m_requestImpl->getFrontEndReq();
+
+    m_vulkanLayoutOptions = new VulkanLayoutOptions;
 
     m_cmdOptions = &session->m_commandOptions;
 
