@@ -661,7 +661,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(PublicDecoration,                  public,                 0, 0)
     INST(HLSLExportDecoration,              hlslExport,             0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
-
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
     INST(OutputTopologyDecoration,          outputTopology,         1, 0)
     INST(PartitioningDecoration,            partioning,             1, 0)
@@ -782,6 +781,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST_RANGE(StageAccessDecoration, StageReadAccessDecoration, StageWriteAccessDecoration)
 
     INST(SemanticDecoration, semantic, 2, 0)
+    INST(PackOffsetDecoration, packoffset, 2, 0)
 
     INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
 

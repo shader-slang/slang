@@ -1116,6 +1116,18 @@ struct IRSemanticDecoration : public IRDecoration
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
 };
 
+struct IRPackOffsetDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_PackOffsetDecoration
+    };
+    IR_LEAF_ISA(PackOffsetDecoration)
+
+    IRIntLit* getRegisterOffset() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getComponentOffset() { return cast<IRIntLit>(getOperand(1)); }
+};
+
 struct IRStageAccessDecoration : public IRDecoration
 {
     IR_PARENT_ISA(StageAccessDecoration)

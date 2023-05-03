@@ -608,6 +608,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     {
         linkage->setFileSystem(desc.fileSystem);
     }
+
+    if (desc.structureSize >= offsetof(slang::SessionDesc, enableEffectAnnotations))
+    {
+        linkage->setEnableEffectAnnotations(desc.enableEffectAnnotations);
+    }
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
@@ -4802,6 +4808,11 @@ void EndToEndCompileRequest::addSearchPath(const char* path)
 void EndToEndCompileRequest::addPreprocessorDefine(const char* key, const char* value)
 {
     getLinkage()->addPreprocessorDefine(key, value);
+}
+
+void EndToEndCompileRequest::setEnableEffectAnnotations(bool value)
+{
+    getLinkage()->setEnableEffectAnnotations(value);
 }
 
 char const* EndToEndCompileRequest::getDiagnosticOutput()

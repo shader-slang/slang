@@ -1589,7 +1589,6 @@ namespace Slang
         SlangTargetFlags getTargetFlags() { return targetFlags; }
         CapabilitySet getTargetCaps();
         bool getForceGLSLScalarBufferLayout() { return forceGLSLScalarBufferLayout; }
-
         Session* getSession();
         MatrixLayoutMode getDefaultMatrixLayoutMode();
 
@@ -1756,6 +1755,15 @@ namespace Slang
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
 
+        bool getEnableEffectAnnotations()
+        {
+            return m_enableEffectAnnotations;
+        }
+        void setEnableEffectAnnotations(bool value)
+        {
+            m_enableEffectAnnotations = value;
+        }
+
         // Information on the targets we are being asked to
         // generate code for.
         List<RefPtr<TargetRequest>> targets;
@@ -1914,6 +1922,7 @@ namespace Slang
 
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
+        bool m_enableEffectAnnotations = false;
 
         // Modules that have been read in with the -r option
         List<ComPtr<IArtifact>> m_libModules;
@@ -2550,6 +2559,7 @@ namespace Slang
         virtual SLANG_NO_THROW SlangCompileFlags SLANG_MCALL getCompileFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediates(int  enable) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediatePrefix(const char* prefix) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setEnableEffectAnnotations(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setLineDirectiveMode(SlangLineDirectiveMode  mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setCodeGenTarget(SlangCompileTarget target) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW int SLANG_MCALL addCodeGenTarget(SlangCompileTarget target) SLANG_OVERRIDE;

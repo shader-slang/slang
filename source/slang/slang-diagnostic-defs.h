@@ -70,14 +70,12 @@ DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'")
 DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'")
 DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
-DIAGNOSTIC(    18, Error, unknownFileSystemOption, "unknown file-system option '$0'")
 DIAGNOSTIC(    19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)")
 DIAGNOSTIC(    22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(    26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
-DIAGNOSTIC(    27, Error, unknownDebugInfoLevel, "unknown debug info level '$0'")
 
 DIAGNOSTIC(    28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
 
@@ -546,8 +544,8 @@ DIAGNOSTIC(39007, Error, unknownRegisterClass, "unknown register class: '$0'")
 DIAGNOSTIC(39008, Error, expectedARegisterIndex, "expected a register index after '$0'")
 DIAGNOSTIC(39009, Error, expectedSpace, "expected 'space', got '$0'")
 DIAGNOSTIC(39010, Error, expectedSpaceIndex, "expected a register space index after 'space'")
-DIAGNOSTIC(39011, Error, componentMaskNotSupported, "explicit register component masks are not yet supported in Slang")
-DIAGNOSTIC(39012, Error, packOffsetNotSupported, "explicit 'packoffset' bindings are not yet supported in Slang")
+DIAGNOSTIC(39011, Error, invalidComponentMask, "invalid register component mask '$0'.")
+
 DIAGNOSTIC(39013, Warning, registerModifierButNoVulkanLayout, "shader parameter '$0' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan")
 DIAGNOSTIC(39014, Error, unexpectedSpecifierAfterSpace, "unexpected specifier after register space: '$0'")
 DIAGNOSTIC(39015, Error, wholeSpaceParameterRequiresZeroBinding, "shader parameter '$0' consumes whole descriptor sets, so the binding must be in the form '[[vk::binding(0, ...)]]'; the non-zero binding '$1' is not allowed")

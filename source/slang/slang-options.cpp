@@ -32,7 +32,9 @@
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-char-util.h"
 
-#include "../core/slang-command-options.h"
+#include "../core/slang-name-value.h"
+
+#include "../core/slang-command-options-writer.h"
 
 #include <assert.h>
 
@@ -49,6 +51,7 @@ enum class OptionKind
     DepFile,
     EntryPointName,
     Help,
+    HelpStyle,
     Include,
     Language,
     MatrixLayoutColumn,
@@ -78,6 +81,8 @@ enum class OptionKind
     LineDirectiveMode,
     Optimization,
     Obfuscate,
+    GLSLForceScalarLayout,
+    EnableEffectAnnotations,
     
     // Downstream
 
@@ -151,6 +156,10 @@ enum class ValueCategory
     Stage,
     LineDirectiveMode,
     DebugInfoFormat,
+    HelpStyle,
+    OptimizationLevel,
+    DebugLevel, 
+    FileSystemType,
 
     CountOf,
 };
@@ -200,6 +209,18 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(CategoryKind::Value, "fp-mode", "Floating Point Mode", UserValue(ValueCategory::FloatingPointMode));
         options.addValues(TypeTextUtil::getFloatingPointModeInfos());
+
+        options.addCategory(CategoryKind::Value, "help-style", "Help Style", UserValue(ValueCategory::HelpStyle));
+        options.addValues(CommandOptionsWriter::getStyleInfos());
+
+        options.addCategory(CategoryKind::Value, "optimization-level", "Optimization Level", UserValue(ValueCategory::OptimizationLevel));
+        options.addValues(TypeTextUtil::getOptimizationLevelInfos());
+
+        options.addCategory(CategoryKind::Value, "debug-level", "Debug Level", UserValue(ValueCategory::DebugLevel));
+        options.addValues(TypeTextUtil::getDebugLevelInfos());
+
+        options.addCategory(CategoryKind::Value, "file-system-type", "File System Type", UserValue(ValueCategory::FileSystemType));
+        options.addValues(TypeTextUtil::getFileSystemTypeInfos());
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -307,15 +328,20 @@ void initCommandOptions(CommandOptions& options)
 
     const Option generalOpts[] = 
     {
-        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]", "Insert a preprocessor macro." },
+        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]", 
+        "Insert a preprocessor macro.\n" 
+        "The space between - D and <name> is optional. If no <value> is specified, Slang will define the macro with an empty value." },
         { OptionKind::DepFile,      "-depfile", "-depfile <path>", "Save the source file dependency list in a file." },
         { OptionKind::EntryPointName, "-entry", "-entry <name>", 
         "Specify the name of an entry-point function.\n"
+        "When compiling from a single file, this defaults to main if you specify a stage using -stage.\n"
         "Multiple -entry options may be used in a single invocation. "
+        "When they do, the file associated with the entry point will be the first one found when searching to the left in the command line.\n"
         "If no -entry options are given, compiler will use [shader(...)] "
         "attributes to detect entry points."},
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
+        { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style>", "Help formatting style" },
         { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
         "Add a path to be used in resolving '#include' "
         "and 'import' operations."},
@@ -336,10 +362,10 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Profile, "-profile", "-profile <profile>[+<capability>...]",
         "Specify the shader profile for code generation.\n"
         "Accepted profiles are:\n"
-        "  sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
-        "  glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
+        "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
+        "* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
         "Additional profiles that include -stage information:\n"
-        "  {vs,hs,ds,gs,ps}_<version>\n"
+        "* {vs,hs,ds,gs,ps}_<version>\n"
         "See -capability for information on <capability>\n"
         "When multiple -target options are present, each -profile associates "
         "with the first -target to its left."},
@@ -350,7 +376,9 @@ void initCommandOptions(CommandOptions& options)
         "May be omitted if entry-point function has a [shader(...)] attribute; "
         "otherwise required for each -entry option."},
         { OptionKind::Target, "-target", "-target <target>", "Specifies the format in which code should be generated."},
-        { OptionKind::Version, "-v,-version", nullptr, "Display the build version."},
+        { OptionKind::Version, "-v,-version", nullptr, 
+            "Display the build version. This is the contents of git describe --tags.\n"
+            "It is typically only set from automated builds(such as distros available on github).A user build will by default be 'unknown'."},
         { OptionKind::WarningsAsErrors, "-warnings-as-errors", "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]", 
         "all - Treat all warnings as errors.\n"
         "<id>[,<id>...]: Treat specific warning ids as errors.\n"},
@@ -377,20 +405,25 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DisableSpecialization, "-disable-specialization", nullptr, "Disables generics and specialization pass." },
         { OptionKind::FloatingPointMode, "-fp-mode,-floating-point-mode", "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>", 
         "Control floating point optimizations"},
-        { OptionKind::DebugInformation, "-g...", "-g, -g<N>, -g<debug-info-format>", 
+        { OptionKind::DebugInformation, "-g...", "-g, -g<debug-info-format>, -g<debug-level>", 
         "Include debug information in the generated code, where possible.\n"
-        "N is the amount of information, 0..3, unspecified means 2\n" 
+        "<debug-level> is the amount of information, 0..3, unspecified means 2\n" 
         "<debug-info-format> specifies a debugging info format\n"
-        "It is valid to have multiple -g options, such as a level and a <debug-info-format>" },
+        "It is valid to have multiple -g options, such as a <debug-level> and a <debug-info-format>" },
         { OptionKind::LineDirectiveMode, "-line-directive-mode", "-line-directive-mode <line-directive-mode>", 
         "Sets how the `#line` directives should be produced. Available options are:\n"
         "If not specified, default behavior is to use C-style `#line` directives "
         "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives "
         "for GLSL output." },
-        { OptionKind::Optimization, "-O...", "-O<N>", 
-        "Set the optimization level.\n"
-        "N is the amount of optimization, 0..3, default is 1" },
+        { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
         { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
+        { OptionKind::GLSLForceScalarLayout,
+         "-force-glsl-scalar-layout",
+         nullptr,
+         "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
+        { OptionKind::EnableEffectAnnotations,
+         "-enable-effect-annotations",
+         "Enables support for legacy effect annotation syntax."},
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -424,8 +457,9 @@ void initCommandOptions(CommandOptions& options)
         "to the downstream compiler. -X<compiler>... options -X. will pass *all* of the options "
         "inbetween the opening -X and -X. to the downstream compiler."},
         { OptionKind::PassThrough, "-pass-through", "-pass-through <compiler>", 
-        "Pass the input through mostly unmodified to the \n"
-        "existing compiler <compiler>." },
+        "Pass the input through mostly unmodified to the "
+        "existing compiler <compiler>.\n" 
+        "These are intended for debugging/testing purposes, when you want to be able to see what these existing compilers do with the \"same\" input and options"},
     };
 
     _addOptions(makeConstArrayView(downstreamOpts), options);
@@ -470,9 +504,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr, 
         "Generate SPIR-V output directly (otherwise through "
         "GLSL and using the glslang compiler)"},
-        { OptionKind::FileSystem, "-file-system", "-file-system <fs>", 
-        "Set the filesystem hook to use for a compile request.\n"
-        "Accepted file systems: default, load-file, os" },
+        { OptionKind::FileSystem, "-file-system", "-file-system <file-system-type>", 
+        "Set the filesystem hook to use for a compile request."},
         { OptionKind::Heterogeneous, "-heterogeneous", nullptr, "Output heterogeneity-related code." },
         { OptionKind::NoMangle, "-no-mangle", nullptr, "Do as little mangling of names as possible." }
     };
@@ -632,7 +665,7 @@ struct OptionsParser
         SlangTargetFlags    targetFlags = 0;
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
-
+        bool                forceGLSLScalarLayout = false;
         List<CapabilityAtom> capabilityAtoms;
 
         // State for tracking command-line errors
@@ -1087,11 +1120,11 @@ struct OptionsParser
         return SLANG_OK;
     }
 
-    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
+    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, const UnownedStringSlice& name, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
     {
         auto& cmdOptions = asInternal(session)->m_commandOptions;
 
-        const auto optionIndex = cmdOptions.findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), arg.value.getUnownedSlice());
+        const auto optionIndex = cmdOptions.findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), name);
         if (optionIndex < 0)
         {                
             const auto categoryIndex = cmdOptions.findCategoryByUserValue(CommandOptions::UserValue(valueCategory));
@@ -1114,6 +1147,46 @@ struct OptionsParser
         outValue = cmdOptions.getOptionAt(optionIndex).userValue;
         return SLANG_OK;
     }
+
+    SlangResult _getValue(ValueCategory valueCategory, const CommandLineArg& arg, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
+    {
+        return _getValue(valueCategory, arg, arg.value.getUnownedSlice(), sink, outValue);
+    }
+
+    SlangResult _getValue(const ConstArrayView<ValueCategory>& valueCategories, const CommandLineArg& arg, const UnownedStringSlice& name, DiagnosticSink* sink, ValueCategory& outCat, CommandOptions::UserValue& outValue)
+    {
+        auto& cmdOptions = asInternal(session)->m_commandOptions;
+
+        for (auto valueCategory : valueCategories)
+        {
+            const auto optionIndex = cmdOptions.findOptionByCategoryUserValue(CommandOptions::UserValue(valueCategory), name);
+            if (optionIndex >= 0)
+            {
+                outCat = valueCategory;
+                outValue = cmdOptions.getOptionAt(optionIndex).userValue;
+                return SLANG_OK;
+            }
+        }
+
+        List<UnownedStringSlice> names;
+        for (auto valueCategory : valueCategories)
+        { 
+            const auto categoryIndex = cmdOptions.findCategoryByUserValue(CommandOptions::UserValue(valueCategory));
+            SLANG_ASSERT(categoryIndex >= 0);
+            if (categoryIndex < 0)
+            {
+                return SLANG_FAIL;
+            }
+            cmdOptions.appendCategoryOptionNames(categoryIndex, names);
+        }
+
+        StringBuilder buf;
+        StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
+
+        sink->diagnose(arg.loc, Diagnostics::unknownCommandLineValue, buf);
+        return SLANG_FAIL;
+    }
+
     SlangResult _expectValue(ValueCategory valueCategory, CommandLineReader& reader, DiagnosticSink* sink, CommandOptions::UserValue& outValue)
     {
         CommandLineArg arg;
@@ -1208,7 +1281,8 @@ struct OptionsParser
 
         // Get the options on the session
         CommandOptions& options = asInternal(session)->m_commandOptions;
-        
+        CommandOptionsWriter::Style helpStyle = CommandOptionsWriter::Style::Text; 
+
         auto frontEndReq = requestImpl->getFrontEndReq();
 
         while (reader.hasArg())
@@ -1472,7 +1546,7 @@ struct OptionsParser
                 case OptionKind::EnableWarning:
                 {
                     // 2 because -W
-                    auto name = argValue.getUnownedSlice().tail(5);
+                    auto name = argValue.getUnownedSlice().tail(2);
                     // Enable the warning
                     SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning, sink));
                     break;
@@ -1766,91 +1840,60 @@ struct OptionsParser
                     setFloatingPointMode(getCurrentTarget(), FloatingPointMode(value));
                     break;
                 }
+                case OptionKind::GLSLForceScalarLayout:
+                {
+                    getCurrentTarget()->forceGLSLScalarLayout = true;
+                    break;
+                }
+                case OptionKind::EnableEffectAnnotations:
+                {
+                    compileRequest->setEnableEffectAnnotations(true);
+                    break;
+                }
                 case OptionKind::Optimization:
                 {
                     UnownedStringSlice levelSlice = argValue.getUnownedSlice().tail(2);
                     SlangOptimizationLevel level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
 
-                    const char c = levelSlice.getLength() == 1 ? levelSlice[0] : 0;
-
-                    switch (c)
+                    if (levelSlice.getLength())
                     {
-                        case '0':   level = SLANG_OPTIMIZATION_LEVEL_NONE;      break;
-                        case '1':   level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;   break;
-                        case '2':   level = SLANG_OPTIMIZATION_LEVEL_HIGH;      break;
-                        case '3':   level = SLANG_OPTIMIZATION_LEVEL_MAXIMAL;   break;
-                        default:
-                        {
-                            sink->diagnose(arg.loc, Diagnostics::unknownOptimiziationLevel, arg.value);
-                            return SLANG_FAIL;
-                        }
+                        CommandOptions::UserValue value;
+                        SLANG_RETURN_ON_FAIL(_getValue(ValueCategory::OptimizationLevel, arg, levelSlice, sink, value));
+                        level = SlangOptimizationLevel(value);
                     }
-                 
+
                     compileRequest->setOptimizationLevel(level);
                     break;
                 }
                 case OptionKind::DebugInformation:
                 {
+                    auto name = argValue.getUnownedSlice().tail(2);
+
                     // Note: unlike with `-O` above, we have to consider that other
                     // options might have names that start with `-g` and so cannot
                     // just detect it as a prefix.
-                    if (argValue == toSlice("-g"))
+                    if (name.getLength() == 0)
                     {
                         // The default is standard
                         compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
                     }
-                    else if (argValue.getLength() == 3 && argValue[2] >= '0' && argValue[2] <= '3')
+                    else 
                     {
-                        // Extract the digit into an index
-                        const Index levelIndex = argValue[2] - '0';
-                        SLANG_ASSERT(levelIndex >= 0 && levelIndex <= 3);
+                        CommandOptions::UserValue value;
+                        ValueCategory valueCat;
+                        ValueCategory valueCats[] = { ValueCategory::DebugLevel, ValueCategory::DebugInfoFormat };
+                        SLANG_RETURN_ON_FAIL(_getValue(makeConstArrayView(valueCats), arg, name, sink, valueCat, value));
 
-                        // Map indices to enum values
-                        const SlangDebugInfoLevel levels[] = 
+                        if (valueCat == ValueCategory::DebugLevel)
                         {
-                            SLANG_DEBUG_INFO_LEVEL_NONE,
-                            SLANG_DEBUG_INFO_LEVEL_MINIMAL,
-                            SLANG_DEBUG_INFO_LEVEL_STANDARD,
-                            SLANG_DEBUG_INFO_LEVEL_MAXIMAL
-                        };
-
-                        const auto level = levels[levelIndex];
-                        compileRequest->setDebugInfoLevel(level);
-                    }
-                    else
-                    {
-                        // Perhaps it's trying to specify a format
-                        auto formatName = argValue.getUnownedSlice().tail(2);
-
-                        SlangDebugInfoFormat format;
-                        if (SLANG_FAILED(TypeTextUtil::findDebugInfoFormat(formatName, format)))
-                        {
-                            List<String> debugOptions;
-
-                            debugOptions.add(toSlice("-g"));
-
-                            for (Int i = 0; i <= 3; ++i)
-                            {
-                                StringBuilder buf;
-                                buf << toSlice("-g") << i;
-                                debugOptions.add(buf);
-                            }
-
-                            for (Index i = 0; i < SLANG_DEBUG_INFO_FORMAT_COUNT_OF; ++i)
-                            {
-                                StringBuilder buf;
-                                buf << toSlice("-g") << TypeTextUtil::getDebugInfoFormatName(SlangDebugInfoFormat(i));
-                                debugOptions.add(buf);
-                            }
-
-                            StringBuilder buf;
-                            StringUtil::join(debugOptions, toSlice(", "), buf);
-
-                            sink->diagnose(arg.loc, Diagnostics::unknownDebugOption, buf);
-                            return SLANG_FAIL;
+                            const auto level = (SlangDebugInfoLevel)value;
+                            compileRequest->setDebugInfoLevel(level);
                         }
-                       
-                        compileRequest->setDebugInfoFormat(format);
+                        else
+                        {
+                            const auto debugFormat = (SlangDebugInfoFormat)value;
+                            compileRequest->setDebugInfoFormat(debugFormat);
+                        }
                     }
                     break;
                 }
@@ -1858,27 +1901,15 @@ struct OptionsParser
                 case OptionKind::Obfuscate: requestImpl->getLinkage()->m_obfuscateCode = true; break;
                 case OptionKind::FileSystem:
                 {
-                    CommandLineArg name;
-                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
+                    CommandOptions::UserValue value;
+                    SLANG_RETURN_ON_FAIL(_expectValue(ValueCategory::FileSystemType, reader, sink, value));
+                    typedef TypeTextUtil::FileSystemType FileSystemType;
 
-                    if (name.value == "default")
+                    switch (FileSystemType(value))
                     {
-                        compileRequest->setFileSystem(nullptr);
-                    }
-                    else if (name.value == "load-file")
-                    {
-                        // 'Simple' just implements loadFile interface, so will be wrapped with CacheFileSystem internally
-                        compileRequest->setFileSystem(OSFileSystem::getLoadSingleton());
-                    }
-                    else if (name.value == "os")
-                    {
-                        // 'Immutable' implements the ISlangFileSystemExt interface - and will be used directly
-                        compileRequest->setFileSystem(OSFileSystem::getExtSingleton());
-                    }
-                    else
-                    {
-                        sink->diagnose(name.loc, Diagnostics::unknownFileSystemOption, name.value);
-                        return SLANG_FAIL;
+                        case FileSystemType::Default:   compileRequest->setFileSystem(nullptr); break;
+                        case FileSystemType::LoadFile:  compileRequest->setFileSystem(OSFileSystem::getLoadSingleton()); break;
+                        case FileSystemType::Os:        compileRequest->setFileSystem(OSFileSystem::getExtSingleton()); break;
                     }
                     break;
                 }
@@ -1950,9 +1981,15 @@ struct OptionsParser
                     sink->diagnoseRaw(Severity::Note, session->getBuildTagString());
                     break;
                 }
+                case OptionKind::HelpStyle:
+                {
+                    CommandOptions::UserValue value;
+                    SLANG_RETURN_ON_FAIL(_expectValue(ValueCategory::HelpStyle, reader, sink, value));
+                    helpStyle = CommandOptionsWriter::Style(value);
+                    break;
+                }
                 case OptionKind::Help:
                 {
-                    
                     Index categoryIndex = -1;
 
                     if (reader.hasArg())
@@ -1960,24 +1997,48 @@ struct OptionsParser
                         auto catArg = reader.getArgAndAdvance();
 
                         categoryIndex = options.findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
-                        if (categoryIndex)
+                        if (categoryIndex < 0)
                         {
                             sink->diagnose(catArg.loc, Diagnostics::unknownHelpCategory);
                             return SLANG_FAIL;
                         }
                     }
 
-                    CommandOptionsWriter writer;
-                    auto& buf = writer.getBuilder();
+                    CommandOptionsWriter::Options writerOptions;
+                    writerOptions.style = helpStyle;
+
+                    auto writer = CommandOptionsWriter::create(writerOptions);
+
+                    auto& buf = writer->getBuilder();
 
                     if (categoryIndex < 0)
                     {
-                        _appendUsageTitle(buf);
-                        writer.appendDescription(options);
+                        // If it's the text style we can inject usage at the top
+                        if (helpStyle == CommandOptionsWriter::Style::Text)
+                        {
+                            _appendUsageTitle(buf);
+                        }
+                        else
+                        {
+                            // NOTE! We need this preamble because if we have links,
+                            // we have to make sure the first thing in markdown *isn't* <>
+
+                            buf << "# Slang Command Line Options\n\n";
+                            buf << "*Usage:*\n";
+                            buf << "```\n";
+                            buf << "slangc [options...] [--] <input files>\n\n";
+                            buf << "# For help\n";
+                            buf << "slangc -h\n\n";
+                            buf << "# To generate this file\n";
+                            buf << "slangc -help-style markdown -h\n";
+                            buf << "```\n";
+                        }
+
+                        writer->appendDescription(&options);
                     }
                     else
                     {
-                        writer.appendDescriptionForCategory(options, categoryIndex);
+                        writer->appendDescriptionForCategory(&options, categoryIndex);
                     }
                     
                     sink->diagnoseRaw(Severity::Note, buf.getBuffer());
@@ -2482,6 +2543,10 @@ struct OptionsParser
             if( rawTarget.floatingPointMode != FloatingPointMode::Default )
             {
                 compileRequest->setTargetFloatingPointMode(targetID, SlangFloatingPointMode(rawTarget.floatingPointMode));
+            }
+            if (rawTarget.forceGLSLScalarLayout)
+            {
+                compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
             }
         }
 
