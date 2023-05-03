@@ -5,8 +5,6 @@
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
-#include "../core/slang-name-value.h"
-
 #include "../compiler-core/slang-artifact-desc-util.h"
 
 #include "slang-ir-string-hash.h"
@@ -14,9 +12,6 @@
 #include "../../slang.h"
 
 namespace Slang {
-
-
-
 
 struct ParameterInfo;
 
