@@ -1013,18 +1013,18 @@ namespace Slang
                 {
                     return true;
                 }
-                auto startingLine = humaneLoc.line;
-                for (auto modifier : funcDecl->modifiers)
-                {
-                    auto modifierLoc = getLinkage()->getSourceManager()->getHumaneLoc(
-                        modifier->loc, SourceLocType::Actual);
-                    if (modifierLoc.line < startingLine)
-                        startingLine = modifierLoc.line;
-                }
                 if (assistInfo.checkingMode == ContentAssistCheckingMode::Completion)
                 {
                     // For completion requests, we skip all funtion bodies except for the one
                     // that the current cursor is in.
+                    auto startingLine = humaneLoc.line;
+                    for (auto modifier : funcDecl->modifiers)
+                    {
+                        auto modifierLoc = getLinkage()->getSourceManager()->getHumaneLoc(
+                            modifier->loc, SourceLocType::Actual);
+                        if (modifierLoc.line < startingLine)
+                            startingLine = modifierLoc.line;
+                    }
                     auto closingLoc = getLinkage()->getSourceManager()->getHumaneLoc(
                         funcDecl->closingSourceLoc, SourceLocType::Actual);
 
