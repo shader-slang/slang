@@ -56,6 +56,9 @@ public:
         /// Returns true if contains default information. If so it can in effect be ignored
     bool isDefault() const;
 
+        /// True as global binds set
+    bool hasGlobalsBinding() const { return m_globalsBinding >= 0 && m_globalsBindingSet >= 0; }
+
     static ConstArrayView<NamesDescriptionValue> getKindInfos();
 
         /// Get the kind. Returns Kind::Invalid if not an applicable category

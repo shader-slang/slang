@@ -2505,24 +2505,46 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
     /// the resources required for a constant buffer in the appropriate
     /// target-specific fashion.
     ///
-static ParameterBindingAndKindInfo maybeAllocateConstantBufferBinding(
-    ParameterBindingContext*    context,
-    bool                        needConstantBuffer)
+static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
+    ParameterBindingContext*    context)
 {
-    if( !needConstantBuffer ) return ParameterBindingAndKindInfo();
-
     UInt space = context->shared->defaultSpace;
     auto usedRangeSet = findUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
                           ->getConstantBufferRules(context->getTargetRequest())
-                          ->GetObjectLayout(
-        ShaderParameterKind::ConstantBuffer);
+                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
     info.count = layoutInfo.size;
     info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(nullptr, layoutInfo.size.getFiniteValue());
+    info.space = space;
+    return info;
+}
+
+static ParameterBindingAndKindInfo _assignConstantBufferBinding(
+    ParameterBindingContext* context,
+    UInt space, 
+    UInt index)
+{
+    auto usedRangeSet = findUsedRangeSetForSpace(context, space);
+
+    auto layoutInfo = context->getRulesFamily()
+        ->getConstantBufferRules(context->getTargetRequest())
+        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+
+    UsedRange range;
+    range.begin = index;
+    range.end = index + 1;
+    range.parameter = nullptr;
+
+    usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(range);
+
+    ParameterBindingAndKindInfo info;
+    info.kind = layoutInfo.kind;
+    info.count = 1; 
+    info.index = index;
     info.space = space;
     return info;
 }
@@ -3596,6 +3618,24 @@ RefPtr<ProgramLayout> generateParameterBindings(
         }
     }
 
+    // Global constant buffer binding. 
+    // It's initially invalid
+    ParameterBindingAndKindInfo globalConstantBufferBinding;
+
+    // If we have a space/binding assigned for use for globals in Vulkan, 
+    // we can't use *that* as the default space, so we allocate if
+    if (auto vulkanOptions = targetReq->getVulkanLayoutOptions())
+    {
+        if (vulkanOptions->hasGlobalsBinding())
+        {
+            // Allocate the set
+            markSpaceUsed(&context, nullptr, vulkanOptions->m_globalsBindingSet);
+
+            // Mark the use of this binding
+            globalConstantBufferBinding = _assignConstantBufferBinding(&context, vulkanOptions->m_globalsBindingSet, vulkanOptions->m_globalsBinding);
+        }
+    }
+
     // Once we have a canonical list of all the parameters, we can
     // detect if there are any global-scope parameters that make use
     // of `LayoutResourceKind::Uniform`, since such parameters would
@@ -3638,6 +3678,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // we are creating a default constant buffer, since it should get
     // a binding in that "default" space.
     //
+    // Note: If HLSL->Vulkan binding options, have global bindings set, 
+    // that will consume the set specified, so the default may not be zero if that is already used
     bool needDefaultSpace = needDefaultConstantBuffer;
     if (!needDefaultSpace)
     {
@@ -3754,12 +3796,13 @@ RefPtr<ProgramLayout> generateParameterBindings(
     }
 
     // If there are any global-scope uniforms, then we need to
-    // allocate a constant-buffer binding for them here.
-    //
-    ParameterBindingAndKindInfo globalConstantBufferBinding = maybeAllocateConstantBufferBinding(
-        &context,
-        needDefaultConstantBuffer);
-
+    // allocate a constant-buffer binding for them here, if hasn't already been
+    // assigned
+    if (globalConstantBufferBinding.kind == LayoutResourceKind::None && needDefaultConstantBuffer)
+    {
+        globalConstantBufferBinding = _allocateConstantBufferBinding(&context);
+    }
+     
     // Now that all of the explicit bindings have been dealt with
     // and we've also allocate any space/buffer that is required
     // for global-scope parameters, we will go through the
@@ -3782,9 +3825,11 @@ RefPtr<ProgramLayout> generateParameterBindings(
     }
 
     auto globalScopeVarLayout = globalScopeLayoutBuilder.endLayout();
+
     if( globalConstantBufferBinding.count != 0 )
     {
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
+         
         cbInfo->space = globalConstantBufferBinding.space;
         cbInfo->index = globalConstantBufferBinding.index;
     }
