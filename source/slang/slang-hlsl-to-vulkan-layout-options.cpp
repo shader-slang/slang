@@ -25,6 +25,15 @@ static NamesDescriptionValue s_vulkanShiftKinds[] =
     return makeConstArrayView(s_vulkanShiftKinds);
 }
 
+HLSLToVulkanLayoutOptions::HLSLToVulkanLayoutOptions()
+{
+    for (auto& shift : m_allShifts)
+    {
+        shift = kInvalidShift;
+    }
+}
+
+
    /// Set the the all option for the kind
 void HLSLToVulkanLayoutOptions::setAllShift(Kind kind, Index shift)
 {
@@ -89,7 +98,7 @@ bool HLSLToVulkanLayoutOptions::isDefault() const
     }
 
     // If either has been set it's not default
-    return m_globalsBinding >= 0 || m_globalsBindingSet >= 0;
+    return m_globalsBinding < 0 && m_globalsBindingSet < 0;
 }
 
 /* static */HLSLToVulkanLayoutOptions::Kind HLSLToVulkanLayoutOptions::getKind(slang::ParameterCategory param)

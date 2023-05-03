@@ -44,7 +44,7 @@ public:
         HashCode getHashCode() const { return combineHash(Slang::getHashCode(kind), Slang::getHashCode(set)); }
 
         Kind kind;          ///< The kind this entry is for
-        Index set;          ///< If -1 this is the shift for all of this kind
+        Index set;          ///< The set this shift is associated with 
     };
 
         /// Set the the all option for the kind
@@ -62,15 +62,19 @@ public:
         /// True as global binds set
     bool hasGlobalsBinding() const { return m_globalsBinding >= 0 && m_globalsBindingSet >= 0; }
 
+        /// Ctor
+    HLSLToVulkanLayoutOptions();
+
+        /// Get information about the different kinds
     static ConstArrayView<NamesDescriptionValue> getKindInfos();
 
-        /// Get the kind. Returns Kind::Invalid if not an applicable category
+        /// Given a paramCategory get the kind. Returns Kind::Invalid if not an applicable category
     static Kind getKind(slang::ParameterCategory param);
 
     Index m_globalsBinding = -1;
     Index m_globalsBindingSet = -1;
 
-    Index m_allShifts[Count(Kind::CountOf)] = { kInvalidShift };
+    Index m_allShifts[Count(Kind::CountOf)];
 
         /// Maps a key to the amount of shift
     Dictionary<Key, Index> m_shifts;
