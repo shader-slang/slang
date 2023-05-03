@@ -51,6 +51,8 @@ void VulkanLayoutOptions::setAllShift(Kind kind, Index shift)
 
 void VulkanLayoutOptions::setShift(Kind kind, Index set, Index shift)
 {
+    SLANG_ASSERT(shift != kInvalidShift);
+
     Key key{ kind, set };
     m_shifts.add(key, shift);
 }
@@ -61,6 +63,7 @@ Index VulkanLayoutOptions::getShift(Kind kind, Index set) const
     {
         return *ptr;
     }
+
     return m_allShifts[Index(kind)];
 }
 
@@ -69,7 +72,7 @@ bool VulkanLayoutOptions::isDefault() const
     // If any all shift is set it's not default
     for (auto shift : m_allShifts)
     {
-        if (shift)
+        if (shift != kInvalidShift)
         {
             return false;
         }
@@ -78,6 +81,7 @@ bool VulkanLayoutOptions::isDefault() const
     // If any has a non zero shift, it's not default
     for (auto& pair : m_shifts)
     {
+        // We need a value that is non zero...
         if (pair.value)
         {
             return false;
@@ -85,8 +89,35 @@ bool VulkanLayoutOptions::isDefault() const
     }
 
     // If either has been set it's not default
-    return m_globalsBinding > 0 && m_globalsBindingSet >= 0;
+    return m_globalsBinding >= 0 || m_globalsBindingSet >= 0;
 }
 
+/* static */VulkanLayoutOptions::Kind VulkanLayoutOptions::getKind(slang::ParameterCategory param)
+{
+    typedef slang::ParameterCategory ParameterCategory;
+
+    switch (param)
+    {
+        case ParameterCategory::Mixed:
+        {
+            // TODO(JS):
+            // Hmm, is this TextureSampler?
+            return Kind::Invalid;
+        }
+        case ParameterCategory::Uniform:
+        case ParameterCategory::ConstantBuffer: 
+        {
+            return Kind::Uniform;
+        }
+        case ParameterCategory::ShaderResource:     return Kind::Texture;
+        case ParameterCategory::UnorderedAccess:    return Kind::Buffer;
+        case ParameterCategory::SamplerState:       return Kind::Sampler;
+        
+        default:
+        {
+            return Kind::Invalid;
+        }
+    }
+}
 
 } // namespace Slang

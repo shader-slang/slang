@@ -16,9 +16,13 @@ struct VulkanLayoutOptions : public RefObject
 {
 public:
 
+    static const Index kInvalidShift = Index(0x80000000);
+
     // {b|s|t|u} 
     enum class Kind
     {
+        Invalid = -1,
+
         Buffer,             ///< Buffer 
         Sampler,            ///< Sampler
         Texture,            ///< Texture
@@ -46,7 +50,7 @@ public:
         /// Set the shift for kind/set
     void setShift(Kind kind, Index set, Index shift);
 
-        /// Get the shift. If not found returns 0 meaning don't shift
+        /// Get the shift. Returns kInvalidShift if no shift is found
     Index getShift(Kind kind, Index set) const;
 
         /// Returns true if contains default information. If so it can in effect be ignored
@@ -54,10 +58,13 @@ public:
 
     static ConstArrayView<NamesDescriptionValue> getKindInfos();
 
+        /// Get the kind. Returns Kind::Invalid if not an applicable category
+    static Kind getKind(slang::ParameterCategory param);
+
     Index m_globalsBinding = -1;
     Index m_globalsBindingSet = -1;
 
-    Index m_allShifts[Count(Kind::CountOf)] = { 0 };
+    Index m_allShifts[Count(Kind::CountOf)] = { kInvalidShift };
 
         /// Maps a key to the amount of shift
     Dictionary<Key, Index> m_shifts;

@@ -975,10 +975,16 @@ static void addExplicitParameterBindings_HLSL(
     }
 }
 
-static void maybeDiagnoseMissingVulkanLayoutModifier(
+static void _maybeDiagnoseMissingVulkanLayoutModifier(
     ParameterBindingContext*    context,
     DeclRef<VarDeclBase> const& varDecl)
 {
+    // If we have vulkan layout optins this *might* be all ok
+    if (context->getTargetRequest()->getVulkanLayoutOptions())
+    {
+        return;
+    }
+
     // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
     // but they *did* specify a `register` for D3D, then that is probably an
     // oversight on their part.
@@ -1023,7 +1029,7 @@ static void addExplicitParameterBindings_GLSL(
         auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>();
         if (!attr)
         {
-            maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
+            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
             return;
         }
         semanticInfo.index = attr->binding;
@@ -1035,7 +1041,7 @@ static void addExplicitParameterBindings_GLSL(
         auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>();
         if (!attr)
         {
-            maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
+            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
             return;
         }
         if( attr->binding != 0)
@@ -1054,15 +1060,57 @@ static void addExplicitParameterBindings_GLSL(
             return;
     }
 
-    // If we didn't find any matches, then bail
-    if(!resInfo)
+    // if we found resInfo, we add the explicit binding
+    if (resInfo)
+    {
+        auto kind = resInfo->kind;
+        auto count = resInfo->count;
+        semanticInfo.kind = kind;
+
+        addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
         return;
+    }
 
-    auto kind = resInfo->kind;
-    auto count = resInfo->count;
-    semanticInfo.kind = kind;
+    // If we didn't find any matches, but perhaps we can use VulkanLayoutInfo to convert HLSL binding to 
+    // GLSL/Vulkan
+    
+    // Do we have any vulkan shift settings
+    auto vulkanLayoutOptions = context->getTargetRequest()->getVulkanLayoutOptions();
+    auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
 
-    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
+    if (vulkanLayoutOptions == nullptr || hlslRegSemantic == nullptr)
+    {
+        // If we don't have vulkanLayoutOptions or a HLSL explicit binding to map from, then we done 
+        return;
+    }
+            
+    // Get the HLSL binding info
+    const auto hlslInfo = ExtractLayoutSemanticInfo(context, hlslRegSemantic);
+    if (hlslInfo.kind != LayoutResourceKind::None)
+    {
+        // We need to map to the GLSL binding types
+        VulkanLayoutOptions::Kind vulkanKind = VulkanLayoutOptions::getKind(hlslInfo.kind);
+        if (vulkanKind != VulkanLayoutOptions::Kind::Invalid)
+        {
+            const auto shift = vulkanLayoutOptions->getShift(vulkanKind, Index(hlslInfo.space));
+            if (shift != VulkanLayoutOptions::kInvalidShift)
+            {
+                const Index bindingIndex = Index(hlslInfo.index) + shift;
+
+                if (bindingIndex >= 0)
+                {
+                    semanticInfo.kind = hlslInfo.kind;
+                    semanticInfo.index = UInt(bindingIndex);
+                    semanticInfo.space = hlslInfo.space;
+                    
+                    // Count can only be 1?
+                    const Slang::LayoutSize count = 1;
+
+                    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
+                }
+            }
+        }
+    }
 }
 
 // Given a single parameter, collect whatever information we have on

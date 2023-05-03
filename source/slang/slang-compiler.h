@@ -1578,7 +1578,8 @@ namespace Slang
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
 
-        void setVulkanLayoutOptions(VulkanLayoutOptions* opts) { vulkanLayoutOptions = opts; }
+        void setVulkanLayoutOptions(VulkanLayoutOptions* opts);
+
         const VulkanLayoutOptions* getVulkanLayoutOptions() const { return vulkanLayoutOptions; }
 
         bool shouldDumpIntermediates() { return dumpIntermediates; }
@@ -2627,7 +2628,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
 
-        void setVulkanLayoutOptions(int targetIndex, const VulkanLayoutOptions* vulkanLayoutOptions);
+        void setVulkanLayoutOptions(int targetIndex, VulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
             Session* session);

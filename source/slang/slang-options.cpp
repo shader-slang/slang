@@ -179,7 +179,7 @@ SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
 SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
-SLANG_GET_VALUE_CATEGORY(VulkanShift, VulkanShiftOptions::Kind)
+SLANG_GET_VALUE_CATEGORY(VulkanShift, VulkanLayoutOptions::Kind)
 
 } // anonymous
 
@@ -450,7 +450,7 @@ void initCommandOptions(CommandOptions& options)
 
     {
         StringBuilder names;
-        for (auto nameSlice : NameValueUtil::getNames(NameValueUtil::NameKind::All, VulkanShiftOptions::getKindInfos()))
+        for (auto nameSlice : NameValueUtil::getNames(NameValueUtil::NameKind::All, VulkanLayoutOptions::getKindInfos()))
         {
             // -fvk-{b|s|t|u}-shift
             names << "-fvk-" << nameSlice << "-shift,";
