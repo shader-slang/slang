@@ -317,21 +317,21 @@ void initCommandOptions(CommandOptions& options)
         const CommandOptions::ValuePair pairs[] = 
         {
             {"hlsl,fx", "hlsl"},
-            {"dxbc"},
+            {"dxbc", nullptr},
             {"dxbc-asm", "dxbc-assembly"},
-            {"dxil"},
+            {"dxil", nullptr},
             {"dxil-asm", "dxil-assembly"},
-            {"glsl"},
+            {"glsl", nullptr},
             {"vert", "glsl (vertex)"},
             {"frag", "glsl (fragment)"},
             {"geom", "glsl (geoemtry)"},
             {"tesc", "glsl (hull)"},
             {"tese", "glsl (domain)"},
             {"comp", "glsl (compute)"},
-            {"slang"},
+            {"slang", nullptr},
             {"spv", "SPIR-V"},
             {"spv-asm", "SPIR-V assembly"},
-            {"c"},
+            {"c", nullptr},
             {"cpp,c++,cxx", "C++"},
             {"exe", "executable"},
             {"dll,so", "sharedlibrary/dll"},
@@ -2167,7 +2167,7 @@ SlangResult OptionsParser::_parse(
                 m_compileRequest->setOptimizationLevel(level);
                 break;
             }
-            case OptionKind::DebugInformation: SLANG_RETURN_ON_FAIL(_parseDebugInformation(arg));
+            case OptionKind::DebugInformation: SLANG_RETURN_ON_FAIL(_parseDebugInformation(arg)); break;
             case OptionKind::DefaultImageFormatUnknown: m_requestImpl->useUnknownImageFormatAsDefault = true; break;
             case OptionKind::Obfuscate: m_requestImpl->getLinkage()->m_obfuscateCode = true; break;
             case OptionKind::FileSystem:
