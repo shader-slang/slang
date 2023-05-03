@@ -3492,6 +3492,19 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
                 case LayoutResourceKind::RegisterSpace:
                 case LayoutResourceKind::PushConstantBuffer:
                     continue;
+                case LayoutResourceKind::Uniform:
+                {
+                    // If it's uniform, but we have globals binding defined, we don't need a default space for it
+                    // as it will go in the global binding specified
+                    if (auto hlslToVulkanOptions = sharedContext.getTargetRequest()->getHLSLToVulkanLayoutOptions())
+                    {
+                        if (hlslToVulkanOptions->hasGlobalsBinding())
+                        {
+                            continue;
+                        }
+                    }
+                    break;
+                }
 
                 default:
                     break;
