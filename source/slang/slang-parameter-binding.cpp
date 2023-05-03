@@ -2531,6 +2531,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     const Index count = Index(layoutInfo.size.getFiniteValue());
 
     auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
+    SLANG_UNUSED(existingParam);
     SLANG_ASSERT(existingParam == nullptr);
 
     ParameterBindingAndKindInfo info;
