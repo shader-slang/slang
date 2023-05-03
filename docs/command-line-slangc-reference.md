@@ -321,8 +321,7 @@ Places the $Globals cbuffer at descriptor set &lt;descriptor-set&gt; and binding
 
 <a id="enable-effect-annotations"></a>
 ## -enable-effect-annotations
-
-**Enables support for legacy effect annotation syntax.**
+Enables support for legacy effect annotation syntax. 
 
 
 <a id="fvk-b-shift"></a>

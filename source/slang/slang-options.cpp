@@ -445,14 +445,13 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
         { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
         { OptionKind::GLSLForceScalarLayout,
-         "-force-glsl-scalar-layout",
-         nullptr,
+         "-force-glsl-scalar-layout", nullptr,
          "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
         "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>. See HLSL global variables and Vulkan binding for explanation and examples."
         },
         { OptionKind::EnableEffectAnnotations,
-         "-enable-effect-annotations",
+         "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
     };
 
