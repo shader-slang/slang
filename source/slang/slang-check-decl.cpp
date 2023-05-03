@@ -6962,7 +6962,6 @@ namespace Slang
             }
         }
 
-
         visitor->getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
     }
 
