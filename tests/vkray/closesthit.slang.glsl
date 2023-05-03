@@ -23,7 +23,7 @@ struct SLANG_ParameterGroup_ShaderRecord_0
 layout(shaderRecordNV)
 buffer tmp_shaderrecord
 {
-    SLANG_ParameterGroup_ShaderRecord_0 _data;
+    uint shaderRecordID_0; 
 } ShaderRecord_0;
 
 layout(std430, binding = 0) readonly buffer tmp_colors
@@ -59,7 +59,7 @@ void main()
     uint tmp_add_1 = tmp_add_0 + tmp_primid;
     uint tmp_hitkind = gl_HitKindNV;
 
-    vec4 color_1 = colors_0._data[tmp_add_1 + tmp_hitkind + ShaderRecord_0._data.shaderRecordID_0];
+    vec4 color_1 = colors_0._data[tmp_add_1 + tmp_hitkind + ShaderRecord_0.shaderRecordID_0];
 
     float tmp_hitt = gl_RayTmaxNV;
     float tmp_tmin = gl_RayTminNV;

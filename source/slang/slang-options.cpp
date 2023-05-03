@@ -86,6 +86,9 @@ enum class OptionKind
     VulkanBindShift,
     VulkanBindGlobals,
 
+    GLSLForceScalarLayout,
+    EnableEffectAnnotations,
+    
     // Downstream
 
     CompilerPath,
@@ -440,10 +443,17 @@ void initCommandOptions(CommandOptions& options)
         "for HLSL and C/C++ output, and traditional GLSL-style `#line` directives "
         "for GLSL output." },
         { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
-        { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },   
+        { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
+        { OptionKind::GLSLForceScalarLayout,
+         "-force-glsl-scalar-layout",
+         nullptr,
+         "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
         "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>. See HLSL global variables and Vulkan binding for explanation and examples."
         },
+        { OptionKind::EnableEffectAnnotations,
+         "-enable-effect-annotations",
+         "Enables support for legacy effect annotation syntax."},
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -686,7 +696,7 @@ struct OptionsParser
         SlangTargetFlags    targetFlags = 0;
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
-
+        bool                forceGLSLScalarLayout = false;
         List<CapabilityAtom> capabilityAtoms;
 
         // State for tracking command-line errors
@@ -2011,6 +2021,17 @@ SlangResult OptionsParser::_parse(
                 }
                 break;
             }
+            case OptionKind::GLSLForceScalarLayout:
+            {
+                getCurrentTarget()->forceGLSLScalarLayout = true;
+                break;
+            }
+            case OptionKind::EnableEffectAnnotations:
+            {
+                m_compileRequest->setEnableEffectAnnotations(true);
+                break;
+            }
+            
             case OptionKind::EntryPointName:
             {
                 CommandLineArg name;
@@ -2159,7 +2180,7 @@ SlangResult OptionsParser::_parse(
             {
                 UnownedStringSlice levelSlice = argValue.getUnownedSlice().tail(2);
                 SlangOptimizationLevel level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
-
+            
                 if (levelSlice.getLength())
                 {
                     SLANG_RETURN_ON_FAIL(_getValue(arg, levelSlice, level));
@@ -2662,7 +2683,6 @@ SlangResult OptionsParser::_parse(
         }
 
     }
-
     for (auto& rawTarget : m_rawTargets)
     {
         if (rawTarget.conflictingProfilesSet)
@@ -2705,6 +2725,11 @@ SlangResult OptionsParser::_parse(
         if (rawTarget.floatingPointMode != FloatingPointMode::Default)
         {
             m_compileRequest->setTargetFloatingPointMode(targetID, SlangFloatingPointMode(rawTarget.floatingPointMode));
+        }
+
+        if (rawTarget.forceGLSLScalarLayout)
+        {
+            m_compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
         }
     }
 

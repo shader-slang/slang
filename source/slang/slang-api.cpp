@@ -284,7 +284,6 @@ SLANG_API void spSetLineDirectiveMode(
     request->setLineDirectiveMode(mode);
 }
 
-
 SLANG_API void spSetTargetForceGLSLScalarBufferLayout(
     slang::ICompileRequest* request, int targetIndex, bool forceScalarLayout)
 {

@@ -9,7 +9,7 @@ struct SLANG_ParameterGroup_C_0
 layout(binding = 0)
 layout(std140) uniform _S1
 {
-    SLANG_ParameterGroup_C_0 _data;
+    uvec4 u_0;
 } C_0;
 vec4 f16tof32_0(uvec4 value_0)
 {
@@ -35,6 +35,6 @@ out vec4 _S2;
 
 void main()
 {
-    _S2 = f16tof32_0(C_0._data.u_0);
+    _S2 = f16tof32_0(C_0.u_0);
     return;
 }

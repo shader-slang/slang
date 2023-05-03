@@ -11,13 +11,13 @@ struct P_0
 layout(binding = 0)
 layout(std140) uniform _S1
 {
-    P_0 _data;
+    vec4 param_0;
 } pblock_0;
 layout(location = 0)
 out vec4 _S2;
 
 void main()
 {
-    _S2 = pblock_0._data.param_0;
+    _S2 = pblock_0.param_0;
     return;
 }

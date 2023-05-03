@@ -600,12 +600,6 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
         spaceToken->loc,
         getSink(context));
 
-    // TODO: handle component mask part of things...
-    if( semantic->componentMask.hasContent())
-    {
-        getSink(context)->diagnose(semantic->componentMask, Diagnostics::componentMaskNotSupported);
-    }
-
     return info;
 }
 
