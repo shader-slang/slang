@@ -20,7 +20,7 @@ struct SLANG_ParameterGroup_C_0
 layout(binding = 0)
 layout(std140) uniform _S1
 {
-    SLANG_ParameterGroup_C_0 _data;
+    uint shaderIndex_0;
 } C_0;
 void CallShader_0(uint shaderIndex_1, inout MaterialPayload_0 payload_0)
 {
@@ -42,7 +42,7 @@ void main()
     vec2 _S3 = vec2(_S2.xy);
     uvec3 _S4 = ((gl_LaunchSizeNV));
     payload_1.uv_0 = _S3 / vec2(_S4.xy);
-    CallShader_0(C_0._data.shaderIndex_0, payload_1);
+    CallShader_0(C_0.shaderIndex_0, payload_1);
     uvec3 _S5 = ((gl_LaunchIDNV));
     imageStore((gImage_0), ivec2((_S5.xy)), payload_1.albedo_0);
     return;

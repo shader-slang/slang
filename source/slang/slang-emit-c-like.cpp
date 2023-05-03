@@ -1797,6 +1797,37 @@ void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
     getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
 }
 
+bool CLikeSourceEmitter::hasExplicitConstantBufferOffset(IRInst* cbufferType)
+{
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
+    if (!type)
+        return false;
+    if (as<IRGLSLShaderStorageBufferType>(cbufferType))
+        return false;
+    auto structType = as<IRStructType>(type->getElementType());
+    if (!structType)
+        return false;
+    for (auto ff : structType->getFields())
+    {
+        if (ff->getKey()->findDecoration<IRPackOffsetDecoration>())
+            return true;
+    }
+    return false;
+}
+
+bool CLikeSourceEmitter::isSingleElementConstantBuffer(IRInst* cbufferType)
+{
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
+    if (!type)
+        return false;
+    if (as<IRGLSLShaderStorageBufferType>(cbufferType))
+        return false;
+    auto structType = as<IRStructType>(type->getElementType());
+    if (structType)
+        return false;
+    return true;
+}
+
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -1895,11 +1926,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("->");
         else
             m_writer->emit(".");
-        if(getSourceLanguage() == SourceLanguage::GLSL
-            && as<IRUniformParameterGroupType>(base->getDataType()))
-        {
-            m_writer->emit("_data.");
-        }
         m_writer->emit(getName(fieldExtract->getField()));
         break;
     }
@@ -1930,14 +1956,13 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
-
-            auto base = ii->getBase();
-            emitOperand(base, leftSide(outerPrec, prec));
-            m_writer->emit(".");
-            if(getSourceLanguage() == SourceLanguage::GLSL
-                && as<IRUniformParameterGroupType>(base->getDataType()))
+            auto skipBase = isD3DTarget(getTargetReq()) &&
+                hasExplicitConstantBufferOffset(ii->getBase()->getDataType());
+            if (!skipBase)
             {
-                m_writer->emit("_data.");
+                auto base = ii->getBase();
+                emitOperand(base, leftSide(outerPrec, prec));
+                m_writer->emit(".");
             }
             m_writer->emit(getName(ii->getField()));
         }
@@ -2032,8 +2057,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto base = inst->getOperand(0);
             emitDereferenceOperand(base, outerPrec);
-            if(getSourceLanguage() == SourceLanguage::GLSL
-                && as<IRUniformParameterGroupType>(base->getDataType()))
+            if (isKhronosTarget(getTargetReq()) && isSingleElementConstantBuffer(base->getDataType()))
             {
                 m_writer->emit("._data");
             }
@@ -2628,9 +2652,9 @@ void CLikeSourceEmitter::emitSemanticsUsingVarLayout(IRVarLayout* varLayout)
     }
 }
 
-void CLikeSourceEmitter::emitSemantics(IRInst* inst)
+void CLikeSourceEmitter::emitSemantics(IRInst* inst, bool allowOffsetLayout)
 {
-    emitSemanticsImpl(inst);
+    emitSemanticsImpl(inst, allowOffsetLayout);
 }
 
 void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
@@ -3105,11 +3129,11 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 
     m_writer->emit(getName(structType));
 
-    emitStructDeclarationsBlock(structType);
+    emitStructDeclarationsBlock(structType, false);
     m_writer->emit(";\n\n");
 }
 
-void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType)
+void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout)
 {
     m_writer->emit("\n{\n");
     m_writer->indent();
@@ -3130,8 +3154,15 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType)
             emitInterpolationModifiers(fieldKey, fieldType, nullptr);
         }
 
+        if (allowOffsetLayout)
+        {
+            if (auto packOffsetDecoration = fieldKey->findDecoration<IRPackOffsetDecoration>())
+            {
+                emitPackOffsetModifier(fieldKey, fieldType, packOffsetDecoration);
+            }
+        }
         emitType(fieldType, getName(fieldKey));
-        emitSemantics(fieldKey);
+        emitSemantics(fieldKey, allowOffsetLayout);
         m_writer->emit(";\n");
     }
 

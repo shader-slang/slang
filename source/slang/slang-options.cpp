@@ -81,6 +81,8 @@ enum class OptionKind
     LineDirectiveMode,
     Optimization,
     Obfuscate,
+    GLSLForceScalarLayout,
+    EnableEffectAnnotations,
     
     // Downstream
 
@@ -415,6 +417,13 @@ void initCommandOptions(CommandOptions& options)
         "for GLSL output." },
         { OptionKind::Optimization, "-O...", "-O<optimization-level>", "Set the optimization level."},
         { OptionKind::Obfuscate, "-obfuscate", nullptr, "Remove all source file information from outputs." },
+        { OptionKind::GLSLForceScalarLayout,
+         "-force-glsl-scalar-layout",
+         nullptr,
+         "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
+        { OptionKind::EnableEffectAnnotations,
+         "-enable-effect-annotations",
+         "Enables support for legacy effect annotation syntax."},
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -656,7 +665,7 @@ struct OptionsParser
         SlangTargetFlags    targetFlags = 0;
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
-
+        bool                forceGLSLScalarLayout = false;
         List<CapabilityAtom> capabilityAtoms;
 
         // State for tracking command-line errors
@@ -1831,6 +1840,16 @@ struct OptionsParser
                     setFloatingPointMode(getCurrentTarget(), FloatingPointMode(value));
                     break;
                 }
+                case OptionKind::GLSLForceScalarLayout:
+                {
+                    getCurrentTarget()->forceGLSLScalarLayout = true;
+                    break;
+                }
+                case OptionKind::EnableEffectAnnotations:
+                {
+                    compileRequest->setEnableEffectAnnotations(true);
+                    break;
+                }
                 case OptionKind::Optimization:
                 {
                     UnownedStringSlice levelSlice = argValue.getUnownedSlice().tail(2);
@@ -2524,6 +2543,10 @@ struct OptionsParser
             if( rawTarget.floatingPointMode != FloatingPointMode::Default )
             {
                 compileRequest->setTargetFloatingPointMode(targetID, SlangFloatingPointMode(rawTarget.floatingPointMode));
+            }
+            if (rawTarget.forceGLSLScalarLayout)
+            {
+                compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
             }
         }
 

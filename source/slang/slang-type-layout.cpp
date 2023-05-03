@@ -3183,6 +3183,35 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     return fieldLayout;
 }
 
+RefPtr<VarLayout> StructTypeLayoutBuilder::addExplicitUniformField(DeclRef<VarDeclBase> field, TypeLayoutResult fieldResult)
+{
+    auto packoffsetModifier = field.getDecl()->findModifier<HLSLPackOffsetSemantic>();
+    if (!packoffsetModifier)
+        return nullptr;
+
+    RefPtr<VarLayout> fieldLayout = new VarLayout();
+    fieldLayout->varDecl = field;
+    fieldLayout->typeLayout = fieldResult.layout;
+    m_typeLayout->fields.add(fieldLayout);
+    if (field)
+    {
+        m_typeLayout->mapVarToLayout.add(field.getDecl(), fieldLayout);
+    }
+    UInt uniformOffset = packoffsetModifier->uniformOffset;
+    if (fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform))
+    {
+        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset;
+    }
+    UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
+    auto uniformInfo = m_info;
+    m_rules->AddStructField(&uniformInfo, fieldInfo);
+    m_info.alignment = uniformInfo.alignment;
+    m_info.size.raw = Math::Max(
+        m_info.size.getFiniteValue(),
+        (size_t)(uniformOffset + fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform)->count.getFiniteValue()));
+    return fieldLayout;
+}
+
 RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     DeclRef<VarDeclBase>    field,
     RefPtr<TypeLayout>      fieldTypeLayout)
@@ -3684,8 +3713,29 @@ static TypeLayoutResult _createTypeLayout(
 
             typeLayoutBuilder.beginLayout(type, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
+
+            // First, add all fields with explicit offsets.
             for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
             {
+                // If the field has an explicit offset, then we will
+                // use that to place it.
+                //
+                if (auto packOffsetModifier = field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
+                {
+                    TypeLayoutResult fieldResult = _createTypeLayout(
+                        context,
+                        getType(context.astBuilder, field),
+                        field.getDecl());
+                    typeLayoutBuilder.addExplicitUniformField(field, fieldResult);
+                    continue;
+                }
+                
+            }
+            for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
+            {
+                if (auto packOffsetModifier = field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
+                    continue;
+
                 // The fields of a `struct` type may include existential (interface)
                 // types (including as nested sub-fields), and any types present
                 // in those fields will need to be specialized based on the

@@ -11,7 +11,7 @@ struct Params_0
 layout(binding = 0)
 layout(std140) uniform _S1
 {
-    Params_0 _data;
+    int mode_0;
 } gParams_0;
 
 layout(binding = 1)
@@ -34,7 +34,7 @@ rayPayloadInEXT ShadowRay_0 _S3;
 
 void main()
 {
-    if(gParams_0._data.mode_0 != 0)
+    if(gParams_0.mode_0 != 0)
     {
         float val_0 = textureLod(
             sampler2D(gParams_alphaMap_0, gParams_sampler_0),

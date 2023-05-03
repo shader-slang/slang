@@ -17,7 +17,7 @@ struct SLANG_ParameterGroup_U_0
 layout(binding = 0)
 layout(std140) uniform _S1
 {
-    SLANG_ParameterGroup_U_0 _data;
+    Sphere_0 gSphere_0;
 } U_0;
 struct RayDesc_0
 {
@@ -62,7 +62,7 @@ void main()
     ray_1.TMax_0 = _S6;
     float tHit_2;
     SphereHitAttributes_0 attrs_1;
-    bool _S7 = rayIntersectsSphere_0(ray_1, U_0._data.gSphere_0, tHit_2, attrs_1);
+    bool _S7 = rayIntersectsSphere_0(ray_1, U_0.gSphere_0, tHit_2, attrs_1);
     if(_S7)
     {
         bool _S8 = ReportHit_0(tHit_2, uint(0), attrs_1);

@@ -7648,6 +7648,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 irAggType,
                 fieldKey,
                 fieldType);
+
+            if (auto packOffsetModifier = fieldDecl->findModifier<HLSLPackOffsetSemantic>())
+            {
+                lowerPackOffsetModifier(fieldKey, packOffsetModifier);
+            }
         }
 
         // There may be members not handled by the above logic (e.g.,
@@ -7661,6 +7666,36 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(irAggType, decl);
 
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
+    }
+
+    void lowerPackOffsetModifier(IRInst* inst, HLSLPackOffsetSemantic* semantic)
+    {
+        auto builder = getBuilder();
+        int registerOffset = stringToInt(semantic->registerName.getName()->text.getUnownedSlice().tail(1));
+        int componentOffset = 0;
+        if (semantic->componentMask.getContentLength() != 0)
+        {
+            switch (semantic->componentMask.getContent()[0])
+            {
+            case 'x':
+                componentOffset = 0;
+                break;
+            case 'y':
+                componentOffset = 1;
+                break;
+            case 'z':
+                componentOffset = 2;
+                break;
+            case 'w':
+                componentOffset = 3;
+                break;
+            }
+        }
+        builder->addDecoration(
+            inst,
+            kIROp_PackOffsetDecoration,
+            builder->getIntValue(builder->getIntType(), registerOffset),
+            builder->getIntValue(builder->getIntType(), componentOffset));
     }
 
     void lowerRayPayloadAccessModifier(IRInst* inst, RayPayloadAccessSemantic* semantic, IROp op)
