@@ -1,18 +1,21 @@
-// slang-vk-layout-options.h
-#ifndef SLANG_VK_LAYOUT_OPTIONS_H
-#define SLANG_VK_LAYOUT_OPTIONS_H
+// slang-hlsl-to-vulkan-layout-options.h
+#ifndef SLANG_HLSL_TO_VULKAN_LAYOUT_OPTIONS_H
+#define SLANG_HLSL_TO_VULKAN_LAYOUT_OPTIONS_H
 
 #include "../core/slang-basic.h"
-
 #include "../core/slang-name-value.h"
 
 namespace Slang
 {
 
 /*
-  https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#descriptors
-*/
-struct VulkanLayoutOptions : public RefObject
+For support features similar to described here..
+
+https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#descriptors
+
+Options that allow for infering Vulkan bindings based on HLSL register bindings
+  */
+struct HLSLToVulkanLayoutOptions : public RefObject
 {
 public:
 

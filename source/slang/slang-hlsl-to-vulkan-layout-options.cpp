@@ -1,12 +1,12 @@
-// slang-vk-layout-options.cpp
+// slang-hlsl-to-vulkan-layout-options.cpp
 
-#include "slang-vk-layout-options.h"
+#include "slang-hlsl-to-vulkan-layout-options.h"
 
 namespace Slang {
 
 namespace { // anonymous
 
-typedef VulkanLayoutOptions::Kind ShiftKind;
+typedef HLSLToVulkanLayoutOptions::Kind ShiftKind;
 
 /* {b|s|t|u} */
 
@@ -14,19 +14,19 @@ static NamesDescriptionValue s_vulkanShiftKinds[] =
 {
     { ValueInt(ShiftKind::Buffer),  "b", "Vulkan Buffer resource" },
     { ValueInt(ShiftKind::Sampler), "s", "Vulkan Sampler resource" },
-    { ValueInt(ShiftKind::Texture), "t", "Vulkan Sampler resource" },
+    { ValueInt(ShiftKind::Texture), "t", "Vulkan Texture resource" },
     { ValueInt(ShiftKind::Uniform), "u", "Vulkan Uniform resource" },
 };
 
 } // anonymous
 
-/* static */ConstArrayView<NamesDescriptionValue> VulkanLayoutOptions::getKindInfos()
+/* static */ConstArrayView<NamesDescriptionValue> HLSLToVulkanLayoutOptions::getKindInfos()
 {
     return makeConstArrayView(s_vulkanShiftKinds);
 }
 
    /// Set the the all option for the kind
-void VulkanLayoutOptions::setAllShift(Kind kind, Index shift)
+void HLSLToVulkanLayoutOptions::setAllShift(Kind kind, Index shift)
 {
     // We try to follow the convention, of the *last* entry set is the one used.
     // If there a "all" set, we remove everything for the kind.
@@ -49,7 +49,7 @@ void VulkanLayoutOptions::setAllShift(Kind kind, Index shift)
     m_allShifts[Index(kind)] = shift;
 }
 
-void VulkanLayoutOptions::setShift(Kind kind, Index set, Index shift)
+void HLSLToVulkanLayoutOptions::setShift(Kind kind, Index set, Index shift)
 {
     SLANG_ASSERT(shift != kInvalidShift);
 
@@ -57,7 +57,7 @@ void VulkanLayoutOptions::setShift(Kind kind, Index set, Index shift)
     m_shifts.add(key, shift);
 }
 
-Index VulkanLayoutOptions::getShift(Kind kind, Index set) const
+Index HLSLToVulkanLayoutOptions::getShift(Kind kind, Index set) const
 {
     if (auto ptr = m_shifts.tryGetValue(Key{ kind, set }))
     {
@@ -67,7 +67,7 @@ Index VulkanLayoutOptions::getShift(Kind kind, Index set) const
     return m_allShifts[Index(kind)];
 }
 
-bool VulkanLayoutOptions::isDefault() const
+bool HLSLToVulkanLayoutOptions::isDefault() const
 {
     // If any all shift is set it's not default
     for (auto shift : m_allShifts)
@@ -92,7 +92,7 @@ bool VulkanLayoutOptions::isDefault() const
     return m_globalsBinding >= 0 || m_globalsBindingSet >= 0;
 }
 
-/* static */VulkanLayoutOptions::Kind VulkanLayoutOptions::getKind(slang::ParameterCategory param)
+/* static */HLSLToVulkanLayoutOptions::Kind HLSLToVulkanLayoutOptions::getKind(slang::ParameterCategory param)
 {
     typedef slang::ParameterCategory ParameterCategory;
 

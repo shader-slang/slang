@@ -980,7 +980,7 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     DeclRef<VarDeclBase> const& varDecl)
 {
     // If we have vulkan layout optins this *might* be all ok
-    if (context->getTargetRequest()->getVulkanLayoutOptions())
+    if (context->getTargetRequest()->getHLSLToVulkanLayoutOptions())
     {
         return;
     }
@@ -1075,7 +1075,7 @@ static void addExplicitParameterBindings_GLSL(
     // GLSL/Vulkan
     
     // Do we have any vulkan shift settings
-    auto vulkanLayoutOptions = context->getTargetRequest()->getVulkanLayoutOptions();
+    auto vulkanLayoutOptions = context->getTargetRequest()->getHLSLToVulkanLayoutOptions();
     auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
 
     if (vulkanLayoutOptions == nullptr || hlslRegSemantic == nullptr)
@@ -1089,11 +1089,11 @@ static void addExplicitParameterBindings_GLSL(
     if (hlslInfo.kind != LayoutResourceKind::None)
     {
         // We need to map to the GLSL binding types
-        VulkanLayoutOptions::Kind vulkanKind = VulkanLayoutOptions::getKind(hlslInfo.kind);
-        if (vulkanKind != VulkanLayoutOptions::Kind::Invalid)
+        HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
+        if (vulkanKind != HLSLToVulkanLayoutOptions::Kind::Invalid)
         {
             const auto shift = vulkanLayoutOptions->getShift(vulkanKind, Index(hlslInfo.space));
-            if (shift != VulkanLayoutOptions::kInvalidShift)
+            if (shift != HLSLToVulkanLayoutOptions::kInvalidShift)
             {
                 const Index bindingIndex = Index(hlslInfo.index) + shift;
 
@@ -3624,7 +3624,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
 
     // If we have a space/binding assigned for use for globals in Vulkan, 
     // we can't use *that* as the default space, so we allocate if
-    if (auto vulkanOptions = targetReq->getVulkanLayoutOptions())
+    if (auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions())
     {
         if (vulkanOptions->hasGlobalsBinding())
         {

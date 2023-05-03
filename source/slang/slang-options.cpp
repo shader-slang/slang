@@ -19,7 +19,7 @@
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
-#include "slang-vk-layout-options.h"
+#include "slang-hlsl-to-vulkan-layout-options.h"
 
 #include "../core/slang-castable.h"
 #include "../core/slang-file-system.h"
@@ -179,7 +179,7 @@ SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
 SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
-SLANG_GET_VALUE_CATEGORY(VulkanShift, VulkanLayoutOptions::Kind)
+SLANG_GET_VALUE_CATEGORY(VulkanShift, HLSLToVulkanLayoutOptions::Kind)
 
 } // anonymous
 
@@ -266,7 +266,7 @@ void initCommandOptions(CommandOptions& options)
 
     {
         options.addCategory(CategoryKind::Value, "vulkan-shift", "Vulkan Shift", UserValue(ValueCategory::VulkanShift));
-        options.addValues(VulkanLayoutOptions::getKindInfos());
+        options.addValues(HLSLToVulkanLayoutOptions::getKindInfos());
     }
     
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! capabilities !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -450,7 +450,7 @@ void initCommandOptions(CommandOptions& options)
 
     {
         StringBuilder names;
-        for (auto nameSlice : NameValueUtil::getNames(NameValueUtil::NameKind::All, VulkanLayoutOptions::getKindInfos()))
+        for (auto nameSlice : NameValueUtil::getNames(NameValueUtil::NameKind::All, HLSLToVulkanLayoutOptions::getKindInfos()))
         {
             // -fvk-{b|s|t|u}-shift
             names << "-fvk-" << nameSlice << "-shift,";
@@ -806,7 +806,7 @@ struct OptionsParser
 
     SlangCompileFlags m_flags = 0;
 
-    RefPtr<VulkanLayoutOptions> m_vulkanLayoutOptions;
+    RefPtr<HLSLToVulkanLayoutOptions> m_hlslToVulkanLayoutOptions;
 
     List<RawTranslationUnit> m_rawTranslationUnits;
 
@@ -1933,7 +1933,7 @@ SlangResult OptionsParser::_parse(
             {
                 // -fvk-{b|s|t|u}-shift
                 const auto slice = arg.value.getUnownedSlice().subString(5, 1);
-                VulkanLayoutOptions::Kind kind;
+                HLSLToVulkanLayoutOptions::Kind kind;
                 SLANG_RETURN_ON_FAIL(_getValue(arg, slice, kind));
 
                 Int shift;
@@ -1942,13 +1942,13 @@ SlangResult OptionsParser::_parse(
                 if (m_reader.hasArg() && m_reader.peekArg().value == toSlice("all"))
                 {
                     m_reader.advance();
-                    m_vulkanLayoutOptions->setAllShift(kind, shift);
+                    m_hlslToVulkanLayoutOptions->setAllShift(kind, shift);
                 }
                 else
                 {
                     Int set;
                     SLANG_RETURN_ON_FAIL(_expectInt(arg, set));
-                    m_vulkanLayoutOptions->setShift(kind, set, shift);
+                    m_hlslToVulkanLayoutOptions->setShift(kind, set, shift);
                 }
                 break;
             }
@@ -1959,8 +1959,8 @@ SlangResult OptionsParser::_parse(
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, binding));
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSet));
 
-                m_vulkanLayoutOptions->m_globalsBindingSet = Index(bindingSet);
-                m_vulkanLayoutOptions->m_globalsBinding = Index(binding);
+                m_hlslToVulkanLayoutOptions->m_globalsBindingSet = Index(bindingSet);
+                m_hlslToVulkanLayoutOptions->m_globalsBinding = Index(binding);
                 break;
             }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;
@@ -2275,9 +2275,9 @@ SlangResult OptionsParser::_parse(
     }
 
     // If there are no layout settings, we don't need to carry this state
-    if (m_vulkanLayoutOptions->isDefault())
+    if (m_hlslToVulkanLayoutOptions->isDefault())
     {
-        m_vulkanLayoutOptions.setNull();
+        m_hlslToVulkanLayoutOptions.setNull();
     }
 
     if (m_compileStdLib)
@@ -2686,7 +2686,7 @@ SlangResult OptionsParser::_parse(
         int targetID = m_compileRequest->addCodeGenTarget(SlangCompileTarget(rawTarget.format));
         rawTarget.targetID = targetID;
 
-        m_requestImpl->setVulkanLayoutOptions(targetID, m_vulkanLayoutOptions);
+        m_requestImpl->setHLSLToVulkanLayoutOptions(targetID, m_hlslToVulkanLayoutOptions);
 
         if (rawTarget.profileVersion != ProfileVersion::Unknown)
         {
@@ -2890,7 +2890,7 @@ SlangResult OptionsParser::parse(
     m_session = session;
     m_frontEndReq = m_requestImpl->getFrontEndReq();
 
-    m_vulkanLayoutOptions = new VulkanLayoutOptions;
+    m_hlslToVulkanLayoutOptions = new HLSLToVulkanLayoutOptions;
 
     m_cmdOptions = &session->m_commandOptions;
 

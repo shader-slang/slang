@@ -1439,11 +1439,11 @@ MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
     return linkage->getDefaultMatrixLayoutMode();
 }
 
-void TargetRequest::setVulkanLayoutOptions(VulkanLayoutOptions* opts)
+void TargetRequest::setHLSLToVulkanLayoutOptions(HLSLToVulkanLayoutOptions* opts)
 {
     if (isKhronosTarget(this))
     {
-        vulkanLayoutOptions = opts;
+        hlslToVulkanLayoutOptions = opts;
     }
 }
 
@@ -4681,9 +4681,9 @@ void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID pr
     getLinkage()->targets[targetIndex]->setTargetProfile(Profile(profile));
 }
 
-void EndToEndCompileRequest::setVulkanLayoutOptions(int targetIndex, VulkanLayoutOptions* vulkanShiftOptions)
+void EndToEndCompileRequest::setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanShiftOptions)
 {
-    getLinkage()->targets[targetIndex]->setVulkanLayoutOptions(vulkanShiftOptions);
+    getLinkage()->targets[targetIndex]->setHLSLToVulkanLayoutOptions(vulkanShiftOptions);
 }
 
 void EndToEndCompileRequest::setTargetFlags(int targetIndex, SlangTargetFlags flags)

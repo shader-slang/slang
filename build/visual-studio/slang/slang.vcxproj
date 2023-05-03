@@ -344,6 +344,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-torch.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-hlsl-to-vulkan-layout-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-intrinsic-expand.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-addr-inst-elimination.h" />
@@ -493,7 +494,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-type-system-shared.h" />
     <ClInclude Include="..\..\..\source\slang\slang-value-reflect.h" />
     <ClInclude Include="..\..\..\source\slang\slang-visitor.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-vk-layout-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-workspace-version.h" />
   </ItemGroup>
   <ItemGroup>
@@ -543,6 +543,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-emit-torch.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-glsl-extension-tracker.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-hlsl-to-vulkan-layout-options.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-intrinsic-expand.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-addr-inst-elimination.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-address-analysis.cpp" />
@@ -686,7 +687,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-type-layout.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-type-system-shared.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-value-reflect.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-vk-layout-options.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-workspace-version.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang.cpp" />
   </ItemGroup>

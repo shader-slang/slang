@@ -25,7 +25,7 @@
 #include "slang-syntax.h"
 #include "slang-content-assist-info.h"
 
-#include "slang-vk-layout-options.h"
+#include "slang-hlsl-to-vulkan-layout-options.h"
 
 #include "slang-serialize-ir-types.h"
 
@@ -1578,9 +1578,9 @@ namespace Slang
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
 
-        void setVulkanLayoutOptions(VulkanLayoutOptions* opts);
+        void setHLSLToVulkanLayoutOptions(HLSLToVulkanLayoutOptions* opts);
 
-        const VulkanLayoutOptions* getVulkanLayoutOptions() const { return vulkanLayoutOptions; }
+        const HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions() const { return hlslToVulkanLayoutOptions; }
 
         bool shouldDumpIntermediates() { return dumpIntermediates; }
 
@@ -1620,7 +1620,7 @@ namespace Slang
         bool                    forceGLSLScalarBufferLayout = false;
         bool                    enableLivenessTracking = false;
 
-        RefPtr<VulkanLayoutOptions> vulkanLayoutOptions;           ///< Optional vulkan layout options
+        RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanLayoutOptions;           ///< Optional vulkan layout options
     };
 
         /// Are we generating code for a D3D API?
@@ -2628,7 +2628,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
 
-        void setVulkanLayoutOptions(int targetIndex, VulkanLayoutOptions* vulkanLayoutOptions);
+        void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
             Session* session);
