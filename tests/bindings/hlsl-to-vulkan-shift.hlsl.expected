@@ -21,7 +21,7 @@ standard output = {
         },
         {
             "name": "c",
-            "binding": {"kind": "descriptorTableSlot", "index": 2},
+            "binding": {"kind": "descriptorTableSlot", "index": 0},
             "type": {
                 "kind": "constantBuffer",
                 "elementType": {
@@ -86,7 +86,7 @@ standard output = {
         },
         {
             "name": "u",
-            "binding": {"kind": "descriptorTableSlot", "index": 0},
+            "binding": {"kind": "descriptorTableSlot", "index": 2},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
@@ -157,7 +157,7 @@ standard output = {
                 },
                 {
                     "name": "c",
-                    "binding": {"kind": "descriptorTableSlot", "index": 2}
+                    "binding": {"kind": "descriptorTableSlot", "index": 0}
                 },
                 {
                     "name": "t2",
@@ -165,7 +165,7 @@ standard output = {
                 },
                 {
                     "name": "u",
-                    "binding": {"kind": "descriptorTableSlot", "index": 0}
+                    "binding": {"kind": "descriptorTableSlot", "index": 2}
                 },
                 {
                     "name": "u2",
