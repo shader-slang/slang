@@ -1799,8 +1799,10 @@ void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
 
 bool CLikeSourceEmitter::hasExplicitConstantBufferOffset(IRInst* cbufferType)
 {
-    auto type = as<IRConstantBufferType>(cbufferType);
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
     if (!type)
+        return false;
+    if (as<IRGLSLShaderStorageBufferType>(cbufferType))
         return false;
     auto structType = as<IRStructType>(type->getElementType());
     if (!structType)
@@ -1811,6 +1813,19 @@ bool CLikeSourceEmitter::hasExplicitConstantBufferOffset(IRInst* cbufferType)
             return true;
     }
     return false;
+}
+
+bool CLikeSourceEmitter::isSingleElementConstantBuffer(IRInst* cbufferType)
+{
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
+    if (!type)
+        return false;
+    if (as<IRGLSLShaderStorageBufferType>(cbufferType))
+        return false;
+    auto structType = as<IRStructType>(type->getElementType());
+    if (structType)
+        return false;
+    return true;
 }
 
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
@@ -1941,7 +1956,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
-            auto skipBase = getTarget() == CodeGenTarget::HLSL &&
+            auto skipBase = isD3DTarget(getTargetReq()) &&
                 hasExplicitConstantBufferOffset(ii->getBase()->getDataType());
             if (!skipBase)
             {
@@ -2042,6 +2057,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto base = inst->getOperand(0);
             emitDereferenceOperand(base, outerPrec);
+            if (isKhronosTarget(getTargetReq()) && isSingleElementConstantBuffer(base->getDataType()))
+            {
+                m_writer->emit("._data");
+            }
         }
         break;
 

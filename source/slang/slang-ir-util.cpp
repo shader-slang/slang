@@ -430,6 +430,11 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
         if (canAddressesPotentiallyAlias(func, as<IRStore>(inst)->getPtr(), addr))
             return true;
         break;
+    case kIROp_SwizzledStore:
+        // If the target of the swizzled store inst may overlap addr, return true.
+        if (canAddressesPotentiallyAlias(func, as<IRSwizzledStore>(inst)->getDest(), addr))
+            return true;
+        break;
     case kIROp_Call:
         {
             auto call = as<IRCall>(inst);

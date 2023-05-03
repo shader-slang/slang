@@ -27,12 +27,12 @@ struct EntryPointParams_0
 layout(shaderRecordEXT)
 buffer _S2
 {
-    EntryPointParams_0 _data;
+    float value_0;
 } _S3;
 
 void main()
 {
     uvec3 _S4 = gl_LaunchIDEXT;
-    buffer_0._data[_S4.x] = _S3._data.value_0;
+    buffer_0._data[_S4.x] = _S3.value_0;
     return;
 }

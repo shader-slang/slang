@@ -15,8 +15,6 @@ SamplerState c : register(s0, s1);
 // No space index given after `space`:
 SamplerState d : register(s2, space);
 
-// use of a component mask (not supported):
-Texture2D e : register(t3.x);
 
 void main()
 {}

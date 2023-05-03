@@ -342,7 +342,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
 
     auto elementType = type->getElementType();
     auto structType = as<IRStructType>(elementType);
-    if (as<IRConstantBufferType>(type) && structType)
+    if (!as<IRGLSLShaderStorageBufferType>(type) && structType)
     {
         // We need to emit the fields of the struct as individual variables
         // in the constant buffer.

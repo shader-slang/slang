@@ -45,7 +45,10 @@ struct Uniforms_0
 layout(binding = 3)
 layout(std140) uniform _S1
 {
-    Uniforms_0 _data;
+    Light_0 light_0;
+    vec4 viewPos_0;
+    mat4x4 view_0;
+    mat4x4 model_0;
 } ubo_0;
 struct RayDesc_0
 {
@@ -99,7 +102,7 @@ void main()
     vec4 _S10 = (texture(sampler2D(samplerNormal_0,sampler_0), (inUV_0)));
     vec3 N_0 = _S10.xyz * 2.0 - 1.0;
 
-    vec3 lightDelta_0 = ubo_0._data.light_0.position_0.xyz - P_0;
+    vec3 lightDelta_0 = ubo_0.light_0.position_0.xyz - P_0;
     float lightDist_0 = length(lightDelta_0);
     vec3 L_0 = normalize(lightDelta_0);
     float _S11 = 1.0 / (lightDist_0 * lightDist_0);
@@ -121,7 +124,7 @@ void main()
     {
         atten_0 = _S11;
     }
-    vec3 color_2 = ubo_0._data.light_0.color_0.xyz * saturate_0(dot(N_0, L_0)) * atten_0;
+    vec3 color_2 = ubo_0.light_0.color_0.xyz * saturate_0(dot(N_0, L_0)) * atten_0;
 
     ReflectionRay_0 reflectionRay_0;
     TraceRay_1(as_0, 1U, 255U, 0U, 0U, 2U, ray_0, reflectionRay_0);
