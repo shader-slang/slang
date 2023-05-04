@@ -2060,7 +2060,7 @@ struct DiffTransposePass
                 // Insert new operand just after the old operand, so we have the old
                 // operands available.
                 // 
-                builder->setInsertAfter(operand);
+                setInsertAfterOrdinaryInst(builder, operand);
 
                 IRInst* newOperand = promoteToType(builder, targetType, operand);
                 
