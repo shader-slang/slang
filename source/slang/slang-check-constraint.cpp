@@ -741,6 +741,20 @@ namespace Slang
 
                 return true;
             }
+        } else if(auto fstFunType = as<FuncType>(fst))
+        {
+            if (auto sndFunType = as<FuncType>(snd))
+            {
+                const Index numParams = fstFunType->paramTypes.getCount();
+                if(numParams != sndFunType->paramTypes.getCount())
+                    return false;
+                for(Index i = 0; i < numParams; ++i)
+                {
+                    if(!TryUnifyTypes(constraints, fstFunType->paramTypes[i], sndFunType->paramTypes[i]))
+                        return false;
+                }
+                return TryUnifyTypes(constraints, fstFunType->resultType, sndFunType->resultType);
+            }
         }
 
         return false;
