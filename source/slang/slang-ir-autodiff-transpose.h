@@ -2044,30 +2044,31 @@ struct DiffTransposePass
 
     void safeSetInsertAfterInst(IRBuilder* builder, IRInst* inst)
     {
-        // Handle a very specific case.. is this a function parameter?
-        // Then insert into a block that unconditionally branches to the current block.
-        // 
-        if (as<IRParam>(inst) && inst->getParent())
+        // If the inst is in the first or second block of the parent function, then 
+        // insert into the third block, otherwise simply call setInsertAfterOrdinaryInst.
+        // The second block is the block that the first block branches into unconditionaly.
+        //
+        if (auto block = as<IRBlock>(inst->getParent()))
         {
-            auto block = as<IRBlock>(inst->getParent());
-
-            // If the inst is a parameter and it's parent is the first block, 
-            // then we need to insert into the unconditional target block.
-            //
-            if (block && block->getParent() && block == block->getParent()->getFirstBlock())
+            auto firstBlock = cast<IRFunc>(block->getParent())->getFirstBlock();
+            if (auto firstBranch = as<IRUnconditionalBranch>(firstBlock->getTerminator()))
             {
-                if (auto branch = as<IRUnconditionalBranch>(block->getTerminator()))
+                auto secondBlock = firstBranch->getTargetBlock();
+                
+                if (block == firstBlock || block == secondBlock)
                 {
-                    if (auto ordInst = branch->getTargetBlock()->getFirstOrdinaryInst())
-                        builder->setInsertAfter(ordInst);
-                    else
-                        builder->setInsertInto(branch->getTargetBlock());
+                    if (auto branch = as<IRUnconditionalBranch>(secondBlock->getTerminator()))
+                    {
+                        if (auto ordInst = branch->getTargetBlock()->getFirstOrdinaryInst())
+                            builder->setInsertAfter(ordInst);
+                        else
+                            builder->setInsertInto(branch->getTargetBlock());
 
-                    return;
+                        return;
+                    }
                 }
             }
         }
-        
         setInsertAfterOrdinaryInst(builder, inst);
     }
 
