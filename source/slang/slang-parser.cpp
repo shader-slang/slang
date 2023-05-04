@@ -4839,6 +4839,8 @@ namespace Slang
         return parsePostfixTypeSuffix(parser, typeExpr);
     }
 
+    static Expr* _parseInfixTypeExpr(Parser* parser);
+
     static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr)
     {
         for(;;)
@@ -4860,12 +4862,12 @@ namespace Slang
             }
             else if(AdvanceIf(parser, TokenType::RightArrow))
             {
-                // TODO(Ellie): These should associate to the right!
                 // TODO(Ellie): Although conjunction types and function types
                 // can't be used together, we could probably do better re
-                // parsing precedence
+                // parsing precedence, this is quite ad-hoc just jamming this
+                // branch in here.
 
-                auto rightExpr = _parsePostfixTypeExpr(parser);
+                auto rightExpr = _parseInfixTypeExpr(parser);
 
                 auto funcExpr = parser->astBuilder->create<FuncTypeExpr>();
                 funcExpr->loc = loc;
@@ -4884,8 +4886,9 @@ namespace Slang
 
         /// Parse an infix type expression.
         ///
-        /// Currently, the only infix type expression we support is the `&`
-        /// operator for forming interface conjunctions.
+        /// Currently, the only infix type expressions we support are the `&`
+        /// operator for forming interface conjunctions and the `->` operator
+        /// for functions.
         ///
     static Expr* _parseInfixTypeExpr(Parser* parser)
     {
