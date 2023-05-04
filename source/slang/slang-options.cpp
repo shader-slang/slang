@@ -422,6 +422,17 @@ void initCommandOptions(CommandOptions& options)
 
     options.setCategory("Target");
 
+    StringBuilder vkShiftNames;
+    {
+        for (auto nameSlice : NameValueUtil::getNames(NameValueUtil::NameKind::All, HLSLToVulkanLayoutOptions::getKindInfos()))
+        {
+            // -fvk-{b|s|t|u}-shift
+            vkShiftNames << "-fvk-" << nameSlice << "-shift,";
+        }
+        // remove last ,
+        vkShiftNames.reduceLength(vkShiftNames.getLength() - 1);
+    }
+
     const Option targetOpts[] = 
     {
         { OptionKind::Capability, "-capability", "-capability <capability>[+<capability>...]",
@@ -447,34 +458,21 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::GLSLForceScalarLayout,
          "-force-glsl-scalar-layout", nullptr,
          "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
+        { OptionKind::VulkanBindShift, vkShiftNames.getBuffer(), "-vk-<vulkan-shift>-shift <N> <space>", 
+        "For example '-vk-b-shift <N> <space>' shifts by N the inferred binding numbers for all resources in 'b' registers of space <space>. "
+        "For a resource attached with :register(bX, <space>) but not [vk::binding(...)], "
+        "sets its Vulkan descriptor set to <space> and binding number to X + N. If you need to shift the "
+        "inferred binding numbers for more than one space, provide more than one such option. "
+        "If more than one such option is provided for the same space, the last one takes effect. "
+        "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>." },
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
-        "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>. See HLSL global variables and Vulkan binding for explanation and examples."
-        },
+        "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
-
-    {
-        StringBuilder names;
-        for (auto nameSlice : NameValueUtil::getNames(NameValueUtil::NameKind::All, HLSLToVulkanLayoutOptions::getKindInfos()))
-        {
-            // -fvk-{b|s|t|u}-shift
-            names << "-fvk-" << nameSlice << "-shift,";
-        }
-        // remove last ,
-        names.reduceLength(names.getLength() - 1);
-        options.add(names.getBuffer(), "-vk-<vulkan-shift>-shift <N> <space>", 
-            "Shifts by N the inferred binding numbers for all resources in b-type registers of space <space>. "
-            "Specifically, for a resouce attached with :register(bX, <space>) but not [vk::binding(...)], "
-            "sets its Vulkan descriptor set to <space> and binding number to X + N. If you need to shift the "
-            "inferred binding numbers for more than one space, provide more than one such option. "
-            "If more than one such option is provided for the same space, the last one takes effect. "
-            "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>.", 
-            UserValue(OptionKind::VulkanBindShift));
-    }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Downstream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -1940,7 +1938,7 @@ SlangResult OptionsParser::_parse(
             }
             case OptionKind::VulkanBindShift:
             {
-                // -fvk-{b|s|t|u}-shift
+                // -fvk-{b|s|t|u}-shift <binding-shift> <set>
                 const auto slice = arg.value.getUnownedSlice().subString(5, 1);
                 HLSLToVulkanLayoutOptions::Kind kind;
                 SLANG_RETURN_ON_FAIL(_getValue(arg, slice, kind));
@@ -1963,7 +1961,7 @@ SlangResult OptionsParser::_parse(
             }
             case OptionKind::VulkanBindGlobals:
             {
-                // -fvk-bind-globals N M
+                // -fvk-bind-globals <index> <set>
                 Int binding, bindingSet;
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, binding));
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSet));
