@@ -372,6 +372,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-constexpr.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dce.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-deduplicate-generic-children.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-defunctionalization.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-diff-call.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-export.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-import.h" />
@@ -570,6 +571,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-dce.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-deduplicate-generic-children.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-deduplicate.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-defunctionalization.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-diff-call.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-export.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-import.cpp" />
