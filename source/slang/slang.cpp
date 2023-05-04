@@ -61,6 +61,7 @@ extern Slang::String get_slang_hlsl_prelude();
 
 namespace Slang {
 
+
 /* static */const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOf)] =
 {
     { 0, 0, uint8_t(BaseType::Void) },
@@ -1442,6 +1443,14 @@ Session* TargetRequest::getSession()
 MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
 {
     return linkage->getDefaultMatrixLayoutMode();
+}
+
+void TargetRequest::setHLSLToVulkanLayoutOptions(HLSLToVulkanLayoutOptions* opts)
+{
+    if (isKhronosTarget(this))
+    {
+        hlslToVulkanLayoutOptions = opts;
+    }
 }
 
 void TargetRequest::addCapability(CapabilityAtom capability)
@@ -4676,6 +4685,11 @@ int EndToEndCompileRequest::addCodeGenTarget(SlangCompileTarget target)
 void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID profile)
 {
     getLinkage()->targets[targetIndex]->setTargetProfile(Profile(profile));
+}
+
+void EndToEndCompileRequest::setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanShiftOptions)
+{
+    getLinkage()->targets[targetIndex]->setHLSLToVulkanLayoutOptions(vulkanShiftOptions);
 }
 
 void EndToEndCompileRequest::setTargetFlags(int targetIndex, SlangTargetFlags flags)

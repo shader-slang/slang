@@ -255,7 +255,7 @@ public:
         /// Default Ctor
     DiagnosticSink():
         m_sourceManager(nullptr),
-        m_sourceLocationLexer (nullptr)
+        m_sourceLocationLexer(nullptr)
     {
     }
 

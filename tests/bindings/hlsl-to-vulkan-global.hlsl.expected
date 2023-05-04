@@ -1,0 +1,77 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "a",
+            "binding": {"kind": "uniform", "offset": 0, "size": 4},
+            "type": {
+                "kind": "scalar",
+                "scalarType": "int32"
+            }
+        },
+        {
+            "name": "b",
+            "binding": {"kind": "uniform", "offset": 4, "size": 4},
+            "type": {
+                "kind": "scalar",
+                "scalarType": "float32"
+            }
+        },
+        {
+            "name": "t",
+            "binding": {"kind": "descriptorTableSlot", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "sampler",
+            "binding": {"kind": "descriptorTableSlot", "index": 1},
+            "type": {
+                "kind": "samplerState"
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment",
+            "result:": {
+                "stage": "fragment",
+                "binding": {"kind": "varyingOutput", "index": 0},
+                "semanticName": "SV_TARGET",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            },
+            "bindings": [
+                {
+                    "name": "a",
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                },
+                {
+                    "name": "b",
+                    "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                },
+                {
+                    "name": "t",
+                    "binding": {"kind": "descriptorTableSlot", "index": 0}
+                },
+                {
+                    "name": "sampler",
+                    "binding": {"kind": "descriptorTableSlot", "index": 1}
+                }
+            ]
+        }
+    ]
+}
+}

@@ -25,6 +25,8 @@
 #include "slang-syntax.h"
 #include "slang-content-assist-info.h"
 
+#include "slang-hlsl-to-vulkan-layout-options.h"
+
 #include "slang-serialize-ir-types.h"
 
 #include "../compiler-core/slang-artifact-representation-impl.h"
@@ -1535,6 +1537,7 @@ namespace Slang
     class TargetRequest : public RefObject
     {
     public:
+        
         TargetRequest(Linkage* linkage, CodeGenTarget format);
 
         void addTargetFlags(SlangTargetFlags flags)
@@ -1575,6 +1578,10 @@ namespace Slang
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
 
+        void setHLSLToVulkanLayoutOptions(HLSLToVulkanLayoutOptions* opts);
+
+        const HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions() const { return hlslToVulkanLayoutOptions; }
+
         bool shouldDumpIntermediates() { return dumpIntermediates; }
 
         void setTrackLiveness(bool enable) { enableLivenessTracking = enable; }
@@ -1611,6 +1618,8 @@ namespace Slang
         bool                    dumpIntermediates = false;
         bool                    forceGLSLScalarBufferLayout = false;
         bool                    enableLivenessTracking = false;
+
+        RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanLayoutOptions;           ///< Optional vulkan layout options
     };
 
         /// Are we generating code for a D3D API?
@@ -1858,7 +1867,7 @@ namespace Slang
             Type* const*    args,
             DiagnosticSink* sink);
 
-            /// Add a mew target and return its index.
+            /// Add a new target and return its index.
         UInt addTarget(
             CodeGenTarget   target);
 
@@ -2628,6 +2637,8 @@ namespace Slang
         virtual SLANG_NO_THROW SlangDiagnosticFlags SLANG_MCALL getDiagnosticFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
+
+        void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
             Session* session);
