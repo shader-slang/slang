@@ -344,6 +344,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-torch.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-hlsl-to-vulkan-layout-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-intrinsic-expand.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-addr-inst-elimination.h" />
@@ -395,6 +396,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-layout.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-uniform-buffer-load.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-varying-params.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-link.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-liveness.h" />
@@ -542,6 +544,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-emit-torch.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-glsl-extension-tracker.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-hlsl-to-vulkan-layout-options.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-intrinsic-expand.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-addr-inst-elimination.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-address-analysis.cpp" />
@@ -589,6 +592,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-types.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-uniform-buffer-load.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-varying-params.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-link.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-liveness.cpp" />

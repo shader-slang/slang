@@ -4122,6 +4122,9 @@ namespace slang
 
             /** Set the debug format to be used for debugging information */
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat debugFormat) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setEnableEffectAnnotations(bool value) = 0;
+
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
@@ -4208,6 +4211,8 @@ namespace slang
         SlangInt                        preprocessorMacroCount = 0;
 
         ISlangFileSystem* fileSystem = nullptr;
+
+        bool enableEffectAnnotations = false;
     };
 
     enum class ContainerType

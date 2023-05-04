@@ -70,16 +70,12 @@ DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'")
 DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'")
 DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
-DIAGNOSTIC(    18, Error, unknownFileSystemOption, "unknown file-system option '$0'")
 DIAGNOSTIC(    19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)")
 DIAGNOSTIC(    22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
-DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'")
-DIAGNOSTIC(    25, Error, unknownFloatingPointMode, "unknown floating-point mode '$0'")
 DIAGNOSTIC(    26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
-DIAGNOSTIC(    27, Error, unknownDebugInfoLevel, "unknown debug info level '$0'")
 
 DIAGNOSTIC(    28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
 
@@ -89,6 +85,7 @@ DIAGNOSTIC(    32, Warning, explicitStageDoesntMatchImpliedStage, "the stage spe
 DIAGNOSTIC(    33, Error, stageSpecificationIgnoredBecauseNoEntryPoints, "one or more stages were specified, but no entry points were specified with '-entry'")
 DIAGNOSTIC(    34, Error, stageSpecificationIgnoredBecauseBeforeAllEntryPoints, "when compiling multiple entry points, any '-stage' options must follow the '-entry' option that they apply to")
 DIAGNOSTIC(    35, Error, noStageSpecifiedInPassThroughMode, "no stage was specified for entry point '$0'; when using the '-pass-through' option, stages must be fully specified on the command line")
+DIAGNOSTIC(    36, Error, expectingAnInteger, "expecting an integer value")
 
 DIAGNOSTIC(    40, Warning, sameProfileSpecifiedMoreThanOnce, "the '$0' was specified more than once for target '$0'")
 DIAGNOSTIC(    41, Error, conflictingProfilesSpecifiedForTarget, "conflicting profiles have been specified for target '$0'")
@@ -103,6 +100,9 @@ DIAGNOSTIC(    50, Error, duplicateTargets, "the target '$0' has been specified 
 
 DIAGNOSTIC(    60, Error, cannotDeduceOutputFormatFromPath, "cannot infer an output format from the output path '$0'")
 DIAGNOSTIC(    61, Error, cannotMatchOutputFileToTarget, "no specified '-target' option matches the output path '$0', which implies the '$1' format")
+
+DIAGNOSTIC(    62, Error, unknownCommandLineValue, "unknown value for option. Valid values are '$0'")
+DIAGNOSTIC(    63, Error, unknownHelpCategory, "unknown help category")
 
 DIAGNOSTIC(    70, Error, cannotMatchOutputFileToEntryPoint, "the output path '$0' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point")
 
@@ -545,25 +545,30 @@ DIAGNOSTIC(39007, Error, unknownRegisterClass, "unknown register class: '$0'")
 DIAGNOSTIC(39008, Error, expectedARegisterIndex, "expected a register index after '$0'")
 DIAGNOSTIC(39009, Error, expectedSpace, "expected 'space', got '$0'")
 DIAGNOSTIC(39010, Error, expectedSpaceIndex, "expected a register space index after 'space'")
-DIAGNOSTIC(39011, Error, componentMaskNotSupported, "explicit register component masks are not yet supported in Slang")
-DIAGNOSTIC(39012, Error, packOffsetNotSupported, "explicit 'packoffset' bindings are not yet supported in Slang")
+DIAGNOSTIC(39011, Error, invalidComponentMask, "invalid register component mask '$0'.")
+
 DIAGNOSTIC(39013, Warning, registerModifierButNoVulkanLayout, "shader parameter '$0' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan")
 DIAGNOSTIC(39014, Error, unexpectedSpecifierAfterSpace, "unexpected specifier after register space: '$0'")
 DIAGNOSTIC(39015, Error, wholeSpaceParameterRequiresZeroBinding, "shader parameter '$0' consumes whole descriptor sets, so the binding must be in the form '[[vk::binding(0, ...)]]'; the non-zero binding '$1' is not allowed")
 
-DIAGNOSTIC(39013, Error, dontExpectOutParametersForStage, "the '$0' stage does not support `out` or `inout` entry point parameters")
-DIAGNOSTIC(39014, Error, dontExpectInParametersForStage, "the '$0' stage does not support `in` entry point parameters")
+DIAGNOSTIC(39016, Warning, hlslToVulkanMappingNotFound, "unable to infer Vulkan binding for '$0', automatic layout will be used")
 
-DIAGNOSTIC(39016, Warning, globalUniformNotExpected, "'$0' is implicitly a global shader parameter, not a global variable. If a global variable is intended, add the 'static' modifier. If a uniform shader parameter is intended, add the 'uniform' modifier to silence this warning.")
+DIAGNOSTIC(39017, Error, dontExpectOutParametersForStage, "the '$0' stage does not support `out` or `inout` entry point parameters")
+DIAGNOSTIC(39018, Error, dontExpectInParametersForStage, "the '$0' stage does not support `in` entry point parameters")
 
-DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "can have at most one 'shader record' attributed constant buffer; found $0.")
+DIAGNOSTIC(39019, Warning, globalUniformNotExpected, "'$0' is implicitly a global shader parameter, not a global variable. If a global variable is intended, add the 'static' modifier. If a uniform shader parameter is intended, add the 'uniform' modifier to silence this warning.")
 
-DIAGNOSTIC(39018, Error, typeParametersNotAllowedOnEntryPointGlobal, "local-root-signature shader parameter '$0' at global scope must not include existential/interface types")
+DIAGNOSTIC(39020, Error, tooManyShaderRecordConstantBuffers, "can have at most one 'shader record' attributed constant buffer; found $0.")
 
-DIAGNOSTIC(39019, Warning, vkIndexWithoutVkLocation, "ignoring '[[vk::index(...)]]` attribute without a corresponding '[[vk::location(...)]]' attribute")
-DIAGNOSTIC(39020, Error, mixingImplicitAndExplicitBindingForVaryingParams, "mixing explicit and implicit bindings for varying parameters is not supported (see '$0' and '$1')")
+DIAGNOSTIC(39021, Error, typeParametersNotAllowedOnEntryPointGlobal, "local-root-signature shader parameter '$0' at global scope must not include existential/interface types")
+
+DIAGNOSTIC(39022, Warning, vkIndexWithoutVkLocation, "ignoring '[[vk::index(...)]]` attribute without a corresponding '[[vk::location(...)]]' attribute")
+DIAGNOSTIC(39023, Error, mixingImplicitAndExplicitBindingForVaryingParams, "mixing explicit and implicit bindings for varying parameters is not supported (see '$0' and '$1')")
+
+DIAGNOSTIC(39024, Warning, cannotInferVulkanBindingWithoutRegisterModifier, "shader parameter '$0' doesn't have a 'register' specified, automatic layout will be used")
 
 //
+
 // 4xxxx - IL code generation.
 //
 DIAGNOSTIC(40001, Error, bindingAlreadyOccupiedByComponent, "resource binding location '$0' is already occupied by component '$1'.")

@@ -5,8 +5,19 @@ The `slangc` command-line tool is used to compile or cross-compile shader source
 
 ```
 slangc [<options>] <file1> [<file2>...]
+```
+
+## Options
+
+The available options are in [the command line option reference](command-line-slangc-reference.md). 
+
+This information is also available from `slangc` via 
 
 ```
+slangc -h
+```
+
+The sections below describe usage in more detail.
 
 Simple Examples
 ---------------
@@ -49,8 +60,10 @@ To write DXBC, SPIR-V, or GLSL to files, use:
     slangc my-shader.slang -profile sm_6_0 -entry main -stage fragment -o my-shader.dxil
     slangc my-shader.slang -profile glsl_450 -entry main -stage fragment -o my-shader.spv
 
-Multiple Entry Points
----------------------
+Usage
+-----
+
+## Multiple Entry Points
 
 `slangc` can compile multiple entry points, which may span multiple files in a single invocation.
 This is useful when you are taking advantage of Slang's ability to automatically assign binding locations to shader parameters, because the compiler can take all of your entry points into account when assigning location (avoiding overlap between entry points that will be used together).
@@ -75,84 +88,8 @@ These long command lines obviously aren't pleasant.
 We encourage applications that require complex shader compilation workflows to use the Slang API directly so that they can implement compilation that follows application conventions/policy.
 The ability to specify compilation actions like this on the command line is primarily intended a testing and debugging tool.
 
-Options
--------
-
-For completeness, here are the options that `slangc` currently accepts:
-
-* `-v`: Displays the build version. This is the contents of `git describe --tags`. It is typically only set from automated builds (such as distros available on github). A user build will by default be 'unknown'. 
-
-* `-D <name>[=<value>]`: Insert a preprocessor macro definition
-  * The space between `-D` and `<name>` is optional
-  * If no `<value>` is specified, Slang will define the macro with an empty value
-
-* `-I <path>`: Add a path to be used in resolving `#include` and `import` operations
-  * The space between `-I` and `<path>` is optional
-
-* `-entry <name>`: Specify the name of the entry-point function
-  * When compiling from a single file, this defaults to `main` *if* you specify a stage using `-stage`
-  * Multiple `-entry` options may appear on the command line. When they do, the file associated with the entry point will be the first one found when searching to the left in the command line.
-
-* `-stage <name>`: Specify the stage of an entry-point function
-  * When there are multiple entry points, a `-stage` option applies to the most recent `-entry` point specified
-  * When there is only a single entry point, the `-stage` option may appear anywhere on the command line
-  * The traditional stages are named as follows:
-    * `vertex`
-    * `hull`: D3D Hull Shader and GL/VK Tessellation Control Shader
-    * `domain`: D3D Domain Shader and GL/VK Tessellation Evaluation Shader
-    * `geometry`
-    * `fragment` / `pixel`: D3D Pixel Shader and GL/VK Fragment Shader
-    * `compute`
-  * The stages for ray tracing use the following names:
-    * `raygeneration`
-    * `intersection`
-    * `anyhit`
-    * `closesthit`
-    * `miss`
-    * `callable`
-
-* `-target <format>`: Specifies the format in which code should be generated. Values for `<target>` are:
-  * `glsl`: GLSL source code
-  * `hlsl`: HLSL source code
-  * `spirv`: SPIR-V intermediate language binary.
-  * `spirv-assembly` / `spirv-asm`: SPIR-V intermediate language assembly
-  * `dxbc`: DirectX shader bytecode binary
-  * `dxbc-assembly` / `dxbc-asm`: DirectX shader bytecode assembly
-  * `dxil`: DirectX Intermediate Language binary
-  * `dxil-assembly` / `dxil-asm`: DirectX Intermediate Language assembly
-
-* `-profile <profile>`: Specify the "profile" to use for the code generation target, which represents an abstact feature level as defined by a particular API standard. Available values include:
-  * The Direct3D "Shader Model" levels are available as `sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}`
-  * Profiles corresponding to GLSL langauge versions are available as `glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}`
-  * As a convenience, names matching traditional HLSL shader profiles are provided such that, e.g., `-profile vs_5_0` is an abbreviation for `-profile sm_5_0 -stage vertex`
-
-* `-o <path>`: Specify a path where generated output should be written
-  * When multiple `-entry` options are present, each `-o` associates with the first `-entry` to its left.
-
-* `-pass-through <name>`: Don't actually perform Slang parsing/checking/etc. on the input and instead pass it through (more or less) unmodified to the existing compiler `<name>`
-  * `fxc`: Use the `D3DCompile` API as exposed by `d3dcompiler_47.dll`
-  * `glslang`: Use Slang's internal version of `glslang` as exposed by `slang-glslang.dll`
-  * `dxc`: Use DirectXShaderCompiler (https://github.com/Microsoft/DirectXShaderCompiler)
-  * These are intended for debugging/testing purposes, when you want to be able to see what these existing compilers do with the "same" input and options
-
-* `-verbose-paths`: When displaying diagnostic output aim to display more detailed path information. In practice this is typically the complete 'canonical' path to the source file used.
-
-* `-g`: Include debug information in the generated code, where possible. Currently only supported for DXBC and DXIL output (not SPIR-V).
-
-* `-O`: Control optimization levels. This currently only affects DXBC and DXIL generation.
-  * `-O0`: Disable all optimizations
-  * `-O1`, `-O`: Enable a default level of optimization. This is the default if no `-O` options are used.
-  * `-O2`: Enable aggressive optimizations for speed.
-  * `-O3`: Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size.
-
-* `--`: Stop parsing options, and treat the rest of the command line as input paths
-
-* `-output-includes`: After pre-processing has been performed will output to via the diagnostics the hierarchy of paths to source files reached 
-
-* -Xname to specify arguments to downstream tool `name` (covered in more detail in "Downstream Arguments")
-
 <a id="downstream-arguments"></a>
-### Downstream Arguments
+## Downstream Arguments
 
 During a Slang compilation work may be performed by multiple other stages including downstream compilers and linkers. It isn't possible in general or perhaps even desirable to provide Slang command line equivalents of every option available at every stage of compilation. It is useful to be able to set options specific to a particular compilation stage - to alter code generation, linkage and other options.
 
@@ -245,16 +182,16 @@ For example to specify an include path "somePath" to DXC you can use...
 -Xdxc -IsomePath
 ```
 
-### Specifying where dlls/shared libraries are loaded from
+## Specifying where dlls/shared libraries are loaded from
 
 On windows if you want a dll loaded from a specific path, the path must be specified absolutely. See the [LoadLibrary documentation](https://docs.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibrarya) for more details. A relative path will cause Windows to check all locations along it's search procedure.
 
 On linux it's similar, but any path (relative or not) will override the regular search mechanism. See [dlopen](https://man7.org/linux/man-pages/man3/dlopen.3.html) for more details. 
 
+See [the reference for a complete list](#command-line-slangc-reference.md#none-path)
+
 * `-dxc-path`: Sets the path where dxc dll/shared libraries are loaded from (dxcompiler & dxil).
-
 * `-fxc-path`: Sets the path where fxc dll is loaded from (d3dcompiler_47.dll). 
-
 * `-glslang-path`: Sets where the Slang specific 'slang-glslang' is loaded from
 
 Paths can specify a directory that holds the appropriate binaries. It can also be used to name a specific downstream binary - be it a shared library or an executable. Note that if it is a shared library, it is not necessary to provide the full filesystem name - just the path and/or name that will be used to load it. For example on windows `fxc` can be loaded from `D:/mydlls` with

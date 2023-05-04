@@ -7,6 +7,7 @@
 namespace Slang
 {
 
+struct CommandOptions;
 
 UnownedStringSlice getCodeGenTargetName(SlangCompileTarget target);
 
@@ -14,6 +15,9 @@ SlangResult parseOptions(
     SlangCompileRequest*    compileRequestIn,
     int                     argc,
     char const* const*      argv);
+
+// Initialize command options. Holds the details how parsing works. 
+void initCommandOptions(CommandOptions& commandOptions);
 
 }
 #endif

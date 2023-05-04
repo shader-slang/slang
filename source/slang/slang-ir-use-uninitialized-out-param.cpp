@@ -63,6 +63,7 @@ namespace Slang
                         addresses.add(use->getUser());
                         break;
                     case kIROp_Store:
+                    case kIROp_SwizzledStore:
                         // If we see a store of this address, add it to stores set.
                         if (use == use->getUser()->getOperands())
                             stores.add(StoreSite{ use->getUser(), addr });

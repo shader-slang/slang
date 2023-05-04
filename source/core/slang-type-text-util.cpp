@@ -7,6 +7,8 @@
 namespace Slang
 {
 
+namespace { // anonymous
+
 #define SLANG_SCALAR_TYPES(x) \
     x(None, none) \
     x(Void, void) \
@@ -18,28 +20,6 @@ namespace Slang
     x(UInt64, uint64_t) \
     x(Float32, float) \
     x(Float64, double) 
-
-#define SLANG_PASS_THROUGH_TYPES(x) \
-        x(none, NONE) \
-        x(fxc, FXC) \
-        x(dxc, DXC) \
-        x(glslang, GLSLANG) \
-        x(visualstudio, VISUAL_STUDIO) \
-        x(clang, CLANG) \
-        x(gcc, GCC) \
-        x(genericcpp, GENERIC_C_CPP) \
-        x(nvrtc, NVRTC) \
-        x(llvm, LLVM)
-
-#define SLANG_DEBUG_INFO_FORMATS(x) \
-    x(default-format, DEFAULT) \
-    x(c7, C7) \
-    x(pdb, PDB) \
-    x(stabs, STABS) \
-    x(coff, COFF) \
-    x(dwarf, DWARF) 
-
-namespace { // anonymous
 
 struct ScalarTypeInfo
 {
@@ -54,105 +34,196 @@ static const ScalarTypeInfo s_scalarTypeInfos[] =
     SLANG_SCALAR_TYPES(SLANG_SCALAR_TYPE_INFO)
 };
 
-struct CompileTargetInfo
-{
-    SlangCompileTarget target;          ///< The target
-    const char* extensions;             ///< Comma delimited list of extensions associated with the target
-    const char* names;                  ///< Comma delimited list of names associated with the target. NOTE! First name is taken as the normal display name.
-};
-
 // Make sure to keep this table in sync with that in slang/slang-options.cpp getHelpText
-static const CompileTargetInfo s_compileTargetInfos[] = 
+static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
 {
     { SLANG_TARGET_UNKNOWN, "",                                                 "unknown"},
     { SLANG_TARGET_NONE,    "",                                                 "none"},
-    { SLANG_HLSL,           "hlsl,fx",                                          "hlsl"},
-    { SLANG_DXBC,           "dxbc",                                             "dxbc"},
-    { SLANG_DXBC_ASM,       "dxbc-asm",                                         "dxbc-asm,dxbc-assembly" },
-    { SLANG_DXIL,           "dxil",                                             "dxil" },
-    { SLANG_DXIL_ASM,       "dxil-asm",                                         "dxil-asm,dxil-assembly" },
-    { SLANG_GLSL,           "glsl,vert,frag,geom,tesc,tese,comp",               "glsl" },
-    { SLANG_GLSL_VULKAN,    "",                                                 "glsl-vulkan" },
-    { SLANG_GLSL_VULKAN_ONE_DESC, "",                                           "glsl-vulkan-one-desc" },
-    { SLANG_SPIRV,          "spv",                                              "spirv"},
-    { SLANG_SPIRV_ASM,      "spv-asm",                                          "spirv-asm,spirv-assembly" },
-    { SLANG_C_SOURCE,       "c",                                                "c" },
-    { SLANG_CPP_SOURCE,     "cpp,c++,cxx",                                      "cpp,c++,cxx" },
-    { SLANG_CPP_PYTORCH_BINDING, "cpp,c++,cxx",                                 "torch,torch-binding,torch-cpp,torch-cpp-binding" },
-    { SLANG_HOST_CPP_SOURCE, "cpp,c++,cxx",                                     "host-cpp,host-c++,host-cxx"},
-    { SLANG_HOST_EXECUTABLE,"exe",                                              "exe,executable" },
-    { SLANG_SHADER_SHARED_LIBRARY, "dll,so",                                    "sharedlib,sharedlibrary,dll" },
-    { SLANG_CUDA_SOURCE,    "cu",                                               "cuda,cu"  },
-    { SLANG_PTX,            "ptx",                                              "ptx" },
-    { SLANG_CUDA_OBJECT_CODE, "obj,o",                                          "cuobj,cubin" },
-    { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable" },
-    { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code" },
-    { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable" },
-
-
+    { SLANG_HLSL,           "hlsl,fx",                                          "hlsl",                     "HLSL source code"},
+    { SLANG_DXBC,           "dxbc",                                             "dxbc",                     "DirectX shader bytecode binary"},
+    { SLANG_DXBC_ASM,       "dxbc-asm",                                         "dxbc-asm,dxbc-assembly",   "DirectX shader bytecode assembly" },
+    { SLANG_DXIL,           "dxil",                                             "dxil",                     "DirectX Intermediate Language binary" },
+    { SLANG_DXIL_ASM,       "dxil-asm",                                         "dxil-asm,dxil-assembly",   "DirectX Intermediate Language assembly"},
+    { SLANG_GLSL,           "glsl,vert,frag,geom,tesc,tese,comp",               "glsl",                     "GLSL source code" },
+    { SLANG_GLSL_VULKAN,    "",                                                 "glsl-vulkan",              "GLSL Vulkan source code" },
+    { SLANG_GLSL_VULKAN_ONE_DESC, "",                                           "glsl-vulkan-one-desc",     "GLSL Vulkan source code" },
+    { SLANG_SPIRV,          "spv",                                              "spirv",                    "SPIR-V binary"},
+    { SLANG_SPIRV_ASM,      "spv-asm",                                          "spirv-asm,spirv-assembly", "SPIR-V assembly" },
+    { SLANG_C_SOURCE,       "c",                                                "c",                        "C source code" },
+    { SLANG_CPP_SOURCE,     "cpp,c++,cxx",                                      "cpp,c++,cxx",              "C++ source code" },
+    { SLANG_CPP_PYTORCH_BINDING, "cpp,c++,cxx",                                 "torch,torch-binding,torch-cpp,torch-cpp-binding", "C++ for pytorch binding" },
+    { SLANG_HOST_CPP_SOURCE, "cpp,c++,cxx",                                     "host-cpp,host-c++,host-cxx", "C++ source for host execution"},
+    { SLANG_HOST_EXECUTABLE,"exe",                                              "exe,executable",           "Executable binary" },
+    { SLANG_SHADER_SHARED_LIBRARY, "dll,so",                                    "sharedlib,sharedlibrary,dll", "Shared library/Dll" },
+    { SLANG_CUDA_SOURCE,    "cu",                                               "cuda,cu",                  "CUDA source code"  },
+    { SLANG_PTX,            "ptx",                                              "ptx",                      "PTX assembly" },
+    { SLANG_CUDA_OBJECT_CODE, "obj,o",                                          "cuobj,cubin",              "CUDA binary" },
+    { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable",   "Host callable" },
+    { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code",              "Object code" },
+    { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable",       "Host callable for host execution" },
 };
 
-struct ArchiveTypeInfo
+static const NamesDescriptionValue s_languageInfos[] =
 {
-    SlangArchiveType type;
-    UnownedStringSlice text;
+    { SLANG_SOURCE_LANGUAGE_C, "c,C", "C language" },
+    { SLANG_SOURCE_LANGUAGE_CPP, "cpp,c++,C++,cxx", "C++ language" },
+    { SLANG_SOURCE_LANGUAGE_SLANG, "slang", "Slang language" },
+    { SLANG_SOURCE_LANGUAGE_GLSL, "glsl", "GLSL language" },
+    { SLANG_SOURCE_LANGUAGE_HLSL, "hlsl", "HLSL language" },
+    { SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda", "CUDA" },
+};
+    
+static const NamesDescriptionValue s_compilerInfos[] = 
+{
+    { SLANG_PASS_THROUGH_NONE,      "none",     "Unknown" },
+    { SLANG_PASS_THROUGH_FXC,       "fxc",      "FXC HLSL compiler" },
+    { SLANG_PASS_THROUGH_DXC,       "dxc",      "DXC HLSL compiler" },
+    { SLANG_PASS_THROUGH_GLSLANG,   "glslang",  "GLSLANG GLSL compiler" },
+    { SLANG_PASS_THROUGH_VISUAL_STUDIO, "visualstudio,vs", "Visual Studio C/C++ compiler" },
+    { SLANG_PASS_THROUGH_CLANG,     "clang",    "Clang C/C++ compiler" },
+    { SLANG_PASS_THROUGH_GCC,       "gcc",      "GCC C/C++ compiler" },
+    { SLANG_PASS_THROUGH_GENERIC_C_CPP, "genericcpp,c,cpp", "A generic C++ compiler (can be any one of visual studio, clang or gcc depending on system and availability)" },
+    { SLANG_PASS_THROUGH_NVRTC,     "nvrtc",     "NVRTC CUDA compiler" },
+    { SLANG_PASS_THROUGH_LLVM,      "llvm",     "LLVM/Clang `slang-llvm`" },
 };
 
-static const ArchiveTypeInfo s_archiveTypeInfos[] =
+static const NamesDescriptionValue s_archiveTypeInfos[] =
 {
-    { SLANG_ARCHIVE_TYPE_RIFF_DEFLATE, UnownedStringSlice::fromLiteral("riff-deflate")},
-    { SLANG_ARCHIVE_TYPE_RIFF_LZ4, UnownedStringSlice::fromLiteral("riff-lz4")},
-    { SLANG_ARCHIVE_TYPE_ZIP, UnownedStringSlice::fromLiteral("zip")},
-    { SLANG_ARCHIVE_TYPE_RIFF, UnownedStringSlice::fromLiteral("riff")},
+    { SLANG_ARCHIVE_TYPE_RIFF_DEFLATE, "riff-deflate", "Slang RIFF using deflate compression" },
+    { SLANG_ARCHIVE_TYPE_RIFF_LZ4, "riff-lz4", "Slang RIFF using LZ4 compression" },
+    { SLANG_ARCHIVE_TYPE_ZIP, "zip", "Zip file" },
+    { SLANG_ARCHIVE_TYPE_RIFF, "riff", "Slang RIFF without compression" },
+};
+
+static const NamesDescriptionValue s_debugInfoFormatInfos[] = 
+{
+    { SLANG_DEBUG_INFO_FORMAT_DEFAULT,  "default-format", "Use the default debugging format for the target" },
+    { SLANG_DEBUG_INFO_FORMAT_C7,       "c7",           "CodeView C7 format (typically means debugging infomation is embedded in the binary)" },
+    { SLANG_DEBUG_INFO_FORMAT_PDB,      "pdb",          "Program database" },
+    { SLANG_DEBUG_INFO_FORMAT_STABS,    "stabs",        "STABS debug format" },
+    { SLANG_DEBUG_INFO_FORMAT_COFF,     "coff",         "COFF debug format" },
+    { SLANG_DEBUG_INFO_FORMAT_DWARF,    "dwarf",        "DWARF debug format"},
+};
+
+static const NamesDescriptionValue s_lineDirectiveInfos[] = 
+{
+    { SLANG_LINE_DIRECTIVE_MODE_NONE, "none", "Don't emit `#line` directives at all"}, 
+    { SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP, "source-map", "Use source map to track line associations (doen't emit #line)"},
+    { SLANG_LINE_DIRECTIVE_MODE_DEFAULT, "default", "Default behavior"},
+    { SLANG_LINE_DIRECTIVE_MODE_STANDARD, "standard", "Emit standard C-style `#line` directives." },
+    { SLANG_LINE_DIRECTIVE_MODE_GLSL, "glsl", "Emit GLSL-style directives with file *number* instead of name." },
+};
+
+static const NamesDescriptionValue s_floatingPointModes[] =
+{
+    { SLANG_FLOATING_POINT_MODE_PRECISE, "precise",
+    "Disable optimization that could change the output of floating-"
+    "point computations, including around infinities, NaNs, denormalized "
+    "values, and negative zero. Prefer the most precise versions of special "
+    "functions supported by the target."},
+    { SLANG_FLOATING_POINT_MODE_FAST,"fast",
+    "Allow optimizations that may change results of floating-point "
+    "computations. Prefer the fastest version of special functions supported "
+    "by the target."},
+    { SLANG_FLOATING_POINT_MODE_DEFAULT, "default", 
+    "Default floating point mode" }
+};
+
+static const NamesDescriptionValue s_optimizationLevels[] =
+{
+    { SLANG_OPTIMIZATION_LEVEL_NONE,    "0,none",       "Disable all optimizations" },
+    { SLANG_OPTIMIZATION_LEVEL_DEFAULT, "1,default",    "Enable a default level of optimization.This is the default if no -o options are used." },
+    { SLANG_OPTIMIZATION_LEVEL_HIGH,    "2,high",       "Enable aggressive optimizations for speed." },
+    { SLANG_OPTIMIZATION_LEVEL_MAXIMAL, "3,maximal",    "Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size." },
+};
+
+static const NamesDescriptionValue s_debugLevels[] =
+{
+    { SLANG_DEBUG_INFO_LEVEL_NONE,      "0,none",       "Don't emit debug information at all." }, 
+    { SLANG_DEBUG_INFO_LEVEL_MINIMAL,   "1,minimal",    "Emit as little debug information as possible, while still supporting stack traces." },
+    { SLANG_DEBUG_INFO_LEVEL_STANDARD,  "2,standard",   "Emit whatever is the standard level of debug information for each target." },
+    { SLANG_DEBUG_INFO_LEVEL_MAXIMAL,   "3,maximal",    "Emit as much debug information as possible for each target." },
+};
+
+static const NamesDescriptionValue s_fileSystemTypes[] =
+{
+    { ValueInt(TypeTextUtil::FileSystemType::Default),     "default",      "Default fike system." },
+    { ValueInt(TypeTextUtil::FileSystemType::LoadFile),    "load-file",    "Just implements loadFile interface, so will be wrapped with CacheFileSystem internally." },
+    { ValueInt(TypeTextUtil::FileSystemType::Os),          "os",           "Use the OS based file system directly (without file system caching)" },
 };
 
 } // anonymous
 
-/* static */SlangArchiveType TypeTextUtil::findArchiveType(const UnownedStringSlice& slice)
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFileSystemTypeInfos()
 {
-    for (const auto& entry : s_archiveTypeInfos)
-    {
-        if (slice == entry.text)
-        {
-            return entry.type;
-        }
-    }
-    return SLANG_ARCHIVE_TYPE_UNDEFINED;
+    return makeConstArrayView(s_fileSystemTypes);
 }
 
-struct DebugInfoFormatTable
+/* static */ConstArrayView<TypeTextUtil::CompileTargetInfo> TypeTextUtil::getCompileTargetInfos()
 {
-    UnownedStringSlice entries[SLANG_DEBUG_INFO_FORMAT_COUNT_OF];
+    return makeConstArrayView(s_compileTargetInfos);
+}
 
-    static DebugInfoFormatTable _makeTable()
-    {
-        DebugInfoFormatTable dst;
-#define SLANG_DEBUG_INFO_FORMAT_ENTRY(name, value) \
-        dst.entries[SLANG_DEBUG_INFO_FORMAT_##value] = toSlice(#name);
-        SLANG_DEBUG_INFO_FORMATS(SLANG_DEBUG_INFO_FORMAT_ENTRY)
-        return dst;
-    }
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getLanguageInfos()
+{
+    return makeConstArrayView(s_languageInfos);
+}
 
-    static Index findIndex(const UnownedStringSlice slice) { return makeConstArrayView(table.entries).indexOf(slice); }
-    static UnownedStringSlice getSlice(SlangDebugInfoFormat format) { return table.entries[Index(format)]; }
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getCompilerInfos()
+{
+    return makeConstArrayView(s_compilerInfos);
+}
 
-    static const DebugInfoFormatTable table;
-};
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getArchiveTypeInfos()
+{
+    return makeConstArrayView(s_archiveTypeInfos);
+}
 
-/* static */const DebugInfoFormatTable DebugInfoFormatTable::table = DebugInfoFormatTable::_makeTable();
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getDebugInfoFormatInfos()
+{
+    return makeConstArrayView(s_debugInfoFormatInfos);
+}
+
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getLineDirectiveInfos()
+{
+    return makeConstArrayView(s_lineDirectiveInfos);
+}
+
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFloatingPointModeInfos()
+{
+    return makeConstArrayView(s_floatingPointModes);
+}
+
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getOptimizationLevelInfos()
+{
+    return makeConstArrayView(s_optimizationLevels);
+}
+
+/* static */ConstArrayView<NamesDescriptionValue> TypeTextUtil::getDebugLevelInfos()
+{
+    return makeConstArrayView(s_debugLevels);
+}
+
+/* static */SlangArchiveType TypeTextUtil::findArchiveType(const UnownedStringSlice& slice)
+{
+    return NameValueUtil::findValue(getArchiveTypeInfos(), slice, SLANG_ARCHIVE_TYPE_UNDEFINED);
+}
 
 /* static */SlangResult TypeTextUtil::findDebugInfoFormat(const Slang::UnownedStringSlice& text, SlangDebugInfoFormat& out)
 {
-    const auto index = DebugInfoFormatTable::findIndex(text);
-    if (index >= 0)
+    const ValueInt value = NameValueUtil::findValue(getDebugInfoFormatInfos(), text, -1);
+    if (value >= 0)
     {
-        out = SlangDebugInfoFormat(index);
+        out = SlangDebugInfoFormat(value);
         return SLANG_OK;
     }
     return SLANG_FAIL;
 }
 
-/* static */UnownedStringSlice TypeTextUtil::getDebugInfoFormatName(SlangDebugInfoFormat format) { return DebugInfoFormatTable::getSlice(format); }
+/* static */UnownedStringSlice TypeTextUtil::getDebugInfoFormatName(SlangDebugInfoFormat format) 
+{
+    return NameValueUtil::findName(getDebugInfoFormatInfos(), format, toSlice("unknown"));
+}
 
 /* static */UnownedStringSlice TypeTextUtil::getScalarTypeName(slang::TypeReflection::ScalarType scalarType)
 {    
@@ -180,82 +251,20 @@ struct DebugInfoFormatTable
     return slang::TypeReflection::ScalarType::None;
 }
 
-#define SLANG_PASS_THROUGH_HUMAN_TEXT(x) \
-    x(NONE,             "Unknown") \
-    x(VISUAL_STUDIO,    "Visual Studio") \
-    x(GCC,              "GCC") \
-    x(CLANG,            "Clang") \
-    x(NVRTC,            "NVRTC") \
-    x(FXC,              "fxc") \
-    x(DXC,              "dxc") \
-    x(GLSLANG,          "glslang") \
-    x(LLVM,             "LLVM/Clang")
 
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough type)
 {
-#define SLANG_PASS_THROUGH_HUMAN_CASE(value, text)  case SLANG_PASS_THROUGH_##value: return UnownedStringSlice::fromLiteral(text); 
-
-    switch (type)
-    {
-        default: [[fallthrough]]; /* fall-through to none */
-        SLANG_PASS_THROUGH_HUMAN_TEXT(SLANG_PASS_THROUGH_HUMAN_CASE)
-    }
-}
-
-/* static */SlangResult TypeTextUtil::findPassThroughFromHumanText(const UnownedStringSlice& inText, SlangPassThrough& outPassThrough)
-{
-    #define SLANG_PASS_THROUGH_HUMAN_IF(value, text)  if (inText == UnownedStringSlice::fromLiteral(text)) { outPassThrough = SLANG_PASS_THROUGH_##value; return SLANG_OK; } else
-    SLANG_PASS_THROUGH_HUMAN_TEXT(SLANG_PASS_THROUGH_HUMAN_IF)
-    return SLANG_FAIL;
+    return NameValueUtil::findName(getCompilerInfos(), type, toSlice("unknown"));
 }
 
 /* static */SlangSourceLanguage TypeTextUtil::findSourceLanguage(const UnownedStringSlice& text)
 {
-    if (text == "c" || text == "C")
-    {
-        return SLANG_SOURCE_LANGUAGE_C;
-    }
-    else if (text == "cpp" || text == "c++" || text == "C++" || text == "cxx")
-    {
-        return SLANG_SOURCE_LANGUAGE_CPP;
-    }
-    else if (text == "slang")
-    {
-        return SLANG_SOURCE_LANGUAGE_SLANG;
-    }
-    else if (text == "glsl")
-    {
-        return SLANG_SOURCE_LANGUAGE_GLSL;
-    }
-    else if (text == "hlsl")
-    {
-        return SLANG_SOURCE_LANGUAGE_HLSL;
-    }
-    else if (text == "cu" || text == "cuda")
-    {
-        return SLANG_SOURCE_LANGUAGE_CUDA;
-    }
-    return SLANG_SOURCE_LANGUAGE_UNKNOWN;
+    return NameValueUtil::findValue(getLanguageInfos(), text, SLANG_SOURCE_LANGUAGE_UNKNOWN);
 }
 
 /* static */SlangPassThrough TypeTextUtil::findPassThrough(const UnownedStringSlice& slice)
 {
-#define SLANG_PASS_THROUGH_NAME_TO_TYPE(x, y) \
-    if (slice == UnownedStringSlice::fromLiteral(#x)) return SLANG_PASS_THROUGH_##y;
-
-    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_NAME_TO_TYPE)
-
-    // Other options
-    if (slice == "c" || slice == "cpp")
-    {
-        return SLANG_PASS_THROUGH_GENERIC_C_CPP;
-    }
-    else if (slice == "vs")
-    {
-        return SLANG_PASS_THROUGH_VISUAL_STUDIO;
-    }
-
-    return SLANG_PASS_THROUGH_NONE;
+    return NameValueUtil::findValue(getCompilerInfos(), slice, SLANG_PASS_THROUGH_NONE);
 }
 
 /* static */SlangResult TypeTextUtil::findPassThrough(const UnownedStringSlice& slice, SlangPassThrough& outPassThrough)
@@ -271,15 +280,7 @@ struct DebugInfoFormatTable
 
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughName(SlangPassThrough passThru)
 {
-#define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
-    case SLANG_PASS_THROUGH_##y: return UnownedStringSlice::fromLiteral(#x);
-
-    switch (passThru)
-    {
-        SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_TO_NAME)
-        default: break;
-    }
-    return UnownedStringSlice::fromLiteral("unknown");
+    return NameValueUtil::findName(getCompilerInfos(), passThru, toSlice("unknown"));
 }
 
 /* static */SlangCompileTarget TypeTextUtil::findCompileTargetFromExtension(const UnownedStringSlice& slice)

@@ -745,9 +745,9 @@ void CUDASourceEmitter::emitSimpleValueImpl(IRInst* inst)
 }
 
 
-void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst)
+void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
 {
-    Super::emitSemanticsImpl(inst);
+    Super::emitSemanticsImpl(inst, allowOffsetLayout);
 }
 
 void CUDASourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout)
