@@ -1,0 +1,11 @@
+result code = 0
+standard error = {
+tests/diagnostics/hlsl-to-vulkan-shift-diagnostic.hlsl(11): warning 39016: unable to infer Vulkan binding for 'c', automatic layout will be used
+ConstantBuffer<Data> c : register(b2);
+                     ^
+tests/diagnostics/hlsl-to-vulkan-shift-diagnostic.hlsl(15): warning 39016: unable to infer Vulkan binding for 'u', automatic layout will be used
+RWStructuredBuffer<Data> u : register(u11);
+                         ^
+}
+standard output = {
+}

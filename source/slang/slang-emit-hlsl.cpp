@@ -1168,7 +1168,7 @@ void HLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
             : as<IRIndicesDecoration>(modifier)    ? "indices "
             : as<IRPrimitivesDecoration>(modifier) ? "primitives "
             : nullptr;
-        SLANG_EXPECT(s, "Unhandled type of mesh output decoration");
+        SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
     }
 }

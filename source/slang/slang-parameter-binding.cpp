@@ -1052,53 +1052,66 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
-    // See if we can infer vulkan binding from HLSL if we have such options set
+    // See if we can infer vulkan binding from HLSL if we have such options set, we know 
+    // we can't map
     auto hlslToVulkanLayoutOptions = context->getTargetRequest()->getHLSLToVulkanLayoutOptions();
 
-    if (!hlslToVulkanLayoutOptions)
+    // If we have the options, but cannot infer bindings, we don't need to go further
+    if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
         _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
         return;
     }
 
-    // Do we have any vulkan shift settings
+    // We need an HLSL register semantic to to infer from
     auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
-
     if (hlslRegSemantic == nullptr)
     {
-        // We don't have a HLSL binding, so we can't infer, so we can't assign an infered explicit binding
+        // We don't have a HLSL binding, so no inferance can occur, issue a warning
+        // 
+        // TODO(JS): I suppose there is some ambiguity here, because if we did a semantic lookup, and it didn't have a vulkanKind
+        // or didn't parse correctly we wouldn't issue this message.
+        getSink(context)->diagnose(varDecl, Diagnostics::cannotInferVulkanBindingWithoutRegisterModifier, varDecl);
         return;
     }
             
     // Get the HLSL binding info
     const auto hlslInfo = ExtractLayoutSemanticInfo(context, hlslRegSemantic);
-    if (hlslInfo.kind != LayoutResourceKind::None)
+    if (hlslInfo.kind == LayoutResourceKind::None)
     {
-        // We need to map to the GLSL binding types
-        HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
-        if (vulkanKind != HLSLToVulkanLayoutOptions::Kind::Invalid)
-        {
-            const auto shift = hlslToVulkanLayoutOptions->getShift(vulkanKind, Index(hlslInfo.space));
-            if (shift != HLSLToVulkanLayoutOptions::kInvalidShift)
-            {
-                const Index bindingIndex = Index(hlslInfo.index) + shift;
-
-                if (bindingIndex >= 0)
-                {
-                    // Add for descriptor slot 
-                    resInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
-
-                    semanticInfo.kind = resInfo->kind;
-                    semanticInfo.index = UInt(bindingIndex);
-                    semanticInfo.space = hlslInfo.space;
-                    
-                    const LayoutSize count = resInfo->count;
-
-                    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
-                }
-            }
-        }
+        // Is no hlsl resource binding
+        return;
     }
+
+    // We need to map to the GLSL binding types
+    HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
+    if (vulkanKind == HLSLToVulkanLayoutOptions::Kind::Invalid)
+    {
+        // The binding is not "inferable" so we are done
+        return;
+    }
+
+    const auto hlslBinding = HLSLToVulkanLayoutOptions::Binding{ Index(hlslInfo.space), Index(hlslInfo.index) };
+    const auto vulkanBinding = hlslToVulkanLayoutOptions->inferBinding(vulkanKind, hlslBinding);
+    
+    if (vulkanBinding.isInvalid())
+    {
+        // If we made it here, there are shift options, but there isn't one for the space/kind specified
+        // That could be a problem and unexpected, so issue a warning
+        getSink(context)->diagnose(varDecl, Diagnostics::hlslToVulkanMappingNotFound, varDecl);
+        return;
+    }
+
+    // Add for descriptor slot 
+    resInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
+
+    semanticInfo.kind = resInfo->kind;
+    semanticInfo.index = UInt(vulkanBinding.index);
+    semanticInfo.space = UInt(vulkanBinding.set);
+                    
+    const LayoutSize count = resInfo->count;
+
+    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
 }
 
 // Given a single parameter, collect whatever information we have on
@@ -3709,16 +3722,18 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // we can't use *that* as the default space, so we allocate if
     if (auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions())
     {
-        if (vulkanOptions->hasGlobalsBinding())
+        const auto& globalBinding = vulkanOptions->getGlobalsBinding();
+
+        if (globalBinding.isSet())
         {
             // Create VarLayout which will be associated with the binding, and setup later
             globalScopeVarLayout = new VarLayout;
 
             // Allocate the set
-            markSpaceUsed(&context, nullptr, vulkanOptions->m_globalsBindingSet);
+            markSpaceUsed(&context, nullptr, globalBinding.set);
 
             // Mark the use of this binding
-            globalConstantBufferBinding = _assignConstantBufferBinding(&context, globalScopeVarLayout, vulkanOptions->m_globalsBindingSet, vulkanOptions->m_globalsBinding);
+            globalConstantBufferBinding = _assignConstantBufferBinding(&context, globalScopeVarLayout, globalBinding.set, globalBinding.index);
         }
     }
 

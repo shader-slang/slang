@@ -27,14 +27,25 @@ static NamesDescriptionValue s_vulkanShiftKinds[] =
 
 HLSLToVulkanLayoutOptions::HLSLToVulkanLayoutOptions()
 {
+    reset();
+    SLANG_ASSERT(isReset());
+}
+
+void HLSLToVulkanLayoutOptions::setGlobalsBinding(const Binding& binding)
+{
+    m_globalsBinding = binding;
+}
+
+void HLSLToVulkanLayoutOptions::reset()
+{
     for (auto& shift : m_allShifts)
     {
         shift = kInvalidShift;
     }
+
+    m_shifts.clear();
 }
 
-
-   /// Set the the all option for the kind
 void HLSLToVulkanLayoutOptions::setAllShift(Kind kind, Index shift)
 {
     // We try to follow the convention, of the *last* entry set is the one used.
@@ -76,29 +87,38 @@ Index HLSLToVulkanLayoutOptions::getShift(Kind kind, Index set) const
     return m_allShifts[Index(kind)];
 }
 
-bool HLSLToVulkanLayoutOptions::isDefault() const
+bool HLSLToVulkanLayoutOptions::canInferBindings() const
 {
     // If any all shift is set it's not default
     for (auto shift : m_allShifts)
     {
         if (shift != kInvalidShift)
         {
-            return false;
+            return true;
         }
     }
 
-    // If any has a non zero shift, it's not default
-    for (auto& pair : m_shifts)
+    return m_shifts.getCount() > 0;
+}
+
+bool HLSLToVulkanLayoutOptions::hasState() const
+{
+    return canInferBindings() || hasGlobalsBinding();
+}
+
+HLSLToVulkanLayoutOptions::Binding HLSLToVulkanLayoutOptions::inferBinding(Kind kind, const Binding& inBinding) const
+{
+    auto shift = getShift(kind, inBinding.set);
+
+    if (shift != kInvalidShift)
     {
-        // We need a value that is non zero...
-        if (pair.value)
-        {
-            return false;
-        }
+        Binding binding(inBinding);
+        binding.index += shift;
+        return binding;
     }
 
-    // If either has been set it's not default
-    return m_globalsBinding < 0 && m_globalsBindingSet < 0;
+    // Else return an invalid binding
+    return Binding();
 }
 
 /* static */HLSLToVulkanLayoutOptions::Kind HLSLToVulkanLayoutOptions::getKind(slang::ParameterCategory param)

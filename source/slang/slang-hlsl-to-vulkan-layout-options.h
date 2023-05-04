@@ -21,6 +21,17 @@ public:
 
     static const Index kInvalidShift = Index(0x80000000);
 
+        /// For holding combination of set and index for binding
+    struct Binding
+    {
+        bool isSet() const { return set >= 0 && index >= 0;}
+        void reset() { set = -1; index = -1; }
+        bool isInvalid() const { return !isSet(); }
+
+        Index set = -1;
+        Index index = -1;
+    };
+
     // {b|s|t|u} 
     enum class Kind
     {
@@ -56,23 +67,44 @@ public:
         /// Get the shift. Returns kInvalidShift if no shift is found
     Index getShift(Kind kind, Index set) const;
 
-        /// Returns true if contains default information. If so it can in effect be ignored
-    bool isDefault() const;
-
         /// True as global binds set
-    bool hasGlobalsBinding() const { return m_globalsBinding >= 0 && m_globalsBindingSet >= 0; }
+    bool hasGlobalsBinding() const { return m_globalsBinding.isSet(); }
+
+        /// True if holds state such that vulkan bindings can be inferred from HLSL bindings
+    bool canInferBindings() const;
+
+        /// Given an kind and a binding infer the vulkan binding.
+        /// Will return an invalid binding if one is not found
+    Binding inferBinding(Kind kind, const Binding& inBinding) const;
+
+        /// Reset state such that all options are set to their default. The same state as when 
+        /// originally constructed
+    void reset();
+
+        /// Returns true if any state is set
+    bool hasState() const;
+
+        /// Returns true if contains default reset state. If so it can in effect be ignored
+    bool isReset() const { return !hasState(); }
+
+        /// Set the global binding
+    void setGlobalsBinding(Index set, Index bindingIndex) { setGlobalsBinding(Binding{set, bindingIndex}); }
+        /// Set the global bindings
+    void setGlobalsBinding(const Binding& binding);
+        /// Get the globals binding
+    const Binding& getGlobalsBinding() const { return m_globalsBinding; }
 
         /// Ctor
     HLSLToVulkanLayoutOptions();
-
+    
         /// Get information about the different kinds
     static ConstArrayView<NamesDescriptionValue> getKindInfos();
 
         /// Given a paramCategory get the kind. Returns Kind::Invalid if not an applicable category
     static Kind getKind(slang::ParameterCategory param);
 
-    Index m_globalsBinding = -1;
-    Index m_globalsBindingSet = -1;
+protected:
+    Binding m_globalsBinding;
 
     Index m_allShifts[Count(Kind::CountOf)];
 

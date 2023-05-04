@@ -311,25 +311,25 @@ Remove all source file information from outputs.
 Force using scalar block layout for uniform and shader storage buffers in GLSL output. 
 
 
-<a id="fvk-bind-globals"></a>
-## -fvk-bind-globals
-
-**-fvk-bind-globals &lt;N&gt; &lt;descriptor-set&gt;**
-
-Places the $Globals cbuffer at descriptor set &lt;descriptor-set&gt; and binding &lt;N&gt;. See HLSL global variables and Vulkan binding for explanation and examples. 
-
-
-<a id="enable-effect-annotations"></a>
-## -enable-effect-annotations
-Enables support for legacy effect annotation syntax. 
-
-
 <a id="fvk-b-shift"></a>
 ## -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
 
 **-vk-&lt;[vulkan-shift](#vulkan-shift)&gt;-shift &lt;N&gt; &lt;space&gt;**
 
-Shifts by N the inferred binding numbers for all resources in b-type registers of space &lt;space&gt;. Specifically, for a resouce attached with :register(bX, &lt;space&gt;) but not \[vk::binding(...)\], sets its Vulkan descriptor set to &lt;space&gt; and binding number to X + N. If you need to shift the inferred binding numbers for more than one space, provide more than one such option. If more than one such option is provided for the same space, the last one takes effect. If you need to shift the inferred binding numbers for all sets, use 'all' as &lt;space&gt;. 
+For example '-vk-b-shift &lt;N&gt; &lt;space&gt;' shifts by N the inferred binding numbers for all resources in 'b' registers of space &lt;space&gt;. For a resource attached with :register(bX, &lt;space&gt;) but not \[vk::binding(...)\], sets its Vulkan descriptor set to &lt;space&gt; and binding number to X + N. If you need to shift the inferred binding numbers for more than one space, provide more than one such option. If more than one such option is provided for the same space, the last one takes effect. If you need to shift the inferred binding numbers for all sets, use 'all' as &lt;space&gt;. 
+
+
+<a id="fvk-bind-globals"></a>
+## -fvk-bind-globals
+
+**-fvk-bind-globals &lt;N&gt; &lt;descriptor-set&gt;**
+
+Places the $Globals cbuffer at descriptor set &lt;descriptor-set&gt; and binding &lt;N&gt;. 
+
+
+<a id="enable-effect-annotations"></a>
+## -enable-effect-annotations
+Enables support for legacy effect annotation syntax. 
 
 
 
