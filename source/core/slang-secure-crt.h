@@ -6,12 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <assert.h>
 
 #include <wchar.h>
 
-inline void memcpy_s(void *dest, size_t numberOfElements, const void * src, size_t count)
+inline void memcpy_s(void *dest, [[maybe_unused]] size_t destSize, const void * src, size_t count)
 {
-	memcpy(dest, src, count);
+    assert(destSize >= count);
+    memcpy(dest, src, count);
 }
 
 #define _TRUNCATE ((size_t)-1)
@@ -22,9 +24,10 @@ inline void fopen_s(FILE**f, const char * fileName, const char * mode)
 	*f = fopen(fileName, mode);
 }
 
-inline size_t fread_s(void * buffer, size_t bufferSize, size_t elementSize, size_t count, FILE * stream)
+inline size_t fread_s(void * buffer, [[maybe_unused]] size_t bufferSize, size_t elementSize, size_t count, FILE * stream)
 {
-	return fread(buffer, elementSize, count, stream);
+    assert(bufferSize >= elementSize * count);
+    return fread(buffer, elementSize, count, stream);
 }
 
 inline size_t wcsnlen_s(const wchar_t * str, size_t /*numberofElements*/)
@@ -80,13 +83,11 @@ inline void strcpy_s(char * strDestination, size_t /*numberOfElements*/, const c
 
 inline void wcsncpy_s(wchar_t * strDestination, size_t /*numberOfElements*/, const wchar_t * strSource, size_t count)
 {
-	wcscpy(strDestination, strSource);
-	//wcsncpy(strDestination, strSource, count);
+	wcsncpy(strDestination, strSource, count);
 }
 inline void strncpy_s(char * strDestination, size_t /*numberOfElements*/, const char * strSource, size_t count)
 {
 	strncpy(strDestination, strSource, count);
-	//wcsncpy(strDestination, strSource, count);
 }
 #endif
 #endif

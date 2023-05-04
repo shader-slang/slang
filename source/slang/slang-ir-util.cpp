@@ -354,7 +354,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     }
 }
 
-static IRInst* _getRootAddr(IRInst* addr)
+IRInst* getRootAddr(IRInst* addr)
 {
     for (;;)
     {
@@ -379,8 +379,8 @@ bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IR
         return true;
 
     // Two variables can never alias.
-    addr1 = _getRootAddr(addr1);
-    addr2 = _getRootAddr(addr2);
+    addr1 = getRootAddr(addr1);
+    addr2 = getRootAddr(addr2);
 
     // Global addresses can alias with anything.
     if (!isChildInstOf(addr1, func))
@@ -430,13 +430,18 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
         if (canAddressesPotentiallyAlias(func, as<IRStore>(inst)->getPtr(), addr))
             return true;
         break;
+    case kIROp_SwizzledStore:
+        // If the target of the swizzled store inst may overlap addr, return true.
+        if (canAddressesPotentiallyAlias(func, as<IRSwizzledStore>(inst)->getDest(), addr))
+            return true;
+        break;
     case kIROp_Call:
         {
             auto call = as<IRCall>(inst);
 
             // If addr is a global variable, calling a function may change its value.
             // So we need to return true here to be conservative.
-            if (!isChildInstOf(_getRootAddr(addr), func))
+            if (!isChildInstOf(getRootAddr(addr), func))
             {
                 auto callee = call->getCallee();
                 if (callee &&
@@ -757,6 +762,21 @@ void removePhiArgs(IRInst* phiParam)
         SLANG_ASSERT(paramIndex < termInst->getArgCount());
         termInst->removeArgument(paramIndex);
     }
+}
+
+int getParamIndexInBlock(IRParam* paramInst)
+{
+    auto block = as<IRBlock>(paramInst->getParent());
+    if (!block)
+        return -1;
+    int paramIndex = 0;
+    for (auto param : block->getParams())
+    {
+        if (param == paramInst)
+            return paramIndex;
+        paramIndex++;
+    }
+    return -1;
 }
 
 struct GenericChildrenMigrationContextImpl

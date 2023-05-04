@@ -372,6 +372,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-framebuffer.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-helper-functions.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-posix-synchapi.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-query.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-render-pass.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource-views.h" />
@@ -490,6 +491,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-fence.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-helper-functions.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-posix-synchapi.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-query.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-render-pass.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-resource-views.cpp" />

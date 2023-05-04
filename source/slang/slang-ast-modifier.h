@@ -304,6 +304,8 @@ class HLSLRegisterSemantic : public HLSLLayoutSemantic
 class HLSLPackOffsetSemantic : public HLSLLayoutSemantic 
 {
     SLANG_AST_CLASS(HLSLPackOffsetSemantic)
+
+    Index uniformOffset = 0;
 };
 
 
@@ -577,7 +579,9 @@ class AttributeTargetModifier : public Modifier
 class AttributeBase : public Modifier 
 {
     SLANG_AST_CLASS(AttributeBase)
- 
+    
+    AttributeDecl* attributeDecl = nullptr;
+
     List<Expr*> args;
 };
 
@@ -727,6 +731,18 @@ class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute
 class SPIRVInstructionOpAttribute : public Attribute
 {
     SLANG_AST_CLASS(SPIRVInstructionOpAttribute)
+};
+
+// [[spv_target_env_1_3]]
+class SPIRVTargetEnv13Attribute : public Attribute
+{
+    SLANG_AST_CLASS(SPIRVTargetEnv13Attribute);
+};
+
+// [[disable_array_flattening]]
+class DisableArrayFlatteningAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DisableArrayFlatteningAttribute);
 };
 
 // TODO: for attributes that take arguments, the syntax node

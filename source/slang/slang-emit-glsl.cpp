@@ -339,16 +339,25 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     m_writer->emit("_S");
     m_writer->emit(m_uniqueIDCounter++);
 
-    m_writer->emit("\n{\n");
-    m_writer->indent();
 
     auto elementType = type->getElementType();
-
-    emitType(elementType, "_data");
-    m_writer->emit(";\n");
-
-    m_writer->dedent();
-    m_writer->emit("} ");
+    auto structType = as<IRStructType>(elementType);
+    if (!as<IRGLSLShaderStorageBufferType>(type) && structType)
+    {
+        // We need to emit the fields of the struct as individual variables
+        // in the constant buffer.
+        //
+        emitStructDeclarationsBlock(structType, true);
+    }
+    else
+    {
+        m_writer->emit("\n{\n");
+        m_writer->indent();
+        emitType(elementType, "_data");
+        m_writer->emit(";\n");
+        m_writer->dedent();
+        m_writer->emit("} ");
+    }
 
     m_writer->emit(getName(varDecl));
 
@@ -794,7 +803,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         m_writer->emit("out");
         m_writer->emit(" ");
         m_writer->emit(elementTypeName);
-        emitStructDeclarationsBlock(elementType);
+        emitStructDeclarationsBlock(elementType, false);
         m_writer->emit(" ");
         m_writer->emit(name);
         emitArrayBrackets(arrayType);
@@ -1157,7 +1166,7 @@ void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* pa
     //
     _emitType(type, &arrayDeclarator);
 
-    emitSemantics(param);
+    emitSemantics(param, false);
 
     emitLayoutSemantics(param);
 
@@ -1654,7 +1663,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         case kIROp_Not:
         {
             IRInst* operand = inst->getOperand(0);
-            if (auto vectorType = as<IRVectorType>(operand->getDataType()))
+            if (const auto vectorType = as<IRVectorType>(operand->getDataType()))
             {
                 EmitOpInfo outerPrec = inOuterPrec;
                 bool needClose = false;
@@ -1719,7 +1728,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 auto prec = getInfo(EmitOp::Postfix);
 
                 EmitOpInfo outerPrec = inOuterPrec;
-                bool needClose = maybeEmitParens(outerPrec, outerPrec);
+                bool needClose = maybeEmitParens(outerPrec, prec);
 
                 m_writer->emit(funcName);
                 m_writer->emit("(");
@@ -1745,7 +1754,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto prec = getInfo(EmitOp::Postfix);
 
             EmitOpInfo outerPrec = inOuterPrec;
-            bool needClose = maybeEmitParens(outerPrec, outerPrec);
+            bool needClose = maybeEmitParens(outerPrec, prec);
 
             // TODO: the GLSL `mod` function amounts to a floating-point
             // modulus rather than a floating-point remainder. We need
@@ -2175,7 +2184,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitGLSLTextureOrTextureSamplerType(imageType, "image");
         return;
     }
-    else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
         // TODO: We desugar global variables with structured-buffer type into GLSL
         // `buffer` declarations, but we don't currently handle structured-buffer types
@@ -2370,6 +2379,17 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
             _maybeEmitGLSLFlatModifier(valueType);
         }
     }
+}
+
+void GLSLSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueType, IRPackOffsetDecoration* decoration)
+{
+    SLANG_UNUSED(varInst);
+    SLANG_UNUSED(valueType);
+
+    _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_enhanced_layouts"));
+    m_writer->emit("layout(offset = ");
+    m_writer->emit(decoration->getRegisterOffset()->getValue() * 16 + decoration->getComponentOffset()->getValue() * 4);
+    m_writer->emit(")\n");
 }
 
 void GLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)

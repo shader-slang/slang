@@ -234,7 +234,7 @@ namespace Slang
             emitRaw(context, "t");
             emitQualifiedName(context, thisType->interfaceDeclRef);
         }
-        else if (auto errorType = dynamicCast<ErrorType>(type))
+        else if (const auto errorType = dynamicCast<ErrorType>(type))
         {
             emitRaw(context, "E");
         }
@@ -252,7 +252,7 @@ namespace Slang
         {
             emitType(context, type);
         }
-        else if( auto witness = dynamicCast<Witness>(val) )
+        else if( const auto witness = dynamicCast<Witness>(val) )
         {
             // We don't emit witnesses as part of a mangled
             // name, because the way that the front-end
@@ -301,7 +301,7 @@ namespace Slang
             emitVal(context, lookupIntVal->witness);
             emitName(context, lookupIntVal->key->getName());
         }
-        else if (auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
+        else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
         {
             emitRaw(context, "KX");
         }
@@ -634,7 +634,7 @@ namespace Slang
         builder << "_Sh";
         builder.append(uint64_t(hash), 16);
 
-        return builder;
+        return std::move(builder);
     }
 
 }

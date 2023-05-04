@@ -167,27 +167,29 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 #define SLANG_UNIX_FAMILY (SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY) /* shortcut for unix/posix platforms */
 
 /* Macros concerning DirectX */
+#if !defined(SLANG_CONFIG_DX_ON_VK) || !SLANG_CONFIG_DX_ON_VK
+#    define SLANG_ENABLE_DXVK 0
+#    define SLANG_ENABLE_VKD3D 0
+#else
+#    define SLANG_ENABLE_DXVK 1
+#    define SLANG_ENABLE_VKD3D 1
+#endif
+
 #if SLANG_WINDOWS_FAMILY
 #    define SLANG_ENABLE_DIRECTX 1
 #    define SLANG_ENABLE_DXGI_DEBUG 1
-#    define SLANG_ENABLE_FXC 1
+#    define SLANG_ENABLE_DXBC_SUPPORT 1
 #    define SLANG_ENABLE_PIX 1
-#    define SLANG_ENABLE_DXVK 0
-#    define SLANG_ENABLE_VKD3D_PROTON 0
 #elif SLANG_LINUX_FAMILY
-#    define SLANG_ENABLE_DIRECTX 0
+#    define SLANG_ENABLE_DIRECTX (SLANG_ENABLE_DXVK || SLANG_ENABLE_VKD3D)
 #    define SLANG_ENABLE_DXGI_DEBUG 0
-#    define SLANG_ENABLE_FXC 0
+#    define SLANG_ENABLE_DXBC_SUPPORT 0
 #    define SLANG_ENABLE_PIX 0
-#    define SLANG_ENABLE_DXVK 1
-#    define SLANG_ENABLE_VKD3D_PROTON 1
 #else
 #    define SLANG_ENABLE_DIRECTX 0
 #    define SLANG_ENABLE_DXGI_DEBUG 0
-#    define SLANG_ENABLE_FXC 0
+#    define SLANG_ENABLE_DXBC_SUPPORT 0
 #    define SLANG_ENABLE_PIX 0
-#    define SLANG_ENABLE_DXVK 0
-#    define SLANG_ENABLE_VKD3D_PROTON 0
 #endif
 
 /* Macro for declaring if a method is no throw. Should be set before the return parameter. */
@@ -299,7 +301,8 @@ convention for interface methods.
 #endif
 
 // Use for getting the amount of members of a standard C array.
-#define SLANG_COUNT_OF(x) (sizeof(x)/sizeof(x[0]))
+// Use 0[x] here to catch the case where x has an overloaded subscript operator
+#define SLANG_COUNT_OF(x) (SlangSSizeT(sizeof(x)/sizeof(0[x])))
 /// SLANG_INLINE exists to have a way to inline consistent with SLANG_ALWAYS_INLINE
 #define SLANG_INLINE inline
 
@@ -525,11 +528,13 @@ extern "C"
     typedef int64_t    SlangInt;
     typedef uint64_t   SlangUInt;
 
+    typedef int64_t    SlangSSizeT;
     typedef uint64_t   SlangSizeT;
 #else
     typedef int32_t    SlangInt;
     typedef uint32_t   SlangUInt;
 
+    typedef int32_t    SlangSSizeT;
     typedef uint32_t   SlangSizeT;
 #endif
 
@@ -4117,6 +4122,9 @@ namespace slang
 
             /** Set the debug format to be used for debugging information */
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat debugFormat) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setEnableEffectAnnotations(bool value) = 0;
+
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
@@ -4203,6 +4211,8 @@ namespace slang
         SlangInt                        preprocessorMacroCount = 0;
 
         ISlangFileSystem* fileSystem = nullptr;
+
+        bool enableEffectAnnotations = false;
     };
 
     enum class ContainerType

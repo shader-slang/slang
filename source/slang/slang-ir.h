@@ -2278,7 +2278,7 @@ R instMatch(IRInst* i, R def, F f, Fs... fs)
 
 // Base case with no eliminators, return the default value
 template<typename R>
-R instMatch(IRInst* i, R def)
+R instMatch(IRInst*, R def)
 {
     return def;
 }
@@ -2309,7 +2309,7 @@ void instMatch_(IRInst* i, F f, Fs... fs)
 }
 
 template<typename... Fs>
-void instMatch_(IRInst* i)
+void instMatch_(IRInst*)
 {
     // Base case with no eliminators
 }

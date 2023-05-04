@@ -731,6 +731,7 @@ namespace renderer_test
                 throw ShaderInputLayoutFormatException(String("Unknown shader input type '") + word + String("' at line") + String(parser.NextToken().Position.Line));
             }
             parser.ReadToken();
+            return nullptr;
         }
 
         String parseName(Misc::TokenReader& parser)

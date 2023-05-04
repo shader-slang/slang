@@ -5,6 +5,7 @@
 
 #include "../compiler-core/slang-lexer.h"
 #include "../compiler-core/slang-name.h"
+#include "../compiler-core/slang-doc-extractor.h"
 
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
@@ -18,7 +19,6 @@
 
 #include "slang-ast-reflect.h"
 #include "slang-ref-object-reflect.h"
-
 
 #include <assert.h>
 
@@ -1553,6 +1553,16 @@ namespace Slang
         None,
         Forward,
         Backward
+    };
+
+        /// Represents a markup (documentation) associated with a decl.
+    struct MarkupEntry : public SerialRefObject
+    {
+        SLANG_OBJ_CLASS(MarkupEntry)
+
+        NodeBase* m_node;                                           ///< The node this documentation is associated with
+        String m_markup;                                            ///< The raw contents of of markup associated with the decoration
+        MarkupVisibility m_visibility = MarkupVisibility::Public;   ///< How visible this decl is
     };
 
     /// Get the inner most expr from an higher order expr chain, e.g. `__fwd_diff(__fwd_diff(f))`'s

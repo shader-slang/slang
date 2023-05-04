@@ -411,6 +411,8 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
             return differentiateType(builder, origType);
         else if (as<IRWitnessTableType>(primalType->getDataType()))
             return (IRType*)primalType;
+        else
+            return nullptr;
 
     case kIROp_ArrayType:
     {
@@ -990,7 +992,7 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
             return InstPair(origGeneric, nullptr);
         differentiableTypeConformanceContext.setFunc(innerFunc);
     }
-    else if (auto funcType = as<IRFuncType>(innerVal))
+    else if (const auto funcType = as<IRFuncType>(innerVal))
     {
     }
     else
@@ -1029,7 +1031,7 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     auto bodyBlock = builder.emitBlock();
     mapPrimalInst(origGeneric->getFirstBlock(), bodyBlock);
     mapDifferentialInst(origGeneric->getFirstBlock(), bodyBlock);
-    auto transcribedBlock = transcribeBlockImpl(&builder, origGeneric->getFirstBlock(), instsToSkip);
+    transcribeBlockImpl(&builder, origGeneric->getFirstBlock(), instsToSkip);
 
     return InstPair(primalGeneric, diffGeneric);
 }

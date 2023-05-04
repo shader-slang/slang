@@ -112,12 +112,13 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
-/// Modifer to mark a function for forward-mode differentiation.
+/// Marks a function for forward-mode differentiation.
 /// i.e. the compiler will automatically generate a new function
 /// that computes the jacobian-vector product of the original.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 
+/// Marks a function for backward-mode differentiation.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
 
@@ -363,7 +364,7 @@ ${{{{
 }}}}
     ,  __BuiltinSignedArithmeticType
 ${{{{
-        ; // fall through to:
+        ; // fall through
     case BaseType::UInt8:
     case BaseType::UInt16:
     case BaseType::UInt:
@@ -373,7 +374,7 @@ ${{{{
     ,  __BuiltinArithmeticType
     ,  __BuiltinIntegerType
 ${{{{
-        ; // fall through to:
+        ; // fall through
     case BaseType::Bool:
 }}}}
     ,  __BuiltinLogicalType
@@ -760,6 +761,8 @@ struct String
         get { return (int)getLength(); }
     }
 };
+
+typedef String string;
 
 __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
@@ -1333,8 +1336,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 }
 
                 // `GetDimensions`
-
-                for(int isFloat = 0; isFloat < 2; ++isFloat)
+                const char* dimParamTypes[] = {"out float ", "out int ", "out uint "};
+                for(auto t : dimParamTypes)
                 for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
                 {
                     {
@@ -1415,8 +1418,6 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                         sb << ")\")\n";
                     }
-
-                    char const* t = isFloat ? "out float " : "out uint ";
 
                     sb << "[__readNone]\n";
                     sb << "void GetDimensions(";
@@ -2965,6 +2966,12 @@ attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [vk_spirv_instruction(op : int, set : String = "")]     : SPIRVInstructionOpAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [disable_array_flattening] : DisableArrayFlatteningAttribute;
 
 // Statement Attributes
 

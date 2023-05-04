@@ -1017,10 +1017,18 @@ namespace Slang
                 {
                     // For completion requests, we skip all funtion bodies except for the one
                     // that the current cursor is in.
+                    auto startingLine = humaneLoc.line;
+                    for (auto modifier : funcDecl->modifiers)
+                    {
+                        auto modifierLoc = getLinkage()->getSourceManager()->getHumaneLoc(
+                            modifier->loc, SourceLocType::Actual);
+                        if (modifierLoc.line < startingLine)
+                            startingLine = modifierLoc.line;
+                    }
                     auto closingLoc = getLinkage()->getSourceManager()->getHumaneLoc(
                         funcDecl->closingSourceLoc, SourceLocType::Actual);
 
-                    if (assistInfo.cursorLine < humaneLoc.line ||
+                    if (assistInfo.cursorLine < startingLine ||
                         assistInfo.cursorLine > closingLoc.line)
                         return true;
                 }
@@ -1106,7 +1114,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* extensionExternMemberModifier)
     {
-        if (auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
+        if (const auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
         {
             if (auto originalVarDecl = extensionExternMemberModifier->originalDecl.as<VarDeclBase>())
             {
@@ -1275,7 +1283,7 @@ namespace Slang
             }
         }
 
-        if (auto interfaceDecl = as<InterfaceDecl>(varDecl->parentDecl))
+        if (const auto interfaceDecl = as<InterfaceDecl>(varDecl->parentDecl))
         {
             if (auto basicType = as<BasicExpressionType>(varDecl->getType()))
             {
@@ -1427,6 +1435,7 @@ namespace Slang
                 varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
             }
         }
+        maybeRegisterDifferentiableType(getASTBuilder(), varDecl->getType());
     }
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
@@ -1905,7 +1914,6 @@ namespace Slang
             DeclCheckState::ModifiersChecked,
             DeclCheckState::ReadyForReference,
             DeclCheckState::ReadyForLookup,
-            DeclCheckState::ReadyForLookup,
             DeclCheckState::Checked
         };
         for(auto s : states)
@@ -2338,7 +2346,7 @@ namespace Slang
 
             if(auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
             {
-                auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
+                [[maybe_unused]] auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
                 SLANG_ASSERT(satisfyingTypeParamDeclRef);
 
                 // There are no additional checks we need to make on plain old
@@ -2348,7 +2356,6 @@ namespace Slang
                 // then this is possibly where we'd want to check that the kinds of
                 // the two parameters match.
                 //
-                SLANG_UNUSED(satisfyingGenericDeclRef);
             }
             else if (auto requiredValueParamDeclRef = requiredMemberDeclRef.as<GenericValueParamDecl>())
             {
@@ -2847,7 +2854,8 @@ namespace Slang
         // a temporary diagnostic sink.
         //
         DiagnosticSink tempSink(getSourceManager(), nullptr);
-        SemanticsVisitor subVisitor(withSink(&tempSink));
+        ExprLocalScope localScope;
+        SemanticsVisitor subVisitor(withSink(&tempSink).withExprLocalScope(&localScope));
 
         // With our temporary diagnostic sink soaking up any messages
         // from overload resolution, we can now try to resolve
@@ -3960,7 +3968,7 @@ namespace Slang
                             getSink()->diagnose(inheritanceDecl, Diagnostics::interfaceInheritingComMustBeCom);
                         }
                     }
-                    else if (auto structDecl = as<StructDecl>(superTypeDecl))
+                    else if (const auto structDecl = as<StructDecl>(superTypeDecl))
                     {
                         getSink()->diagnose(inheritanceDecl, Diagnostics::structCannotImplementComInterface);
                     }
@@ -4041,12 +4049,12 @@ namespace Slang
         // confirm that the type actually provides whatever
         // those clauses require.
 
-        if (auto interfaceDecl = as<InterfaceDecl>(decl))
+        if (const auto interfaceDecl = as<InterfaceDecl>(decl))
         {
             // Don't check that an interface conforms to the
             // things it inherits from.
         }
-        else if (auto assocTypeDecl = as<AssocTypeDecl>(decl))
+        else if (const auto assocTypeDecl = as<AssocTypeDecl>(decl))
         {
             // Don't check that an associated type decl conforms to the
             // things it inherits from.
@@ -4164,7 +4172,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if( auto baseErrorType = as<ErrorType>(baseType) )
+            if( const auto baseErrorType = as<ErrorType>(baseType) )
             {
                 continue;
             }
@@ -4232,7 +4240,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if( auto baseErrorType = as<ErrorType>(baseType) )
+            if( const auto baseErrorType = as<ErrorType>(baseType) )
             {
                 continue;
             }
@@ -4301,7 +4309,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if (auto baseErrorType = as<ErrorType>(baseType))
+            if (const auto baseErrorType = as<ErrorType>(baseType))
             {
                 continue;
             }
@@ -4442,7 +4450,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if( auto baseErrorType = as<ErrorType>(baseType) )
+            if( const auto baseErrorType = as<ErrorType>(baseType) )
             {
                 continue;
             }
@@ -4738,7 +4746,6 @@ namespace Slang
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         auto newContext = withParentFunc(decl);
-
         if (newContext.getParentDifferentiableAttribute())
         {
             // Register additional types outside the function body first.
@@ -4756,7 +4763,7 @@ namespace Slang
             m_parentDifferentiableAttr = oldAttr;
         }
 
-        if (auto body = decl->body)
+        if (const auto body = decl->body)
         {
             checkStmt(decl->body, newContext);
         }
@@ -4821,9 +4828,9 @@ namespace Slang
             Decl* leftParam = leftParams[pp];
             Decl* rightParam = rightParams[pp];
 
-            if (auto leftTypeParam = as<GenericTypeParamDecl>(leftParam))
+            if (const auto leftTypeParam = as<GenericTypeParamDecl>(leftParam))
             {
-                if (auto rightTypeParam = as<GenericTypeParamDecl>(rightParam))
+                if (const auto rightTypeParam = as<GenericTypeParamDecl>(rightParam))
                 {
                     // Right now any two type parameters are a match.
                     // Names are irrelevant to matching, and any constraints
@@ -5588,7 +5595,7 @@ namespace Slang
             return;
         decl->returnType.type = funcType->getResultType();
         decl->errorType.type = funcType->getErrorType();
-        for (UInt i = 0; i < funcType->getParamCount(); i++)
+        for (Index i = 0; i < funcType->getParamCount(); i++)
         {
             auto paramType = funcType->getParamType(i);
             if (auto dirType = as<ParamDirectionType>(paramType))
@@ -5638,11 +5645,8 @@ namespace Slang
             bool isDiffFunc = false;
             if (decl->hasModifier<ForwardDifferentiableAttribute>() || decl->hasModifier<BackwardDifferentiableAttribute>())
             {
-                if (GetOuterGeneric(decl))
-                {
-                    getSink()->diagnose(decl, Diagnostics::differentiableGenericInterfaceMethodNotSupported);
-                }
                 auto reqDecl = m_astBuilder->create<ForwardDerivativeRequirementDecl>();
+                reqDecl->originalRequirementDecl = decl;
                 cloneModifiers(reqDecl, decl);
                 auto declRef = DeclRef<CallableDecl>(decl, createDefaultSubstitutions(m_astBuilder, this, decl));
                 auto diffFuncType = getForwardDiffFuncType(getFuncType(m_astBuilder, declRef));
@@ -5664,6 +5668,7 @@ namespace Slang
                 auto diffFuncType = as<FuncType>(getBackwardDiffFuncType(originalFuncType));
                 {
                     auto reqDecl = m_astBuilder->create<BackwardDerivativeRequirementDecl>();
+                    reqDecl->originalRequirementDecl = decl;
                     cloneModifiers(reqDecl, decl);
                     setFuncTypeIntoRequirementDecl(reqDecl, diffFuncType);
                     interfaceDecl->members.add(reqDecl);
@@ -5830,7 +5835,7 @@ namespace Slang
             // It is possible that there was an error in checking the base type
             // expression, and in such a case we shouldn't emit a cascading error.
             //
-            if( auto baseErrorType = as<ErrorType>(baseType) )
+            if( const auto baseErrorType = as<ErrorType>(baseType) )
             {
                 continue;
             }
@@ -6923,9 +6928,13 @@ namespace Slang
         auto ctx = visitor->withExprLocalScope(&scope);
         auto subVisitor = SemanticsVisitor(ctx);
         auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
+        attr->funcExpr = checkedFuncExpr;
+        if (attr->args.getCount())
+            attr->args[0] = attr->funcExpr;
         if (auto declRefExpr = as<DeclRefExpr>(checkedFuncExpr))
         {
-            visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+            if (declRefExpr->declRef)
+                visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
         }
         else if (auto overloadedExpr = as<OverloadedExpr>(checkedFuncExpr))
         {
@@ -6947,10 +6956,12 @@ namespace Slang
             if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
             {
                 attr->funcExpr = calleeDeclRef;
+                if (attr->args.getCount())
+                    attr->args[0] = attr->funcExpr;
                 return;
             }
         }
-        
+
         visitor->getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
     }
 
@@ -7084,7 +7095,8 @@ namespace Slang
         DeclRefExpr* calleeDeclRefExpr = nullptr;
         HigherOrderInvokeExpr* higherOrderFuncExpr = visitor->getASTBuilder()->create<TDifferentiateExpr>();
         higherOrderFuncExpr->baseFunction = derivativeOfAttr->funcExpr;
-        higherOrderFuncExpr->loc = derivativeOfAttr->loc;
+        if (derivativeOfAttr->args.getCount() > 0)
+            higherOrderFuncExpr->loc = derivativeOfAttr->args[0]->loc;
         Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(higherOrderFuncExpr, visitor->allowStaticReferenceToNonStaticMember());
         if (!checkedHigherOrderFuncExpr)
         {
@@ -7109,6 +7121,11 @@ namespace Slang
             visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
             return;
         }
+
+        calleeDeclRefExpr->loc = higherOrderFuncExpr->loc;
+        if (derivativeOfAttr->args.getCount() > 0)
+            derivativeOfAttr->args[0] = calleeDeclRefExpr;
+
         calleeDeclRef = calleeDeclRefExpr->declRef;
 
         auto calleeFunc = as<FunctionDeclBase>(calleeDeclRef.getDecl());

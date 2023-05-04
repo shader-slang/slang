@@ -61,6 +61,7 @@ extern Slang::String get_slang_hlsl_prelude();
 
 namespace Slang {
 
+
 /* static */const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOf)] =
 {
     { 0, 0, uint8_t(BaseType::Void) },
@@ -132,6 +133,7 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
+    
     _initCodeGenTransitionMap();
 
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
@@ -143,6 +145,9 @@ void Session::init()
     m_completionTokenName = getNamePool()->getName("#?");
 
     m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
+
+    // Set up the command line options
+    initCommandOptions(m_commandOptions);
 
     // Set up shared AST builder
     m_sharedASTBuilder = new SharedASTBuilder;
@@ -604,6 +609,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     {
         linkage->setFileSystem(desc.fileSystem);
     }
+
+    if (desc.structureSize >= offsetof(slang::SessionDesc, enableEffectAnnotations))
+    {
+        linkage->setEnableEffectAnnotations(desc.enableEffectAnnotations);
+    }
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
@@ -752,7 +763,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
         // We prefer LLVM if it's available
-        if (auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
+        if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
         {
             return SLANG_PASS_THROUGH_LLVM;
         }
@@ -1432,6 +1443,14 @@ Session* TargetRequest::getSession()
 MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
 {
     return linkage->getDefaultMatrixLayoutMode();
+}
+
+void TargetRequest::setHLSLToVulkanLayoutOptions(HLSLToVulkanLayoutOptions* opts)
+{
+    if (isKhronosTarget(this))
+    {
+        hlslToVulkanLayoutOptions = opts;
+    }
 }
 
 void TargetRequest::addCapability(CapabilityAtom capability)
@@ -4543,6 +4562,11 @@ void Session::addBuiltinSource(
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();
     auto moduleDecl = module->getModuleDecl();
 
+    // Extact documentation markup.
+    ASTMarkup markup;
+    ASTMarkupUtil::extract(moduleDecl, sourceManager, &sink, &markup);
+    markup.attachToAST();
+
     // Put in the loaded module map
     linkage->mapNameToLoadedModules.add(moduleName, module);
 
@@ -4661,6 +4685,11 @@ int EndToEndCompileRequest::addCodeGenTarget(SlangCompileTarget target)
 void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID profile)
 {
     getLinkage()->targets[targetIndex]->setTargetProfile(Profile(profile));
+}
+
+void EndToEndCompileRequest::setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanShiftOptions)
+{
+    getLinkage()->targets[targetIndex]->setHLSLToVulkanLayoutOptions(vulkanShiftOptions);
 }
 
 void EndToEndCompileRequest::setTargetFlags(int targetIndex, SlangTargetFlags flags)
@@ -4793,6 +4822,11 @@ void EndToEndCompileRequest::addSearchPath(const char* path)
 void EndToEndCompileRequest::addPreprocessorDefine(const char* key, const char* value)
 {
     getLinkage()->addPreprocessorDefine(key, value);
+}
+
+void EndToEndCompileRequest::setEnableEffectAnnotations(bool value)
+{
+    getLinkage()->setEnableEffectAnnotations(value);
 }
 
 char const* EndToEndCompileRequest::getDiagnosticOutput()

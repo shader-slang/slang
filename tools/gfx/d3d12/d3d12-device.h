@@ -17,7 +17,7 @@ using namespace Slang;
 
 // Define function pointer types for PIX library.
 typedef HRESULT(WINAPI* PFN_BeginEventOnCommandList)(
-    ID3D12GraphicsCommandList* commandList, UINT64 color, _In_ PCSTR formatString);
+    ID3D12GraphicsCommandList* commandList, UINT64 color, PCSTR formatString);
 typedef HRESULT(WINAPI* PFN_EndEventOnCommandList)(ID3D12GraphicsCommandList* commandList);
 
 struct D3D12DeviceInfo

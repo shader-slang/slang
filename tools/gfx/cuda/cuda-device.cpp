@@ -210,7 +210,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
         limits.maxTextureDimension2D = Math::Min(deviceProps.maxSurface2D[0], deviceProps.maxSurface2D[1]);
         limits.maxTextureDimension3D = Math::Min(deviceProps.maxSurface3D[0], Math::Min(deviceProps.maxSurface3D[1], deviceProps.maxSurface3D[2]));
         limits.maxTextureDimensionCube = deviceProps.maxSurfaceCubemap;
-        limits.maxTextureArrayLayers = Math::Min(deviceProps.maxSurface1DLayered[2], deviceProps.maxSurface2DLayered[2]);
+        limits.maxTextureArrayLayers = Math::Min(deviceProps.maxSurface1DLayered[1], deviceProps.maxSurface2DLayered[2]);
 
         // limits.maxVertexInputElements
         // limits.maxVertexInputElementOffset

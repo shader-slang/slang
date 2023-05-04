@@ -106,7 +106,7 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     
     void writeBackDerivativeToInOutParams(ParameterBlockTransposeInfo& info, IRFunc* diffFunc);
     
-    InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType);
+    virtual InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType) override;
 
     InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize);
 

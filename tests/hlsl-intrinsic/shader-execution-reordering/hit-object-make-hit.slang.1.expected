@@ -7,6 +7,12 @@ standard output = {
 #extension GL_NV_shader_invocation_reorder : require
 layout(row_major) uniform;
 layout(row_major) buffer;
+layout(binding = 0)
+uniform accelerationStructureEXT scene_0;
+
+layout(std430, binding = 1) buffer _S1 {
+    uint _data[];
+} outputBuffer_0;
 struct SomeValues_0
 {
     int a_0;
@@ -16,9 +22,6 @@ struct SomeValues_0
 layout(location = 0)
 hitObjectAttributeNV
 SomeValues_0 t_0;
-
-layout(binding = 0)
-uniform accelerationStructureEXT scene_0;
 
 struct RayDesc_0
 {
@@ -30,11 +33,11 @@ struct RayDesc_0
 
 RayDesc_0 HitObject_GetRayDesc_0(hitObjectNV this_0)
 {
-    vec3 _S1 = (hitObjectGetWorldRayOriginNV((this_0)));
-    float _S2 = (hitObjectGetRayTMinNV((this_0)));
-    vec3 _S3 = (hitObjectGetObjectRayDirectionNV((this_0)));
-    float _S4 = (hitObjectGetRayTMaxNV((this_0)));
-    RayDesc_0 ray_0 = { _S1, _S2, _S3, _S4 };
+    vec3 _S2 = (hitObjectGetWorldRayOriginNV((this_0)));
+    float _S3 = (hitObjectGetRayTMinNV((this_0)));
+    vec3 _S4 = (hitObjectGetObjectRayDirectionNV((this_0)));
+    float _S5 = (hitObjectGetRayTMaxNV((this_0)));
+    RayDesc_0 ray_0 = { _S2, _S3, _S4, _S5 };
     return ray_0;
 }
 
@@ -46,9 +49,9 @@ SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_1)
 
 uint calcValue_0(hitObjectNV hit_0)
 {
-    bool _S5 = (hitObjectIsHitNV((hit_0)));
+    bool _S6 = (hitObjectIsHitNV((hit_0)));
     uint r_0;
-    if(_S5)
+    if(_S6)
     {
         uint instanceIndex_0 = (hitObjectGetInstanceCustomIndexNV((hit_0)));
         uint instanceID_0 = (hitObjectGetInstanceIdNV((hit_0)));
@@ -63,8 +66,8 @@ uint calcValue_0(hitObjectNV hit_0)
     }
     else
     {
-        bool _S6 = (hitObjectIsMissNV((hit_0)));
-        if(_S6)
+        bool _S7 = (hitObjectIsMissNV((hit_0)));
+        if(_S7)
         {
             r_0 = 1U;
         }
@@ -76,9 +79,6 @@ uint calcValue_0(hitObjectNV hit_0)
     return r_0;
 }
 
-layout(std430, binding = 1) buffer _S7 {
-    uint _data[];
-} outputBuffer_0;
 void main()
 {
     uvec3 _S8 = ((gl_LaunchIDEXT));

@@ -462,7 +462,10 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
     return SLANG_OK;
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+/* static */SlangResult VisualStudioCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    [[maybe_unused]] DownstreamCompilerSet* set)
 {
     SLANG_UNUSED(loader);
 

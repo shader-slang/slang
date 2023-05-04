@@ -37,7 +37,12 @@ SlangResult FileStream::init(const String& fileName, FileMode fileMode, FileAcce
     return _init(fileName, fileMode, access, share);
 }
 
-SlangResult FileStream::_init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
+SlangResult FileStream::_init(
+    const String& fileName,
+    FileMode fileMode,
+    FileAccess access,
+    // Only used on Windows
+    [[maybe_unused]] FileShare share)
 {
     // Make sure it's closed to start with
     close();

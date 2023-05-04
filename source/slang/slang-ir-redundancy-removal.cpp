@@ -246,7 +246,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
 
     // A store can be removed if it stores into a local variable
     // that has no other uses than store.
-    if (auto varInst = as<IRVar>(rootVar))
+    if (const auto varInst = as<IRVar>(rootVar))
     {
         bool hasNonStoreUse = false;
         // If the entire access chain doesn't non-store use, we can safely remove it.
@@ -344,6 +344,34 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     {
         store->removeAndDeallocate();
         return true;
+    }
+
+    // A store can be removed if it is a store into the same var, and there are
+    // no side effects between the load of the var and the store of the var.
+    if (auto load = as<IRLoad>(store->getVal()))
+    {
+        if (load->getPtr() == store->getPtr())
+        {
+            if (load->getParent() == store->getParent())
+            {
+                bool valueMayChange = false;
+                for (auto inst = load->next; inst; inst = inst->next)
+                {
+                    if (inst == store)
+                        break;
+                    if (canInstHaveSideEffectAtAddress(func, inst, store->getPtr()))
+                    {
+                        valueMayChange = true;
+                        break;
+                    }
+                }
+                if (!valueMayChange)
+                {
+                    store->removeAndDeallocate();
+                    return true;
+                }
+            }
+        }
     }
     return false;
 }

@@ -582,12 +582,12 @@ void CLikeSourceEmitter::emitStringLiteral(String const& value)
             m_writer->emit(buffer);
             break;
 
-        case '\"': m_writer->emit("\\\"");
-        case '\'': m_writer->emit("\\\'");
-        case '\\': m_writer->emit("\\\\");
-        case '\n': m_writer->emit("\\n");
-        case '\r': m_writer->emit("\\r");
-        case '\t': m_writer->emit("\\t");
+        case '\"': m_writer->emit("\\\""); break;
+        case '\'': m_writer->emit("\\\'"); break;
+        case '\\': m_writer->emit("\\\\"); break;
+        case '\n': m_writer->emit("\\n"); break;
+        case '\r': m_writer->emit("\\r"); break;
+        case '\t': m_writer->emit("\\t"); break;
         }
     }
     m_writer->emit("\"");
@@ -1797,6 +1797,37 @@ void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
     getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
 }
 
+bool CLikeSourceEmitter::hasExplicitConstantBufferOffset(IRInst* cbufferType)
+{
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
+    if (!type)
+        return false;
+    if (as<IRGLSLShaderStorageBufferType>(cbufferType))
+        return false;
+    auto structType = as<IRStructType>(type->getElementType());
+    if (!structType)
+        return false;
+    for (auto ff : structType->getFields())
+    {
+        if (ff->getKey()->findDecoration<IRPackOffsetDecoration>())
+            return true;
+    }
+    return false;
+}
+
+bool CLikeSourceEmitter::isSingleElementConstantBuffer(IRInst* cbufferType)
+{
+    auto type = as<IRUniformParameterGroupType>(cbufferType);
+    if (!type)
+        return false;
+    if (as<IRGLSLShaderStorageBufferType>(cbufferType))
+        return false;
+    auto structType = as<IRStructType>(type->getElementType());
+    if (structType)
+        return false;
+    return true;
+}
+
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -1895,11 +1926,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("->");
         else
             m_writer->emit(".");
-        if(getSourceLanguage() == SourceLanguage::GLSL
-            && as<IRUniformParameterGroupType>(base->getDataType()))
-        {
-            m_writer->emit("_data.");
-        }
         m_writer->emit(getName(fieldExtract->getField()));
         break;
     }
@@ -1930,14 +1956,13 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
-
-            auto base = ii->getBase();
-            emitOperand(base, leftSide(outerPrec, prec));
-            m_writer->emit(".");
-            if(getSourceLanguage() == SourceLanguage::GLSL
-                && as<IRUniformParameterGroupType>(base->getDataType()))
+            auto skipBase = isD3DTarget(getTargetReq()) &&
+                hasExplicitConstantBufferOffset(ii->getBase()->getDataType());
+            if (!skipBase)
             {
-                m_writer->emit("_data.");
+                auto base = ii->getBase();
+                emitOperand(base, leftSide(outerPrec, prec));
+                m_writer->emit(".");
             }
             m_writer->emit(getName(ii->getField()));
         }
@@ -2032,8 +2057,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto base = inst->getOperand(0);
             emitDereferenceOperand(base, outerPrec);
-            if(getSourceLanguage() == SourceLanguage::GLSL
-                && as<IRUniformParameterGroupType>(base->getDataType()))
+            if (isKhronosTarget(getTargetReq()) && isSingleElementConstantBuffer(base->getDataType()))
             {
                 m_writer->emit("._data");
             }
@@ -2628,9 +2652,9 @@ void CLikeSourceEmitter::emitSemanticsUsingVarLayout(IRVarLayout* varLayout)
     }
 }
 
-void CLikeSourceEmitter::emitSemantics(IRInst* inst)
+void CLikeSourceEmitter::emitSemantics(IRInst* inst, bool allowOffsetLayout)
 {
-    emitSemanticsImpl(inst);
+    emitSemanticsImpl(inst, allowOffsetLayout);
 }
 
 void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
@@ -3094,7 +3118,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if(auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
+    if(const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
     {
         return;
     }
@@ -3105,11 +3129,11 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 
     m_writer->emit(getName(structType));
 
-    emitStructDeclarationsBlock(structType);
+    emitStructDeclarationsBlock(structType, false);
     m_writer->emit(";\n\n");
 }
 
-void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType)
+void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout)
 {
     m_writer->emit("\n{\n");
     m_writer->indent();
@@ -3130,8 +3154,15 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType)
             emitInterpolationModifiers(fieldKey, fieldType, nullptr);
         }
 
+        if (allowOffsetLayout)
+        {
+            if (auto packOffsetDecoration = fieldKey->findDecoration<IRPackOffsetDecoration>())
+            {
+                emitPackOffsetModifier(fieldKey, fieldType, packOffsetDecoration);
+            }
+        }
         emitType(fieldType, getName(fieldKey));
-        emitSemantics(fieldKey);
+        emitSemantics(fieldKey, allowOffsetLayout);
         m_writer->emit(";\n");
     }
 
@@ -3143,7 +3174,7 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
 {
     // If the selected `class` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if (auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
+    if (const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
     {
         return;
     }
@@ -3771,12 +3802,28 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
 
     for(auto inst : module->getGlobalInsts())
     {
+        // Emit all resource-typed objects first. This is to avoid an odd scenario in HLSL
+        // where not using a resource type in a resource definition before the same type
+        // is used for a function parameter causes HLSL to complain about an 'incomplete type'
+        // 
+        if ( isResourceType(inst->getDataType()) )
+        {
+            ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
+        }
+    }
+
+    for(auto inst : module->getGlobalInsts())
+    {
         if( as<IRType>(inst) )
         {
             // Don't emit a type unless it is actually used or is marked public.
             if (!inst->findDecoration<IRPublicDecoration>())
                 continue;
         }
+
+        // Skip resource types in this pass.
+        if ( isResourceType(inst->getDataType()) )
+            continue;
 
         ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
     }

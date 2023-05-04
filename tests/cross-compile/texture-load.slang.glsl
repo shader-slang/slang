@@ -17,7 +17,7 @@ layout(binding = 2)
 layout(std140)
 uniform _S1
 {
-    SLANG_ParameterGroup_C_0 _data;
+    ivec2 pos_0;
 } C_0;
 
 layout(binding = 0)
@@ -30,7 +30,7 @@ uniform image2D outputTexture_0;
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 void main()
 {
-    ivec3 _S2 = ivec3(C_0._data.pos_0, 0);
+    ivec3 _S2 = ivec3(C_0.pos_0, 0);
 
     vec2 tmp_0 = texelFetch(
     	inputTexture_0,
@@ -39,7 +39,7 @@ void main()
 
     imageStore(
     	outputTexture_0,
-    	ivec2(uvec2(C_0._data.pos_0)),
+    	ivec2(uvec2(C_0.pos_0)),
     	vec4(tmp_0, float(0), float(0)));
 
     return;

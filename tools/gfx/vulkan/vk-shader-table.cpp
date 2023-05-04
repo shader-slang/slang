@@ -39,7 +39,11 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         ResourceStateSet(ResourceState::General, ResourceState::CopyDestination);
     bufferDesc.type = IResource::Type::Buffer;
     bufferDesc.sizeInBytes = tableSize;
-    m_device->createBufferResource(bufferDesc, nullptr, bufferResource.writeRef());
+    static_cast<vk::DeviceImpl*>(m_device)->createBufferResourceImpl(
+        bufferDesc,
+        VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR,
+        nullptr,
+        bufferResource.writeRef());
 
     TransientResourceHeapImpl* transientHeapImpl =
         static_cast<TransientResourceHeapImpl*>(transientHeap);

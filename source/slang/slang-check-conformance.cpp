@@ -264,7 +264,7 @@ namespace Slang
                 }
                 return true;
             }
-            if (auto dynamicType = as<DynamicType>(subType))
+            if (const auto dynamicType = as<DynamicType>(subType))
             {
                 // A __Dynamic type always conforms to the interface via its witness table.
                 if (outWitness)

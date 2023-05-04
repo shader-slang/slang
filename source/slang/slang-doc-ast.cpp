@@ -12,15 +12,15 @@ namespace Slang {
 {
     typedef Extractor::SearchStyle SearchStyle;
 
-    if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    if (const auto enumCaseDecl = as<EnumCaseDecl>(decl))
     {
         return SearchStyle::EnumCase;
     }
-    if (auto paramDecl = as<ParamDecl>(decl))
+    if (const auto paramDecl = as<ParamDecl>(decl))
     {
         return SearchStyle::Param;
     }
-    else if (auto callableDecl = as<CallableDecl>(decl))
+    else if (const auto callableDecl = as<CallableDecl>(decl))
     {
         return SearchStyle::Function;
     }
@@ -35,6 +35,10 @@ namespace Slang {
     else if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl))
     {
         return SearchStyle::GenericParam;
+    }
+    else if (as<AttributeDecl>(decl))
+    {
+        return SearchStyle::Attribute;
     }
     else
     {

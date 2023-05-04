@@ -22,7 +22,8 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
     // We now find the relavent instructions.
     IRCall* callInst = nullptr;
     IRLookupWitnessMethod* lookupInst = nullptr;
-    IRReturn* returnInst = nullptr;
+    // Only used in debug builds as a sanity check
+    [[maybe_unused]] IRReturn* returnInst = nullptr;
     for (auto inst : block->getOrdinaryInsts())
     {
         switch (inst->getOp())

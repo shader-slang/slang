@@ -638,6 +638,12 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle se
         {
             return _findMarkup(info, Location::Before, out);
         }
+        case SearchStyle::Attribute:
+        {
+            FindInfo newInfo = info;
+            newInfo.tokenIndex -= 2;
+            return _findMarkup(newInfo, Location::Before, out);
+        }
         case SearchStyle::Variable:
         {
             Location locs[] = { Location::Before, Location::AfterSemicolon };
@@ -717,8 +723,6 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 {
     struct Entry
     {
-        typedef Entry ThisType;
-
         Index viewIndex;                    ///< The view/file index this loc is found in
         SourceLoc::RawValue locOrOffset;    ///< Can be a loc or an offset into the file
 

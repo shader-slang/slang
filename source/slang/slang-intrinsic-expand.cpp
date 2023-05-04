@@ -335,7 +335,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
             auto textureArg = m_args[0].get();
 
-            if (auto baseTextureSamplerType = as<IRTextureSamplerType>(textureArg->getDataType()))
+            if (const auto baseTextureSamplerType = as<IRTextureSamplerType>(textureArg->getDataType()))
             {
                 // If the base object (first argument) has a combined texture-sampler type,
                 // then we can simply use that argument as-is.
@@ -513,7 +513,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
 
             SLANG_ASSERT(elementType);
-            if (auto basicType = as<IRBasicType>(elementType))
+            if (const auto basicType = as<IRBasicType>(elementType))
             {
                 // A scalar result is expected
                 m_writer->emit(".x");

@@ -29,8 +29,9 @@ namespace Slang {
 
 SlangResult DefaultArtifactHandler::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-	if (auto ptr = getInterface(uuid))
+	if ([[maybe_unused]] auto ptr = getInterface(uuid))
 	{
+        SLANG_ASSERT(ptr == this);
 		addRef();
 		*outObject = static_cast<IArtifactHandler*>(this);
 		return SLANG_OK;

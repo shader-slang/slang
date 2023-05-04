@@ -32,6 +32,18 @@ struct StringUtil
     static Index split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices);
         /// Splits into outSlices up to maxSlices. Returns SLANG_OK if of 'in' consumed.
     static SlangResult split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices, Index& outSlicesCount);
+        /// Splits on white space
+    static void splitOnWhitespace(const UnownedStringSlice& in, List<UnownedStringSlice>& slicesOut);
+
+        /// Split in, by specified splitChar append into slices out
+        /// Slices contents will directly address into in, so contents will only stay valid as long as in does.
+    static void appendSplit(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut);
+        /// Split in by the specified splitSlice
+        /// Slices contents will directly address into in, so contents will only stay valid as long as in does.
+    static void appendSplit(const UnownedStringSlice& in, const UnownedStringSlice& splitSlice, List<UnownedStringSlice>& slicesOut);
+
+        /// appends splits on white space 
+    static void appendSplitOnWhitespace(const UnownedStringSlice& in, List<UnownedStringSlice>& slicesOut);
 
         /// Append the joining of in items, separated by 'separator' onto out
     static void join(const List<String>& in, char separator, StringBuilder& out);

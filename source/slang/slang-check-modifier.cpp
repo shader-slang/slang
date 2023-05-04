@@ -500,7 +500,7 @@ namespace Slang
                 return false;
             }
         }
-        else if (auto unrollAttr = as<UnrollAttribute>(attr))
+        else if (const auto unrollAttr = as<UnrollAttribute>(attr))
         {
             // Check has an argument. We need this because default behavior is to give an error
             // if an attribute has arguments, but not handled explicitly (and the default param will come through
@@ -532,7 +532,7 @@ namespace Slang
                 }
             }
         }
-        else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
+        else if (const auto userDefAttr = as<UserDefinedAttribute>(attr))
         {
             // check arguments against attribute parameters defined in attribClassDecl
             Index paramIndex = 0;
@@ -704,7 +704,7 @@ namespace Slang
                 return false;
             }
         }
-        else if (auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
+        else if (const auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
         {
             auto varDecl = as<VarDeclBase>(attrTarget);
             if (!varDecl)
@@ -780,6 +780,7 @@ namespace Slang
         attr->keywordName  = uncheckedAttr->keywordName;
         attr->args  = uncheckedAttr->args;
         attr->loc   = uncheckedAttr->loc;
+        attr->attributeDecl = attrDecl;
 
         // We will start with checking steps that can be applied independent
         // of the concrete attribute type that was selected. These only need
@@ -801,7 +802,7 @@ namespace Slang
             {
                 // We didn't have enough arguments for the
                 // number of parameters declared.
-                if(auto defaultArg = paramDecl->initExpr)
+                if(const auto defaultArg = paramDecl->initExpr)
                 {
                     // The attribute declaration provided a default,
                     // so we should use that.
@@ -884,7 +885,7 @@ namespace Slang
             }
         }
 
-        if (auto externModifier = as<ExternModifier>(m))
+        if (const auto externModifier = as<ExternModifier>(m))
         {
             if (auto varDecl = as<VarDeclBase>(syntaxNode))
             {
@@ -917,6 +918,40 @@ namespace Slang
                 // See SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute.
             }
         }
+
+        if (auto packOffsetModifier = as<HLSLPackOffsetSemantic>(m))
+        {
+            if (!packOffsetModifier->registerName.getContent().startsWith("c"))
+            {
+                getSink()->diagnose(packOffsetModifier, Diagnostics::unknownRegisterClass, packOffsetModifier->registerName);
+                return m;
+            }
+            auto uniformOffset = stringToInt(packOffsetModifier->registerName.getContent().tail(1)) * 16;
+            if (packOffsetModifier->componentMask.getContentLength())
+            {
+                switch (packOffsetModifier->componentMask.getContent()[0])
+                {
+                case 'x':
+                    uniformOffset += 0;
+                    break;
+                case 'y':
+                    uniformOffset += 4;
+                    break;
+                case 'z':
+                    uniformOffset += 8;
+                    break;
+                case 'w':
+                    uniformOffset += 12;
+                    break;
+                default:
+                    getSink()->diagnose(packOffsetModifier, Diagnostics::invalidComponentMask, packOffsetModifier->componentMask);
+                    break;
+                }
+            }
+            packOffsetModifier->uniformOffset = uniformOffset;
+            return packOffsetModifier;
+        }
+
         // Default behavior is to leave things as they are,
         // and assume that modifiers are mostly already checked.
         //

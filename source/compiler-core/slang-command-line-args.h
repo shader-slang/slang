@@ -109,17 +109,15 @@ struct CommandLineReader
         /// Set the current index
     void setIndex(Index index) { SLANG_ASSERT(index >= 0 && index <= m_args->getArgCount()); m_index = index; }
 
-        /// Set up reader with args
-    CommandLineReader(CommandLineArgs* args, DiagnosticSink* sink):
-        m_args(args),
-        m_index(0),
-        m_sink(sink)
-    {
-    }
+    void init(CommandLineArgs* args, DiagnosticSink* sink) { m_args = args; m_sink = sink; m_index = 0; }
 
-    DiagnosticSink* m_sink;
-    CommandLineArgs* m_args;
-    Index m_index;
+        /// Set up reader with args
+    CommandLineReader(CommandLineArgs* args, DiagnosticSink* sink) { init(args, sink); }
+    CommandLineReader() = default;
+
+    DiagnosticSink* m_sink = nullptr;
+    CommandLineArgs* m_args = nullptr;
+    Index m_index = 0;
 };
 
 struct DownstreamArgs

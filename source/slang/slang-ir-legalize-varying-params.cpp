@@ -464,7 +464,7 @@ protected:
         auto localVar = builder.emitVar(valueType);
         auto localVal = LegalizedVaryingVal::makeAddress(localVar);
 
-        if( auto inOutType = as<IRInOutType>(paramPtrType) )
+        if( const auto inOutType = as<IRInOutType>(paramPtrType) )
         {
             // If the parameter was an `inout` and not just an `out`
             // parameter, we will create one more more legal `in`
@@ -1122,7 +1122,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             }
             return builder->emitMakeVector(typeToFetch, elementVals.getCount(), elementVals.getBuffer());
         }
-        else if (auto basicType = as<IRBasicType>(typeToFetch))
+        else if (const auto basicType = as<IRBasicType>(typeToFetch))
         {
             IRIntegerValue idx = ioBaseAttributeIndex;
             auto idxInst = builder->getIntValue(builder->getIntType(), idx);

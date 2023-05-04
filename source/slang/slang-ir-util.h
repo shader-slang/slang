@@ -162,7 +162,7 @@ inline IRInst* unwrapAttributedType(IRInst* type)
 
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
 void copyNameHintDecoration(IRInst* dest, IRInst* src);
-
+IRInst* getRootAddr(IRInst* addrInst);
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
 String dumpIRToString(IRInst* root);
@@ -202,6 +202,9 @@ IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 void moveParams(IRBlock* dest, IRBlock* src);
 
 void removePhiArgs(IRInst* phiParam);
+
+int getParamIndexInBlock(IRParam* paramInst);
+
 }
 
 #endif

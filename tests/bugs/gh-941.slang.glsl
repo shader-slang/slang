@@ -14,7 +14,8 @@ layout(binding = 2)
 layout(std140)
 uniform _S1
 {
-    SLANG_ParameterGroup_C_0 _data;
+    vec2 uv_0;
+    uint index_0;
 } C_0;
 
 layout(binding = 0)
@@ -30,9 +31,9 @@ void main()
 {
     vec4 _S3 = texture(
     	sampler2D(
-    		t_0[C_0._data.index_0],
+    		t_0[C_0.index_0],
     		s_0),
-		C_0._data.uv_0);
+		C_0.uv_0);
     _S2 = _S3;
     return;
 }

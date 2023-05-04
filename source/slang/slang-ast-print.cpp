@@ -168,7 +168,9 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
     // If the parent declaration is a generic, then we need to print out its
     // signature
-    if (parentGenericDeclRef)
+    if (parentGenericDeclRef && 
+        !declRef.as<GenericValueParamDecl>() &&
+        !declRef.as<GenericTypeParamDecl>())
     {
         auto genSubst = as<GenericSubstitution>(declRef.substitutions.substitutions);
         if (genSubst)
@@ -364,6 +366,8 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
                     continue;
                 if (as<SpecializedForTargetModifier>(modifier))
                     continue;
+                if (as<AttributeTargetModifier>(modifier))
+                    continue;
             }
             // Don't print out attributes.
             if (as<AttributeBase>(modifier))
@@ -396,7 +400,7 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
             m_builder << " ";
         }
     }
-    else if (auto propertyDecl = as<PropertyDecl>(decl))
+    else if (const auto propertyDecl = as<PropertyDecl>(decl))
     {
         m_builder << "property ";
     }
@@ -424,9 +428,13 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
             m_builder << " ";
         }
     }
-    else if (auto assocType = as<AssocTypeDecl>(decl))
+    else if (const auto assocType = as<AssocTypeDecl>(decl))
     {
         m_builder << "associatedtype ";
+    }
+    else if (const auto attribute = as<AttributeDecl>(decl))
+    {
+        m_builder << "attribute ";
     }
 }
 

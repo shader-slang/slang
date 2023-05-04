@@ -25,8 +25,6 @@ SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out) { 
 
 SlangResult MacroWriter::calcDef(NodeTree* tree, SourceOrigin* origin, StringBuilder& out)
 {
-    Node* currentScope = nullptr;
-
     for (Node* node : origin->m_nodes)
     {
         if (node->isReflected())

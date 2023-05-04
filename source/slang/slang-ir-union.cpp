@@ -448,11 +448,11 @@ struct DesugarUnionTypesContext
             }
             return builder->emitMakeVector(vecType, elementVals);
         }
-        else if( auto matType = as<IRMatrixType>(payloadType) )
+        else if( const auto matType = as<IRMatrixType>(payloadType) )
         {
             SLANG_UNIMPLEMENTED_X("matrix in union type");
         }
-        else if( auto arrayType = as<IRArrayType>(payloadType) )
+        else if( const auto arrayType = as<IRArrayType>(payloadType) )
         {
             SLANG_UNIMPLEMENTED_X("array in union type");
         }

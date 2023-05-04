@@ -13,6 +13,7 @@
 #include "../compiler-core/slang-command-line-args.h"
 
 #include "../core/slang-std-writers.h"
+#include "../core/slang-command-options.h"
 
 #include "../../slang-com-ptr.h"
 
@@ -23,6 +24,8 @@
 #include "slang-profile.h"
 #include "slang-syntax.h"
 #include "slang-content-assist-info.h"
+
+#include "slang-hlsl-to-vulkan-layout-options.h"
 
 #include "slang-serialize-ir-types.h"
 
@@ -1534,6 +1537,7 @@ namespace Slang
     class TargetRequest : public RefObject
     {
     public:
+        
         TargetRequest(Linkage* linkage, CodeGenTarget format);
 
         void addTargetFlags(SlangTargetFlags flags)
@@ -1574,6 +1578,10 @@ namespace Slang
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
 
+        void setHLSLToVulkanLayoutOptions(HLSLToVulkanLayoutOptions* opts);
+
+        const HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions() const { return hlslToVulkanLayoutOptions; }
+
         bool shouldDumpIntermediates() { return dumpIntermediates; }
 
         void setTrackLiveness(bool enable) { enableLivenessTracking = enable; }
@@ -1588,7 +1596,6 @@ namespace Slang
         SlangTargetFlags getTargetFlags() { return targetFlags; }
         CapabilitySet getTargetCaps();
         bool getForceGLSLScalarBufferLayout() { return forceGLSLScalarBufferLayout; }
-
         Session* getSession();
         MatrixLayoutMode getDefaultMatrixLayoutMode();
 
@@ -1611,6 +1618,8 @@ namespace Slang
         bool                    dumpIntermediates = false;
         bool                    forceGLSLScalarBufferLayout = false;
         bool                    enableLivenessTracking = false;
+
+        RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanLayoutOptions;           ///< Optional vulkan layout options
     };
 
         /// Are we generating code for a D3D API?
@@ -1755,6 +1764,15 @@ namespace Slang
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
 
+        bool getEnableEffectAnnotations()
+        {
+            return m_enableEffectAnnotations;
+        }
+        void setEnableEffectAnnotations(bool value)
+        {
+            m_enableEffectAnnotations = value;
+        }
+
         // Information on the targets we are being asked to
         // generate code for.
         List<RefPtr<TargetRequest>> targets;
@@ -1849,7 +1867,7 @@ namespace Slang
             Type* const*    args,
             DiagnosticSink* sink);
 
-            /// Add a mew target and return its index.
+            /// Add a new target and return its index.
         UInt addTarget(
             CodeGenTarget   target);
 
@@ -1913,6 +1931,7 @@ namespace Slang
 
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
+        bool m_enableEffectAnnotations = false;
 
         // Modules that have been read in with the -r option
         List<ComPtr<IArtifact>> m_libModules;
@@ -2549,6 +2568,7 @@ namespace Slang
         virtual SLANG_NO_THROW SlangCompileFlags SLANG_MCALL getCompileFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediates(int  enable) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediatePrefix(const char* prefix) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setEnableEffectAnnotations(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setLineDirectiveMode(SlangLineDirectiveMode  mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setCodeGenTarget(SlangCompileTarget target) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW int SLANG_MCALL addCodeGenTarget(SlangCompileTarget target) SLANG_OVERRIDE;
@@ -2617,6 +2637,8 @@ namespace Slang
         virtual SLANG_NO_THROW SlangDiagnosticFlags SLANG_MCALL getDiagnosticFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
+
+        void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
             Session* session);
@@ -3004,6 +3026,9 @@ namespace Slang
         ComPtr<IDownstreamCompiler> m_downstreamCompilers[int(PassThroughMode::CountOf)];        ///< A downstream compiler for a pass through
         DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
         Name* m_completionTokenName = nullptr; ///< The name of a completion request token.
+
+            /// For parsing command line options
+        CommandOptions m_commandOptions;
 
     private:
 

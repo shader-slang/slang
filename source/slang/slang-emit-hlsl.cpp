@@ -208,10 +208,20 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
 
     _emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
+    auto elementType = type->getElementType();
+    if (hasExplicitConstantBufferOffset(type))
+    {
+        // If the user has provided any explicit `packoffset` modifiers,
+        // we have to unwrap the struct and emit the fields directly.
+        emitStructDeclarationsBlock(as<IRStructType>(elementType), true);
+        m_writer->emit("\n");
+        return;
+    }
+    
+    
     m_writer->emit("\n{\n");
     m_writer->indent();
 
-    auto elementType = type->getElementType();
 
     emitType(elementType, getName(varDecl));
     m_writer->emit(";\n");
@@ -898,7 +908,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitHLSLTextureType(texType);
         return;
     }
-    else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
+    else if (const auto textureSamplerType = as<IRTextureSamplerType>(type))
     {
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see combined texture-sampler types");
         return;
@@ -929,7 +939,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
         return;
     }
-    else if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
     {
         switch (type->getOp())
         {
@@ -989,13 +999,40 @@ void HLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     }
 }
 
-void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
+void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 {
     if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
     {
         m_writer->emit(" : ");
         m_writer->emit(semanticDecoration->getSemanticName());
         return;
+    }
+    else if (auto packOffsetDecoration = inst->findDecoration<IRPackOffsetDecoration>())
+    {
+        if (allowOffsets)
+        {
+            m_writer->emit(" : packoffset(c");
+            m_writer->emit(packOffsetDecoration->getRegisterOffset()->getValue());
+            if (packOffsetDecoration->getComponentOffset())
+            {
+                switch (packOffsetDecoration->getComponentOffset()->getValue())
+                {
+                case 0:
+                    break;
+                case 1:
+                    m_writer->emit(".y");
+                    break;
+                case 2:
+                    m_writer->emit(".z");
+                    break;
+                case 3:
+                    m_writer->emit(".w");
+                    break;
+                }
+            }
+            m_writer->emit(")");
+            return;
+        }
     }
 
     if( auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
@@ -1039,7 +1076,7 @@ void HLSLSourceEmitter::_emitStageAccessSemantic(IRStageAccessDecoration* decora
 
 void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
 {
-    if( auto payloadDecoration = inst->findDecoration<IRPayloadDecoration>() )
+    if( const auto payloadDecoration = inst->findDecoration<IRPayloadDecoration>() )
     {
         m_writer->emit("[payload] ");
     }
@@ -1112,6 +1149,14 @@ void HLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
             m_writer->emitChar(' ');
         }
     }
+}
+
+void HLSLSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueType, IRPackOffsetDecoration* layout)
+{
+    SLANG_UNUSED(varInst);
+    SLANG_UNUSED(valueType);
+    SLANG_UNUSED(layout);
+    // We emit packoffset as a semantic in `emitSemantic`, so nothing to do here.
 }
 
 void HLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
@@ -1235,7 +1280,7 @@ void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 
 void HLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
-    if( auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>() )
+    if( const auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>() )
     {
         // When emitting one of the "magic" NVAPI declarations,
         // we will wrap it in a preprocessor conditional that

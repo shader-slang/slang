@@ -332,6 +332,7 @@ struct EntryPointParameterBindingContext
     UsedRangeSet usedRangeSet;
 };
 
+
 // State that is shared during parameter binding,
 // across all translation units
 struct SharedParameterBindingContext
@@ -476,7 +477,7 @@ LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerC
         break;
 
     case 5:
-        if( registerClassName == "space" )
+        if( registerClassName == toSlice("space") )
         {
             return LayoutResourceKind::RegisterSpace;
         }
@@ -593,12 +594,6 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
         spaceToken->getContent(),
         spaceToken->loc,
         getSink(context));
-
-    // TODO: handle component mask part of things...
-    if( semantic->componentMask.hasContent())
-    {
-        getSink(context)->diagnose(semantic->componentMask, Diagnostics::componentMaskNotSupported);
-    }
 
     return info;
 }
@@ -969,7 +964,7 @@ static void addExplicitParameterBindings_HLSL(
     }
 }
 
-static void maybeDiagnoseMissingVulkanLayoutModifier(
+static void _maybeDiagnoseMissingVulkanLayoutModifier(
     ParameterBindingContext*    context,
     DeclRef<VarDeclBase> const& varDecl)
 {
@@ -987,7 +982,6 @@ static void addExplicitParameterBindings_GLSL(
     RefPtr<ParameterInfo>       parameterInfo,
     RefPtr<VarLayout>           varLayout)
 {
-
     // We only want to apply GLSL-style layout modifers
     // when compiling for a Khronos-related target.
     //
@@ -1008,36 +1002,35 @@ static void addExplicitParameterBindings_GLSL(
     //
 
     TypeLayout::ResourceInfo* resInfo = nullptr;
+    TypeLayout::ResourceInfo* foundResInfo = nullptr;
+
     LayoutSemanticInfo semanticInfo;
     semanticInfo.index = 0;
     semanticInfo.space = 0;
-    if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
+
+    if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {
         // Try to find `binding` and `set`
-        auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>();
-        if (!attr)
+        if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
         {
-            maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
-            return;
+            resInfo = foundResInfo;
+            semanticInfo.index = attr->binding;
+            semanticInfo.space = attr->set;
         }
-        semanticInfo.index = attr->binding;
-        semanticInfo.space = attr->set;
     }
-    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace)) != nullptr )
+    else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace)) != nullptr )
     {
         // Try to find `set`
-        auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>();
-        if (!attr)
+        if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
         {
-            maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
-            return;
+            resInfo = foundResInfo;
+            if (attr->binding != 0)
+            {
+                getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.getName(), attr->binding);
+            }
+            semanticInfo.index = attr->set;
+            semanticInfo.space = 0;
         }
-        if( attr->binding != 0)
-        {
-            getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.getName(), attr->binding);
-        }
-        semanticInfo.index = attr->set;
-        semanticInfo.space = 0;
     }
     else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant)) != nullptr )
     {
@@ -1048,15 +1041,64 @@ static void addExplicitParameterBindings_GLSL(
             return;
     }
 
-    // If we didn't find any matches, then bail
-    if(!resInfo)
+    // if we found resInfo, we add the explicit binding
+    if (resInfo)
+    {
+        auto kind = resInfo->kind;
+        auto count = resInfo->count;
+        semanticInfo.kind = kind;
+
+        addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
         return;
+    }
 
-    auto kind = resInfo->kind;
-    auto count = resInfo->count;
-    semanticInfo.kind = kind;
+    // See if we can infer vulkan binding from HLSL if we have such options set
+    auto hlslToVulkanLayoutOptions = context->getTargetRequest()->getHLSLToVulkanLayoutOptions();
 
-    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
+    if (!hlslToVulkanLayoutOptions)
+    {
+        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
+        return;
+    }
+
+    // Do we have any vulkan shift settings
+    auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
+
+    if (hlslRegSemantic == nullptr)
+    {
+        // We don't have a HLSL binding, so we can't infer, so we can't assign an infered explicit binding
+        return;
+    }
+            
+    // Get the HLSL binding info
+    const auto hlslInfo = ExtractLayoutSemanticInfo(context, hlslRegSemantic);
+    if (hlslInfo.kind != LayoutResourceKind::None)
+    {
+        // We need to map to the GLSL binding types
+        HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
+        if (vulkanKind != HLSLToVulkanLayoutOptions::Kind::Invalid)
+        {
+            const auto shift = hlslToVulkanLayoutOptions->getShift(vulkanKind, Index(hlslInfo.space));
+            if (shift != HLSLToVulkanLayoutOptions::kInvalidShift)
+            {
+                const Index bindingIndex = Index(hlslInfo.index) + shift;
+
+                if (bindingIndex >= 0)
+                {
+                    // Add for descriptor slot 
+                    resInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
+
+                    semanticInfo.kind = resInfo->kind;
+                    semanticInfo.index = UInt(bindingIndex);
+                    semanticInfo.space = hlslInfo.space;
+                    
+                    const LayoutSize count = resInfo->count;
+
+                    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
+                }
+            }
+        }
+    }
 }
 
 // Given a single parameter, collect whatever information we have on
@@ -1089,8 +1131,7 @@ void generateParameterBindings(
 static void completeBindingsForParameterImpl(
     ParameterBindingContext*    context,
     RefPtr<VarLayout>           firstVarLayout,
-    ParameterBindingInfo        bindingInfos[kLayoutResourceKindCount],
-    RefPtr<ParameterInfo>       parameterInfo)
+    ParameterBindingInfo        bindingInfos[kLayoutResourceKindCount])
 {
     // For any resource kind used by the parameter
     // we need to update its layout information
@@ -1316,8 +1357,7 @@ static void completeBindingsForParameter(
     completeBindingsForParameterImpl(
         context,
         varLayout,
-        parameterInfo->bindingInfo,
-        parameterInfo);
+        parameterInfo->bindingInfo);
 
     // At this point we should have explicit binding locations chosen for
     // all the relevant resource kinds, so we can apply these to the
@@ -1334,8 +1374,7 @@ static void completeBindingsForParameter(
     completeBindingsForParameterImpl(
         context,
         varLayout,
-        bindingInfos,
-        nullptr);
+        bindingInfos);
     applyBindingInfoToParameter(varLayout, bindingInfos);
 }
 
@@ -1942,9 +1981,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         return arrayTypeLayout;
     }
     // Ignore a bunch of types that don't make sense here...
-    else if (auto textureType = as<TextureType>(type)) { return nullptr;  }
-    else if(auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
-    else if(auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
+    else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
+    else if(const auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
+    else if(const auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
     else if( auto declRefType = as<DeclRefType>(type) )
@@ -2085,7 +2124,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         }
     }
     // If we ran into an error in checking the user's code, then skip this parameter
-    else if( auto errorType = as<ErrorType>(type) )
+    else if( const auto errorType = as<ErrorType>(type) )
     {
         return nullptr;
     }
@@ -2290,7 +2329,7 @@ struct ScopeLayoutBuilder
 
     }
 
-    RefPtr<VarLayout> endLayout()
+    RefPtr<VarLayout> endLayout(VarLayout* inVarLayout = nullptr)
     {
         // Finish computing the layout for the ordindary data (if any).
         //
@@ -2316,7 +2355,12 @@ struct ScopeLayoutBuilder
 
         // We now have a bunch of layout information, which we should
         // record into a suitable object that represents the scope
-        RefPtr<VarLayout> scopeVarLayout = new VarLayout();
+        RefPtr<VarLayout> scopeVarLayout = inVarLayout;
+        if (!scopeVarLayout)
+        {
+            scopeVarLayout = new VarLayout();
+        }
+
         scopeVarLayout->typeLayout = scopeTypeLayout;
 
         if( auto pendingTypeLayout = scopeTypeLayout->pendingDataTypeLayout )
@@ -2454,24 +2498,46 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
     /// the resources required for a constant buffer in the appropriate
     /// target-specific fashion.
     ///
-static ParameterBindingAndKindInfo maybeAllocateConstantBufferBinding(
-    ParameterBindingContext*    context,
-    bool                        needConstantBuffer)
+static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
+    ParameterBindingContext*    context)
 {
-    if( !needConstantBuffer ) return ParameterBindingAndKindInfo();
-
     UInt space = context->shared->defaultSpace;
     auto usedRangeSet = findUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
                           ->getConstantBufferRules(context->getTargetRequest())
-                          ->GetObjectLayout(
-        ShaderParameterKind::ConstantBuffer);
+                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
     info.count = layoutInfo.size;
     info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(nullptr, layoutInfo.size.getFiniteValue());
+    info.space = space;
+    return info;
+}
+
+static ParameterBindingAndKindInfo _assignConstantBufferBinding(
+    ParameterBindingContext* context,
+    VarLayout* varLayout,
+    UInt space, 
+    UInt index)
+{
+    auto usedRangeSet = findUsedRangeSetForSpace(context, space);
+
+    auto layoutInfo = context->getRulesFamily()
+        ->getConstantBufferRules(context->getTargetRequest())
+        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+
+    const Index count = Index(layoutInfo.size.getFiniteValue());
+
+    auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
+    SLANG_UNUSED(existingParam);
+    SLANG_ASSERT(existingParam == nullptr);
+
+    ParameterBindingAndKindInfo info;
+    info.kind = layoutInfo.kind;
+    info.count = count;
+    info.index = index;
     info.space = space;
     return info;
 }
@@ -3383,6 +3449,92 @@ static void _completeBindings(
     _completeBindings(context, program, &counters);
 }
 
+static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
+{
+    // Next we will look at the global-scope parameters and see if
+    // any of them requires a `register` or `binding` that will
+    // thus need to land in a default space.
+    //
+    for (auto& parameterInfo : sharedContext.parameters)
+    {
+        auto varLayout = parameterInfo->varLayout;
+        SLANG_RELEASE_ASSERT(varLayout);
+
+        // For each parameter, we will look at each resource it consumes.
+        //
+        for (auto resInfo : varLayout->typeLayout->resourceInfos)
+        {
+            // We don't want to consider resource kinds for which
+            // the variable already has an (explicit) binding, since
+            // the space from the explicit binding will be used, so
+            // that a default space isn't needed.
+            //
+            if (parameterInfo->bindingInfo[resInfo.kind].count != 0)
+                continue;
+
+            // We also want to exclude certain resource kinds from
+            // consideration, since parameters using those resource
+            // kinds wouldn't be allocated into the default space
+            // anyway.
+            //
+            switch (resInfo.kind)
+            {
+                case LayoutResourceKind::RegisterSpace:
+                case LayoutResourceKind::PushConstantBuffer:
+                    continue;
+                case LayoutResourceKind::Uniform:
+                {
+                    // If it's uniform, but we have globals binding defined, we don't need a default space for it
+                    // as it will go in the global binding specified
+                    if (auto hlslToVulkanOptions = sharedContext.getTargetRequest()->getHLSLToVulkanLayoutOptions())
+                    {
+                        if (hlslToVulkanOptions->hasGlobalsBinding())
+                        {
+                            continue;
+                        }
+                    }
+                    break;
+                }
+
+                default:
+                    break;
+            }
+
+            // Otherwise, we have a shader parameter that will need
+            // a default space or set to live in.
+            //
+            return true;
+        }
+    }
+
+    // We also need a default space for any entry-point parameters
+    // that consume appropriate resource kinds.
+    //
+    for (auto& entryPoint : sharedContext.programLayout->entryPoints)
+    {
+        auto paramsLayout = entryPoint->parametersLayout;
+        for (auto resInfo : paramsLayout->resourceInfos)
+        {
+            switch (resInfo.kind)
+            {
+                default:
+                    break;
+
+                case LayoutResourceKind::RegisterSpace:
+                case LayoutResourceKind::VaryingInput:
+                case LayoutResourceKind::VaryingOutput:
+                case LayoutResourceKind::HitAttributes:
+                case LayoutResourceKind::RayPayload:
+                    continue;
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
 RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram*  targetProgram,
     DiagnosticSink* sink)
@@ -3545,6 +3697,31 @@ RefPtr<ProgramLayout> generateParameterBindings(
         }
     }
 
+    // Global constant buffer binding. 
+    // It's initially invalid. (kind = None).
+    ParameterBindingAndKindInfo globalConstantBufferBinding;
+
+    // We define this variable early, such that we can create and use when specifying 
+    // a HLSLToVulkan based binding. It can if setup be used on endLayout, called later
+    RefPtr<VarLayout> globalScopeVarLayout;
+
+    // If we have a space/binding assigned for use for globals in Vulkan, 
+    // we can't use *that* as the default space, so we allocate if
+    if (auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions())
+    {
+        if (vulkanOptions->hasGlobalsBinding())
+        {
+            // Create VarLayout which will be associated with the binding, and setup later
+            globalScopeVarLayout = new VarLayout;
+
+            // Allocate the set
+            markSpaceUsed(&context, nullptr, vulkanOptions->m_globalsBindingSet);
+
+            // Mark the use of this binding
+            globalConstantBufferBinding = _assignConstantBufferBinding(&context, globalScopeVarLayout, vulkanOptions->m_globalsBindingSet, vulkanOptions->m_globalsBinding);
+        }
+    }
+
     // Once we have a canonical list of all the parameters, we can
     // detect if there are any global-scope parameters that make use
     // of `LayoutResourceKind::Uniform`, since such parameters would
@@ -3559,10 +3736,14 @@ RefPtr<ProgramLayout> generateParameterBindings(
     //
     bool needDefaultConstantBuffer = false;
 
+    // If we have already setup a global constant buffer binding, we don't need a default one
+    // 
     // On a CPU target, it's okay to have global scope parameters that use Uniform resources (because on CPU
     // all resources are 'Uniform')
     // TODO(JS): We'll just assume the same with CUDA target for now..
-    if (!_isCPUTarget(targetReq->getTarget()) && !_isPTXTarget(targetReq->getTarget()))
+    if (globalConstantBufferBinding.kind == LayoutResourceKind::None &&
+        !_isCPUTarget(targetReq->getTarget()) && 
+        !_isPTXTarget(targetReq->getTarget()))
     {
         for( auto& parameterInfo : sharedContext.parameters )
         {
@@ -3586,81 +3767,9 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // As a starting point, we will definitely need a "default" space if
     // we are creating a default constant buffer, since it should get
     // a binding in that "default" space.
-    //
-    bool needDefaultSpace = needDefaultConstantBuffer;
-    if (!needDefaultSpace)
-    {
-        // Next we will look at the global-scope parameters and see if
-        // any of them requires a `register` or `binding` that will
-        // thus need to land in a default space.
-        //
-        for (auto& parameterInfo : sharedContext.parameters)
-        {
-            auto varLayout = parameterInfo->varLayout;
-            SLANG_RELEASE_ASSERT(varLayout);
-
-            // For each parameter, we will look at each resource it consumes.
-            //
-            for (auto resInfo : varLayout->typeLayout->resourceInfos)
-            {
-                // We don't want to consider resource kinds for which
-                // the variable already has an (explicit) binding, since
-                // the space from the explicit binding will be used, so
-                // that a default space isn't needed.
-                //
-                if( parameterInfo->bindingInfo[resInfo.kind].count != 0 )
-                    continue;
-
-                // We also want to exclude certain resource kinds from
-                // consideration, since parameters using those resource
-                // kinds wouldn't be allocated into the default space
-                // anyway.
-                //
-                switch( resInfo.kind )
-                {
-                case LayoutResourceKind::RegisterSpace:
-                case LayoutResourceKind::PushConstantBuffer:
-                    continue;
-
-                default:
-                    break;
-                }
-
-                // Otherwise, we have a shader parameter that will need
-                // a default space or set to live in.
-                //
-                needDefaultSpace = true;
-                break;
-            }
-        }
-
-        // We also need a default space for any entry-point parameters
-        // that consume appropriate resource kinds.
-        //
-        for(auto& entryPoint : sharedContext.programLayout->entryPoints)
-        {
-            auto paramsLayout = entryPoint->parametersLayout;
-            for(auto resInfo : paramsLayout->resourceInfos )
-            {
-                switch(resInfo.kind)
-                {
-                default:
-                    break;
-
-                case LayoutResourceKind::RegisterSpace:
-                case LayoutResourceKind::VaryingInput:
-                case LayoutResourceKind::VaryingOutput:
-                case LayoutResourceKind::HitAttributes:
-                case LayoutResourceKind::RayPayload:
-                    continue;
-                }
-
-                needDefaultSpace = true;
-                break;
-            }
-        }
-    }
-
+    
+    const bool needDefaultSpace = needDefaultConstantBuffer || _calcNeedsDefaultSpace(sharedContext);
+    
     // If we need a space for default bindings, then allocate it here.
     if (needDefaultSpace)
     {
@@ -3703,12 +3812,13 @@ RefPtr<ProgramLayout> generateParameterBindings(
     }
 
     // If there are any global-scope uniforms, then we need to
-    // allocate a constant-buffer binding for them here.
-    //
-    ParameterBindingAndKindInfo globalConstantBufferBinding = maybeAllocateConstantBufferBinding(
-        &context,
-        needDefaultConstantBuffer);
-
+    // allocate a constant-buffer binding for them here, if hasn't already been
+    // assigned
+    if (globalConstantBufferBinding.kind == LayoutResourceKind::None && needDefaultConstantBuffer)
+    {
+        globalConstantBufferBinding = _allocateConstantBufferBinding(&context);
+    }
+     
     // Now that all of the explicit bindings have been dealt with
     // and we've also allocate any space/buffer that is required
     // for global-scope parameters, we will go through the
@@ -3730,10 +3840,12 @@ RefPtr<ProgramLayout> generateParameterBindings(
         globalScopeLayoutBuilder.addParameter(parameterInfo);
     }
 
-    auto globalScopeVarLayout = globalScopeLayoutBuilder.endLayout();
+    globalScopeVarLayout = globalScopeLayoutBuilder.endLayout(globalScopeVarLayout);
+
     if( globalConstantBufferBinding.count != 0 )
     {
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
+         
         cbInfo->space = globalConstantBufferBinding.space;
         cbInfo->index = globalConstantBufferBinding.index;
     }
