@@ -242,6 +242,12 @@ struct ASTIterator
             dispatchIfNotNull(expr->negative.exp);
             dispatchIfNotNull(expr->positive.exp);
         }
+        void visitTupleTypeExpr(TupleTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            for(auto t : expr->members)
+                dispatchIfNotNull(t.exp);
+        }
         void visitPointerTypeExpr(PointerTypeExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

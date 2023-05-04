@@ -417,6 +417,15 @@ public:
             return true;
         return dispatchIfNotNull(expr->positive.exp);
     }
+    bool visitTupleTypeExpr(TupleTypeExpr* expr)
+    {
+        for(auto t : expr->members)
+        {
+            if(dispatchIfNotNull(t.exp))
+                return true;
+        }
+        return false;
+    }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
     bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {

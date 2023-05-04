@@ -435,6 +435,11 @@ Type* ASTBuilder::getUnaryFuncType(Type* negative, Type* positive)
     return type;
 }
 
+Type* ASTBuilder::getTupleType(List<Type*>& types)
+{
+    return getOrCreateWithList<TupleType>(types);
+}
+
 TypeType* ASTBuilder::getTypeType(Type* type)
 {
     return getOrCreate<TypeType>(type);

@@ -3694,4 +3694,21 @@ namespace Slang
 
         return expr;
     }
+
+    Expr* SemanticsExprVisitor::visitTupleTypeExpr(TupleTypeExpr* expr)
+    {
+        // All tuple members must be types
+        for(auto& t : expr->members)
+            t = CheckProperType(t);
+
+        // As in the other cases above, wrap in TypeType
+        List<Type*> types;
+        types.reserve(expr->members.getCount());
+        for(auto t : expr->members)
+            types.add(t.type);
+        auto tupleType = m_astBuilder->getTupleType(types);
+        expr->type = m_astBuilder->getTypeType(tupleType);
+
+        return expr;
+    }
 }

@@ -555,6 +555,13 @@ class FuncTypeExpr : public Expr
     TypeExp positive;
 };
 
+class TupleTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(TupleTypeExpr);
+
+    List<TypeExp> members;
+};
+
     /// An expression that applies a generic to arguments for some,
     /// but not all, of its explicit parameters.
     ///

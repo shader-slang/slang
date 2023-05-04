@@ -694,6 +694,26 @@ class FuncType : public Type
     HashCode _getHashCodeOverride();
 };
 
+// A tuple is a product of its member types
+class TupleType : public Type
+{
+    SLANG_AST_CLASS(TupleType)
+
+    // Construct a unary tupletion
+    TupleType(List<Type*> memberTypes)
+        : memberTypes(std::move(memberTypes))
+    {}
+
+    List<Type*> memberTypes;
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+};
+
 // The "type" of an expression that names a generic declaration.
 class GenericDeclRefType : public Type 
 {

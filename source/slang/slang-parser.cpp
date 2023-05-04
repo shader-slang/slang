@@ -2243,6 +2243,20 @@ namespace Slang
         return parseThisTypeExpr(parser);
     }
 
+    static Expr* parseTupleTypeExpr(Parser* parser)
+    {
+        parser->ReadToken(TokenType::LParent);
+        TupleTypeExpr* expr = parser->astBuilder->create<TupleTypeExpr>();
+        while(!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
+        {
+            expr->members.add(parser->ParseTypeExp());
+            if(AdvanceIf(parser, TokenType::RParent))
+                break;
+            parser->ReadToken(TokenType::Comma);
+        }
+        return expr;
+    }
+
         /// Apply the given `modifiers` (if any) to the given `typeExpr`
     static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers const& modifiers)
     {
@@ -2436,6 +2450,11 @@ namespace Slang
         else if(AdvanceIf(parser, "This"))
         {
             typeSpec.expr = parseThisTypeExpr(parser);
+            return typeSpec;
+        }
+        else if(parser->LookAheadToken(TokenType::LParent))
+        {
+            typeSpec.expr = parseTupleTypeExpr(parser);
             return typeSpec;
         }
 

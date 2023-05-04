@@ -174,11 +174,11 @@ public:
     }
 
     template<typename T, typename... TArgs>
-    T* create(TArgs... args)
+    T* create(TArgs&&... args)
     {
         auto alloced = m_arena.allocate(sizeof(T));
         memset(alloced, 0, sizeof(T));
-        return _initAndAdd(new (alloced) T(args...));
+        return _initAndAdd(new (alloced) T(std::forward<TArgs>(args)...));
     }
 
     template<typename T, typename ... TArgs>
@@ -202,6 +202,20 @@ public:
         NodeDesc desc;
         desc.type = T::kType;
         return (T*)_getOrCreateImpl(desc, [this]() { return create<T>(); });
+    }
+
+    template<typename T, typename TArgs>
+    SLANG_FORCE_INLINE T* getOrCreateWithList(const List<TArgs>& args)
+    {
+        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
+        NodeDesc desc;
+        desc.type = T::kType;
+        for(auto a : args)
+            desc.operands.add(a);
+        return (T*)_getOrCreateImpl(desc, [&]()
+            {
+                return create<T>(args);
+            });
     }
 
     template<typename T, typename ... TArgs>
@@ -368,6 +382,8 @@ public:
     Val* getNoDiffModifierVal();
 
     Type* getUnaryFuncType(Type* negative, Type* positive);
+
+    Type* getTupleType(List<Type*>& types);
 
     TypeType* getTypeType(Type* type);
 

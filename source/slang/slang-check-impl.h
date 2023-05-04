@@ -1972,6 +1972,7 @@ namespace Slang
         Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
         Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
+        Expr* visitTupleTypeExpr(TupleTypeExpr* expr);
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
         Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);

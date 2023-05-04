@@ -521,8 +521,8 @@ ParameterDirection FuncType::getParamDirection(Index index)
 
 void FuncType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("(");
     Index paramCount = getParamCount();
+    out << toSlice("(");
     for (Index pp = 0; pp < paramCount; ++pp)
     {
         if (pp != 0)
@@ -531,7 +531,7 @@ void FuncType::_toTextOverride(StringBuilder& out)
         }
         out << getParamType(pp);
     }
-    out << toSlice(") -> ") << getResultType();
+    out << ") -> " << getResultType();
 
     if (!getErrorType()->equals(getASTBuilder()->getBottomType()))
     {
@@ -631,6 +631,77 @@ HashCode FuncType::_getHashCodeOverride()
             getParamType(pp)->getHashCode());
     }
     combineHash(hashCode, getErrorType()->getHashCode());
+    return hashCode;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void TupleType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("(");
+    for (Index pp = 0; pp < memberTypes.getCount(); ++pp)
+    {
+        if (pp != 0)
+            out << toSlice(", ");
+        out << memberTypes[pp];
+    }
+    out << toSlice(")");
+}
+
+bool TupleType::_equalsImplOverride(Type * type)
+{
+    if (const auto other = as<TupleType>(type))
+    {
+        auto paramCount = memberTypes.getCount();
+        auto otherParamCount = other->memberTypes.getCount();
+        if (paramCount != otherParamCount)
+            return false;
+
+        for (Index i = 0; i < memberTypes.getCount(); ++i)
+        {
+            if(!memberTypes[i]->equals(other->memberTypes[i]))
+                return false;
+        }
+
+        return true;
+    }
+    return false;
+}
+
+Val* TupleType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+
+    // just recurse into the members
+    List<Type*> substMemberTypes;
+    for (auto m : memberTypes)
+        substMemberTypes.add(as<Type>(m->substituteImpl(astBuilder, subst, &diff)));
+
+    // early exit for no change...
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->create<TupleType>(std::move(substMemberTypes));
+}
+
+Type* TupleType::_createCanonicalTypeOverride()
+{
+    // member types
+    List<Type*> canMemberTypes;
+    for (auto m : memberTypes)
+    {
+        canMemberTypes.add(m->getCanonicalType());
+    }
+
+    return getASTBuilder()->create<TupleType>(std::move(canMemberTypes));
+}
+
+HashCode TupleType::_getHashCodeOverride()
+{
+    HashCode hashCode = Slang::getHashCode(kType);
+    for(auto m : memberTypes)
+        hashCode = combineHash(hashCode, m->getHashCode());
     return hashCode;
 }
 
