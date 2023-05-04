@@ -4,7 +4,7 @@
 //TEST_INPUT:ubuffer(data=[0 3 2 2], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-func saturated_cooperation<A : __BuiltinType, B>(cooperate : A -> B, fallback : A -> B, A input) -> B
+func saturated_cooperation<A : __BuiltinType, B, C>(cooperate : (A, B) -> C, fallback : (A, B) -> C, A input, B otherArgs) -> C
 {
     const bool isWaveSaturated = WaveActiveCountBits(true) == WaveGetLaneCount();
     if(isWaveSaturated)
@@ -15,7 +15,7 @@ func saturated_cooperation<A : __BuiltinType, B>(cooperate : A -> B, fallback : 
         // The representative lanes for all lanes
         var allRepresentatives = WaveActiveBitOr(ourRepresentative);
 
-        B ret;
+        C ret;
 
         // Iterate over set bits in mask from low to high.
         // In each iteration the lowest bit is cleared.
@@ -27,11 +27,11 @@ func saturated_cooperation<A : __BuiltinType, B>(cooperate : A -> B, fallback : 
 
             // All lanes perform some cooperative computation with dynamic
             // uniform input
-            B b = cooperate(uniformInput);
+            C c = cooperate(uniformInput, otherArgs);
 
             // Update our return value until it
             if(bool(allRepresentatives & ourRepresentative))
-                ret = b;
+                ret = c;
 
             // Clear the lowest bit
             allRepresentatives &= allRepresentatives - 1;
@@ -41,22 +41,22 @@ func saturated_cooperation<A : __BuiltinType, B>(cooperate : A -> B, fallback : 
     }
     else
     {
-        return fallback(input);
+        return fallback(input, otherArgs);
     }
 }
 
 static int count = 0;
 
-int cooperate(float x)
+int cooperate(float x, int i)
 {
     count += 1;
-    return int(x) * 2;
+    return int(x) * 2 + i;
 }
 
-int fallback(float x)
+int fallback(float x, int i)
 {
     count += 100;
-    return int(x) * 3;
+    return int(x) * 3 + i;
 }
 
 // Make sure that we have enough invocations to saturate the first workgroup
@@ -67,7 +67,9 @@ void computeMain(uint tig : SV_GroupIndex)
     // We track the number of sets evaluated in the "count" variable, and write
     // that at index 0
     let i = tig < 4 ? float(outputBuffer[tig]) : 0;
-    let x = saturated_cooperation(cooperate, fallback, i);
+    // In this test we also check that the 'otherArgs' are not synchronized
+    // across lanes
+    let x = saturated_cooperation(cooperate, fallback, i, int(tig));
     if(tig < 4)
         outputBuffer[tig] = tig == 0 ? count : x;
 
