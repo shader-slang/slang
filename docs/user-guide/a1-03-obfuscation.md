@@ -19,8 +19,7 @@ If a developer is not able to ship all shader binaries then there is a problem. 
 
 Some of these issues are similar to the problems of distributing JavaScript libraries that run on client machines, but which the original authors do not want to directly make available the implementation. Some of the obfuscation solutions used in the JavaScript world are partially applicable to Slang's obfuscation solution, including [source maps](https://github.com/source-map/source-map-spec).
 
-Obfuscation in Slang
-====================
+## Obfuscation in Slang
 
 Slang provides an obfuscation feature that addresses these issues. The major parts being
 
@@ -261,8 +260,7 @@ Why you might not want to use an emit source map
   * A developer could use the slang `compiler-core` implementation
   * In the future the project could provide some API support 
 
-Issues/Future Work
-==================
+## Issues/Future Work
 
 * Support AST emitting in obfuscated modules
 * Potentially add API support for source maps

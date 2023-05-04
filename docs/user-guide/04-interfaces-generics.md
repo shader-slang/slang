@@ -136,25 +136,6 @@ void f<T:IFoo>()
 }
 ```
 
-### `This` Type
-
-You may use a special keyword `This` in interface definitions to refer to the type that is conforming to the interface. The following examples demonstrate a use of `This` type:
-```csharp
-interface IComparable
-{
-    int comparesTo(This other);
-}
-struct MyObject : IComparable
-{
-    int val;
-    int comparesTo(MyObject other)
-    {
-        return val < other.val ? -1 : 1;
-    }
-}
-```
-In this example, the `IComparable` interface declares that any conforming type must provide a `comparesTo` method that performs a comparison between an object to another object of the same type. The `MyObject` type satisfies this requirement by providing a `comparesTo` method that accepts a `MyObject` typed argument, since in the scope of `MyObject`, `This` type is equivalent to `MyObject`.
-
 ### Static Constants
 
 You can define static constant requirements in an interface. The constants can be accessed in places where a compile-time constant is needed.
@@ -174,6 +155,25 @@ struct GetValuePlus1<T:IMyValue>
 
 static const int result = GetValuePlus1<MyObject2>.value;  // result == 3
 ```
+
+### `This` Type
+
+You may use a special keyword `This` in interface definitions to refer to the type that is conforming to the interface. The following examples demonstrate a use of `This` type:
+```csharp
+interface IComparable
+{
+    int comparesTo(This other);
+}
+struct MyObject : IComparable
+{
+    int val;
+    int comparesTo(MyObject other)
+    {
+        return val < other.val ? -1 : 1;
+    }
+}
+```
+In this example, the `IComparable` interface declares that any conforming type must provide a `comparesTo` method that performs a comparison between an object to another object of the same type. The `MyObject` type satisfies this requirement by providing a `comparesTo` method that accepts a `MyObject` typed argument, since in the scope of `MyObject`, `This` type is equivalent to `MyObject`.
 
 ### Initializers
 
@@ -459,10 +459,10 @@ In this example, the `Array` type has a generic type parameter, `T`, that is use
 Note that the builtin `vector<float, N>` type also has an generic value parameter `N`.
 
 > #### Note ####
-> The only type of generic value parameters are integer values. `bool`, `float` and
+> The only type of generic value parameters are `int`, `uint` and `bool`. `float` and
 > other types cannot be used in a generic value parameter. Computations in a type
-> expression are supported as long as they can be folded at compile time. For example,
-`vector<float, 1+1>` is equivalent to `vector<float, 2>`.
+> expression are supported as long as they can be evaluated at compile time. For example,
+`vector<float, 1+1>` is allowed and considered equivalent to `vector<float, 2>`.
 
 
 Interface-typed Values
