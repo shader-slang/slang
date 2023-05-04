@@ -2042,6 +2042,35 @@ struct DiffTransposePass
         }
     }
 
+    void safeSetInsertAfterInst(IRBuilder* builder, IRInst* inst)
+    {
+        // Handle a very specific case.. is this a function parameter?
+        // Then insert into a block that unconditionally branches to the current block.
+        // 
+        if (as<IRParam>(inst) && inst->getParent())
+        {
+            auto block = as<IRBlock>(inst->getParent());
+
+            // If the inst is a parameter and it's parent is the first block, 
+            // then we need to insert into the unconditional target block.
+            //
+            if (block && block->getParent() && block == block->getParent()->getFirstBlock())
+            {
+                if (auto branch = as<IRUnconditionalBranch>(block->getTerminator()))
+                {
+                    if (auto ordInst = branch->getTargetBlock()->getFirstOrdinaryInst())
+                        builder->setInsertAfter(ordInst);
+                    else
+                        builder->setInsertInto(branch->getTargetBlock());
+
+                    return;
+                }
+            }
+        }
+        
+        setInsertAfterOrdinaryInst(builder, inst);
+    }
+
     IRInst* promoteOperandsToTargetType(IRBuilder* builder, IRInst* fwdInst)
     {
         auto oldLoc = builder->getInsertLoc();
@@ -2060,7 +2089,7 @@ struct DiffTransposePass
                 // Insert new operand just after the old operand, so we have the old
                 // operands available.
                 // 
-                setInsertAfterOrdinaryInst(builder, operand);
+                safeSetInsertAfterInst(builder, operand);
 
                 IRInst* newOperand = promoteToType(builder, targetType, operand);
                 
