@@ -411,11 +411,10 @@ public:
         return dispatchIfNotNull(expr->originalExpr);
     }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
-    bool visitfuncTypeExpr(FuncTypeExpr* expr)
+    bool visitFuncTypeExpr(FuncTypeExpr* expr)
     {
-        if (dispatchIfNotNull(expr->negative.exp))
-            return true;
-        return dispatchIfNotNull(expr->positive.exp);
+        return dispatchIfNotNull(expr->negative.exp) ||
+               dispatchIfNotNull(expr->positive.exp);
     }
     bool visitTupleTypeExpr(TupleTypeExpr* expr)
     {
