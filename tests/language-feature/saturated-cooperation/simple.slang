@@ -63,7 +63,7 @@ int fallback(float x)
 [numthreads(128, 1, 1)]
 void computeMain(uint tig : SV_GroupIndex)
 {
-    // The values we're cooperating over are 0, 2 and 3.
+    // The values we're cooperating over are {0, 2, 3}
     // We track the number of sets evaluated in the "count" variable, and write
     // that at index 0
     let i = tig < 4 ? float(outputBuffer[tig]) : 0;
