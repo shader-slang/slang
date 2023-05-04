@@ -239,8 +239,9 @@ struct ASTIterator
         void visitFuncTypeExpr(FuncTypeExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
-            dispatchIfNotNull(expr->negative.exp);
-            dispatchIfNotNull(expr->positive.exp);
+            for(const auto& t : expr->parameters)
+                dispatchIfNotNull(t.exp);
+            dispatchIfNotNull(expr->result.exp);
         }
         void visitTupleTypeExpr(TupleTypeExpr* expr)
         {

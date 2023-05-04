@@ -413,8 +413,12 @@ public:
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
     bool visitFuncTypeExpr(FuncTypeExpr* expr)
     {
-        return dispatchIfNotNull(expr->negative.exp) ||
-               dispatchIfNotNull(expr->positive.exp);
+        for(const auto& t : expr->parameters)
+        {
+            if(!dispatchIfNotNull(t.exp))
+                return false;
+        }
+        return dispatchIfNotNull(expr->result.exp);
     }
     bool visitTupleTypeExpr(TupleTypeExpr* expr)
     {

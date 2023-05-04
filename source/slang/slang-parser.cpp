@@ -4871,8 +4871,17 @@ namespace Slang
 
                 auto funcExpr = parser->astBuilder->create<FuncTypeExpr>();
                 funcExpr->loc = loc;
-                funcExpr->negative = TypeExp(leftExpr);
-                funcExpr->positive = TypeExp(rightExpr);
+
+
+                // If we parsed this as a tuple type, i.e. one in parentheses,
+                // then treat each tuple element type as a parameter type,
+                // otherwise make this a unary function.
+                if(auto tup = as<TupleTypeExpr>(leftExpr))
+                    funcExpr->parameters = tup->members;
+                else
+                    funcExpr->parameters.add(TypeExp(leftExpr));
+
+                funcExpr->result = TypeExp(rightExpr);
                 leftExpr = funcExpr;
             }
             else

@@ -545,14 +545,13 @@ class PointerTypeExpr : public Expr
     TypeExp base;
 };
 
-    /// A type expression that represents a (unary, for now) function type,
-    /// e.g. int -> float
+    /// A type expression that represents a function type, e.g. (bool, int) -> float
 class FuncTypeExpr : public Expr
 {
     SLANG_AST_CLASS(FuncTypeExpr);
 
-    TypeExp negative;
-    TypeExp positive;
+    List<TypeExp> parameters;
+    TypeExp result;
 };
 
 class TupleTypeExpr : public Expr

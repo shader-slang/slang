@@ -669,6 +669,10 @@ class FuncType : public Type
         : paramTypes{{paramType}}, resultType{resultType}, errorType{errorType}
     {}
 
+    FuncType(List<Type*> parameters, Type* result, Type* error)
+        : paramTypes(std::move(parameters)), resultType(result), errorType(error)
+    {}
+
     // TODO: We may want to preserve parameter names
     // in the list here, just so that we can print
     // out friendly names when printing a function

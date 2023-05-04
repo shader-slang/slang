@@ -3680,8 +3680,9 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitFuncTypeExpr(FuncTypeExpr* expr)
     {
         // The input and output to a function type must both be types
-        expr->negative = CheckProperType(expr->negative);
-        expr->positive = CheckProperType(expr->positive);
+        for(auto& t : expr->parameters)
+            t = CheckProperType(t);
+        expr->result = CheckProperType(expr->result);
 
         // TODO: Kind checking? Where are we stopping someone passing
         // constraints around as value-inhabitable types
@@ -3689,7 +3690,11 @@ namespace Slang
         // The result of this expression is a `FuncType`, which we need
         // to wrap in a `TypeType` to indicate that the result is the type
         // itself and not a value of that type.
-        auto funcType = m_astBuilder->getUnaryFuncType(expr->negative.type, expr->positive.type);
+        List<Type*> types;
+        types.reserve(expr->parameters.getCount());
+        for(const auto& t : expr->parameters)
+            types.add(t.type);
+        auto funcType = m_astBuilder->getFuncType(std::move(types), expr->result.type);
         expr->type = m_astBuilder->getTypeType(funcType);
 
         return expr;

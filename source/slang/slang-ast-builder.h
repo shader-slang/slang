@@ -151,6 +151,25 @@ public:
     /// no need for additional state.
     Dictionary<NodeDesc, NodeBase*> m_cachedNodes;
 
+    template<int N>
+    static void addOrAppendToNodeList(ShortList<NodeOperand, N>&)
+    {}
+
+    template<int N, typename T, typename... Ts>
+    static void addOrAppendToNodeList(ShortList<NodeOperand, N>& list, T t, Ts... ts)
+    {
+        list.add(t);
+        addOrAppendToNodeList(list, ts...);
+    }
+
+    template<int N, typename T, typename... Ts>
+    static void addOrAppendToNodeList(ShortList<NodeOperand, N>& list, const List<T>& l, Ts... ts )
+    {
+        for(auto t : l)
+            list.add(t);
+        addOrAppendToNodeList(list, ts...);
+    }
+
 public:
 
     // For compile time check to see if thing being constructed is an AST type
@@ -187,7 +206,7 @@ public:
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
         NodeDesc desc;
         desc.type = T::kType;
-        addToList(desc.operands, args...);
+        addOrAppendToNodeList(desc.operands, args...);
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>(args...);
@@ -204,27 +223,13 @@ public:
         return (T*)_getOrCreateImpl(desc, [this]() { return create<T>(); });
     }
 
-    template<typename T, typename TArgs>
-    SLANG_FORCE_INLINE T* getOrCreateWithList(const List<TArgs>& args)
-    {
-        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
-        NodeDesc desc;
-        desc.type = T::kType;
-        for(auto a : args)
-            desc.operands.add(a);
-        return (T*)_getOrCreateImpl(desc, [&]()
-            {
-                return create<T>(args);
-            });
-    }
-
     template<typename T, typename ... TArgs>
     SLANG_FORCE_INLINE T* getOrCreateWithDefaultCtor(TArgs ... args)
     {
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
         NodeDesc desc;
         desc.type = T::kType;
-        addToList(desc.operands, args...);
+        addOrAppendToNodeList(desc.operands, args...);
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>();
@@ -381,9 +386,9 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
-    Type* getUnaryFuncType(Type* negative, Type* positive);
-
     Type* getTupleType(List<Type*>& types);
+
+    Type* getFuncType(List<Type*> parameters, Type* result);
 
     TypeType* getTypeType(Type* type);
 
