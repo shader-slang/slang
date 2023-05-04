@@ -404,9 +404,11 @@ void __d_mul(inout DifferentialPair<vector<T, N>> left, inout DifferentialPair<m
 {
     vector<T, N>.Differential left_d_result;
     matrix<T, N, M>.Differential right_d_result;
+    [ForceUnroll]
     for (int i = 0; i < N; ++i)
     {
         T sum = T(0);
+        [ForceUnroll]
         for (int j = 0; j < M; ++j)
         {
             sum += right.p[i][j] * dOut[j];
@@ -439,9 +441,11 @@ void __d_mul(inout DifferentialPair<matrix<T, N, M>> left, inout DifferentialPai
 {
     matrix<T, N, M>.Differential left_d_result;
     vector<T, M>.Differential right_d_result;
+    [ForceUnroll]
     for (int j = 0; j < M; ++j)
     {
         T sum = T(0);
+        [ForceUnroll]
         for (int i = 0; i < N; ++i)
         {
             sum += left.p[i][j] * dOut[i];
@@ -473,19 +477,26 @@ __generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 void mul(inout DifferentialPair<matrix<T, R, N>> left, inout DifferentialPair<matrix<T, N, C>> right, matrix<T, R, C>.Differential dOut)
 {
     matrix<T, R, N>.Differential left_d_result;
+    [ForceUnroll]
     for (int r = 0; r < R; ++r)
+        [ForceUnroll]
         for (int n = 0; n < N; ++n)
             left_d_result[r][n] = T(0.0);
-    
+
     matrix<T, N, C>.Differential right_d_result;
+    [ForceUnroll]
     for (int n = 0; n < N; ++n)
+        [ForceUnroll]
         for (int c = 0; c < C; ++c)
             right_d_result[n][c] = T(0.0);
-    
+
+    [ForceUnroll]
     for (int r = 0; r < R; ++r)
     {
+        [ForceUnroll]
         for (int c = 0; c < C; ++c)
         {
+            [ForceUnroll]
             for (int n = 0; n < N; ++n)
             {
                 left_d_result[r][n] += right.p[n][c] * dOut[r][c];
