@@ -1968,8 +1968,7 @@ SlangResult OptionsParser::_parse(
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, binding));
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSet));
 
-                m_hlslToVulkanLayoutOptions->m_globalsBindingSet = Index(bindingSet);
-                m_hlslToVulkanLayoutOptions->m_globalsBinding = Index(binding);
+                m_hlslToVulkanLayoutOptions->setGlobalsBinding(Index(bindingSet), Index(binding));
                 break;
             }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;
@@ -2295,7 +2294,7 @@ SlangResult OptionsParser::_parse(
     }
 
     // If there are no layout settings, we don't need to carry this state
-    if (m_hlslToVulkanLayoutOptions->isDefault())
+    if (m_hlslToVulkanLayoutOptions->isReset())
     {
         m_hlslToVulkanLayoutOptions.setNull();
     }
