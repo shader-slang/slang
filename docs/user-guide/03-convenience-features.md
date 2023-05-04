@@ -336,7 +336,7 @@ Please note that the support for inheritance is currently very limited. Common f
 
 Extensions
 --------------------
-Slang allows defining additional members for a type outside its initial definition. For example, suppose we already have a type defined:
+Slang allows defining additional methods for a type outside its initial definition. For example, suppose we already have a type defined:
 
 ```csharp
 struct MyType
@@ -346,11 +346,10 @@ struct MyType
 }
 ```
 
-You can extend `MyType` with new members:
+You can extend `MyType` with new method members:
 ```csharp
 extension MyType
 {
-    float newField;
     float getNewField() { return newField; }
 }
 ```
@@ -361,12 +360,14 @@ All locations that sees the definition of the `extension` can access the new mem
 void test()
 {
     MyType t;
-    t.newField = 1.0;
     float val = t.getNewField();
 }
 ```
 
 This feature is similar to extensions in Swift and partial classes in C#.
+
+> #### Note:
+> You can only extend a type with additional methods. Extending with additiional data fields is not allowed.
 
 Multi-level break
 -------------------
