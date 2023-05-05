@@ -367,7 +367,11 @@ workspace "slang"
 
     -- Disable some warnings
     filter { "toolset:clang or gcc*" }
-        buildoptions { "-Wno-switch", "-Wno-parentheses" }
+        buildoptions {
+          "-Wno-switch",
+          "-Wno-parentheses",
+          "-Wno-unused-local-typedefs",
+        }
     filter { "toolset:gcc*", "language:C++" }
         buildoptions { "-Wno-class-memaccess" }
     filter { "toolset:clang or gcc*", "language:C++" }
