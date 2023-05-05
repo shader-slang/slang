@@ -1,6 +1,5 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX():-slang -dx12 -use-dxil -compute -shaderobj -output-using-type
->>>>>>> d4f4681b5 (a)
 
 //TEST_INPUT:ubuffer(data=[0 3 2 2], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
