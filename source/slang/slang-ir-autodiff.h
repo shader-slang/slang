@@ -316,6 +316,8 @@ bool finalizeAutoDiffPass(IRModule* module);
 
 // Utility methods
 
+void copyCheckpointHints(IRBuilder* builder, IRGlobalValueWithCode* oldInst, IRGlobalValueWithCode* newInst);
+
 void stripDerivativeDecorations(IRInst* inst);
 
 bool isBackwardDifferentiableFunc(IRInst* func);
