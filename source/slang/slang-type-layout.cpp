@@ -3720,7 +3720,7 @@ static TypeLayoutResult _createTypeLayout(
                 // If the field has an explicit offset, then we will
                 // use that to place it.
                 //
-                if (auto packOffsetModifier = field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
+                if (const auto packOffsetModifier = field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
                 {
                     TypeLayoutResult fieldResult = _createTypeLayout(
                         context,
@@ -3733,7 +3733,7 @@ static TypeLayoutResult _createTypeLayout(
             }
             for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
             {
-                if (auto packOffsetModifier = field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
+                if (const auto packOffsetModifier = field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
                     continue;
 
                 // The fields of a `struct` type may include existential (interface)
