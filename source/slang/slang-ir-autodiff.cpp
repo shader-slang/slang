@@ -749,6 +749,19 @@ IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(I
     SLANG_UNIMPLEMENTED_X("TODO: Implement");
 }
 
+
+void copyCheckpointHints(IRBuilder* builder, IRGlobalValueWithCode* oldInst, IRGlobalValueWithCode* newInst)
+{
+    for (auto decor = oldInst->getFirstDecoration(); decor; decor = decor->getNextDecoration())
+    {
+        if (auto chkHint = as<IRCheckpointHintDecoration>(decor))
+        {
+            SLANG_ASSERT(chkHint->getOperandCount() == 0);
+            builder->addDecoration(newInst, chkHint->getOp());
+        }
+    }
+}
+
 void stripDerivativeDecorations(IRInst* inst)
 {
     for (auto decor = inst->getFirstDecoration(); decor; )

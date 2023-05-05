@@ -340,6 +340,9 @@ namespace Slang
             builder.addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
         }
 
+        // Transfer checkpoint hint decorations
+        copyCheckpointHints(&builder, origFunc, diffFunc);
+
         // Mark the generated derivative function itself as differentiable.
         builder.addBackwardDifferentiableDecoration(diffFunc);
         // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.

@@ -11,7 +11,7 @@ typedef float.Differential dfloat;
 [PreferRecompute]
 float compute(float x, float y)
 {
-    return x * y;
+    return x * y * y;
 }
 
 [BackwardDifferentiable]
@@ -58,14 +58,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat dpa = dpfloat(1.0, 0.0);
 
         __bwd_diff(test_simple_loop)(dpa, 1.0f);
-        outputBuffer[0] = dpa.d; // Expect: 29.0
+        outputBuffer[0] = dpa.d; // Expect: 57.0
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
         __bwd_diff(test_simple_loop)(dpa, 0.5f);
-        outputBuffer[1] = dpa.d; // Expect: 14.5
+        outputBuffer[1] = dpa.d; // Expect: 28.5
     }
 
     outputBuffer[2] = computeLoop(1.0);

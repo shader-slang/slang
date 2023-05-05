@@ -1508,6 +1508,9 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
     builder.addForwardDifferentiableDecoration(diffFunc);
     if (isBackwardDifferentiableFunc(origFunc))
         builder.addBackwardDifferentiableDecoration(diffFunc);
+    
+    // Transfer checkpoint hint decorations
+    copyCheckpointHints(&builder, origFunc, diffFunc);
 
     // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
     if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
