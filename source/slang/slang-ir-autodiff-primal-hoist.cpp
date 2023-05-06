@@ -1741,7 +1741,7 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
         if (as<IRParam>(ptr) || as<IRVar>(ptr))
         {
             if (isInstInPrimalOrTransposedParameterBlocks(ptr))
-                return true;
+                return false;
         }
     }
     auto param = as<IRParam>(use.usedVal);
