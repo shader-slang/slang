@@ -1744,21 +1744,20 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
                 return false;
         }
     }
-    auto param = as<IRParam>(use.usedVal);
-    if (!param)
-        return true;
-
-    if (inductionValueInsts.containsKey(param))
-        return true;
-
-    // We can recompute a phi param if it is not in a loop start block.
-    auto parentBlock = as<IRBlock>(param->getParent());
-    for (auto pred : parentBlock->getPredecessors())
+    else if (auto param = as<IRParam>(use.usedVal))
     {
-        if (auto loop = as<IRLoop>(pred->getTerminator()))
+        if (inductionValueInsts.containsKey(param))
+            return true;
+
+        // We can recompute a phi param if it is not in a loop start block.
+        auto parentBlock = as<IRBlock>(param->getParent());
+        for (auto pred : parentBlock->getPredecessors())
         {
-            if (loop->getTargetBlock() == parentBlock)
-                return false;
+            if (auto loop = as<IRLoop>(pred->getTerminator()))
+            {
+                if (loop->getTargetBlock() == parentBlock)
+                    return false;
+            }
         }
     }
     return true;
