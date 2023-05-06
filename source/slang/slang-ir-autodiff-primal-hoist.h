@@ -231,6 +231,7 @@ namespace Slang
         };
         Kind kind;
         IRLoop* loopInst = nullptr;
+        IRInst* counterOffset = nullptr;
     };
     
     // Information on which insts are to be stored, recomputed

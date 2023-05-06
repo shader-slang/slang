@@ -595,17 +595,12 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
 
                     // The use of the add inst matches all of our conditions as an induction value
                     // that is equivalent to loop counter.
-                    if (auto initialVal = as<IRIntLit>(loopInst->getArg(paramIndex)))
-                    {
-                        if (initialVal->getValue() == 0)
-                        {
-                            LoopInductionValueInfo info;
-                            info.kind = LoopInductionValueInfo::Kind::EqualsToCounter;
-                            info.loopInst = loopInst;
-                            inductionValueInsts[param] = info;
-                            break;
-                        }
-                    }
+                    LoopInductionValueInfo info;
+                    info.kind = LoopInductionValueInfo::Kind::EqualsToCounter;
+                    info.loopInst = loopInst;
+                    info.counterOffset = loopInst->getArg(paramIndex);
+                    inductionValueInsts[param] = info;
+                    break;
                 }
             }
         }
@@ -653,6 +648,14 @@ void applyToInst(
                     SLANG_ASSERT(indexInfo);
                     SLANG_ASSERT(indexInfo->getCount() != 0);
                     replacement = indexInfo->getFirst().diffCountParam;
+                    if (inductionValueInfo.counterOffset)
+                    {
+                        setInsertAfterOrdinaryInst(builder, replacement);
+                        replacement = builder->emitAdd(
+                            replacement->getDataType(),
+                            replacement,
+                            inductionValueInfo.counterOffset);
+                    }
                 }
                 SLANG_ASSERT(replacement);
                 cloneCtx->cloneEnv.mapOldValToNew[inst] = replacement;
