@@ -19,11 +19,18 @@ namespace Slang
             UInt operandCount = clonedInst->getOperandCount();
             for (UInt ii = 0; ii < operandCount; ++ii)
             {
-                auto oldOperand = inst->getOperand(ii);
                 auto newOperand = clonedInst->getOperand(ii);
-
-                if (oldOperand == newOperand)
-                    pendingUses.add(&clonedInst->getOperands()[ii]);
+                // If operand is in a differential or recompute block, it means it has already
+                // been cloned, so we don't add it to pending uses.
+                if (auto operandParent = as<IRBlock>(newOperand->getParent()))
+                {
+                    if (isDifferentialOrRecomputeBlock(operandParent))
+                    {
+                        continue;
+                    }
+                }
+                // Otherwise, add it to pending uses.
+                pendingUses.add(&clonedInst->getOperands()[ii]);
             }
 
             for (auto use = inst->firstUse; use;)
@@ -221,6 +228,18 @@ namespace Slang
             return primalCountParam == other.primalCountParam;
         }
     };
+
+    struct LoopInductionValueInfo
+    {
+        enum Kind
+        {
+            AlwaysTrue,
+            EqualsToCounter,
+        };
+        Kind kind;
+        IRLoop* loopInst = nullptr;
+        IRInst* counterOffset = nullptr;
+    };
     
     // Information on which insts are to be stored, recomputed
     // and inverted within a single function.
@@ -232,7 +251,7 @@ namespace Slang
         HashSet<IRInst*> storeSet;
         HashSet<IRInst*> recomputeSet;
         HashSet<IRInst*> invertSet;
-
+        Dictionary<IRInst*, LoopInductionValueInfo> loopInductionInfo;
         Dictionary<IRInst*, InversionInfo> invInfoMap;
     };
 
@@ -289,7 +308,8 @@ namespace Slang
         RefPtr<HoistedPrimalsInfo> processFunc(
             IRGlobalValueWithCode* func,
             Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock,
-            IROutOfOrderCloneContext* cloneCtx);
+            IROutOfOrderCloneContext* cloneCtx,
+            Dictionary<IRBlock*, List<IndexTrackingInfo>>& blockIndexInfo);
 
         // Do pre-processing on the function (mainly for 
         // 'global' checkpointing methods that consider the entire
@@ -302,6 +322,8 @@ namespace Slang
      protected:
 
         IRModule*               module;
+        Dictionary<IRInst*, LoopInductionValueInfo> inductionValueInsts;
+        void collectInductionValues(IRGlobalValueWithCode* func);
     };
 
     class DefaultCheckpointPolicy : public AutodiffCheckpointPolicyBase
@@ -314,6 +336,10 @@ namespace Slang
 
         virtual void preparePolicy(IRGlobalValueWithCode* func);
         virtual HoistResult classify(UseOrPseudoUse use);
+
+    private:
+        bool canRecompute(UseOrPseudoUse use);
+
     };
 
     RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func);
