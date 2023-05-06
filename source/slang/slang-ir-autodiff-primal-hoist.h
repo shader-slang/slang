@@ -19,11 +19,18 @@ namespace Slang
             UInt operandCount = clonedInst->getOperandCount();
             for (UInt ii = 0; ii < operandCount; ++ii)
             {
-                auto oldOperand = inst->getOperand(ii);
                 auto newOperand = clonedInst->getOperand(ii);
-
-                if (oldOperand == newOperand)
-                    pendingUses.add(&clonedInst->getOperands()[ii]);
+                // If operand is in a differential or recompute block, it means it has already
+                // been cloned, so we don't add it to pending uses.
+                if (auto operandParent = as<IRBlock>(newOperand->getParent()))
+                {
+                    if (isDifferentialOrRecomputeBlock(operandParent))
+                    {
+                        continue;
+                    }
+                }
+                // Otherwise, add it to pending uses.
+                pendingUses.add(&clonedInst->getOperands()[ii]);
             }
 
             for (auto use = inst->firstUse; use;)
