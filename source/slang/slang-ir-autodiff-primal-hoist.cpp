@@ -1615,17 +1615,10 @@ static bool shouldStoreInst(IRInst* inst)
         //    those variables are written only once so we can always load them anytime.
         //  - Loads to global mutable variables are now allowed, but we will capture that
         //    case in canRecompute().
-        // The only exception is the load of an inout param, in which case we do need
-        // to store it because the param may be modified by the func at exit.
-        {
-            auto ptr = inst->getOperand(0);
-            if (as<IRParam>(ptr) || as<IRVar>(ptr))
-            {
-                if (isInstInPrimalOrTransposedParameterBlocks(ptr))
-                    return true;
-            }
-            return false;
-        }
+        //  - The only exception is the load of an inout param, in which case we do need
+        //    to store it because the param may be modified by the func at exit. Similarly,
+        //    this will be handled in canRecompute().
+        return false;
 
     case kIROp_Call:
         // If the callee prefers recompute policy, don't store.
@@ -1682,10 +1675,19 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
 {
     if (auto load = as<IRLoad>(use.usedVal))
     {
-        // The only case where we can't recompute a `load` is if it is a load from a global mutable
+        auto ptr = load->getPtr();
+
+        // We can't recompute a `load` is if it is a load from a global mutable
         // variable.
-        if (isGlobalMutableAddress(load->getOperand(0)))
+        if (isGlobalMutableAddress(ptr))
             return false;
+
+        // We can't recompute a 'load' from a mutable function parameter.
+        if (as<IRParam>(ptr) || as<IRVar>(ptr))
+        {
+            if (isInstInPrimalOrTransposedParameterBlocks(ptr))
+                return true;
+        }
     }
     auto param = as<IRParam>(use.usedVal);
     if (!param)
