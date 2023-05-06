@@ -399,14 +399,19 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
             {
                 if (auto var = as<IRVar>(result.instToRecompute))
                 {
-                    IRUse* storeUse = findLatestUniqueWriteUse(var);
-                    if (storeUse)
+                    for (auto varUse = var->firstUse; varUse; varUse = varUse->nextUse)
                     {
-                        // When we have a var and a store/call insts that writes to the var,
-                        // we treat as if there is a pseudo-use of the store/call to compute
-                        // the var inst, i.e. the var depends on the store/call, despite
-                        // the IR's def-use chain doesn't reflect this.
-                        workList.add(UseOrPseudoUse(var, storeUse->getUser()));
+                        switch (varUse->getUser()->getOp())
+                        {
+                        case kIROp_Store:
+                        case kIROp_Call:
+                            // When we have a var and a store/call insts that writes to the var,
+                            // we treat as if there is a pseudo-use of the store/call to compute
+                            // the var inst, i.e. the var depends on the store/call, despite
+                            // the IR's def-use chain doesn't reflect this.
+                            workList.add(UseOrPseudoUse(var, varUse->getUser()));
+                            break;
+                        }
                     }
                 }
                 else
@@ -439,13 +444,20 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         {
             for (auto use = var->firstUse; use; use = use->nextUse)
             {
-                auto callUser = as<IRCall>(use->getUser());
-                if (!callUser)
-                    continue;
-                checkpointInfo->recomputeSet.add(callUser);
-                checkpointInfo->storeSet.remove(callUser);
-                if (instWorkListSet.add(callUser))
-                    instWorkList.add(callUser);
+                if (auto callUser = as<IRCall>(use->getUser()))
+                {
+                    checkpointInfo->recomputeSet.add(callUser);
+                    checkpointInfo->storeSet.remove(callUser);
+                    if (instWorkListSet.add(callUser))
+                        instWorkList.add(callUser);
+                }
+                else if (auto storeUser = as<IRStore>(use->getUser()))
+                {
+                    checkpointInfo->recomputeSet.add(storeUser);
+                    checkpointInfo->storeSet.remove(storeUser);
+                    if (instWorkListSet.add(callUser))
+                        instWorkList.add(callUser);
+                }
             }
         }
         else if (auto call = as<IRCall>(inst))
@@ -1491,7 +1503,22 @@ static bool isGlobalMutableAddress(IRInst* inst)
     return false;
 }
 
-static bool shouldStoreVar(IRVar* var);
+static bool isInstInPrimalOrTransposedParameterBlocks(IRInst* inst)
+{
+    auto func = getParentFunc(inst);
+    if (!func)
+        return false;
+    auto firstBlock = func->getFirstBlock();
+    if (inst->getParent() == firstBlock)
+        return true;
+    auto branch = as<IRUnconditionalBranch>(firstBlock->getTerminator());
+    if (!branch)
+        return false;
+    auto secondBlock = branch->getTargetBlock();
+    if (inst->getParent() == secondBlock)
+        return true;
+    return false;
+}
 
 static bool shouldStoreInst(IRInst* inst)
 {
@@ -1585,11 +1612,17 @@ static bool shouldStoreInst(IRInst* inst)
         //    those variables are written only once so we can always load them anytime.
         //  - Loads to global mutable variables are now allowed, but we will capture that
         //    case in canRecompute().
-        if (auto var = as<IRVar>(inst->getOperand(0)))
+        // The only exception is the load of an inout param, in which case we do need
+        // to store it because the param may be modified by the func at exit.
         {
-            return shouldStoreVar(var);
+            auto ptr = inst->getOperand(0);
+            if (as<IRParam>(ptr) || as<IRVar>(ptr))
+            {
+                if (isInstInPrimalOrTransposedParameterBlocks(ptr))
+                    return true;
+            }
+            return false;
         }
-        return true;
 
     case kIROp_Call:
         // If the callee prefers recompute policy, don't store.
