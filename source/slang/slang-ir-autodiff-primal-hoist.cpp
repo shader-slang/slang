@@ -482,6 +482,14 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
 void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode* func)
 {
+    // Collect loop induction values.
+    // There are two special phi insts we want to handle differently in our
+    // checkpointing policy:
+    // 1. a bool execution flag inserted as the result of CFG normalization,
+    //    that is always true as long as the loop is still active.
+    // 2. the original induction variable that can be replaced with the loop
+    //    counter we inserted during createPrimalRecomputeBlocks().
+
     for (auto block : func->getBlocks())
     {
         auto loopInst = as<IRLoop>(block->getTerminator());
@@ -491,6 +499,9 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
         auto ifElse = as<IRIfElse>(targetBlock->getTerminator());
         Int paramIndex = -1;
         Int conditionParamIndex = -1;
+        // First, we are going to collect all the bool execution flags from loops.
+        // These are very easy to identify: they are a phi param defined in
+        // targetBlock, and used as the condition value in the condtion block.
         for (auto param : targetBlock->getParams())
         {
             paramIndex++;
@@ -512,6 +523,50 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
         if (conditionParamIndex == -1)
             continue;
 
+        // Next, we try to identify the original induction variables, if they exist.
+        // These are trickier, and we have to hard code the complex pattern that
+        // we can recognize.
+        // This pattern matching logic is ugly and fragile against changes to cfg
+        // normalization, but it is the easiest way to do it right now.
+        // Basically, we are looking for this pattern:
+        // loop(..., i=initVal)
+        // {
+        // targetBlock:
+        //      ...
+        //      param int i;
+        //      param bool condition;
+        //      ...
+        //      branch condtionBlock;
+        // conditionBlock:
+        //      if (condition)
+        //      {
+        //      }
+        //      else
+        //      {
+        //          break;
+        //      }
+        // //  ...
+        // someBodyBlock:
+        //     ...
+        //     if (condition)
+        //     {
+        //         ...
+        //         // Check condition 1: i is used by an `add`
+        //         // Check condition 2: parent of (i+1) is a branch target of if(condition)
+        //         // Check condition 3: branches to parentBlock with i1 = i + 1.
+        //         goto parentBlock(i + 1); 
+        //     }
+        //     else
+        //         goto parentBlock(other);
+        //  parentBlock:
+        //     // Check condition 4: parentBlock branches to finalBlock.
+        //     param int i1;
+        //     goto finalBlock;
+        //  finalBlock:
+        //     // Check condition 5: finalBlock branches to targetBlock with new i = i1.
+        //     goto loopHeader(i1);
+        // }
+        //
         paramIndex = -1;
         for (auto param : targetBlock->getParams())
         {
