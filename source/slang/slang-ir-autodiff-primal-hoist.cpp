@@ -36,9 +36,16 @@ static bool isDifferentialBlock(IRBlock* block)
     return block->findDecoration<IRDifferentialInstDecoration>();
 }
 
-static IRBlock* getLoopRegionBodyBlock(IRLoop* loop)
+static IRBlock* getLoopConditionBlock(IRLoop* loop)
 {
     auto condBlock = as<IRBlock>(loop->getTargetBlock());
+    SLANG_ASSERT(as<IRIfElse>(condBlock->getTerminator()));
+    return condBlock;
+}
+
+static IRBlock* getLoopRegionBodyBlock(IRLoop* loop)
+{
+    auto condBlock = getLoopConditionBlock(loop);
     // We assume the loop body always sit at the true side of the if-else.
     if (auto ifElse = as<IRIfElse>(condBlock->getTerminator()))
     {
@@ -183,6 +190,12 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             auto bodyRecomputeBlock = createRecomputeBlock(bodyBlock);
             bodyRecomputeBlock->insertBefore(diffBodyBlock);
             diffBodyBlock->replaceUsesWith(bodyRecomputeBlock);
+            
+            // Map the primal condition block directly to the diff
+            // conditon block (we won't create a recompute block for this)
+            // 
+            recomputeBlockMap[getLoopConditionBlock(loop)] = getLoopConditionBlock(diffLoop);
+
             moveParams(bodyRecomputeBlock, diffBodyBlock);
             {
                 // After CFG normalization, the loop body will contain only jumps to the
@@ -1060,6 +1073,37 @@ static int getInstRegionNestLevel(
     return (int)result;
 }
 
+// Trim defBlockIndices based on the indices of out of scope uses.
+//
+static List<IndexTrackingInfo> maybeTrimIndices(
+    const List<IndexTrackingInfo>& defBlockIndices,
+    const Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo,
+    const List<IRUse*>& outOfScopeUses)
+{
+    // Go through uses, lookup the defBlockIndices, and remove any indices if they
+    // are not present in any of the uses. (This is sort of slow...)
+    //
+    List<IndexTrackingInfo> result;
+    for (auto& index : defBlockIndices)
+    {
+        bool found = false;
+        for (auto& use : outOfScopeUses)
+        {
+            auto useInst = use->getUser();
+            auto useBlock = useInst->getParent();
+            auto useBlockIndices = indexedBlockInfo[as<IRBlock>(useBlock)].getValue();
+            if (useBlockIndices.contains(index))
+            {
+                found = true;
+                break;
+            }
+        }
+        if (found)
+            result.add(index);
+    }
+    return result;
+}
+
 
 /// Legalizes all accesses to primal insts from recompute and diff blocks.
 ///
@@ -1230,6 +1274,12 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
                 setInsertAfterOrdinaryInst(&builder, getInstInBlock(storeUse->getUser()));
 
+                // There is an edge-case optimization we apply here,
+                // If none of the out-of-scope uses are actually within the indexed 
+                // region, that means there's no need to allocate a fully indexed var.
+                // 
+                defBlockIndices = maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
+
                 IRVar* localVar = storeIndexedValue(
                     &builder,
                     varBlock,
@@ -1259,6 +1309,11 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 if (isLoopCounter)
                 {
                     defBlockIndices.removeAt(0);
+                }
+                else
+                {
+                    // For all others, check out of scope uses and trim indices if possible.
+                    defBlockIndices = maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
                 }
 
                 setInsertAfterOrdinaryInst(&builder, instToStore);
@@ -1650,6 +1705,7 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_BitXor:
     case kIROp_Lsh:
     case kIROp_Rsh:
+    case kIROp_Select:
         return false;
 
     case kIROp_GetElement:
