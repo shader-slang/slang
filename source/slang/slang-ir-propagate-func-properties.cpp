@@ -109,10 +109,11 @@ bool propagateFuncProperties(IRModule* module)
                         case kIROp_Switch:
                         case kIROp_Return:
                         case kIROp_loop:
-                        case kIROp_Store:
                         case kIROp_Call:
                         case kIROp_Param:
                         case kIROp_Unreachable:
+                        case kIROp_Store:
+                        case kIROp_SwizzledStore:
                             break;
                         default:
                             // We have a inst that has side effect and is not understood by this method.
@@ -141,6 +142,9 @@ bool propagateFuncProperties(IRModule* module)
                         }
                     }
                     
+                    if (auto load = as<IRLoad>(inst))
+                        continue;
+
                     // Are any operands defined in global scope?
                     for (UInt o = 0; o < inst->getOperandCount(); o++)
                     {
@@ -153,18 +157,16 @@ bool propagateFuncProperties(IRModule* module)
                             continue;
                         switch (operand->getOp())
                         {
-                        case kIROp_Specialize:
-                        case kIROp_LookupWitness:
-                        case kIROp_StructKey:
-                        case kIROp_WitnessTable:
-                        case kIROp_WitnessTableEntry:
-                        case kIROp_undefined:
-                        case kIROp_Func:
-                            continue;
+                        case kIROp_GlobalVar:
+                            hasSideEffectCall = true;
+                            break;
                         default:
+                            if (operand->mightHaveSideEffects())
+                            {
+                                hasSideEffectCall = true;
+                            }
                             break;
                         }
-                        hasSideEffectCall = true;
                         break;
                     }
                 }
