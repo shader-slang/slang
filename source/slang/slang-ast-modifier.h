@@ -1294,6 +1294,11 @@ class DeprecatedAttribute : public Attribute
     String message;
 };
 
+class NonCopyableTypeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(NonCopyableTypeAttribute)
+};
+
     /// A modifier that applies to types rather than declarations.
     ///
     /// In most cases, the Slang compiler assumes that a modifier should

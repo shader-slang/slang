@@ -107,17 +107,16 @@ void main()
 #line 107
     uint index_0 = gl_GlobalInvocationID.x;
 
-    rayQueryEXT _S3;
-
-#line 109
-    rayQueryEXT query_0 = _S3;
-
-
+#line 112
     MyRayPayload_0 payload_5;
 
 #line 112
     payload_5.value_1 = -1;
 
+#line 109
+    rayQueryEXT query_0;
+
+#line 114
     rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0.rayFlags_0 | 512), (C_0.instanceMask_0), (C_0.origin_0), (C_0.tMin_0), (C_0.direction_0), (C_0.tMax_0));
 
 #line 114
@@ -128,10 +127,10 @@ void main()
     {
 
 #line 123
-        bool _S4 = rayQueryProceedEXT(query_0);
+        bool _S3 = rayQueryProceedEXT(query_0);
 
 #line 123
-        if(!_S4)
+        if(!_S3)
         {
 
 #line 123
@@ -150,18 +149,18 @@ void main()
 #line 129
                 candidateProceduralAttrs_0.value_0 = 0;
                 float tHit_1 = 0.0;
-                bool _S5 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
+                bool _S4 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
 
 #line 131
-                if(_S5)
+                if(_S4)
                 {
-                    bool _S6 = myProceduralAnyHit_0(payload_5);
+                    bool _S5 = myProceduralAnyHit_0(payload_5);
 
 #line 133
-                    if(_S6)
+                    if(_S5)
                     {
                         rayQueryGenerateIntersectionEXT(query_0, tHit_1);
-                        MyProceduralHitAttrs_0 _S7 = candidateProceduralAttrs_0;
+                        MyProceduralHitAttrs_0 _S6 = candidateProceduralAttrs_0;
                         if(C_0.shouldStopAtFirstHit_0 != 0U)
                         {
 
@@ -177,7 +176,7 @@ void main()
                         }
 
 #line 137
-                        committedProceduralAttrs_1 = _S7;
+                        committedProceduralAttrs_1 = _S6;
 
 #line 137
                     }
@@ -208,10 +207,10 @@ void main()
             {
 
 #line 146
-                bool _S8 = myTriangleAnyHit_0(payload_5);
+                bool _S7 = myTriangleAnyHit_0(payload_5);
 
 #line 146
-                if(_S8)
+                if(_S7)
                 {
                     rayQueryConfirmIntersectionEXT(query_0);
                     if(C_0.shouldStopAtFirstHit_0 != 0U)

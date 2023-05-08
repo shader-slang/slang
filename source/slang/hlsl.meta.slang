@@ -5686,13 +5686,9 @@ __target_intrinsic(hlsl, RayQuery)
 __target_intrinsic(glsl, rayQueryEXT)
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
+[__NonCopyableType]
 struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 {
-    // Initialize the query object in a "fresh" state.
-    //
-    __intrinsic_op($(kIROp_DefaultConstruct))
-    __init();
-
     // Initialize a ray-tracing query.
     //
     // This method may be called on a "fresh" ray query, or

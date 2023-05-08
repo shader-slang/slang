@@ -1,5 +1,6 @@
 #include "slang-ir-addr-inst-elimination.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -122,9 +123,13 @@ struct AddressInstEliminationContext
         {
             for (auto inst : block->getChildren())
             {
-                if (as<IRPtrTypeBase>(inst->getDataType()))
+                if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                 {
-                    workList.add(inst);
+                    auto valType = unwrapAttributedType(ptrType->getValueType());
+                    if (!getResolvedInstForDecorations(valType)->findDecoration<IRNonCopyableTypeDecoration>())
+                    {
+                        workList.add(inst);
+                    }
                 }
             }
         }
