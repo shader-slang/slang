@@ -205,6 +205,7 @@ void removePhiArgs(IRInst* phiParam);
 
 int getParamIndexInBlock(IRParam* paramInst);
 
+bool isGlobalOrUnknownMutableAddress(IRInst* inst);
 }
 
 #endif

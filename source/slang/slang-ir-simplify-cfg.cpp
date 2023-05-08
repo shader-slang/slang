@@ -6,6 +6,7 @@
 #include "slang-ir-restructure.h"
 #include "slang-ir-util.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-reachability.h"
 
 namespace Slang
 {
@@ -103,6 +104,9 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
     HashSet<IRBlock*> loopBlocks;
     for (auto b : blocks)
         loopBlocks.add(b);
+
+    ReachabilityContext reachability = {};
+
     auto addressHasOutOfLoopUses = [&](IRInst* addr)
     {
         // The entire access chain of `addr` must have no uses outside the loop.
@@ -114,7 +118,11 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
             for (auto use = chainNode->firstUse; use; use = use->nextUse)
             {
                 if (!loopBlocks.contains(as<IRBlock>(use->getUser()->getParent())))
-                    return true;
+                {
+                    // Is this use reachable from the loop header?
+                    if (reachability.isInstReachable(loopInst, use->getUser()))
+                        return true;
+                }
             }
             switch (chainNode->getOp())
             {
@@ -315,6 +323,37 @@ static bool isTrivialIfElse(IRIfElse* condBranch, bool& isTrueBranchTrivial, boo
     return false;
 }
 
+// Return the true of the switch branch block if the branch is a trivial jump
+// to after block with no other insts.
+static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
+{
+    if (branchBlock != switchInst->getBreakLabel())
+    {
+        if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
+        {
+            if (br->getTargetBlock() == switchInst->getBreakLabel() && br->getOp() == kIROp_unconditionalBranch)
+            {
+                return true;
+            }
+        }
+    }
+    else
+    {
+        return true;
+    }
+    return false;
+}
+
+static bool isTrivialSwitch(IRSwitch* switchBranch)
+{
+    for (UInt i = 0; i < switchBranch->getCaseCount(); i++)
+    {
+        if (!isTrivialSwitchBranch(switchBranch, switchBranch->getCaseLabel(i)))
+            return false;
+    }
+    return true;
+}
+
 static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
 {
     bool isTrueBranchTrivial = false;
@@ -336,6 +375,26 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
         }
     }
     return false;
+}
+
+static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
+{
+    if (!isTrivialSwitch(switchInst))
+        return false;
+    if (switchInst->getCaseCount() == 0)
+        return false;
+
+    auto termInst = as<IRUnconditionalBranch>(switchInst->getCaseLabel(0)->getTerminator());
+    if (!termInst)
+        return false;
+
+    List<IRInst*> args;
+    for (UInt i = 0; i < termInst->getArgCount(); i++)
+        args.add(termInst->getArg(i));
+    builder.setInsertBefore(switchInst);
+    builder.emitBranch(switchInst->getBreakLabel(), (Int)args.getCount(), args.getBuffer());
+    switchInst->removeAndDeallocate();
+    return true;
 }
 
 static bool isTrueLit(IRInst* lit)
@@ -581,6 +640,10 @@ static bool processFunc(IRGlobalValueWithCode* func)
                 else if (auto condBranch = as<IRIfElse>(block->getTerminator()))
                 {
                     changed |= trySimplifyIfElse(builder, condBranch);
+                }
+                else if (auto switchBranch = as<IRSwitch>(block->getTerminator()))
+                {
+                    changed |= trySimplifySwitch(builder, switchBranch);
                 }
 
                 // If `block` does not end with an unconditional branch, bail.

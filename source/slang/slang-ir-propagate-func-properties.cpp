@@ -145,7 +145,8 @@ bool propagateFuncProperties(IRModule* module)
                     if (auto load = as<IRLoad>(inst))
                         continue;
 
-                    // Are any operands defined in global scope?
+                    // Do any operands defined have pointer type of global or
+                    // unknown source?
                     for (UInt o = 0; o < inst->getOperandCount(); o++)
                     {
                         auto operand = inst->getOperand(o);
@@ -155,16 +156,9 @@ bool propagateFuncProperties(IRModule* module)
                             continue;
                         if (as<IRType>(operand))
                             continue;
-                        switch (operand->getOp())
+                        if (isGlobalOrUnknownMutableAddress(operand))
                         {
-                        case kIROp_GlobalVar:
                             hasSideEffectCall = true;
-                            break;
-                        default:
-                            if (operand->mightHaveSideEffects())
-                            {
-                                hasSideEffectCall = true;
-                            }
                             break;
                         }
                         break;

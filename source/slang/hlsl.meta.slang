@@ -5706,6 +5706,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     //
     __target_intrinsic(hlsl)
     [__readNone]
+    [mutating]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,

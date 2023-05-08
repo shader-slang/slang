@@ -180,6 +180,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_AnyValueType:
     case kIROp_ArrayType:
     case kIROp_FuncType:
+    case kIROp_RaytracingAccelerationStructureType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -406,12 +407,19 @@ bool isPtrLikeOrHandleType(IRInst* type)
 {
     if (!type)
         return false;
+    if (as<IRPointerLikeType>(type))
+        return true;
+    if (as<IRPseudoPtrType>(type))
+        return true;
+    if (as<IRMeshOutputType>(type))
+        return true;
+    if (as<IRHLSLOutputPatchType>(type))
+        return true;
     switch (type->getOp())
     {
     case kIROp_ComPtrType:
     case kIROp_RawPointerType:
     case kIROp_RTTIPointerType:
-    case kIROp_PseudoPtrType:
     case kIROp_OutType:
     case kIROp_InOutType:
     case kIROp_PtrType:
@@ -777,6 +785,38 @@ int getParamIndexInBlock(IRParam* paramInst)
         paramIndex++;
     }
     return -1;
+}
+
+bool isGlobalOrUnknownMutableAddress(IRInst* inst)
+{
+    auto root = getRootAddr(inst);
+
+    auto type = unwrapAttributedType(inst->getDataType());
+    if (!isPtrLikeOrHandleType(type))
+        return false;
+
+    switch (root->getOp())
+    {
+    case kIROp_GlobalVar:
+    case kIROp_GlobalParam:
+    case kIROp_GlobalConstant:
+    case kIROp_Var:
+    case kIROp_Param:
+        break;
+    default:
+        // The inst is defined by an unknown inst.
+        return true;
+    }
+
+    if (root)
+    {
+        if (as<IRParameterGroupType>(root->getDataType()))
+        {
+            return false;
+        }
+        return as<IRModuleInst>(root->getParent()) != nullptr;
+    }
+    return false;
 }
 
 struct GenericChildrenMigrationContextImpl

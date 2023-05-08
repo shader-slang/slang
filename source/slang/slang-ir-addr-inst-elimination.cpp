@@ -110,7 +110,6 @@ struct AddressInstEliminationContext
     }
 
     SlangResult eliminateAddressInstsImpl(
-        AddressConversionPolicy* policy,
         IRFunc* func,
         DiagnosticSink* inSink)
     {
@@ -133,9 +132,6 @@ struct AddressInstEliminationContext
         for (Index workListIndex = 0; workListIndex < workList.getCount(); workListIndex++)
         {
             auto addrInst = workList[workListIndex];
-
-            if (!policy->shouldConvertAddrInst(addrInst))
-                continue;
 
             for (auto use = addrInst->firstUse; use; )
             {
@@ -174,14 +170,13 @@ struct AddressInstEliminationContext
 };
 
 SlangResult eliminateAddressInsts(
-    AddressConversionPolicy* policy,
     IRFunc* func,
     DiagnosticSink* sink)
 {
     AddressInstEliminationContext ctx;
     ctx.module = func->getModule();
     ctx.sink = sink;
-    return ctx.eliminateAddressInstsImpl(policy, func, sink);
+    return ctx.eliminateAddressInstsImpl(func, sink);
 }
 
 } // namespace Slang

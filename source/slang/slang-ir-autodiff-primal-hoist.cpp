@@ -1602,20 +1602,6 @@ static CheckpointPreference getCheckpointPreference(IRInst* callee)
     return CheckpointPreference::None;
 }
 
-static bool isGlobalMutableAddress(IRInst* inst)
-{
-    auto root = getRootAddr(inst);
-    if (root)
-    {
-        if (as<IRParameterGroupType>(root->getDataType()))
-        {
-            return false;
-        }
-        return as<IRModuleInst>(root->getParent()) != nullptr;
-    }
-    return false;
-}
-
 static bool isInstInPrimalOrTransposedParameterBlocks(IRInst* inst)
 {
     auto func = getParentFunc(inst);
@@ -1790,7 +1776,7 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
 
         // We can't recompute a `load` is if it is a load from a global mutable
         // variable.
-        if (isGlobalMutableAddress(ptr))
+        if (isGlobalOrUnknownMutableAddress(ptr))
             return false;
 
         // We can't recompute a 'load' from a mutable function parameter.

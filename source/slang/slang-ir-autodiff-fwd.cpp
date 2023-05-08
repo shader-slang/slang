@@ -1590,16 +1590,6 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     }
 }
 
-struct AutoDiffAddressConversionPolicy : public AddressConversionPolicy
-{
-    DifferentiableTypeConformanceContext* diffTypeContext;
-
-    virtual bool shouldConvertAddrInst(IRInst*) override
-    {
-        return true;
-    }
-};
-
 SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
 {
     insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
@@ -1609,9 +1599,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     
     initializeLocalVariables(autoDiffSharedContext->moduleInst->getModule(), func);
 
-    AutoDiffAddressConversionPolicy cvtPolicty;
-    cvtPolicty.diffTypeContext = &differentiableTypeConformanceContext;
-    auto result = eliminateAddressInsts(&cvtPolicty, func, sink);
+    auto result = eliminateAddressInsts(func, sink);
 
     if (SLANG_SUCCEEDED(result))
     {
