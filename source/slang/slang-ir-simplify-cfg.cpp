@@ -275,16 +275,8 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
     return false;
 }
 
-static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
+static bool arePhiArgsEquivalentInBranchesImpl(IRBlock* branch1, IRBlock* branch2, IRBlock* afterBlock)
 {
-    // If one of the branch target is afterBlock itself, and the other branch
-    // is a trivial block that jumps into the afterBlock, this if-else is trivial.
-    // In this case the argCount must be 0 because a block with phi parameters can't
-    // be used as targets in a conditional branch.
-    auto branch1 = ifElse->getTrueBlock();
-    auto branch2 = ifElse->getFalseBlock();
-    auto afterBlock = ifElse->getAfterBlock();
-
     if (branch1 == afterBlock) return true;
     if (branch2 == afterBlock) return true;
 
@@ -299,7 +291,7 @@ static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
         // This should never happen, return false now to be safe.
         return false;
     }
-    
+
     for (UInt i = 0; i < branchInst1->getArgCount(); i++)
     {
         if (branchInst1->getArg(i) != branchInst2->getArg(i))
@@ -309,6 +301,19 @@ static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
         }
     }
     return true;
+}
+
+static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
+{
+    // If one of the branch target is afterBlock itself, and the other branch
+    // is a trivial block that jumps into the afterBlock, this if-else is trivial.
+    // In this case the argCount must be 0 because a block with phi parameters can't
+    // be used as targets in a conditional branch.
+    auto branch1 = ifElse->getTrueBlock();
+    auto branch2 = ifElse->getFalseBlock();
+    auto afterBlock = ifElse->getAfterBlock();
+
+    return arePhiArgsEquivalentInBranchesImpl(branch1, branch2, afterBlock);
 }
 
 static bool isTrivialIfElse(IRIfElse* condBranch, bool& isTrueBranchTrivial, bool& isFalseBranchTrivial)
@@ -342,6 +347,29 @@ static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
         return true;
     }
     return false;
+}
+
+static bool arePhiArgsEquivalentInBranches(IRSwitch* switchInst)
+{
+    ShortList<IRBlock*> jumpTargets;
+    if (switchInst->getDefaultLabel())
+        jumpTargets.add(switchInst->getDefaultLabel());
+    for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+    {
+        jumpTargets.add(switchInst->getCaseLabel(i));
+    }
+    if (jumpTargets.getCount() == 0)
+        return true;
+    for (Index i = 1; i < jumpTargets.getCount(); i++)
+    {
+        auto branch1 = jumpTargets[0];
+        auto branch2 = jumpTargets[1];
+        auto afterBlock = switchInst->getBreakLabel();
+
+        if (!arePhiArgsEquivalentInBranchesImpl(branch1, branch2, afterBlock))
+            return false;
+    }
+    return true;
 }
 
 static bool isTrivialSwitch(IRSwitch* switchBranch)
@@ -386,6 +414,9 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
 
     auto termInst = as<IRUnconditionalBranch>(switchInst->getCaseLabel(0)->getTerminator());
     if (!termInst)
+        return false;
+
+    if (!arePhiArgsEquivalentInBranches(switchInst))
         return false;
 
     List<IRInst*> args;

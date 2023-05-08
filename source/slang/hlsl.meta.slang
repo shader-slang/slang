@@ -720,7 +720,6 @@ struct $(item.name)
     {
         __target_intrinsic(glsl, "$0._data[$1]")
         __target_intrinsic(spirv_direct, "*StorageBuffer OpAccessChain resultType resultId _0 const(int, 0) _1")
-        [__readNone]
         ref;
     }
 };
