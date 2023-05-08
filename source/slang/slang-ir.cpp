@@ -3395,7 +3395,7 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitCallInst(
+    IRCall* IRBuilder::emitCallInst(
         IRType*         type,
         IRInst*        pFunc,
         UInt            argCount,

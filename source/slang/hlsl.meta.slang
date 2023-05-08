@@ -6948,3 +6948,71 @@ uint3 cudaBlockIdx();
 __target_intrinsic(cuda, "(blockDim)")
 [__readNone]
 uint3 cudaBlockDim();
+
+//
+// Workgroup cooperation
+//
+
+//
+// `saturated_cooperation(c, f, s, u)` will call `f(s, u)` if not all lanes in the
+// workgroup are currently executing. however if all lanes are saturated, then
+// for each unique `s` across all the active lanes `c(s, u)` is called. The
+// return value is the one corresponding to the input `s` from this lane.
+//
+// Adjacent calls to saturated_cooperation are subject to fusion, i.e.
+//      saturated_cooperation(c1, f1, s, u1);
+//      saturated_cooperation(c2, f2, s, u2);
+// will be transformed to:
+//      saturated_cooperation(c1c2, f1f2, s, u1u2);
+// where
+//      c1c2 is a function which calls c1(s, u1) and then c2(s, u2);
+//      f1f2 is a function which calls f1(s, u1) and then f2(s, u2);
+//
+// (This fusion takes place in the fuse-satcoop pass, and as such any changes to
+// the signature or behavior of this function should be adjusted for there).
+//
+func saturated_cooperation<A : __BuiltinType, B, C>(
+    cooperate : (A, B) -> C,
+    fallback : (A, B) -> C,
+    A input,
+    B otherArgs)
+    -> C
+{
+    const bool isWaveSaturated = WaveActiveCountBits(true) == WaveGetLaneCount();
+    if(isWaveSaturated)
+    {
+        let lanesWithSameInput = WaveMatch(input).x;
+        // Keep least significant lane in our set
+        let ourRepresentative = lanesWithSameInput & -lanesWithSameInput;
+        // The representative lanes for all lanes
+        var allRepresentatives = WaveActiveBitOr(ourRepresentative);
+
+        C ret;
+
+        // Iterate over set bits in mask from low to high.
+        // In each iteration the lowest bit is cleared.
+        while(bool(allRepresentatives))
+        {
+            // Broadcast input across warp.
+            let laneIdx = firstbitlow(allRepresentatives);
+            let uniformInput = WaveReadLaneAt(input, int(laneIdx));
+
+            // All lanes perform some cooperative computation with dynamic
+            // uniform input
+            C c = cooperate(uniformInput, otherArgs);
+
+            // Update our return value until it
+            if(bool(allRepresentatives & ourRepresentative))
+                ret = c;
+
+            // Clear the lowest bit
+            allRepresentatives &= allRepresentatives - 1;
+        }
+
+        return ret;
+    }
+    else
+    {
+        return fallback(input, otherArgs);
+    }
+}

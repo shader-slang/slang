@@ -3016,6 +3016,14 @@ public:
         UInt            argCount,
         IRInst* const*  args);
 
+    IRInst* emitSpecializeInst(
+        IRType*         type,
+        IRInst*         genericVal,
+        const List<IRInst*>& args)
+    {
+        return emitSpecializeInst(type, genericVal, args.getCount(), args.begin());
+    }
+
     IRInst* emitLookupInterfaceMethodInst(
         IRType* type,
         IRInst* witnessTableVal,
@@ -3029,13 +3037,13 @@ public:
 
     IRInst* emitUnpackAnyValue(IRType* type, IRInst* value);
 
-    IRInst* emitCallInst(
+    IRCall* emitCallInst(
         IRType*         type,
         IRInst*         func,
         UInt            argCount,
         IRInst* const*  args);
 
-    IRInst* emitCallInst(
+    IRCall* emitCallInst(
         IRType*                 type,
         IRInst*                 func,
         List<IRInst*> const&    args)

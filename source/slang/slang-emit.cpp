@@ -21,6 +21,7 @@
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
+#include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
@@ -350,6 +351,11 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // It's important that this takes place before defunctionalization as we
+    // want to be able to easily discover the cooperate and fallback funcitons
+    // being passed to saturated_cooperation
+    fuseCallsToSaturatedCooperation(irModule);
+
     // Next, we need to ensure that the code we emit for
     // the target doesn't contain any operations that would
     // be illegal on the target platform. For example,
@@ -397,6 +403,12 @@ Result linkAndOptimizeIR(
                 return SLANG_FAIL;
         }
 
+        // Few of our targets support higher order functions, and
+        // we don't have the backend code to emit higher order functions for those
+        // which do.
+        // Specialize away these parameters
+        // TODO: We should implement a proper defunctionalization pass
+        changed |= specializeHigherOrderParameters(codeGenContext, irModule);
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
         enableIRValidationAtInsert();
@@ -616,13 +628,6 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
-
-    // Few of our targets support higher order functions, and
-    // we don't have the backend code to emit higher order functions for those
-    // which do.
-    // Specialize away these parameters
-    // TODO: We should implement a proper defunctionalization pass
-    specializeHigherOrderParameters(codeGenContext, irModule);
 
     // For all targets, we translate load/store operations
     // of aggregate types from/to byte-address buffers into
