@@ -1454,14 +1454,16 @@ namespace Slang
             // Limit it for now though to make the specialization easier
             ensureDecl(localDeclRef, DeclCheckState::CanUseFuncSignature);
             const auto type = localDeclRef.getDecl()->getType();
+            // We can only add overload candidates if this is known to be a function
             if(const auto funType = as<FuncType>(type))
                 AddFuncExprOverloadCandidate(funType, context, context.originalExpr->functionExpr);
             else
-                SLANG_UNREACHABLE("Trying to find overload for non-function typed parameter");
+                return;
         }
         else
         {
             // TODO(tfoley): any other cases needed here?
+            return;
         }
     }
 
