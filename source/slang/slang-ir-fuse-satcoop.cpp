@@ -116,9 +116,9 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
     // Now we can safely reorder things by moving p;f;g before everything else
     // Remember, we constructed ps in reverse, so we must insert these
     // backwards too
-    for(Index i = ps.getCount()-1; i >= 0; --i)
+    for(Index j = ps.getCount()-1; j >= 0; --j)
     {
-        auto p = ps[i];
+        auto p = ps[j];
         p->removeFromParent();
         p->insertBefore(f);
     }
