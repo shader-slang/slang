@@ -839,8 +839,6 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
     case kIROp_Call:
         return true;
     default:
-        // The inst is defined by an unknown inst.
-        SLANG_RELEASE_ASSERT(0 && "unknown addr inst");
         return true;
     }
 

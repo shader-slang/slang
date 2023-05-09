@@ -2215,7 +2215,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_Select:
         {
-            
             auto prec = getInfo(EmitOp::Conditional);
             needClose = maybeEmitParens(outerPrec, prec);
 
