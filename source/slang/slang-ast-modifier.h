@@ -1299,6 +1299,10 @@ class NonCopyableTypeAttribute : public Attribute
     SLANG_AST_CLASS(NonCopyableTypeAttribute)
 };
 
+class NoSideEffectAttribute : public Attribute
+{
+    SLANG_AST_CLASS(NoSideEffectAttribute)
+};
     /// A modifier that applies to types rather than declarations.
     ///
     /// In most cases, the Slang compiler assumes that a modifier should

@@ -8756,6 +8756,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
             }
+            else if (as<NoSideEffectAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRNoSideEffectDecoration>(irFunc);
+            }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {
                 IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), instanceAttr);

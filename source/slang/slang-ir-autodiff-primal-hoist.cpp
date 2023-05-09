@@ -1776,7 +1776,7 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
 
         // We can't recompute a `load` is if it is a load from a global mutable
         // variable.
-        if (isGlobalOrUnknownMutableAddress(ptr))
+        if (isGlobalOrUnknownMutableAddress(getParentFunc(load), ptr))
             return false;
 
         // We can't recompute a 'load' from a mutable function parameter.

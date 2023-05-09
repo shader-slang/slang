@@ -720,6 +720,7 @@ struct $(item.name)
     {
         __target_intrinsic(glsl, "$0._data[$1]")
         __target_intrinsic(spirv_direct, "*StorageBuffer OpAccessChain resultType resultId _0 const(int, 0) _1")
+        [__NoSideEffect]
         ref;
     }
 };
@@ -5701,7 +5702,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // must obey any API-imposed restrictions.
     //
     __target_intrinsic(hlsl)
-    [__readNone]
+    [__NoSideEffect]
     [mutating]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
@@ -5723,7 +5724,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     [__unsafeForceInlineEarly]
     __specialized_for_target(glsl)
-    [__readNone]
+    [__NoSideEffect]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -5757,7 +5758,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryProceedEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
+    [__NoSideEffect]
     [mutating]
     bool Proceed();
 
@@ -5770,7 +5771,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryTerminateEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
+    [__NoSideEffect]
     [mutating]
     void Abort();
 
@@ -5892,7 +5893,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryConfirmIntersectionEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
+    [__NoSideEffect]
     [mutating]
     void CommitNonOpaqueTriangleHit();
 
@@ -5900,7 +5901,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryGenerateIntersectionEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
+    [__NoSideEffect]
     [mutating]
     void CommitProceduralPrimitiveHit(float t);
 
