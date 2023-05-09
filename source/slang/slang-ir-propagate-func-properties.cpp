@@ -105,6 +105,11 @@ public:
         }
         if (!hasSideEffectCall)
         {
+            if (auto name = f->findDecoration<IRNameHintDecoration>())
+            {
+                if (name->getName().startsWith("s_bwd_GlossyMaterial"))
+                    printf("break");
+            }
             builder.addDecoration(f, kIROp_ReadNoneDecoration);
             return true;
         }
@@ -166,11 +171,7 @@ bool propagateFuncPropertiesImpl(IRModule* module, FuncPropertyPropagationContex
             }
             if (auto func = as<IRFunc>(inst))
             {
-                if (func->findDecoration<IRReadNoneDecoration>())
-                {
-                    addCallersToWorkList(func);
-                }
-                if (func->findDecoration<IRNoSideEffectDecoration>())
+                if (context->canProcess(func))
                 {
                     addCallersToWorkList(func);
                 }

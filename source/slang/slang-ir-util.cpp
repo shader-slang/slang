@@ -826,6 +826,7 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
     switch (root->getOp())
     {
     case kIROp_GlobalVar:
+        return true;
     case kIROp_GlobalParam:
     case kIROp_GlobalConstant:
     case kIROp_Var:

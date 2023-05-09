@@ -106,16 +106,44 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
         loopBlocks.add(b);
 
     ReachabilityContext reachability = {};
+    
+    // Construct a map from a root address to all derived addresses.
+    Dictionary<IRInst*, List<IRInst*>> relatedAddrMap;
+    for (auto b : func->getBlocks())
+    {
+        for (auto inst : b->getChildren())
+        {
+            if (as<IRPtrTypeBase>(inst->getDataType()))
+            {
+                auto root = getRootAddr(inst);
+                if (!root) continue;
+                auto list = relatedAddrMap.tryGetValue(root);
+                if (!list)
+                {
+                    relatedAddrMap.add(root, List<IRInst*>());
+                    list = relatedAddrMap.tryGetValue(root);
+                }
+                list->add(inst);
+            }
+        }
+    }
 
     auto addressHasOutOfLoopUses = [&](IRInst* addr)
     {
-        // The entire access chain of `addr` must have no uses outside the loop.
-        // The root variable must be a local var.
-        for (auto chainNode = addr; chainNode;)
+        if (isGlobalOrUnknownMutableAddress(func, addr))
+            return true;
+
+        // If we can't find the address from our map, we conservatively assume it is an unknown address.
+        auto relatedAddrs = relatedAddrMap.tryGetValue(getRootAddr(addr));
+        if (!relatedAddrs)
+            return true;
+       
+        // For all related address of `addr` that may alias with it, we check their uses.
+        for (auto relatedAddr : *relatedAddrs)
         {
-            if (getParentFunc(chainNode) != func)
-                return true;
-            for (auto use = chainNode->firstUse; use; use = use->nextUse)
+            if (!canAddressesPotentiallyAlias(func, relatedAddr, addr))
+                continue;
+            for (auto use = relatedAddr->firstUse; use; use = use->nextUse)
             {
                 if (!loopBlocks.contains(as<IRBlock>(use->getUser()->getParent())))
                 {
@@ -124,24 +152,8 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
                         return true;
                 }
             }
-            switch (chainNode->getOp())
-            {
-            case kIROp_GetElementPtr:
-            case kIROp_FieldAddress:
-                chainNode = chainNode->getOperand(0);
-                continue;
-            case kIROp_Var:
-                if (auto rate = chainNode->getFullType()->getRate())
-                {
-                    if (!as<IRConstExprRate>(rate))
-                        return true;
-                }
-                break;
-            default:
-                return true;
-            }
-            break;
         }
+            
         return false;
     };
 
