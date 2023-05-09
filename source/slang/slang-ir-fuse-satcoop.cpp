@@ -1,7 +1,6 @@
 #include "slang-ir-fuse-satcoop.h"
 
 #include "slang-ir-insts.h"
-#include "slang-ir-reachability.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir.h"
@@ -64,8 +63,6 @@ static bool uses(IRInst* used, IRInst* user)
 // Returns g on success
 static IRInst* floatTogether(IRInst* f, IRInst* g)
 {
-    SLANG_ASSERT(ReachabilityContext().isInstReachable(f, g));
-
     List<IRInst*> ps, qs;
 
     auto usesF = [&](IRInst* i){
@@ -89,6 +86,8 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
     auto i = g->prev;
     while(i != f)
     {
+        SLANG_ASSERT(i);
+
         // If any instruction in x has side effects, we can't reorder things
         if(i->mightHaveSideEffects())
             return nullptr;
