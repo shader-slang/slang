@@ -300,25 +300,34 @@ struct $(item.name)
         out uint dim);
 
     __target_intrinsic(glsl, "$0._data[$1/4]")
+    [__NoSideEffect]
     uint Load(int location);
 
+    [__NoSideEffect]
     uint Load(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec2($0._data[$1/4], $0._data[$1/4+1])")
+    [__NoSideEffect]
     uint2 Load2(int location);
 
+    [__NoSideEffect]
     uint2 Load2(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec3($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2])")
+    [__NoSideEffect]
     uint3 Load3(int location);
 
+    [__NoSideEffect]
     uint3 Load3(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec4($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2], $0._data[$1/4+3])")
+    [__NoSideEffect]
     uint4 Load4(int location);
 
+    [__NoSideEffect]
     uint4 Load4(int location, out uint status);
 
+    [__NoSideEffect]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location);
@@ -713,14 +722,16 @@ struct $(item.name)
 
     __target_intrinsic(glsl, "$0._data[$1]")
     __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
+    [__NoSideEffect]
     T Load(int location);
+    [__NoSideEffect]
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
         __target_intrinsic(glsl, "$0._data[$1]")
         __target_intrinsic(spirv_direct, "*StorageBuffer OpAccessChain resultType resultId _0 const(int, 0) _1")
-        //[__NoSideEffect]
+        [__NoSideEffect]
         ref;
     }
 };

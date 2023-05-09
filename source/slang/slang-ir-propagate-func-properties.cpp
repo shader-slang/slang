@@ -105,11 +105,6 @@ public:
         }
         if (!hasSideEffectCall)
         {
-            if (auto name = f->findDecoration<IRNameHintDecoration>())
-            {
-                if (name->getName().startsWith("s_bwd_GlossyMaterial"))
-                    printf("break");
-            }
             builder.addDecoration(f, kIROp_ReadNoneDecoration);
             return true;
         }

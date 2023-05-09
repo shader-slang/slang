@@ -453,7 +453,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             {
                 auto callee = call->getCallee();
                 if (callee &&
-                    callee->findDecoration<IRReadNoneDecoration>())
+                    doesCalleeHaveSideEffect(callee))
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.
@@ -687,6 +687,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call)
                 switch (use->getUser()->getOp())
                 {
                 case kIROp_Store:
+                case kIROp_SwizzledStore:
                     // We are fine with stores into the variable, since store operations
                     // are not dependent on whatever we do in the call here.
                     continue;

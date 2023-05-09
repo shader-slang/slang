@@ -387,7 +387,7 @@ struct WitnessLookupLoweringContext
         bool changed = false;
         for (auto bb : func->getBlocks())
         {
-            for (auto inst : bb->getChildren())
+            for (auto inst : bb->getModifiableChildren())
             {
                 if (auto witnessLookupInst = as<IRLookupWitnessMethod>(inst))
                 {

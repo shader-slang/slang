@@ -378,7 +378,7 @@ static bool arePhiArgsEquivalentInBranches(IRSwitch* switchInst)
     for (Index i = 1; i < jumpTargets.getCount(); i++)
     {
         auto branch1 = jumpTargets[0];
-        auto branch2 = jumpTargets[1];
+        auto branch2 = jumpTargets[i];
         auto afterBlock = switchInst->getBreakLabel();
 
         if (!arePhiArgsEquivalentInBranchesImpl(branch1, branch2, afterBlock))
@@ -394,6 +394,8 @@ static bool isTrivialSwitch(IRSwitch* switchBranch)
         if (!isTrivialSwitchBranch(switchBranch, switchBranch->getCaseLabel(i)))
             return false;
     }
+    if (!isTrivialSwitchBranch(switchBranch, switchBranch->getDefaultLabel()))
+        return false;
     return true;
 }
 

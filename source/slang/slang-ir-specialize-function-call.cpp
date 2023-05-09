@@ -822,7 +822,7 @@ struct FunctionParameterSpecializationContext
                 {
                     decoration->removeAndDeallocate();
                 }
-                else if (as<IRReadNoneDecoration>(decoration))
+                else if (as<IRReadNoneDecoration>(decoration) || as<IRNoSideEffectDecoration>(decoration))
                 {
                     // After specialization, the function may no longer be side effect free
                     // because the parameter we substituted in maybe a global param. 
