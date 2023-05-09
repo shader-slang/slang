@@ -708,6 +708,9 @@ class TupleType : public Type
         : memberTypes(std::move(memberTypes))
     {}
 
+    auto getMemberCount() { return memberTypes.getCount(); } const
+    auto& getMember(Index i) { return memberTypes[i]; }
+
     List<Type*> memberTypes;
 
     // Overrides should be public so base classes can access

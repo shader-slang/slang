@@ -252,6 +252,14 @@ namespace Slang
             emitType(context, funcType->getResultType());
             emitType(context, funcType->getErrorType());
         }
+        else if (auto tupleType = dynamicCast<TupleType>(type))
+        {
+            emitRaw(context, "Tu");
+            auto n = tupleType->getMemberCount();
+            emit(context, n);
+            for(Index i = 0; i < n; ++i)
+                emitType(context, tupleType->getMember(i));
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in type mangling");
