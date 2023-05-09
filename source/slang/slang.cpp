@@ -125,6 +125,11 @@ namespace Slang {
 
 const char* getBuildTagString()
 {
+    if (UnownedStringSlice(SLANG_TAG_VERSION) == "unknown")
+    {
+        static String timeStampString = String(SharedLibraryUtils::getSharedLibraryTimestamp(spCreateSession));
+        return timeStampString.getBuffer();
+    }
     return SLANG_TAG_VERSION;
 }
 

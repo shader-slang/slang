@@ -411,10 +411,6 @@ bool isPtrLikeOrHandleType(IRInst* type)
         return true;
     if (as<IRPseudoPtrType>(type))
         return true;
-    if (as<IRMeshOutputType>(type))
-        return true;
-    if (as<IRHLSLOutputPatchType>(type))
-        return true;
     switch (type->getOp())
     {
     case kIROp_ComPtrType:
@@ -822,21 +818,7 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
 
     auto type = unwrapAttributedType(inst->getDataType());
     if (!isPtrLikeOrHandleType(type))
-        return false;
-
-    switch (root->getOp())
-    {
-    case kIROp_GlobalVar:
         return true;
-    case kIROp_GlobalParam:
-    case kIROp_GlobalConstant:
-    case kIROp_Var:
-    case kIROp_Param:
-        break;
-    default:
-        // The inst is defined by an unknown inst.
-        return true;
-    }
 
     if (root)
     {
@@ -844,10 +826,26 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
         {
             return false;
         }
-        auto addrInstParent = getParentFunc(root);
-        return (addrInstParent != parentFunc);
     }
-    return false;
+
+    switch (root->getOp())
+    {
+    case kIROp_GlobalVar:
+    case kIROp_GlobalParam:
+    case kIROp_GlobalConstant:
+    case kIROp_Var:
+    case kIROp_Param:
+        break;
+    case kIROp_Call:
+        return true;
+    default:
+        // The inst is defined by an unknown inst.
+        SLANG_RELEASE_ASSERT(0 && "unknown addr inst");
+        return true;
+    }
+
+    auto addrInstParent = getParentFunc(root);
+    return (addrInstParent != parentFunc);
 }
 
 struct GenericChildrenMigrationContextImpl
