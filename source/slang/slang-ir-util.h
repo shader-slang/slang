@@ -167,9 +167,17 @@ bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IR
 
 String dumpIRToString(IRInst* root);
 
-// Returns whether a call insts can be treated as a pure functional inst
-// (no writes to memory, no side effects).
+// Returns whether a call insts can be treated as a pure functional inst, and thus can be
+// DCE'd and deduplicated.
+// (no writes to memory, no reads from unknown memory, no side effects).
 bool isPureFunctionalCall(IRCall* callInst);
+
+// Returns whether a call insts can be treated as a pure functional inst, and thus can be
+// DCE'd (but not necessarily deduplicated).
+// (no side effects).
+bool isSideEffectFreeFunctionalCall(IRCall* call);
+
+bool doesCalleeHaveSideEffect(IRInst* callee);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
@@ -205,6 +213,7 @@ void removePhiArgs(IRInst* phiParam);
 
 int getParamIndexInBlock(IRParam* paramInst);
 
+bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* inst);
 }
 
 #endif

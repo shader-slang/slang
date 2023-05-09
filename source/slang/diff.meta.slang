@@ -32,16 +32,16 @@ __intrinsic_type($(kIROp_TensorViewType))
 struct TensorView
 {
     __target_intrinsic(cuda, "$0.data_ptr<$G0>()")
-    [__readNone]
+    [__NoSideEffect]
     Ptr<T> data_ptr();
 
     __target_intrinsic(cuda, "$0.data_ptr_at<$G0>($1)")
-    [__readNone]
+    [__NoSideEffect]
     Ptr<T> data_ptr_at(uint index);
 
     __generic<let N: int>
     __target_intrinsic(cuda, "$0.data_ptr_at<$G0>($1)")
-    [__readNone]
+    [__NoSideEffect]
     Ptr<T> data_ptr_at(vector<uint, N> index);
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
@@ -49,19 +49,19 @@ struct TensorView
     __init(TorchTensor<T> t);
 
     __target_intrinsic(cuda, "$0.load<$G0>($1)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint x);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint x, uint y);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint x, uint y, uint z);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint x, uint y, uint z, uint w);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4, $5)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint i0, uint i1, uint i2, uint i3, uint i4);
 
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2)")
@@ -96,59 +96,67 @@ struct TensorView
 
     __subscript(uint index) -> T
     {
-        [ForceInline] [__readNone] get { return load(index); }
+        [ForceInline] [__NoSideEffect] get { return load(index); }
         [ForceInline] set { store(index, newValue); }
         
         __target_intrinsic(cuda, "$0.load<$G0>($1)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint i1, uint i2) -> T
     {
-        [ForceInline] [__readNone] get { return load(i1, i2); }
+        [ForceInline] [__NoSideEffect] get { return load(i1, i2); }
         [ForceInline] set { store(i1, i2, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1, $2)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint2 i) -> T
     {
-        [ForceInline] [__readNone] get { return load(i.x, i.y); }
+        [ForceInline] [__NoSideEffect] get { return load(i.x, i.y); }
         [ForceInline] set { store(i.x, i.y, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint i1, uint i2, uint i3) -> T
     {
-        [ForceInline] [__readNone] get { return load(i1, i2, i3); }
+        [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3); }
         [ForceInline] set { store(i1, i2, i3, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint3 i) -> T
     {
-        [ForceInline] [__readNone] get { return load(i.x, i.y, i.z); }
+        [ForceInline] [__NoSideEffect] get { return load(i.x, i.y, i.z); }
         [ForceInline] set { store(i.x, i.y, i.z, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y, $1.z)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint i1, uint i2, uint i3, uint i4) -> T
     {
-        [ForceInline] [__readNone] get { return load(i1, i2, i3, i4); }
+        [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3, i4); }
         [ForceInline] set { store(i1, i2, i3, i4, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint4 i) -> T
     {
-        [__readNone][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
+        [__NoSideEffect][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
         [ForceInline] set { store(i.x, i.y, i.z, i.w, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y, $1.z, $1.w)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint i1, uint i2, uint i3, uint i4, uint i5) -> T
     {
-        [ForceInline] [__readNone] get { return load(i1, i2, i3, i4, i5); }
+        [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3, i4, i5); }
         [ForceInline] set { store(i1, i2, i3, i4, i5, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4, $5)")
+        [__NoSideEffect]
         ref;
     }
 }

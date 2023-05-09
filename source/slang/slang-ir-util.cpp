@@ -180,6 +180,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_AnyValueType:
     case kIROp_ArrayType:
     case kIROp_FuncType:
+    case kIROp_RaytracingAccelerationStructureType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -406,12 +407,19 @@ bool isPtrLikeOrHandleType(IRInst* type)
 {
     if (!type)
         return false;
+    if (as<IRPointerLikeType>(type))
+        return true;
+    if (as<IRPseudoPtrType>(type))
+        return true;
+    if (as<IRMeshOutputType>(type))
+        return true;
+    if (as<IRHLSLOutputPatchType>(type))
+        return true;
     switch (type->getOp())
     {
     case kIROp_ComPtrType:
     case kIROp_RawPointerType:
     case kIROp_RTTIPointerType:
-    case kIROp_PseudoPtrType:
     case kIROp_OutType:
     case kIROp_InOutType:
     case kIROp_PtrType:
@@ -445,7 +453,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             {
                 auto callee = call->getCallee();
                 if (callee &&
-                    callee->findDecoration<IRReadNoneDecoration>())
+                    doesCalleeHaveSideEffect(callee))
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.
@@ -641,69 +649,98 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
     }
 }
 
+bool areCallArgumentsSideEffectFree(IRCall* call)
+{
+    // If the function has no side effect and is not writing to any outputs,
+    // we can safely treat the call as a normal inst.
+    IRFunc* parentFunc = nullptr;
+    for (UInt i = 0; i < call->getArgCount(); i++)
+    {
+        auto arg = call->getArg(i);
+        if (isValueType(arg->getDataType()))
+            continue;
+
+        // If the argument type is not a known value type,
+        // assume it is a pointer or handle through which side effect can take place.
+        if (!parentFunc)
+        {
+            parentFunc = getParentFunc(call);
+            if (!parentFunc)
+                return false;
+        }
+
+        if (arg->getOp() == kIROp_Var && getParentFunc(arg) == parentFunc)
+        {
+            // If the pointer argument is a local variable (thus can't alias with other addresses)
+            // and it is never read from in the function, we can safely treat the call as having
+            // no side-effect.
+            // This is a conservative test, but is sufficient to detect the most common case where
+            // a temporary variable is used as the inout argument and the result stored in the temp
+            // variable isn't being used elsewhere in the parent func.
+            // 
+            // A more aggresive test can check all other address uses reachable from the call site
+            // and see if any of them are aliasing with the argument.
+            for (auto use = arg->firstUse; use; use = use->nextUse)
+            {
+                if (as<IRDecoration>(use->getUser()))
+                    continue;
+                switch (use->getUser()->getOp())
+                {
+                case kIROp_Store:
+                case kIROp_SwizzledStore:
+                    // We are fine with stores into the variable, since store operations
+                    // are not dependent on whatever we do in the call here.
+                    continue;
+                default:
+                    // Skip the call itself, since we are checking if the call has side effect.
+                    if (use->getUser() == call)
+                        continue;
+                    // We have some other unknown use of the variable address, they can
+                    // be loads, or calls using addresses derived from the variable,
+                    // we will treat the call as having side effect to be safe.
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool isPureFunctionalCall(IRCall* call)
 {
     auto callee = getResolvedInstForDecorations(call->getCallee());
     if (callee->findDecoration<IRReadNoneDecoration>())
     {
-        // If the function has no side effect and is not writing to any outputs,
-        // we can safely treat the call as a normal inst.
-        IRFunc* parentFunc = nullptr;
-        for (UInt i = 0; i < call->getArgCount(); i++)
-        {
-            auto arg = call->getArg(i);
-            if (isValueType(arg->getDataType()))
-                continue;
-
-            // If the argument type is not a known value type,
-            // assume it is a pointer or handle through which side effect can take place.
-            if (!parentFunc)
-            {
-                parentFunc = getParentFunc(call);
-                if (!parentFunc)
-                    return false;
-            }
-
-            if (arg->getOp() == kIROp_Var && getParentFunc(arg) == parentFunc)
-            {
-                // If the pointer argument is a local variable (thus can't alias with other addresses)
-                // and it is never read from in the function, we can safely treat the call as having
-                // no side-effect.
-                // This is a conservative test, but is sufficient to detect the most common case where
-                // a temporary variable is used as the inout argument and the result stored in the temp
-                // variable isn't being used elsewhere in the parent func.
-                // 
-                // A more aggresive test can check all other address uses reachable from the call site
-                // and see if any of them are aliasing with the argument.
-                for (auto use = arg->firstUse; use; use = use->nextUse)
-                {
-                    if (as<IRDecoration>(use->getUser()))
-                        continue;
-                    switch (use->getUser()->getOp())
-                    {
-                    case kIROp_Store:
-                        // We are fine with stores into the variable, since store operations
-                        // are not dependent on whatever we do in the call here.
-                        continue;
-                    default:
-                        // Skip the call itself, since we are checking if the call has side effect.
-                        if (use->getUser() == call)
-                            continue;
-                        // We have some other unknown use of the variable address, they can
-                        // be loads, or calls using addresses derived from the variable,
-                        // we will treat the call as having side effect to be safe.
-                        return false;
-                    }
-                }
-            }
-            else
-            {
-                return false;
-            }
-        }
-        return true;
+        return areCallArgumentsSideEffectFree(call);
     }
     return false;
+}
+
+bool isSideEffectFreeFunctionalCall(IRCall* call)
+{
+    if (!doesCalleeHaveSideEffect(call->getCallee()))
+    {
+        return areCallArgumentsSideEffectFree(call);
+    }
+    return false;
+}
+
+bool doesCalleeHaveSideEffect(IRInst* callee)
+{
+    for (auto decor : getResolvedInstForDecorations(callee)->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_NoSideEffectDecoration:
+        case kIROp_ReadNoneDecoration:
+            return false;
+        }
+    }
+    return true;
 }
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
@@ -777,6 +814,40 @@ int getParamIndexInBlock(IRParam* paramInst)
         paramIndex++;
     }
     return -1;
+}
+
+bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* inst)
+{
+    auto root = getRootAddr(inst);
+
+    auto type = unwrapAttributedType(inst->getDataType());
+    if (!isPtrLikeOrHandleType(type))
+        return false;
+
+    switch (root->getOp())
+    {
+    case kIROp_GlobalVar:
+        return true;
+    case kIROp_GlobalParam:
+    case kIROp_GlobalConstant:
+    case kIROp_Var:
+    case kIROp_Param:
+        break;
+    default:
+        // The inst is defined by an unknown inst.
+        return true;
+    }
+
+    if (root)
+    {
+        if (as<IRParameterGroupType>(root->getDataType()))
+        {
+            return false;
+        }
+        auto addrInstParent = getParentFunc(root);
+        return (addrInstParent != parentFunc);
+    }
+    return false;
 }
 
 struct GenericChildrenMigrationContextImpl

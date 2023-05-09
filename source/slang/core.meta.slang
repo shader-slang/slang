@@ -112,6 +112,12 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
+__attributeTarget(AggTypeDecl)
+attribute_syntax [__NonCopyableType] : NonCopyableTypeAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__NoSideEffect] : NoSideEffectAttribute;
+
 /// Marks a function for forward-mode differentiation.
 /// i.e. the compiler will automatically generate a new function
 /// that computes the jacobian-vector product of the original.

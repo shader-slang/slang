@@ -7157,7 +7157,7 @@ namespace Slang
                 // will treat it so, by-passing all other checks.
                 if (call->findDecoration<IRNoSideEffectDecoration>())
                     return false;
-                return !isPureFunctionalCall(call);
+                return !isSideEffectFreeFunctionalCall(call);
             }
             break;
 
