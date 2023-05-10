@@ -28,6 +28,22 @@
 #   include <stdint.h>
 #endif // SLANG_LLVM
 
+#if defined(_MSC_VER)
+#   define SLANG_PRELUDE_SHARED_LIB_EXPORT __declspec(dllexport)
+#else
+#   define SLANG_PRELUDE_SHARED_LIB_EXPORT __attribute__((__visibility__("default")))
+//#   define SLANG_PRELUDE_SHARED_LIB_EXPORT __attribute__ ((dllexport)) __attribute__((__visibility__("default")))
+#endif    
+
+#ifdef __cplusplus    
+#   define SLANG_PRELUDE_EXTERN_C extern "C"
+#   define SLANG_PRELUDE_EXTERN_C_START extern "C" {
+#   define SLANG_PRELUDE_EXTERN_C_END }
+#else
+#   define SLANG_PRELUDE_EXTERN_C 
+#   define SLANG_PRELUDE_EXTERN_C_START
+#   define SLANG_PRELUDE_EXTERN_C_END 
+#endif    
 
 #include "slang-cpp-scalar-intrinsics.h"
 
