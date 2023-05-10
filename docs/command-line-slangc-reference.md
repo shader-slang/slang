@@ -232,6 +232,11 @@ Dump to output list of warning diagnostic numeric and name ids.
 Treat the rest of the command line as input files. 
 
 
+<a id="report-downstream-time"></a>
+## -report-downstream-time
+Reports the time spent in the downstream compiler. 
+
+
 
 <a id="Target"></a>
 # Target
