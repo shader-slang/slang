@@ -214,6 +214,10 @@ void removePhiArgs(IRInst* phiParam);
 int getParamIndexInBlock(IRParam* paramInst);
 
 bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* inst);
+
+bool isZero(IRInst* inst);
+
+bool isOne(IRInst* inst);
 }
 
 #endif
