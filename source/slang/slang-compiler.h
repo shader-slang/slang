@@ -2637,7 +2637,7 @@ namespace Slang
         virtual SLANG_NO_THROW SlangDiagnosticFlags SLANG_MCALL getDiagnosticFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
-
+        virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
@@ -2675,6 +2675,7 @@ namespace Slang
         // Are we being driven by the command-line `slangc`, and should act accordingly?
         bool m_isCommandLineCompile = false;
 
+        bool m_reportDownstreamCompileTime = false;
         
         String m_diagnosticOutput;
 
