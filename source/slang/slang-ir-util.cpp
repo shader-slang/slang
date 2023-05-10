@@ -818,7 +818,7 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
 
     auto type = unwrapAttributedType(inst->getDataType());
     if (!isPtrLikeOrHandleType(type))
-        return true;
+        return false;
 
     if (root)
     {
