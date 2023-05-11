@@ -1,93 +1,48 @@
-// func-resource-param-array.slang.glsl
 #version 450
+layout(row_major) uniform;
+layout(row_major) buffer;
 
-#define a a_0
-#define b b_0
-#define c c_0
-#define ii ii_0
-#define jj jj_0
-#define kk kk_0
-
-#define f_a f_0
-#define f_b f_1
-#define g_b g_0
-#define g_c g_1
-
-#define a_block _S1
-#define b_block _S2
-#define c_block _S3
-
-#define f_a_i  	_S4
-#define f_b_t 	_S5
-#define f_b_i   _S6
-#define g_b_i   _S7
-#define g_b_j   _S8
-#define g_c_t   _S9
-#define g_c_i   _S10
-#define g_c_j   _S11
-
-#define tmp_f_a_ii	_S12
-#define tmp_f_a_jj	_S13
-
-#define tmp_f_b 	_S14
-#define tmp_g_b 	_S15
-#define tmp_g_c 	_S16
-
-layout(std430, binding = 0) buffer a_block {
+layout(std430, binding = 0) buffer _S1 {
     int _data[];
-} a;
+} a_0;
 
-layout(std430, binding = 1) buffer b_block {
+layout(std430, binding = 1) buffer _S2 {
     int _data[];
-} b[3];
+} b_0[3];
 
-layout(std430, binding = 2) buffer c_block {
+layout(std430, binding = 2) buffer _S3 {
     int _data[];
-} c[4][3];
+} c_0[4][3];
 
-int f_a(uint f_a_i)
+int f_0(uint _S4)
 {
-    return a._data[f_a_i];
+    return ((a_0)._data[(_S4)]);
 }
 
-int f_b(uint f_b_t, uint f_b_i)
+int f_1(uint _S5, uint _S6)
 {
-    return b[f_b_t]._data[f_b_i];
+    return ((b_0[_S5])._data[(_S6)]);
 }
 
-int g_b(uint g_b_i, uint g_b_j)
+int g_0(uint _S7, uint _S8)
 {
-    return b[g_b_i]._data[g_b_j];
+    return ((b_0[_S7])._data[(_S8)]);
 }
 
-int g_c(uint g_c_t, uint g_c_i, uint g_c_j)
+int g_1(uint _S9, uint _S10, uint _S11)
 {
-    return c[g_c_t][g_c_i]._data[g_c_j];
+    return ((c_0[_S9][_S10])._data[(_S11)]);
 }
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-
 void main()
 {
-    uint ii = gl_GlobalInvocationID.x;
-    uint jj = gl_GlobalInvocationID.y;
-    uint kk = gl_GlobalInvocationID.z;
+    uint ii_0 = gl_GlobalInvocationID.x;
+    uint jj_0 = gl_GlobalInvocationID.y;
 
-    int tmp_f_a_ii = f_a(ii);
+    int tmp_0 = f_0(ii_0) + f_0(jj_0) + f_1(ii_0, jj_0) + g_0(ii_0, jj_0) + g_1(ii_0, jj_0, gl_GlobalInvocationID.z);
 
-    int tmp_f_a_jj = f_a(jj);
-    int tmp_0 = tmp_f_a_ii + tmp_f_a_jj;
-
-    int tmp_f_b = f_b(ii, jj);
-    int tmp_1 = tmp_0 + tmp_f_b;
-
-    int tmp_g_b = g_b(ii, jj);
-    int tmp_2 = tmp_1 + tmp_g_b;
-
-    int tmp_g_c = g_c(ii, jj, kk);
-    int tmp_3 = tmp_2 + tmp_g_c;
-
-    a._data[ii] = tmp_3;
-
+    ((a_0)._data[(ii_0)]) = tmp_0;
     return;
 }
+

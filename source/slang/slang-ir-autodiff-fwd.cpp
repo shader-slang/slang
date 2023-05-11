@@ -177,7 +177,10 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
     if (diffLeft || diffRight)
     {
         diffLeft = diffLeft ? diffLeft : getDifferentialZeroOfType(builder, primalLeft->getDataType());
+
+        bool diffRightIsZero = (diffRight == nullptr);
         diffRight = diffRight ? diffRight : getDifferentialZeroOfType(builder, primalRight->getDataType());
+        diffRightIsZero = diffRightIsZero || isZero(diffRight);
 
         auto resultType = primalArith->getDataType();
         auto origResultType = origArith->getDataType();
@@ -196,7 +199,7 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
         case kIROp_Mul:
             {
                 auto diffLeftTimesRight = builder->emitMul(diffType, diffLeft, primalRight);
-                auto diffRightTimesLeft = builder->emitMul(diffType, primalLeft, diffRight);
+                auto diffRightTimesLeft = builder->emitMul(diffType, diffRight, primalLeft);
                 builder->markInstAsDifferential(diffLeftTimesRight, resultType);
                 builder->markInstAsDifferential(diffRightTimesLeft, resultType);
 
@@ -215,20 +218,43 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
             }
         case kIROp_Div:
             {
-                auto diffLeftTimesRight = builder->emitMul(diffType, diffLeft, primalRight);
-                auto diffRightTimesLeft = builder->emitMul(diffType, primalLeft, diffRight);
-                auto diffSub = builder->emitSub(diffType, diffLeftTimesRight, diffRightTimesLeft);
-                builder->markInstAsDifferential(diffLeftTimesRight, resultType);
-                builder->markInstAsDifferential(diffRightTimesLeft, resultType);
-                builder->markInstAsDifferential(diffSub, resultType);
+                if (diffRightIsZero)
+                {
+                    // Special case the dRight = 0 case here since it would be difficult
+                    // to optimize out in the future.
+                    IRInst* diff = nullptr;
+                    if (auto constant = as<IRFloatLit>(primalRight))
+                    {
+                        diff = builder->emitMul(
+                            diffType,
+                            diffLeft,
+                            builder->getFloatValue(
+                                constant->getDataType(), 1.0 / constant->getValue()));
+                    }
+                    else
+                    {
+                        diff = builder->emitDiv(diffType, diffLeft, primalRight);
+                    }
+                    return InstPair(primalArith, diff);
+                }
+                else
+                {
+                    auto diffLeftTimesRight = builder->emitMul(diffType, diffLeft, primalRight);
+                    builder->markInstAsDifferential(diffLeftTimesRight, resultType);
+
+                    auto diffRightTimesLeft = builder->emitMul(diffType, primalLeft, diffRight);
+                    builder->markInstAsDifferential(diffRightTimesLeft, resultType);
                 
-                auto diffMul = builder->emitMul(primalRight->getFullType(), primalRight, primalRight);
-                builder->markInstAsPrimal(diffMul);
+                    auto diffSub = builder->emitSub(diffType, diffLeftTimesRight, diffRightTimesLeft);
+                    builder->markInstAsDifferential(diffSub, resultType);
+                    auto diffMul = builder->emitMul(primalRight->getFullType(), primalRight, primalRight);
+                    builder->markInstAsPrimal(diffMul);
 
-                auto diffDiv = builder->emitDiv(diffType, diffSub, diffMul);
-                builder->markInstAsDifferential(diffDiv, resultType);
+                    auto diffDiv = builder->emitDiv(diffType, diffSub, diffMul);
+                    builder->markInstAsDifferential(diffDiv, resultType);
 
-                return InstPair(primalArith, diffDiv);
+                    return InstPair(primalArith, diffDiv);
+                }
             }
         default:
             getSink()->diagnose(origArith->sourceLoc,
@@ -1590,16 +1616,6 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     }
 }
 
-struct AutoDiffAddressConversionPolicy : public AddressConversionPolicy
-{
-    DifferentiableTypeConformanceContext* diffTypeContext;
-
-    virtual bool shouldConvertAddrInst(IRInst*) override
-    {
-        return true;
-    }
-};
-
 SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
 {
     insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
@@ -1609,9 +1625,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     
     initializeLocalVariables(autoDiffSharedContext->moduleInst->getModule(), func);
 
-    AutoDiffAddressConversionPolicy cvtPolicty;
-    cvtPolicty.diffTypeContext = &differentiableTypeConformanceContext;
-    auto result = eliminateAddressInsts(&cvtPolicty, func, sink);
+    auto result = eliminateAddressInsts(func, sink);
 
     if (SLANG_SUCCEEDED(result))
     {

@@ -203,6 +203,23 @@ struct Vector<T, 4>
 };
 
 template<typename T, int N>
+SLANG_FORCE_INLINE Vector<T, N> _slang_select(Vector<bool, N> condition, Vector<T, N> v0, Vector<T, N> v1)
+{
+    Vector<T, N> result;
+    for (int i = 0; i < N; i++)
+    {
+        result[i] = condition[i] ? v0[i] : v1[i];
+    }
+    return result;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE T _slang_select(bool condition, T v0, T v1)
+{
+    return condition ? v0 : v1;
+}
+
+template<typename T, int N>
 SLANG_FORCE_INLINE T _slang_vector_get_element(Vector<T, N> x, int index)
 {
     return x[index];

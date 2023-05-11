@@ -32,7 +32,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
     uint ii = tid.x;
     uint jj = tid.y;
-    uint kk = tid.z;
 
     // Can we specialize `f`?
     //
@@ -56,7 +55,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     // What if the function takes an array, and we pass
     // in an element of an array-of-arrays?
     //
-    tmp += g(c[ii], jj, kk);
+    tmp += g(c[ii], jj, tid.z);
 
     a[ii] = tmp;
 }

@@ -50,7 +50,7 @@ struct PeepholeContext : InstPassBase
                 return false;
 
             isAccessChainEqual = true;
-            for (UInt i = 0; i < (UInt)chainKey.getCount(); i++)
+            for (UInt i = 0; i < updateInst->getAccessKeyCount(); i++)
             {
                 if (updateInst->getAccessKey(i) != chainKey[i])
                 {
@@ -110,74 +110,6 @@ struct PeepholeContext : InstPassBase
             }
         }
         return false;
-    }
-
-    bool isZero(IRInst* inst)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_IntLit:
-            return as<IRIntLit>(inst)->getValue() == 0;
-        case kIROp_FloatLit:
-            return as<IRFloatLit>(inst)->getValue() == 0.0;
-        case kIROp_BoolLit:
-            return as<IRBoolLit>(inst)->getValue() == false;
-        case kIROp_MakeVector:
-        case kIROp_MakeVectorFromScalar:
-        case kIROp_MakeMatrix:
-        case kIROp_MakeMatrixFromScalar:
-        case kIROp_MatrixReshape:
-        case kIROp_VectorReshape:
-        {
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-            {
-                if (!isZero(inst->getOperand(i)))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-        case kIROp_CastIntToFloat:
-        case kIROp_CastFloatToInt:
-            return isZero(inst->getOperand(0));
-        default:
-            return false;
-        }
-    }
-
-    bool isOne(IRInst* inst)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_IntLit:
-            return as<IRIntLit>(inst)->getValue() == 1;
-        case kIROp_FloatLit:
-            return as<IRFloatLit>(inst)->getValue() == 1.0;
-        case kIROp_BoolLit:
-            return as<IRBoolLit>(inst)->getValue();
-        case kIROp_MakeVector:
-        case kIROp_MakeVectorFromScalar:
-        case kIROp_MakeMatrix:
-        case kIROp_MakeMatrixFromScalar:
-        case kIROp_MatrixReshape:
-        case kIROp_VectorReshape:
-        {
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-            {
-                if (!isOne(inst->getOperand(i)))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-        case kIROp_CastIntToFloat:
-        case kIROp_CastFloatToInt:
-            return isOne(inst->getOperand(0));
-        default:
-            return false;
-        }
     }
 
     bool tryOptimizeArithmeticInst(IRInst* inst)

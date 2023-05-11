@@ -4125,6 +4125,8 @@ namespace slang
 
         virtual SLANG_NO_THROW void SLANG_MCALL setEnableEffectAnnotations(bool value) = 0;
 
+        virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) = 0;
+
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

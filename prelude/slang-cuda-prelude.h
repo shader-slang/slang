@@ -743,11 +743,43 @@ SLANG_FLOAT_MATRIX_OPS(__half)
 #undef SLANG_MATRIX_INT_NEG_OP
 #undef SLANG_FLOAT_MATRIX_MOD
 
+#define SLANG_SELECT_IMPL(T, N)\
+SLANG_FORCE_INLINE SLANG_CUDA_CALL Vector<T, N> _slang_select(bool##N condition, Vector<T, N> v0, Vector<T, N> v1) \
+{ \
+    Vector<T, N> result; \
+    for (int i = 0; i < N; i++) \
+    { \
+        *_slang_vector_get_element_ptr(&result, i) = _slang_vector_get_element(condition, i) ? _slang_vector_get_element(v0, i) : _slang_vector_get_element(v1, i); \
+    } \
+    return result; \
+}
+#define SLANG_SELECT_T(T)\
+    SLANG_SELECT_IMPL(T, 2)\
+    SLANG_SELECT_IMPL(T, 3)\
+    SLANG_SELECT_IMPL(T, 4)
+
+SLANG_SELECT_T(int)
+SLANG_SELECT_T(uint)
+SLANG_SELECT_T(short)
+SLANG_SELECT_T(ushort)
+SLANG_SELECT_T(char)
+SLANG_SELECT_T(uchar)
+SLANG_SELECT_T(float)
+SLANG_SELECT_T(double)
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_select(bool condition, T v0, T v1)
+{
+    return condition ? v0 : v1;
+}
+
 //
 // Half support
 // 
 
 #if SLANG_CUDA_ENABLE_HALF
+SLANG_SELECT_T(__half)
+
 // Convenience functions ushort -> half
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 __ushort_as_half(const ushort2& i) { return __halves2half2(__ushort_as_half(i.x), __ushort_as_half(i.y)); }

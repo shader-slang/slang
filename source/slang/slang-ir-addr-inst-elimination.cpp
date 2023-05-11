@@ -1,5 +1,6 @@
 #include "slang-ir-addr-inst-elimination.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -110,7 +111,6 @@ struct AddressInstEliminationContext
     }
 
     SlangResult eliminateAddressInstsImpl(
-        AddressConversionPolicy* policy,
         IRFunc* func,
         DiagnosticSink* inSink)
     {
@@ -123,9 +123,13 @@ struct AddressInstEliminationContext
         {
             for (auto inst : block->getChildren())
             {
-                if (as<IRPtrTypeBase>(inst->getDataType()))
+                if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                 {
-                    workList.add(inst);
+                    auto valType = unwrapAttributedType(ptrType->getValueType());
+                    if (!getResolvedInstForDecorations(valType)->findDecoration<IRNonCopyableTypeDecoration>())
+                    {
+                        workList.add(inst);
+                    }
                 }
             }
         }
@@ -133,9 +137,6 @@ struct AddressInstEliminationContext
         for (Index workListIndex = 0; workListIndex < workList.getCount(); workListIndex++)
         {
             auto addrInst = workList[workListIndex];
-
-            if (!policy->shouldConvertAddrInst(addrInst))
-                continue;
 
             for (auto use = addrInst->firstUse; use; )
             {
@@ -174,14 +175,13 @@ struct AddressInstEliminationContext
 };
 
 SlangResult eliminateAddressInsts(
-    AddressConversionPolicy* policy,
     IRFunc* func,
     DiagnosticSink* sink)
 {
     AddressInstEliminationContext ctx;
     ctx.module = func->getModule();
     ctx.sink = sink;
-    return ctx.eliminateAddressInstsImpl(policy, func, sink);
+    return ctx.eliminateAddressInstsImpl(func, sink);
 }
 
 } // namespace Slang

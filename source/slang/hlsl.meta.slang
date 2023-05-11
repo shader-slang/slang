@@ -300,25 +300,34 @@ struct $(item.name)
         out uint dim);
 
     __target_intrinsic(glsl, "$0._data[$1/4]")
+    [__NoSideEffect]
     uint Load(int location);
 
+    [__NoSideEffect]
     uint Load(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec2($0._data[$1/4], $0._data[$1/4+1])")
+    [__NoSideEffect]
     uint2 Load2(int location);
 
+    [__NoSideEffect]
     uint2 Load2(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec3($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2])")
+    [__NoSideEffect]
     uint3 Load3(int location);
 
+    [__NoSideEffect]
     uint3 Load3(int location, out uint status);
 
     __target_intrinsic(glsl, "uvec4($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2], $0._data[$1/4+3])")
+    [__NoSideEffect]
     uint4 Load4(int location);
 
+    [__NoSideEffect]
     uint4 Load4(int location, out uint status);
 
+    [__NoSideEffect]
     T Load<T>(int location)
     {
         return __byteAddressBufferLoad<T>(this, location);
@@ -713,13 +722,16 @@ struct $(item.name)
 
     __target_intrinsic(glsl, "$0._data[$1]")
     __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
+    [__NoSideEffect]
     T Load(int location);
+    [__NoSideEffect]
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
         __target_intrinsic(glsl, "$0._data[$1]")
         __target_intrinsic(spirv_direct, "*StorageBuffer OpAccessChain resultType resultId _0 const(int, 0) _1")
+        [__NoSideEffect]
         ref;
     }
 };
@@ -5694,13 +5706,9 @@ __target_intrinsic(hlsl, RayQuery)
 __target_intrinsic(glsl, rayQueryEXT)
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
+[__NonCopyableType]
 struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 {
-    // Initialize the query object in a "fresh" state.
-    //
-    __intrinsic_op($(kIROp_DefaultConstruct))
-    __init();
-
     // Initialize a ray-tracing query.
     //
     // This method may be called on a "fresh" ray query, or
@@ -5714,6 +5722,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // must obey any API-imposed restrictions.
     //
     __target_intrinsic(hlsl)
+    [__NoSideEffect]
+    [mutating]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -5734,6 +5744,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     [__unsafeForceInlineEarly]
     __specialized_for_target(glsl)
+    [__NoSideEffect]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -5767,6 +5778,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryProceedEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__NoSideEffect]
+    [mutating]
     bool Proceed();
 
     // Causes the ray query to terminate.
@@ -5778,6 +5791,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryTerminateEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__NoSideEffect]
+    [mutating]
     void Abort();
 
     // Get the type of candidate hit being considered.
@@ -5792,6 +5807,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "rayQueryGetIntersectionTypeEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     CANDIDATE_TYPE CandidateType();
 
     // Access properties of a candidate hit.
@@ -5799,46 +5815,55 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "transpose(rayQueryGetIntersectionObjectToWorldEXT($0, false))")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3x4 CandidateObjectToWorld3x4();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionObjectToWorldEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float4x3 CandidateObjectToWorld4x3();
 
     __target_intrinsic(glsl, "transpose(rayQueryGetIntersectionWorldToObjectEXT($0, false))")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3x4 CandidateWorldToObject3x4();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionWorldToObjectEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float4x3 CandidateWorldToObject4x3();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CandidateInstanceIndex();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CandidateInstanceID();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionGeometryIndexEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CandidateGeometryIndex();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionPrimitiveIndexEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CandidatePrimitiveIndex();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CandidateInstanceContributionToHitGroupIndex();
 
     // Access properties of the ray being traced
@@ -5847,11 +5872,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "rayQueryGetIntersectionObjectRayOriginEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3 CandidateObjectRayOrigin();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionObjectRayDirectionEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3 CandidateObjectRayDirection();
 
     // Access properties of a candidate procedural primitive hit.
@@ -5859,6 +5886,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "rayQueryGetIntersectionCandidateAABBOpaqueEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     bool CandidateProceduralPrimitiveNonOpaque();
 
     // Access properties of a candidate non-opaque triangle hit.
@@ -5866,34 +5894,42 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "rayQueryGetIntersectionFrontFaceEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     bool CandidateTriangleFrontFace();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionBarycentricsEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float2 CandidateTriangleBarycentrics();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionTEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float CandidateTriangleRayT();
 
     // Commit the current non-opaque triangle hit.
     __target_intrinsic(glsl, rayQueryConfirmIntersectionEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__NoSideEffect]
+    [mutating]
     void CommitNonOpaqueTriangleHit();
 
     // Commit the current procedural primitive hit, with hit time `t`.
     __target_intrinsic(glsl, rayQueryGenerateIntersectionEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__NoSideEffect]
+    [mutating]
     void CommitProceduralPrimitiveHit(float t);
 
     // Get the status of the committed (closest) hit, if any.
     __target_intrinsic(glsl, "rayQueryGetIntersectionTypeEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     COMMITTED_STATUS CommittedStatus();
 
     // Access properties of the committed hit.
@@ -5901,51 +5937,61 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "transpose(rayQueryGetIntersectionObjectToWorldEXT($0, true))")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3x4 CommittedObjectToWorld3x4();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionObjectToWorldEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float4x3 CommittedObjectToWorld4x3();
 
     __target_intrinsic(glsl, "transpose(rayQueryGetIntersectionWorldToObjectEXT($0, true))")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3x4 CommittedWorldToObject3x4();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionWorldToObjectEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float4x3 CommittedWorldToObject4x3();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionTEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float CommittedRayT();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CommittedInstanceIndex();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CommittedInstanceID();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionGeometryIndexEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CommittedGeometryIndex();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionPrimitiveIndexEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CommittedPrimitiveIndex();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint CommittedInstanceContributionToHitGroupIndex();
 
     // Access properties of the ray being traced
@@ -5954,11 +6000,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "rayQueryGetIntersectionObjectRayOriginEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3 CommittedObjectRayOrigin();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionObjectRayDirectionEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3 CommittedObjectRayDirection();
 
     // Access properties of a committed triangle hit.
@@ -5966,11 +6014,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "rayQueryGetIntersectionFrontFaceEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     bool CommittedTriangleFrontFace();
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionBarycentricsEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float2 CommittedTriangleBarycentrics();
 
     // Access properties of the ray being traced.
@@ -5978,21 +6028,25 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryGetRayFlagsEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     uint RayFlags();
 
     __target_intrinsic(glsl, rayQueryGetWorldRayOriginEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3 WorldRayOrigin();
 
     __target_intrinsic(glsl, rayQueryGetWorldRayDirectionEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float3 WorldRayDirection();
 
     __target_intrinsic(glsl, rayQueryGetRayTMinEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [__readNone]
     float RayTMin();
 }
 

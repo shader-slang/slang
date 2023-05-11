@@ -7676,7 +7676,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         irAggType->moveToEnd();
         addTargetIntrinsicDecorations(irAggType, decl);
-
+        for (auto modifier : decl->modifiers)
+        {
+            if (as<NonCopyableTypeAttribute>(modifier))
+                subBuilder->addNonCopyableTypeDecoration(irAggType);
+        }
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
     }
 
@@ -8790,6 +8794,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (as<ReadNoneAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
+            }
+            else if (as<NoSideEffectAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRNoSideEffectDecoration>(irFunc);
             }
             else if (as<EarlyDepthStencilAttribute>(modifier))
             {

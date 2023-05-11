@@ -6,6 +6,7 @@
 #include "slang-ir-restructure.h"
 #include "slang-ir-util.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-reachability.h"
 
 namespace Slang
 {
@@ -103,37 +104,59 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
     HashSet<IRBlock*> loopBlocks;
     for (auto b : blocks)
         loopBlocks.add(b);
+
+    ReachabilityContext reachability = {};
+    
+    // Construct a map from a root address to all derived addresses.
+    Dictionary<IRInst*, List<IRInst*>> relatedAddrMap;
+    for (auto b : func->getBlocks())
+    {
+        for (auto inst : b->getChildren())
+        {
+            if (as<IRPtrTypeBase>(inst->getDataType()))
+            {
+                auto root = getRootAddr(inst);
+                if (!root) continue;
+                auto list = relatedAddrMap.tryGetValue(root);
+                if (!list)
+                {
+                    relatedAddrMap.add(root, List<IRInst*>());
+                    list = relatedAddrMap.tryGetValue(root);
+                }
+                list->add(inst);
+            }
+        }
+    }
+
     auto addressHasOutOfLoopUses = [&](IRInst* addr)
     {
-        // The entire access chain of `addr` must have no uses outside the loop.
-        // The root variable must be a local var.
-        for (auto chainNode = addr; chainNode;)
+        auto rootAddr = getRootAddr(addr);
+        if (isGlobalOrUnknownMutableAddress(func, rootAddr))
+            return true;
+        if (as<IRParam>(rootAddr))
+            return true;
+
+        // If we can't find the address from our map, we conservatively assume it is an unknown address.
+        auto relatedAddrs = relatedAddrMap.tryGetValue(getRootAddr(addr));
+        if (!relatedAddrs)
+            return true;
+       
+        // For all related address of `addr` that may alias with it, we check their uses.
+        for (auto relatedAddr : *relatedAddrs)
         {
-            if (getParentFunc(chainNode) != func)
-                return true;
-            for (auto use = chainNode->firstUse; use; use = use->nextUse)
+            if (!canAddressesPotentiallyAlias(func, relatedAddr, addr))
+                continue;
+            for (auto use = relatedAddr->firstUse; use; use = use->nextUse)
             {
                 if (!loopBlocks.contains(as<IRBlock>(use->getUser()->getParent())))
-                    return true;
-            }
-            switch (chainNode->getOp())
-            {
-            case kIROp_GetElementPtr:
-            case kIROp_FieldAddress:
-                chainNode = chainNode->getOperand(0);
-                continue;
-            case kIROp_Var:
-                if (auto rate = chainNode->getFullType()->getRate())
                 {
-                    if (!as<IRConstExprRate>(rate))
+                    // Is this use reachable from the loop header?
+                    if (reachability.isInstReachable(loopInst, use->getUser()))
                         return true;
                 }
-                break;
-            default:
-                return true;
             }
-            break;
         }
+            
         return false;
     };
 
@@ -267,16 +290,8 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
     return false;
 }
 
-static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
+static bool arePhiArgsEquivalentInBranchesImpl(IRBlock* branch1, IRBlock* branch2, IRBlock* afterBlock)
 {
-    // If one of the branch target is afterBlock itself, and the other branch
-    // is a trivial block that jumps into the afterBlock, this if-else is trivial.
-    // In this case the argCount must be 0 because a block with phi parameters can't
-    // be used as targets in a conditional branch.
-    auto branch1 = ifElse->getTrueBlock();
-    auto branch2 = ifElse->getFalseBlock();
-    auto afterBlock = ifElse->getAfterBlock();
-
     if (branch1 == afterBlock) return true;
     if (branch2 == afterBlock) return true;
 
@@ -291,7 +306,7 @@ static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
         // This should never happen, return false now to be safe.
         return false;
     }
-    
+
     for (UInt i = 0; i < branchInst1->getArgCount(); i++)
     {
         if (branchInst1->getArg(i) != branchInst2->getArg(i))
@@ -301,6 +316,19 @@ static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
         }
     }
     return true;
+}
+
+static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
+{
+    // If one of the branch target is afterBlock itself, and the other branch
+    // is a trivial block that jumps into the afterBlock, this if-else is trivial.
+    // In this case the argCount must be 0 because a block with phi parameters can't
+    // be used as targets in a conditional branch.
+    auto branch1 = ifElse->getTrueBlock();
+    auto branch2 = ifElse->getFalseBlock();
+    auto afterBlock = ifElse->getAfterBlock();
+
+    return arePhiArgsEquivalentInBranchesImpl(branch1, branch2, afterBlock);
 }
 
 static bool isTrivialIfElse(IRIfElse* condBranch, bool& isTrueBranchTrivial, bool& isFalseBranchTrivial)
@@ -313,6 +341,62 @@ static bool isTrivialIfElse(IRIfElse* condBranch, bool& isTrueBranchTrivial, boo
             return true;
     }
     return false;
+}
+
+// Return the true of the switch branch block if the branch is a trivial jump
+// to after block with no other insts.
+static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
+{
+    if (branchBlock != switchInst->getBreakLabel())
+    {
+        if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
+        {
+            if (br->getTargetBlock() == switchInst->getBreakLabel() && br->getOp() == kIROp_unconditionalBranch)
+            {
+                return true;
+            }
+        }
+    }
+    else
+    {
+        return true;
+    }
+    return false;
+}
+
+static bool arePhiArgsEquivalentInBranches(IRSwitch* switchInst)
+{
+    ShortList<IRBlock*> jumpTargets;
+    if (switchInst->getDefaultLabel())
+        jumpTargets.add(switchInst->getDefaultLabel());
+    for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+    {
+        jumpTargets.add(switchInst->getCaseLabel(i));
+    }
+    if (jumpTargets.getCount() == 0)
+        return true;
+    for (Index i = 1; i < jumpTargets.getCount(); i++)
+    {
+        auto branch1 = jumpTargets[0];
+        auto branch2 = jumpTargets[i];
+        auto afterBlock = switchInst->getBreakLabel();
+
+        if (!arePhiArgsEquivalentInBranchesImpl(branch1, branch2, afterBlock))
+            return false;
+    }
+    return true;
+}
+
+static bool isTrivialSwitch(IRSwitch* switchBranch)
+{
+    for (UInt i = 0; i < switchBranch->getCaseCount(); i++)
+    {
+        if (!isTrivialSwitchBranch(switchBranch, switchBranch->getCaseLabel(i)))
+            return false;
+    }
+    if (!isTrivialSwitchBranch(switchBranch, switchBranch->getDefaultLabel()))
+        return false;
+    return true;
 }
 
 static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
@@ -336,6 +420,29 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
         }
     }
     return false;
+}
+
+static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
+{
+    if (!isTrivialSwitch(switchInst))
+        return false;
+    if (switchInst->getCaseCount() == 0)
+        return false;
+
+    auto termInst = as<IRUnconditionalBranch>(switchInst->getCaseLabel(0)->getTerminator());
+    if (!termInst)
+        return false;
+
+    if (!arePhiArgsEquivalentInBranches(switchInst))
+        return false;
+
+    List<IRInst*> args;
+    for (UInt i = 0; i < termInst->getArgCount(); i++)
+        args.add(termInst->getArg(i));
+    builder.setInsertBefore(switchInst);
+    builder.emitBranch(switchInst->getBreakLabel(), (Int)args.getCount(), args.getBuffer());
+    switchInst->removeAndDeallocate();
+    return true;
 }
 
 static bool isTrueLit(IRInst* lit)
@@ -581,6 +688,10 @@ static bool processFunc(IRGlobalValueWithCode* func)
                 else if (auto condBranch = as<IRIfElse>(block->getTerminator()))
                 {
                     changed |= trySimplifyIfElse(builder, condBranch);
+                }
+                else if (auto switchBranch = as<IRSwitch>(block->getTerminator()))
+                {
+                    changed |= trySimplifySwitch(builder, switchBranch);
                 }
 
                 // If `block` does not end with an unconditional branch, bail.

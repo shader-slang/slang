@@ -70,6 +70,7 @@ enum class OptionKind
     DumpWarningDiagnostics,
     InputFilesRemain,
     EmitIr,
+    ReportDownstreamTime,
 
     // Target
 
@@ -413,7 +414,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EnableWarning, "-W...", "-W<id>", "Enable a warning with the specified id."},
         { OptionKind::DisableWarning, "-Wno-...", "-Wno-<id>", "Disable warning with <id>"},
         { OptionKind::DumpWarningDiagnostics, "-dump-warning-diagnostics", nullptr, "Dump to output list of warning diagnostic numeric and name ids." },
-        { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."}
+        { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."},
+        { OptionKind::ReportDownstreamTime, "-report-downstream-time", nullptr, "Reports the time spent in the downstream compiler." },
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -1836,6 +1838,11 @@ SlangResult OptionsParser::_parse(
                         return res;
                     }
                 }
+                break;
+            }
+            case OptionKind::ReportDownstreamTime:
+            {
+                m_compileRequest->setReportDownstreamTime(true);
                 break;
             }
             case OptionKind::ModuleName:

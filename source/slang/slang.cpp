@@ -125,6 +125,14 @@ namespace Slang {
 
 const char* getBuildTagString()
 {
+    if (UnownedStringSlice(SLANG_TAG_VERSION) == "unknown")
+    {
+        // If the tag is unknown, then we will try to get the timestamp of the shared library
+        // and use that as the version string, so that we can at least return something
+        // that uniquely identifies the build.
+        static String timeStampString = String(SharedLibraryUtils::getSharedLibraryTimestamp((void*)spCreateSession));
+        return timeStampString.getBuffer();
+    }
     return SLANG_TAG_VERSION;
 }
 
@@ -4798,6 +4806,11 @@ void EndToEndCompileRequest::setPassThrough(SlangPassThrough inPassThrough)
     m_passThrough = PassThroughMode(inPassThrough);
 }
 
+void EndToEndCompileRequest::setReportDownstreamTime(bool value)
+{
+    m_reportDownstreamCompileTime = value;
+}
+
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)
 {
     ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, WriterFlag::IsConsole));
@@ -5104,7 +5117,11 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
 SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
 {
     SlangResult res = SLANG_FAIL;
-
+    double downstreamStartTime = 0.0;
+    if (m_reportDownstreamCompileTime)
+    {
+        downstreamStartTime = getSession()->getDownstreamCompilerElapsedTime();
+    }
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
@@ -5151,6 +5168,14 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
         res = req->executeActions();
     }
 #endif
+
+    if (m_reportDownstreamCompileTime)
+    {
+        double downstreamTime = getSession()->getDownstreamCompilerElapsedTime() - downstreamStartTime;
+        String downstreamTimeStr = String(downstreamTime, "%.2f");
+        getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
+
+    }
 
     // Repro dump handling
     {
