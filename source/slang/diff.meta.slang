@@ -32,16 +32,16 @@ __intrinsic_type($(kIROp_TensorViewType))
 struct TensorView
 {
     __target_intrinsic(cuda, "$0.data_ptr<$G0>()")
-    [__readNone]
+    [__NoSideEffect]
     Ptr<T> data_ptr();
 
     __target_intrinsic(cuda, "$0.data_ptr_at<$G0>($1)")
-    [__readNone]
+    [__NoSideEffect]
     Ptr<T> data_ptr_at(uint index);
 
     __generic<let N: int>
     __target_intrinsic(cuda, "$0.data_ptr_at<$G0>($1)")
-    [__readNone]
+    [__NoSideEffect]
     Ptr<T> data_ptr_at(vector<uint, N> index);
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
@@ -49,19 +49,19 @@ struct TensorView
     __init(TorchTensor<T> t);
 
     __target_intrinsic(cuda, "$0.load<$G0>($1)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint x);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint x, uint y);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint x, uint y, uint z);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint x, uint y, uint z, uint w);
     __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4, $5)")
-    [__readNone]
+    [__NoSideEffect]
     T load(uint i0, uint i1, uint i2, uint i3, uint i4);
 
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2)")
@@ -96,59 +96,67 @@ struct TensorView
 
     __subscript(uint index) -> T
     {
-        [ForceInline] [__readNone] get { return load(index); }
+        [ForceInline] [__NoSideEffect] get { return load(index); }
         [ForceInline] set { store(index, newValue); }
         
         __target_intrinsic(cuda, "$0.load<$G0>($1)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint i1, uint i2) -> T
     {
-        [ForceInline] [__readNone] get { return load(i1, i2); }
+        [ForceInline] [__NoSideEffect] get { return load(i1, i2); }
         [ForceInline] set { store(i1, i2, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1, $2)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint2 i) -> T
     {
-        [ForceInline] [__readNone] get { return load(i.x, i.y); }
+        [ForceInline] [__NoSideEffect] get { return load(i.x, i.y); }
         [ForceInline] set { store(i.x, i.y, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint i1, uint i2, uint i3) -> T
     {
-        [ForceInline] [__readNone] get { return load(i1, i2, i3); }
+        [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3); }
         [ForceInline] set { store(i1, i2, i3, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint3 i) -> T
     {
-        [ForceInline] [__readNone] get { return load(i.x, i.y, i.z); }
+        [ForceInline] [__NoSideEffect] get { return load(i.x, i.y, i.z); }
         [ForceInline] set { store(i.x, i.y, i.z, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y, $1.z)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint i1, uint i2, uint i3, uint i4) -> T
     {
-        [ForceInline] [__readNone] get { return load(i1, i2, i3, i4); }
+        [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3, i4); }
         [ForceInline] set { store(i1, i2, i3, i4, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint4 i) -> T
     {
-        [__readNone][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
+        [__NoSideEffect][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
         [ForceInline] set { store(i.x, i.y, i.z, i.w, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1.x, $1.y, $1.z, $1.w)")
+        [__NoSideEffect]
         ref;
     }
     __subscript(uint i1, uint i2, uint i3, uint i4, uint i5) -> T
     {
-        [ForceInline] [__readNone] get { return load(i1, i2, i3, i4, i5); }
+        [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3, i4, i5); }
         [ForceInline] set { store(i1, i2, i3, i4, i5, newValue); }
         __target_intrinsic(cuda, "$0.load<$G0>($1, $2, $3, $4, $5)")
+        [__NoSideEffect]
         ref;
     }
 }
@@ -238,52 +246,66 @@ __intrinsic_type($(kIROp_TorchTensorType))
 struct TorchTensor
 {
     __intrinsic_op($(kIROp_TorchTensorGetView))
+    [CudaHost]
     TensorView<T> getView();
 
     __target_intrinsic(cuda, "$0.dims()")
     __target_intrinsic(cpp, "$0.dims()")
     [__readNone]
+    [CudaHost]
     uint dims();
 
     __target_intrinsic(cuda, "$0.size($1)")
     __target_intrinsic(cpp, "$0.size($1)")
     [__readNone]
+    [CudaHost]
     uint size(uint i);
 
     __target_intrinsic(cuda, "$0.stride($1)")
     __target_intrinsic(cpp, "$0.stride($1)")
     [__readNone]
+    [CudaHost]
     uint stride(uint i);
 
     __target_intrinsic(cuda, "$0.data_ptr<$G0>()")
     __target_intrinsic(cpp, "$0.data_ptr<$G0>()")
     [__readNone]
+    [CudaHost]
     Ptr<T> data_ptr();
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
+    [CudaHost]
     static TorchTensor<T> alloc(uint x);
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
+    [CudaHost]
     static TorchTensor<T> alloc(uint x, uint y);
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
+    [CudaHost]
     static TorchTensor<T> alloc(uint x, uint y, uint z);
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
+    [CudaHost]
     static TorchTensor<T> alloc(uint x, uint y, uint z, uint w);
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
+    [CudaHost]
     static TorchTensor<T> alloc(uint i0, uint i1, uint i2, uint i3, uint i4);
 
     __intrinsic_op($(kIROp_AllocateTorchTensor))
+    [CudaHost]
     static TorchTensor<T> emptyLike(TorchTensor<T> other);
 
     __target_intrinsic(cpp, "$0.zero_()")
+    [CudaHost]
     void fillZero();
 
     __target_intrinsic(cpp, "$0.fill_($1)")
+    [CudaHost]
     void fillValue(T val);
 
+    [CudaHost]
     static TorchTensor<T> zerosLike(TorchTensor<T> other)
     {
         var result = emptyLike(other);
@@ -367,6 +389,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [ForceInline]
 [ForwardDerivativeOf(transpose)]
 [PreferRecompute]
+[BackwardDifferentiable]
 DifferentialPair<matrix<T, M, N>> __d_transpose(DifferentialPair<matrix<T, N, M>> m)
 {
     return DifferentialPair<matrix<T, M, N>>(transpose(m.p), transpose(m.d));
@@ -376,6 +399,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [ForceInline]
 [BackwardDerivativeOf(transpose)]
 [PreferRecompute]
+[BackwardDifferentiable]
 void __d_transpose(inout DifferentialPair<matrix<T, N, M>> m, matrix<T, M, N>.Differential dOut)
 {
     m = diffPair(m.p, transpose(dOut));
@@ -386,6 +410,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [ForceInline]
 [ForwardDerivativeOf(mul)]
 [PreferRecompute]
+[BackwardDifferentiable]
 DifferentialPair<vector<T, M>> mul(DifferentialPair<vector<T, N>> left, DifferentialPair<matrix<T, N, M>> right)
 {
     let primal = mul(left.p, right.p);
@@ -396,13 +421,16 @@ DifferentialPair<vector<T, M>> mul(DifferentialPair<vector<T, N>> left, Differen
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [BackwardDerivativeOf(mul)]
 [PreferRecompute]
+[BackwardDifferentiable]
 void __d_mul(inout DifferentialPair<vector<T, N>> left, inout DifferentialPair<matrix<T, N, M>> right, vector<T, M>.Differential dOut)
 {
     vector<T, N>.Differential left_d_result;
     matrix<T, N, M>.Differential right_d_result;
+    [ForceUnroll]
     for (int i = 0; i < N; ++i)
     {
         T sum = T(0);
+        [ForceUnroll]
         for (int j = 0; j < M; ++j)
         {
             sum += right.p[i][j] * dOut[j];
@@ -419,6 +447,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [ForceInline]
 [ForwardDerivativeOf(mul)]
 [PreferRecompute]
+[BackwardDifferentiable]
 DifferentialPair<vector<T,N>> mul(DifferentialPair<matrix<T,N,M>> left, DifferentialPair<vector<T,M>> right)
 {
     let primal = mul(left.p, right.p);
@@ -429,13 +458,16 @@ DifferentialPair<vector<T,N>> mul(DifferentialPair<matrix<T,N,M>> left, Differen
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [BackwardDerivativeOf(mul)]
 [PreferRecompute]
+[BackwardDifferentiable]
 void __d_mul(inout DifferentialPair<matrix<T, N, M>> left, inout DifferentialPair<vector<T, M>> right, vector<T, N>.Differential dOut)
 {
     matrix<T, N, M>.Differential left_d_result;
     vector<T, M>.Differential right_d_result;
+    [ForceUnroll]
     for (int j = 0; j < M; ++j)
     {
         T sum = T(0);
+        [ForceUnroll]
         for (int i = 0; i < N; ++i)
         {
             sum += left.p[i][j] * dOut[i];
@@ -452,6 +484,7 @@ __generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 [ForceInline]
 [ForwardDerivativeOf(mul)]
 [PreferRecompute]
+[BackwardDifferentiable]
 DifferentialPair<matrix<T,R,C>> mul(DifferentialPair<matrix<T,R,N>> left, DifferentialPair<matrix<T,N,C>> right)
 {
     let primal = mul(left.p, right.p);
@@ -462,22 +495,30 @@ DifferentialPair<matrix<T,R,C>> mul(DifferentialPair<matrix<T,R,N>> left, Differ
 __generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 [BackwardDerivativeOf(mul)]
 [PreferRecompute]
+[BackwardDifferentiable]
 void mul(inout DifferentialPair<matrix<T, R, N>> left, inout DifferentialPair<matrix<T, N, C>> right, matrix<T, R, C>.Differential dOut)
 {
     matrix<T, R, N>.Differential left_d_result;
+    [ForceUnroll]
     for (int r = 0; r < R; ++r)
+        [ForceUnroll]
         for (int n = 0; n < N; ++n)
             left_d_result[r][n] = T(0.0);
-    
+
     matrix<T, N, C>.Differential right_d_result;
+    [ForceUnroll]
     for (int n = 0; n < N; ++n)
+        [ForceUnroll]
         for (int c = 0; c < C; ++c)
             right_d_result[n][c] = T(0.0);
-    
+
+    [ForceUnroll]
     for (int r = 0; r < R; ++r)
     {
+        [ForceUnroll]
         for (int c = 0; c < C; ++c)
         {
+            [ForceUnroll]
             for (int n = 0; n < N; ++n)
             {
                 left_d_result[r][n] += right.p[n][c] * dOut[r][c];
@@ -493,6 +534,7 @@ void mul(inout DifferentialPair<matrix<T, R, N>> left, inout DifferentialPair<ma
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [ForwardDerivativeOf(dot)]
 [PreferRecompute]
+[BackwardDifferentiable]
 DifferentialPair<T> __d_dot(DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
 {
     T result = T(0);
@@ -510,6 +552,7 @@ DifferentialPair<T> __d_dot(DifferentialPair<vector<T, N>> dpx, DifferentialPair
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [BackwardDerivativeOf(dot)]
 [PreferRecompute]
+[BackwardDifferentiable]
 void __d_dot(inout DifferentialPair<vector<T, N>> dpx, inout DifferentialPair<vector<T, N>> dpy, T.Differential dOut)
 {
     vector<T, N>.Differential x_d_result, y_d_result;
@@ -527,6 +570,7 @@ void __d_dot(inout DifferentialPair<vector<T, N>> dpx, inout DifferentialPair<ve
 __generic<T : __BuiltinFloatingPointType>
 [ForwardDerivativeOf(cross)]
 [PreferRecompute]
+[BackwardDifferentiable]
 DifferentialPair<vector<T, 3>> __d_cross(DifferentialPair<vector<T, 3>> a, DifferentialPair<vector<T, 3>> b)
 {
     /*
@@ -555,6 +599,7 @@ DifferentialPair<vector<T, 3>> __d_cross(DifferentialPair<vector<T, 3>> a, Diffe
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(cross)]
 [PreferRecompute]
+[BackwardDifferentiable]
 void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<vector<T, 3>> b, vector<T, 3>.Differential dOut)
 {
     /*
@@ -823,8 +868,10 @@ T detach(T x);
 
 #define SLANG_SQR(x) ((x)*(x))
 
+#define SLANG_SIGN(x) select(((x)>T(0.0)), ReturnType(T(1.0)), select(((x)==T(0.0)), ReturnType(T(0.0)), ReturnType(T(-1.0))))
+
 // Absolute value
-UNARY_DERIVATIVE_IMPL(abs, select(dpx.p > T(0.0), dpx.d, ReturnType.dmul(T(-1.0), dpx.d)), (ReturnType.dmul(__slang_noop_cast<ReturnType>(sign(dpx.p)), dOut)))
+UNARY_DERIVATIVE_IMPL(abs, ReturnType.dmul(SLANG_SIGN(dpx.p), dpx.d), ReturnType.dmul(SLANG_SIGN(dpx.p), dOut))
 // Saturate
 UNARY_DERIVATIVE_IMPL(saturate, select(dpx.p < T(0.0) || dpx.p > T(1.0), ReturnType.dzero(), dpx.d), select(dpx.p < T(0.0) || dpx.p > T(1.0), ReturnType.dzero(), dOut))
 // frac

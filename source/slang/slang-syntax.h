@@ -194,6 +194,8 @@ namespace Slang
 
     inline Type* getType(ASTBuilder* astBuilder, SubstExpr<Expr> expr)
     {
+        if (!expr)
+            return astBuilder->getErrorType();
         return substituteType(expr.getSubsts(), astBuilder, expr.getExpr()->type);
     }
 

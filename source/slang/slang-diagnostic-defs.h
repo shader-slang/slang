@@ -138,7 +138,7 @@ DIAGNOSTIC(    99, Error, unknownDebugOption, "unknown debug option, known optio
 
 DIAGNOSTIC(  100, Error, failedToLoadDownstreamCompiler, "failed to load downstream compiler '$0'")
 DIAGNOSTIC(  101, Error, downstreamCompilerDoesntSupportWholeProgramCompilation, "downstream compiler '$0' doesn't support whole program compilation")
-
+DIAGNOSTIC(  102, Note,  downstreamCompileTime, "downstream compile time: $0s")
 
 DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
@@ -551,19 +551,24 @@ DIAGNOSTIC(39013, Warning, registerModifierButNoVulkanLayout, "shader parameter 
 DIAGNOSTIC(39014, Error, unexpectedSpecifierAfterSpace, "unexpected specifier after register space: '$0'")
 DIAGNOSTIC(39015, Error, wholeSpaceParameterRequiresZeroBinding, "shader parameter '$0' consumes whole descriptor sets, so the binding must be in the form '[[vk::binding(0, ...)]]'; the non-zero binding '$1' is not allowed")
 
-DIAGNOSTIC(39013, Error, dontExpectOutParametersForStage, "the '$0' stage does not support `out` or `inout` entry point parameters")
-DIAGNOSTIC(39014, Error, dontExpectInParametersForStage, "the '$0' stage does not support `in` entry point parameters")
+DIAGNOSTIC(39016, Warning, hlslToVulkanMappingNotFound, "unable to infer Vulkan binding for '$0', automatic layout will be used")
 
-DIAGNOSTIC(39016, Warning, globalUniformNotExpected, "'$0' is implicitly a global shader parameter, not a global variable. If a global variable is intended, add the 'static' modifier. If a uniform shader parameter is intended, add the 'uniform' modifier to silence this warning.")
+DIAGNOSTIC(39017, Error, dontExpectOutParametersForStage, "the '$0' stage does not support `out` or `inout` entry point parameters")
+DIAGNOSTIC(39018, Error, dontExpectInParametersForStage, "the '$0' stage does not support `in` entry point parameters")
 
-DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "can have at most one 'shader record' attributed constant buffer; found $0.")
+DIAGNOSTIC(39019, Warning, globalUniformNotExpected, "'$0' is implicitly a global shader parameter, not a global variable. If a global variable is intended, add the 'static' modifier. If a uniform shader parameter is intended, add the 'uniform' modifier to silence this warning.")
 
-DIAGNOSTIC(39018, Error, typeParametersNotAllowedOnEntryPointGlobal, "local-root-signature shader parameter '$0' at global scope must not include existential/interface types")
+DIAGNOSTIC(39020, Error, tooManyShaderRecordConstantBuffers, "can have at most one 'shader record' attributed constant buffer; found $0.")
 
-DIAGNOSTIC(39019, Warning, vkIndexWithoutVkLocation, "ignoring '[[vk::index(...)]]` attribute without a corresponding '[[vk::location(...)]]' attribute")
-DIAGNOSTIC(39020, Error, mixingImplicitAndExplicitBindingForVaryingParams, "mixing explicit and implicit bindings for varying parameters is not supported (see '$0' and '$1')")
+DIAGNOSTIC(39021, Error, typeParametersNotAllowedOnEntryPointGlobal, "local-root-signature shader parameter '$0' at global scope must not include existential/interface types")
+
+DIAGNOSTIC(39022, Warning, vkIndexWithoutVkLocation, "ignoring '[[vk::index(...)]]` attribute without a corresponding '[[vk::location(...)]]' attribute")
+DIAGNOSTIC(39023, Error, mixingImplicitAndExplicitBindingForVaryingParams, "mixing explicit and implicit bindings for varying parameters is not supported (see '$0' and '$1')")
+
+DIAGNOSTIC(39024, Warning, cannotInferVulkanBindingWithoutRegisterModifier, "shader parameter '$0' doesn't have a 'register' specified, automatic layout will be used")
 
 //
+
 // 4xxxx - IL code generation.
 //
 DIAGNOSTIC(40001, Error, bindingAlreadyOccupiedByComponent, "resource binding location '$0' is already occupied by component '$1'.")
@@ -609,6 +614,9 @@ DIAGNOSTIC(41023, Error, getStringHashMustBeOnStringLiteral, "getStringHash can 
 
 DIAGNOSTIC(41901, Error, unsupportedUseOfLValueForAutoDiff, "unsupported use of L-value for auto differentiation.")
 DIAGNOSTIC(41902, Error, cannotDifferentiateDynamicallyIndexedData, "cannot auto-differentiate mixed read/write access to dynamically indexed data in '$0'.")
+
+DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use of TorchTensor type in device/kernel functions. use `TensorView` instead.")
+
 //
 // 5xxxx - Target code generation.
 //

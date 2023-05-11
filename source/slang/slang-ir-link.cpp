@@ -445,6 +445,7 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_UserDefinedBackwardDerivativeDecoration:
         case kIROp_PrimalSubstituteDecoration:
         case kIROp_IntrinsicOpDecoration:
+        case kIROp_NonCopyableTypeDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);

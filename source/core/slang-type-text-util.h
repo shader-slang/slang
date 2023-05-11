@@ -25,7 +25,7 @@ struct TypeTextUtil
         SlangCompileTarget target;          ///< The target
         const char* extensions;             ///< Comma delimited list of extensions associated with the target
         const char* names;                  ///< Comma delimited list of names associated with the target. NOTE! First name is taken as the normal display name.
-        const char* description;            ///< Description, can be null
+        const char* description = nullptr;  ///< Description, can be null
     };
     
         /// Get the compile target infos

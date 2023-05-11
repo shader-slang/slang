@@ -749,6 +749,19 @@ IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(I
     SLANG_UNIMPLEMENTED_X("TODO: Implement");
 }
 
+
+void copyCheckpointHints(IRBuilder* builder, IRGlobalValueWithCode* oldInst, IRGlobalValueWithCode* newInst)
+{
+    for (auto decor = oldInst->getFirstDecoration(); decor; decor = decor->getNextDecoration())
+    {
+        if (auto chkHint = as<IRCheckpointHintDecoration>(decor))
+        {
+            SLANG_ASSERT(chkHint->getOperandCount() == 0);
+            builder->addDecoration(newInst, chkHint->getOp());
+        }
+    }
+}
+
 void stripDerivativeDecorations(IRInst* inst)
 {
     for (auto decor = inst->getFirstDecoration(); decor; )
@@ -1896,7 +1909,7 @@ IRUse* findUniqueStoredVal(IRVar* var)
 // the final value to it, this method will return the call inst for this case.
 IRUse* findLatestUniqueWriteUse(IRVar* var)
 {
-    IRUse* storeUse = nullptr;
+    IRUse* callUse = nullptr;
     for (auto use = var->firstUse; use; use = use->nextUse)
     {
         if (const auto callInst = as<IRCall>(use->getUser()))
@@ -1904,10 +1917,14 @@ IRUse* findLatestUniqueWriteUse(IRVar* var)
             // Ignore uses from differential blocks.
             if (callInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
                 continue;
-            SLANG_RELEASE_ASSERT(!storeUse);
-            storeUse = use;
+            SLANG_RELEASE_ASSERT(!callUse);
+            callUse = use;
         }
     }
+
+    if (callUse)
+        return callUse;
+
     // If no unique call found, try to look for a store.
     return findUniqueStoredVal(var);
 }

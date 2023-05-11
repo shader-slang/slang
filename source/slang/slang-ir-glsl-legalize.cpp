@@ -952,7 +952,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // It's legal to declare these as unsized arrays, but by sizing
             // them by the (max) max size GLSL allows us to index into them
             // with variable index.
-            SLANG_EXPECT(dd->elementCount, "Mesh output declarator didn't specify element count");
+            SLANG_ASSERT(dd->elementCount && "Mesh output declarator didn't specify element count");
             auto arrayType = builder->getArrayType(type, dd->elementCount);
 
             IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
@@ -1737,7 +1737,7 @@ void legalizeMeshOutputParam(
 {
     auto builder = context->getBuilder();
     auto stage = context->getStage();
-    SLANG_EXPECT(stage == Stage::Mesh, "legalizing mesh output, but we're not a mesh shader");
+    SLANG_ASSERT(stage == Stage::Mesh && "legalizing mesh output, but we're not a mesh shader");
     IRBuilderInsertLocScope locScope{builder};
     builder->setInsertInto(func);
 
@@ -1814,7 +1814,7 @@ void legalizeMeshOutputParam(
     traverseUsers(g, [&](IRInst* u)
     {
         auto l = as<IRLoad>(u);
-        SLANG_EXPECT(l, "Mesh Output sentinel parameter wasn't used in a load");
+        SLANG_ASSERT(l && "Mesh Output sentinel parameter wasn't used in a load");
 
         std::function<void(ScalarizedVal&, IRInst*)> assignUses =
             [&](ScalarizedVal& d, IRInst* a)
@@ -1838,7 +1838,7 @@ void legalizeMeshOutputParam(
                 if(auto m = as<IRFieldAddress>(s))
                 {
                     auto key = as<IRStructKey>(m->getField());
-                    SLANG_EXPECT(key, "Result of getField wasn't a struct key");
+                    SLANG_ASSERT(key && "Result of getField wasn't a struct key");
 
                     auto d_ = extractField(builder, d, kMaxUInt, key);
                     assignUses(d_, m);
@@ -1880,7 +1880,7 @@ void legalizeMeshOutputParam(
                     // best we can hope for without going and
                     // specializing foo.
                     auto ptr = as<IRPtrTypeBase>(a->getFullType());
-                    SLANG_EXPECT(ptr, "Mesh output parameter was passed by value");
+                    SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
                     auto t = ptr->getValueType();
                     auto tmp = builder->emitVar(t);
                     for(UInt i = 0; i < c->getOperandCount(); i++)
@@ -2045,7 +2045,7 @@ void legalizeMeshOutputParam(
         traverseUsers(builtin.param, [&](IRInst* u)
         {
             auto p = as<IRGetElementPtr>(u);
-            SLANG_EXPECT(p, "Mesh Output sentinel parameter wasn't used as an array");
+            SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
 
             IRBuilderInsertLocScope locScope{builder};
             builder->setInsertBefore(p);

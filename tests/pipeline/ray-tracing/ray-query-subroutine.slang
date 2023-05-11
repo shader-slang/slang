@@ -7,7 +7,7 @@
 RWStructuredBuffer<int> gOutput;
 RaytracingAccelerationStructure gScene;
 
-int helper<let N : int>(RayQuery<N> q)
+float3 helper<let N : int>(RayQuery<N> q)
 {
     RayDesc ray;
     ray.Origin = 0;
@@ -20,7 +20,7 @@ int helper<let N : int>(RayQuery<N> q)
         /* instanceInclusionmask: */    0xFFFFFFFF,
         /* ray: */                      ray );
 
-    return 1;
+    return q.WorldRayDirection();
 }
 
 [shader("compute")]
@@ -36,5 +36,5 @@ void computeMain(uint tid : SV_DispatchThreadID)
     RayQuery<0> rayQuery;
     let result = helper(rayQuery);
 
-    gOutput[tid.x] = result;
+    gOutput[tid.x] = int(result.x);
 }

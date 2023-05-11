@@ -336,6 +336,7 @@ IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
 IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
 IR_SIMPLE_DECORATION(StaticRequirementDecoration)
+IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {
@@ -3956,6 +3957,11 @@ public:
     void addNVAPISlotDecoration(IRInst* value, UnownedStringSlice const& registerName, UnownedStringSlice const& spaceName)
     {
         addDecoration(value, kIROp_NVAPISlotDecoration, getStringValue(registerName), getStringValue(spaceName));
+    }
+
+    void addNonCopyableTypeDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_NonCopyableTypeDecoration);
     }
 
         /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.

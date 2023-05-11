@@ -76,28 +76,43 @@ namespace Slang
     template <typename T>
     SLANG_FORCE_INLINE T* clone(IClonable* clonable) { return (T*)clonable->clone(T::getTypeGuid()); }
 
+}
 
 // TODO: Shouldn't these be SLANG_ prefixed?
 #ifdef _MSC_VER
 #define UNREACHABLE_RETURN(x)
-#define UNREACHABLE(x)
 #else
 #define UNREACHABLE_RETURN(x) return x;
-#define UNREACHABLE(x) x;
 #endif
 
-}
-
-#ifdef _DEBUG
-#define SLANG_EXPECT(VALUE, MSG) if(VALUE) {} else SLANG_ASSERT_FAILURE(MSG)
-#define SLANG_ASSERT(VALUE) SLANG_EXPECT(VALUE, #VALUE)
+//
+// Use `SLANG_ASSUME(myBoolExpression);` to inform the compiler that the condition is true.
+// Do not rely on side effects of the condition being performed.
+//
+#if defined(__cpp_assume)
+#    define SLANG_ASSUME(X) [[assume(X)]]
+#elif SLANG_GCC
+#    define SLANG_ASSUME(X) do{if(!(X)) __builtin_unreachable();} while(0)
+#elif SLANG_CLANG
+#    define SLANG_ASSUME(X) __builtin_assume(X)
+#elif SLANG_VC
+#    define SLANG_ASSUME(X) __assume(X)
 #else
-#define SLANG_EXPECT(VALUE, MSG) do {} while(0)
-#define SLANG_ASSERT(VALUE) do {} while(0)
+     [[noreturn]] inline void invokeUndefinedBehaviour() {}
+#    define SLANG_ASSUME(X) do{if(!(X)) invokeUndefinedBehaviour();} while(0)
+#endif
+
+//
+// Assertions abort in debug builds, but inform the compiler of true
+// assumptions in release builds
+//
+#ifdef _DEBUG
+#define SLANG_ASSERT(VALUE) do{if(!(VALUE)) SLANG_ASSERT_FAILURE(#VALUE);} while(0)
+#else
+#define SLANG_ASSERT(VALUE) SLANG_ASSUME(VALUE)
 #endif
 
 #define SLANG_RELEASE_ASSERT(VALUE) if(VALUE) {} else SLANG_ASSERT_FAILURE(#VALUE)
-#define SLANG_RELEASE_EXPECT(VALUE, WHAT) if(VALUE) {} else SLANG_UNEXPECTED(WHAT)
 
 template<typename T> void slang_use_obj(T&) {}
 

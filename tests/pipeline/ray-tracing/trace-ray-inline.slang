@@ -83,6 +83,8 @@ bool myProceduralIntersection(inout float tHit, inout MyProceduralHitAttrs hitAt
 	return true;
 }
 
+RWStructuredBuffer<int> resultBuffer;
+
 // In order to kick of tracing we need the properties of a ray
 // query to trace, so we will pipe those in via a constant buffer.
 //
@@ -169,4 +171,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 		myMiss(payload);
 		break;
 	}
+
+    resultBuffer[index] = payload.value;
 }

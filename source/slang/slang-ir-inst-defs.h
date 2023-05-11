@@ -763,6 +763,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
     INST(NoInlineDecoration, noInline, 0, 0)
 
+        // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
+    INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
+
         /// A call to the decorated function should always be folded into its use site.
     INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
 
