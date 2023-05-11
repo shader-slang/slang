@@ -4512,6 +4512,18 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitFuncTypeExpr(FuncTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitTupleTypeExpr(TupleTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitPointerTypeExpr(PointerTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");

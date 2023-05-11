@@ -177,7 +177,7 @@ namespace Slang
             break;
 
         default:
-            SLANG_UNEXPECTED("unimplemented case in mangling");
+            SLANG_UNEXPECTED("unimplemented case in base type mangling");
             break;
         }
     }
@@ -238,9 +238,31 @@ namespace Slang
         {
             emitRaw(context, "E");
         }
+        else if (const auto bottomType = dynamicCast<BottomType>(type))
+        {
+            emitRaw(context, "B");
+        }
+        else if (auto funcType = dynamicCast<FuncType>(type))
+        {
+            emitRaw(context, "F");
+            auto n = funcType->getParamCount();
+            emit(context, n);
+            for(Index i = 0; i < n; ++i)
+                emitType(context, funcType->getParamType(i));
+            emitType(context, funcType->getResultType());
+            emitType(context, funcType->getErrorType());
+        }
+        else if (auto tupleType = dynamicCast<TupleType>(type))
+        {
+            emitRaw(context, "Tu");
+            auto n = tupleType->getMemberCount();
+            emit(context, n);
+            for(Index i = 0; i < n; ++i)
+                emitType(context, tupleType->getMember(i));
+        }
         else
         {
-            SLANG_UNEXPECTED("unimplemented case in mangling");
+            SLANG_UNEXPECTED("unimplemented case in type mangling");
         }
     }
 
@@ -307,7 +329,7 @@ namespace Slang
         }
         else
         {
-            SLANG_UNEXPECTED("unimplemented case in mangling");
+            SLANG_UNEXPECTED("unimplemented case in val mangling");
         }
     }
 

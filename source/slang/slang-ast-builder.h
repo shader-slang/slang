@@ -151,6 +151,25 @@ public:
     /// no need for additional state.
     Dictionary<NodeDesc, NodeBase*> m_cachedNodes;
 
+    template<int N>
+    static void addOrAppendToNodeList(ShortList<NodeOperand, N>&)
+    {}
+
+    template<int N, typename T, typename... Ts>
+    static void addOrAppendToNodeList(ShortList<NodeOperand, N>& list, T t, Ts... ts)
+    {
+        list.add(t);
+        addOrAppendToNodeList(list, ts...);
+    }
+
+    template<int N, typename T, typename... Ts>
+    static void addOrAppendToNodeList(ShortList<NodeOperand, N>& list, const List<T>& l, Ts... ts )
+    {
+        for(auto t : l)
+            list.add(t);
+        addOrAppendToNodeList(list, ts...);
+    }
+
 public:
 
     // For compile time check to see if thing being constructed is an AST type
@@ -174,11 +193,11 @@ public:
     }
 
     template<typename T, typename... TArgs>
-    T* create(TArgs... args)
+    T* create(TArgs&&... args)
     {
         auto alloced = m_arena.allocate(sizeof(T));
         memset(alloced, 0, sizeof(T));
-        return _initAndAdd(new (alloced) T(args...));
+        return _initAndAdd(new (alloced) T(std::forward<TArgs>(args)...));
     }
 
     template<typename T, typename ... TArgs>
@@ -187,7 +206,7 @@ public:
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
         NodeDesc desc;
         desc.type = T::kType;
-        addToList(desc.operands, args...);
+        addOrAppendToNodeList(desc.operands, args...);
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>(args...);
@@ -210,7 +229,7 @@ public:
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
         NodeDesc desc;
         desc.type = T::kType;
-        addToList(desc.operands, args...);
+        addOrAppendToNodeList(desc.operands, args...);
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>();
@@ -366,6 +385,10 @@ public:
     Val* getUNormModifierVal();
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
+
+    Type* getTupleType(List<Type*>& types);
+
+    Type* getFuncType(List<Type*> parameters, Type* result);
 
     TypeType* getTypeType(Type* type);
 

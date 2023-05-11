@@ -4298,16 +4298,25 @@ matrix<T,N,M> WaveMaskReadLaneFirst(WaveMask mask, matrix<T,N,M> expr);
 
 __generic<T : __BuiltinType>
 __target_intrinsic(hlsl, "WaveMatch($1).x")
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupPartitionNV($1).x")
 __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchScalar($0, $1).x")
 WaveMask WaveMaskMatch(WaveMask mask, T value);
 __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl, "WaveMatch($1).x")
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupPartitionNV($1).x")
 __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchMultiple($0, $1)")
 WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl, "WaveMatch($1).x")
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupPartitionNV($1).x")
 __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchMultiple($0, $1)")
 WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value);

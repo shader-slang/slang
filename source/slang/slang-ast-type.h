@@ -664,6 +664,15 @@ class FuncType : public Type
 {
     SLANG_AST_CLASS(FuncType)
 
+    // Construct a unary function
+    FuncType(Type* paramType, Type* resultType, Type* errorType)
+        : paramTypes{{paramType}}, resultType{resultType}, errorType{errorType}
+    {}
+
+    FuncType(List<Type*> parameters, Type* result, Type* error)
+        : paramTypes(std::move(parameters)), resultType(result), errorType(error)
+    {}
+
     // TODO: We may want to preserve parameter names
     // in the list here, just so that we can print
     // out friendly names when printing a function
@@ -680,6 +689,29 @@ class FuncType : public Type
     Type* getErrorType() { return errorType; }
 
     ParameterDirection getParamDirection(Index index);
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+};
+
+// A tuple is a product of its member types
+class TupleType : public Type
+{
+    SLANG_AST_CLASS(TupleType)
+
+    // Construct a unary tupletion
+    TupleType(List<Type*> memberTypes)
+        : memberTypes(std::move(memberTypes))
+    {}
+
+    auto getMemberCount() { return memberTypes.getCount(); } const
+    auto& getMember(Index i) { return memberTypes[i]; }
+
+    List<Type*> memberTypes;
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);

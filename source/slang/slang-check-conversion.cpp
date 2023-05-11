@@ -951,13 +951,13 @@ namespace Slang
         overloadContext.disallowNestedConversions = true;
         overloadContext.argCount = 1;
         overloadContext.argTypes = &fromType;
+        overloadContext.args = &fromExpr;
 
         overloadContext.originalExpr = nullptr;
         if(fromExpr)
         {
             overloadContext.loc = fromExpr->loc;
             overloadContext.funcLoc = fromExpr->loc;
-            overloadContext.args = &fromExpr;
         }
 
         overloadContext.baseExpr = nullptr;

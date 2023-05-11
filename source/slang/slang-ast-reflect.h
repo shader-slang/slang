@@ -13,7 +13,7 @@
     NAME() = default; \
     public:     \
     typedef NAME This; \
-    static const ASTNodeType kType = ASTNodeType::NAME; \
+    static constexpr ASTNodeType kType = ASTNodeType::NAME; \
     static const ReflectClassInfo kReflectClassInfo;  \
     SLANG_FORCE_INLINE static bool isDerivedFrom(ASTNodeType type) { return int(type) >= int(kType) && int(type) <= int(ASTNodeType::LAST); } \
     SLANG_CLASS_REFLECT_SUPER_##TYPE(SUPER) \

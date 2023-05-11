@@ -411,6 +411,24 @@ public:
         return dispatchIfNotNull(expr->originalExpr);
     }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
+    bool visitFuncTypeExpr(FuncTypeExpr* expr)
+    {
+        for(const auto& t : expr->parameters)
+        {
+            if(!dispatchIfNotNull(t.exp))
+                return false;
+        }
+        return dispatchIfNotNull(expr->result.exp);
+    }
+    bool visitTupleTypeExpr(TupleTypeExpr* expr)
+    {
+        for(auto t : expr->members)
+        {
+            if(dispatchIfNotNull(t.exp))
+                return true;
+        }
+        return false;
+    }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
     bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {
