@@ -1,5 +1,4 @@
 //TEST:SIMPLE:
-//TEST:SIMPLE:
 
 func x<A, B>(f : functype (A) -> B)
 { }

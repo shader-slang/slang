@@ -412,6 +412,8 @@ namespace Slang
 
             if (context.mode == OverloadResolveContext::Mode::JustTrying)
             {
+                SLANG_ASSERT(argType);
+
                 ConversionCost cost = kConversionCost_None;
                 if( context.disallowNestedConversions )
                 {
@@ -1700,6 +1702,16 @@ namespace Slang
         {
             if (IsErrorExpr(arg))
                 return CreateErrorExpr(expr);
+
+            // If this argument is itself an overloaded value without a type
+            // then we can't sensibly continue
+            if(!arg->type && (as<OverloadedExpr>(arg) || as<OverloadedExpr2>(arg)))
+            {
+                getSink()->diagnose(
+                    expr->loc,
+                    Diagnostics::overloadedParameterToHigherOrderFunction);
+                return CreateErrorExpr(expr);
+            }
         }
 
         for (auto& arg : expr->arguments)

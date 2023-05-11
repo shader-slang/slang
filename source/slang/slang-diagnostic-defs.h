@@ -480,6 +480,8 @@ DIAGNOSTIC(39999, Warning, floatLiteralTooSmall, "'$1' is smaller than the small
 
 DIAGNOSTIC(39999, Error, unableToFindSymbolInModule, "unable to find the mangled symbol '$0' in module '$1'")
 
+DIAGNOSTIC(39999, Error, overloadedParameterToHigherOrderFunction, "passing overloaded functions to higher order functions is not supported")
+
 // 38xxx 
 
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
