@@ -50,7 +50,7 @@ struct PeepholeContext : InstPassBase
                 return false;
 
             isAccessChainEqual = true;
-            for (UInt i = 0; i < (UInt)updateInst->getAccessKeyCount(); i++)
+            for (UInt i = 0; i < updateInst->getAccessKeyCount(); i++)
             {
                 if (updateInst->getAccessKey(i) != chainKey[i])
                 {
