@@ -4,12 +4,12 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-func twice<A>(f : A -> A, a : A) -> A
+func twice<A>(f : functype (A) -> A, a : A) -> A
 {
     return f(f(a));
 }
 
-func apply2<A, B, C>(f : (A, B) -> C, a : A, b : B) -> C
+func apply2<A, B, C>(f : functype (A, B) -> C, a : A, b : B) -> C
 {
     return f(a, b);
 }

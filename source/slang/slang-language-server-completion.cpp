@@ -22,7 +22,8 @@ static const char* kDeclKeywords[] = {
     "class",     "struct",         "interface", "public",    "private", "internal",
     "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
     "extension", "associatedtype", "namespace", "This",    "using",
-    "__generic", "__exported",     "import",    "enum",      "cbuffer",   "tbuffer",   "func"};
+    "__generic", "__exported",     "import",    "enum",      "cbuffer",   "tbuffer",   "func",
+    "functype"};
 static const char* kStmtKeywords[] = {
     "if",        "else",           "switch",    "case",      "default", "return",
     "try",       "throw",          "throws",    "catch",     "while",   "for",
@@ -33,7 +34,7 @@ static const char* kStmtKeywords[] = {
     "extension", "associatedtype", "this",      "namespace", "This",    "using",
     "__generic", "__exported",     "import",    "enum",      "break",   "continue",
     "discard",   "defer",          "cbuffer",   "tbuffer",   "func",    "is",
-    "as",        "nullptr",        "none",      "true",      "false"};
+    "as",        "nullptr",        "none",      "true",      "false",   "functype"};
 
 static const char* hlslSemanticNames[] = {
     "register",

@@ -2243,6 +2243,8 @@ namespace Slang
         return parseThisTypeExpr(parser);
     }
 
+    // (a,b,c) style tuples, curently unused
+#if 0
     static Expr* parseTupleTypeExpr(Parser* parser)
     {
         parser->ReadToken(TokenType::LParent);
@@ -2254,6 +2256,23 @@ namespace Slang
                 break;
             parser->ReadToken(TokenType::Comma);
         }
+        return expr;
+    }
+#endif
+
+    static Expr* parseFuncTypeExpr(Parser* parser)
+    {
+        parser->ReadToken(TokenType::LParent);
+        auto expr = parser->astBuilder->create<FuncTypeExpr>();
+        while(!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
+        {
+            expr->parameters.add(parser->ParseTypeExp());
+            if(AdvanceIf(parser, TokenType::RParent))
+                break;
+            parser->ReadToken(TokenType::Comma);
+        }
+        parser->ReadToken(TokenType::RightArrow);
+        expr->result = parser->ParseTypeExp();
         return expr;
     }
 
@@ -2452,9 +2471,15 @@ namespace Slang
             typeSpec.expr = parseThisTypeExpr(parser);
             return typeSpec;
         }
-        else if(parser->LookAheadToken(TokenType::LParent))
+        // Uncomment should we decide to enable (a,b,c) tuple types
+        // else if(parser->LookAheadToken(TokenType::LParent))
+        // {
+        //     typeSpec.expr = parseTupleTypeExpr(parser);
+        //     return typeSpec;
+        // }
+        else if(AdvanceIf(parser, "functype"))
         {
-            typeSpec.expr = parseTupleTypeExpr(parser);
+            typeSpec.expr = parseFuncTypeExpr(parser);
             return typeSpec;
         }
 
@@ -4859,30 +4884,6 @@ namespace Slang
                 andExpr->left = TypeExp(leftExpr);
                 andExpr->right = TypeExp(rightExpr);
                 leftExpr = andExpr;
-            }
-            else if(AdvanceIf(parser, TokenType::RightArrow))
-            {
-                // TODO(Ellie): Although conjunction types and function types
-                // can't be used together, we could probably do better re
-                // parsing precedence, this is quite ad-hoc just jamming this
-                // branch in here.
-
-                auto rightExpr = _parseInfixTypeExpr(parser);
-
-                auto funcExpr = parser->astBuilder->create<FuncTypeExpr>();
-                funcExpr->loc = loc;
-
-
-                // If we parsed this as a tuple type, i.e. one in parentheses,
-                // then treat each tuple element type as a parameter type,
-                // otherwise make this a unary function.
-                if(auto tup = as<TupleTypeExpr>(leftExpr))
-                    funcExpr->parameters = tup->members;
-                else
-                    funcExpr->parameters.add(TypeExp(leftExpr));
-
-                funcExpr->result = TypeExp(rightExpr);
-                leftExpr = funcExpr;
             }
             else
             {
