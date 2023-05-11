@@ -6968,20 +6968,64 @@ uint3 cudaBlockDim();
 //      c1c2 is a function which calls c1(s, u1) and then c2(s, u2);
 //      f1f2 is a function which calls f1(s, u1) and then f2(s, u2);
 //
+// When the input differs, calls are fused
+//      saturated_cooperation(c1, f1, s1, u1);
+//      saturated_cooperation(c2, f2, s2, u2);
+// will be transformed to:
+//      saturated_cooperation(c1c2, f1f2, s1s2, u1u2);
+// where
+//      s1s2 is a tuple of s1 and s2
+//      c1c2 is a function which calls c1(s1, u1) and then c2(s2, u2);
+//      f1f2 is a function which calls f1(s1, u1) and then f2(s2, u2);
+// Note that in this case, we will make a call to c1c2 for every unique pair
+// s1s2 across all lanes
+//
 // (This fusion takes place in the fuse-satcoop pass, and as such any changes to
 // the signature or behavior of this function should be adjusted for there).
 //
 func saturated_cooperation<A : __BuiltinType, B, C>(
-    cooperate : (A, B) -> C,
-    fallback : (A, B) -> C,
+    cooperate : functype (A, B) -> C,
+    fallback : functype (A, B) -> C,
     A input,
-    B otherArgs)
+    B otherArg)
+    -> C
+{
+    return saturated_cooperation_using(cooperate, fallback, __WaveMatchBuitin<A>, __WaveReadLaneAtBuiltin<A>, input, otherArg);
+}
+
+// These two functions are a temporary (circa May 2023) workaround to the fact
+// that we can't deduce which overload to pass to saturated_cooperation_using
+// in the call above
+[__unsafeForceInlineEarly]
+func __WaveMatchBuitin<T : __BuiltinType>(T t) -> uint4
+{
+    return WaveMatch(t);
+}
+[__unsafeForceInlineEarly]
+func __WaveReadLaneAtBuiltin<T : __BuiltinType>(T t, int i) -> T
+{
+    return WaveReadLaneAt(t, i);
+}
+
+//
+// saturated_cooperation, but you're able to specify manually the functions:
+//
+// waveMatch: a function to return a mask of lanes with the same input as this one
+// broadcast: a function which returns the value passed into it on the specified lane
+//
+func saturated_cooperation_using<A, B, C>(
+    cooperate : functype (A, B) -> C,
+    fallback : functype (A, B) -> C,
+    waveMatch : functype (A) -> uint4,
+    broadcast : functype (A, int) -> A,
+    A input,
+    B otherArg)
     -> C
 {
     const bool isWaveSaturated = WaveActiveCountBits(true) == WaveGetLaneCount();
     if(isWaveSaturated)
     {
-        let lanesWithSameInput = WaveMatch(input).x;
+        let lanesWithSameInput = waveMatch(input).x;
         // Keep least significant lane in our set
         let ourRepresentative = lanesWithSameInput & -lanesWithSameInput;
         // The representative lanes for all lanes
@@ -6995,11 +7039,11 @@ func saturated_cooperation<A : __BuiltinType, B, C>(
         {
             // Broadcast input across warp.
             let laneIdx = firstbitlow(allRepresentatives);
-            let uniformInput = WaveReadLaneAt(input, int(laneIdx));
+            let uniformInput = broadcast(input, int(laneIdx));
 
             // All lanes perform some cooperative computation with dynamic
             // uniform input
-            C c = cooperate(uniformInput, otherArgs);
+            C c = cooperate(uniformInput, otherArg);
 
             // Update our return value until it
             if(bool(allRepresentatives & ourRepresentative))
@@ -7013,6 +7057,6 @@ func saturated_cooperation<A : __BuiltinType, B, C>(
     }
     else
     {
-        return fallback(input, otherArgs);
+        return fallback(input, otherArg);
     }
 }

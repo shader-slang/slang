@@ -1,5 +1,6 @@
 #include "slang-ir-fuse-satcoop.h"
 
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-ssa-simplification.h"
@@ -26,19 +27,6 @@ static void overAllBlocks(IRModule* module, F f)
             }
         }
     }
-}
-
-// Given a specialize call, replace the first parameters with the given ones
-static IRInst* respecialize(IRBuilder& builder, IRSpecialize* spec, List<IRInst*> newArgs)
-{
-    SLANG_ASSERT(Index(spec->getArgCount()) >= newArgs.getCount());
-
-    const auto generic = spec->getBase();
-
-    // Copy over any witness tables
-    for(UInt i = newArgs.getCount(); i < spec->getArgCount(); ++i)
-        newArgs.add(spec->getArg(i));
-    return builder.emitSpecializeInst(builder.getTypeKind(), generic, newArgs);
 }
 
 static bool uses(IRInst* used, IRInst* user)
@@ -127,21 +115,22 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
     return g;
 }
 
-// bifanout(f, g)(x, (a, b)) = (f(x, a), g(x, b))
+// bifanout(f, g)((x, y), (a, b)) = (f(x, a), g(y, b))
 //
-// Make a function `bifanout` which applies one function after another to the
-// same input, while also distributing a pair of distinct inputs amongst the
-// functions
+// Make a function `bifanout` which applies two functions to their respective
+// elements in two pairs. Optionally the first and second inputs can be shared
+// instead of split in a tuple.
 //
 // The outputs are returned in a 2-tuple
-static IRFunc* makeBiFanout(IRBuilder& builder, IRFunc* f, IRFunc* g)
+static IRFunc* makeBiFanout(IRBuilder& builder, IRFunc* f, IRFunc* g, bool shareFirst, bool shareSecond)
 {
     SLANG_ASSERT(f->getParamCount() == 2);
     SLANG_ASSERT(g->getParamCount() == f->getParamCount());
-    SLANG_ASSERT(f->getParamType(0) == g->getParamType(0));
+    SLANG_ASSERT(!shareFirst || f->getParamType(0) == g->getParamType(0));
+    SLANG_ASSERT(!shareSecond || f->getParamType(1) == g->getParamType(1));
     IRBuilderInsertLocScope insertLocScope(&builder);
 
-    // Create
+    // Create (using shareFirst = false, shareSecond = true as an example)
     // func myFunc(s : S, u : (U1,U2)) -> (R1, R2)
     // {
     //     let fRes = f(s, u.fst);
@@ -151,83 +140,122 @@ static IRFunc* makeBiFanout(IRBuilder& builder, IRFunc* f, IRFunc* g)
 
     // The return type is the tuple of f and g's return types
     auto resType = builder.getTupleType(f->getResultType(), g->getResultType());
-    auto sharedInputType = f->getParamType(0);
-    // likewise, the distinct input type is the product of this input to the two functions
-    auto unsharedInputType = builder.getTupleType(f->getParamType(1), g->getParamType(1));
+    auto firstInputType = shareFirst
+        ? f->getParamType(0)
+        : builder.getTupleType(f->getParamType(0), g->getParamType(0));
+    auto secondInputType = shareSecond
+        ? f->getParamType(1)
+        : builder.getTupleType(f->getParamType(1), g->getParamType(1));
 
     // Set up our function
     // func myFunc(s : S, u : (U1,U2)) -> (R1, R2)
     auto func = builder.createFunc();
     builder.addDecoration(func, kIROp_ForceInlineDecoration);
-    builder.setDataType(func, builder.getFuncType({sharedInputType, unsharedInputType}, resType));
+    builder.setDataType(func, builder.getFuncType({firstInputType, secondInputType}, resType));
     builder.setInsertInto(func);
     auto b = builder.emitBlock();
     builder.setInsertInto(b);
-    auto s = builder.emitParam(sharedInputType);
-    auto u = builder.emitParam(unsharedInputType);
+
+    auto s = builder.emitParam(firstInputType);
+    auto s1 = shareFirst ? s : builder.emitGetTupleElement(f->getParamType(0), s, 0);
+    auto s2 = shareFirst ? s : builder.emitGetTupleElement(g->getParamType(0), s, 1);
+
+    auto u = builder.emitParam(secondInputType);
+    auto u1 = shareSecond ? u : builder.emitGetTupleElement(f->getParamType(1), u, 0);
+    auto u2 = shareSecond ? u : builder.emitGetTupleElement(g->getParamType(1), u, 1);
 
     //     let fRes = f(s, u.fst);
-    auto fRes = builder.emitCallInst(f->getResultType(), f, {s, builder.emitGetTupleElement(f->getParamType(1), u, 0)});
+    auto fRes = builder.emitCallInst(f->getResultType(), f, {s1, u1});
     //     let gRes = g(s, u.snd);
-    auto gRes = builder.emitCallInst(g->getResultType(), g, {s, builder.emitGetTupleElement(g->getParamType(1), u, 1)});
+    auto gRes = builder.emitCallInst(g->getResultType(), g, {s2, u2});
     //     return (fRes, gRes);
     builder.emitReturn(builder.emitMakeTuple(fRes, gRes));
     return func;
 }
 
-// fanout(f, g)(x, a) = (f(x, a), g(x, a))
-// or: fanout f g = f &&& g
-// 
-// (We distinguish functions taking two arguments from functions taking one
-// 2-tuple argument, hence the expansion of (x,a) above)
-//
-// This is very similar to above, except that f and g have the same second
-// parameter.
-static IRFunc* makeFanout(
-    IRBuilder& builder,
-    IRFunc* f, 
-    IRFunc* g)
+// Given f : a -> uint4, g : b -> uint4, return z : (a, b) -> uint4 using
+// bitwise and to combine the outputs
+static IRFunc* makeWaveMatchBoth(IRBuilder& builder, IRType* inputTypeF, IRType* inputTypeG, IRInst* f, IRInst* g)
 {
-    SLANG_ASSERT(f->getParamCount() == 2);
-    SLANG_ASSERT(g->getParamCount() == f->getParamCount());
-    for(UInt i = 0; i < f->getParamCount(); ++i)
-        SLANG_ASSERT(f->getParamType(i) == g->getParamType(i));
+    // SLANG_ASSERT(f->getParamCount() == 1);
+    // SLANG_ASSERT(g->getParamCount() == f->getParamCount());
+    auto uint4Type = builder.getVectorType(builder.getUIntType(), 4);
+    // SLANG_ASSERT(f->getResultType() == uint4Type);
+    // SLANG_ASSERT(g->getResultType() == f->getResultType());
     IRBuilderInsertLocScope insertLocScope(&builder);
 
-    // Create
-    // func myFunc(s : S, u : U) -> (R1, R2)
+    // Create (using shareFirst = false, shareSecond = true as an example)
+    // func myFunc(x : (A,B)) -> uint4
     // {
-    //     let fRes = f(s, u);
-    //     let gRes = g(s, u);
+    //     let fRes = f(x.fst);
+    //     let gRes = g(x.snd);
+    //     return fRes & gRes;
+    // }
+
+    auto inputTypeFG = builder.getTupleType(inputTypeF, inputTypeG);
+    auto resType = uint4Type;
+
+    auto func = builder.createFunc();
+    builder.addDecoration(func, kIROp_ForceInlineDecoration);
+    builder.setDataType(func, builder.getFuncType({inputTypeFG}, resType));
+    builder.setInsertInto(func);
+    auto b = builder.emitBlock();
+    builder.setInsertInto(b);
+
+    auto x = builder.emitParam(inputTypeFG);
+    auto x1 = builder.emitGetTupleElement(inputTypeF, x, 0);
+    auto x2 = builder.emitGetTupleElement(inputTypeG, x, 1);
+
+    auto b1 = builder.emitCallInst(uint4Type, f, {x1});
+    auto b2 = builder.emitCallInst(uint4Type, g, {x2});
+    auto r = builder.emitBitAnd(uint4Type, b1, b2);
+
+    builder.emitReturn(r);
+    return func;
+}
+
+// Similar to above
+static IRFunc* makeBroadcastBoth(IRBuilder& builder, IRType* inputTypeF, IRType* inputTypeG, IRInst* f, IRInst* g)
+{
+    // SLANG_ASSERT(f->getParamCount() == 2);
+    // SLANG_ASSERT(g->getParamCount() == f->getParamCount());
+    auto intType = builder.getIntType();
+    // SLANG_ASSERT(f->getParamType(1) == intType);
+    // SLANG_ASSERT(g->getParamType(1) == f->getParamType(1));
+    IRBuilderInsertLocScope insertLocScope(&builder);
+
+    // Create (using shareFirst = false, shareSecond = true as an example)
+    // func myFunc(x : (A,B), i : int) -> (A, B)
+    // {
+    //     let fRes = f(x.fst, i);
+    //     let gRes = g(x.snd, i);
     //     return (fRes, gRes);
     // }
 
-    // We still return the results of both f and g in a tuple
-    auto resType = builder.getTupleType(f->getResultType(), g->getResultType());
-    auto sharedInputType = f->getParamType(0);
-    // Differing from above, it's the same type for f and g
-    auto unsharedInputType = f->getParamType(1);
+    auto inputTypeFG = builder.getTupleType(inputTypeF, inputTypeG);
+    auto resType = inputTypeFG;
 
-    // Set up our function
-    // func myFunc(s : S, u : U) -> (R1, R2)
     auto func = builder.createFunc();
     builder.addDecoration(func, kIROp_ForceInlineDecoration);
-    builder.setDataType(func, builder.getFuncType({sharedInputType, unsharedInputType}, resType));
+    builder.setDataType(func, builder.getFuncType({inputTypeFG, intType}, resType));
     builder.setInsertInto(func);
     auto b = builder.emitBlock();
     builder.setInsertInto(b);
-    auto s = builder.emitParam(sharedInputType);
-    auto u = builder.emitParam(unsharedInputType);
 
-    //     let fRes = f(s, u);
-    auto fRes = builder.emitCallInst(f->getResultType(), f, {s, u});
-    //     let gRes = g(s, u);
-    auto gRes = builder.emitCallInst(g->getResultType(), g, {s, u});
-    //     return (fRes, gRes);
-    builder.emitReturn(builder.emitMakeTuple(fRes, gRes));
+    auto x = builder.emitParam(inputTypeFG);
+    auto i = builder.emitParam(intType);
+    auto x1 = builder.emitGetTupleElement(inputTypeF, x, 0);
+    auto x2 = builder.emitGetTupleElement(inputTypeG, x, 1);
+
+    auto b1 = builder.emitCallInst(inputTypeF, f, {x1, i});
+    auto b2 = builder.emitCallInst(inputTypeG, g, {x2, i});
+    auto r = builder.emitMakeTuple(b1, b2);
+
+    builder.emitReturn(r);
     return func;
 }
 
+// All the information on a call to saturated_cooperation_using
 struct SatCoopCall
 {
     // The definition in hlsl.slang
@@ -246,6 +274,11 @@ struct SatCoopCall
     // The function arguments to the call
     IRFunc* cooperate;
     IRFunc* fallback;
+
+    // The inter-lane communication functions
+    // TODO: call specializeGeneric on these and extract the IRFunc
+    IRInst* waveMatch;
+    IRInst* broadcast;
 
     // The values to pass to these functions
     IRInst* sharedInput;
@@ -270,27 +303,32 @@ static SatCoopCall getSatCoopCall(IRCall* f)
     SLANG_ASSERT(ret.distinctInputType);
     SLANG_ASSERT(ret.retType);
     
-    SLANG_ASSERT(f->getArgCount() == 4);
+    SLANG_ASSERT(f->getArgCount() == 6);
     ret.cooperate = as<IRFunc>(f->getArg(0));
     ret.fallback = as<IRFunc>(f->getArg(1));
     SLANG_ASSERT(ret.cooperate);
     SLANG_ASSERT(ret.fallback);
 
-    ret.sharedInput = f->getArg(2);
-    ret.distinctInput = f->getArg(3);
+    ret.waveMatch = f->getArg(2);
+    ret.broadcast = f->getArg(3);
+    SLANG_ASSERT(ret.waveMatch);
+    SLANG_ASSERT(ret.broadcast);
+
+    ret.sharedInput = f->getArg(4);
+    ret.distinctInput = f->getArg(5);
     SLANG_ASSERT(ret.sharedInput->getDataType() == ret.sharedInputType);
     SLANG_ASSERT(ret.distinctInput->getDataType() == ret.distinctInputType);
     return ret;
 }
 
 // transform:
-//     a = sat_coop(c1, f1, s, u1); // f
+//     a = sat_coop(c1, f1, s1, u1); // f
 //     p;
 //     q;
-//     b = sat_coop(c2, f2, s, u2); // g
+//     b = sat_coop(c2, f2, s2, u2); // g
 // to:
 //     p;
-//     (a,b) = sat_coop(c1 &&& c2, f1 &&& f2, s, (u1, u2));
+//     (a,b) = sat_coop(c1 &&& c2, f1 &&& f2, (s1, s2), (u1, u2));
 //     q;
 //
 // Removes the first two calls, and returns the second one if creation was
@@ -305,6 +343,9 @@ static SatCoopCall getSatCoopCall(IRCall* f)
 // the second call to sat_coop depends on q
 static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
 {
+    // TODO: Make sure that the types in here are concrete, use
+    // `isGenericParam`
+
     IRBuilderInsertLocScope insertLocScope(&builder);
 
     SatCoopCall callF = getSatCoopCall(f);
@@ -312,10 +353,6 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
     // If these aren't referencing the same generic, then something has gone
     // wrong in our assumptions.
     SLANG_ASSERT(callF.generic == callG.generic);
-
-    // If these don't use the same shared input then we can't fuse them
-    if(callF.sharedInput != callG.sharedInput)
-        return nullptr;
 
     // If g uses the result of f, we can't fuse them with this logic (we could
     // however with a replacement for 'fanout') 
@@ -333,34 +370,57 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
     bool usesSameDistinctInput = callF.distinctInput == callG.distinctInput;
     SLANG_ASSERT(!usesSameDistinctInput || callF.distinctInputType == callG.distinctInputType);
 
-    // Generate a new specialization of our saturated_cooperation function,
+    // Similarly for the shared input: if these use the same shared input then
+    // the fusing is simpler (no need to make a product of s1 and s2)
+    // TODO: if there is an injection from s1 to s2, then we can avoid the WaveMatch on s2
+    const bool usesSameSharedInput =
+        callF.sharedInput == callG.sharedInput &&
+        callF.waveMatch == callG.waveMatch &&
+        callF.broadcast == callG.broadcast;
+    SLANG_ASSERT(!usesSameSharedInput || callF.sharedInputType == callG.sharedInputType);
+
+    // Generate a new specialization of our saturated_cooperation_using function,
     // reflecting the new input and output types. 
-    // Make sure that any additional specialization arguments are identical,
-    // which according to the definition of saturated_cooperation when this
-    // fuse pass was written must be true.
-    for(UInt i = 3; i < callF.specialize->getArgCount(); ++i)
-        SLANG_ASSERT(callF.specialize->getArg(i) == callG.specialize->getArg(i));
     const auto newRetType = builder.getTupleType(callF.retType, callG.retType);
+    const auto sharedInputType = usesSameSharedInput
+        ? callF.sharedInputType
+        : builder.getTupleType(callF.sharedInputType, callG.sharedInputType);
     const auto distinctInputType = usesSameDistinctInput 
         ? callF.distinctInputType 
         : builder.getTupleType(callF.distinctInputType, callG.distinctInputType);
-    const auto newSpec = respecialize(builder, callF.specialize, {
-        callF.sharedInputType,
-        distinctInputType,
-        newRetType
-    });
+
+    // Make sure there are no other generic parameters which are are failing to
+    // take care of here.
+    SLANG_ASSERT(callF.specialize->getArgCount() == 3);
+    SLANG_ASSERT(callG.specialize->getArgCount() == 3);
+
+    // Specialize our new call
+    const auto newSpec = builder.emitSpecializeInst(
+        builder.getTypeKind(),
+        callF.generic,
+        {sharedInputType, distinctInputType, newRetType});
 
     // Make our new functions, and joined inputs
-    const auto fanout = usesSameDistinctInput ? makeFanout : makeBiFanout;
-    const auto newCooperate = fanout(builder, callF.cooperate, callG.cooperate);
-    const auto newFallback = fanout(builder, callF.fallback, callG.fallback);
-    const auto newSharedInput = callF.sharedInput;
+    const auto newCooperate = makeBiFanout(builder, callF.cooperate, callG.cooperate, usesSameSharedInput, usesSameDistinctInput);
+    const auto newFallback = makeBiFanout(builder, callF.fallback, callG.fallback, usesSameSharedInput, usesSameDistinctInput);
+    const auto newWaveMatch = usesSameSharedInput
+        ? callF.waveMatch
+        : makeWaveMatchBoth(builder, callF.sharedInputType, callG.sharedInputType, callF.waveMatch, callG.waveMatch);
+    const auto newBroadcast = usesSameSharedInput
+        ? callF.broadcast
+        : makeBroadcastBoth(builder, callF.sharedInputType, callG.sharedInputType, callF.broadcast, callG.broadcast);
+    const auto newSharedInput = usesSameSharedInput
+        ? callF.sharedInput
+        : builder.emitMakeTuple(callF.sharedInput, callG.sharedInput);
     const auto newDistinctInput = usesSameDistinctInput 
         ? callF.distinctInput 
         : builder.emitMakeTuple(callF.distinctInput, callG.distinctInput);
 
     // Call it and extract the results from f and g
-    const auto res = builder.emitCallInst(newRetType, newSpec, {newCooperate, newFallback, newSharedInput, newDistinctInput});
+    const auto res = builder.emitCallInst(
+        newRetType,
+        newSpec,
+        {newCooperate, newFallback, newWaveMatch, newBroadcast, newSharedInput, newDistinctInput});
     const auto resF = builder.emitGetTupleElement(callF.retType, res, 0);
     const auto resG = builder.emitGetTupleElement(callG.retType, res, 1);
     f->replaceUsesWith(resF);
@@ -374,24 +434,44 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
 //
 // Identify calls which we can fuse
 //
-bool isSatCoopCall(IRCall* call)
+IRCall* isCallNamed(const char* n, IRInst* i)
 {
+    auto call = as<IRCall>(i);
+    if(!call)
+        return nullptr;
     // saturated_cooperation is a generic function, so look for specializations thereof
     auto spec = as<IRSpecialize>(call->getCallee());
     if(!spec)
-        return false;
+        return nullptr;
     auto func = findSpecializeReturnVal(spec);
     if(!func)
-        return false;
+        return nullptr;
 
     // TODO: Is there nothing better for finding a specific declaration in
     // core.slang?
     auto h = func->findDecoration<IRNameHintDecoration>();
-    return h->getName() == "saturated_cooperation";
+    if(h->getName() != n)
+        return nullptr;
+    return call;
 }
 
 static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
 {
+    // first, inline calls to saturated_cooperation to expose
+    // saturated_cooperation_using which is simpler to fuse.
+    // It is simpler to fuse because it makes explicit the inter-lane
+    // communication functions, which we can use as buiding blocks in our
+    // composition.
+
+    List<IRCall*> toInline;
+    for (auto inst : block->getChildren())
+    {
+        if(auto sat_coop = isCallNamed("saturated_cooperation", inst))
+            toInline.add(sat_coop);
+    }
+    for(auto c : toInline)
+        inlineCall(c);
+
     // Walk over the instructions in this block
     // If we see a call to sat_coop then remember where it is and keep
     // walking, if we reach another call without first encountering any
@@ -401,27 +481,24 @@ static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
     IRCall* lastCall = nullptr;
     for(auto inst = block->getFirstInst(); inst != block->getTerminator(); inst = inst->getNextInst())
     {
-        if (auto call = as<IRCall>(inst))
+        if(auto call = isCallNamed("saturated_cooperation_using", inst))
         {
-            if(isSatCoopCall(call))
+            if(lastCall)
             {
-                if(lastCall)
+                auto fused = tryFuseCalls(builder, lastCall, call);
+                if(fused)
                 {
-                    auto fused = tryFuseCalls(builder, lastCall, call);
-                    if(fused)
-                    {
-                        inst = fused;
-                        lastCall = fused;
-                    }
-                    else
-                    {
-                        lastCall = call;
-                    }
+                    inst = fused;
+                    lastCall = fused;
                 }
-                else 
+                else
                 {
                     lastCall = call;
                 }
+            }
+            else
+            {
+                lastCall = call;
             }
         }
     }
