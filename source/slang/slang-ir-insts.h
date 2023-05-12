@@ -4072,7 +4072,7 @@ public:
         addDecoration(value, d, maxCount);
     }
 
-    void addKnownBuiltinDeclration(IRInst* value, UnownedStringSlice const& name)
+    void addKnownBuiltinDecoration(IRInst* value, UnownedStringSlice const& name)
     {
         addDecoration(value, kIROp_KnownBuiltinDecoration, getStringValue(name));
     }

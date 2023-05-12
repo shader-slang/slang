@@ -1273,8 +1273,7 @@ static void addLinkageDecoration(
         }
         else if (as<KnownBuiltinAttribute>(modifier))
         {
-            builder->addKnownBuiltinDeclration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addPublicDecoration(inst);
+            builder->addKnownBuiltinDecoration(inst, decl->getName()->text.getUnownedSlice());
         }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
