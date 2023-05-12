@@ -1454,6 +1454,7 @@ namespace Slang
             // We could probably be broader than just parameters here
             // eventually.
             // Limit it for now though to make the specialization easier
+            // TODO: why can't this use DeclCheckState::CanUseFuncSignature
             ensureDecl(localDeclRef, DeclCheckState::TypesFullyResolved);
             const auto type = localDeclRef.getDecl()->getType();
             // We can only add overload candidates if this is known to be a function
