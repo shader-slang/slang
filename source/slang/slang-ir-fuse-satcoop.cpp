@@ -443,11 +443,11 @@ IRCall* isKnownFunction(const char* n, IRInst* i)
     auto spec = as<IRSpecialize>(call->getCallee());
     if(!spec)
         return nullptr;
-    auto func = findSpecializeReturnVal(spec);
-    if(!func)
+    auto generic = findSpecializedGeneric(spec);
+    if(!generic)
         return nullptr;
 
-    auto h = func->findDecoration<IRKnownBuiltinDecoration>();
+    auto h = generic->findDecoration<IRKnownBuiltinDecoration>();
     if(!h || h->getName() != n)
         return nullptr;
     return call;
