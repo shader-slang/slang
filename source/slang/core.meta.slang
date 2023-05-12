@@ -3160,3 +3160,6 @@ attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [KnownBuiltin(name : String)] : KnownBuiltinAttribute;

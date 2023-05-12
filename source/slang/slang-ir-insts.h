@@ -541,6 +541,18 @@ struct IRTorchEntryPointDecoration : IRDecoration
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
+struct IRKnownBuiltinDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_KnownBuiltinDecoration
+    };
+    IR_LEAF_ISA(KnownBuiltinDecoration)
+
+    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
+};
+
 struct IRFormatDecoration : IRDecoration
 {
     enum { kOp = kIROp_FormatDecoration };
@@ -3016,6 +3028,14 @@ public:
         UInt            argCount,
         IRInst* const*  args);
 
+    IRInst* emitSpecializeInst(
+        IRType*         type,
+        IRInst*         genericVal,
+        const List<IRInst*>& args)
+    {
+        return emitSpecializeInst(type, genericVal, args.getCount(), args.begin());
+    }
+
     IRInst* emitLookupInterfaceMethodInst(
         IRType* type,
         IRInst* witnessTableVal,
@@ -3029,13 +3049,13 @@ public:
 
     IRInst* emitUnpackAnyValue(IRType* type, IRInst* value);
 
-    IRInst* emitCallInst(
+    IRCall* emitCallInst(
         IRType*         type,
         IRInst*         func,
         UInt            argCount,
         IRInst* const*  args);
 
-    IRInst* emitCallInst(
+    IRCall* emitCallInst(
         IRType*                 type,
         IRInst*                 func,
         List<IRInst*> const&    args)
@@ -4050,6 +4070,11 @@ public:
         SLANG_ASSERT(IRMeshOutputDecoration::isaImpl(d));
         // TODO: Ellie, correct int type here?
         addDecoration(value, d, maxCount);
+    }
+
+    void addKnownBuiltinDecoration(IRInst* value, UnownedStringSlice const& name)
+    {
+        addDecoration(value, kIROp_KnownBuiltinDecoration, getStringValue(name));
     }
 };
 

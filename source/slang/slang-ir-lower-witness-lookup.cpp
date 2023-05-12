@@ -284,7 +284,7 @@ struct WitnessLookupLoweringContext
                     callReturnType = dispatchFuncType->getResultType();
                 }
                 
-                auto call = builder.emitCallInst(
+                IRInst* ret = builder.emitCallInst(
                     callReturnType,
                     entry,
                     (UInt)args.getCount(),
@@ -292,9 +292,9 @@ struct WitnessLookupLoweringContext
                 // If result type is an associated type, we need to pack it into an anyValue.
                 if (as<IRAssociatedType>(dispatchFuncType->getResultType()))
                 {
-                    call = builder.emitPackAnyValue(dispatchFuncType->getResultType(), call);
+                    ret = builder.emitPackAnyValue(dispatchFuncType->getResultType(), ret);
                 }
-                builder.emitReturn(call);
+                builder.emitReturn(ret);
             }
             builder.setInsertInto(firstBlock);
             if (witnessTables.getCount() == 1)

@@ -385,6 +385,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-explicit-global-context.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-explicit-global-init.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-extract-value-from-type.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-fuse-satcoop.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-generics-lowering-context.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-glsl-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-glsl-liveness.h" />
@@ -584,6 +585,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-explicit-global-context.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-explicit-global-init.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-extract-value-from-type.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-fuse-satcoop.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-generics-lowering-context.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-glsl-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-glsl-liveness.cpp" />
