@@ -1,5 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX():-dx12 -profile sm_6_5 -use-dxil -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile cs_6_5 -entry computeMain -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK):-target glsl -profile cs_6_5 -entry computeMain -line-directive-mode none
 
 //
 // This test checks that we fuse calls to saturated cooperation, even with different input values
@@ -16,7 +18,7 @@ int coopAdd(float x, int i)
     return int(x) * 2;
 }
 
-int fallback(float x, int)
+int fallback1(float x, int)
 {
     count = -1;
     return -1;
@@ -59,13 +61,25 @@ void computeMain(uint tig : SV_GroupIndex)
     let i = tig < 4 ? float(outputBuffer[tig]) : 0;
     let j = i + 1;
     let k = j + 1;
-    let y = saturated_cooperation(coopAdd, fallback, i, 1);
+    let y = saturated_cooperation(coopAdd, fallback1, i, 1);
     let m = 2.f;
     let x = saturated_cooperation(coopMul, fallback2, j, m);
     // Put some calculation between the calls to check that the fusion still takes place
     let e = min(m*100, 2);
-    let z = saturated_cooperation(coopExp, fallback, k, int(e));
+    let z = saturated_cooperation(coopExp, fallback1, k, int(e));
+
+    // check that all the piping functions we invent during fusing is inlined away
+    // CHECK:      = coopAdd
+    // CHECK-NEXT: = coopMul
+    // there is a tuple pack here
+    // CHECK-NEXT: Tuple
+    // CHECK-NEXT: = coopExp
+
+    // CHECK:      = fallback1
+    // CHECK-NEXT: = fallback2
+    // CHECK-NEXT: Tuple
+    // CHECK-NEXT: = fallback1
+
     if(tig < 4)
         outputBuffer[tig] = tig == 0 ? count : z;
-
 }
