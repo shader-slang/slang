@@ -1,6 +1,11 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX():-dx12 -profile sm_6_5 -use-dxil -compute -shaderobj -output-using-type
 
+//
+// This test checks whether more than 2 adjacent calls to saturated_cooperation
+// are fused, even with operations between them
+//
+
 //TEST_INPUT:ubuffer(data=[0 3 2 2], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
