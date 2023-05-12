@@ -127,6 +127,9 @@ attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 /// Marks a function for backward-mode differentiation.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribute;
+
 
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as

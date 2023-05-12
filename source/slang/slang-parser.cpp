@@ -6850,6 +6850,8 @@ namespace Slang
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
         _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
         _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
+        _makeParseExpr("fwd_diff", parseForwardDifferentiate),
+        _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
         _makeParseExpr("__dispatch_kernel", parseDispatchKernel)
     };
 
