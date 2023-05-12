@@ -455,6 +455,35 @@ IRCall* isCallNamed(const char* n, IRInst* i)
     return call;
 }
 
+//
+// We perform a left fold over calls to saturated_cooperation
+//
+// sc(ca, fa)
+// sc(cb, fb)
+// sc(cc, fc)
+//
+// to
+//
+// sc(cacbcc, fafbfc)
+//
+// where cacbcc (and fafbfc) look like
+//
+// cacbcc(){
+//   cacb();
+//   cc();
+// }
+//
+// cacb(){
+//   ca();
+//   cb();
+// }
+//
+// These helper functions are inlined shortly after and the generated code is
+// exactly what you'd expect: it's the body of sat_coop except that the
+// original call to cooperate is replaced by three calls to ca, cb, cc.
+//
+// We use a fold here rather than accumulating everything at once as it's
+// easier to implement fusing for 2 functions than n
 static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
 {
     // first, inline calls to saturated_cooperation to expose
