@@ -32,7 +32,7 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(IRParam* 
         if (as<IRGlobalParam>(arg)) return true;
 
         // Similarly for these global values
-        if( as<IRGlobalValueWithCode>(arg) ) return true;
+        if (as<IRGlobalValueWithCode>(arg)) return true;
 
         // As we will see later, we can also
         // specialize a call when the argument
