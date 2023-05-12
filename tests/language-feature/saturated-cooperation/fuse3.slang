@@ -1,5 +1,6 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX():-dx12 -profile sm_6_5 -use-dxil -compute -shaderobj -output-using-type
+// Disabled because some testing infra (swiftshader) doens't support the necessary wave ops
 
 //
 // This test checks whether more than 2 adjacent calls to saturated_cooperation

@@ -1,7 +1,8 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX():-dx12 -profile sm_6_5 -use-dxil -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile cs_6_5 -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -profile cs_6_5 -entry computeMain -line-directive-mode none
+// Disabled because some testing infra (swiftshader) doens't support the necessary wave ops
 
 //
 // This test checks that we fuse calls to saturated cooperation, even with different input values
