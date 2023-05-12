@@ -1271,6 +1271,11 @@ static void addLinkageDecoration(
             builder->addPublicDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
         }
+        else if (as<KnownBuiltinAttribute>(modifier))
+        {
+            builder->addKnownBuiltinDeclration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addPublicDecoration(inst);
+        }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
         decl->parentDecl->hasModifier<ComInterfaceAttribute>() &&

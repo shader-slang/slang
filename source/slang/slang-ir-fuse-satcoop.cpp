@@ -434,7 +434,7 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
 //
 // Identify calls which we can fuse
 //
-IRCall* isCallNamed(const char* n, IRInst* i)
+IRCall* isKnownFunction(const char* n, IRInst* i)
 {
     auto call = as<IRCall>(i);
     if(!call)
@@ -447,10 +447,8 @@ IRCall* isCallNamed(const char* n, IRInst* i)
     if(!func)
         return nullptr;
 
-    // TODO: Is there nothing better for finding a specific declaration in
-    // core.slang?
-    auto h = func->findDecoration<IRNameHintDecoration>();
-    if(h->getName() != n)
+    auto h = func->findDecoration<IRKnownBuiltinDecoration>();
+    if(!h || h->getName() != n)
         return nullptr;
     return call;
 }
@@ -495,7 +493,7 @@ static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
     List<IRCall*> toInline;
     for (auto inst : block->getChildren())
     {
-        if(auto sat_coop = isCallNamed("saturated_cooperation", inst))
+        if(auto sat_coop = isKnownFunction("saturated_cooperation", inst))
             toInline.add(sat_coop);
     }
     for(auto c : toInline)
@@ -510,7 +508,7 @@ static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
     IRCall* lastCall = nullptr;
     for(auto inst = block->getFirstInst(); inst != block->getTerminator(); inst = inst->getNextInst())
     {
-        if(auto call = isCallNamed("saturated_cooperation_using", inst))
+        if(auto call = isKnownFunction("saturated_cooperation_using", inst))
         {
             if(lastCall)
             {

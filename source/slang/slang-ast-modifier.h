@@ -1303,6 +1303,18 @@ class NoSideEffectAttribute : public Attribute
 {
     SLANG_AST_CLASS(NoSideEffectAttribute)
 };
+
+    /// A `[KnownBuiltin("name")]` attribute allows the compiler to
+    /// identify this declaration during compilation, despite obfuscation or
+    /// linkage removing optimizations
+    ///
+class KnownBuiltinAttribute : public Attribute
+{
+    SLANG_AST_CLASS(KnownBuiltinAttribute)
+
+    String name;
+};
+
     /// A modifier that applies to types rather than declarations.
     ///
     /// In most cases, the Slang compiler assumes that a modifier should

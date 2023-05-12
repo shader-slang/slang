@@ -6983,6 +6983,7 @@ uint3 cudaBlockDim();
 // (This fusion takes place in the fuse-satcoop pass, and as such any changes to
 // the signature or behavior of this function should be adjusted for there).
 //
+[KnownBuiltin("saturated_cooperation")]
 func saturated_cooperation<A : __BuiltinType, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,
@@ -7013,6 +7014,7 @@ func __WaveReadLaneAtBuiltin<T : __BuiltinType>(T t, int i) -> T
 // waveMatch: a function to return a mask of lanes with the same input as this one
 // broadcast: a function which returns the value passed into it on the specified lane
 //
+[KnownBuiltin("saturated_cooperation_using")]
 func saturated_cooperation_using<A, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,

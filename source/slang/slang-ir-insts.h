@@ -541,6 +541,18 @@ struct IRTorchEntryPointDecoration : IRDecoration
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
+struct IRKnownBuiltinDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_KnownBuiltinDecoration
+    };
+    IR_LEAF_ISA(KnownBuiltinDecoration)
+
+    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
+};
+
 struct IRFormatDecoration : IRDecoration
 {
     enum { kOp = kIROp_FormatDecoration };
@@ -4058,6 +4070,11 @@ public:
         SLANG_ASSERT(IRMeshOutputDecoration::isaImpl(d));
         // TODO: Ellie, correct int type here?
         addDecoration(value, d, maxCount);
+    }
+
+    void addKnownBuiltinDeclration(IRInst* value, UnownedStringSlice const& name)
+    {
+        addDecoration(value, kIROp_KnownBuiltinDecoration, getStringValue(name));
     }
 };
 

@@ -738,6 +738,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Marks an interface as a COM interface declaration.
     INST(ComInterfaceDecoration, COMInterface, 0, 0)
 
+        /// Attaches a name to this instruction so that it can be identified
+        /// later in the compiler reliably
+    INST(KnownBuiltinDecoration, name, 1, 0)
+
     /* Decorations for RTTI objects */
     INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
     INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)

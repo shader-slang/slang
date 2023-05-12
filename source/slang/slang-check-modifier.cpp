@@ -725,6 +725,18 @@ namespace Slang
 
             deprecatedAttr->message = message;
         }
+        else if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+
+            String name;
+            if(!checkLiteralStringVal(attr->args[0], &name))
+            {
+                return false;
+            }
+
+            knownBuiltinAttr->name = name;
+        }
         else
         {
             if(attr->args.getCount() == 0)
