@@ -1184,6 +1184,7 @@ class ForwardDerivativeOfAttribute : public DerivativeOfAttribute
 class BackwardDifferentiableAttribute : public DifferentiableAttribute
 {
     SLANG_AST_CLASS(BackwardDifferentiableAttribute)
+    int maxOrder = 0;
 };
 
     /// The `[BackwardDerivative(function)]` attribute specifies a custom function that should

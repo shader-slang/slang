@@ -8,7 +8,7 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-[BackwardDifferentiable]
+[Differentiable]
 float test_simple_loop(float y)
 {
     float t = y;

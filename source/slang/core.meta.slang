@@ -126,7 +126,7 @@ attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 
 /// Marks a function for backward-mode differentiation.
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
+attribute_syntax [BackwardDifferentiable(order:int = 0)] : BackwardDifferentiableAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribute;
 
