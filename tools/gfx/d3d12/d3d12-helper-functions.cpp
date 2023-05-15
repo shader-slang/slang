@@ -95,6 +95,8 @@ DXGI_FORMAT getTypelessFormatFromDepthFormat(Format format)
         return DXGI_FORMAT_R16_TYPELESS;
     case Format::D32_FLOAT:
         return DXGI_FORMAT_R32_TYPELESS;
+    case Format::D32_FLOAT_S8_UINT:
+        return DXGI_FORMAT_R32G8X24_TYPELESS;
     default:
         return D3DUtil::getMapFormat(format);
     }

@@ -135,6 +135,7 @@ struct FormatInfoMap
 
         set(Format::D32_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 1);
         set(Format::D16_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::D32_FLOAT_S8_UINT, SLANG_SCALAR_TYPE_FLOAT32, 2);
 
         set(Format::B4G4R4A4_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
         set(Format::B5G6R5_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 3);
