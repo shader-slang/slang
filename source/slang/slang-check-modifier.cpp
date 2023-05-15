@@ -573,6 +573,13 @@ namespace Slang
                 getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), params.getCount());
             }
         }
+        else if (auto diffAttr = as<BackwardDifferentiableAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            auto cint = checkConstantIntVal(attr->args[0]);
+            if (cint)
+                diffAttr->maxOrder = (int32_t)cint->value;
+        }
         else if (auto formatAttr = as<FormatAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
@@ -724,6 +731,18 @@ namespace Slang
             }
 
             deprecatedAttr->message = message;
+        }
+        else if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+
+            String name;
+            if(!checkLiteralStringVal(attr->args[0], &name))
+            {
+                return false;
+            }
+
+            knownBuiltinAttr->name = name;
         }
         else
         {

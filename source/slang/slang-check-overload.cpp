@@ -412,6 +412,8 @@ namespace Slang
 
             if (context.mode == OverloadResolveContext::Mode::JustTrying)
             {
+                SLANG_ASSERT(argType);
+
                 ConversionCost cost = kConversionCost_None;
                 if( context.disallowNestedConversions )
                 {
@@ -1138,6 +1140,21 @@ namespace Slang
         AddOverloadCandidate(context, candidate);
     }
 
+    void SemanticsVisitor::AddFuncExprOverloadCandidate(
+        FuncType*        funcType,
+        OverloadResolveContext& context,
+        Expr* expr)
+    {
+        SLANG_ASSERT(expr);
+        OverloadCandidate candidate;
+        candidate.flavor = OverloadCandidate::Flavor::Expr;
+        candidate.funcType = funcType;
+        candidate.resultType = funcType->getResultType();
+        candidate.exprVal = expr;
+
+        AddOverloadCandidate(context, candidate);
+    }
+
     void SemanticsVisitor::AddCtorOverloadCandidate(
         LookupResultItem            typeItem,
         Type*                type,
@@ -1432,9 +1449,24 @@ namespace Slang
             auto type = DeclRefType::create(m_astBuilder, genericTypeParamDeclRef);
             AddTypeOverloadCandidates(type, context);
         }
+        else if( auto localDeclRef = item.declRef.as<ParamDecl>() )
+        {
+            // We could probably be broader than just parameters here
+            // eventually.
+            // Limit it for now though to make the specialization easier
+            // TODO: why can't this use DeclCheckState::CanUseFuncSignature
+            ensureDecl(localDeclRef, DeclCheckState::TypesFullyResolved);
+            const auto type = localDeclRef.getDecl()->getType();
+            // We can only add overload candidates if this is known to be a function
+            if(const auto funType = as<FuncType>(type))
+                AddFuncExprOverloadCandidate(funType, context, context.originalExpr->functionExpr);
+            else
+                return;
+        }
         else
         {
             // TODO(tfoley): any other cases needed here?
+            return;
         }
     }
 
@@ -1671,6 +1703,16 @@ namespace Slang
         {
             if (IsErrorExpr(arg))
                 return CreateErrorExpr(expr);
+
+            // If this argument is itself an overloaded value without a type
+            // then we can't sensibly continue
+            if(!arg->type && (as<OverloadedExpr>(arg) || as<OverloadedExpr2>(arg)))
+            {
+                getSink()->diagnose(
+                    expr->loc,
+                    Diagnostics::overloadedParameterToHigherOrderFunction);
+                return CreateErrorExpr(expr);
+            }
         }
 
         for (auto& arg : expr->arguments)

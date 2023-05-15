@@ -1271,6 +1271,10 @@ static void addLinkageDecoration(
             builder->addPublicDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
         }
+        else if (as<KnownBuiltinAttribute>(modifier))
+        {
+            builder->addKnownBuiltinDecoration(inst, decl->getName()->text.getUnownedSlice());
+        }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
         decl->parentDecl->hasModifier<ComInterfaceAttribute>() &&
@@ -4507,6 +4511,18 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     }
 
     LoweredValInfo visitModifiedTypeExpr(ModifiedTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitFuncTypeExpr(FuncTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitTupleTypeExpr(TupleTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());

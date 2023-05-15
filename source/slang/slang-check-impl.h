@@ -1528,7 +1528,7 @@ namespace Slang
             SourceLoc loc;
 
             // The original expression (if any) that triggered things
-            Expr* originalExpr = nullptr;
+            AppExprBase* originalExpr = nullptr;
 
             // Source location of the "function" part of the expression, if any
             SourceLoc       funcLoc;
@@ -1694,6 +1694,11 @@ namespace Slang
         void AddFuncOverloadCandidate(
             FuncType*		/*funcType*/,
             OverloadResolveContext&	/*context*/);
+
+        void AddFuncExprOverloadCandidate(
+            FuncType* funcType,
+            OverloadResolveContext& context,
+            Expr* expr);
 
         // Add a candidate callee for overload resolution, based on
         // calling a particular `ConstructorDecl`.
@@ -1966,6 +1971,8 @@ namespace Slang
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
         Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
+        Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
+        Expr* visitTupleTypeExpr(TupleTypeExpr* expr);
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
         Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);

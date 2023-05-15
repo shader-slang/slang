@@ -31,6 +31,9 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(IRParam* 
         //
         if (as<IRGlobalParam>(arg)) return true;
 
+        // Similarly for these global values
+        if (as<IRGlobalValueWithCode>(arg)) return true;
+
         // As we will see later, we can also
         // specialize a call when the argument
         // is the result of indexing into an
@@ -505,6 +508,11 @@ struct FunctionParameterSpecializationContext
             //
             ioInfo.key.vals.add(oldGlobalParam);
         }
+        else if( auto globalConstant = as<IRGlobalValueWithCode>(oldArg) )
+        {
+            // Similarly for other global constants
+            ioInfo.key.vals.add(globalConstant);
+        }
         else if( oldArg->getOp() == kIROp_GetElement )
         {
             // This is the case where the `oldArg` is
@@ -625,6 +633,12 @@ struct FunctionParameterSpecializationContext
             // parameter in the specialized function.
             //
             return globalParam;
+        }
+        if( auto globalFunc = as<IRGlobalValueWithCode>(oldArg) )
+        {
+            // As above, the identity of the specialized function is sufficient
+            // to resolve the uses
+            return globalFunc;
         }
         else if( oldArg->getOp() == kIROp_GetElement )
         {

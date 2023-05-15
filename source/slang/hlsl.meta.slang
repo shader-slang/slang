@@ -4298,16 +4298,25 @@ matrix<T,N,M> WaveMaskReadLaneFirst(WaveMask mask, matrix<T,N,M> expr);
 
 __generic<T : __BuiltinType>
 __target_intrinsic(hlsl, "WaveMatch($1).x")
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupPartitionNV($1).x")
 __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchScalar($0, $1).x")
 WaveMask WaveMaskMatch(WaveMask mask, T value);
 __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl, "WaveMatch($1).x")
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupPartitionNV($1).x")
 __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchMultiple($0, $1)")
 WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl, "WaveMatch($1).x")
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupPartitionNV($1).x")
 __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchMultiple($0, $1)")
 WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value);
@@ -6939,3 +6948,117 @@ uint3 cudaBlockIdx();
 __target_intrinsic(cuda, "(blockDim)")
 [__readNone]
 uint3 cudaBlockDim();
+
+//
+// Workgroup cooperation
+//
+
+//
+// `saturated_cooperation(c, f, s, u)` will call `f(s, u)` if not all lanes in the
+// workgroup are currently executing. however if all lanes are saturated, then
+// for each unique `s` across all the active lanes `c(s, u)` is called. The
+// return value is the one corresponding to the input `s` from this lane.
+//
+// Adjacent calls to saturated_cooperation are subject to fusion, i.e.
+//      saturated_cooperation(c1, f1, s, u1);
+//      saturated_cooperation(c2, f2, s, u2);
+// will be transformed to:
+//      saturated_cooperation(c1c2, f1f2, s, u1u2);
+// where
+//      c1c2 is a function which calls c1(s, u1) and then c2(s, u2);
+//      f1f2 is a function which calls f1(s, u1) and then f2(s, u2);
+//
+// When the input differs, calls are fused
+//      saturated_cooperation(c1, f1, s1, u1);
+//      saturated_cooperation(c2, f2, s2, u2);
+// will be transformed to:
+//      saturated_cooperation(c1c2, f1f2, s1s2, u1u2);
+// where
+//      s1s2 is a tuple of s1 and s2
+//      c1c2 is a function which calls c1(s1, u1) and then c2(s2, u2);
+//      f1f2 is a function which calls f1(s1, u1) and then f2(s2, u2);
+// Note that in this case, we will make a call to c1c2 for every unique pair
+// s1s2 across all lanes
+//
+// (This fusion takes place in the fuse-satcoop pass, and as such any changes to
+// the signature or behavior of this function should be adjusted for there).
+//
+[KnownBuiltin("saturated_cooperation")]
+func saturated_cooperation<A : __BuiltinType, B, C>(
+    cooperate : functype (A, B) -> C,
+    fallback : functype (A, B) -> C,
+    A input,
+    B otherArg)
+    -> C
+{
+    return saturated_cooperation_using(cooperate, fallback, __WaveMatchBuitin<A>, __WaveReadLaneAtBuiltin<A>, input, otherArg);
+}
+
+// These two functions are a temporary (circa May 2023) workaround to the fact
+// that we can't deduce which overload to pass to saturated_cooperation_using
+// in the call above
+[__unsafeForceInlineEarly]
+func __WaveMatchBuitin<T : __BuiltinType>(T t) -> uint4
+{
+    return WaveMatch(t);
+}
+[__unsafeForceInlineEarly]
+func __WaveReadLaneAtBuiltin<T : __BuiltinType>(T t, int i) -> T
+{
+    return WaveReadLaneAt(t, i);
+}
+
+//
+// saturated_cooperation, but you're able to specify manually the functions:
+//
+// waveMatch: a function to return a mask of lanes with the same input as this one
+// broadcast: a function which returns the value passed into it on the specified lane
+//
+[KnownBuiltin("saturated_cooperation_using")]
+func saturated_cooperation_using<A, B, C>(
+    cooperate : functype (A, B) -> C,
+    fallback : functype (A, B) -> C,
+    waveMatch : functype (A) -> uint4,
+    broadcast : functype (A, int) -> A,
+    A input,
+    B otherArg)
+    -> C
+{
+    const bool isWaveSaturated = WaveActiveCountBits(true) == WaveGetLaneCount();
+    if(isWaveSaturated)
+    {
+        let lanesWithSameInput = waveMatch(input).x;
+        // Keep least significant lane in our set
+        let ourRepresentative = lanesWithSameInput & -lanesWithSameInput;
+        // The representative lanes for all lanes
+        var allRepresentatives = WaveActiveBitOr(ourRepresentative);
+
+        C ret;
+
+        // Iterate over set bits in mask from low to high.
+        // In each iteration the lowest bit is cleared.
+        while(bool(allRepresentatives))
+        {
+            // Broadcast input across warp.
+            let laneIdx = firstbitlow(allRepresentatives);
+            let uniformInput = broadcast(input, int(laneIdx));
+
+            // All lanes perform some cooperative computation with dynamic
+            // uniform input
+            C c = cooperate(uniformInput, otherArg);
+
+            // Update our return value until it
+            if(bool(allRepresentatives & ourRepresentative))
+                ret = c;
+
+            // Clear the lowest bit
+            allRepresentatives &= allRepresentatives - 1;
+        }
+
+        return ret;
+    }
+    else
+    {
+        return fallback(input, otherArg);
+    }
+}

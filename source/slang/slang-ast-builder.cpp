@@ -428,6 +428,17 @@ Val* ASTBuilder::getNoDiffModifierVal()
     return getOrCreate<NoDiffModifierVal>();
 }
 
+Type* ASTBuilder::getFuncType(List<Type*> parameters, Type* result)
+{
+    auto errorType = getOrCreate<BottomType>();
+    return getOrCreate<FuncType>(parameters, result, errorType);
+}
+
+Type* ASTBuilder::getTupleType(List<Type*>& types)
+{
+    return getOrCreate<TupleType>(types);
+}
+
 TypeType* ASTBuilder::getTypeType(Type* type)
 {
     return getOrCreate<TypeType>(type);

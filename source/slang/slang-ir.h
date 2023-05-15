@@ -677,6 +677,7 @@ struct IRInst
         //
     IRInstListBase m_decorationsAndChildren;
 
+
     IRInst* getFirstDecorationOrChild() { return m_decorationsAndChildren.first; }
     IRInst* getLastDecorationOrChild()  { return m_decorationsAndChildren.last;  }
     IRInstListBase getDecorationsAndChildren() { return m_decorationsAndChildren; }

@@ -545,6 +545,22 @@ class PointerTypeExpr : public Expr
     TypeExp base;
 };
 
+    /// A type expression that represents a function type, e.g. (bool, int) -> float
+class FuncTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(FuncTypeExpr);
+
+    List<TypeExp> parameters;
+    TypeExp result;
+};
+
+class TupleTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(TupleTypeExpr);
+
+    List<TypeExp> members;
+};
+
     /// An expression that applies a generic to arguments for some,
     /// but not all, of its explicit parameters.
     ///

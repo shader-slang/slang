@@ -2243,6 +2243,39 @@ namespace Slang
         return parseThisTypeExpr(parser);
     }
 
+    // (a,b,c) style tuples, curently unused
+#if 0
+    static Expr* parseTupleTypeExpr(Parser* parser)
+    {
+        parser->ReadToken(TokenType::LParent);
+        TupleTypeExpr* expr = parser->astBuilder->create<TupleTypeExpr>();
+        while(!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
+        {
+            expr->members.add(parser->ParseTypeExp());
+            if(AdvanceIf(parser, TokenType::RParent))
+                break;
+            parser->ReadToken(TokenType::Comma);
+        }
+        return expr;
+    }
+#endif
+
+    static Expr* parseFuncTypeExpr(Parser* parser)
+    {
+        parser->ReadToken(TokenType::LParent);
+        auto expr = parser->astBuilder->create<FuncTypeExpr>();
+        while(!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
+        {
+            expr->parameters.add(parser->ParseTypeExp());
+            if(AdvanceIf(parser, TokenType::RParent))
+                break;
+            parser->ReadToken(TokenType::Comma);
+        }
+        parser->ReadToken(TokenType::RightArrow);
+        expr->result = parser->ParseTypeExp();
+        return expr;
+    }
+
         /// Apply the given `modifiers` (if any) to the given `typeExpr`
     static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers const& modifiers)
     {
@@ -2436,6 +2469,17 @@ namespace Slang
         else if(AdvanceIf(parser, "This"))
         {
             typeSpec.expr = parseThisTypeExpr(parser);
+            return typeSpec;
+        }
+        // Uncomment should we decide to enable (a,b,c) tuple types
+        // else if(parser->LookAheadToken(TokenType::LParent))
+        // {
+        //     typeSpec.expr = parseTupleTypeExpr(parser);
+        //     return typeSpec;
+        // }
+        else if(AdvanceIf(parser, "functype"))
+        {
+            typeSpec.expr = parseFuncTypeExpr(parser);
             return typeSpec;
         }
 
@@ -4820,6 +4864,8 @@ namespace Slang
         return parsePostfixTypeSuffix(parser, typeExpr);
     }
 
+    static Expr* _parseInfixTypeExpr(Parser* parser);
+
     static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr)
     {
         for(;;)
@@ -4829,16 +4875,20 @@ namespace Slang
             // a conjunction type expression.
 
             auto loc = peekToken(parser).loc;
-            if(!AdvanceIf(parser, TokenType::OpBitAnd))
+            if(AdvanceIf(parser, TokenType::OpBitAnd))
+            {
+                auto rightExpr = _parsePostfixTypeExpr(parser);
+
+                auto andExpr = parser->astBuilder->create<AndTypeExpr>();
+                andExpr->loc = loc;
+                andExpr->left = TypeExp(leftExpr);
+                andExpr->right = TypeExp(rightExpr);
+                leftExpr = andExpr;
+            }
+            else
+            {
                 break;
-
-            auto rightExpr = _parsePostfixTypeExpr(parser);
-
-            auto andExpr = parser->astBuilder->create<AndTypeExpr>();
-            andExpr->loc = loc;
-            andExpr->left = TypeExp(leftExpr);
-            andExpr->right = TypeExp(rightExpr);
-            leftExpr = andExpr;
+            }
         }
 
         return leftExpr;
@@ -4846,8 +4896,9 @@ namespace Slang
 
         /// Parse an infix type expression.
         ///
-        /// Currently, the only infix type expression we support is the `&`
-        /// operator for forming interface conjunctions.
+        /// Currently, the only infix type expressions we support are the `&`
+        /// operator for forming interface conjunctions and the `->` operator
+        /// for functions.
         ///
     static Expr* _parseInfixTypeExpr(Parser* parser)
     {
@@ -6799,6 +6850,8 @@ namespace Slang
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
         _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
         _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
+        _makeParseExpr("fwd_diff", parseForwardDifferentiate),
+        _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
         _makeParseExpr("__dispatch_kernel", parseDispatchKernel)
     };
 
