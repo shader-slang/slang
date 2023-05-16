@@ -97,6 +97,8 @@ DXGI_FORMAT getTypelessFormatFromDepthFormat(Format format)
         return DXGI_FORMAT_R32_TYPELESS;
     case Format::D32_FLOAT_S8_UINT:
         return DXGI_FORMAT_R32G8X24_TYPELESS;
+    //case Format::D24_UNORM_S8_UINT:
+    //    return DXGI_FORMAT_R24G8_TYPELESS;
     default:
         return D3DUtil::getMapFormat(format);
     }
@@ -108,6 +110,8 @@ bool isTypelessDepthFormat(DXGI_FORMAT format)
     {
     case DXGI_FORMAT_R16_TYPELESS:
     case DXGI_FORMAT_R32_TYPELESS:
+    case DXGI_FORMAT_R32G8X24_TYPELESS:
+    case DXGI_FORMAT_R24G8_TYPELESS:
         return true;
     default:
         return false;
