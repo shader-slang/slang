@@ -209,6 +209,7 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
         case Format::D32_FLOAT:                 return DXGI_FORMAT_D32_FLOAT;
         case Format::D16_UNORM:                 return DXGI_FORMAT_D16_UNORM;
         case Format::D32_FLOAT_S8_UINT:         return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+        case Format::R32_FLOAT_X32_TYPELESS:    return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
 
         case Format::B4G4R4A4_UNORM:            return DXGI_FORMAT_B4G4R4A4_UNORM;
         case Format::B5G6R5_UNORM:              return DXGI_FORMAT_B5G6R5_UNORM;
