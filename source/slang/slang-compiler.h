@@ -2661,6 +2661,12 @@ namespace Slang
 
         ~EndToEndCompileRequest();
 
+        struct ArtifactAndPath
+        {
+            ComPtr<IArtifact> artifact;
+            String path;
+        };
+
             // If enabled will emit IR 
         bool m_emitIr = false;
 
@@ -2747,7 +2753,7 @@ namespace Slang
         SlangResult maybeWriteContainer(const String& fileName);
 
             /// Write out artifact in source code embedding
-        SlangResult writeSourceEmbedded();
+        SlangResult writeSourceEmbedded(const List<ArtifactAndPath>& artifactPaths);
 
         Linkage* getLinkage() { return m_linkage; }
 
@@ -2825,9 +2831,6 @@ namespace Slang
 
             /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
         SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
-
-            /// Maybe write the artifact to the path
-        SlangResult _maybeWriteSourceEmbeddedArtifact(const String& path, IArtifact* artifact);
 
         ISlangUnknown* getInterface(const Guid& guid);
 

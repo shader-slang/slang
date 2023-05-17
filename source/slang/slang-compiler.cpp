@@ -1665,40 +1665,7 @@ namespace Slang
         return String();
     }
 
-    SlangResult EndToEndCompileRequest::_maybeWriteSourceEmbeddedArtifact(const String& inPath, IArtifact* artifact)
-    {
-        if (artifact == nullptr)
-        {
-            return SLANG_OK;
-        }
-
-        if (m_sourceEmbedLanguage != SourceLanguage::C &&
-            m_sourceEmbedLanguage != SourceLanguage::CPP)
-        {
-            getSink()->diagnose(SourceLoc(), Diagnostics::unhandledLanguageForSourceEmbedding);
-            return SLANG_FAIL;
-        }
-
-        // We only support output to 
-        const auto ext = toSlice(".h");
-        
-        StringBuilder buf;
-
-        if (inPath.getLength() == 0)
-        {
-            // We need to produce a name to write this out to
-            
-        }
-        else
-        {
-            buf << inPath;
-            if (!inPath.endsWith(ext))
-            {
-                buf << ext;
-            }
-        }
-
-    }
+    
 
     SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
     {
@@ -2169,34 +2136,45 @@ namespace Slang
             generateOutput(targetProgram);
         }
     }
-    SlangResult EndToEndCompileRequest::writeSourceEmbedded()
+
+    SlangResult EndToEndCompileRequest::writeSourceEmbedded(const List<ArtifactAndPath>& artifactPaths)
     {
-        auto linkage = getLinkage();
-        auto program = getSpecializedGlobalAndEntryPointsComponentType();
-
-        for (auto targetReq : linkage->targets)
+        if (m_sourceEmbedLanguage != SourceLanguage::C &&
+            m_sourceEmbedLanguage != SourceLanguage::CPP)
         {
-            auto targetProgram = program->getTargetProgram(targetReq);
+            getSink()->diagnose(SourceLoc(), Diagnostics::unhandledLanguageForSourceEmbedding);
+            return SLANG_FAIL;
+        }
 
-            if (targetReq->isWholeProgramRequest())
+        // We only support output to 
+        const auto ext = toSlice(".h");
+       
+        for (const auto& artifactPath : artifactPaths)
+        {
+            const auto& path = artifactPath.path;
+            IArtifact* artifact = artifactPath.artifact;
+
+            // Must have a blob to be able to write
+            ComPtr<ISlangBlob> blob;
+            SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+
+
+
+            StringBuilder buf;
+            if (path.getLength() == 0)
             {
-                const auto path = _getWholeProgramPath(targetReq);
-                const auto artifact = targetProgram->getExistingWholeProgramResult();
+                // We need to produce a name to write this out to
 
-                SLANG_RETURN_ON_FAIL(_maybeWriteSourceEmbeddedArtifact(path, artifact));
             }
             else
             {
-                Index entryPointCount = program->getEntryPointCount();
-                for (Index ee = 0; ee < entryPointCount; ++ee)
+                buf << inPath;
+                if (!inPath.endsWith(ext))
                 {
-                    const auto artifact = targetProgram->getExistingEntryPointResult(ee);
-
-                    const auto path = _getEntryPointPath(targetReq, ee);
-                    
-                    SLANG_RETURN_ON_FAIL(_maybeWriteSourceEmbeddedArtifact(path, artifact));
+                    buf << ext;
                 }
             }
+
         }
 
         return SLANG_OK;
@@ -2211,14 +2189,11 @@ namespace Slang
 
         if (m_isCommandLineCompile)
         {
-            if (m_sourceEmbedStyle != SourceEmbedStyle::None)
-            {
-                writeSourceEmbedded();
-                return;
-            }
-
             auto linkage = getLinkage();
             auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+            // Collect all the artifacts and paths
+            List<ArtifactAndPath> artifactPaths;
 
             for (auto targetReq : linkage->targets)
             {
@@ -2226,23 +2201,37 @@ namespace Slang
 
                 if (targetReq->isWholeProgramRequest())
                 {
-                    const auto path = _getWholeProgramPath(targetReq);
-                    const auto artifact = targetProgram->getExistingWholeProgramResult();
-
-                    _maybeWriteArtifact(path, artifact);
+                    if (const auto artifact = targetProgram->getExistingWholeProgramResult())
+                    {
+                        const auto path = _getWholeProgramPath(targetReq);
+                        artifactPaths.add({ ComPtr<IArtifact>(artifact), path });
+                    }
                 }
                 else
                 {
                     Index entryPointCount = program->getEntryPointCount();
                     for (Index ee = 0; ee < entryPointCount; ++ee)
                     {        
-                        const auto path = _getEntryPointPath(targetReq, ee);
-                        const auto artifact = targetProgram->getExistingEntryPointResult(ee);
-                        
-                        _maybeWriteArtifact(path, artifact);
+                        if (const auto artifact = targetProgram->getExistingEntryPointResult(ee))
+                        {
+                            const auto path = _getEntryPointPath(targetReq, ee);
+                            artifactPaths.add({ ComPtr<IArtifact>(artifact), path });
+                        }
                     }
                 }
-            }            
+
+                if (m_sourceEmbedStyle != SourceEmbedStyle::None)
+                {
+                    writeSourceEmbedded(artifactPaths);
+                }
+                else
+                {
+                    for (auto& artifactPath : artifactPaths)
+                    {
+                        _maybeWriteArtifact(artifactPath.path, artifactPath.artifact);
+                    }
+                }
+            }
         }
 
         // Maybe create the container 
