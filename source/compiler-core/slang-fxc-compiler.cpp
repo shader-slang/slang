@@ -335,7 +335,7 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 bool FXCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // Can only disassemble blobs that are DXBC
-    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == ArtifactPayload::DXBC;
+    return ArtifactDescUtil::isDisassembly(from, to) && from.payload == ArtifactPayload::DXBC;
 }
 
 SlangResult FXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 

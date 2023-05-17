@@ -899,7 +899,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     }
 }
 
-/* static */bool ArtifactDescUtil::isDissassembly(const ArtifactDesc& from, const ArtifactDesc& to)
+/* static */bool ArtifactDescUtil::isDisassembly(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // From must be a binary like type
     if (!isDerivedFrom(from.kind, ArtifactKind::CompileBinary))

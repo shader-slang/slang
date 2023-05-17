@@ -100,7 +100,7 @@ struct ArtifactDescUtil
     static bool isDescDerivedFrom(const ArtifactDesc& desc, const ArtifactDesc& from);
 
         /// True if `to` is disassembly of `from`
-    static bool isDissassembly(const ArtifactDesc& from, const ArtifactDesc& to);
+    static bool isDisassembly(const ArtifactDesc& from, const ArtifactDesc& to);
 
         /// Append the desc as text to out
     static void appendText(const ArtifactDesc& desc, StringBuilder& out);
