@@ -388,6 +388,23 @@ namespace Slang
         return makeConstArrayView(kStages);
     }
 
+    static const NamesDescriptionValue kSourceEmbedStyleInfos[] =
+    {
+        { ValueInt(SourceEmbedStyle::None),         "none",     "No source level embedding" },
+        { ValueInt(SourceEmbedStyle::Default),      "default",  "The default embedding for the type to be embedded"},
+        { ValueInt(SourceEmbedStyle::Text),         "text",     "Embed as text. May change line endings. If output isn't text will use 'default'. Size will *not* contain terminating 0." },
+        { ValueInt(SourceEmbedStyle::BinaryText),   "binary-text", "Embed as text assuming contents is binary. "},
+        { ValueInt(SourceEmbedStyle::U8),           "u8",       "Embed as unsigned bytes."},
+        { ValueInt(SourceEmbedStyle::U16),          "u16",      "Embed as uint16_t."},
+        { ValueInt(SourceEmbedStyle::U32),          "u32",      "Embed as uint32_t."},
+        { ValueInt(SourceEmbedStyle::U64),          "u64",      "Embed as uint64_t."},
+    };
+
+    ConstArrayView<NamesDescriptionValue> getSourceEmbedStyleInfos()
+    {
+        return makeConstArrayView(kSourceEmbedStyleInfos);
+    }
+
     Stage findStageByName(String const& name)
     {
         for(auto entry : kStages)
@@ -1648,6 +1665,41 @@ namespace Slang
         return String();
     }
 
+    SlangResult EndToEndCompileRequest::_maybeWriteSourceEmbeddedArtifact(const String& inPath, IArtifact* artifact)
+    {
+        if (artifact == nullptr)
+        {
+            return SLANG_OK;
+        }
+
+        if (m_sourceEmbedLanguage != SourceLanguage::C &&
+            m_sourceEmbedLanguage != SourceLanguage::CPP)
+        {
+            getSink()->diagnose(SourceLoc(), Diagnostics::unhandledLanguageForSourceEmbedding);
+            return SLANG_FAIL;
+        }
+
+        // We only support output to 
+        const auto ext = toSlice(".h");
+        
+        StringBuilder buf;
+
+        if (inPath.getLength() == 0)
+        {
+            // We need to produce a name to write this out to
+            
+        }
+        else
+        {
+            buf << inPath;
+            if (!inPath.endsWith(ext))
+            {
+                buf << ext;
+            }
+        }
+
+    }
+
     SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
     {
         // We don't have to do anything if there is no artifact
@@ -1659,7 +1711,7 @@ namespace Slang
                 return SLANG_OK;
             }
 
-            // If we aren't writing to a container and we didn't write to a file, we can output to 
+            // If we aren't writing to a container and we didn't write to a file, we can output to standard output
             if (m_containerFormat == ContainerFormat::None)
             {
                 writeArtifactToStandardOutput(artifact, getSink());
@@ -2117,16 +2169,54 @@ namespace Slang
             generateOutput(targetProgram);
         }
     }
+    SlangResult EndToEndCompileRequest::writeSourceEmbedded()
+    {
+        auto linkage = getLinkage();
+        auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+        for (auto targetReq : linkage->targets)
+        {
+            auto targetProgram = program->getTargetProgram(targetReq);
+
+            if (targetReq->isWholeProgramRequest())
+            {
+                const auto path = _getWholeProgramPath(targetReq);
+                const auto artifact = targetProgram->getExistingWholeProgramResult();
+
+                SLANG_RETURN_ON_FAIL(_maybeWriteSourceEmbeddedArtifact(path, artifact));
+            }
+            else
+            {
+                Index entryPointCount = program->getEntryPointCount();
+                for (Index ee = 0; ee < entryPointCount; ++ee)
+                {
+                    const auto artifact = targetProgram->getExistingEntryPointResult(ee);
+
+                    const auto path = _getEntryPointPath(targetReq, ee);
+                    
+                    SLANG_RETURN_ON_FAIL(_maybeWriteSourceEmbeddedArtifact(path, artifact));
+                }
+            }
+        }
+
+        return SLANG_OK;
+    }
 
     void EndToEndCompileRequest::generateOutput()
     {
         generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
-
+        
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
         if (m_isCommandLineCompile)
         {
+            if (m_sourceEmbedStyle != SourceEmbedStyle::None)
+            {
+                writeSourceEmbedded();
+                return;
+            }
+
             auto linkage = getLinkage();
             auto program = getSpecializedGlobalAndEntryPointsComponentType();
 

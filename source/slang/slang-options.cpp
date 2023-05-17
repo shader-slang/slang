@@ -72,6 +72,10 @@ enum class OptionKind
     EmitIr,
     ReportDownstreamTime,
 
+    SourceEmbedStyle,
+    SourceEmbedName,
+    SourceEmbedLanguage,
+
     // Target
 
     Capability,
@@ -167,6 +171,7 @@ enum class ValueCategory
     DebugLevel, 
     FileSystemType,
     VulkanShift,
+    SourceEmbedStyle,
 
     CountOf,
 };
@@ -184,6 +189,8 @@ SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
 SLANG_GET_VALUE_CATEGORY(VulkanShift, HLSLToVulkanLayoutOptions::Kind)
+SLANG_GET_VALUE_CATEGORY(SourceEmbedStyle, SourceEmbedStyle)
+SLANG_GET_VALUE_CATEGORY(Language, SourceLanguage)
 
 } // anonymous
 
@@ -242,6 +249,11 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(CategoryKind::Value, "file-system-type", "File System Type", UserValue(ValueCategory::FileSystemType));
         options.addValues(TypeTextUtil::getFileSystemTypeInfos());
+
+        options.addCategory(CategoryKind::Value, "source-embed-style", "Source Embed Style", UserValue(ValueCategory::SourceEmbedStyle));
+        options.addValues(getSourceEmbedStyleInfos());
+
+
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -416,6 +428,13 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DumpWarningDiagnostics, "-dump-warning-diagnostics", nullptr, "Dump to output list of warning diagnostic numeric and name ids." },
         { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."},
         { OptionKind::ReportDownstreamTime, "-report-downstream-time", nullptr, "Reports the time spent in the downstream compiler." },
+
+        { OptionKind::SourceEmbedStyle, "-source-embed-style", "-source-embed-style <source-embed-style>",
+        "If source embedding is enabled, defines the style used. "},
+        { OptionKind::SourceEmbedName, "-source-embed-name", "-source-embed-name <name>",
+        "The name used as the basis for variables output for source embedding"},
+        { OptionKind::SourceEmbedLanguage, "-source-embed-language", "-source-embed-language <language>",
+        "The language to be used for source embedding. Defaults to C/C++."},
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -2285,6 +2304,23 @@ SlangResult OptionsParser::_parse(
                 {
                     SLANG_RETURN_ON_FAIL(addInputPath(m_reader.getValueAndAdvance().getBuffer()));
                 }
+                break;
+            }
+            case OptionKind::SourceEmbedStyle:
+            {
+                SLANG_RETURN_ON_FAIL(_expectValue(m_requestImpl->m_sourceEmbedStyle));
+                break;
+            }
+            case OptionKind::SourceEmbedName:
+            {
+                CommandLineArg name;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
+                m_requestImpl->m_sourceEmbedName = name.value;
+                break;
+            }
+            case OptionKind::SourceEmbedLanguage:
+            {
+                SLANG_RETURN_ON_FAIL(_expectValue(m_requestImpl->m_sourceEmbedLanguage));
                 break;
             }
             default:

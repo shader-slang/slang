@@ -105,6 +105,7 @@ struct ArtifactDescUtil
         /// Append the desc as text to out
     static void appendText(const ArtifactDesc& desc, StringBuilder& out);
 
+        /// Given an artifact desc return a description as a string
     static String getText(const ArtifactDesc& desc);
 
 };
