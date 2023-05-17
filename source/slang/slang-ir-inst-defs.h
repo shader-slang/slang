@@ -299,7 +299,7 @@ INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, Differentia
 
 INST(Specialize, specialize, 2, HOISTABLE)
 INST(LookupWitness, lookupWitness, 2, HOISTABLE)
-INST(GetSequentialID, GetSequentialID, 1, 0)
+INST(GetSequentialID, GetSequentialID, 1, HOISTABLE)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
 INST(AllocObj, allocObj, 0, 0)
 
