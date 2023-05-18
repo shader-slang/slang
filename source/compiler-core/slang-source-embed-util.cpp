@@ -104,8 +104,6 @@ static void _appendHex(const T* in, ArrayView<char> elementWork, char* dst, size
     // Check the alignment
     SLANG_ASSERT((size_t(in) & (sizeof(T) - 1)) == 0);
 
-    const auto elementSizeInChars = elementWork.getCount();
-    
     // Calculate the amount of elements for this line.
     const size_t elementsCount = (bytesForLine + sizeof(T) - 1) / sizeof(T);
 
@@ -356,7 +354,7 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
         }
     }
 
-    buf << "const size_t " << options.variableName << "_sizeInBytes = " << totalSizeInBytes << ";\n\n"; 
+    buf << "const size_t " << options.variableName << "_sizeInBytes = " << uint64_t(totalSizeInBytes) << ";\n\n"; 
 
     // Make into an artifact
     ArtifactPayload payload = options.language == SLANG_SOURCE_LANGUAGE_C ? ArtifactPayload::C : ArtifactPayload::Cpp;
