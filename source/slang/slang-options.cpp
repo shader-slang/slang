@@ -2320,6 +2320,13 @@ SlangResult OptionsParser::_parse(
             case OptionKind::SourceEmbedLanguage:
             {
                 SLANG_RETURN_ON_FAIL(_expectValue(m_requestImpl->m_sourceEmbedLanguage));
+
+                if (!SourceEmbedUtil::isSupported((SlangSourceLanguage)m_requestImpl->m_sourceEmbedLanguage))
+                {
+                    m_sink->diagnose(arg.loc, Diagnostics::unhandledLanguageForSourceEmbedding);
+                    return SLANG_FAIL;
+                }
+
                 break;
             }
             default:
