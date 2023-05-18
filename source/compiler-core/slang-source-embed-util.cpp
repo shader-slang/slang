@@ -251,6 +251,14 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
 
     Options options(inOptions);
 
+    // If the style is text, but the artifact *isn't* a text type, we'll 
+    // use 'default' for the type
+    if (options.style == Style::Text && 
+        !ArtifactDescUtil::isText(desc))
+    {
+        options.style = Style::Default;
+    }
+
     if (options.style == Style::Default)
     {
         options.style = getDefaultStyle(desc);
