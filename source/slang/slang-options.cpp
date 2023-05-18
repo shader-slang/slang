@@ -29,6 +29,7 @@
 #include "../compiler-core/slang-command-line-args.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-core-diagnostics.h"
+#include "../compiler-core/slang-source-embed-util.h"
 
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-char-util.h"
@@ -189,7 +190,7 @@ SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
 SLANG_GET_VALUE_CATEGORY(VulkanShift, HLSLToVulkanLayoutOptions::Kind)
-SLANG_GET_VALUE_CATEGORY(SourceEmbedStyle, SourceEmbedStyle)
+SLANG_GET_VALUE_CATEGORY(SourceEmbedStyle, SourceEmbedUtil::Style)
 SLANG_GET_VALUE_CATEGORY(Language, SourceLanguage)
 
 } // anonymous
@@ -251,9 +252,7 @@ void initCommandOptions(CommandOptions& options)
         options.addValues(TypeTextUtil::getFileSystemTypeInfos());
 
         options.addCategory(CategoryKind::Value, "source-embed-style", "Source Embed Style", UserValue(ValueCategory::SourceEmbedStyle));
-        options.addValues(getSourceEmbedStyleInfos());
-
-
+        options.addValues(SourceEmbedUtil::getStyleInfos());
     }
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! target !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

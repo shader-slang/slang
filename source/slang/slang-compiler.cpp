@@ -388,23 +388,6 @@ namespace Slang
         return makeConstArrayView(kStages);
     }
 
-    static const NamesDescriptionValue kSourceEmbedStyleInfos[] =
-    {
-        { ValueInt(SourceEmbedStyle::None),         "none",     "No source level embedding" },
-        { ValueInt(SourceEmbedStyle::Default),      "default",  "The default embedding for the type to be embedded"},
-        { ValueInt(SourceEmbedStyle::Text),         "text",     "Embed as text. May change line endings. If output isn't text will use 'default'. Size will *not* contain terminating 0." },
-        { ValueInt(SourceEmbedStyle::BinaryText),   "binary-text", "Embed as text assuming contents is binary. "},
-        { ValueInt(SourceEmbedStyle::U8),           "u8",       "Embed as unsigned bytes."},
-        { ValueInt(SourceEmbedStyle::U16),          "u16",      "Embed as uint16_t."},
-        { ValueInt(SourceEmbedStyle::U32),          "u32",      "Embed as uint32_t."},
-        { ValueInt(SourceEmbedStyle::U64),          "u64",      "Embed as uint64_t."},
-    };
-
-    ConstArrayView<NamesDescriptionValue> getSourceEmbedStyleInfos()
-    {
-        return makeConstArrayView(kSourceEmbedStyleInfos);
-    }
-
     Stage findStageByName(String const& name)
     {
         for(auto entry : kStages)
@@ -1665,26 +1648,52 @@ namespace Slang
         return String();
     }
 
-    
+    SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact* artifact)
+    {
+        if (path.getLength() > 0)
+        {
+            SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
+        }
+        else if (m_containerFormat == ContainerFormat::None)
+        {
+            // If we aren't writing to a container and we didn't write to a file, we can output to standard output
+            writeArtifactToStandardOutput(artifact, getSink());
+        }
+        return SLANG_OK;
+    }
 
     SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
     {
         // We don't have to do anything if there is no artifact
-        if (artifact)
+        if (!artifact)
         {
-            if (path.getLength())
-            {
-                SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
-                return SLANG_OK;
-            }
-
-            // If we aren't writing to a container and we didn't write to a file, we can output to standard output
-            if (m_containerFormat == ContainerFormat::None)
-            {
-                writeArtifactToStandardOutput(artifact, getSink());
-            }
+            return SLANG_OK;
         }
 
+        // If embedding is enabled...
+        if (m_sourceEmbedStyle != SourceEmbedUtil::Style::None)
+        {
+            SourceEmbedUtil::Options options;
+
+            options.style = m_sourceEmbedStyle;
+            options.variableName = m_sourceEmbedName;
+            options.language = (SlangSourceLanguage)m_sourceEmbedLanguage;
+
+            ComPtr<IArtifact> embeddedArtifact;
+            SLANG_RETURN_ON_FAIL(SourceEmbedUtil::createEmbedded(artifact, options, embeddedArtifact));
+
+            if (!embeddedArtifact)
+            {
+                return SLANG_FAIL;
+            }
+            SLANG_RETURN_ON_FAIL(_writeArtifact(SourceEmbedUtil::getPath(path, options), embeddedArtifact));
+            return SLANG_OK;
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(_writeArtifact(path, artifact));
+        }
+    
         return SLANG_OK;
     }
 
@@ -2137,49 +2146,7 @@ namespace Slang
         }
     }
 
-    SlangResult EndToEndCompileRequest::writeSourceEmbedded(const List<ArtifactAndPath>& artifactPaths)
-    {
-        if (m_sourceEmbedLanguage != SourceLanguage::C &&
-            m_sourceEmbedLanguage != SourceLanguage::CPP)
-        {
-            getSink()->diagnose(SourceLoc(), Diagnostics::unhandledLanguageForSourceEmbedding);
-            return SLANG_FAIL;
-        }
-
-        // We only support output to 
-        const auto ext = toSlice(".h");
-       
-        for (const auto& artifactPath : artifactPaths)
-        {
-            const auto& path = artifactPath.path;
-            IArtifact* artifact = artifactPath.artifact;
-
-            // Must have a blob to be able to write
-            ComPtr<ISlangBlob> blob;
-            SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
-
-
-
-            StringBuilder buf;
-            if (path.getLength() == 0)
-            {
-                // We need to produce a name to write this out to
-
-            }
-            else
-            {
-                buf << inPath;
-                if (!inPath.endsWith(ext))
-                {
-                    buf << ext;
-                }
-            }
-
-        }
-
-        return SLANG_OK;
-    }
-
+    
     void EndToEndCompileRequest::generateOutput()
     {
         generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
@@ -2187,13 +2154,11 @@ namespace Slang
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
-        if (m_isCommandLineCompile)
+        if (m_isCommandLineCompile && 
+            m_containerFormat == ContainerFormat::None)
         {
             auto linkage = getLinkage();
             auto program = getSpecializedGlobalAndEntryPointsComponentType();
-
-            // Collect all the artifacts and paths
-            List<ArtifactAndPath> artifactPaths;
 
             for (auto targetReq : linkage->targets)
             {
@@ -2204,7 +2169,8 @@ namespace Slang
                     if (const auto artifact = targetProgram->getExistingWholeProgramResult())
                     {
                         const auto path = _getWholeProgramPath(targetReq);
-                        artifactPaths.add({ ComPtr<IArtifact>(artifact), path });
+
+                        _maybeWriteArtifact(path, artifact);
                     }
                 }
                 else
@@ -2215,20 +2181,9 @@ namespace Slang
                         if (const auto artifact = targetProgram->getExistingEntryPointResult(ee))
                         {
                             const auto path = _getEntryPointPath(targetReq, ee);
-                            artifactPaths.add({ ComPtr<IArtifact>(artifact), path });
-                        }
-                    }
-                }
 
-                if (m_sourceEmbedStyle != SourceEmbedStyle::None)
-                {
-                    writeSourceEmbedded(artifactPaths);
-                }
-                else
-                {
-                    for (auto& artifactPath : artifactPaths)
-                    {
-                        _maybeWriteArtifact(artifactPath.path, artifactPath.artifact);
+                            _maybeWriteArtifact(path, artifact);
+                        }
                     }
                 }
             }
@@ -2240,6 +2195,9 @@ namespace Slang
         // If it's a command line compile we may need to write the container to a file
         if (m_isCommandLineCompile)
         {
+            // TODO(JS): 
+            // We could write the container into a source embedded format potentially
+
             maybeWriteContainer(m_containerOutputPath);
 
             _writeDependencyFile(this);

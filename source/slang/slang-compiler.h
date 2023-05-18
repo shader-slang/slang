@@ -12,6 +12,8 @@
 #include "../compiler-core/slang-include-system.h"
 #include "../compiler-core/slang-command-line-args.h"
 
+#include "../compiler-core/slang-source-embed-util.h"
+
 #include "../core/slang-std-writers.h"
 #include "../core/slang-command-options.h"
 
@@ -1160,19 +1162,6 @@ namespace Slang
         RefPtr<IRModule> m_irModule;
         Int m_conformanceIdOverride;
         void addDepedencyFromWitness(SubtypeWitness* witness);
-    };
-
-    enum class SourceEmbedStyle : uint32_t
-    {
-        None,               ///< No embedding
-        Default,            ///< Default embedding for the type
-        Text,               ///< Embed as text. May change line endings. If output isn't text will use 'default'. Size will *not* contain terminating 0
-        BinaryText,         ///< Embed as text assuming contents is binary. 
-        U8,                 ///< Embed as unsigned bytes
-        U16,                ///< Embed as uint16_t 
-        U32,                ///< Embed as uint32_t
-        U64,                ///< Embed as uint64_t
-        CountOf,
     };
 
     enum class PassThroughMode : SlangPassThroughIntegral
@@ -2661,12 +2650,6 @@ namespace Slang
 
         ~EndToEndCompileRequest();
 
-        struct ArtifactAndPath
-        {
-            ComPtr<IArtifact> artifact;
-            String path;
-        };
-
             // If enabled will emit IR 
         bool m_emitIr = false;
 
@@ -2687,7 +2670,7 @@ namespace Slang
         PassThroughMode m_passThrough = PassThroughMode::None;
 
             /// If output should be source embedded, define the style of the embedding
-        SourceEmbedStyle m_sourceEmbedStyle = SourceEmbedStyle::None;
+        SourceEmbedUtil::Style m_sourceEmbedStyle = SourceEmbedUtil::Style::None;
             /// The language to be used for source embedding
         SourceLanguage m_sourceEmbedLanguage = SourceLanguage::C;
             /// Source embed variable name. Note may be used as a basis for names if multiple items written
@@ -2751,9 +2734,6 @@ namespace Slang
             /// If a container has been constructed and the filename/path has contents will try to write
             /// the container contents to the file
         SlangResult maybeWriteContainer(const String& fileName);
-
-            /// Write out artifact in source code embedding
-        SlangResult writeSourceEmbedded(const List<ArtifactAndPath>& artifactPaths);
 
         Linkage* getLinkage() { return m_linkage; }
 
@@ -2831,6 +2811,7 @@ namespace Slang
 
             /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
         SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
+        SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
         ISlangUnknown* getInterface(const Guid& guid);
 
@@ -3096,9 +3077,6 @@ namespace Slang
         SourceLoc const& loc,
         DiagnosticSink* sink,
         const LoadedModuleDictionary* additionalLoadedModules);
-
-
-    ConstArrayView<NamesDescriptionValue> getSourceEmbedStyleInfos();
 
 //
 // The following functions are utilties to convert between
