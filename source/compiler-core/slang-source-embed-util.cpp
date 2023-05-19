@@ -104,6 +104,7 @@ static bool _needsCopy(const uint8_t* cur, Count bytesPerElement, Count bytesPer
     return ((size_t(bytesPerLine) | size_t(cur)) & size_t(bytesPerElement - 1)) != 0;
 }
 
+// NOTE! Assumes T is an unsigned type. Behavior will be incorrect if it is not.
 template <typename T>
 static void _appendHex(const T* in, ArrayView<char> elementWork, char* dst, size_t bytesForLine, StringBuilder& out)
 {
@@ -118,13 +119,16 @@ static void _appendHex(const T* in, ArrayView<char> elementWork, char* dst, size
     // The amount of hex digits needed, is 2 per byte
     const Count numHexDigits = sizeof(T) * 2;
 
+    // Shift to get top nybble
+    const Index shift = (numHexDigits - 1) * 4;
+
     for (size_t i = 0; i < elementsCount; ++i)
     {
-        const T value = in[i];
+        T value = in[i];
 
-        for (Index j = 0; j < numHexDigits; j++)
+        for (Index j = 0; j < numHexDigits; j++, value <<= 4)
         {
-            dst[j] = CharUtil::getHexChar((value >> (((numHexDigits - 1) - j) * 4)) & 0xf);
+            dst[j] = CharUtil::getHexChar(Index(value >> shift) & 0xf);
         }
 
         out.append(elementWork.getBuffer(), elementWork.getCount());
