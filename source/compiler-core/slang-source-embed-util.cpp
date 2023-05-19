@@ -108,6 +108,9 @@ static bool _needsCopy(const uint8_t* cur, Count bytesPerElement, Count bytesPer
 template <typename T>
 static void _appendHex(const T* in, ArrayView<char> elementWork, char* dst, size_t bytesForLine, StringBuilder& out)
 {
+    // Check that T is unsigned
+    SLANG_COMPILE_TIME_ASSERT((T(~T(0))) > T(0));
+
     // Make sure dst seems plausible
     SLANG_ASSERT(dst >= elementWork.begin() && dst <= elementWork.end());
     // Check the alignment
