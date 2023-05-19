@@ -41,6 +41,15 @@ static const NamesDescriptionValue kSourceEmbedStyleInfos[] =
     return lang == SLANG_SOURCE_LANGUAGE_CPP || lang == SLANG_SOURCE_LANGUAGE_C;
 }
 
+static bool _isHeaderExtension(const UnownedStringSlice& in)
+{
+    // Some "typical" header extensions
+    return in == toSlice("h") ||
+        in == toSlice("hpp") ||
+        in == toSlice("hxx") ||
+        in == toSlice("h++") ||
+        in == toSlice("hh");
+}
 
 /* static */String SourceEmbedUtil::getPath(const String& path, const Options& options)
 {
@@ -54,17 +63,16 @@ static const NamesDescriptionValue kSourceEmbedStyleInfos[] =
         return path;
     }
 
-    // We only support output to C/C++ headers for now
-    const auto ext = toSlice(".h");
+    const auto ext = Path::getPathExt(path);
 
-    if (path.endsWith(ext))
+    if (_isHeaderExtension(ext.getUnownedSlice()))
     {
         return path;
     }
 
+    // Assume it's a header, and just use the .h extension
     StringBuilder buf;
-    buf.append(path);
-    buf.append(ext);
+    buf << path << toSlice(".h");
     return buf;
 }
 

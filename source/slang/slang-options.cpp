@@ -427,13 +427,17 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DumpWarningDiagnostics, "-dump-warning-diagnostics", nullptr, "Dump to output list of warning diagnostic numeric and name ids." },
         { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."},
         { OptionKind::ReportDownstreamTime, "-report-downstream-time", nullptr, "Reports the time spent in the downstream compiler." },
-
         { OptionKind::SourceEmbedStyle, "-source-embed-style", "-source-embed-style <source-embed-style>",
-        "If source embedding is enabled, defines the style used. "},
+        "If source embedding is enabled, defines the style used. When enabled (with any style other than `none`), "
+        "will write compile results into embeddable source for the target language. "
+        "If no output file is specified, the output is written to stdout. If an output file is specified "
+        "it is written either to that file directly (if it is appropriate for the target language), "
+        "or it will be output to the filename with an appropriate extension.\n\n"
+        "Note for C/C++ with u16/u32/u64 types it is necessary to have `#include <stdint.h>` before the generated file.\n" },
         { OptionKind::SourceEmbedName, "-source-embed-name", "-source-embed-name <name>",
-        "The name used as the basis for variables output for source embedding"},
+        "The name used as the basis for variables output for source embedding."},
         { OptionKind::SourceEmbedLanguage, "-source-embed-language", "-source-embed-language <language>",
-        "The language to be used for source embedding. Defaults to C/C++."},
+        "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ are supported"},
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
