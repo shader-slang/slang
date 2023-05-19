@@ -204,7 +204,7 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
     const size_t bytesPerLine = elementsPerLine * bytesPerElement;
 
     List<uint64_t> alignedElements;
-    alignedElements.setCount(Count((bytesPerLine / 8) + 1));
+    alignedElements.setCount(Count((bytesPerLine / sizeof(uint64_t)) + 2));
     uint8_t* alignedDst = (uint8_t*)alignedElements.getBuffer();
 
     size_t bytesRemaining = data.getCount();
@@ -220,10 +220,16 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
         // We copy if we want alignment of if we hit a partial at the end
         if (_needsCopy(lineBytes, bytesPerElement, bytesForLine))
         {
-            uint8_t* lastElement = alignedDst + (bytesForLine & Index(~(bytesPerElement - 1)));
-            ::memset(lastElement, 0, bytesPerElement);
+            // Offset to the last element
+            const auto lastOffset = bytesForLine - size_t(bytesPerElement);
+            // Make sure the last element is zeroed, before copying 
+            // Needed if the last element is partial.
+            alignedElements[Index(lastOffset / sizeof(uint64_t))] = 0;
 
+            // Copy the bytes over
             ::memcpy(alignedDst, lineBytes, bytesForLine);
+
+            // Use the aligned buffer for the line
             lineBytes = alignedDst;
         }
 
