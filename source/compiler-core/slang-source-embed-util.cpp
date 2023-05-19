@@ -220,11 +220,9 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
         // We copy if we want alignment of if we hit a partial at the end
         if (_needsCopy(lineBytes, bytesPerElement, bytesForLine))
         {
-            // Offset to the last element
-            const auto lastOffset = bytesForLine - size_t(bytesPerElement);
             // Make sure the last element is zeroed, before copying 
             // Needed if the last element is partial.
-            alignedElements[Index(lastOffset / sizeof(uint64_t))] = 0;
+            alignedElements[Index(bytesForLine / sizeof(uint64_t))] = 0;
 
             // Copy the bytes over
             ::memcpy(alignedDst, lineBytes, bytesForLine);
