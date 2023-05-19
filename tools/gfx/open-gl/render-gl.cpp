@@ -1594,6 +1594,7 @@ public:
         R8G8B8A8_UNORM,
         D32_FLOAT,
         D_Unorm24_S8,
+        D32_FLOAT_S8,
         CountOf,
     };
 
@@ -1660,6 +1661,8 @@ public:
     {
         case Format::R8G8B8A8_UNORM:        return GlPixelFormat::R8G8B8A8_UNORM;
         case Format::D32_FLOAT:             return GlPixelFormat::D32_FLOAT;
+        //case Format::D24_UNORM_S8_UINT:     return GlPixelFormat::D_Unorm24_S8;
+        case Format::D32_FLOAT_S8_UINT:     return GlPixelFormat::D32_FLOAT_S8;
 
         default:                            return GlPixelFormat::Unknown;
     }
@@ -1672,6 +1675,7 @@ public:
     { GL_RGBA8,         GL_RGBA,    GL_UNSIGNED_BYTE },         // GlPixelFormat::R8G8B8A8_UNORM
     { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE}, // GlPixelFormat::D32_FLOAT
     { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE}, // GlPixelFormat::D_Unorm24_S8
+    { GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV}, // GlPixelFormat::D32_FLOAT_S8
 
 };
 
