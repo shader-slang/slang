@@ -433,7 +433,7 @@ void initCommandOptions(CommandOptions& options)
         "If no output file is specified, the output is written to stdout. If an output file is specified "
         "it is written either to that file directly (if it is appropriate for the target language), "
         "or it will be output to the filename with an appropriate extension.\n\n"
-        "Note for C/C++ with u16/u32/u64 types it is necessary to have `#include <stdint.h>` before the generated file.\n" },
+        "Note for C/C++ with u16/u32/u64 types it is necessary to have \"#include <stdint.h>\" before the generated file.\n" },
         { OptionKind::SourceEmbedName, "-source-embed-name", "-source-embed-name <name>",
         "The name used as the basis for variables output for source embedding."},
         { OptionKind::SourceEmbedLanguage, "-source-embed-language", "-source-embed-language <language>",

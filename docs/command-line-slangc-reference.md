@@ -247,7 +247,7 @@ If source embedding is enabled, defines the style used. When enabled (with any s
 
 
 
-Note for C/C++ with u16/u32/u64 types it is necessary to have `#include &lt;stdint.h&gt;` before the generated file. 
+Note for C/C++ with u16/u32/u64 types it is necessary to have "#include &lt;stdint.h&gt;" before the generated file. 
 
 
 
