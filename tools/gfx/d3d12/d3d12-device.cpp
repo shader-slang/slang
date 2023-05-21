@@ -1321,13 +1321,21 @@ Result DeviceImpl::createTextureView(
         viewImpl->m_allocator = m_rtvAllocator;
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
         rtvDesc.Format = D3DUtil::getMapFormat(desc.format);
-        isArray = desc.subresourceRange.layerCount > 1;
         switch (desc.renderTarget.shape)
         {
         case IResource::Type::Texture1D:
-            rtvDesc.ViewDimension =
-                isArray ? D3D12_RTV_DIMENSION_TEXTURE1DARRAY : D3D12_RTV_DIMENSION_TEXTURE1D;
-            rtvDesc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
+            rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE1DARRAY : D3D12_RTV_DIMENSION_TEXTURE1D;
+            if(isArray)
+            {
+                rtvDesc.Texture1DArray.MipSlice = desc.subresourceRange.mipLevel;
+                rtvDesc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                rtvDesc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount;
+            }
+            else
+            {
+                rtvDesc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
+            }
+            
             break;
         case IResource::Type::Texture2D:
             if (isMultiSample)
@@ -1341,14 +1349,26 @@ Result DeviceImpl::createTextureView(
             {
                 rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY
                     : D3D12_RTV_DIMENSION_TEXTURE2D;
-                rtvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
-                rtvDesc.Texture2DArray.PlaneSlice =
-                    resourceImpl ? D3DUtil::getPlaneSlice(
-                        D3DUtil::getMapFormat(resourceImpl->getDesc()->format),
-                        desc.subresourceRange.aspectMask)
-                    : 0;
-                rtvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
-                rtvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                if(isArray)
+                {
+                    rtvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+                    rtvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
+                    rtvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                    rtvDesc.Texture2DArray.PlaneSlice =
+                        resourceImpl ? D3DUtil::getPlaneSlice(
+                            D3DUtil::getMapFormat(resourceImpl->getDesc()->format),
+                            desc.subresourceRange.aspectMask)
+                        : 0;
+                }
+                else
+                {
+                    rtvDesc.Texture2D.MipSlice = desc.subresourceRange.mipLevel;
+                    rtvDesc.Texture2D.PlaneSlice =
+                        resourceImpl ? D3DUtil::getPlaneSlice(
+                            D3DUtil::getMapFormat(resourceImpl->getDesc()->format),
+                            desc.subresourceRange.aspectMask)
+                        : 0;
+                }
             }
             break;
         case IResource::Type::Texture3D:
@@ -1425,27 +1445,42 @@ Result DeviceImpl::createTextureView(
         switch (resourceImpl->getDesc()->type)
         {
         case IResource::Type::Texture1D:
-            d3d12desc.ViewDimension = resourceDesc.arraySize == 0
-                ? D3D12_UAV_DIMENSION_TEXTURE1D
-                : D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
-            d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
-            d3d12desc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount == 0
-                ? resourceDesc.arraySize
-                : desc.subresourceRange.layerCount;
-            d3d12desc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-
+            d3d12desc.ViewDimension = isArray
+                ? D3D12_UAV_DIMENSION_TEXTURE1DARRAY
+                : D3D12_UAV_DIMENSION_TEXTURE1D;
+            if(isArray)
+            {
+                d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
+            }
+            else
+            {
+                d3d12desc.Texture1DArray.MipSlice = desc.subresourceRange.mipLevel;
+                d3d12desc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount == 0
+                    ? resourceDesc.arraySize
+                    : desc.subresourceRange.layerCount;
+                d3d12desc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+            }
             break;
         case IResource::Type::Texture2D:
-            d3d12desc.ViewDimension = resourceDesc.arraySize == 0
-                ? D3D12_UAV_DIMENSION_TEXTURE2D
-                : D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-            d3d12desc.Texture2D.MipSlice = desc.subresourceRange.mipLevel;
-            d3d12desc.Texture2D.PlaneSlice =
-                D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
-            d3d12desc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount == 0
-                ? resourceDesc.arraySize
-                : desc.subresourceRange.layerCount;
-            d3d12desc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+            d3d12desc.ViewDimension = isArray
+                ? D3D12_UAV_DIMENSION_TEXTURE2DARRAY
+                : D3D12_UAV_DIMENSION_TEXTURE2D;
+            if(isArray)
+            {
+                d3d12desc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+                d3d12desc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount == 0
+                    ? resourceDesc.arraySize
+                    : desc.subresourceRange.layerCount;
+                d3d12desc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                d3d12desc.Texture2DArray.PlaneSlice =
+                    D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
+            }
+            else
+            {
+                d3d12desc.Texture2D.MipSlice = desc.subresourceRange.mipLevel;
+                d3d12desc.Texture2D.PlaneSlice =
+                    D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
+            }
             break;
         case IResource::Type::Texture3D:
             d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
