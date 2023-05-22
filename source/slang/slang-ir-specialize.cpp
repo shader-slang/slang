@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-lower-witness-lookup.h"
+#include "slang-ir-dce.h"
 
 namespace Slang
 {
@@ -930,6 +931,7 @@ struct SpecializationContext
             if (iterChanged)
             {
                 this->changed = true;
+                eliminateDeadCode(module->getModuleInst(), IRDeadCodeEliminationOptions());
             }
             else
             {
@@ -1615,6 +1617,8 @@ struct SpecializationContext
         // consideration.
         //
         addToWorkList(newFunc);
+
+        simplifyFunc(newFunc);
 
         return newFunc;
     }
