@@ -613,6 +613,15 @@ public:
     RefPtr<TypeLayout> originalElementTypeLayout;
 };
 
+/// Type layout for an pointer type
+class PointerTypeLayout : public SequenceTypeLayout
+{
+public:
+    // TODO(JS): For now I just follow the same mechanisms used for ArrayTypeLayout,
+    // because a pointer type is similar to an array, without bounds
+    RefPtr<TypeLayout> originalElementTypeLayout;
+};
+
 // type layout for a variable with stream-output type
 class StreamOutputTypeLayout : public TypeLayout
 {

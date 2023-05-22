@@ -238,6 +238,7 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(MIXED, mixed);
     CASE(REGISTER_SPACE, registerSpace);
     CASE(GENERIC, generic);
+
     #undef CASE
 
         default:
@@ -721,6 +722,16 @@ static void emitReflectionTypeInfoJSON(
             emitReflectionTypeJSON(writer, arrayType->getElementType());
         }
         break;
+    case slang::TypeReflection::Kind::Pointer:
+        {
+            auto pointerType = type;
+            comma(writer);
+            write(writer, "\"kind\": \"pointer\"");
+            comma(writer);
+            write(writer, "\"targetType\": ");
+            emitReflectionTypeJSON(writer, pointerType->getElementType());
+        }
+        break;
 
     case slang::TypeReflection::Kind::Struct:
         {
@@ -840,6 +851,20 @@ static void emitReflectionTypeLayoutInfoJSON(
         emitReflectionTypeInfoJSON(writer, typeLayout->getType());
         break;
 
+    case slang::TypeReflection::Kind::Pointer:
+        {
+            auto targetTypeLayout = typeLayout->getElementTypeLayout();
+
+            comma(writer);
+            write(writer, "\"kind\": \"pointer\"");
+
+            comma(writer);
+            write(writer, "\"targetType\": ");
+            emitReflectionTypeLayoutJSON(
+                writer,
+                targetTypeLayout);
+        }
+        break;
     case slang::TypeReflection::Kind::Array:
         {
             auto arrayTypeLayout = typeLayout;

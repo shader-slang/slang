@@ -360,6 +360,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_FEEDBACK;
     }
+    else if (const auto ptrType = as<PtrType>(type))
+    {
+        return SLANG_TYPE_KIND_POINTER;
+    }
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE)                          \
     else if(as<TYPE>(type)) do {          \
