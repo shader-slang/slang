@@ -1036,7 +1036,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& inO
 
 bool NVRTCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
-    return ArtifactDescUtil::isDissassembly(from, to) || ArtifactDescUtil::isDissassembly(to, from);
+    return ArtifactDescUtil::isDisassembly(from, to) || ArtifactDescUtil::isDisassembly(to, from);
 }
 
 SlangResult NVRTCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)

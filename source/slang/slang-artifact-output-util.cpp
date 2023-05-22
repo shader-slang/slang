@@ -25,7 +25,7 @@ namespace Slang
     assemblyDesc.kind = ArtifactKind::Assembly;
 
     // Check it seems like a plausbile disassembly 
-    if (!ArtifactDescUtil::isDissassembly(desc, assemblyDesc))
+    if (!ArtifactDescUtil::isDisassembly(desc, assemblyDesc))
     {
         if (sink)
         {
@@ -77,7 +77,7 @@ SlangResult ArtifactOutputUtil::maybeDisassemble(Session* session, IArtifact* ar
     toDesc.kind = ArtifactKind::Assembly;
 
     // If this likes a playsible disassebly conversion
-    if (ArtifactDescUtil::isDissassembly(desc, toDesc))
+    if (ArtifactDescUtil::isDisassembly(desc, toDesc))
     {
         ComPtr<IArtifact> disassemblyArtifact;
 
