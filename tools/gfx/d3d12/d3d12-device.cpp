@@ -1308,7 +1308,7 @@ Result DeviceImpl::createTextureView(
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
     viewImpl->m_desc = desc;
-    bool isArray = resourceImpl ? resourceImpl->getDesc()->arraySize != 0 : false;
+    bool isArray = resourceImpl ? resourceImpl->getDesc()->arraySize > 1 : false;
     bool isMultiSample = resourceImpl ? resourceImpl->getDesc()->sampleDesc.numSamples > 1 : false;
     switch (desc.type)
     {
@@ -1396,7 +1396,6 @@ Result DeviceImpl::createTextureView(
         viewImpl->m_allocator = m_dsvAllocator;
         D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
         dsvDesc.Format = D3DUtil::getMapFormat(desc.format);
-        isArray = desc.subresourceRange.layerCount > 1;
         switch (desc.renderTarget.shape)
         {
         case IResource::Type::Texture1D:
