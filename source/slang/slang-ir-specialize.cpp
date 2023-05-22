@@ -929,7 +929,6 @@ struct SpecializationContext
 
             if (iterChanged)
             {
-                simplifyIR(module);
                 this->changed = true;
             }
             else
