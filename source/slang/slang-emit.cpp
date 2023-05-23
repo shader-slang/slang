@@ -584,17 +584,14 @@ Result linkAndOptimizeIR(
     specializeResourceUsage(codeGenContext, irModule);
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
-    //
-    simplifyIR(irModule);
-
     // For GLSL targets, we also want to specialize calls to functions that
     // takes array parameters if possible, to avoid performance issues on
     // those platforms.
     if (isKhronosTarget(targetRequest))
     {
         specializeArrayParameters(codeGenContext, irModule);
-        simplifyIR(irModule);
     }
+    simplifyIR(irModule);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
