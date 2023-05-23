@@ -100,6 +100,12 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         }
     }
 
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // We'll assume 64 pointers by default, with 8 byte alignment
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+    }
+
     SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
@@ -250,6 +256,15 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         return vectorInfo;
     }
 
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // TODO(JS): 
+        // We'll assume 64 bit "pointer". If we are using these extensions... 
+        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_buffer_reference.txt
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_buffer_device_address.html.
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(int64_t), sizeof(int64_t));
+    }
+
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         // The size of an array must be rounded up to be a multiple of its alignment.
@@ -330,6 +345,12 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // Not supported on HLSL currently...
+        return SimpleLayoutInfo();
+    }
+
     UniformLayoutInfo BeginStructLayout() override
     {
         return UniformLayoutInfo(0, 16);
@@ -394,6 +415,16 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
             // This always returns a layout where the size is the same as the alignment.
             default: return Super::GetScalarLayout(baseType);
         }
+    }
+
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // TODO(JS):
+        // NOTE! We are assuming that the layout is the same for the *target* that it is for 
+        // the compilation.
+        // If we are emitting C++, then there is no way in general to know how that C++ will be compiled
+        // it could be 32 or 64 (or other) sizes. For now we just assume they are the same.
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
@@ -471,6 +502,12 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
 
             default: return Super::GetScalarLayout(baseType);
         }
+    }
+
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // CUDA/NVTRC only support 64 bit pointers
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(int64_t), sizeof(int64_t));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
@@ -587,6 +624,13 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
             getKind(),
             1);
     }
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // For pointers assume same logic as for scalars
+        return SimpleLayoutInfo(
+            getKind(),
+            1);
+    }
 
     SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t) override
     {
@@ -627,6 +671,13 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
     SimpleLayoutInfo GetScalarLayout(BaseType) override
     {
         // Assume that all scalars take up one "slot"
+        return SimpleLayoutInfo(
+            getKind(),
+            1);
+    }
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // In a sense pointer are just like ScalarLayout, so we'll use the same logic...
         return SimpleLayoutInfo(
             getKind(),
             1);
@@ -3701,6 +3752,27 @@ static TypeLayoutResult _createTypeLayout(
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {
         return createArrayLikeTypeLayout(context, arrayType, arrayType->getElementType(), arrayType->getElementCount());
+    }
+    else if (auto ptrType = as<PtrType>(type))
+    {
+        RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
+
+        ptrLayout->type = type;
+        ptrLayout->rules = rules;
+
+        const auto info = rules->GetPointerLayout();
+
+        ptrLayout->uniformAlignment = info.alignment;
+
+        ptrLayout->addResourceUsage(info.kind, info.size);
+
+        const auto valueTypeLayout = _createTypeLayout(
+            context,
+            ptrType->getValueType());
+
+        ptrLayout->valueTypeLayout = valueTypeLayout.layout;
+
+        return TypeLayoutResult(ptrLayout, info);
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {

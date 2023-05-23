@@ -614,12 +614,14 @@ public:
 };
 
 /// Type layout for an pointer type
-class PointerTypeLayout : public SequenceTypeLayout
+class PointerTypeLayout : public TypeLayout
 {
 public:
-    // TODO(JS): For now I just follow the same mechanisms used for ArrayTypeLayout,
-    // because a pointer type is similar to an array, without bounds
-    RefPtr<TypeLayout> originalElementTypeLayout;
+    // TODO(JS): 
+    // Should this derive from SequenceTypeLayout? A pointer is kind of like an array without
+    // bounds - in that it can be indexed. Of it it can be looked at as an indirection to a value.
+    // Is the "Just Work"iness applicable?
+    RefPtr<TypeLayout> valueTypeLayout;
 };
 
 // type layout for a variable with stream-output type
@@ -926,6 +928,9 @@ struct SimpleLayoutRulesImpl
     // Get size and alignment for an array of elements
     virtual SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) = 0;
 
+    /// Get pointer layout
+    virtual SimpleLayoutInfo GetPointerLayout() = 0;
+
     // Get layout for a vector or matrix type
     virtual SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
     virtual SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) = 0;
@@ -958,7 +963,10 @@ struct LayoutRulesImpl
     {
         return simpleRules->GetScalarLayout(baseType);
     }
-
+    SimpleLayoutInfo GetPointerLayout()
+    {
+        return simpleRules->GetPointerLayout();
+    }
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
     {
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
