@@ -98,6 +98,8 @@ DIAGNOSTIC(    43, Error, targetFlagsIgnoredBecauseBeforeAllTargets, "when using
 
 DIAGNOSTIC(    50, Error, duplicateTargets, "the target '$0' has been specified more than once")
 
+DIAGNOSTIC(    51, Error, unhandledLanguageForSourceEmbedding, "unhandled source language for source embedding")
+
 DIAGNOSTIC(    60, Error, cannotDeduceOutputFormatFromPath, "cannot infer an output format from the output path '$0'")
 DIAGNOSTIC(    61, Error, cannotMatchOutputFileToTarget, "no specified '-target' option matches the output path '$0', which implies the '$1' format")
 

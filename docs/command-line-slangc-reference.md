@@ -29,6 +29,7 @@ slangc -help-style markdown -h
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
 * [file-system-type](#file-system-type)
+* [source-embed-style](#source-embed-style)
 * [target](#target)
 * [stage](#stage)
 * [vulkan-shift](#vulkan-shift)
@@ -235,6 +236,36 @@ Treat the rest of the command line as input files.
 <a id="report-downstream-time"></a>
 ## -report-downstream-time
 Reports the time spent in the downstream compiler. 
+
+
+<a id="source-embed-style-1"></a>
+## -source-embed-style
+
+**-source-embed-style &lt;[source-embed-style](#source-embed-style)&gt;**
+
+If source embedding is enabled, defines the style used. When enabled (with any style other than `none`), will write compile results into embeddable source for the target language. If no output file is specified, the output is written to stdout. If an output file is specified it is written either to that file directly (if it is appropriate for the target language), or it will be output to the filename with an appropriate extension. 
+
+
+
+Note for C/C++ with u16/u32/u64 types it is necessary to have "#include &lt;stdint.h&gt;" before the generated file. 
+
+
+
+
+<a id="source-embed-name"></a>
+## -source-embed-name
+
+**-source-embed-name &lt;name&gt;**
+
+The name used as the basis for variables output for source embedding. 
+
+
+<a id="source-embed-language"></a>
+## -source-embed-language
+
+**-source-embed-language &lt;[language](#language)&gt;**
+
+The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ are supported 
 
 
 
@@ -718,6 +749,20 @@ File System Type
 * `default` : Default fike system. 
 * `load-file` : Just implements loadFile interface, so will be wrapped with CacheFileSystem internally. 
 * `os` : Use the OS based file system directly (without file system caching) 
+
+<a id="source-embed-style"></a>
+# source-embed-style
+
+Source Embed Style 
+
+* `none` : No source level embedding 
+* `default` : The default embedding for the type to be embedded 
+* `text` : Embed as text. May change line endings. If output isn't text will use 'default'. Size will *not* contain terminating 0. 
+* `binary-text` : Embed as text assuming contents is binary. 
+* `u8` : Embed as unsigned bytes. 
+* `u16` : Embed as uint16_t. 
+* `u32` : Embed as uint32_t. 
+* `u64` : Embed as uint64_t. 
 
 <a id="target"></a>
 # target
