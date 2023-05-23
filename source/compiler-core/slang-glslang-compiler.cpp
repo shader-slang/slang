@@ -251,7 +251,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
 bool GlslangDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // Can only disassemble blobs that are SPIR-V
-    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == ArtifactPayload::SPIRV;
+    return ArtifactDescUtil::isDisassembly(from, to) && from.payload == ArtifactPayload::SPIRV;
 }
 
 SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 

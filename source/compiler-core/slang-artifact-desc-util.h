@@ -100,11 +100,12 @@ struct ArtifactDescUtil
     static bool isDescDerivedFrom(const ArtifactDesc& desc, const ArtifactDesc& from);
 
         /// True if `to` is disassembly of `from`
-    static bool isDissassembly(const ArtifactDesc& from, const ArtifactDesc& to);
+    static bool isDisassembly(const ArtifactDesc& from, const ArtifactDesc& to);
 
         /// Append the desc as text to out
     static void appendText(const ArtifactDesc& desc, StringBuilder& out);
 
+        /// Given an artifact desc return a description as a string
     static String getText(const ArtifactDesc& desc);
 
 };

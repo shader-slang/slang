@@ -701,7 +701,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
 bool DXCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
-    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == ArtifactPayload::DXIL;
+    return ArtifactDescUtil::isDisassembly(from, to) && from.payload == ArtifactPayload::DXIL;
 }
 
 SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 
