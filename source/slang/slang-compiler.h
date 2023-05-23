@@ -12,6 +12,8 @@
 #include "../compiler-core/slang-include-system.h"
 #include "../compiler-core/slang-command-line-args.h"
 
+#include "../compiler-core/slang-source-embed-util.h"
+
 #include "../core/slang-std-writers.h"
 #include "../core/slang-command-options.h"
 
@@ -2667,6 +2669,13 @@ namespace Slang
         // Should we just pass the input to another compiler?
         PassThroughMode m_passThrough = PassThroughMode::None;
 
+            /// If output should be source embedded, define the style of the embedding
+        SourceEmbedUtil::Style m_sourceEmbedStyle = SourceEmbedUtil::Style::None;
+            /// The language to be used for source embedding
+        SourceLanguage m_sourceEmbedLanguage = SourceLanguage::C;
+            /// Source embed variable name. Note may be used as a basis for names if multiple items written
+        String m_sourceEmbedName;
+        
             /// Source code for the specialization arguments to use for the global specialization parameters of the program.
         List<String> m_globalSpecializationArgStrings;
 
@@ -2802,6 +2811,7 @@ namespace Slang
 
             /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
         SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
+        SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
         ISlangUnknown* getInterface(const Guid& guid);
 

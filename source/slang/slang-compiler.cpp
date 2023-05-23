@@ -1650,24 +1650,52 @@ namespace Slang
         return String();
     }
 
+    SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact* artifact)
+    {
+        if (path.getLength() > 0)
+        {
+            SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
+        }
+        else if (m_containerFormat == ContainerFormat::None)
+        {
+            // If we aren't writing to a container and we didn't write to a file, we can output to standard output
+            writeArtifactToStandardOutput(artifact, getSink());
+        }
+        return SLANG_OK;
+    }
+
     SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
     {
         // We don't have to do anything if there is no artifact
-        if (artifact)
+        if (!artifact)
         {
-            if (path.getLength())
-            {
-                SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
-                return SLANG_OK;
-            }
-
-            // If we aren't writing to a container and we didn't write to a file, we can output to 
-            if (m_containerFormat == ContainerFormat::None)
-            {
-                writeArtifactToStandardOutput(artifact, getSink());
-            }
+            return SLANG_OK;
         }
 
+        // If embedding is enabled...
+        if (m_sourceEmbedStyle != SourceEmbedUtil::Style::None)
+        {
+            SourceEmbedUtil::Options options;
+
+            options.style = m_sourceEmbedStyle;
+            options.variableName = m_sourceEmbedName;
+            options.language = (SlangSourceLanguage)m_sourceEmbedLanguage;
+
+            ComPtr<IArtifact> embeddedArtifact;
+            SLANG_RETURN_ON_FAIL(SourceEmbedUtil::createEmbedded(artifact, options, embeddedArtifact));
+
+            if (!embeddedArtifact)
+            {
+                return SLANG_FAIL;
+            }
+            SLANG_RETURN_ON_FAIL(_writeArtifact(SourceEmbedUtil::getPath(path, options), embeddedArtifact));
+            return SLANG_OK;
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(_writeArtifact(path, artifact));
+        }
+    
         return SLANG_OK;
     }
 
@@ -2120,14 +2148,16 @@ namespace Slang
         }
     }
 
+    
     void EndToEndCompileRequest::generateOutput()
     {
         generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
-
+        
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
-        if (m_isCommandLineCompile)
+        if (m_isCommandLineCompile && 
+            m_containerFormat == ContainerFormat::None)
         {
             auto linkage = getLinkage();
             auto program = getSpecializedGlobalAndEntryPointsComponentType();
@@ -2138,23 +2168,27 @@ namespace Slang
 
                 if (targetReq->isWholeProgramRequest())
                 {
-                    const auto path = _getWholeProgramPath(targetReq);
-                    const auto artifact = targetProgram->getExistingWholeProgramResult();
+                    if (const auto artifact = targetProgram->getExistingWholeProgramResult())
+                    {
+                        const auto path = _getWholeProgramPath(targetReq);
 
-                    _maybeWriteArtifact(path, artifact);
+                        _maybeWriteArtifact(path, artifact);
+                    }
                 }
                 else
                 {
                     Index entryPointCount = program->getEntryPointCount();
                     for (Index ee = 0; ee < entryPointCount; ++ee)
                     {        
-                        const auto path = _getEntryPointPath(targetReq, ee);
-                        const auto artifact = targetProgram->getExistingEntryPointResult(ee);
-                        
-                        _maybeWriteArtifact(path, artifact);
+                        if (const auto artifact = targetProgram->getExistingEntryPointResult(ee))
+                        {
+                            const auto path = _getEntryPointPath(targetReq, ee);
+
+                            _maybeWriteArtifact(path, artifact);
+                        }
                     }
                 }
-            }            
+            }
         }
 
         // Maybe create the container 
@@ -2163,6 +2197,9 @@ namespace Slang
         // If it's a command line compile we may need to write the container to a file
         if (m_isCommandLineCompile)
         {
+            // TODO(JS): 
+            // We could write the container into a source embedded format potentially
+
             maybeWriteContainer(m_containerOutputPath);
 
             _writeDependencyFile(this);
