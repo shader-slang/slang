@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 
 #include "slang-check.h"
+#include "slang-ir-loop-inversion.h"
 #include "slang-ir.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
@@ -9846,6 +9847,24 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // call sites.
     //
     performMandatoryEarlyInlining(module);
+
+    // Where possible, move loop condition checks to the end of loops, and wrap
+    // the loop in an 'if(condition)'.
+    // This makes it so that if sccp can see that the loop will always loop
+    // at least once it can record this information by removing the outer
+    // conditional.
+    // This has advantages:
+    // - Uninitialized variable usage detection doesn't have to
+    //   worry about a loop never being executed.
+    // - The loop condition is evaluated one fewer times.
+    // - Allegedly better performance on pipelined processors:
+    //   https://en.wikipedia.org/wiki/Loop_inversion
+    //
+    // And disadvantages
+    // - If sccp is unable to eliminate the outer 'if' then we end up with
+    //   duplicated code the the conditional value. Users don't tend to put
+    //   huge gobs of code in the conditional expression in loops however.
+    invertLoops(module);
 
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
