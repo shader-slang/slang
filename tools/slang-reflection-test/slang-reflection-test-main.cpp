@@ -853,16 +853,17 @@ static void emitReflectionTypeLayoutInfoJSON(
 
     case slang::TypeReflection::Kind::Pointer:
         {
-            auto targetTypeLayout = typeLayout->getElementTypeLayout();
+            auto valueTypeLayout = typeLayout->getElementTypeLayout();
+            SLANG_ASSERT(valueTypeLayout);
 
             comma(writer);
             write(writer, "\"kind\": \"pointer\"");
 
             comma(writer);
-            write(writer, "\"targetType\": ");
+            write(writer, "\"valueType\": ");
             emitReflectionTypeLayoutJSON(
                 writer,
-                targetTypeLayout);
+                valueTypeLayout);
         }
         break;
     case slang::TypeReflection::Kind::Array:
