@@ -2025,6 +2025,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     // type with the appropriate opcode.
     IRType* lowerSimpleIntrinsicType(DeclRefType* type)
     {
+        SLANG_ASSERT(getBuilder()->getInsertLoc().getMode() != IRInsertLoc::Mode::None);
+
+        if (type->declRef.decl && type->declRef.decl->getName()
+            && type->declRef.decl->getName()->text == "HitObject")
+        {
+            type = type;
+        }
+
         auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);

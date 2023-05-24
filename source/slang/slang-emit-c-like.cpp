@@ -1239,9 +1239,11 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         {
             return true;
         }
+        if (as<IRHitObjectType>(type))
+        {
+            return true;
+        }
     }
-
-
 
     // If the instruction is at global scope, then it might represent
     // a constant (e.g., the value of an enum case).
@@ -1292,6 +1294,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // definition for certain types on certain targets (e.g. `out TriangleStream<T>`
     // for GLSL), so we check this only after all those special cases are
     // considered.
+    //
     if (inst->getOp() == kIROp_undefined)
         return false;
 
@@ -1382,6 +1385,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     if(inst->getParent() != user->getParent())
         return false;
 
+
     // Now let's look at all the instructions between this instruction
     // and the user. If any of them might have side effects, then lets
     // bail out now.
@@ -1409,6 +1413,25 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     //
     if(as<IRUnconditionalBranch>(user))
         return false;
+
+    // HACK: As a special case, an `allocateOpaqueHandle` operation should
+    // only be folded in if its only use is as the operand of a `store`
+    // that will *itself* get peephole merged in as the initial-value expression
+    // of a `var`:
+    //
+    if (inst->getOp() == kIROp_AllocateOpaqueHandle)
+    {
+        auto store = as<IRStore>(user);
+        if (!store) return false;
+        if (store->getVal() != inst) return false;
+
+        auto var = as<IRVar>(store->getPtr());
+        if (!var) return false;
+
+        if(var->getNextInst() != store) return false;
+
+        return true;
+    }
 
     // Okay, if we reach this point then the user comes later in
     // the same block, and there are no instructions with side
@@ -1843,6 +1866,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_undefined:
     case kIROp_DefaultConstruct:
+    case kIROp_AllocateOpaqueHandle:
         m_writer->emit(getName(inst));
         break;
 
@@ -2441,19 +2465,13 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DefaultConstruct:
         {
             auto type = inst->getDataType();
-            emitType(type, getName(inst));
+            _emitInstAsDefaultInitializedVar(inst, type);
+        }
+        break;
 
-            // On targets that support empty initializers, we will emit it.
-            switch (this->getTarget())
-            {
-            case CodeGenTarget::CPPSource:
-            case CodeGenTarget::HostCPPSource:
-            case CodeGenTarget::PyTorchCppBinding:
-            case CodeGenTarget::CUDASource:
-                m_writer->emit(" = {}");
-                break;
-            }
-            m_writer->emit(";\n");
+    case kIROp_AllocateOpaqueHandle:
+        {
+            _emitAllocateOpaqueHandleImpl(inst);
         }
         break;
 
@@ -2466,17 +2484,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_Store:
         {
-            if (inst->getPrevInst() == inst->getOperand(0) && inst->getOperand(0)->getOp() == kIROp_Var)
-            {
-                // If we are storing into a var that is defined right before the store, we have
-                // already folded the store in the initialization of the var, so we can skip here.
-                break;
-            }
-            auto prec = getInfo(EmitOp::Assign);
-            emitDereferenceOperand(inst->getOperand(0), leftSide(getInfo(EmitOp::General), prec));
-            m_writer->emit(" = ");
-            emitOperand(inst->getOperand(1), rightSide(prec, getInfo(EmitOp::General)));
-            m_writer->emit(";\n");
+            auto store = cast<IRStore>(inst);
+            emitStore(store);
         }
         break;
 
@@ -2618,6 +2627,51 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         }
         break;
     }
+}
+
+void CLikeSourceEmitter::emitStore(IRStore* store)
+{
+    if (store->getPrevInst() == store->getOperand(0) && store->getOperand(0)->getOp() == kIROp_Var)
+    {
+        // If we are storing into a `var` that is defined right before the store, we have
+        // already folded the store in the initialization of the `var`, so we can skip here.
+        //
+        return;
+    }
+    _emitStoreImpl(store);
+}
+
+void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
+{
+    auto srcVal = store->getVal();
+    auto dstPtr = store->getPtr();
+    auto prec = getInfo(EmitOp::Assign);
+    emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
+    m_writer->emit(" = ");
+    emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
+    m_writer->emit(";\n");
+}
+
+void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* type)
+{
+    emitType(type, getName(inst));
+
+    // On targets that support empty initializers, we will emit it.
+    switch (this->getTarget())
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::PyTorchCppBinding:
+    case CodeGenTarget::CUDASource:
+        m_writer->emit(" = {}");
+        break;
+    }
+    m_writer->emit(";\n");
+}
+
+void CLikeSourceEmitter::_emitAllocateOpaqueHandleImpl(IRInst* allocateInst)
+{
+    _emitInstAsDefaultInitializedVar(allocateInst, allocateInst->getDataType());
 }
 
 void CLikeSourceEmitter::emitSemanticsUsingVarLayout(IRVarLayout* varLayout)
@@ -3415,16 +3469,25 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
 
     emitLayoutSemantics(varDecl);
 
+    // TODO: ideally this logic should scan ahead to see if it can find a `store`
+    // instruction that writes to the `var`, within the same block, such that all
+    // of the intervening instructions are safe to fold.
+    //
     if (auto store = as<IRStore>(varDecl->getNextInst()))
     {
         if (store->getPtr() == varDecl)
         {
-            m_writer->emit(" = ");
-            emitOperand(store->getVal(), getInfo(EmitOp::General));
+            _emitInstAsVarInitializerImpl(store->getVal());
         }
     }
 
     m_writer->emit(";\n");
+}
+
+void CLikeSourceEmitter::_emitInstAsVarInitializerImpl(IRInst* inst)
+{
+    m_writer->emit(" = ");
+    emitOperand(inst, getInfo(EmitOp::General));
 }
 
 void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
