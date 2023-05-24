@@ -1,8 +1,13 @@
 //TEST(64-bit):REFLECTION:-stage compute -no-codegen -target host-callable -entry computeMain
 
-Ptr<int> regularGlobal;
-int* regularGlobal2;
-int regularGlobal3;
+struct SomeStruct
+{    
+    Ptr<int> regularGlobal;
+    int* regularGlobal2;
+    int regularGlobal3;
+};
+
+RWStructuredBuffer<SomeStruct> inputBuffer;
 
 RWStructuredBuffer<int> outputBuffer;
 
