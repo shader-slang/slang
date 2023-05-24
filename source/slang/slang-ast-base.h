@@ -208,7 +208,7 @@ SLANG_FORCE_INLINE const T* as(const Type* obj);
 // `typedef` which gives them a good name when printed as
 // part of diagnostic messages.
 //
-// In order to operation on types, though, we often want
+// In order to operate on types, though, we often want
 // to look past any sugar, and operate on an underlying
 // "canonical" type. The representation caches a pointer to
 // a canonical type on every type, so we can easily

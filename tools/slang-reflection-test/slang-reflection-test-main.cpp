@@ -861,9 +861,18 @@ static void emitReflectionTypeLayoutInfoJSON(
 
             comma(writer);
             write(writer, "\"valueType\": ");
+
+            auto typeName = valueTypeLayout->getType()->getName();
+
+            // TODO(JS):
+            // We can't emit the type layout, because the type could contain
+            // a pointer and we end up in a recursive loop. For now we output the typename.
+            writeEscapedString(writer, typeName, strlen(typeName));
+
+            /*
             emitReflectionTypeLayoutJSON(
                 writer,
-                valueTypeLayout);
+                valueTypeLayout); */
         }
         break;
     case slang::TypeReflection::Kind::Array:

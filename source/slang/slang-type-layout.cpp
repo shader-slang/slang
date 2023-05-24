@@ -3486,11 +3486,66 @@ static TypeLayoutResult createArrayLikeTypeLayout(
     return TypeLayoutResult(typeLayout, arrayUniformInfo);
 }
 
+static void _addLayout(TypeLayoutContext const& context,
+    Type* type,
+    TypeLayout* layout)
+{
+    // Add it *without info*.
+    // The info can be added with _updateLayout
+    context.layoutMap[type] = TypeLayoutResult(layout, SimpleLayoutInfo());
+}
+
+static void _addLayout(TypeLayoutContext const& context,
+    Type* type,
+    const TypeLayoutResult& result)
+{
+    context.layoutMap[type] = result;
+}
+
+static TypeLayoutResult _updateLayout(TypeLayoutContext const& context,
+    Type* type,
+    TypeLayout* layout,
+    const SimpleLayoutInfo& info)
+{
+    auto layoutResultPtr = context.layoutMap.tryGetValue(type);
+    SLANG_ASSERT(layoutResultPtr);
+    if (layoutResultPtr)
+    {
+        // Check the layout is the same!
+        SLANG_ASSERT(layoutResultPtr->layout.get() == layout);
+        // Update the info
+        layoutResultPtr->info = info;
+    }
+
+    return TypeLayoutResult(layout, info);
+}
+
+static TypeLayoutResult _updateLayout(TypeLayoutContext const& context,
+    Type* type,
+    const TypeLayoutResult& result)
+{
+    auto layoutResultPtr = context.layoutMap.tryGetValue(type);
+    SLANG_ASSERT(layoutResultPtr);
+    if (layoutResultPtr)
+    {
+        // Check the layout is the same!
+        SLANG_ASSERT(layoutResultPtr->layout.get() == result.layout);
+        // Update the info
+        layoutResultPtr->info = result.info;
+    }
+
+    return result;
+}
 
 static TypeLayoutResult _createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type)
 {
+    if (auto layoutResultPtr = context.layoutMap.tryGetValue(type))
+    {
+        return *layoutResultPtr; 
+    }
+
     auto rules = context.rules;
 
     if (auto parameterGroupType = as<ParameterGroupType>(type))
@@ -3757,10 +3812,13 @@ static TypeLayoutResult _createTypeLayout(
     {
         RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
 
+        const auto info = rules->GetPointerLayout();
+
+        const TypeLayoutResult result(ptrLayout, info);
+        _addLayout(context, type, result);
+
         ptrLayout->type = type;
         ptrLayout->rules = rules;
-
-        const auto info = rules->GetPointerLayout();
 
         ptrLayout->uniformAlignment = info.alignment;
 
@@ -3772,7 +3830,7 @@ static TypeLayoutResult _createTypeLayout(
 
         ptrLayout->valueTypeLayout = valueTypeLayout.layout;
 
-        return TypeLayoutResult(ptrLayout, info);
+        return result;
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
@@ -3785,6 +3843,8 @@ static TypeLayoutResult _createTypeLayout(
 
             typeLayoutBuilder.beginLayout(type, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
+
+            _addLayout(context, type, typeLayout);
 
             // First, add all fields with explicit offsets.
             for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
@@ -3862,7 +3922,7 @@ static TypeLayoutResult _createTypeLayout(
                 typeLayout->pendingDataTypeLayout = pendingDataTypeLayout;
             }
 
-            return typeLayoutBuilder.getTypeLayoutResult();
+            return _updateLayout(context, type, typeLayoutBuilder.getTypeLayoutResult());
         }
         else if (auto globalGenericParamDecl = declRef.as<GlobalGenericParamDecl>())
         {
@@ -4164,6 +4224,9 @@ static TypeLayoutResult _createTypeLayout(
         UniformLayoutInfo info(0, 1);
 
         RefPtr<TaggedUnionTypeLayout> taggedUnionLayout = new TaggedUnionTypeLayout();
+
+        _addLayout(context, type, taggedUnionLayout);
+
         taggedUnionLayout->type = type;
         taggedUnionLayout->rules = rules;
 
@@ -4227,7 +4290,7 @@ static TypeLayoutResult _createTypeLayout(
         taggedUnionLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->count = info.size;
         taggedUnionLayout->uniformAlignment = info.alignment;
 
-        return TypeLayoutResult(taggedUnionLayout, info);
+        return _updateLayout(context, type, taggedUnionLayout, info);
     }
     else if( auto existentialSpecializedType = as<ExistentialSpecializedType>(type) )
     {
@@ -4243,6 +4306,9 @@ static TypeLayoutResult _createTypeLayout(
         rules->AddStructField(&info, baseTypeLayoutResult.info.getUniformLayout());
 
         RefPtr<ExistentialSpecializedTypeLayout> typeLayout = new ExistentialSpecializedTypeLayout();
+
+        _addLayout(context, type, typeLayout);
+
         typeLayout->type = type;
         typeLayout->rules = rules;
 
@@ -4287,7 +4353,7 @@ static TypeLayoutResult _createTypeLayout(
             typeLayout->addResourceUsage(LayoutResourceKind::Uniform, info.size);
         }
 
-        return makeTypeLayoutResult(typeLayout);
+        return _updateLayout(context, type, makeTypeLayoutResult(typeLayout));
     }
 
     // catch-all case in case nothing matched

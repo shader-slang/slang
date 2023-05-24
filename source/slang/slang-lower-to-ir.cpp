@@ -101,6 +101,8 @@ struct ExtractedExistentialValInfo;
 // values are also supported.
 struct LoweredValInfo
 {
+    typedef LoweredValInfo ThisType;
+
     // Which of the cases of value are we looking at?
     enum class Flavor
     {
@@ -136,10 +138,20 @@ struct LoweredValInfo
 
     union
     {
+        // Any change to this union might require a change to equality test
         IRInst*            val;
         ExtendedValueInfo*  ext;
     };
     Flavor flavor;
+
+    bool operator==(const ThisType& rhs) const
+    {
+        // NOTE! This only works because we are doing a pointer comparison, 
+        // and so it doesn't matter if we compare val/ext. If the union changes
+        // this may no longer apply.
+        return flavor == rhs.flavor && val == rhs.val;
+    }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
     LoweredValInfo()
     {
@@ -413,8 +425,8 @@ LoweredValInfo LoweredValInfo::extractedExistential(
 struct IRGenEnv
 {
     // Map an AST-level declaration to the IR-level value that represents it.
-    Dictionary<Decl*, LoweredValInfo> mapDeclToValue;
-
+    Dictionary<NodeBase*, LoweredValInfo> astNodeToValue;
+    
     // The next outer env around this one
     IRGenEnv*   outer = nullptr;
 };
@@ -524,12 +536,13 @@ struct IRGenContext
         return shared->m_mainModuleDecl;
     }
 
-    LoweredValInfo* findLoweredDecl(Decl* decl)
+    // Find lowered Val for a given node (decl/type)
+    LoweredValInfo* findLowered(NodeBase* node)
     {
         IRGenEnv* envToFindIn = env;
         while (envToFindIn)
         {
-            if (auto rs = envToFindIn->mapDeclToValue.tryGetValue(decl))
+            if (auto rs = envToFindIn->astNodeToValue.tryGetValue(node))
                 return rs;
             envToFindIn = envToFindIn->outer;
         }
@@ -539,7 +552,7 @@ struct IRGenContext
 
 void setGlobalValue(SharedIRGenContext* sharedContext, Decl* decl, LoweredValInfo value)
 {
-    sharedContext->globalEnv.mapDeclToValue[decl] = value;
+    sharedContext->globalEnv.astNodeToValue[decl] = value;
 }
 
 void setGlobalValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
@@ -549,7 +562,7 @@ void setGlobalValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
 
 void setValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
 {
-    context->env->mapDeclToValue[decl] = value;
+    context->env->astNodeToValue[decl] = value;
 }
 
 ModuleDecl* findModuleDecl(Decl* decl)
@@ -1926,7 +1939,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitPtrType(PtrType* type)
     {
-        IRType* valueType = lowerType(context, type->getValueType());
+        auto astValueType = type->getValueType();
+
+        IRType* valueType = lowerType(context, astValueType);
         return getBuilder()->getPtrType(valueType);
     }
 
@@ -2252,6 +2267,18 @@ IRType* lowerType(
     IRGenContext*   context,
     Type*           type)
 {
+    // See if the type is already lowered
+    if (auto valPtr = context->findLowered(type))
+    {
+        if (valPtr->flavor == LoweredValInfo::Flavor::Simple)
+        {
+            if (auto irType = as<IRType>(valPtr->val))
+            {
+                return irType;
+            }
+        }
+    }
+   
     ValLoweringVisitor visitor;
     visitor.context = context;
     return (IRType*) getSimpleVal(context, visitor.dispatchType(type));
@@ -4949,7 +4976,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 varType,
                 ii);
 
-            subEnv->mapDeclToValue[varDecl] = LoweredValInfo::simple(constVal);
+            subEnv->astNodeToValue[varDecl] = LoweredValInfo::simple(constVal);
 
             lowerStmt(subContext, stmt->body);
         }
@@ -7600,6 +7627,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
 
+        // The value that will be lowered to
+        LoweredValInfo loweredVal;
+        {
+            // Find the outer most generic, to match what is returned via finishOuterGenerics
+            if (outerGeneric)
+            {
+                auto curGeneric = outerGeneric;
+                while (true)
+                {
+                    auto parentBlock = as<IRBlock>(curGeneric->getParent());
+                    if (!parentBlock) break;
+                    auto parentGeneric = as<IRGeneric>(parentBlock->getParent());
+                    if (!parentGeneric) break;
+                    curGeneric = parentGeneric;
+                }
+
+                loweredVal = LoweredValInfo::simple(curGeneric);
+            }
+            else
+            {
+                loweredVal = LoweredValInfo::simple(irAggType);
+            }
+
+            // Add it to the map (even though it *isn't* complete), such that it can be referenced whilst  
+            // traversal (for example the type could contain pointer to itself)
+            context->env->astNodeToValue.add(decl, loweredVal);
+        }
+
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
 
@@ -7685,7 +7740,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (as<NonCopyableTypeAttribute>(modifier))
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
         }
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
+
+        const auto finalLoweredVal = LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
+
+        // These should be the same!
+        SLANG_ASSERT(finalLoweredVal == loweredVal);
+        
+        return finalLoweredVal;
     }
 
     void lowerPackOffsetModifier(IRInst* inst, HLSLPackOffsetSemantic* semantic)
@@ -7890,7 +7951,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             if (auto declRefType = as<DeclRefType>(constraintDecl->sub.type))
             {
-                auto typeParamDeclVal = subContext->findLoweredDecl(declRefType->declRef.decl);
+                auto typeParamDeclVal = subContext->findLowered(declRefType->declRef.decl);
                 SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
                 subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
             }
@@ -8082,7 +8143,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         while (parentGeneric)
         {
-            // Create a universal type in `outterBlock` that will be used
+            // Create a universal type in `outerBlock` that will be used
             // as the type of this generic inst. The return value of the
             // generic inst will have a specialized type.
             // For example, if we have a generic function
@@ -9117,8 +9178,8 @@ LoweredValInfo ensureDecl(
     auto env = context->env;
     while(env)
     {
-        if(env->mapDeclToValue.tryGetValue(decl, result))
-            return result;
+        if(auto resultPtr = env->astNodeToValue.tryGetValue(decl))
+            return *resultPtr;
 
         env = env->outer;
     }

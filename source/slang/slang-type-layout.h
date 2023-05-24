@@ -1030,6 +1030,30 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getStructuredBufferRules(TargetRequest* request) = 0;
 };
 
+    /// A custom tuple to capture the outputs of type layout
+struct TypeLayoutResult
+{
+        /// The actual heap-allocated layout object with all the details
+    RefPtr<TypeLayout>  layout;
+
+        /// A simplified representation of layout information.
+        ///
+        /// This information is suitable for the case where a type only
+        /// consumes a single resource.
+        ///
+    SimpleLayoutInfo    info;
+
+        /// Default constructor.
+    TypeLayoutResult()
+    {}
+
+        /// Construct a result from the given layout object and simple layout info.
+    TypeLayoutResult(RefPtr<TypeLayout> inLayout, SimpleLayoutInfo const& inInfo)
+        : layout(inLayout)
+        , info(inInfo)
+    {}
+};
+
 struct TypeLayoutContext
 {
     ASTBuilder* astBuilder;
@@ -1056,6 +1080,9 @@ struct TypeLayoutContext
     //
     Int                                 specializationArgCount = 0;
     ExpandedSpecializationArg const*    specializationArgs = nullptr;
+
+    // Map types to their type layout
+    Dictionary<Type*, TypeLayoutResult>      layoutMap;
 
     LayoutRulesImpl* getRules() { return rules; }
     LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }
@@ -1105,29 +1132,7 @@ struct TypeLayoutContext
 
 //
 
-    /// A custom tuple to capture the outputs of type layout
-struct TypeLayoutResult
-{
-        /// The actual heap-allocated layout object with all the details
-    RefPtr<TypeLayout>  layout;
 
-        /// A simplified representation of layout information.
-        ///
-        /// This information is suitable for the case where a type only
-        /// consumes a single resource.
-        ///
-    SimpleLayoutInfo    info;
-
-        /// Default constructor.
-    TypeLayoutResult()
-    {}
-
-        /// Construct a result from the given layout object and simple layout info.
-    TypeLayoutResult(RefPtr<TypeLayout> inLayout, SimpleLayoutInfo const& inInfo)
-        : layout(inLayout)
-        , info(inInfo)
-    {}
-};
 
     /// Helper type for building `struct` type layouts
 struct StructTypeLayoutBuilder
