@@ -597,6 +597,8 @@ DIAGNOSTIC(40011, Error, unconstrainedGenericParameterNotAllowedInDynamicFunctio
 
 DIAGNOSTIC(40020, Error, cannotUnrollLoop, "loop does not terminate within the limited number of iterations, unrolling is aborted.")
 
+DIAGNOSTIC(40030, Fatal, functionNeverReturnsFatal, "function '$0' never returns, compilation ceased.")
+
 // 41000 - IR-level validation issues
 
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
