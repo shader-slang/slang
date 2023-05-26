@@ -10,4 +10,6 @@ namespace Slang
     void convertFuncToSingleReturnForm(IRModule* module, IRGlobalValueWithCode* func);
 
     bool isSingleReturnFunc(IRGlobalValueWithCode* func);
+
+    int getReturnCount(IRGlobalValueWithCode* func);
 }

@@ -2285,6 +2285,7 @@ struct LegalFuncBuilder
         // prefers to modify an IR node in-place rather than create a distinct
         // legalized copy of it.
         //
+        irBuilder->setInsertBefore(oldFunc);
         auto newFuncType = irBuilder->getFuncType(
             m_paramTypes.getCount(),
             m_paramTypes.getBuffer(),
