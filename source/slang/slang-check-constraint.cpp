@@ -792,6 +792,8 @@ namespace Slang
         Type*  fst,
         Type*  snd)
     {
+        if (!fst) return false;
+
         if (fst->equals(snd)) return true;
 
         // An error type can unify with anything, just so we avoid cascading errors.
