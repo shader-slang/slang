@@ -30,7 +30,6 @@ bool specializeHigherOrderParameters(
     while (changed)
     {
         changed = specializeFunctionCalls(codeGenContext, module, &condition);
-        simplifyIR(module);
         result |= changed;
     }
     return result;
