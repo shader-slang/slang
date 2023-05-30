@@ -145,6 +145,7 @@ namespace Slang
 
 #define CASE(TYPE) void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
 
+        CASE(EnumCaseDecl)
         CASE(FuncDecl)
         CASE(VarDeclBase)
         CASE(SimpleTypeDecl)
