@@ -2219,11 +2219,13 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     // Extrac the stand
     ParseDiagnosticUtil::OutputInfo outputInfo;
-    if (SLANG_SUCCEEDED(ParseDiagnosticUtil::parseOutputInfo(actualOutput.getUnownedSlice(), outputInfo)) &&
-        SLANG_SUCCEEDED(outputInfo.resultCode))
+    if (SLANG_SUCCEEDED(ParseDiagnosticUtil::parseOutputInfo(actualOutput.getUnownedSlice(), outputInfo)))
     {
+        const auto toolReturnCode = ToolReturnCode(outputInfo.resultCode);
+
         // The output should be JSON. 
         // Parse it to check that it is valid json
+        if (toolReturnCode == ToolReturnCode::Success)
         {
             SourceManager sourceManager;
             sourceManager.initialize(nullptr, nullptr);
