@@ -1217,6 +1217,109 @@ IntVal* PolynomialIntVal::canonicalize(ASTBuilder* builder)
     return this;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypeCastIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+bool TypeCastIntVal::_equalsValOverride(Val* val)
+{
+    if (auto typeCastIntVal = as<TypeCastIntVal>(val))
+    {
+        if (!type->equals(typeCastIntVal->type))
+            return false;
+        if (!base->equalsVal(typeCastIntVal->base))
+            return false;
+        return true;
+    }
+    return false;
+}
+
+void TypeCastIntVal::_toTextOverride(StringBuilder& out)
+{
+    type->toText(out);
+    out << "(";
+    base->toText(out);
+    out << ")";
+}
+
+HashCode TypeCastIntVal::_getHashCodeOverride()
+{
+    HashCode result = type->getHashCode();
+    result = combineHash(result, base->getHashCode());
+    return result;
+}
+
+Val* TypeCastIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, Val* base, DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+
+    if (auto c = as<ConstantIntVal>(base))
+    {
+        IntegerLiteralValue resultValue = c->value;
+        auto baseType = as<BasicExpressionType>(resultType);
+        if (baseType)
+        {
+            switch (baseType->baseType)
+            {
+            case BaseType::Int:
+                resultValue = (IntegerLiteralValue)(int)resultValue;
+                break;
+            case BaseType::UInt:
+                resultValue = (IntegerLiteralValue)(unsigned int)resultValue;
+                break;
+            case BaseType::Int64:
+            case BaseType::IntPtr:
+                resultValue = (IntegerLiteralValue)(Int64)resultValue;
+                break;
+            case BaseType::UInt64:
+            case BaseType::UIntPtr:
+                resultValue = (IntegerLiteralValue)(UInt64)resultValue;
+                break;
+            case BaseType::Int16:
+                resultValue = (IntegerLiteralValue)(int16_t)resultValue;
+                break;
+            case BaseType::UInt16:
+                resultValue = (IntegerLiteralValue)(uint16_t)resultValue;
+                break;
+            case BaseType::Int8:
+                resultValue = (IntegerLiteralValue)(int8_t)resultValue;
+                break;
+            case BaseType::UInt8:
+                resultValue = (IntegerLiteralValue)(uint8_t)resultValue;
+                break;
+            default:
+                SLANG_UNEXPECTED("unknown base type");
+                break;
+            }
+        }
+        return astBuilder->getIntVal(resultType, resultValue);
+    }
+    return nullptr;
+}
+
+Val* TypeCastIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    auto substBase = base->substituteImpl(astBuilder, subst, &diff);
+    if (substBase != base)
+        diff++;
+    auto substType = type->substituteImpl(astBuilder, subst, &diff);
+    if (substType != type)
+        diff++;
+    *ioDiff += diff;
+    if (diff)
+    {
+        auto newVal = tryFoldImpl(astBuilder, type, substBase, nullptr);
+        if (newVal)
+            return newVal;
+        else
+        {
+            auto result = astBuilder->create<TypeCastIntVal>(as<Type>(substType), substBase);
+            return result;
+        }
+    }
+    // Nothing found: don't substitute.
+    return this;
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncCallIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 bool FuncCallIntVal::_equalsValOverride(Val* val)

@@ -1620,8 +1620,16 @@ namespace Slang
         if(auto castExpr = expr.as<TypeCastExpr>())
         {
             auto val = tryConstantFoldExpr(getArg(castExpr, 0), circularityInfo);
-            if(val)
-                return val;
+            if (val)
+            {
+                if (!castExpr.getExpr()->type)
+                    return nullptr;
+                auto substType = getType(m_astBuilder, expr);
+                if (!substType)
+                    return nullptr;
+                auto result = m_astBuilder->getOrCreate<TypeCastIntVal>(substType, val);
+                return result;
+            }
         }
         else if (auto invokeExpr = expr.as<InvokeExpr>())
         {
