@@ -1619,14 +1619,20 @@ namespace Slang
 
         if(auto castExpr = expr.as<TypeCastExpr>())
         {
+            auto substType = getType(m_astBuilder, expr);
+            if (!substType)
+                return nullptr;
+            if (!isScalarIntegerType(substType))
+                return nullptr;
             auto val = tryConstantFoldExpr(getArg(castExpr, 0), circularityInfo);
             if (val)
             {
                 if (!castExpr.getExpr()->type)
                     return nullptr;
-                auto substType = getType(m_astBuilder, expr);
-                if (!substType)
-                    return nullptr;
+                auto foldVal = as<IntVal>(
+                    TypeCastIntVal::tryFoldImpl(m_astBuilder, substType, val, getSink()));
+                if (foldVal)
+                    return foldVal;
                 auto result = m_astBuilder->getOrCreate<TypeCastIntVal>(substType, val);
                 return result;
             }

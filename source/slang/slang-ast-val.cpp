@@ -1285,8 +1285,7 @@ Val* TypeCastIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, Val* 
                 resultValue = (IntegerLiteralValue)(uint8_t)resultValue;
                 break;
             default:
-                SLANG_UNEXPECTED("unknown base type");
-                break;
+                return nullptr;
             }
         }
         return astBuilder->getIntVal(resultType, resultValue);
@@ -1300,18 +1299,18 @@ Val* TypeCastIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
     auto substBase = base->substituteImpl(astBuilder, subst, &diff);
     if (substBase != base)
         diff++;
-    auto substType = type->substituteImpl(astBuilder, subst, &diff);
+    auto substType = as<Type>(type->substituteImpl(astBuilder, subst, &diff));
     if (substType != type)
         diff++;
     *ioDiff += diff;
     if (diff)
     {
-        auto newVal = tryFoldImpl(astBuilder, type, substBase, nullptr);
+        auto newVal = tryFoldImpl(astBuilder, substType, substBase, nullptr);
         if (newVal)
             return newVal;
         else
         {
-            auto result = astBuilder->create<TypeCastIntVal>(as<Type>(substType), substBase);
+            auto result = astBuilder->create<TypeCastIntVal>(substType, substBase);
             return result;
         }
     }
