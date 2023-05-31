@@ -10,6 +10,7 @@
 
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-char-util.h"
+#include "../../source/core/slang-string-util.h"
 
 #include "../../source/core/slang-test-tool-util.h"
 
@@ -17,6 +18,8 @@ using namespace Slang;
 
 struct PrettyWriter
 {
+    typedef PrettyWriter ThisType;
+
     struct CommaTrackerRAII;
 
     struct CommaState
@@ -24,11 +27,11 @@ struct PrettyWriter
         bool needComma = false;
     };
 
-    void writeRaw(const UnownedStringSlice& out) { m_writer->write(out.begin(), out.getLength()); }
+    void writeRaw(const UnownedStringSlice& slice) { m_builder.append(slice); }
     void writeRaw(char const* begin, char const* end);
     void writeRaw(PrettyWriter& writer, char const* begin) { writeRaw(UnownedStringSlice(begin)); }
     
-    void writeRawChar(int c);
+    void writeRawChar(int c) { m_builder.appendChar(char(c)); }
 
     void writeHexChar(int c) { writeRawChar(CharUtil::getHexChar(Index(c))); }
 
@@ -51,15 +54,16 @@ struct PrettyWriter
         /// Call before items in a comma-separated JSON list to emit the comma if/when needed
     void maybeComma();
 
-        /// Get the output writer as a helper 
-    WriterHelper getOut() const { return WriterHelper(m_writer); }
-        /// Get the output writer
-    ISlangWriter* getOutWriter() const { return m_writer; }
+        /// Get the builder the result is being constructed in
+    StringBuilder& getBuilder() { return m_builder; }
+
+    ThisType& operator<<(UnownedStringSlice& slice) { write(slice); return *this; }
+
 
     bool m_startOfLine = true;
     int m_indent = 0;
     CommaState* m_commaState = nullptr;
-    ISlangWriter* m_writer = StdWriters::getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT);
+    StringBuilder m_builder;
 };
 
 void PrettyWriter::writeRaw(char const* begin, char const* end)
@@ -68,22 +72,13 @@ void PrettyWriter::writeRaw(char const* begin, char const* end)
     writeRaw(UnownedStringSlice(begin, end));
 }
 
-void PrettyWriter::writeRawChar(int c)
-{
-    const char ch = char(c);
-    m_writer->write(&ch, 1);
-}
-
 void PrettyWriter::adjust()
 {
     // Only indent if at start of a line
     if (m_startOfLine)
     {
         // Output current indentation
-        const auto indentSlice = toSlice("    ");
-        for (int ii = 0; ii < m_indent; ++ii)
-            writeRaw(indentSlice);
-
+        m_builder.appendRepeatedChar(' ', m_indent * 4);
         m_startOfLine = false;      
     }
 }
@@ -129,12 +124,8 @@ void PrettyWriter::write(const UnownedStringSlice& slice)
 void PrettyWriter::writeEscapedString(const UnownedStringSlice& slice)
 {
     adjust();
-
     auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
-
-    StringBuilder buf;
-    StringEscapeUtil::appendQuoted(handler, slice, buf);
-    writeRaw(buf.getUnownedSlice());
+    StringEscapeUtil::appendQuoted(handler, slice, m_builder);
 }
 
 void PrettyWriter::maybeComma()
@@ -154,31 +145,32 @@ void PrettyWriter::maybeComma()
 static void write(PrettyWriter& writer, uint64_t val)
 {
     writer.adjust();
-    writer.getOut().print("%llu", (unsigned long long)val);
+    writer.getBuilder() << val; 
 }
 
 static void write(PrettyWriter& writer, int64_t val)
 {
     writer.adjust();
-    writer.getOut().print("%lld", (long long)val);
+    writer.getBuilder() << val;
 }
 
 static void write(PrettyWriter& writer, int32_t val)
 {
     writer.adjust();
-    writer.getOut().print("%d", int(val));
+    writer.getBuilder() << val;
 }
 
 static void write(PrettyWriter& writer, uint32_t val)
 {
     writer.adjust();
-    writer.getOut().print("%u", (unsigned int)val);
+    writer.getBuilder() << val;
 }
 
 static void write(PrettyWriter& writer, float val)
 {
     writer.adjust();
-    writer.getOut().print("%f", val);
+    // We want to use a specific format, so we use the StringUtil to specify format, and not just use << 
+    StringUtil::appendFormat(writer.getBuilder(), "%f", val);
 }
 
     /// Type for tracking whether a comma is needed in a comma-separated JSON list
@@ -1336,6 +1328,12 @@ void emitReflectionJSON(
     PrettyWriter writer;
     
     emitReflectionJSON(writer, request, programReflection);
+
+    // Get the contents of the writer
+    const auto slice = writer.getBuilder().getUnownedSlice();
+
+    // Output the writer content to out stream
+    StdWriters::getOut().write(slice.begin(), slice.getLength());
 }
 
 static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* request)
@@ -1343,7 +1341,7 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     const char* diagnostic;
     if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
     {
-        Slang::StdWriters::getError().put(diagnostic);
+        StdWriters::getError().put(diagnostic);
     }
     return res;
 }
