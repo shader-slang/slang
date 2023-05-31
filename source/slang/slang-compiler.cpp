@@ -1548,6 +1548,8 @@ namespace Slang
     // Do emit logic for a zero or more entry points
     SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
+        CompileTimerRAII recordCompileTime(getSession());
+
         auto target = getTargetFormat();
 
         switch (target)

@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-ssa-simplification.h"
 
 namespace Slang
 {
@@ -887,6 +888,8 @@ struct FunctionParameterSpecializationContext
         // potentially-specializable call sites to our work list.
         //
         addCallsToWorkListRec(newFunc);
+
+        simplifyFunc(newFunc);
 
         return newFunc;
     }

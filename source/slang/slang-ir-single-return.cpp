@@ -89,7 +89,7 @@ void convertFuncToSingleReturnForm(IRModule* irModule, IRGlobalValueWithCode* fu
     context.processFunc(func);
 }
 
-bool isSingleReturnFunc(IRGlobalValueWithCode* func)
+int getReturnCount(IRGlobalValueWithCode* func)
 {
     int returnCount = 0;
     for (auto block : func->getBlocks())
@@ -102,7 +102,12 @@ bool isSingleReturnFunc(IRGlobalValueWithCode* func)
             }
         }
     }
-    return returnCount <= 1;
+    return returnCount;
+}
+
+bool isSingleReturnFunc(IRGlobalValueWithCode* func)
+{
+    return getReturnCount(func) == 1;
 }
 
 } // namespace Slang

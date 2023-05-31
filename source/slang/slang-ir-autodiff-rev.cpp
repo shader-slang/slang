@@ -537,9 +537,16 @@ namespace Slang
         DifferentiableTypeConformanceContext diffTypeContext(autoDiffSharedContext);
         diffTypeContext.setFunc(func);
 
-        if (!isSingleReturnFunc(func))
+        auto returnCount = getReturnCount(func);
+        if (returnCount > 1)
         {
             convertFuncToSingleReturnForm(func->getModule(), func);
+        }
+        else if (returnCount == 0)
+        {
+            // The function is ill-formed and never returns (such as having an infinite loop),
+            // we can't possibly reverse-differentiate such functions, so we will diagnose it here.
+            getSink()->diagnose(func->sourceLoc, Diagnostics::functionNeverReturnsFatal, func);
         }
 
         eliminateContinueBlocksInFunc(func->getModule(), func);
