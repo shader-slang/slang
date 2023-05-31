@@ -409,11 +409,12 @@ namespace Slang
             auto& arg = context.getArg(ii);
             auto argType = context.getArgType(ii);
             auto paramType = paramTypes[ii];
-
+            if (!paramType)
+                return false;
+            if (!argType)
+                return false;
             if (context.mode == OverloadResolveContext::Mode::JustTrying)
             {
-                SLANG_ASSERT(argType);
-
                 ConversionCost cost = kConversionCost_None;
                 if( context.disallowNestedConversions )
                 {
@@ -1656,7 +1657,11 @@ namespace Slang
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             if(aa != 0) argsListBuilder << ", ";
-            context.getArgType(aa)->toText(argsListBuilder);
+            auto argType = context.getArgType(aa);
+            if (argType)
+                context.getArgType(aa)->toText(argsListBuilder);
+            else
+                argsListBuilder << "error";
         }
         argsListBuilder << ")";
         return argsListBuilder.produceString();

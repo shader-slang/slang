@@ -221,7 +221,7 @@ namespace Slang
     static const IntrinsicOpInfo intrinsicUnaryOps[] = {
         { kIROp_Neg,    "neg",              "-",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
         { kIROp_Not,    "logicalNot",       "!",    nullptr,                    BOOL_MASK | BOOL_RESULT },
-        { kIROp_BitNot, "not",              "~",    "__BuiltinIntegerType",     INT_MASK        },
+        { kIROp_BitNot, "not",              "~",    "__BuiltinLogicalType",     INT_MASK        },
     };
 
     static const IntrinsicOpInfo intrinsicBinaryOps[] = {
