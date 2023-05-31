@@ -16,7 +16,7 @@ namespace Slang
 {
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
-    void simplifyIR(IRModule* module)
+    void simplifyIR(IRModule* module, DiagnosticSink* sink)
     {
         bool changed = true;
         const int kMaxIterations = 8;
@@ -25,12 +25,16 @@ namespace Slang
 
         while (changed && iterationCounter < kMaxIterations)
         {
+            if (sink && sink->getErrorCount())
+                break;
+
             changed = false;
+
             changed |= hoistConstants(module);
             changed |= deduplicateGenericChildren(module);
             changed |= propagateFuncProperties(module);
             changed |= removeUnusedGenericParam(module);
-            changed |= applySparseConditionalConstantPropagationForGlobalScope(module);
+            changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
             changed |= peepholeOptimize(module);
 
             for (auto inst : module->getGlobalInsts())
@@ -43,7 +47,7 @@ namespace Slang
                 while (funcChanged && funcIterationCount < kMaxFuncIterations)
                 {
                     funcChanged = false;
-                    funcChanged |= applySparseConditionalConstantPropagation(func);
+                    funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                     funcChanged |= peepholeOptimize(func);
                     funcChanged |= removeRedundancyInFunc(func);
                     funcChanged |= simplifyCFG(func);
@@ -85,15 +89,18 @@ namespace Slang
     }
 
 
-    void simplifyFunc(IRGlobalValueWithCode* func)
+    void simplifyFunc(IRGlobalValueWithCode* func, DiagnosticSink* sink)
     {
         bool changed = true;
         const int kMaxIterations = 8;
         int iterationCounter = 0;
         while (changed && iterationCounter < kMaxIterations)
         {
+            if (sink && sink->getErrorCount())
+                break;
+
             changed = false;
-            changed |= applySparseConditionalConstantPropagation(func);
+            changed |= applySparseConditionalConstantPropagation(func, sink);
             changed |= peepholeOptimize(func);
             changed |= removeRedundancyInFunc(func);
             changed |= simplifyCFG(func);
@@ -106,6 +113,7 @@ namespace Slang
             changed |= constructSSA(func);
 
             iterationCounter++;
+
         }
     }
 }
