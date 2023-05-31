@@ -709,10 +709,8 @@ void normalizeCFG(
             IRBuilder builder(func);
             for (auto b : workList)
             {
-                for (auto inst = b->getFirstInst(); inst; )
+                for (auto inst : b->getModifiableChildren())
                 {
-                    auto next = inst->getNextInst();
-
                     // If inst has uses outside the loop body, we need to hoist it.
                     IRVar* tempVar = nullptr;
                     if (auto var = as<IRVar>(inst))
@@ -751,8 +749,6 @@ void normalizeCFG(
                             }
                         });
                     }
-
-                    inst = next;
                 }
             }
         }
