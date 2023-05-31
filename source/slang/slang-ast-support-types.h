@@ -97,6 +97,9 @@ namespace Slang
         // Conversions that are lossless, but change "kind"
         kConversionCost_UnsignedToSignedPromotion = 200,
 
+        // Same-size size unsigned->signed conversions are potentially lossy, but they are commonly allowed silently.
+        kConversionCost_SameSizeUnsignedToSignedConversion = 250,
+
         // Conversion from signed->unsigned integer of same or greater size
         kConversionCost_SignedToUnsignedConversion = 300,
 

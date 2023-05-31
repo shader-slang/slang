@@ -150,11 +150,20 @@ namespace Slang
         // *from* a pointer-sized unsigned integer.
         else if(toInfo.conversionKind == kBaseTypeConversionKind_Signed
             && fromInfo.conversionKind == kBaseTypeConversionKind_Unsigned
-            && toInfo.conversionRank >= fromInfo.conversionRank
+            && toInfo.conversionRank > fromInfo.conversionRank
             && toInfo.conversionRank != kBaseTypeConversionRank_IntPtr
             && fromInfo.conversionRank != kBaseTypeConversionRank_IntPtr)
         {
             return kConversionCost_UnsignedToSignedPromotion;
+        }
+        // Same-size unsigned to signed integer conversion.
+        else if (toInfo.conversionKind == kBaseTypeConversionKind_Signed
+            && fromInfo.conversionKind == kBaseTypeConversionKind_Unsigned
+            && toInfo.conversionRank == fromInfo.conversionRank
+            && toInfo.conversionRank != kBaseTypeConversionRank_IntPtr
+            && fromInfo.conversionRank != kBaseTypeConversionRank_IntPtr)
+        {
+            return kConversionCost_SameSizeUnsignedToSignedConversion;
         }
 
         // Conversion from signed to unsigned is always lossy,
