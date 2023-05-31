@@ -9657,7 +9657,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     constructSSA(module);
     simplifyCFG(module);
-    applySparseConditionalConstantPropagation(module);
+    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
 
     // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
@@ -9677,7 +9677,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     constructSSA(module);
     simplifyCFG(module);
-    applySparseConditionalConstantPropagation(module);
+    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
 
     // Propagate `constexpr`-ness through the dataflow graph (and the
     // call graph) based on constraints imposed by different instructions.

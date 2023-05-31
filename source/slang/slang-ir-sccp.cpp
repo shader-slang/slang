@@ -15,6 +15,7 @@ namespace Slang {
 struct SharedSCCPContext
 {
     IRModule*       module;
+    DiagnosticSink* sink;
 };
 //
 // Next we have a context struct that will be applied for each function (or other
@@ -580,7 +581,7 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 / c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1) {  return c0 / c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 / c1; });
     }
     LatticeVal evalEql(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -870,10 +871,27 @@ struct SCCPContext
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Div:
+        {
+            // Detect divide by zero error.
+            auto divisor = getLatticeVal(inst->getOperand(1));
+            if (divisor.flavor == LatticeVal::Flavor::Constant)
+            {
+                if (isIntegralType(divisor.value->getDataType()))
+                {
+                    auto c = as<IRConstant>(divisor.value);
+                    if (c->value.intVal == 0)
+                    {
+                        if (shared->sink)
+                            shared->sink->diagnose(inst->sourceLoc, Diagnostics::divideByZero);
+                        return LatticeVal::getAny();
+                    }
+                }
+            }
             return evalDiv(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
-                getLatticeVal(inst->getOperand(1)));
+                divisor);
+        }
         case kIROp_Eql:
             return evalEql(
                 inst->getDataType(),
@@ -1658,10 +1676,15 @@ static bool applySparseConditionalConstantPropagationRec(
 }
 
 bool applySparseConditionalConstantPropagation(
-    IRModule*       module)
+    IRModule*       module,
+    DiagnosticSink* sink)
 {
+    if (sink && sink->getErrorCount())
+        return false;
+
     SharedSCCPContext shared;
     shared.module = module;
+    shared.sink = sink;
 
     // First we fold constants at global scope.
     SCCPContext globalContext;
@@ -1676,10 +1699,15 @@ bool applySparseConditionalConstantPropagation(
 }
 
 bool applySparseConditionalConstantPropagationForGlobalScope(
-    IRModule* module)
+    IRModule* module,
+    DiagnosticSink* sink)
 {
+    if (sink && sink->getErrorCount())
+        return false;
+
     SharedSCCPContext shared;
     shared.module = module;
+    shared.sink = sink;
     SCCPContext globalContext;
     globalContext.shared = &shared;
     globalContext.code = nullptr;
@@ -1687,10 +1715,14 @@ bool applySparseConditionalConstantPropagationForGlobalScope(
     return changed;
 }
 
-bool applySparseConditionalConstantPropagation(IRInst* func)
+bool applySparseConditionalConstantPropagation(IRInst* func, DiagnosticSink* sink)
 {
+    if (sink && sink->getErrorCount())
+        return false;
+
     SharedSCCPContext shared;
     shared.module = func->getModule();
+    shared.sink = sink;
 
     SCCPContext globalContext;
     globalContext.shared = &shared;
