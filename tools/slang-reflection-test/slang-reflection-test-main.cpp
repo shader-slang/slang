@@ -8,7 +8,12 @@
 #include <slang.h>
 #include <slang-com-helper.h>
 
+#include "../../source/core/slang-string-escape-util.h"
+#include "../../source/core/slang-char-util.h"
+
 #include "../../source/core/slang-test-tool-util.h"
+
+using namespace Slang;
 
 struct PrettyWriter
 {
@@ -17,35 +22,40 @@ struct PrettyWriter
         bool needComma = false;
     };
 
+        /// Get the output writer as a helper 
+    WriterHelper getOut() const { return WriterHelper(writer); }
+
     bool startOfLine = true;
     int indent = 0;
     CommaState* commaState = nullptr;
+    ISlangWriter* writer = StdWriters::getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT);
 };
+
+static void writeRaw(PrettyWriter& writer, const UnownedStringSlice& out)
+{
+    writer.writer->write(out.begin(), out.getLength());
+}
 
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
     SLANG_ASSERT(end >= begin);
-    Slang::StdWriters::getOut().write(begin, size_t(end - begin));
+    writeRaw(writer, UnownedStringSlice(begin, end));
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
 {
-    writeRaw(writer, begin, begin + strlen(begin));
+    writeRaw(writer, UnownedStringSlice(begin));
 }
 
 static void writeRawChar(PrettyWriter& writer, int c)
 {
-    char buffer[] = { (char) c, 0 };
-    writeRaw(writer, buffer, buffer + 1);
+    const char ch = char(c);
+    writer.writer->write(&ch, 1);
 }
-
 
 static void writeHexChar(PrettyWriter& writer, int c)
 {
-    char v = char(c) + (c < 10 ? '0' : ('a' - 10)); 
-
-    char buffer[] = { v, 0 };
-    writeRaw(writer, buffer, buffer + 1);
+    writeRawChar(writer, CharUtil::getHexChar(Index(c)));
 }
 
 static void adjust(PrettyWriter& writer)
@@ -70,94 +80,87 @@ static void dedent(PrettyWriter& writer)
     writer.indent--;
 }
 
-static void write(PrettyWriter& writer, char const* text, size_t length = 0)
+static void write(PrettyWriter& writer, const UnownedStringSlice& slice)
 {
-    // TODO: can do this more efficiently...
-    char const* cursor = text;
-    for(;;)
+    const auto end = slice.end();
+    auto start = slice.begin();
+
+    while (start < end)
     {
-        char c = *cursor++;
-        if (!c) break;
-        if (length && cursor - text == length) break;
-        if (c == '\n')
-        {
-            writer.startOfLine = true;
-        }
-        else
+        const char* cur = start;
+
+        // Search for \n if there is one
+        while (cur < end && *cur != '\n') cur++;
+
+        // If there were some chars, adjust and write
+        if (cur > start)
         {
             adjust(writer);
+            writeRaw(writer, UnownedStringSlice(start, cur));
         }
 
-        writeRawChar(writer, c);
+        if (cur < end && *cur == '\n')
+        {
+            writeRawChar(writer, '\n');
+            // Skip the CR
+            cur++;
+            // Mark we are at the start of a line
+            writer.startOfLine = true;
+        }
+
+        start = cur;
     }
 }
 
-static void writeEscapedString(PrettyWriter& writer, char const* text, size_t length)
+static void write(PrettyWriter& writer, char const* text)
+{
+    write(writer, UnownedStringSlice(text));
+}
+
+static void write(PrettyWriter& writer, char const* text, size_t length)
+{
+    write(writer, UnownedStringSlice(text, length));
+}
+
+static void writeEscapedString(PrettyWriter& writer, const UnownedStringSlice& slice)
 {
     adjust(writer);
 
-    writeRawChar(writer, '"');
+    auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
 
-    for (size_t i = 0; i < length; ++i)
-    {
-        const char c = text[i];
-        switch (c)
-        {
-            case '\n': write(writer, "\\n"); break;
-            case '\t': write(writer, "\\t"); break;
-            case '\b': write(writer, "\\b"); break;
-            case '\f': write(writer, "\\f"); break;
-            case '\0': write(writer, "\\0"); break;
-            case '"': write(writer, "\\\""); break;
-            default:
-            {
-                if (c < ' ' || int(c) >= 128)
-                {
-                    // Not strictly right - as we should decode as a unicode code point and write that.
-                    write(writer, "\\u00");
-                    writeHexChar(writer, (c >> 4) & 0xf);
-                    writeHexChar(writer, c & 0xf);
-                }
-                else
-                {
-                    writeRawChar(writer, c);
-                }
-            }
-        }
-    }
-
-    writeRawChar(writer, '"');
+    StringBuilder buf;
+    StringEscapeUtil::appendQuoted(handler, slice, buf);
+    writeRaw(writer, buf.getUnownedSlice());
 }
 
 static void write(PrettyWriter& writer, uint64_t val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%llu", (unsigned long long)val);
+    writer.getOut().print("%llu", (unsigned long long)val);
 }
 
 static void write(PrettyWriter& writer, int64_t val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%lld", (long long)val);
+    writer.getOut().print("%lld", (long long)val);
 }
 
 static void write(PrettyWriter& writer, int32_t val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%d", int(val));
+    writer.getOut().print("%d", int(val));
 }
 
 static void write(PrettyWriter& writer, uint32_t val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%u", (unsigned int)val);
+    writer.getOut().print("%u", (unsigned int)val);
 }
-
 
 static void write(PrettyWriter& writer, float val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%f", val);
+    writer.getOut().print("%f", val);
 }
 
     /// Type for tracking whether a comma is needed in a comma-separated JSON list
@@ -196,7 +199,6 @@ static void comma(PrettyWriter& writer)
 
     write(writer, ",\n");
 }
-
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
 static void emitReflectionTypeLayoutJSON(PrettyWriter& writer, slang::TypeLayoutReflection* type);
@@ -1073,45 +1075,45 @@ public:
     Range(
         T begin,
         T end)
-        : mBegin(begin)
-        , mEnd(end)
+        : m_begin(begin)
+        , m_end(end)
     {}
 
     struct Iterator
     {
     public:
         explicit Iterator(T value)
-            : mValue(value)
+            : m_value(value)
         {}
 
-        T operator*() const { return mValue; }
-        void operator++() { mValue++; }
+        T operator*() const { return m_value; }
+        void operator++() { m_value++; }
 
         bool operator!=(Iterator const& other)
         {
-            return mValue != other.mValue;
+            return m_value != other.m_value;
         }
 
     private:
-        T mValue;
+        T m_value;
     };
 
-    Iterator begin() const { return Iterator(mBegin); }
-    Iterator end()   const { return Iterator(mEnd); }
+    Iterator begin() const { return Iterator(m_begin); }
+    Iterator end()   const { return Iterator(m_end); }
 
 private:
-    T mBegin;
-    T mEnd;
+    T m_begin;
+    T m_end;
 };
 
 template<typename T>
-Range<T> range(T begin, T end)
+Range<T> makeRange(T begin, T end)
 {
     return Range<T>(begin, end);
 }
 
 template<typename T>
-Range<T> range(T end)
+Range<T> makeRange(T end)
 {
     return Range<T>(T(0), end);
 }
@@ -1128,7 +1130,7 @@ static void emitReflectionTypeParamJSON(
     write(writer, "[\n");
     indent(writer);
     auto constraintCount = typeParam->getConstraintCount();
-    for (auto ee : range(constraintCount))
+    for (auto ee : makeRange(constraintCount))
     {
         if (ee != 0) write(writer, ",\n");
         write(writer, "{\n");
@@ -1175,7 +1177,7 @@ static void emitReflectionEntryPointJSON(
         write(writer, ",\n\"parameters\": [\n");
         indent(writer);
 
-        for( auto pp : range(parameterCount) )
+        for( auto pp : makeRange(parameterCount) )
         {
             if(pp != 0) write(writer, ",\n");
 
@@ -1217,7 +1219,7 @@ static void emitReflectionEntryPointJSON(
         indent(writer);
 
         auto parameterCount = programReflection->getParameterCount();
-        for( auto pp : range(parameterCount) )
+        for( auto pp : makeRange(parameterCount) )
         {
             if(pp != 0) write(writer, ",\n");
 
@@ -1244,7 +1246,7 @@ static void emitReflectionJSON(
     indent(writer);
 
     auto parameterCount = programReflection->getParameterCount();
-    for( auto pp : range(parameterCount) )
+    for( auto pp : makeRange(parameterCount) )
     {
         if(pp != 0) write(writer, ",\n");
 
@@ -1261,7 +1263,7 @@ static void emitReflectionJSON(
         write(writer, ",\n\"entryPoints\": [\n");
         indent(writer);
     
-        for (auto ee : range(entryPointCount))
+        for (auto ee : makeRange(entryPointCount))
         {
             if (ee != 0) write(writer, ",\n");
 
@@ -1278,7 +1280,7 @@ static void emitReflectionJSON(
         write(writer, ",\n\"typeParams\":\n");
         write(writer, "[\n");
         indent(writer);
-        for (auto ee : range(genParamCount))
+        for (auto ee : makeRange(genParamCount))
         {
             if (ee != 0) write(writer, ",\n");
 
@@ -1307,7 +1309,7 @@ static void emitReflectionJSON(
                 const char* chars = programReflection->getHashedString(i, &charsCount);
                 const int hash = spComputeStringHash(chars, charsCount);
 
-                writeEscapedString(writer, chars, charsCount);
+                writeEscapedString(writer, UnownedStringSlice(chars, charsCount));
                 write(writer, ": ");
 
                 write(writer, hash);
