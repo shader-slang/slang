@@ -1259,30 +1259,30 @@ Val* TypeCastIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, Val* 
             switch (baseType->baseType)
             {
             case BaseType::Int:
-                resultValue = (IntegerLiteralValue)(int)resultValue;
+                resultValue = (int)resultValue;
                 break;
             case BaseType::UInt:
-                resultValue = (IntegerLiteralValue)(unsigned int)resultValue;
+                resultValue = (unsigned int)resultValue;
                 break;
             case BaseType::Int64:
             case BaseType::IntPtr:
-                resultValue = (IntegerLiteralValue)(Int64)resultValue;
+                resultValue = (Int64)resultValue;
                 break;
             case BaseType::UInt64:
             case BaseType::UIntPtr:
-                resultValue = (IntegerLiteralValue)(UInt64)resultValue;
+                resultValue = (UInt64)resultValue;
                 break;
             case BaseType::Int16:
-                resultValue = (IntegerLiteralValue)(int16_t)resultValue;
+                resultValue = (int16_t)resultValue;
                 break;
             case BaseType::UInt16:
-                resultValue = (IntegerLiteralValue)(uint16_t)resultValue;
+                resultValue = (uint16_t)resultValue;
                 break;
             case BaseType::Int8:
-                resultValue = (IntegerLiteralValue)(int8_t)resultValue;
+                resultValue = (int8_t)resultValue;
                 break;
             case BaseType::UInt8:
-                resultValue = (IntegerLiteralValue)(uint8_t)resultValue;
+                resultValue = (uint8_t)resultValue;
                 break;
             default:
                 return nullptr;
