@@ -16,11 +16,62 @@
 
 using namespace Slang;
 
+template<typename T>
+struct Range
+{
+public:
+    Range(
+        T begin,
+        T end)
+        : m_begin(begin)
+        , m_end(end)
+    {}
+
+    struct Iterator
+    {
+    public:
+        explicit Iterator(T value)
+            : m_value(value)
+        {}
+
+        T operator*() const { return m_value; }
+        void operator++() { m_value++; }
+
+        bool operator!=(Iterator const& other)
+        {
+            return m_value != other.m_value;
+        }
+
+    private:
+        T m_value;
+    };
+
+    Iterator begin() const { return Iterator(m_begin); }
+    Iterator end()   const { return Iterator(m_end); }
+
+private:
+    T m_begin;
+    T m_end;
+};
+
+template<typename T>
+Range<T> makeRange(T begin, T end)
+{
+    return Range<T>(begin, end);
+}
+
+template<typename T>
+Range<T> makeRange(T end)
+{
+    return Range<T>(T(0), end);
+}
+
+
 struct PrettyWriter
 {
     typedef PrettyWriter ThisType;
 
-    struct CommaTrackerRAII;
+    friend struct CommaTrackerRAII;
 
     struct CommaState
     {
@@ -57,8 +108,42 @@ struct PrettyWriter
         /// Get the builder the result is being constructed in
     StringBuilder& getBuilder() { return m_builder; }
 
-    ThisType& operator<<(UnownedStringSlice& slice) { write(slice); return *this; }
-
+    ThisType& operator<<(const UnownedStringSlice& slice) 
+    { 
+        write(slice); 
+        return *this; 
+    }
+    ThisType& operator<<(uint64_t val)
+    {
+        adjust();
+        m_builder << val;
+        return *this;
+    }
+    ThisType& operator<<(int64_t val)
+    {
+        adjust();
+        m_builder << val;
+        return *this;
+    }
+    ThisType& operator<<(int32_t val)
+    {
+        adjust();
+        m_builder << val;
+        return *this;
+    }
+    ThisType& operator<<(uint32_t val)
+    {
+        adjust();
+        m_builder << val;
+        return *this;
+    }
+    ThisType& operator<<(float val)
+    {
+        adjust();
+        // We want to use a specific format, so we use the StringUtil to specify format, and not just use << 
+        StringUtil::appendFormat(m_builder, "%f", val);
+        return *this;
+    }
 
     bool m_startOfLine = true;
     int m_indent = 0;
@@ -142,39 +227,8 @@ void PrettyWriter::maybeComma()
     write(toSlice(",\n"));
 }
 
-static void write(PrettyWriter& writer, uint64_t val)
-{
-    writer.adjust();
-    writer.getBuilder() << val; 
-}
-
-static void write(PrettyWriter& writer, int64_t val)
-{
-    writer.adjust();
-    writer.getBuilder() << val;
-}
-
-static void write(PrettyWriter& writer, int32_t val)
-{
-    writer.adjust();
-    writer.getBuilder() << val;
-}
-
-static void write(PrettyWriter& writer, uint32_t val)
-{
-    writer.adjust();
-    writer.getBuilder() << val;
-}
-
-static void write(PrettyWriter& writer, float val)
-{
-    writer.adjust();
-    // We want to use a specific format, so we use the StringUtil to specify format, and not just use << 
-    StringUtil::appendFormat(writer.getBuilder(), "%f", val);
-}
-
     /// Type for tracking whether a comma is needed in a comma-separated JSON list
-struct PrettyWriter::CommaTrackerRAII
+struct CommaTrackerRAII
 {
     CommaTrackerRAII(PrettyWriter& writer)
         : m_writer(&writer)
@@ -189,9 +243,9 @@ struct PrettyWriter::CommaTrackerRAII
     }
 
 private:
-    CommaState m_state;
+    PrettyWriter::CommaState m_state;
     PrettyWriter* m_writer;
-    CommaState* m_previousState;
+    PrettyWriter::CommaState* m_previousState;
 };
 
 
@@ -211,10 +265,10 @@ static void emitReflectionVarBindingInfoJSON(
         writer.write("\"kind\": \"uniform\"");
         writer.write(", ");
         writer.write("\"offset\": ");
-        write(writer, index);
+        writer << index;
         writer.write(", ");
         writer.write("\"size\": ");
-        write(writer, count);
+        writer << count;
     }
     else
     {
@@ -247,11 +301,11 @@ static void emitReflectionVarBindingInfoJSON(
         {
             writer.write(", ");
             writer.write("\"space\": ");
-            write(writer, space);
+            writer << space;
         }
         writer.write(", ");
         writer.write("\"index\": ");
-        write(writer, index);
+        writer << index;
         if( count != 1)
         {
             writer.write(", ");
@@ -262,7 +316,7 @@ static void emitReflectionVarBindingInfoJSON(
             }
             else
             {
-                write(writer, count);
+                writer << count;
             }
         }
     }
@@ -339,7 +393,7 @@ static void emitReflectionVarBindingInfoJSON(
             if (usedAvailable)
             {
                 writer.write(", \"used\": ");
-                write(writer, used);
+                writer << used;
             }
 
             writer.write("}");
@@ -363,7 +417,7 @@ static void emitReflectionVarBindingInfoJSON(
         {
             writer.maybeComma();
             writer.write("\"semanticIndex\": ");
-            write(writer, int(semanticIndex));
+            writer << int(semanticIndex);
         }
     }
 }
@@ -407,11 +461,11 @@ static void emitUserAttributeJSON(PrettyWriter& writer, slang::UserAttribute* us
             writer.write(",\n");
         if (SLANG_SUCCEEDED(userAttribute->getArgumentValueInt(i, &intVal)))
         {
-            write(writer, intVal);
+            writer << intVal;
         }
         else if (SLANG_SUCCEEDED(userAttribute->getArgumentValueFloat(i, &floatVal)))
         {
-            write(writer, floatVal);
+            writer << floatVal;
         }
         else if (auto str = userAttribute->getArgumentValueString(i, &bufSize))
         {
@@ -466,7 +520,7 @@ static void emitReflectionVarLayoutJSON(
     writer.write("{\n");
     writer.indent();
 
-    PrettyWriter::CommaTrackerRAII commaTracker(writer);
+    CommaTrackerRAII commaTracker(writer);
 
     if( auto name = var->getName() )
     {
@@ -681,7 +735,7 @@ static void emitReflectionTypeInfoJSON(
         writer.write("\"kind\": \"vector\"");
         writer.maybeComma();
         writer.write("\"elementCount\": ");
-        write(writer, int(type->getElementCount()));
+        writer << int(type->getElementCount());
         writer.maybeComma();
         writer.write("\"elementType\": ");
         emitReflectionTypeJSON(
@@ -694,10 +748,10 @@ static void emitReflectionTypeInfoJSON(
         writer.write("\"kind\": \"matrix\"");
         writer.maybeComma();
         writer.write("\"rowCount\": ");
-        write(writer, type->getRowCount());
+        writer << type->getRowCount();
         writer.maybeComma();
         writer.write("\"columnCount\": ");
-        write(writer, type->getColumnCount());
+        writer << type->getColumnCount();
         writer.maybeComma();
         writer.write("\"elementType\": ");
         emitReflectionTypeJSON(
@@ -712,7 +766,7 @@ static void emitReflectionTypeInfoJSON(
             writer.write("\"kind\": \"array\"");
             writer.maybeComma();
             writer.write("\"elementCount\": ");
-            write(writer, int(arrayType->getElementCount()));
+            writer << int(arrayType->getElementCount());
             writer.maybeComma();
             writer.write("\"elementType\": ");
             emitReflectionTypeJSON(writer, arrayType->getElementType());
@@ -812,7 +866,7 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     // TODO: We should probably 
 
     {
-        PrettyWriter::CommaTrackerRAII commaTracker(writer);
+        CommaTrackerRAII commaTracker(writer);
 
         writer.write(",\n\"containerVarLayout\": {\n");
         writer.indent();
@@ -846,7 +900,7 @@ static void emitReflectionTypeLayoutInfoJSON(
 
             writer.maybeComma();
             writer.write("\"elementCount\": ");
-            write(writer, int(arrayTypeLayout->getElementCount()));
+            writer << int(arrayTypeLayout->getElementCount());
 
             writer.maybeComma();
             writer.write("\"elementType\": ");
@@ -858,7 +912,7 @@ static void emitReflectionTypeLayoutInfoJSON(
             {
                 writer.maybeComma();
                 writer.write("\"uniformStride\": ");
-                write(writer, int(arrayTypeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM)));
+                writer << int(arrayTypeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
             }
         }
         break;
@@ -979,7 +1033,7 @@ static void emitReflectionTypeLayoutJSON(
     PrettyWriter&                   writer,
     slang::TypeLayoutReflection*    typeLayout)
 {
-    PrettyWriter::CommaTrackerRAII commaTracker(writer);
+    CommaTrackerRAII commaTracker(writer);
     writer.write("{\n");
     writer.indent();
     emitReflectionTypeLayoutInfoJSON(writer, typeLayout);
@@ -991,7 +1045,7 @@ static void emitReflectionTypeJSON(
     PrettyWriter&           writer,
     slang::TypeReflection*  type)
 {
-    PrettyWriter::CommaTrackerRAII commaTracker(writer);
+    CommaTrackerRAII commaTracker(writer);
     writer.write("{\n");
     writer.indent();
     emitReflectionTypeInfoJSON(writer, type);
@@ -1022,7 +1076,7 @@ static void emitReflectionParamJSON(
     writer.write("{\n");
     writer.indent();
 
-    PrettyWriter::CommaTrackerRAII commaTracker(writer);
+    CommaTrackerRAII commaTracker(writer);
 
     if( auto name = param->getName() )
     {
@@ -1063,55 +1117,6 @@ static void emitEntryPointParamJSON(
     writer.write("\n}");
 }
 
-template<typename T>
-struct Range
-{
-public:
-    Range(
-        T begin,
-        T end)
-        : m_begin(begin)
-        , m_end(end)
-    {}
-
-    struct Iterator
-    {
-    public:
-        explicit Iterator(T value)
-            : m_value(value)
-        {}
-
-        T operator*() const { return m_value; }
-        void operator++() { m_value++; }
-
-        bool operator!=(Iterator const& other)
-        {
-            return m_value != other.m_value;
-        }
-
-    private:
-        T m_value;
-    };
-
-    Iterator begin() const { return Iterator(m_begin); }
-    Iterator end()   const { return Iterator(m_end); }
-
-private:
-    T m_begin;
-    T m_end;
-};
-
-template<typename T>
-Range<T> makeRange(T begin, T end)
-{
-    return Range<T>(begin, end);
-}
-
-template<typename T>
-Range<T> makeRange(T end)
-{
-    return Range<T>(T(0), end);
-}
 
 static void emitReflectionTypeParamJSON(
     PrettyWriter&                   writer,
@@ -1130,7 +1135,7 @@ static void emitReflectionTypeParamJSON(
         if (ee != 0) writer.write(",\n");
         writer.write("{\n");
         writer.indent();
-        PrettyWriter::CommaTrackerRAII commaTracker(writer);
+        CommaTrackerRAII commaTracker(writer);
         emitReflectionTypeInfoJSON(writer, typeParam->getConstraintByIndex(ee));
         writer.dedent();
         writer.write("\n}");
@@ -1202,7 +1207,7 @@ static void emitReflectionEntryPointJSON(
         for (int ii = 0; ii < 3; ++ii)
         {
             if (ii != 0) writer.write(", ");
-            write(writer, threadGroupSize[ii]);
+            writer << threadGroupSize[ii];
         }
         writer.write("]");
     }
@@ -1307,7 +1312,7 @@ static void emitReflectionJSON(
                 writer.writeEscapedString(UnownedStringSlice(chars, charsCount));
                 writer.write(": ");
 
-                write(writer, hash);
+                writer << hash;
             }
 
             writer.dedent();
