@@ -1432,6 +1432,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             tryEnv);
     }
 
+    LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
+    {
+        TryClauseEnvironment tryEnv;
+        auto baseVal = lowerVal(context, val->base);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+        auto type = lowerType(context, val->type);
+        return LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+    }
+
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
     {
         auto witnessVal = lowerVal(context, val->witness);
