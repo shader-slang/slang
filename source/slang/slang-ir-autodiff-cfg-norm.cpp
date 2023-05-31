@@ -709,24 +709,32 @@ void normalizeCFG(
             IRBuilder builder(func);
             for (auto b : workList)
             {
-                for (auto inst : b->getChildren())
+                for (auto inst = b->getFirstInst(); inst; )
                 {
+                    auto next = inst->getNextInst();
+
                     // If inst has uses outside the loop body, we need to hoist it.
                     IRVar* tempVar = nullptr;
-                    for (auto use = inst->firstUse; use; use = use->nextUse)
+                    if (auto var = as<IRVar>(inst))
                     {
-                        auto userBlock = as<IRBlock>(use->getUser()->getParent());
-                        if (userBlock && !workListSet.contains(userBlock))
+                        for (auto use = inst->firstUse; use; use = use->nextUse)
                         {
-                            // Hoist the inst.
-                            if (auto var = as<IRVar>(inst))
+                            // If inst is an var, this is easy, we just move it to the
+                            // loop header.
+                            auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                            if (userBlock && !workListSet.contains(userBlock))
                             {
-                                // If inst is an var, this is easy, we just move it to the
-                                // loop header.
                                 var->insertBefore(insertionPoint);
                                 break;
                             }
-                            else
+                        }
+                    }
+                    else
+                    {
+                        traverseUses(inst, [&](IRUse* use)
+                        {
+                            auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                            if (userBlock && !workListSet.contains(userBlock))
                             {
                                 // For all other insts, we need to create a local var for it.
                                 if (!tempVar)
@@ -741,9 +749,10 @@ void normalizeCFG(
                                 auto load = builder.emitLoad(tempVar);
                                 builder.replaceOperand(use, load);
                             }
-                            break;
-                        }
+                        });
                     }
+
+                    inst = next;
                 }
             }
         }
@@ -751,6 +760,9 @@ void normalizeCFG(
     disableIRValidationAtInsert();
     constructSSA(module, func);
     enableIRValidationAtInsert();
+#if _DEBUG
+    validateIRInst(func);
+#endif
 }
 
 } // namespace Slang
