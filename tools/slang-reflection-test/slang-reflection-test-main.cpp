@@ -1123,7 +1123,7 @@ static void emitReflectionTypeParamJSON(
     writer.indent();
     emitReflectionNameInfoJSON(writer, typeParam->getName());
     writer << ",\n";
-    writer << "constraints: \n";
+    writer << "\"constraints\": \n";
     writer << "[\n";
     writer.indent();
     auto constraintCount = typeParam->getConstraintCount();

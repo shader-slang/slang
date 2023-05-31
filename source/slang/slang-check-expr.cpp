@@ -1385,26 +1385,12 @@ namespace Slang
             auto targetBasicType = as<BasicExpressionType>(invokeExpr.getExpr()->type.type);
             if (!targetBasicType)
                 return nullptr;
-            switch (targetBasicType->baseType)
-            {
-            case BaseType::Bool:
-                resultValue = constArgVals[0] != 0;
-                break;
-            case BaseType::Int:
-            case BaseType::UInt:
-            case BaseType::UInt16:
-            case BaseType::Int16:
-            case BaseType::UInt8:
-            case BaseType::Int8:
-            case BaseType::UIntPtr:
-            case BaseType::IntPtr:
-            case BaseType::Int64:
-            case BaseType::UInt64:
-                resultValue = constArgVals[0];
-                break;
-            default:
-                return nullptr;
-            }
+            auto foldVal = as<IntVal>(
+                TypeCastIntVal::tryFoldImpl(m_astBuilder, targetBasicType, argVals[0], getSink()));
+            if (foldVal)
+                return foldVal;
+            auto result = m_astBuilder->getOrCreate<TypeCastIntVal>(targetBasicType, argVals[0]);
+            return result;
         }
         else
         {
@@ -1619,9 +1605,23 @@ namespace Slang
 
         if(auto castExpr = expr.as<TypeCastExpr>())
         {
+            auto substType = getType(m_astBuilder, expr);
+            if (!substType)
+                return nullptr;
+            if (!isScalarIntegerType(substType))
+                return nullptr;
             auto val = tryConstantFoldExpr(getArg(castExpr, 0), circularityInfo);
-            if(val)
-                return val;
+            if (val)
+            {
+                if (!castExpr.getExpr()->type)
+                    return nullptr;
+                auto foldVal = as<IntVal>(
+                    TypeCastIntVal::tryFoldImpl(m_astBuilder, substType, val, getSink()));
+                if (foldVal)
+                    return foldVal;
+                auto result = m_astBuilder->getOrCreate<TypeCastIntVal>(substType, val);
+                return result;
+            }
         }
         else if (auto invokeExpr = expr.as<InvokeExpr>())
         {

@@ -1432,6 +1432,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             tryEnv);
     }
 
+    LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
+    {
+        TryClauseEnvironment tryEnv;
+        auto baseVal = lowerVal(context, val->base);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+        auto type = lowerType(context, val->type);
+        return LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+    }
+
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
     {
         auto witnessVal = lowerVal(context, val->witness);
@@ -9657,7 +9666,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     constructSSA(module);
     simplifyCFG(module);
-    applySparseConditionalConstantPropagation(module);
+    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
 
     // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
@@ -9677,7 +9686,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     constructSSA(module);
     simplifyCFG(module);
-    applySparseConditionalConstantPropagation(module);
+    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
 
     // Propagate `constexpr`-ness through the dataflow graph (and the
     // call graph) based on constraints imposed by different instructions.

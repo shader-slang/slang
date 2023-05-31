@@ -591,7 +591,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
     else
     {
-        diffCallee = findOrTranscribeDiffInst(builder, origCallee);
+        if (_isDifferentiableFunc(origCallee))
+            diffCallee = findOrTranscribeDiffInst(builder, origCallee);
         primalCallee = substPrimalCallee;
     }
 
