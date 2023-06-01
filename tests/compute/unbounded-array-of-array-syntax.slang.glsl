@@ -24,7 +24,7 @@ void main()
     (bufferCount_0) = (g_aoa_0[_S3])._data.length(); (bufferStride_0) = 0;
 
     int innerIndex_1;
-    if(uint(innerIndex_0) >= bufferCount_0)
+    if(innerIndex_0 >= int(bufferCount_0))
     {
         innerIndex_1 = int(bufferCount_0 - 1U);
     }

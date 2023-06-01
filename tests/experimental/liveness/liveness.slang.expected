@@ -47,7 +47,7 @@ int someSlowFunc_0(int a_0)
         uint _S5 = v_0 >> 1;
         uint _S6 = v_0;
         livenessEnd_1(v_0, 0);
-        uint _S7 = (_S5 | _S6 << 31) * uint(i_0);
+        uint _S7 = uint(int(_S5 | _S6 << 31) * i_0);
         int i_1 = i_0 + 1;
         livenessStart_0(v_0, 0);
         v_0 = _S7;

@@ -80,6 +80,10 @@ namespace Slang
         // from one on `Foo`
         kConversionCost_GetRef = 5,
         kConversionCost_ImplicitDereference = 10,
+        kConversionCost_InRangeIntLitConversion = 23,
+        kConversionCost_InRangeIntLitSignedToUnsignedConversion = 32,
+        kConversionCost_InRangeIntLitUnsignedToSignedConversion = 81,
+
 
         // Conversions based on explicit sub-typing relationships are the cheapest
         //
@@ -96,6 +100,9 @@ namespace Slang
 
         // Conversions that are lossless, but change "kind"
         kConversionCost_UnsignedToSignedPromotion = 200,
+
+        // Same-size size unsigned->signed conversions are potentially lossy, but they are commonly allowed silently.
+        kConversionCost_SameSizeUnsignedToSignedConversion = 250,
 
         // Conversion from signed->unsigned integer of same or greater size
         kConversionCost_SignedToUnsignedConversion = 300,

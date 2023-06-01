@@ -26,24 +26,60 @@ namespace Slang
         /// Note: this currently does not include PtrTypeBase.
     Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
+    inline int getIntValueBitSize(IntegerLiteralValue val)
+    {
+        uint64_t v = val > 0 ? (uint64_t)val : (uint64_t)-val;
+        int result = 1;
+        while (v >>= 1)
+        {
+            result++;
+        }
+        return result;
+    }
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
-    enum class BasicTypeKey : uint16_t
+    struct BasicTypeKey
     {
-        Invalid = 0xffff,                 ///< Value that can never be a valid type
+        uint32_t baseType : 8;
+        uint32_t dim1 : 4;
+        uint32_t dim2 : 4;
+        uint32_t knownConstantBitCount : 8;
+        uint32_t knownNegative : 1;
+        uint32_t reserved : 7;
+        uint32_t getRaw() const
+        {
+            uint32_t val;
+            memcpy(&val, this, sizeof(uint32_t));
+            return val;
+        }
+        bool operator==(BasicTypeKey other) const
+        {
+            return getRaw() == other.getRaw();
+        }
+        static BasicTypeKey invalid() { return BasicTypeKey{ 0xff, 0, 0 }; }
     };
 
     SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(BaseType baseType, IntegerLiteralValue dim1 = 0, IntegerLiteralValue dim2 = 0)
     {
         SLANG_ASSERT(dim1 >= 0 && dim2 >= 0);
-        return BasicTypeKey((uint8_t(baseType) << 8) | (uint8_t(dim1) << 4) | uint8_t(dim2));
+        return BasicTypeKey{ uint8_t(baseType), uint8_t(dim1), uint8_t(dim2) };
     }
 
-    inline BasicTypeKey makeBasicTypeKey(Type* typeIn)
+    inline BasicTypeKey makeBasicTypeKey(Type* typeIn, Expr* exprIn = nullptr)
     {
         if (auto basicType = as<BasicExpressionType>(typeIn))
         {
-            return makeBasicTypeKey(basicType->baseType);
+            auto rs = makeBasicTypeKey(basicType->baseType);
+            if (auto constInt = as<IntegerLiteralExpr>(exprIn))
+            {
+                if (constInt->value < 0)
+                {
+                    rs.knownNegative = 1;
+                }
+                rs.knownConstantBitCount = getIntValueBitSize(constInt->value);
+            }
+            return rs;
         }
         else if (auto vectorType = as<VectorExpressionType>(typeIn))
         {
@@ -68,7 +104,7 @@ namespace Slang
                 }
             }
         }
-        return BasicTypeKey::Invalid;
+        return BasicTypeKey::invalid();
     }
 
     struct BasicTypeKeyPair
@@ -77,11 +113,11 @@ namespace Slang
         bool operator==(const BasicTypeKeyPair& rhs) const { return type1 == rhs.type1 && type2 == rhs.type2; }
         bool operator!=(const BasicTypeKeyPair& rhs) const { return !(*this == rhs); }
 
-        bool isValid() const { return type1 != BasicTypeKey::Invalid && type2 != BasicTypeKey::Invalid; }
+        bool isValid() const { return type1.getRaw() != BasicTypeKey::invalid().getRaw() && type2.getRaw() != BasicTypeKey::invalid().getRaw(); }
 
         HashCode getHashCode()
         {
-            return HashCode(int(type1) << 16 | int(type2));
+            return combineHash(type1.getRaw(), type2.getRaw());
         }
     };
 
@@ -95,25 +131,25 @@ namespace Slang
         }
         HashCode getHashCode()
         {
-            return HashCode(((int)(UInt64)(void*)(operatorName) << 16) ^ (int(args[0]) << 8) ^ (int(args[1])));
+            return combineHash((int)(UInt64)(void*)(operatorName), args[0].getRaw(), args[1].getRaw());
         }
         bool fromOperatorExpr(OperatorExpr* opExpr)
         {
             // First, lets see if the argument types are ones
             // that we can encode in our space of keys.
-            args[0] = BasicTypeKey::Invalid;
-            args[1] = BasicTypeKey::Invalid;
+            args[0] = BasicTypeKey::invalid();
+            args[1] = BasicTypeKey::invalid();
             if (opExpr->arguments.getCount() > 2)
                 return false;
 
             for (Index i = 0; i < opExpr->arguments.getCount(); i++)
             {
-                auto key = makeBasicTypeKey(opExpr->arguments[i]->type.Ptr());
-                if (key == BasicTypeKey::Invalid)
+                auto key = makeBasicTypeKey(opExpr->arguments[i]->type.Ptr(), opExpr->arguments[i]);
+                if (key.getRaw() == BasicTypeKey::invalid().getRaw())
                 {
                     return false;
                 }
-                args[i]=  key;
+                args[i] = key;
             }
 
             // Next, lets see if we can find an intrinsic opcode
@@ -136,7 +172,7 @@ namespace Slang
                     // Look at a candidate definition to be called and
                     // see if it gives us a key to work with.
                     //
-                    Decl* funcDecl = overloadedBase->lookupResult2.item.declRef.decl;
+                    Decl* funcDecl = item.declRef.decl;
                     if (auto genDecl = as<GenericDecl>(funcDecl))
                         funcDecl = genDecl->inner;
 
@@ -782,6 +818,9 @@ namespace Slang
         // perform implicit type conversion.
         ConversionCost getImplicitConversionCost(
             Decl* decl);
+
+        ConversionCost getImplicitConversionCostWithKnownArg(Decl* decl, Type* toType, Expr* arg);
+
 
         BuiltinConversionKind getImplicitConversionBuiltinKind(
             Decl* decl);
