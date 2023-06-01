@@ -1167,7 +1167,7 @@ namespace Slang
 
         BasicTypeKeyPair cacheKey;
         cacheKey.type1 = makeBasicTypeKey(toType);
-        cacheKey.type2 = makeBasicTypeKey(fromType);
+        cacheKey.type2 = makeBasicTypeKey(fromType, fromExpr);
     
         if( cacheKey.isValid())
         {

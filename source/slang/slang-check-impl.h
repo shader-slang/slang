@@ -55,11 +55,24 @@ namespace Slang
         return BasicTypeKey{ uint8_t(baseType), uint8_t(dim1), uint8_t(dim2) };
     }
 
-    inline BasicTypeKey makeBasicTypeKey(Type* typeIn)
+    inline BasicTypeKey makeBasicTypeKey(Type* typeIn, Expr* exprIn = nullptr)
     {
         if (auto basicType = as<BasicExpressionType>(typeIn))
         {
-            return makeBasicTypeKey(basicType->baseType);
+            auto rs = makeBasicTypeKey(basicType->baseType);
+            if (auto constInt = as<IntegerLiteralExpr>(exprIn))
+            {
+                auto value = constInt->value;
+                if (value < 0)
+                {
+                    rs.knownNegative = 1;
+                    value = -value;
+                }
+                rs.knownConstantBitCount = 1;
+                while (value >>= 1)
+                    rs.knownConstantBitCount++;
+            }
+            return rs;
         }
         else if (auto vectorType = as<VectorExpressionType>(typeIn))
         {
@@ -124,24 +137,12 @@ namespace Slang
 
             for (Index i = 0; i < opExpr->arguments.getCount(); i++)
             {
-                auto key = makeBasicTypeKey(opExpr->arguments[i]->type.Ptr());
-                if (auto constInt = as<IntegerLiteralExpr>(opExpr->arguments[i]))
-                {
-                    auto value = constInt->value;
-                    if (value < 0)
-                    {
-                        key.knownNegative = 1;
-                        value = -value;
-                    }
-                    key.knownConstantBitCount = 1;
-                    while (value >>= 1)
-                        key.knownConstantBitCount++;
-                }
+                auto key = makeBasicTypeKey(opExpr->arguments[i]->type.Ptr(), opExpr->arguments[i]);
                 if (key.getRaw() == BasicTypeKey::invalid().getRaw())
                 {
                     return false;
                 }
-                args[i]=  key;
+                args[i] = key;
             }
 
             // Next, lets see if we can find an intrinsic opcode
