@@ -80,6 +80,7 @@ namespace Slang
         // from one on `Foo`
         kConversionCost_GetRef = 5,
         kConversionCost_ImplicitDereference = 10,
+        kConversionCost_InRangeIntLitConversion = 20,
 
         // Conversions based on explicit sub-typing relationships are the cheapest
         //

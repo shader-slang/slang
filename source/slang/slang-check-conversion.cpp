@@ -628,6 +628,24 @@ namespace Slang
         }
     }
 
+    ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(Decl* decl, Type* toType, Expr* arg)
+    {
+        ConversionCost candidateCost = getImplicitConversionCost(decl);
+
+        // Fix up the cost if the operand is a const lit.
+        if (isScalarIntegerType(toType))
+        {
+            auto knownVal = as<ConstantIntVal>(tryConstantFoldExpr(arg, nullptr));
+            if (!knownVal)
+                return candidateCost;
+            if (isIntValueInRangeOfType(knownVal->value, toType))
+            {
+                candidateCost = kConversionCost_InRangeIntLitConversion;
+            }
+        }
+        return candidateCost;
+    }
+
     bool SemanticsVisitor::_coerce(
         CoercionSite site,
         Type*    toType,
@@ -989,8 +1007,8 @@ namespace Slang
             ConversionCost bestCost = kConversionCost_Explicit;
             for(auto candidate : overloadContext.bestCandidates)
             {
-                ConversionCost candidateCost = getImplicitConversionCost(
-                    candidate.item.declRef.getDecl());
+                ConversionCost candidateCost = getImplicitConversionCostWithKnownArg(
+                    candidate.item.declRef.getDecl(), toType, fromExpr);
 
                 if(candidateCost < bestCost)
                     bestCost = candidateCost;
@@ -1027,8 +1045,8 @@ namespace Slang
             // Next, we need to look at the implicit conversion
             // cost associated with the initializer we are invoking.
             //
-            ConversionCost cost = getImplicitConversionCost(
-                    overloadContext.bestCandidate->item.declRef.getDecl());
+            ConversionCost cost = getImplicitConversionCostWithKnownArg(
+                overloadContext.bestCandidate->item.declRef.getDecl(), toType, fromExpr);
 
             // If the cost is too high to be usable as an
             // implicit conversion, then we will report the

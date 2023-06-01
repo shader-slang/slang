@@ -1043,6 +1043,18 @@ namespace Slang
         }
         else if(context.bestCandidate)
         {
+            if (as<ContainerDecl>(candidate.item.declRef.decl)->members.getCount())
+            {
+                auto param = as<ParamDecl>( as<ContainerDecl>(candidate.item.declRef.decl)->members.getFirst());
+                if (param)
+                    if (auto t = as<BasicExpressionType>(param->type))
+                    {
+                        if (t->baseType == BaseType::UInt)
+                        {
+                            printf("break");
+                        }
+                    }
+            }
             // There's only one candidate so far
             int cmp = CompareOverloadCandidates(&candidate, context.bestCandidate);
             if(cmp < 0)
