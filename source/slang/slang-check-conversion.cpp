@@ -628,6 +628,54 @@ namespace Slang
         }
     }
 
+    static bool isSigned(Type* t)
+    {
+        auto basicType = as<BasicExpressionType>(t);
+        if (!basicType) return false;
+        switch (basicType->baseType)
+        {
+        case BaseType::Int8:
+        case BaseType::Int16:
+        case BaseType::Int:
+        case BaseType::Int64:
+        case BaseType::IntPtr:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    static int getTypeBitSize(Type* t)
+    {
+        auto basicType = as<BasicExpressionType>(t);
+        if (!basicType) return 0;
+
+        switch (basicType->baseType)
+        {
+        case BaseType::Int8:
+        case BaseType::UInt8:
+            return 8;
+        case BaseType::Int16:
+        case BaseType::UInt16:
+            return 16;
+        case BaseType::Int:
+        case BaseType::UInt:
+            return 32;
+        case BaseType::Int64:
+        case BaseType::UInt64:
+            return 64;
+        case BaseType::IntPtr:
+        case BaseType::UIntPtr:
+#if SLANG_PTR_IS_32
+            return 32;
+#else
+            return 64;
+#endif
+        default:
+            return 0;
+        }
+    }
+
     ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(Decl* decl, Type* toType, Expr* arg)
     {
         ConversionCost candidateCost = getImplicitConversionCost(decl);
@@ -635,12 +683,19 @@ namespace Slang
         // Fix up the cost if the operand is a const lit.
         if (isScalarIntegerType(toType))
         {
-            auto knownVal = as<ConstantIntVal>(tryConstantFoldExpr(arg, nullptr));
+            auto knownVal = as<IntegerLiteralExpr>(arg);
             if (!knownVal)
                 return candidateCost;
-            if (isIntValueInRangeOfType(knownVal->value, toType))
+            if (getIntValueBitSize(knownVal->value) <= getTypeBitSize(toType))
             {
-                candidateCost = kConversionCost_InRangeIntLitConversion;
+                bool toTypeIsSigned = isSigned(toType);
+                bool fromTypeIsSigned = isSigned(knownVal->type);
+                if (toTypeIsSigned == fromTypeIsSigned)
+                    candidateCost = kConversionCost_InRangeIntLitConversion;
+                else if (toTypeIsSigned)
+                    candidateCost = kConversionCost_InRangeIntLitUnsignedToSignedConversion;
+                else
+                    candidateCost = kConversionCost_InRangeIntLitSignedToUnsignedConversion;
             }
         }
         return candidateCost;

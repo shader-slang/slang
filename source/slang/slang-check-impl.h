@@ -26,6 +26,17 @@ namespace Slang
         /// Note: this currently does not include PtrTypeBase.
     Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
+    inline int getIntValueBitSize(IntegerLiteralValue val)
+    {
+        uint64_t v = val > 0 ? (uint64_t)val : (uint64_t)-val;
+        int result = 1;
+        while (v >>= 1)
+        {
+            result++;
+        }
+        return result;
+    }
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
     struct BasicTypeKey
@@ -62,15 +73,11 @@ namespace Slang
             auto rs = makeBasicTypeKey(basicType->baseType);
             if (auto constInt = as<IntegerLiteralExpr>(exprIn))
             {
-                auto value = constInt->value;
-                if (value < 0)
+                if (constInt->value < 0)
                 {
                     rs.knownNegative = 1;
-                    value = -value;
                 }
-                rs.knownConstantBitCount = 1;
-                while (value >>= 1)
-                    rs.knownConstantBitCount++;
+                rs.knownConstantBitCount = getIntValueBitSize(constInt->value);
             }
             return rs;
         }
