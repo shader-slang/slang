@@ -5,6 +5,7 @@ namespace Slang
 {
     struct IRModule;
     struct IRInst;
+    class DiagnosticSink;
 
         /// Apply Sparse Conditional Constant Propagation (SCCP) to a module.
         ///
@@ -15,11 +16,13 @@ namespace Slang
         /// becoming dead code)
         /// Returns true if IR is changed.
     bool applySparseConditionalConstantPropagation(
-        IRModule*       module);
+        IRModule*       module,
+        DiagnosticSink* sink);
     bool applySparseConditionalConstantPropagationForGlobalScope(
-        IRModule* module);
+        IRModule* module,
+        DiagnosticSink* sink);
 
-    bool applySparseConditionalConstantPropagation(IRInst* func);
+    bool applySparseConditionalConstantPropagation(IRInst* func, DiagnosticSink* sink);
 
     IRInst* tryConstantFoldInst(IRModule* module, IRInst* inst);
 }

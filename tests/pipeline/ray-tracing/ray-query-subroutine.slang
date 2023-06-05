@@ -7,7 +7,7 @@
 RWStructuredBuffer<int> gOutput;
 RaytracingAccelerationStructure gScene;
 
-float3 helper<let N : int>(RayQuery<N> q)
+float3 helper<let N : uint>(RayQuery<N> q)
 {
     RayDesc ray;
     ray.Origin = 0;

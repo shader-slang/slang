@@ -2161,6 +2161,25 @@ TestResult runSimpleCompareCommandLineTest(TestContext* context, TestInput& inpu
     return runSimpleTest(context, workInput);
 }
 
+static SlangResult _parseJSON(const UnownedStringSlice& slice, DiagnosticSink* sink, JSONContainer* container, JSONValue& outValue)
+{
+    SourceManager* sourceManager = sink->getSourceManager();
+
+    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), slice);
+    SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
+
+    JSONLexer lexer;
+    lexer.init(sourceView, sink);
+
+    JSONBuilder builder(container);
+
+    JSONParser parser;
+    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, sink));
+    
+    outValue = builder.getRootValue();
+    return SLANG_OK;
+}
+
 TestResult runReflectionTest(TestContext* context, TestInput& input)
 {
     const auto& options = context->options;
@@ -2196,6 +2215,40 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 #else
         outputStem.append(".64");
 #endif
+    }
+
+    // Extrac the stand
+    ParseDiagnosticUtil::OutputInfo outputInfo;
+    if (SLANG_SUCCEEDED(ParseDiagnosticUtil::parseOutputInfo(actualOutput.getUnownedSlice(), outputInfo)))
+    {
+        const auto toolReturnCode = ToolReturnCode(outputInfo.resultCode);
+
+        // The output should be JSON. 
+        // Parse it to check that it is valid json
+        if (toolReturnCode == ToolReturnCode::Success)
+        {
+            SourceManager sourceManager;
+            sourceManager.initialize(nullptr, nullptr);
+
+            JSONContainer container(&sourceManager);
+
+            DiagnosticSink sink;
+            sink.init(&sourceManager, nullptr);
+
+            JSONValue value;
+            if (SLANG_FAILED(_parseJSON(outputInfo.stdOut.getUnownedSlice(), &sink, &container, value)))
+            {
+                // Unable to parse as JSON
+
+                context->getTestReporter()->messageFormat(TestMessageType::RunError,
+                    "Unable to parse reflection JSON '%s'\n",
+                    input.outputStem.getBuffer());
+
+                String actualOutputPath = input.outputStem + ".actual";
+                Slang::File::writeAllText(actualOutputPath, actualOutput);
+                return TestResult::Fail;
+            }
+        }
     }
 
     return _validateOutput(context, input, actualOutput);

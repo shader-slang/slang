@@ -540,8 +540,12 @@ namespace Slang
         // Check if both are integer values in general
         if (auto fstInt = as<IntVal>(fst))
         {
+            if (auto tc = as<TypeCastIntVal>(fstInt))
+                fstInt = as<IntVal>(tc->base);
             if (auto sndInt = as<IntVal>(snd))
             {
+                if (auto tc = as<TypeCastIntVal>(sndInt))
+                    sndInt = as<IntVal>(tc->base);
                 auto fstParam = as<GenericParamIntVal>(fstInt);
                 auto sndParam = as<GenericParamIntVal>(sndInt);
 
