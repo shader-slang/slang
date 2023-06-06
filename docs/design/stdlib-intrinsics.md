@@ -25,7 +25,7 @@ The `.meta.slang` files look largely like Slang source files, but their contents
 
 As an example, to produce an an array with values 0 to 9 we could write...
 
-```slang
+```text
 
 // Slang code
 int a[] = { 
@@ -33,7 +33,7 @@ int a[] = {
 ${{{{
 // C++ code
 for (int i = 0; i < 10; ++i) {
-}}}}}
+}}}}
 
 // Slang code that will be emitted for each iteration of the loop. 
 // $(i) will be replaced by the value of i for the loop
@@ -217,7 +217,7 @@ Defines an attribute `anyValueSize` that can be applied to `InterfaceDecl` and d
 
 Allows returning or passing a value "by reference".
 
-# GLSL/Vulkan specific intrinsics
+# GLSL/Vulkan specific
 
 ## __glsl_version(version)
 
@@ -262,7 +262,7 @@ __specialized_for_target(glsl)
 void debugBreak();
 ``` 
 
-# CUDA specific intrinsics
+# CUDA specific 
 
 ## __cuda_sm_version
 
@@ -270,6 +270,6 @@ When declaration is used with this intrinsic for a CUDA target, the highest shad
 
 # NVAPI 
 
-## `[__requiresNVAPI]`
+## [__requiresNVAPI]
 
 If declaration is reached during a compilation for an applicable target (D3D11/12), will indicate that [NVAPI support](../nvapi-support.md) is required for declaration to work. 
