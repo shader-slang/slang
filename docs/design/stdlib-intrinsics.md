@@ -111,14 +111,14 @@ The `expansion` value can be a string or an identifier. If it is an identifier, 
 Sections of the `expansion` string that are to be replaced are prefixed by the `$` sigil.
 
 * $0-9 - Indicates the parameter at that index. For a method call $0 is `this`.
-* $T0-9 - The element type for the param at the index.
+* $T0-9 - The type for the param at the index. If the type is a texture resource derived type, returns the *element* type.
 * $TR - The return type
 * $G0-9 - Replaced by the type/value at that index of specialization
 * $S0-9 - The scalar type of the generic at the index.
-* $p Used on texturing op, produce the combined texture sampler needed for GLSL.
+* $p - Used on texturing operations. Produces the combined texture sampler arguments as needed for GLSL.
 * $C - The $C intrinsic is a mechanism to change the name of an invocation depending on if there is a format conversion required between the type associated by the resource and the backing ImageFormat. Currently this is only implemented on CUDA, where there are specialized versions of the RWTexture writes that will do a format conversion.
 * $E - Sometimes accesses need to be scaled. For example in CUDA the x coordinate for surface access is byte addressed. $E will return the byte size of the *backing element*.
-* $c - When doing texture access in glsl the result may need to be cast. In particular if the underlying texture is 'half' based, glsl only accesses (read/write) as float. So we need to cast to a half type on output. When storing into a texture it is still the case the value written must be half - but we don't need to do any casting there as half is coerced to float without a problem.
+* $c - When doing texture access in GLSL the result may need to be cast. In particular if the underlying texture is 'half' based, GLSL only accesses (read/write) as float. So we need to cast to a half type on output. When storing into a texture it is still the case the value written must be half - but we don't need to do any casting there as half is coerced to float without a problem.
 * $z - If we are calling a D3D texturing operation in the form t.Foo(s, ...), where `t` is a Texture&lt;T&gt;, then this is the step where we try to properly swizzle the output of the equivalent GLSL call into the right shape.
 * $N0-9 - Extract the element count from a vector argument so that we can use it in the constructed expression.
 * $V0-9 - Take an argument of some scalar/vector type and pad it out to a 4-vector with the same element type (this is the inverse of `$z`).
