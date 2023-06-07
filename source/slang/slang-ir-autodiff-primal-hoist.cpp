@@ -961,6 +961,7 @@ IRInst* emitIndexedStoreAddressForVar(
 IRInst* emitIndexedLoadAddressForVar(
     IRBuilder* builder,
     IRVar* localVar,
+    IRBlock* defBlock,
     const List<IndexTrackingInfo>& defBlockIndices,
     const List<IndexTrackingInfo>& useBlockIndices)
 {
@@ -986,12 +987,15 @@ IRInst* emitIndexedLoadAddressForVar(
         {
             // If the use-block is outside this region, use the
             // last available value (by indexing with primal counter minus 1)
+            // An exception is if the stored inst is in a loop header block where 
+            // we use counter directly (since that block runs N+1 times)
             // 
             auto primalCounterCurrValue = index.primalCountParam;
-            auto primalCounterLastValue = builder->emitSub(
-                primalCounterCurrValue->getDataType(),
-                primalCounterCurrValue,
-                builder->getIntValue(builder->getIntType(), 1));
+            auto primalCounterLastValue = (index.loopHeaderBlock == defBlock) ? primalCounterCurrValue : 
+                builder->emitSub(
+                    primalCounterCurrValue->getDataType(),
+                    primalCounterCurrValue,
+                    builder->getIntValue(builder->getIntType(), 1));
 
             loadAddr = builder->emitElementAddress(
                 builder->getPtrType(currType),
@@ -1021,10 +1025,11 @@ IRVar* storeIndexedValue(
 IRInst* loadIndexedValue(
     IRBuilder* builder,
     IRVar* localVar,
+    IRBlock* defBlock,
     const List<IndexTrackingInfo>& defBlockIndices,
     const List<IndexTrackingInfo>& useBlockIndices)
 {
-    IRInst* addr = emitIndexedLoadAddressForVar(builder, localVar, defBlockIndices, useBlockIndices);
+    IRInst* addr = emitIndexedLoadAddressForVar(builder, localVar, defBlock, defBlockIndices, useBlockIndices);
 
     return builder->emitLoad(addr);
 }
@@ -1292,7 +1297,12 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
                     List<IndexTrackingInfo>& useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
 
-                    IRInst* loadAddr = emitIndexedLoadAddressForVar(&builder, localVar, defBlockIndices, useBlockIndices);
+                    IRInst* loadAddr = emitIndexedLoadAddressForVar(
+                        &builder,
+                        localVar,
+                        defBlock,
+                        defBlockIndices,
+                        useBlockIndices);
                     builder.replaceOperand(use, loadAddr);
                 }
 
@@ -1323,7 +1333,9 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 {
                     List<IndexTrackingInfo> useBlockIndices = indexedBlockInfo[getBlock(use->getUser())];
                     setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
-                    builder.replaceOperand(use, loadIndexedValue(&builder, localVar, defBlockIndices, useBlockIndices));
+                    builder.replaceOperand(
+                        use,
+                        loadIndexedValue(&builder, localVar, defBlock, defBlockIndices, useBlockIndices));
                 }
 
                 if (!isRecomputeInst)
@@ -1511,6 +1523,8 @@ void buildIndexedBlocks(
 
         IndexTrackingInfo indexInfo = {};
         lowerIndexedRegion(primalLoop, loop, indexInfo.primalCountParam, indexInfo.diffCountParam);
+
+        indexInfo.loopHeaderBlock = getLoopConditionBlock(primalLoop);
 
         SLANG_RELEASE_ASSERT(indexInfo.primalCountParam);
         SLANG_RELEASE_ASSERT(indexInfo.diffCountParam);

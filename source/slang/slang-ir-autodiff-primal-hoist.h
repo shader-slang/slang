@@ -211,6 +211,12 @@ namespace Slang
         IRInst* primalCountParam = nullptr;
         IRInst* diffCountParam = nullptr;
 
+        // Reference to the header block. Note that the header block 
+        // typically contains the loop condition and is executed N+1
+        // times if the loop body is executed N times.
+        // 
+        IRBlock* loopHeaderBlock = nullptr;
+
         enum CountStatus
         {
             Unresolved,
