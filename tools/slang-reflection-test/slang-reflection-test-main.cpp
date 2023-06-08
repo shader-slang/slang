@@ -773,10 +773,10 @@ static void emitReflectionTypeInfoJSON(
     case slang::TypeReflection::Kind::Pointer:
         {
             auto pointerType = type;
-            comma(writer);
-            write(writer, "\"kind\": \"pointer\"");
-            comma(writer);
-            write(writer, "\"targetType\": ");
+            writer.maybeComma();
+            writer << "\"kind\": \"pointer\"";
+            writer.maybeComma();
+            writer << "\"targetType\": ";
             emitReflectionTypeJSON(writer, pointerType->getElementType());
         }
         break;
@@ -904,18 +904,28 @@ static void emitReflectionTypeLayoutInfoJSON(
             auto valueTypeLayout = typeLayout->getElementTypeLayout();
             SLANG_ASSERT(valueTypeLayout);
 
-            comma(writer);
-            write(writer, "\"kind\": \"pointer\"");
+            writer.maybeComma();
+            writer << "\"kind\": \"pointer\"";
 
-            comma(writer);
-            write(writer, "\"valueType\": ");
+            writer.maybeComma();
+            writer << "\"valueType\": ";
 
             auto typeName = valueTypeLayout->getType()->getName();
 
-            // TODO(JS):
-            // We can't emit the type layout, because the type could contain
-            // a pointer and we end up in a recursive loop. For now we output the typename.
-            writeEscapedString(writer, typeName, strlen(typeName));
+            if (typeName && typeName[0])
+            {
+                // TODO(JS):
+                // We can't emit the type layout, because the type could contain
+                // a pointer and we end up in a recursive loop. For now we output the typename.
+                writer.writeEscapedString(UnownedStringSlice(typeName));
+            }
+            else
+            {
+                // TODO(JS): We will need to generate name that we will associate with this type 
+                // as it doesn't seem to have one
+                writer.writeEscapedString(toSlice("unknown name!"));
+                SLANG_ASSERT(!"Doesn't have an associated name");
+            }
 
             /*
             emitReflectionTypeLayoutJSON(
