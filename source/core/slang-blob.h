@@ -35,12 +35,6 @@ protected:
 
 By design the StringBlob owns a unique reference to the StringRepresentation. 
 This is because StringBlob, implements an interface which should work across threads.
-If it held a String with a single reference, that isn't thread safe because the ref 
-count on the StringRepresenation may not be in sync (it's not atomic ref counted) 
-if the IBlob access moves across cores.
-
-For simplicity we make StringBlob::create always work this way, even though doing so 
-might lead to an unnecessary copy.
 */
 class StringBlob : public BlobBase
 {
@@ -62,8 +56,6 @@ public:
         /// Moves from in into the created blob. 
         /// NOTE! That will only use the representation from in, if it is *unique*
         /// otherwise it will make a new copy.
-        /// This is so that StringBlob won't hold a reference count via a string held externally.
-        /// In contrast StringBlob::create *may* share the representation.
     static ComPtr<ISlangBlob> moveCreate(String& in);
     static ComPtr<ISlangBlob> moveCreate(String&& in);
 
