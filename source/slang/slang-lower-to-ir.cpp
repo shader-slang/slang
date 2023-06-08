@@ -101,8 +101,6 @@ struct ExtractedExistentialValInfo;
 // values are also supported.
 struct LoweredValInfo
 {
-    typedef LoweredValInfo ThisType;
-
     // Which of the cases of value are we looking at?
     enum class Flavor
     {
@@ -138,20 +136,10 @@ struct LoweredValInfo
 
     union
     {
-        // Any change to this union might require a change to equality test
         IRInst*            val;
         ExtendedValueInfo*  ext;
     };
     Flavor flavor;
-
-    bool operator==(const ThisType& rhs) const
-    {
-        // NOTE! This only works because we are doing a pointer comparison, 
-        // and so it doesn't matter if we compare val/ext. If the union changes
-        // this may no longer apply.
-        return flavor == rhs.flavor && val == rhs.val;
-    }
-    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
     LoweredValInfo()
     {
@@ -424,9 +412,6 @@ LoweredValInfo LoweredValInfo::extractedExistential(
 //
 struct IRGenEnv
 {
-    // Map AggTypeDecl/Type to the lowered IRType
-    Dictionary<NodeBase*, IRType*> typeMap;
-    
     // Map an AST-level declaration to the IR-level value that represents it.
     Dictionary<Decl*, LoweredValInfo> mapDeclToValue;
 
@@ -539,29 +524,6 @@ struct IRGenContext
         return shared->m_mainModuleDecl;
     }
 
-    void addType(Type* type, IRType* irType)
-    {
-        env->typeMap[type] = irType;
-    }
-    void addType(AggTypeDecl* typeDecl, IRType* irType)
-    {
-        env->typeMap[typeDecl] = irType;
-    }
-
-    // Find lowered type for a given type
-    IRType* findLoweredType(NodeBase* type)
-    {
-        IRGenEnv* envToFindIn = env;
-        while (envToFindIn)
-        {
-            if (auto typePtr = envToFindIn->typeMap.tryGetValue(type))
-                return *typePtr;
-            envToFindIn = envToFindIn->outer;
-        }
-        return nullptr;
-    }
-
-    // Find lowered Val for a given node decl
     LoweredValInfo* findLoweredDecl(Decl* decl)
     {
         IRGenEnv* envToFindIn = env;
@@ -1975,22 +1937,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto astValueType = type->getValueType();
 
-        IRType* valueType = lowerType(context, astValueType);
-        return getBuilder()->getPtrType(valueType);
+        IRType* irValueType = lowerType(context, astValueType);
+
+        return getBuilder()->getPtrType(irValueType);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
     {
-        const bool isAggType = as<AggTypeDecl>(type->declRef) != nullptr;
-        if (isAggType)
-        {
-            // See if the type is already lowered
-            if (auto irType = context->findLoweredType(type))
-            {
-                return irType;
-            }
-        }
-
         auto declRef = type->declRef;
         auto decl = declRef.getDecl();
 
@@ -2000,17 +1953,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             return lowerSimpleIntrinsicType(type);
         }
 
-        auto irType = (IRType*) getSimpleVal(
+
+        return (IRType*) getSimpleVal(
             context,
             emitDeclRef(context, declRef,
                 context->irBuilder->getTypeKind()));
-
-        if (isAggType)
-        {
-            context->addType(type, irType);
-        }
-
-        return irType;
     }
 
     IRType* visitNamedExpressionType(NamedExpressionType* type)
@@ -2317,12 +2264,6 @@ IRType* lowerType(
     IRGenContext*   context,
     Type*           type)
 {
-    // See if the type is already lowered
-    if (auto irType = context->findLoweredType(type))
-    {
-        return irType;
-    }
-   
     ValLoweringVisitor visitor;
     visitor.context = context;
     return (IRType*) getSimpleVal(context, visitor.dispatchType(type));
@@ -7621,11 +7562,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
     {
-        if (auto irType = context->findLoweredType(decl))
-        {
-            return LoweredValInfo(
-        }
-
         // Don't generate an IR `struct` for intrinsic types
         if(decl->findModifier<IntrinsicTypeModifier>() || decl->findModifier<BuiltinTypeModifier>())
         {
@@ -7674,13 +7610,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getSink()->diagnose(decl->loc, Diagnostics::unimplemented, "lower unknown AggType to IR");
             return LoweredValInfo::simple(subBuilder->getVoidType());
-        }
-
-        // Need to add to something!
-        if (!outerGeneric)
-        {
-            // It is a concrete type
-            context->addType(
         }
 
         addNameHint(context, irAggType, decl);
@@ -7768,7 +7697,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (as<NonCopyableTypeAttribute>(modifier))
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
         }
-
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
     }
 
@@ -8166,7 +8094,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         while (parentGeneric)
         {
-            // Create a universal type in `outerBlock` that will be used
+            // Create a universal type in `outterBlock` that will be used
             // as the type of this generic inst. The return value of the
             // generic inst will have a specialized type.
             // For example, if we have a generic function
@@ -9188,6 +9116,24 @@ LoweredValInfo lowerDecl(
     }
 }
 
+// We will probably want to put the 
+
+LoweredValInfo* _findLoweredValInfo(
+    IRGenContext* context,
+    Decl* decl)
+{
+    // Look for an existing value installed in this context
+    auto env = context->env;
+    while(env)
+    {
+        if(auto result = env->mapDeclToValue.tryGetValue(decl))
+            return result;
+
+        env = env->outer;
+    }
+    return nullptr;
+}
+
 // Ensure that a version of the given declaration has been emitted to the IR
 LoweredValInfo ensureDecl(
     IRGenContext*   context,
@@ -9195,14 +9141,9 @@ LoweredValInfo ensureDecl(
 {
     auto shared = context->shared;
 
-    // Look for an existing value installed in this context
-    auto env = context->env;
-    while(env)
+    if (auto valInfoPtr = _findLoweredValInfo(context, decl))
     {
-        if(auto resultPtr = env->mapDeclToValue.tryGetValue(decl))
-            return *resultPtr;
-
-        env = env->outer;
+        return *valInfoPtr;
     }
 
     // If we have a decl that's a generic value/type decl then something has gone seriously
@@ -9222,7 +9163,7 @@ LoweredValInfo ensureDecl(
     subContext.irBuilder = &subIRBuilder;
     subContext.env = &subEnv;
 
-    const LoweredValInfo result = lowerDecl(&subContext, decl);
+    auto result = lowerDecl(&subContext, decl);
 
     // By default assume that any value we are lowering represents
     // something that should be installed globally.
