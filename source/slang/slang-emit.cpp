@@ -324,7 +324,7 @@ Result linkAndOptimizeIR(
     }
 
     lowerOptionalType(irModule, sink);
-    simplifyIR(irModule);
+    simplifyIR(irModule, sink);
 
     switch (target)
     {
@@ -450,7 +450,7 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    simplifyIR(irModule);
+    simplifyIR(irModule, sink);
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
@@ -483,7 +483,7 @@ Result linkAndOptimizeIR(
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
     //
-    simplifyIR(irModule);
+    simplifyIR(irModule, sink);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
@@ -565,7 +565,7 @@ Result linkAndOptimizeIR(
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
-    simplifyIR(irModule);
+    simplifyIR(irModule, sink);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER SSA");
@@ -584,17 +584,14 @@ Result linkAndOptimizeIR(
     specializeResourceUsage(codeGenContext, irModule);
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
-    //
-    simplifyIR(irModule);
-
     // For GLSL targets, we also want to specialize calls to functions that
     // takes array parameters if possible, to avoid performance issues on
     // those platforms.
     if (isKhronosTarget(targetRequest))
     {
         specializeArrayParameters(codeGenContext, irModule);
-        simplifyIR(irModule);
     }
+    simplifyIR(irModule, sink);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
@@ -838,7 +835,7 @@ Result linkAndOptimizeIR(
     //
     // We run IR simplification passes again to clean things up.
     //
-    simplifyIR(irModule);
+    simplifyIR(irModule, sink);
 
     if (isKhronosTarget(targetRequest))
     {
@@ -868,7 +865,7 @@ Result linkAndOptimizeIR(
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
     lowerBitCast(targetRequest, irModule);
-    simplifyIR(irModule);
+    simplifyIR(irModule, sink);
 
     eliminateMultiLevelBreak(irModule);
 

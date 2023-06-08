@@ -628,6 +628,79 @@ namespace Slang
         }
     }
 
+    static bool isSigned(Type* t)
+    {
+        auto basicType = as<BasicExpressionType>(t);
+        if (!basicType) return false;
+        switch (basicType->baseType)
+        {
+        case BaseType::Int8:
+        case BaseType::Int16:
+        case BaseType::Int:
+        case BaseType::Int64:
+        case BaseType::IntPtr:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    static int getTypeBitSize(Type* t)
+    {
+        auto basicType = as<BasicExpressionType>(t);
+        if (!basicType) return 0;
+
+        switch (basicType->baseType)
+        {
+        case BaseType::Int8:
+        case BaseType::UInt8:
+            return 8;
+        case BaseType::Int16:
+        case BaseType::UInt16:
+            return 16;
+        case BaseType::Int:
+        case BaseType::UInt:
+            return 32;
+        case BaseType::Int64:
+        case BaseType::UInt64:
+            return 64;
+        case BaseType::IntPtr:
+        case BaseType::UIntPtr:
+#if SLANG_PTR_IS_32
+            return 32;
+#else
+            return 64;
+#endif
+        default:
+            return 0;
+        }
+    }
+
+    ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(Decl* decl, Type* toType, Expr* arg)
+    {
+        ConversionCost candidateCost = getImplicitConversionCost(decl);
+
+        // Fix up the cost if the operand is a const lit.
+        if (isScalarIntegerType(toType))
+        {
+            auto knownVal = as<IntegerLiteralExpr>(arg);
+            if (!knownVal)
+                return candidateCost;
+            if (getIntValueBitSize(knownVal->value) <= getTypeBitSize(toType))
+            {
+                bool toTypeIsSigned = isSigned(toType);
+                bool fromTypeIsSigned = isSigned(knownVal->type);
+                if (toTypeIsSigned == fromTypeIsSigned)
+                    candidateCost = kConversionCost_InRangeIntLitConversion;
+                else if (toTypeIsSigned)
+                    candidateCost = kConversionCost_InRangeIntLitUnsignedToSignedConversion;
+                else
+                    candidateCost = kConversionCost_InRangeIntLitSignedToUnsignedConversion;
+            }
+        }
+        return candidateCost;
+    }
+
     bool SemanticsVisitor::_coerce(
         CoercionSite site,
         Type*    toType,
@@ -989,8 +1062,8 @@ namespace Slang
             ConversionCost bestCost = kConversionCost_Explicit;
             for(auto candidate : overloadContext.bestCandidates)
             {
-                ConversionCost candidateCost = getImplicitConversionCost(
-                    candidate.item.declRef.getDecl());
+                ConversionCost candidateCost = getImplicitConversionCostWithKnownArg(
+                    candidate.item.declRef.getDecl(), toType, fromExpr);
 
                 if(candidateCost < bestCost)
                     bestCost = candidateCost;
@@ -1027,8 +1100,8 @@ namespace Slang
             // Next, we need to look at the implicit conversion
             // cost associated with the initializer we are invoking.
             //
-            ConversionCost cost = getImplicitConversionCost(
-                    overloadContext.bestCandidate->item.declRef.getDecl());
+            ConversionCost cost = getImplicitConversionCostWithKnownArg(
+                overloadContext.bestCandidate->item.declRef.getDecl(), toType, fromExpr);
 
             // If the cost is too high to be usable as an
             // implicit conversion, then we will report the
@@ -1149,7 +1222,7 @@ namespace Slang
 
         BasicTypeKeyPair cacheKey;
         cacheKey.type1 = makeBasicTypeKey(toType);
-        cacheKey.type2 = makeBasicTypeKey(fromType);
+        cacheKey.type2 = makeBasicTypeKey(fromType, fromExpr);
     
         if( cacheKey.isValid())
         {

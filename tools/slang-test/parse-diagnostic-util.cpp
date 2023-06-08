@@ -341,6 +341,20 @@ static UnownedStringSlice _getEquals(const UnownedStringSlice& in)
     return in.tail(equalsIndex + 1).trim();
 }
 
+static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& line)
+{
+    if (line != "}")
+    {
+        return false;
+    }
+    // We need to get the *next* line. If it is "}" then this isn't the final closing
+    UnownedStringSlice remaining(text);
+    UnownedStringSlice nextLine;
+    StringUtil::extractLine(remaining, nextLine);
+
+    return (nextLine != toSlice("}"));
+}
+
 /* static */SlangResult ParseDiagnosticUtil::parseOutputInfo(const UnownedStringSlice& inText, OutputInfo& out)
 {
     enum State
@@ -405,9 +419,9 @@ static UnownedStringSlice _getEquals(const UnownedStringSlice& in)
             case State::InStdError:
             case State::InStdOut:
             {
-                if (line == "}")
+                if (_isAtEnd(text, line))
                 {
-                    String& dst = state == State::InStdError ? out.stdError : out.stdOut;
+                    String& dst = (state == State::InStdError) ? out.stdError : out.stdOut;
                     if (lines.getCount() > 0)
                     {
                         dst = UnownedStringSlice(lines[0].begin(), lines.getLast().end());

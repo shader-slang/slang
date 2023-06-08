@@ -24,7 +24,7 @@ void computeMain(vector<uint,3> dispatchThreadID_0 : SV_DISPATCHTHREADID)
 
     uint bufferCount_0 = _S1;
 
-    if((uint) innerIndex_1 >= bufferCount_0)
+    if(innerIndex_1 >= (int)bufferCount_0)
     {
         innerIndex_0 = (int) (bufferCount_0 - (uint) 1);
     }

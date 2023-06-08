@@ -540,8 +540,12 @@ namespace Slang
         // Check if both are integer values in general
         if (auto fstInt = as<IntVal>(fst))
         {
+            if (auto tc = as<TypeCastIntVal>(fstInt))
+                fstInt = as<IntVal>(tc->base);
             if (auto sndInt = as<IntVal>(snd))
             {
+                if (auto tc = as<TypeCastIntVal>(sndInt))
+                    sndInt = as<IntVal>(tc->base);
                 auto fstParam = as<GenericParamIntVal>(fstInt);
                 auto sndParam = as<GenericParamIntVal>(sndInt);
 
@@ -792,6 +796,8 @@ namespace Slang
         Type*  fst,
         Type*  snd)
     {
+        if (!fst) return false;
+
         if (fst->equals(snd)) return true;
 
         // An error type can unify with anything, just so we avoid cascading errors.

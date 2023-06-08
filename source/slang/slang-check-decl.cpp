@@ -145,6 +145,7 @@ namespace Slang
 
 #define CASE(TYPE) void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
 
+        CASE(EnumCaseDecl)
         CASE(FuncDecl)
         CASE(VarDeclBase)
         CASE(SimpleTypeDecl)
@@ -7026,7 +7027,8 @@ namespace Slang
         List<Expr*> imaginaryArguments;
         auto isOutParam = [&](ParamDecl* param)
         {
-            return param->findModifier<OutModifier>() != nullptr && param->findModifier<InModifier>() == nullptr;
+            return param->findModifier<OutModifier>() != nullptr
+                && param->findModifier<InModifier>() == nullptr && param->findModifier<InOutModifier>() == nullptr;
         };
 
         for (auto param : originalFuncDecl->getParameters())

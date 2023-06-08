@@ -200,7 +200,7 @@ standard output = {
     [
         {
             "name": "TParam",
-            constraints: 
+            "constraints": 
             [
                 {
                     "kind": "Interface",
@@ -210,7 +210,7 @@ standard output = {
         },
         {
             "name": "TParam2",
-            constraints: 
+            "constraints": 
             [
                 {
                     "kind": "Interface",

@@ -2997,6 +2997,8 @@ RefPtr<Module> Linkage::loadModule(
     DiagnosticSink*     sink,
     const LoadedModuleDictionary* additionalLoadedModules)
 {
+    CompileTimerRAII recordCompileTime(static_cast<Session*>(getGlobalSession()));
+
     RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
 
     frontEndReq->additionalLoadedModules = additionalLoadedModules;
@@ -5118,9 +5120,11 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
 {
     SlangResult res = SLANG_FAIL;
     double downstreamStartTime = 0.0;
+    double totalStartTime = 0.0;
+
     if (m_reportDownstreamCompileTime)
     {
-        downstreamStartTime = getSession()->getDownstreamCompilerElapsedTime();
+        getSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
     }
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
@@ -5171,7 +5175,10 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
 
     if (m_reportDownstreamCompileTime)
     {
-        double downstreamTime = getSession()->getDownstreamCompilerElapsedTime() - downstreamStartTime;
+        double downstreamEndTime = 0;
+        double totalEndTime = 0;
+        getSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
+        double downstreamTime = downstreamEndTime - downstreamStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
 

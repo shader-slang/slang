@@ -144,7 +144,14 @@ namespace Slang
 
         auto operandParent = operandValue->getParent();
 
-        if (auto instParentBlock = as<IRBlock>(instParent))
+        auto instParentBlock = as<IRBlock>(instParent);
+        if (!instParentBlock && as<IRDecoration>(inst))
+        {
+            instParent = instParent->getParent();
+            instParentBlock = as<IRBlock>(instParent);
+        }
+
+        if (instParentBlock)
         {
             if (auto operandParentBlock = as<IRBlock>(operandParent))
             {

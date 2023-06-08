@@ -326,6 +326,24 @@ namespace Slang
         else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
         {
             emitRaw(context, "KX");
+            emit(context, (UInt)polynomialIntVal->constantTerm);
+            emit(context, (UInt)polynomialIntVal->terms.getCount());
+            for (auto term : polynomialIntVal->terms)
+            {
+                emit(context, (UInt)term->constFactor);
+                emit(context, (UInt)term->paramFactors.getCount());
+                for (auto factor : term->paramFactors)
+                {
+                    emitVal(context, factor->param);
+                    emit(context, (UInt)factor->power);
+                }
+            }
+        }
+        else if (const auto typecastIntVal = dynamicCast<TypeCastIntVal>(val))
+        {
+            emitRaw(context, "KK");
+            emitVal(context, typecastIntVal->type);
+            emitVal(context, typecastIntVal->base);
         }
         else
         {

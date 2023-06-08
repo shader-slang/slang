@@ -156,6 +156,15 @@ namespace Slang
         {
             return kConversionCost_UnsignedToSignedPromotion;
         }
+        // Same-size unsigned to signed integer conversion.
+        else if (toInfo.conversionKind == kBaseTypeConversionKind_Signed
+            && fromInfo.conversionKind == kBaseTypeConversionKind_Unsigned
+            && toInfo.conversionRank == fromInfo.conversionRank
+            && toInfo.conversionRank != kBaseTypeConversionRank_IntPtr
+            && fromInfo.conversionRank != kBaseTypeConversionRank_IntPtr)
+        {
+            return kConversionCost_SameSizeUnsignedToSignedConversion;
+        }
 
         // Conversion from signed to unsigned is always lossy,
         // but it is preferred over conversions from unsigned
@@ -221,7 +230,7 @@ namespace Slang
     static const IntrinsicOpInfo intrinsicUnaryOps[] = {
         { kIROp_Neg,    "neg",              "-",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
         { kIROp_Not,    "logicalNot",       "!",    nullptr,                    BOOL_MASK | BOOL_RESULT },
-        { kIROp_BitNot, "not",              "~",    "__BuiltinIntegerType",     INT_MASK        },
+        { kIROp_BitNot, "not",              "~",    "__BuiltinLogicalType",     INT_MASK        },
     };
 
     static const IntrinsicOpInfo intrinsicBinaryOps[] = {
