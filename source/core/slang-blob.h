@@ -75,10 +75,9 @@ protected:
 
     void* getObject(const Guid& guid);
 
-    char* m_chars;                  ///< Pointer to the contained data. 
-    size_t m_charsCount;            ///< The amount of chars *not* including terminating 0
-
-    StringRepresentation* m_rep;    ///< Holds actual bytes. Can be nullptr if it's an empty string. 
+    char* m_chars = nullptr;                ///< Pointer to the contained data. 
+    size_t m_charsCount = 0;                ///< The amount of chars *not* including terminating 0
+    StringRepresentation* m_rep = nullptr;  ///< Holds actual bytes. Can be nullptr if it's an empty string. 
 };
 
 class ListBlob : public BlobBase
