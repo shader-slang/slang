@@ -25,33 +25,18 @@ The `.meta.slang` files look largely like Slang source files, but their contents
 
 As an example, to produce an an array with values 0 to 9 we could write...
 
-```text
+```slang
 
 // Slang code
-int a[] = { 
-
 ${{{{
-// C++ code
-for (int i = 0; i < 10; ++i) {
+// C++ code, calling out to a C++ function getTime, the result is held in variable time
+int cppTime = getTime();
 }}}}
 
-// Slang code that will be emitted for each iteration of the loop. 
-// $(i) will be replaced by the value of i for the loop
-$(i),
-
-${{{{
-// C++ code closing { for the loop
-}
-}}}}
-
-// Slang code closing the end of the array
-};
-```
-
-Will produce something like
-
-```slang
-int a[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+// Back to Slang code, can access the C++ variable previously defined as cppTime. Due to $().
+// The code inside the $() is executed on the C++ side, so can do calculations. In practice it would be easier
+// to just use call $(getTime() + 1), but this demonstrates variables are accessible.
+int slangTime = $(cppTime + 1);
 ```
 
 # Attributes

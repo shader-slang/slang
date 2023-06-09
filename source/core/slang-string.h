@@ -474,7 +474,11 @@ namespace Slang
             /// Append data written to buffer output via 'prepareForAppend' directly written 'inplace'
         void appendInPlace(const char* chars, Index count);
 
+            /// Get the internal string represenation
         SLANG_FORCE_INLINE StringRepresentation* getStringRepresentation() const { return m_buffer; }
+
+            /// Detach the representation (will leave string as empty). Rep ref count will remain unchanged.
+        SLANG_FORCE_INLINE StringRepresentation* detachStringRepresentation() { return m_buffer.detach(); }
 
         const char* begin() const
         {
