@@ -313,9 +313,9 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     }
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
-    addBuiltinSource(coreLanguageScope, "core", StringBlob::moveCreate(getCoreLibraryCode()));
-    addBuiltinSource(hlslLanguageScope, "hlsl", StringBlob::moveCreate(getHLSLLibraryCode()));
-    addBuiltinSource(autodiffLanguageScope, "diff", StringBlob::moveCreate(getAutodiffLibraryCode()));
+    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
+    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    addBuiltinSource(autodiffLanguageScope, "diff", getAutodiffLibraryCode());
 
     if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
     {

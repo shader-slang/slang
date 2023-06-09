@@ -14,16 +14,16 @@ namespace Slang
 {
     String Session::getStdlibPath()
     {
-        if(stdlibPath.getLength() != 0)
-            return stdlibPath;
+        if(stdlibPath.getLength() == 0)
+        {
+            // Make sure we have a line of text from __FILE__, that we'll extract the filename from
+            List<UnownedStringSlice> lines;
+            StringUtil::calcLines(UnownedStringSlice::fromLiteral(__FILE__), lines);
+            SLANG_ASSERT(lines.getCount() > 0 && lines[0].getLength() > 0);
 
-        // Make sure we have a line of text from __FILE__, that we'll extract the filename from
-        List<UnownedStringSlice> lines;
-        StringUtil::calcLines(UnownedStringSlice::fromLiteral(__FILE__), lines);
-        SLANG_ASSERT(lines.getCount() > 0 && lines[0].getLength() > 0);
-
-        // Make the path just the filename to remove issues around path being included on different targets
-        stdlibPath = Path::getFileName(lines[0]);
+            // Make the path just the filename to remove issues around path being included on different targets
+            stdlibPath = Path::getFileName(lines[0]);
+        }
         return stdlibPath;
     }
 
@@ -263,54 +263,45 @@ namespace Slang
 
 #define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"" << path << "\"\n"
 
-    String Session::getCoreLibraryCode()
+    ComPtr<ISlangBlob> Session::getCoreLibraryCode()
     {
 #if !defined(SLANG_DISABLE_STDLIB_SOURCE)
-        if (coreLibraryCode.getLength() > 0)
-            return coreLibraryCode;
-
-        StringBuilder sb;
-
-        const String path = getStdlibPath();
-
-        #include "core.meta.slang.h"
-
-        coreLibraryCode = sb.produceString();
+        if (!coreLibraryCode)
+        {
+            StringBuilder sb;
+            const String path = getStdlibPath();
+            #include "core.meta.slang.h"
+            coreLibraryCode = StringBlob::moveCreate(sb);
+        }
 #endif
 
         return coreLibraryCode;
     }
 
-    String Session::getHLSLLibraryCode()
+    ComPtr<ISlangBlob> Session::getHLSLLibraryCode()
     {
 #if !defined(SLANG_DISABLE_STDLIB_SOURCE)
-        if (hlslLibraryCode.getLength() > 0)
-            return hlslLibraryCode;
-
-        const String path = getStdlibPath();
-
-        StringBuilder sb;
-
-        #include "hlsl.meta.slang.h"
-
-        hlslLibraryCode = sb.produceString();
+        if (!hlslLibraryCode)
+        {
+            const String path = getStdlibPath();
+            StringBuilder sb;
+            #include "hlsl.meta.slang.h"
+            hlslLibraryCode = StringBlob::moveCreate(sb);
+        }
 #endif
         return hlslLibraryCode;
     }
 
-    String Session::getAutodiffLibraryCode()
+    ComPtr<ISlangBlob> Session::getAutodiffLibraryCode()
     {
 #if !defined(SLANG_DISABLE_STDLIB_SOURCE)
-        if (autodiffLibraryCode.getLength() > 0)
-            return autodiffLibraryCode;
-
-        const String path = getStdlibPath();
-
-        StringBuilder sb;
-
-        #include "diff.meta.slang.h"
-
-        autodiffLibraryCode = sb.produceString();
+        if (!autodiffLibraryCode)
+        {
+            const String path = getStdlibPath();
+            StringBuilder sb;
+            #include "diff.meta.slang.h"
+            autodiffLibraryCode = StringBlob::moveCreate(sb);
+        }
 #endif
         return autodiffLibraryCode;
     }
