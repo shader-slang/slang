@@ -2070,6 +2070,7 @@ namespace Slang
             // disambiguate based on FOLLOW set
             switch (peekTokenType(&newParser))
             {
+            case TokenType::Scope:
             case TokenType::Dot:
             case TokenType::LParent:
             case TokenType::RParent:
