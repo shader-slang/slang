@@ -45,8 +45,8 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
 
     // ISlangBlob
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_chars; }
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_charsCount; }
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_slice.begin(); }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_slice.getLength(); }
 
         /// Since in is not being moved will *always* create a new representation, unless the in is empty
     static ComPtr<ISlangBlob> create(const String& in);
@@ -63,21 +63,23 @@ public:
     ~StringBlob();
 
 protected:
-        /// Use when rep *must* be unique (ie nullptr, and has a ref count of 1, that can be `taken` by the blob
-    void _uniqueInit(StringRepresentation* uniqueRep);
+    
         /// Init with a rep when can't be owned.
-    void _init(StringRepresentation* rep);
+    void _setWithCopy(StringRepresentation* rep);
         /// Init with a representation that has been moved.
-    void _moveInit(StringRepresentation* rep);
+    void _setWithMove(StringRepresentation* rep);
 
-        /// Checks that m_rep is either nullptr or has a ref count of 1 (ie it is owned by the blob)
-    SLANG_FORCE_INLINE void _checkRep() const { SLANG_ASSERT(m_rep == nullptr || m_rep->isUniquelyReferenced()); }
+        /// Create a unique copy of rep. 
+        /// If nullptr will work (if rep is empty, will return that)
+    static StringRepresentation* _createUniqueCopy(StringRepresentation* rep);
+
+        /// Rep can only be nullptr or have a single ref
+    void _setUniqueRep(StringRepresentation* rep);
 
     void* getObject(const Guid& guid);
 
-    char* m_chars = nullptr;                ///< Pointer to the contained data. 
-    size_t m_charsCount = 0;                ///< The amount of chars *not* including terminating 0
-    StringRepresentation* m_rep = nullptr;  ///< Holds actual bytes. Can be nullptr if it's an empty string. 
+    UnownedTerminatedStringSlice m_slice;           ///< The contents
+    StringRepresentation* m_uniqueRep = nullptr;    ///< Holds actual bytes. Can be nullptr if it's an empty string. 
 };
 
 class ListBlob : public BlobBase
