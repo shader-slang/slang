@@ -778,6 +778,14 @@ void HLSLSourceEmitter::emitIfDecorationsImpl(IRIfElse* ifInst)
     }
 }
 
+void HLSLSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
+{
+    if (switchInst->findDecorationImpl(kIROp_BranchDecoration))
+    {
+        m_writer->emit("[branch]\n");
+    }
+}
+
 void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     switch( decoration->getOp() )

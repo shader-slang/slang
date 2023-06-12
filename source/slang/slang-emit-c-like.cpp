@@ -2806,6 +2806,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
             {
                 auto switchRegion = (SwitchRegion*) region;
 
+                emitSwitchDecorationsImpl(switchRegion->switchInst);
+                
                 // Emit the start of our statement.
                 m_writer->emit("switch(");
                 emitOperand(switchRegion->getCondition(), getInfo(EmitOp::General));

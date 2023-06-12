@@ -5837,7 +5837,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // prepared to emit the `switch` instruction
         // itself.
         builder->setInsertInto(initialBlock);
-        builder->emitSwitch(
+        auto switchInst = builder->emitSwitch(
             conditionVal,
             breakLabel,
             defaultLabel,
@@ -5849,6 +5849,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
         context->shared->breakLabels.remove(stmt);
+
+        // If there is the branch attribute output the IR decoration
+        if (stmt->hasModifier<BranchAttribute>())
+        {
+            builder->addDecoration(switchInst, kIROp_BranchDecoration);
+        }
     }
 };
 
