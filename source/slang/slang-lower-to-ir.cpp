@@ -421,22 +421,7 @@ struct IRGenEnv
 
 struct SharedIRGenContext
 {
-    SharedIRGenContext(
-        Session*        session,
-        DiagnosticSink* sink,
-        bool obfuscateCode, 
-        ModuleDecl*     mainModuleDecl = nullptr)
-        : m_session(session)
-        , m_sink(sink)
-        , m_obfuscateCode(obfuscateCode)
-        , m_mainModuleDecl(mainModuleDecl)
-    {}
-
-    Session*        m_session = nullptr;
-    DiagnosticSink* m_sink = nullptr;
-    bool            m_obfuscateCode = false;
-    ModuleDecl*     m_mainModuleDecl = nullptr;
-
+    
     // The "global" environment for mapping declarations to their IR values.
     IRGenEnv globalEnv;
 
@@ -460,6 +445,27 @@ struct SharedIRGenContext
     Dictionary<Stmt*, IRBlock*> breakLabels;
     Dictionary<Stmt*, IRBlock*> continueLabels;
 
+    void setGlobalValue(Decl* decl, LoweredValInfo value)
+    {
+        globalEnv.mapDeclToValue[decl] = value;
+    }
+
+    SharedIRGenContext(
+        Session* session,
+        DiagnosticSink* sink,
+        bool obfuscateCode,
+        ModuleDecl* mainModuleDecl = nullptr)
+        : m_session(session)
+        , m_sink(sink)
+        , m_obfuscateCode(obfuscateCode)
+        , m_mainModuleDecl(mainModuleDecl)
+    {}
+
+    Session*        m_session = nullptr;
+    DiagnosticSink* m_sink = nullptr;
+    bool            m_obfuscateCode = false;
+    ModuleDecl*     m_mainModuleDecl = nullptr;
+
     // List of all string literals used in user code, regardless
     // of how they were used (i.e., whether or not they were hashed).
     //
@@ -472,7 +478,6 @@ struct SharedIRGenContext
     //
     List<IRInst*> m_stringLiterals;
 };
-
 
 struct IRGenContext
 {
@@ -509,6 +514,16 @@ struct IRGenContext
         , irBuilder(nullptr)
     {}
 
+    void setGlobalValue(Decl* decl, LoweredValInfo value)
+    {
+        shared->setGlobalValue(decl, value);
+    }
+
+    void setValue(Decl* decl, LoweredValInfo value)
+    {
+        env->mapDeclToValue[decl] = value;
+    }
+
     Session* getSession()
     {
         return shared->m_session;
@@ -536,21 +551,6 @@ struct IRGenContext
         return nullptr;
     }
 };
-
-void setGlobalValue(SharedIRGenContext* sharedContext, Decl* decl, LoweredValInfo value)
-{
-    sharedContext->globalEnv.mapDeclToValue[decl] = value;
-}
-
-void setGlobalValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
-{
-    setGlobalValue(context->shared, decl, value);
-}
-
-void setValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
-{
-    context->env->mapDeclToValue[decl] = value;
-}
 
 ModuleDecl* findModuleDecl(Decl* decl)
 {
@@ -3831,7 +3831,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         SLANG_ASSERT(argIndex < subst->getArgs().getCount());
         auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
-        setValue(subContext, paramDecl, argVal);
+        subContext->setValue(paramDecl, argVal);
     }
 
     void _lowerSubstitutionEnv(IRGenContext* subContext, Substitutions* subst)
@@ -4588,7 +4588,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // feels kind of messy and gross.
 
         auto initVal = lowerLValueExpr(context, expr->decl->initExpr);
-        setGlobalValue(context, expr->decl, initVal);
+        context->setGlobalValue(expr->decl, initVal);
         auto bodyVal = lowerSubExpr(expr->body);
         return bodyVal;
     }
@@ -6710,7 +6710,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto irKey = getBuilder()->createStructKey();
                 addLinkageDecoration(context, irKey, inheritanceDecl);
                 auto keyVal = LoweredValInfo::simple(irKey);
-                setGlobalValue(context, inheritanceDecl, keyVal);
+                context->setGlobalValue(inheritanceDecl, keyVal);
                 return keyVal;
             }
         }
@@ -6744,7 +6744,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, nullptr);
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.
-        setGlobalValue(context, inheritanceDecl, LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
+        context->setGlobalValue(inheritanceDecl, LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
         auto irSubType = lowerType(subContext, subType);
         irWitnessTable->setConcreteType(irSubType);
@@ -6901,7 +6901,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
-        setGlobalValue(context, decl, paramVal);
+        context->setGlobalValue(decl, paramVal);
 
         irParam->moveToEnd();
 
@@ -7003,7 +7003,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // for any references to the constant from elsewhere
         // in the code.
         //
-        setGlobalValue(context, decl, loweredValue);
+        context->setGlobalValue(decl, loweredValue);
 
         return loweredValue;
     }
@@ -7057,7 +7057,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
-        setGlobalValue(context, decl, globalVal);
+        context->setGlobalValue(decl, globalVal);
 
         if (isImportedDecl(decl))
         {
@@ -7182,7 +7182,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         subBuilder->addHighLevelDeclDecoration(irGlobal, decl);
 
         LoweredValInfo globalVal = LoweredValInfo::ptr(irGlobal);
-        setValue(context, decl, globalVal);
+        context->setValue(decl, globalVal);
 
         // A `static` variable with an initializer needs special handling,
         // at least if the initializer isn't a compile-time constant.
@@ -7273,7 +7273,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 auto initVal = lowerRValueExpr(context, initExpr);
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
-                setGlobalValue(context, decl, initVal);
+                context->setGlobalValue(decl, initVal);
                 return initVal;
             }
         }
@@ -7288,7 +7288,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             assign(context, varVal, initVal);
         }
 
-        setGlobalValue(context, decl, varVal);
+        context->setGlobalValue(decl, varVal);
 
         return varVal;
     }
@@ -7310,7 +7310,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         auto assocType = context->irBuilder->getAssociatedType(
             constraintInterfaces.getArrayView().arrayView);
-        setValue(context, decl, assocType);
+        context->setValue(decl, assocType);
         return LoweredValInfo::simple(assocType);
     }
 
@@ -7376,7 +7376,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
-        setValue(context, decl, LoweredValInfo::simple(irInterface));
+        context->setValue(decl, LoweredValInfo::simple(irInterface));
 
         // Setup subContext for proper lowering `ThisType`, associated types and
         // the interface decl's self reference.
@@ -7452,7 +7452,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     irInterface->setOperand(entryIndex, constraintEntry);
                     entryIndex++;
 
-                    setValue(context, constraintDecl, LoweredValInfo::simple(constraintEntry));
+                    context->setValue(constraintDecl, LoweredValInfo::simple(constraintEntry));
                 }
             }
             else
@@ -7474,7 +7474,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // Add lowered requirement entry to current decl mapping to prevent
                 // the function requirements from being lowered again when we get to
                 // `ensureAllDeclsRec`.
-                setValue(context, requirementDecl, LoweredValInfo::simple(entry));
+                context->setValue(requirementDecl, LoweredValInfo::simple(entry));
             }
         }
 
@@ -7917,7 +7917,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto supType = lowerType(context, constraintDecl->sup.type);
         auto value = emitGenericConstraintValue(subContext, constraintDecl, supType);
-        setValue(subContext, constraintDecl, LoweredValInfo::simple(value));
+        subContext->setValue(constraintDecl, LoweredValInfo::simple(value));
     }
 
     IRGeneric* emitOuterGeneric(
@@ -7950,14 +7950,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // classifier of the parameter.
                 auto param = subBuilder->emitParam(subBuilder->getTypeType());
                 addNameHint(context, param, typeParamDecl);
-                setValue(subContext, typeParamDecl, LoweredValInfo::simple(param));
+                subContext->setValue(typeParamDecl, LoweredValInfo::simple(param));
             }
             else if (auto valDecl = as<GenericValueParamDecl>(member))
             {
                 auto paramType = lowerType(subContext, valDecl->getType());
                 auto param = subBuilder->emitParam(paramType);
                 addNameHint(context, param, valDecl);
-                setValue(subContext, valDecl, LoweredValInfo::simple(param));
+                subContext->setValue(valDecl, LoweredValInfo::simple(param));
             }
         }
         // Then we emit constraint parameters, again in
@@ -8613,7 +8613,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 if (auto paramDecl = paramInfo.decl)
                 {
-                    setValue(subContext, paramDecl, paramVal);
+                    subContext->setValue(paramDecl, paramVal);
                 }
 
                 if (paramInfo.isThisParam)
@@ -8768,7 +8768,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
-        setGlobalValue(context, decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
+        context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
         for (auto modifier : decl->modifiers)
         {
@@ -9087,7 +9087,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // default to the `result` that is returned from this visitor,
             // so that all the declarations share the same IR representative.
             //
-            setGlobalValue(context->shared, funcDecl, result);
+            context->setGlobalValue(funcDecl, result);
         }
         return result;
     }
@@ -9139,8 +9139,6 @@ LoweredValInfo ensureDecl(
     IRGenContext*   context,
     Decl*           decl)
 {
-    auto shared = context->shared;
-
     if (auto valInfoPtr = _findLoweredValInfo(context, decl))
     {
         return *valInfoPtr;
@@ -9167,7 +9165,7 @@ LoweredValInfo ensureDecl(
 
     // By default assume that any value we are lowering represents
     // something that should be installed globally.
-    setGlobalValue(shared, decl, result);
+    context->setGlobalValue(decl, result);
 
     return result;
 }
