@@ -5073,13 +5073,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto irCond = getSimpleVal(context,
             lowerRValueExpr(context, condExpr));
 
+        IRInst* ifInst = nullptr;
+
         if (elseStmt)
         {
             auto thenBlock = createBlock();
             auto elseBlock = createBlock();
             auto afterBlock = createBlock();
 
-            builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+            ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
             insertBlock(thenBlock);
             lowerStmt(context, thenStmt);
@@ -5095,12 +5097,21 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto thenBlock = createBlock();
             auto afterBlock = createBlock();
 
-            builder->emitIf(irCond, thenBlock, afterBlock);
+            ifInst = builder->emitIf(irCond, thenBlock, afterBlock);
 
             insertBlock(thenBlock);
             lowerStmt(context, thenStmt);
 
             insertBlock(afterBlock);
+        }
+
+        if (stmt->findModifier<FlattenAttribute>())
+        {
+            builder->addDecoration(ifInst, kIROp_FlattenDecoration);
+        }
+        if (stmt->findModifier<BranchAttribute>())
+        {
+            builder->addDecoration(ifInst, kIROp_BranchDecoration);
         }
     }
 

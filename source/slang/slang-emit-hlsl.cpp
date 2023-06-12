@@ -766,6 +766,18 @@ static bool _canEmitExport(const Profile& profile)
     Super::emitFuncDecorationsImpl(func);
 }
 
+void HLSLSourceEmitter::emitIfDecorationsImpl(IRIfElse* ifInst)
+{
+    if (ifInst->findDecorationImpl(kIROp_BranchDecoration))
+    {
+        m_writer->emit("[branch]\n");
+    }
+    else if (ifInst->findDecorationImpl(kIROp_FlattenDecoration))
+    {
+        m_writer->emit("[flatten]\n");
+    }
+}
+
 void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     switch( decoration->getOp() )

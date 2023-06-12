@@ -2738,6 +2738,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
             {
                 auto ifRegion = (IfRegion*) region;
 
+                emitIfDecorationsImpl(ifRegion->ifElseInst);
+
                 // TODO: consider simplifying the code in
                 // the case where `ifRegion == null`
                 // so that we output `if(!condition) { elseRegion }`
