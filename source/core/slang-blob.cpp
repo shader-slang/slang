@@ -35,71 +35,53 @@ void* BlobBase::castAs(const SlangUUID& guid)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void StringBlob::_uniqueInit(StringRepresentation* uniqueRep)
+void StringBlob::_setUniqueRep(StringRepresentation* uniqueRep)
 {
-    // When initing the rep either has to be nullptr *or* uniquely referenced
-    // so we can take ownership of it.
-
     SLANG_ASSERT(uniqueRep == nullptr || uniqueRep->isUniquelyReferenced());
 
-    m_rep = uniqueRep;
+    m_uniqueRep = uniqueRep;
 
-    // If it's nullptr, that means the string is the empty string. To handle we 
-    // 
-    if (!uniqueRep)
-    {
-        m_chars = "";
-        m_charsCount = 0;
-    }
-    else
-    {
-        m_chars = uniqueRep->getData();
-        m_charsCount = uniqueRep->getLength();
-    }
-
-    _checkRep();
+    m_slice = uniqueRep ? 
+        UnownedTerminatedStringSlice(uniqueRep->getData(), uniqueRep->getLength()) :
+        UnownedTerminatedStringSlice();
 }
 
-void StringBlob::_init(StringRepresentation* rep)
+/* static */StringRepresentation* StringBlob::_createUniqueCopy(StringRepresentation* rep)
 {
     if (rep)
     {
-        // Even if the uniqueRep is 1, we can't assume we can take ownership
-        // So we make a copy
-
         // If the length is 0, we can just init as empty
         auto length = rep->getLength();
         if (length == 0)
         {
-            rep = nullptr;
+            return nullptr;
         }
         else
         {
             const UnownedStringSlice slice(rep->getData(), length);
-            rep = StringRepresentation::createWithReference(slice);
+            return StringRepresentation::createWithReference(slice);
         }
     }
-
-    // Must be unique at this point
-    _uniqueInit(rep);
-
-    _checkRep();
+    return nullptr;
 }
 
-void StringBlob::_moveInit(StringRepresentation* rep)
+void StringBlob::_setWithCopy(StringRepresentation* rep)
+{
+    _setUniqueRep(_createUniqueCopy(rep));
+}
+
+void StringBlob::_setWithMove(StringRepresentation* rep)
 {
     if (rep && !rep->isUniquelyReferenced())
     {
-        // Will make a copy of the rep
-        _init(rep);
+        _setUniqueRep(_createUniqueCopy(rep));
         // We need to release a ref as rep is passed in with the 'current' ref count 
         rep->releaseReference();
     }
     else
     {
-        _uniqueInit(rep);
+        _setUniqueRep(rep);
     }
-    _checkRep();
 }
 
 /* static */ComPtr<ISlangBlob> StringBlob::create(const UnownedStringSlice& slice)
@@ -110,38 +92,39 @@ void StringBlob::_moveInit(StringRepresentation* rep)
         rep = StringRepresentation::createWithReference(slice);
     }
 
-    // rep must be unique at this point
     auto blob = new StringBlob;
-    blob->_uniqueInit(rep);
+    
+    // rep must be unique at this point
+    blob->_setUniqueRep(rep);
     return ComPtr<ISlangBlob>(blob);
 }
 
 /* static */ComPtr<ISlangBlob> StringBlob::create(const String& in)
 {
     auto blob = new StringBlob;
-    blob->_init(in.getStringRepresentation());
+    blob->_setWithCopy(in.getStringRepresentation());
     return ComPtr<ISlangBlob>(blob);
 }
 
 /* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
 {
     auto blob = new StringBlob;
-    blob->_moveInit(in.detachStringRepresentation());
+    blob->_setWithMove(in.detachStringRepresentation());
     return ComPtr<ISlangBlob>(blob);
 }
 
 /* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String&& in)
 {
     auto blob = new StringBlob;
-    blob->_moveInit(in.detachStringRepresentation());
+    blob->_setWithMove(in.detachStringRepresentation());
     return ComPtr<ISlangBlob>(blob);
 }
 
 StringBlob::~StringBlob()
 {
-    if (m_rep)
+    if (m_uniqueRep)
     {
-        delete m_rep;
+        delete m_uniqueRep;
     }
 }
 void* StringBlob::castAs(const SlangUUID& guid)
@@ -163,7 +146,7 @@ void* StringBlob::getObject(const Guid& guid)
     // Can always be accessed as terminated char*
     if (guid == SlangTerminatedChars::getTypeGuid())
     {
-        return const_cast<char*>(m_chars);
+        return const_cast<char*>(m_slice.begin());
     }
     return nullptr;
 }
