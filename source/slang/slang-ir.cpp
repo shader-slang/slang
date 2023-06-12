@@ -965,6 +965,15 @@ namespace Slang
         ioOperands.add(m_elementTypeLayout);
     }
 
+    // 
+    // IRPointerTypeLayout
+    //
+
+    void IRPointerTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
+    {
+        ioOperands.add(m_valueTypeLayout);
+    }
+
     //
     // IRStreamOutputTypeLayout
     //

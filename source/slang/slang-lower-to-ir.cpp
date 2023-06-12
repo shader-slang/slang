@@ -7704,6 +7704,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
         }
      
+        
         return loweredValInfo;
     }
 
@@ -10138,6 +10139,12 @@ IRTypeLayout* lowerTypeLayout(
         auto irElementTypeLayout = lowerTypeLayout(context, arrayTypeLayout->elementTypeLayout);
         IRArrayTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
         return _lowerTypeLayoutCommon(context, &builder, arrayTypeLayout);
+    }
+    else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
+    {
+        auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
+        IRArrayTypeLayout::Builder builder(context->irBuilder, irValueTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
     }
     else if( auto taggedUnionTypeLayout = as<TaggedUnionTypeLayout>(typeLayout) )
     {

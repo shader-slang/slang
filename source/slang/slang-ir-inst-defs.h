@@ -962,6 +962,7 @@ INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
         INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, HOISTABLE)
         INST(ExistentialTypeLayout, existentialTypeLayout, 0, HOISTABLE)
         INST(StructTypeLayout, structTypeLayout, 0, HOISTABLE)
+        INST(PointerTypeLayout, ptrTypeLayout, 1, HOISTABLE)
     INST_RANGE(TypeLayout, TypeLayoutBase, StructTypeLayout)
 
     INST(EntryPointLayout, EntryPointLayout, 1, HOISTABLE)

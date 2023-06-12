@@ -1499,6 +1499,39 @@ struct IRArrayTypeLayout : IRTypeLayout
     };
 };
 
+struct IRPointerTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(PointerTypeLayout)
+
+    IRTypeLayout* getValueTypeLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(0));
+    }
+
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder, IRTypeLayout* valueTypeLayout)
+            : Super::Builder(irBuilder)
+            , m_valueTypeLayout(valueTypeLayout)
+        {}
+
+        IRPointerTypeLayout* build()
+        {
+            return cast<IRPointerTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_PointerTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
+
+        IRTypeLayout* m_valueTypeLayout;
+    };
+
+    IRTypeLayout* m_valueTypeLayout;
+};
+
     /// Specialized layout information for stream-output types
 struct IRStreamOutputTypeLayout : IRTypeLayout
 {
