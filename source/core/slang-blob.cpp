@@ -35,25 +35,98 @@ void* BlobBase::castAs(const SlangUUID& guid)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-StringBlob::StringBlob(MoveUnique, String& in)
+void StringBlob::_setUniqueRep(StringRepresentation* uniqueRep)
 {
-    auto rep = in.getStringRepresentation();
+    SLANG_ASSERT(uniqueRep == nullptr || uniqueRep->isUniquelyReferenced());
+
+    m_uniqueRep = uniqueRep;
+
+    m_slice = uniqueRep ? 
+        UnownedTerminatedStringSlice(uniqueRep->getData(), uniqueRep->getLength()) :
+        UnownedTerminatedStringSlice();
+}
+
+/* static */StringRepresentation* StringBlob::_createUniqueCopy(StringRepresentation* rep)
+{
+    if (rep)
+    {
+        // If the length is 0, we can just init as empty
+        auto length = rep->getLength();
+        if (length == 0)
+        {
+            return nullptr;
+        }
+        else
+        {
+            const UnownedStringSlice slice(rep->getData(), length);
+            return StringRepresentation::createWithReference(slice);
+        }
+    }
+    return nullptr;
+}
+
+void StringBlob::_setWithCopy(StringRepresentation* rep)
+{
+    _setUniqueRep(_createUniqueCopy(rep));
+}
+
+void StringBlob::_setWithMove(StringRepresentation* rep)
+{
     if (rep && !rep->isUniquelyReferenced())
     {
-        // Make a new unique copy
-        m_string = in.getUnownedSlice();
-
-        // Move out of in
-        String tmp;
-        tmp.swapWith(in);
+        _setUniqueRep(_createUniqueCopy(rep));
+        // We need to release a ref as rep is passed in with the 'current' ref count 
+        rep->releaseReference();
     }
     else
     {
-        // Must either not have a rep or be unique
-        m_string.swapWith(in);
+        _setUniqueRep(rep);
     }
 }
 
+/* static */ComPtr<ISlangBlob> StringBlob::create(const UnownedStringSlice& slice)
+{
+    StringRepresentation* rep = nullptr;
+    if (slice.getLength())
+    {
+        rep = StringRepresentation::createWithReference(slice);
+    }
+
+    auto blob = new StringBlob;
+    
+    // rep must be unique at this point
+    blob->_setUniqueRep(rep);
+    return ComPtr<ISlangBlob>(blob);
+}
+
+/* static */ComPtr<ISlangBlob> StringBlob::create(const String& in)
+{
+    auto blob = new StringBlob;
+    blob->_setWithCopy(in.getStringRepresentation());
+    return ComPtr<ISlangBlob>(blob);
+}
+
+/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
+{
+    auto blob = new StringBlob;
+    blob->_setWithMove(in.detachStringRepresentation());
+    return ComPtr<ISlangBlob>(blob);
+}
+
+/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String&& in)
+{
+    auto blob = new StringBlob;
+    blob->_setWithMove(in.detachStringRepresentation());
+    return ComPtr<ISlangBlob>(blob);
+}
+
+StringBlob::~StringBlob()
+{
+    if (m_uniqueRep)
+    {
+        delete m_uniqueRep;
+    }
+}
 void* StringBlob::castAs(const SlangUUID& guid)
 {
     if (auto intf = getInterface(guid))
@@ -73,19 +146,9 @@ void* StringBlob::getObject(const Guid& guid)
     // Can always be accessed as terminated char*
     if (guid == SlangTerminatedChars::getTypeGuid())
     {
-        return const_cast<char*>(m_string.getBuffer());
+        return const_cast<char*>(m_slice.begin());
     }
     return nullptr;
-}
-
-/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
-{
-    return ComPtr<ISlangBlob>(new StringBlob(MoveUnique{}, in));
-}
-
-/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String&& in)
-{
-    return ComPtr<ISlangBlob>(new StringBlob(MoveUnique{}, in));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RawBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

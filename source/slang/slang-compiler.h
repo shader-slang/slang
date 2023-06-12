@@ -2988,18 +2988,19 @@ namespace Slang
 
         // Generated code for stdlib, etc.
         String stdlibPath;
-        String coreLibraryCode;
-        String slangLibraryCode;
-        String hlslLibraryCode;
-        String glslLibraryCode;
-        String autodiffLibraryCode;
 
-        String getStdlibPath();
-        String getCoreLibraryCode();
-        String getHLSLLibraryCode();
-        String getAutodiffLibraryCode();
+        ComPtr<ISlangBlob> coreLibraryCode;
+        //ComPtr<ISlangBlob> slangLibraryCode;
+        ComPtr<ISlangBlob> hlslLibraryCode;
+        //ComPtr<ISlangBlob> glslLibraryCode;
+        ComPtr<ISlangBlob> autodiffLibraryCode;
 
-     
+        String  getStdlibPath();
+
+        ComPtr<ISlangBlob> getCoreLibraryCode();
+        ComPtr<ISlangBlob> getHLSLLibraryCode();
+        ComPtr<ISlangBlob> getAutodiffLibraryCode();
+
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
 

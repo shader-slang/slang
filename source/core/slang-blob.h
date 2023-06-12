@@ -31,11 +31,10 @@ protected:
     void* getObject(const Guid& guid);
 };
 
-/** A blob that uses a `String` for its storage.
-NOTE! Returns length *WITHOUT* terminating 0, even though there is one.
+/** A blob that uses a `StringRepresentation` for its storage.
 
-NOTE! Whilst BobBase is atomic ref counted, the contained string *is not*. 
-There is a reasonable argument that StringBlob should contain it's own copy of the string contents.
+By design the StringBlob owns a unique reference to the StringRepresentation. 
+This is because StringBlob, implements an interface which should work across threads.
 */
 class StringBlob : public BlobBase
 {
@@ -46,37 +45,41 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
 
     // ISlangBlob
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.getBuffer(); }
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.getLength(); }
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_slice.begin(); }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_slice.getLength(); }
 
-    static ComPtr<ISlangBlob> create(const String& in) { return ComPtr<ISlangBlob>(new StringBlob(in)); }
+        /// Since in is not being moved will *always* create a new representation, unless the in is empty
+    static ComPtr<ISlangBlob> create(const String& in);
+        /// Create from a slice
+    static ComPtr<ISlangBlob> create(const UnownedStringSlice& slice);
 
         /// Moves from in into the created blob. 
         /// NOTE! That will only use the representation from in, if it is *unique*
         /// otherwise it will make a new copy.
-        /// This is so that StringBlob won't hold a reference count via a string held externally.
-        /// In contrast StringBlob::create *may* share the representation.
     static ComPtr<ISlangBlob> moveCreate(String& in);
     static ComPtr<ISlangBlob> moveCreate(String&& in);
 
+        /// Dtor
+    ~StringBlob();
+
 protected:
-        /// A type that is only used to differentiate a constructor. Can construct with 
-        /// MoveUnique{}
-    struct MoveUnique {};
+    
+        /// Init with a rep when can't be owned.
+    void _setWithCopy(StringRepresentation* rep);
+        /// Init with a representation that has been moved.
+    void _setWithMove(StringRepresentation* rep);
 
-    explicit StringBlob(String const& string)
-        : m_string(string)
-    {}
+        /// Create a unique copy of rep. 
+        /// If nullptr will work (if rep is empty, will return that)
+    static StringRepresentation* _createUniqueCopy(StringRepresentation* rep);
 
-    StringBlob(MoveUnique, String& string);
-    StringBlob() {}
-
-        /// Get the contained string
-    SLANG_FORCE_INLINE const String& getString() const { return m_string; }
+        /// Rep can only be nullptr or have a single ref
+    void _setUniqueRep(StringRepresentation* rep);
 
     void* getObject(const Guid& guid);
 
-    String m_string;
+    UnownedTerminatedStringSlice m_slice;           ///< The contents
+    StringRepresentation* m_uniqueRep = nullptr;    ///< Holds actual bytes. Can be nullptr if it's an empty string. 
 };
 
 class ListBlob : public BlobBase
