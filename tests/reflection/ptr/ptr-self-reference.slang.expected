@@ -1,0 +1,74 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "inputBuffer",
+            "binding": {"kind": "uniform", "offset": 0, "size": 16},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "struct",
+                    "name": "SomeStruct",
+                    "fields": [
+                        {
+                            "name": "payload",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        },
+                        {
+                            "name": "next",
+                            "type": {
+                                "kind": "pointer",
+                                "valueType": "SomeStruct"
+                            },
+                            "binding": {"kind": "uniform", "offset": 8, "size": 8}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "outputBuffer",
+            "binding": {"kind": "uniform", "offset": 16, "size": 16},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "int32"
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "computeMain",
+            "stage:": "compute",
+            "parameters": [
+                {
+                    "name": "dispatchThreadID",
+                    "semanticName": "SV_DISPATCHTHREADID",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 3,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "uint32"
+                        }
+                    }
+                }
+            ],
+            "threadGroupSize": [4, 1, 1]
+        }
+    ]
+}
+}

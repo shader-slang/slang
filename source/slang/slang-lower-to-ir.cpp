@@ -7612,6 +7612,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
 
+        auto loweredValInfo = LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
+
+        // We add the decl now such that if there are Ptr or other references 
+        // to this type they can still complete
+        context->setValue(decl, loweredValInfo); 
+
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
 
@@ -7697,7 +7703,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (as<NonCopyableTypeAttribute>(modifier))
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
         }
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
+     
+        return loweredValInfo;
     }
 
     void lowerPackOffsetModifier(IRInst* inst, HLSLPackOffsetSemantic* semantic)
@@ -8094,7 +8101,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         while (parentGeneric)
         {
-            // Create a universal type in `outterBlock` that will be used
+            // Create a universal type in `outerBlock` that will be used
             // as the type of this generic inst. The return value of the
             // generic inst will have a specialized type.
             // For example, if we have a generic function
