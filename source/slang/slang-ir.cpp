@@ -971,7 +971,10 @@ namespace Slang
 
     void IRPointerTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
     {
-        ioOperands.add(m_valueTypeLayout);
+        SLANG_UNUSED(ioOperands);
+        // TODO(JS): For now we don't store the value types layout to avoid 
+        // infinite recursion.
+        //ioOperands.add(m_valueTypeLayout);
     }
 
     //

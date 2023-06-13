@@ -10142,8 +10142,12 @@ IRTypeLayout* lowerTypeLayout(
     }
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
-        auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
-        IRArrayTypeLayout::Builder builder(context->irBuilder, irValueTypeLayout);
+        // TODO(JS): 
+        // For now we don't lower the value/target type because this could lead to inifinte recursion
+        // in the way this is currently implemented.
+
+        //auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
+        IRPointerTypeLayout::Builder builder(context->irBuilder); 
         return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
     }
     else if( auto taggedUnionTypeLayout = as<TaggedUnionTypeLayout>(typeLayout) )

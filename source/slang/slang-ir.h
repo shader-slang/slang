@@ -578,7 +578,7 @@ struct IRInst
     // Each instruction can have zero or more "decorations"
     // attached to it. A decoration is a specialized kind
     // of instruction that either attaches metadata to,
-    // or modifies the sematnics of, its parent instruction.
+    // or modifies the semantics of, its parent instruction.
     //
     IRDecoration* getFirstDecoration();
     IRDecoration* getLastDecoration();

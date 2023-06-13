@@ -962,8 +962,9 @@ INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
         INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, HOISTABLE)
         INST(ExistentialTypeLayout, existentialTypeLayout, 0, HOISTABLE)
         INST(StructTypeLayout, structTypeLayout, 0, HOISTABLE)
-        INST(PointerTypeLayout, ptrTypeLayout, 1, HOISTABLE)
-    INST_RANGE(TypeLayout, TypeLayoutBase, StructTypeLayout)
+        // TODO(JS): Ideally we'd have the layout to the pointed to value type (ie 1 instead of 0 here). But to avoid infinite recursion we don't.
+        INST(PointerTypeLayout, ptrTypeLayout, 0, HOISTABLE)
+    INST_RANGE(TypeLayout, TypeLayoutBase, PointerTypeLayout)
 
     INST(EntryPointLayout, EntryPointLayout, 1, HOISTABLE)
 INST_RANGE(Layout, VarLayout, EntryPointLayout)
