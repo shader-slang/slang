@@ -2001,7 +2001,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     {
         SLANG_ASSERT(ptrType->astNodeType == ASTNodeType::PtrType);
 
-        // We use the first element to derive the layout for the element type
+        // Work out the layout for the value/target type
         auto valueTypeLayout = processEntryPointVaryingParameter(context, ptrType->getValueType(), state, varLayout);
 
         RefPtr<PointerTypeLayout> ptrTypeLayout = new PointerTypeLayout();

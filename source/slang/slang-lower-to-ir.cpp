@@ -101,6 +101,8 @@ struct ExtractedExistentialValInfo;
 // values are also supported.
 struct LoweredValInfo
 {
+    typedef LoweredValInfo ThisType;
+
     // Which of the cases of value are we looking at?
     enum class Flavor
     {
@@ -136,10 +138,17 @@ struct LoweredValInfo
 
     union
     {
-        IRInst*            val;
+        IRInst*             val;
         ExtendedValueInfo*  ext;
+        // We can compare any of the pointers above by comparing this pointer. If the union
+        // ever becomes something other than a union of pointers, this would no longer be applicable.
+        void*               aliasPtr;
     };
     Flavor flavor;
+
+        // NOTE! This relies on 
+    bool operator==(const ThisType& rhs) const { return flavor == rhs.flavor && aliasPtr == rhs.aliasPtr; }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
     LoweredValInfo()
     {
@@ -7612,11 +7621,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
 
-        auto loweredValInfo = LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
+        const auto finishedVal = _getFinishOuterGenericsReturnValue(irAggType, outerGeneric);
 
         // We add the decl now such that if there are Ptr or other references 
         // to this type they can still complete
-        context->setValue(decl, loweredValInfo); 
+        context->setValue(decl, LoweredValInfo::simple(finishedVal));
 
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
@@ -7704,8 +7713,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
         }
      
-        
-        return loweredValInfo;
+        auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
+        // Confirm that _getFinishOuterGenericsReturnValue above returned the same result
+        SLANG_ASSERT(finalFinishedVal == finishedVal);
+
+        return LoweredValInfo::simple(finalFinishedVal);
     }
 
     void lowerPackOffsetModifier(IRInst* inst, HLSLPackOffsetSemantic* semantic)
@@ -8206,6 +8218,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->emitReturn(v);
             parentGeneric->moveToEnd();
 
+            // There might be more outer generics,
+            // so we need to loop until we run out.
+            v = parentGeneric;
+            auto parentBlock = as<IRBlock>(v->getParent());
+            if (!parentBlock) break;
+
+            parentGeneric = as<IRGeneric>(parentBlock->getParent());
+            if (!parentGeneric) break;
+
+        }
+        return v;
+    }
+
+    // This function matches the return value from finishOuterGenerics
+    // so that we can create the target value without finishOuterGenerics having to be called. 
+    IRInst* _getFinishOuterGenericsReturnValue(
+        IRInst* val,
+        IRGeneric* parentGeneric)
+    {
+        IRInst* v = val;
+        while (parentGeneric)
+        {
             // There might be more outer generics,
             // so we need to loop until we run out.
             v = parentGeneric;
