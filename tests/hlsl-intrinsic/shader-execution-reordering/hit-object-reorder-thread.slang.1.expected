@@ -87,9 +87,9 @@ void main()
     ray_0.Direction_0 = vec3(0.0, 1.0, 0.0);
     ray_0.TMax_0 = 10000.0;
     RayDesc_0 _S7 = ray_0;
+    hitObjectNV hitObj_0;
     p_1.a_0 = idx_0;
     p_1.b_0 = _S6;
-    hitObjectNV hitObj_0;
     hitObjectTraceRayNV(hitObj_0, scene_0, 20U, 255U, 0U, 4U, 0U, _S7.Origin_0, _S7.TMin_0, _S7.Direction_0, _S7.TMax_0, (1));
     uint r_1 = calcValue_0(hitObj_0);
     reorderThreadNV(hitObj_0);

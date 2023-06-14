@@ -1625,6 +1625,16 @@ struct IRFuncType : IRType
     IR_LEAF_ISA(FuncType)
 };
 
+struct IRRayQueryType : IRType
+{
+    IR_LEAF_ISA(RayQueryType)
+};
+
+struct IRHitObjectType : IRType
+{
+    IR_LEAF_ISA(HitObjectType)
+};
+
 bool isDefinition(
     IRInst* inVal);
 

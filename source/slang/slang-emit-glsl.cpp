@@ -869,6 +869,61 @@ void GLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
     }
 }
 
+void GLSLSourceEmitter::_emitInstAsVarInitializerImpl(IRInst* inst)
+{
+    // Some opcodes can be folded into a variable initialization
+    // by allowing the variable to be "default-constructed."
+    //
+    switch (inst->getOp())
+    {
+    case kIROp_AllocateOpaqueHandle:
+        //
+        // Note: semantically, we should only elide the initializer
+        // if `inst` is able to be folded here, since otherwise
+        // it could be a single allocation that is used to initialize
+        // multiple local variables (which should then alias the
+        // same location).
+        //
+        // However, since GlSL doesn't support assignment of opaque
+        // handle types, code will fail to compile downstream in
+        // the case where the initializer *doesn't* fold.
+        //
+        // The decision being made here should help ensure that we
+        // don't emit code that silently has different semantics
+        // than the input.
+        //
+        if (shouldFoldInstIntoUseSites(inst))
+        {
+            return;
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    // We fall back to the default behavior for all targets,
+    // which is to emit `inst` as an initial-value expression
+    // after an `=`.
+    //
+    Super::_emitInstAsVarInitializerImpl(inst);
+}
+
+void GLSLSourceEmitter::_emitStoreImpl(IRStore* store)
+{
+    auto srcVal = store->getVal();
+    switch (srcVal->getOp())
+    {
+    default:
+        Super::_emitStoreImpl(store);
+        break;
+
+    case kIROp_AllocateOpaqueHandle:
+        break;
+    }
+
+}
+
 void GLSLSourceEmitter::_emitSpecialFloatImpl(IRType* type, const char* valueExpr)
 {
     if( type->getOp() != kIROp_FloatType )
@@ -2151,6 +2206,16 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_StringType:
         {
             m_writer->emit("int");
+            return;
+        }
+        case kIROp_RayQueryType:
+        {
+            m_writer->emit("rayQueryEXT");
+            return;
+        }
+        case kIROp_HitObjectType:
+        {
+            m_writer->emit("hitObjectNV");
             return;
         }
         default: break;
