@@ -7276,6 +7276,7 @@ namespace Slang
         case kIROp_MakeTensorView:
         case kIROp_TorchTensorGetView:
         case kIROp_GetStringHash:
+        case kIROp_AllocateOpaqueHandle:
             return false;
 
         case kIROp_ForwardDifferentiate:

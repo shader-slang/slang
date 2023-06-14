@@ -81,6 +81,10 @@ namespace Slang
     public:
         typedef UnownedStringSlice ThisType;
 
+            // Type to indicate that a ctor is with a length to disabmiguate 0/nullptr 
+            // causing ambiguity.
+        struct WithLength {};
+
         UnownedStringSlice()
             : m_begin(nullptr)
             , m_end(nullptr)
@@ -95,6 +99,10 @@ namespace Slang
             , m_end(e)
         {}
         UnownedStringSlice(char const* b, size_t len)
+            : m_begin(b)
+            , m_end(b + len)
+        {}
+        UnownedStringSlice(WithLength, char const* b, size_t len)
             : m_begin(b)
             , m_end(b + len)
         {}
@@ -190,6 +198,7 @@ namespace Slang
         SLANG_FORCE_INLINE static UnownedStringSlice fromLiteral(const char (&in)[SIZE]) { return UnownedStringSlice(in, SIZE - 1); }
 
     protected:
+
         char const* m_begin;
         char const* m_end;
     };
@@ -216,6 +225,9 @@ namespace Slang
         template <size_t SIZE>
         SLANG_FORCE_INLINE static ThisType fromLiteral(const char(&in)[SIZE]) { return ThisType(in, SIZE - 1); }
 
+            /// Default constructor
+        UnownedTerminatedStringSlice():Super(Super::WithLength(), "", 0) {}
+        
             /// Note, b cannot be null because if it were then the string would not be null terminated
         UnownedTerminatedStringSlice(char const* b)
             : Super(b, b + strlen(b))
@@ -474,7 +486,11 @@ namespace Slang
             /// Append data written to buffer output via 'prepareForAppend' directly written 'inplace'
         void appendInPlace(const char* chars, Index count);
 
+            /// Get the internal string represenation
         SLANG_FORCE_INLINE StringRepresentation* getStringRepresentation() const { return m_buffer; }
+
+            /// Detach the representation (will leave string as empty). Rep ref count will remain unchanged.
+        SLANG_FORCE_INLINE StringRepresentation* detachStringRepresentation() { return m_buffer.detach(); }
 
         const char* begin() const
         {
