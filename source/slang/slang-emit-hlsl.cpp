@@ -897,6 +897,18 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("int"); 
             return;
         }
+        case kIROp_RayQueryType:
+        {
+            m_writer->emit("RayQuery<");
+            emitSimpleValue(type->getOperand(0));
+            m_writer->emit(" >");
+            return;
+        }
+        case kIROp_HitObjectType:
+        {
+            m_writer->emit("HitObject");
+            return;
+        }
         default: break;
     }
 
@@ -1093,6 +1105,31 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
     case kIROp_UNormAttr: m_writer->emit("unorm "); break;
     case kIROp_SNormAttr: m_writer->emit("snorm "); break;
     }
+}
+
+void HLSLSourceEmitter::_emitInstAsVarInitializerImpl(IRInst* inst)
+{
+    // Some opcodes can be folded into a variable initialization
+    // by allowing the variable to be "default-constructed."
+    //
+    switch (inst->getOp())
+    {
+    case kIROp_AllocateOpaqueHandle:
+        if (shouldFoldInstIntoUseSites(inst))
+        {
+            return;
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    // We fall back to the default behavior for all targets,
+    // which is to emit `inst` as an initial-value expression
+    // after an `=`.
+    //
+    Super::_emitInstAsVarInitializerImpl(inst);
 }
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
