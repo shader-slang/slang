@@ -204,7 +204,8 @@ INST(Nop, nop, 0, 0)
         INST_RANGE(PointerLikeType, ConstantBufferType, GLSLOutputParameterGroupType)
     INST_RANGE(BuiltinGenericType, HLSLPointStreamType, GLSLOutputParameterGroupType)
 
-
+INST(RayQueryType, RayQuery, 1, HOISTABLE)
+INST(HitObjectType, HitObject, 0, HOISTABLE)
 
 
 // A user-defined structure declaration at the IR level.
@@ -616,6 +617,8 @@ INST(MakeTensorView, makeTensorView, 0, 0)
 INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
 INST(TorchGetCudaStream, TorchGetCudaStream, 0, 0)
 INST(TorchTensorGetView, TorchTensorGetView, 0, 0)
+
+INST(AllocateOpaqueHandle, allocateOpaqueHandle, 0, 0)
 
 /* Decoration */
 

@@ -5,8 +5,6 @@ Slang provides preliminary support for Shader Execution Reordering (SER). The AP
 
 The feature is available on D3D12 via [NVAPI](nvapi-support.md) and on Vulkan through the [GL_NV_shader_invocation_reorder](https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_shader_invocation_reorder.txt) extension.
 
-Note: An upgrade is required to `slang-glslang` and associated projects to add support for SPIR-V output via Slang.
-
 ## Vulkan
 
 SER as implemented on Vulkan has extra limitations on usage. On D3D via NvAPI `HitObject` variables are like regular variables. They can be assigned, passed to functions and so forth. Using `GL_NV_shader_invocation_reorder` on Vulkan, this isn't the case and `HitObject` variables are special and act is if their introduction allocates a single unique entry. One implication of this is there are limitations on Vulkan around HitObject with flow control, and assignment to HitObject variables. 

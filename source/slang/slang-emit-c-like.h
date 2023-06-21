@@ -307,6 +307,12 @@ public:
 
     void emitVal(IRInst* val, const EmitOpInfo& outerPrec);
 
+    void emitStore(IRStore* store);
+    virtual void _emitStoreImpl(IRStore* store);
+    virtual void _emitInstAsVarInitializerImpl(IRInst* inst);
+    void _emitInstAsDefaultInitializedVar(IRInst* inst, IRType* type);
+    virtual void _emitAllocateOpaqueHandleImpl(IRInst* allocateInst);
+
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
 

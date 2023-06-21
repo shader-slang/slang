@@ -5702,13 +5702,41 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 // code can resume to continue tracing the ray, and which yields
 // back to the user code at interesting events along the ray.
 //
-__target_intrinsic(hlsl, RayQuery)
-__target_intrinsic(glsl, rayQueryEXT)
+// Note: The treatment of the `RayQuery` type in Slang does not
+// perfectly match its semantics in vanilla HLSL in some corner
+// cases. Specifically, a `RayQuery` in vanilla HLSL is an
+// opaque handle to mutable storage, and assigning a `RayQuery`
+// or passing one as a parameter will only copy the *handle*,
+// potentially resulting in aliasing of the underlying mutable
+// storage.
+//
+// In contrast, Slang considers a `RayQuery` to own its mutable
+// state, and (because the API does not support cloning of queries),
+// `RayQuery` values are non-copyable (aka "move-only").
+//
+// The main place where this arises as a consideration is when
+// passing a `RayQuery` down into a function that will perform
+// mutating operations on it (e.g., `TraceRay` or `Proceed`):
+//
+//      void myFunc( inout RayQuery<FLAGS> q )
+//      {
+//          q.Proceed();
+//      }
+//
+// In Slang, a parameter like `q` above should be declared `inout`.
+// HLSL does not care about whether `q` is declared `inout` or not.
+//
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 [__NonCopyableType]
+__intrinsic_type($(kIROp_RayQueryType))
 struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 {
+    // Create a new ray query, initialized to its default state.
+    //
+    __intrinsic_op($(kIROp_AllocateOpaqueHandle))
+    __init();
+
     // Initialize a ray-tracing query.
     //
     // This method may be called on a "fresh" ray query, or
@@ -5733,6 +5761,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, "rayQueryInitializeEXT($0, $1, $2, $3, $4, $5, $6, $7)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
+    [mutating]
     void __rayQueryInitializeEXT(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -5745,6 +5774,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     [__unsafeForceInlineEarly]
     __specialized_for_target(glsl)
     [__NoSideEffect]
+    [mutating]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -6114,12 +6144,15 @@ int __hitObjectAttributesLocation(__ref Attributes attributes);
     /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
     /// and its related functions are available in raytracing shader types only.
 [__requiresNVAPI]
-__target_intrinsic(hlsl, NvHitObject)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing)
-__target_intrinsic(glsl, hitObjectNV)
+[__NonCopyableType]
+__intrinsic_type($(kIROp_HitObjectType))
 struct HitObject
 {
+    __intrinsic_op($(kIROp_AllocateOpaqueHandle))
+    __init();
+
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     __specialized_for_target(hlsl)
@@ -6672,7 +6705,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordMissNV")
     static void __glslMakeMiss(
-        HitObject hitObj,
+        out HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
         float TMin,
@@ -6685,7 +6718,7 @@ struct HitObject
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectRecordMissNV")
     static void __glslMakeMotionMiss(
-        HitObject hitObj,
+        out HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
         float TMin,
@@ -6696,7 +6729,7 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordEmptyNV($0)")
-    static void __glslMakeNop(HitObject hitObj);
+    static void __glslMakeNop(out HitObject hitObj);
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
@@ -6719,7 +6752,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV")
     static void __glslMakeHitWithIndex(
-        HitObject hitObj,
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
         int primitiveid,
@@ -6738,7 +6771,7 @@ struct HitObject
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV")
     static void __glslMakeMotionHitWithIndex(
-        HitObject hitObj,
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
         int primitiveid,
@@ -6757,7 +6790,7 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectRecordHitNV")
     static void __glslMakeHit(
-        HitObject hitObj,
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
         int primitiveid,
@@ -6777,7 +6810,7 @@ struct HitObject
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectRecordHitMotionNV")
     static void __glslMakeMotionHit(
-        HitObject hitObj,
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
         int primitiveid,
@@ -6802,7 +6835,7 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectTraceRayNV")
     static void __glslTraceRay(
-        HitObject hitObj,
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         uint rayFlags,
         uint cullMask,
@@ -6820,7 +6853,7 @@ struct HitObject
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectTraceRayMotionNV")
     static void __glslTraceMotionRay(
-        HitObject hitObj,
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         uint rayFlags,
         uint cullMask,
