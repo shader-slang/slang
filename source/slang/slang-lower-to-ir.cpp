@@ -5075,13 +5075,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto irCond = getSimpleVal(context,
             lowerRValueExpr(context, condExpr));
 
+        IRInst* ifInst = nullptr;
+
         if (elseStmt)
         {
             auto thenBlock = createBlock();
             auto elseBlock = createBlock();
             auto afterBlock = createBlock();
 
-            builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+            ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
             insertBlock(thenBlock);
             lowerStmt(context, thenStmt);
@@ -5097,12 +5099,21 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto thenBlock = createBlock();
             auto afterBlock = createBlock();
 
-            builder->emitIf(irCond, thenBlock, afterBlock);
+            ifInst = builder->emitIf(irCond, thenBlock, afterBlock);
 
             insertBlock(thenBlock);
             lowerStmt(context, thenStmt);
 
             insertBlock(afterBlock);
+        }
+
+        if (stmt->findModifier<FlattenAttribute>())
+        {
+            builder->addDecoration(ifInst, kIROp_FlattenDecoration);
+        }
+        if (stmt->findModifier<BranchAttribute>())
+        {
+            builder->addDecoration(ifInst, kIROp_BranchDecoration);
         }
     }
 
@@ -5828,7 +5839,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // prepared to emit the `switch` instruction
         // itself.
         builder->setInsertInto(initialBlock);
-        builder->emitSwitch(
+        auto switchInst = builder->emitSwitch(
             conditionVal,
             breakLabel,
             defaultLabel,
@@ -5840,6 +5851,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
         context->shared->breakLabels.remove(stmt);
+
+        // If there is the branch attribute output the IR decoration
+        if (stmt->hasModifier<BranchAttribute>())
+        {
+            builder->addDecoration(switchInst, kIROp_BranchDecoration);
+        }
     }
 };
 

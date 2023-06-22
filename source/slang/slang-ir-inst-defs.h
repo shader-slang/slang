@@ -624,6 +624,8 @@ INST(AllocateOpaqueHandle, allocateOpaqueHandle, 0, 0)
 
 INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(LayoutDecoration,                  layout,                 1, 0)
+    INST(BranchDecoration,                  branch,                 0, 0)
+    INST(FlattenDecoration,                 flatten,                0, 0)
     INST(LoopControlDecoration,             loopControl,            1, 0)
     INST(LoopMaxItersDecoration,            loopMaxIters,           1, 0)
     INST(LoopInferredMaxItersDecoration,    loopInferredMaxIters,   2, 0)
