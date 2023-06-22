@@ -53,6 +53,9 @@ protected:
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
     virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;
 
+    virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) SLANG_OVERRIDE;
+    virtual void emitIfDecorationsImpl(IRIfElse* ifInst) SLANG_OVERRIDE;
+
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
     
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
