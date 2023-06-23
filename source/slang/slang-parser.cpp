@@ -5610,6 +5610,7 @@ namespace Slang
                 {
                     // Get the identifier for the type
                     const Token typeToken = advanceToken(parser);
+                    parser->ReadToken(TokenType::RParent);
 
                     auto varExpr = parser->astBuilder->create<VarExpr>();
                     varExpr->scope = parser->currentScope;
@@ -5617,9 +5618,9 @@ namespace Slang
                     varExpr->name = typeToken.getName();
 
                     TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
-                    parser->FillPosition(tcexpr);
+                    tcexpr->loc = openParen.loc;
+
                     tcexpr->functionExpr = varExpr;
-                    parser->ReadToken(TokenType::RParent);
 
                     auto arg = parsePrefixExpr(parser);
                     tcexpr->arguments.add(arg);
