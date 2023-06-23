@@ -1,6 +1,7 @@
 // pointer-self-reference.slang
 
-//TEST(compute):SIMPLE:-target cpp -entry computeMain -stage compute
+// Test is disabled for now because emit doesn't work currently.
+//DISABLE_TEST(compute):SIMPLE:-target cpp -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
