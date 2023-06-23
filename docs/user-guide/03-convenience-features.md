@@ -375,14 +375,14 @@ Multi-level break
 Slang allows `break` statements with a label to jump into any ancestor control flow break points, and not just the immediate parent.
 Example:
 ```
-outter:
+outer:
 for (int i = 0; i < 5; i++)
 {
     inner:
     for (int j = 0; j < 10; j++)
     {
         if (someCondition)
-            break outter;
+            break outer;
     }
 }
 ```
