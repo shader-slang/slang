@@ -11,9 +11,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int idx = (int)tid;
     
     float q = (idx * 0.5);
+ 
+    int x = (uint)(int)q;
     
     // This combination of casts and parenthesis used to cause issues. 
     int z = ((uint)(int)q);
-   
- 	outputBuffer[tid] = z;
+    
+ 	outputBuffer[tid] = z + x;
 }

@@ -4354,26 +4354,33 @@ namespace Slang
         return nullptr;
     }
 
-    static bool isTypeName(Parser* parser, Name* name)
+    static bool isTypeName(Parser* parser, Name* name, DeclRef<Decl>* outDecl = nullptr)
     {
         auto lookupResult = lookUp(
             parser->astBuilder,
             nullptr, // no semantics visitor available yet
             name,
             parser->currentScope);
-        if(!lookupResult.isValid() || lookupResult.isOverloaded())
+        if (!lookupResult.isValid() || lookupResult.isOverloaded())
             return false;
 
-        return _isType(lookupResult.item.declRef.getDecl());
+        bool isType = _isType(lookupResult.item.declRef.getDecl());
+
+        if (isType && outDecl)
+        {
+            *outDecl = lookupResult.item.declRef;
+        }
+
+        return isType;
     }
 
-    static bool peekTypeName(Parser* parser)
+    static bool peekTypeName(Parser* parser, DeclRef<Decl>* outDecl = nullptr)
     {
-        if(!parser->LookAheadToken(TokenType::Identifier))
+        if (!parser->LookAheadToken(TokenType::Identifier))
             return false;
 
         auto name = parser->tokenReader.peekToken().getName();
-        return isTypeName(parser, name);
+        return isTypeName(parser, name, outDecl);
     }
 
     Stmt* parseCompileTimeForStmt(
@@ -5596,12 +5603,21 @@ namespace Slang
         case TokenType::LParent:
             {
                 Token openParen = parser->ReadToken(TokenType::LParent);
-                Expr* typeExpr = nullptr;
-                if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent))
+
+                DeclRef<Decl> typeDecl;
+                if (peekTypeName(parser, &typeDecl) && parser->LookAheadToken(TokenType::RParent, 1))
                 {
+                    // Get the identifier for the type
+                    const Token typeToken = advanceToken(parser);
+
+                    auto varExpr = parser->astBuilder->create<VarExpr>();
+                    varExpr->scope = parser->currentScope;
+                    varExpr->loc = typeToken.loc;
+                    varExpr->name = typeToken.getName();
+
                     TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
                     parser->FillPosition(tcexpr);
-                    tcexpr->functionExpr = typeExpr;
+                    tcexpr->functionExpr = varExpr;
                     parser->ReadToken(TokenType::RParent);
 
                     auto arg = parsePrefixExpr(parser);
