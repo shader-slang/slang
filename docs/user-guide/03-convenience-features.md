@@ -183,7 +183,7 @@ If an initializer does not define any parameters, it will be recognized as *defa
 struct MyType
 {
     int myVal;
-    __init(i)
+    __init()
     {
         myVal = 10;
     }
