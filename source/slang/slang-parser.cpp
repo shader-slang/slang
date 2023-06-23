@@ -4355,7 +4355,7 @@ namespace Slang
         return nullptr;
     }
 
-    static bool isTypeName(Parser* parser, Name* name, DeclRef<Decl>* outDecl = nullptr)
+    static bool isTypeName(Parser* parser, Name* name)
     {
         auto lookupResult = lookUp(
             parser->astBuilder,
@@ -4365,23 +4365,16 @@ namespace Slang
         if (!lookupResult.isValid() || lookupResult.isOverloaded())
             return false;
 
-        bool isType = _isType(lookupResult.item.declRef.getDecl());
-
-        if (isType && outDecl)
-        {
-            *outDecl = lookupResult.item.declRef;
-        }
-
-        return isType;
+        return _isType(lookupResult.item.declRef.getDecl());
     }
 
-    static bool peekTypeName(Parser* parser, DeclRef<Decl>* outDecl = nullptr)
+    static bool peekTypeName(Parser* parser)
     {
         if (!parser->LookAheadToken(TokenType::Identifier))
             return false;
 
         auto name = parser->tokenReader.peekToken().getName();
-        return isTypeName(parser, name, outDecl);
+        return isTypeName(parser, name);
     }
 
     Stmt* parseCompileTimeForStmt(
@@ -5605,11 +5598,13 @@ namespace Slang
             {
                 Token openParen = parser->ReadToken(TokenType::LParent);
 
-                DeclRef<Decl> typeDecl;
-                if (peekTypeName(parser, &typeDecl) && parser->LookAheadToken(TokenType::RParent, 1))
+                // Only handles cases of `(type)`, where type is a single identifier,
+                // and at this point the type is known
+                if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
                 {
                     // Get the identifier for the type
                     const Token typeToken = advanceToken(parser);
+                    // Consume the closing `)`
                     parser->ReadToken(TokenType::RParent);
 
                     auto varExpr = parser->astBuilder->create<VarExpr>();
