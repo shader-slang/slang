@@ -1,11 +1,9 @@
 // sv-clip-distance.slang
 
-//TEST:SIMPLE: -profile sm_5_0 -stage vertex -entry mainVertex -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -profile sm_5_0 -stage vertex -entry mainVertex -target glsl
 
-// (filecheck=CHECK)
-//-CHECK: out float  gl_ClipDistance[2];
-//-CHECK: gl_ClipDistance[0] =
-//-CHECK: gl_ClipDistance[1] =
+//CHECK: out float  gl_ClipDistance[2];
+//CHECK: gl_ClipDistance =
 
 struct VertexInput 
 {
