@@ -121,11 +121,11 @@ struct IRGLSLOuterArrayDecoration : IRDecoration
     enum { kOp = kIROp_GLSLOuterArrayDecoration };
     IR_LEAF_ISA(GLSLOuterArrayDecoration)
 
-    IRStringLit* getOuterArraynameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    IRStringLit* getOuterArrayNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getOuterArrayName()
     {
-        return getOuterArraynameOperand()->getStringSlice();
+        return getOuterArrayNameOperand()->getStringSlice();
     }
 };
 
