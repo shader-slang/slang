@@ -746,7 +746,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
     {
         auto module = func->getModule();
         if (module)
-            module->invalidateDominatorTree(func);
+            module->invalidateAnalysisForInst(func);
     }
     return changed;
 }

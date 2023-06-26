@@ -7099,7 +7099,7 @@ namespace Slang
             }
             module->getDeduplicationContext()->getInstReplacementMap().remove(this);
             if (auto func = as<IRGlobalValueWithCode>(this))
-                module->invalidateDominatorTree(func);
+                module->invalidateAnalysisForInst(func);
         }
         removeArguments();
         removeFromParent();

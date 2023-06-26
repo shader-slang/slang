@@ -733,7 +733,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call)
                         }
                         // If we reach here, the var is used as an inout parameter for the call, but the call
                         // is not nested in a loop at an higher nesting level than where the var is defined,
-                        // so we can treat the use as side effect free.
+                        // so we can treat the use as DCE-able.
                         continue;
                     }
                     // We have some other unknown use of the variable address, they can

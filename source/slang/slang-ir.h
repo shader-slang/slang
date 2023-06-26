@@ -2088,7 +2088,7 @@ public:
         return nullptr;
     }
     IRDominatorTree* findOrCreateDominatorTree(IRGlobalValueWithCode* func);
-    void invalidateDominatorTree(IRGlobalValueWithCode* func) { m_mapInstToAnalysis.remove(func); }
+    void invalidateAnalysisForInst(IRGlobalValueWithCode* func) { m_mapInstToAnalysis.remove(func); }
     void invalidateAllAnalysis() { m_mapInstToAnalysis.clear(); }
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }

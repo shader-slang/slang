@@ -286,7 +286,7 @@ struct DeadCodeEliminationContext
             {
                 // If the function body is changed, invalidate its dominator tree.
                 if (auto func = as<IRGlobalValueWithCode>(inst))
-                    module->invalidateDominatorTree(func);
+                    module->invalidateAnalysisForInst(func);
             }
         }
         return changed;

@@ -14,6 +14,26 @@ public:
     virtual bool propagate(IRBuilder& builder, IRFunc* func) = 0;
 };
 
+static bool isKnownOpCodeWithSideEffect(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_ifElse:
+    case kIROp_unconditionalBranch:
+    case kIROp_Switch:
+    case kIROp_Return:
+    case kIROp_loop:
+    case kIROp_Call:
+    case kIROp_Param:
+    case kIROp_Unreachable:
+    case kIROp_Store:
+    case kIROp_SwizzledStore:
+        return true;
+    default:
+        return false;
+    }
+}
+
 class ReadNoneFuncPropertyPropagationContext : public FuncPropertyPropagationContext
 {
 public:
@@ -40,20 +60,8 @@ public:
             for (auto inst : block->getChildren())
             {
                 // Is this inst known to not have global side effect/analyzable?
-                switch (inst->getOp())
+                if (!isKnownOpCodeWithSideEffect(inst->getOp()))
                 {
-                case kIROp_ifElse:
-                case kIROp_unconditionalBranch:
-                case kIROp_Switch:
-                case kIROp_Return:
-                case kIROp_loop:
-                case kIROp_Call:
-                case kIROp_Param:
-                case kIROp_Unreachable:
-                case kIROp_Store:
-                case kIROp_SwizzledStore:
-                    break;
-                default:
                     if (inst->mightHaveSideEffects())
                     {
                         // We have a inst that has side effect and is not understood by this method.
@@ -241,20 +249,8 @@ public:
         {
             for (auto inst : block->getChildren())
             {
-                switch (inst->getOp())
+                if (!isKnownOpCodeWithSideEffect(inst->getOp()))
                 {
-                case kIROp_ifElse:
-                case kIROp_unconditionalBranch:
-                case kIROp_Switch:
-                case kIROp_Return:
-                case kIROp_loop:
-                case kIROp_Call:
-                case kIROp_Param:
-                case kIROp_Unreachable:
-                case kIROp_Store:
-                case kIROp_SwizzledStore:
-                    break;
-                default:
                     // Is this inst known to not have global side effect/analyzable?
                     if (inst->mightHaveSideEffects())
                     {
