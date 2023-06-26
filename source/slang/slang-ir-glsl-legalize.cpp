@@ -196,6 +196,12 @@ struct ScalarizedValImpl : RefObject
 {};
 struct ScalarizedTupleValImpl;
 struct ScalarizedTypeAdapterValImpl;
+
+struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
+{
+    Index index;
+};
+
 struct ScalarizedVal
 {
     enum class Flavor
@@ -216,6 +222,9 @@ struct ScalarizedVal
         // represents an implicit type conversion applied to it on read
         // or write.
         typeAdapter,
+
+        // The IRInst is an array index
+        arrayIndex,
     };
 
     // Create a value representing a simple value
@@ -226,7 +235,6 @@ struct ScalarizedVal
         result.irValue = irValue;
         return result;
     }
-
 
     // Create a value representing an address
     static ScalarizedVal address(IRInst* irValue)
@@ -250,6 +258,17 @@ struct ScalarizedVal
         ScalarizedVal result;
         result.flavor = Flavor::typeAdapter;
         result.impl = (ScalarizedValImpl*)impl;
+        return result;
+    }
+    static ScalarizedVal scalarizedArrayIndex(IRInst* irValue, Index index)
+    {
+        ScalarizedVal result;
+        result.flavor = Flavor::arrayIndex;
+        auto impl = new ScalarizedArrayIndexValImpl;
+        impl->index = index;
+
+        result.irValue = irValue;
+        result.impl = impl;
         return result;
     }
 
@@ -282,6 +301,9 @@ struct ScalarizedTypeAdapterValImpl : ScalarizedValImpl
     IRType*         pretendType;     // the type this value pretends to have
 };
 
+
+
+
 struct GlobalVaryingDeclarator
 {
     enum class Flavor
@@ -308,6 +330,10 @@ struct GLSLSystemValueInfo
 
     // The required type of the built-in variable
     IRType*     requiredType;
+
+    // If the built in GLSL variable is an array, holds the index into the array.
+    // If < 0, then there is no array indexing
+    int arrayIndex;
 };
 
 static void leafAddressesImpl(List<IRInst*>& ret, const ScalarizedVal& v)
@@ -354,6 +380,15 @@ struct GLSLLegalizationContext
     GLSLExtensionTracker*   glslExtensionTracker;
     DiagnosticSink*         sink;
     Stage                   stage;
+
+    struct SystemSemanticGlobal
+    {
+        IRGlobalParam* globalParam;
+        Count maxIndex;
+    };
+
+    // Currently only used for special cases of semantics which map to global variables
+    Dictionary<UnownedStringSlice, SystemSemanticGlobal> systemNameToGlobalMap;
 
     void requireGLSLExtension(const UnownedStringSlice& name)
     {
@@ -408,6 +443,7 @@ GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
         return nullptr;
     }
 
+    inStorage->arrayIndex = -1;
     inStorage->outerArrayName = nullptr;
 
     // Points
@@ -469,6 +505,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
     char const* name = nullptr;
     char const* outerArrayName = nullptr;
+    int arrayIndex = -1;
 
     auto semanticInst = varLayout->findSystemValueSemanticAttr();
     if(!semanticInst)
@@ -539,6 +576,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         name = "gl_ClipDistance";
         requiredType = builder->getBasicType(BaseType::Float);
+
+        arrayIndex = int(semanticInst->getIndex());
     }
     else if(semanticName == "sv_culldistance")
     {
@@ -873,6 +912,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         inStorage->name = name;
         inStorage->outerArrayName = outerArrayName;
         inStorage->requiredType = requiredType;
+        inStorage->arrayIndex = arrayIndex;
         return inStorage;
     }
 
@@ -913,6 +953,91 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     if( systemValueInfo && systemValueInfo->requiredType )
     {
         type = systemValueInfo->requiredType;
+    }
+
+    if (systemValueInfo && systemValueInfo->arrayIndex >= 0)
+    {
+        // If dd is set we have a problem, because we can't have an array of arrays
+        // so for now that's just an error
+        if (declarator)
+        {
+            SLANG_ABORT_COMPILATION("Can't handle array of arrays. This system semantic is an array type.");
+        }
+
+        if (kind != LayoutResourceKind::VaryingOutput)
+        {
+            SLANG_ABORT_COMPILATION("Can't handle anything but VaryingOutput.");
+        }
+
+        // Let's see if it has been already created
+
+        // Note! Assumes that the memory backing the name stays in scope! Does if the memory is string constants
+        UnownedTerminatedStringSlice systemValueName(systemValueInfo->name);
+
+        auto semanticGlobal = context->systemNameToGlobalMap.tryGetValue(systemValueName);
+
+        if (semanticGlobal == nullptr)
+        {
+            // Otherwise we just create and add
+            GLSLLegalizationContext::SystemSemanticGlobal semanticGlobalTmp;
+
+            // We need to create the global. For now we *don't* know how many indices will be used.
+            // So we will 
+
+            // Create the array type, but *don't* set the array size, because at this point we don't know.
+            // We can at the end replace any accesses to this variable with the correctly sized global
+
+            semanticGlobalTmp.maxIndex = Count(systemValueInfo->arrayIndex);
+
+            // Set the array size to 0, to mean it is unsized 
+            auto arrayType = builder->getArrayType(
+                type,
+                0);
+
+            IRType* paramType = builder->getOutType(arrayType);
+
+            auto globalParam = addGlobalParam(builder->getModule(), paramType);
+            moveValueBefore(globalParam, builder->getFunc());
+
+            builder->addImportDecoration(globalParam, systemValueName);
+
+            // We can't run layout here, because we don't actually no the size yet
+            // We could run at the end though
+
+            //
+            semanticGlobalTmp.globalParam = globalParam;
+
+            semanticGlobal = &context->systemNameToGlobalMap.getOrAddValue(systemValueName, semanticGlobalTmp); 
+        }
+
+        // Update the max
+        if (semanticGlobal->maxIndex < systemValueInfo->arrayIndex)
+        {
+            semanticGlobal->maxIndex = systemValueInfo->arrayIndex;
+        }
+
+        // Make it an array index
+        ScalarizedVal val = ScalarizedVal::scalarizedArrayIndex(semanticGlobal->globalParam, systemValueInfo->arrayIndex);
+        
+        // We need to make this access, an array access to the global
+        if( auto fromType = systemValueInfo->requiredType )
+        {
+            // We may need to adapt from the declared type to/from
+            // the actual type of the GLSL global.
+            auto toType = inType;
+
+            if( !isTypeEqual(fromType, toType ))
+            {
+                RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
+                typeAdapter->actualType = systemValueInfo->requiredType;
+                typeAdapter->pretendType = inType;
+                typeAdapter->val = val;
+
+                val = ScalarizedVal::typeAdapter(typeAdapter);
+            }
+        }
+
+        return val;
     }
 
     // Construct the actual type and type-layout for the global variable
@@ -995,7 +1120,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // like our IR function parameters, and need a wrapper
     // `Out<...>` type to represent outputs.
     //
-    bool isOutput = kind == LayoutResourceKind::VaryingOutput;
+    bool isOutput = (kind == LayoutResourceKind::VaryingOutput);
     IRType* paramType = isOutput ? builder->getOutType(type) : type;
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
@@ -1379,6 +1504,10 @@ ScalarizedVal adaptType(
     }
 }
 
+IRInst* materializeValue(
+    IRBuilder*              builder,
+    ScalarizedVal const&    val);
+
 void assign(
     IRBuilder*              builder,
     ScalarizedVal const&    left,
@@ -1388,55 +1517,71 @@ void assign(
 {
     switch( left.flavor )
     {
-    case ScalarizedVal::Flavor::address:
-        switch( right.flavor )
+        case ScalarizedVal::Flavor::arrayIndex:
         {
-        case ScalarizedVal::Flavor::value:
-            {
-                auto address = left.irValue;
-                if(index)
-                {
-                    address = builder->emitElementAddress(right.irValue->getFullType(), left.irValue, index);
-                }
-                builder->emitStore(address, right.irValue);
-            }
-            break;
+            // Get the rhs value
+            auto rhs = materializeValue(builder, right);
 
-        case ScalarizedVal::Flavor::address:
-            {
-                auto val = builder->emitLoad(right.irValue);
-                builder->emitStore(left.irValue, val);
-            }
-            break;
+            // Determine the index
+            auto leftArrayIndexVal = as<ScalarizedArrayIndexValImpl>(left.impl);
+            const auto arrayIndex = leftArrayIndexVal->index;
 
-        case ScalarizedVal::Flavor::tuple:
-            {
-                // We are assigning from a tuple to a destination
-                // that is not a tuple. We will perform assignment
-                // element-by-element.
-                auto rightTupleVal = as<ScalarizedTupleValImpl>(right.impl);
-                Index elementCount = rightTupleVal->elements.getCount();
+            auto arrayIndexInst = builder->getIntValue(builder->getIntType(), arrayIndex);
 
-                for( Index ee = 0; ee < elementCount; ++ee )
-                {
-                    auto rightElement = rightTupleVal->elements[ee];
-                    auto leftElementVal = extractField(
-                        builder,
-                        left,
-                        ee,
-                        rightElement.key);
-                    assign(builder, leftElementVal, rightElement.val, index);
-                }
-            }
-            break;
+            // Store to the index
+            auto address = builder->emitElementAddress(right.irValue->getFullType(), left.irValue, arrayIndexInst);
+            builder->emitStore(address, rhs);
 
-        default:
-            SLANG_UNEXPECTED("unimplemented");
             break;
         }
-        break;
+        case ScalarizedVal::Flavor::address:
+        {
+            switch( right.flavor )
+            {
+                case ScalarizedVal::Flavor::value:
+                {
+                    auto address = left.irValue;
+                    if(index)
+                    {
+                        address = builder->emitElementAddress(right.irValue->getFullType(), left.irValue, index);
+                    }
+                    builder->emitStore(address, right.irValue);
+                    break;
+                }
+                case ScalarizedVal::Flavor::address:
+                {
+                    auto val = builder->emitLoad(right.irValue);
+                    builder->emitStore(left.irValue, val);
+                    break;
+                }
+                case ScalarizedVal::Flavor::tuple:
+                {
+                    // We are assigning from a tuple to a destination
+                    // that is not a tuple. We will perform assignment
+                    // element-by-element.
+                    auto rightTupleVal = as<ScalarizedTupleValImpl>(right.impl);
+                    Index elementCount = rightTupleVal->elements.getCount();
 
-    case ScalarizedVal::Flavor::tuple:
+                    for( Index ee = 0; ee < elementCount; ++ee )
+                    {
+                        auto rightElement = rightTupleVal->elements[ee];
+                        auto leftElementVal = extractField(
+                            builder,
+                            left,
+                            ee,
+                            rightElement.key);
+                        assign(builder, leftElementVal, rightElement.val, index);
+                    }
+                    break;
+                }
+
+                default:
+                    SLANG_UNEXPECTED("unimplemented");
+                    break;
+            }
+            break;
+        }
+        case ScalarizedVal::Flavor::tuple:
         {
             // We have a tuple, so we are going to need to try and assign
             // to each of its constituent fields.
@@ -1452,10 +1597,9 @@ void assign(
                     leftTupleVal->elements[ee].key);
                 assign(builder, leftTupleVal->elements[ee].val, rightElementVal, index);
             }
+            break;
         }
-        break;
-
-    case ScalarizedVal::Flavor::typeAdapter:
+        case ScalarizedVal::Flavor::typeAdapter:
         {
             // We are trying to assign to something that had its type adjusted,
             // so we will need to adjust the type of the right-hand side first.
@@ -1465,12 +1609,13 @@ void assign(
             auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(left.impl);
             auto adaptedRight = adaptType(builder, right, typeAdapter->actualType, typeAdapter->pretendType);
             assign(builder, typeAdapter->val, adaptedRight, index);
+            break;
         }
-        break;
-
-    default:
-        SLANG_UNEXPECTED("unimplemented");
-        break;
+        default:
+        {
+            SLANG_UNEXPECTED("unimplemented");
+            break;
+        }
     }
 }
 
