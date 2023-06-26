@@ -719,13 +719,17 @@ bool areCallArgumentsSideEffectFree(IRCall* call)
                         if (!callBlock) return false;
                         auto varBlock = as<IRBlock>(arg->getParent());
                         if (!varBlock) return false;
-                        while (callBlock != varBlock)
+                        auto idom = callBlock;
+                        while (idom != varBlock)
                         {
-                            callBlock = dom->getImmediateDominator(callBlock);
-                            if (!callBlock)
+                            idom = dom->getImmediateDominator(idom);
+                            if (!idom)
                                 return false; // If we are here, var does not dominate the call, which should never happen.
-                            if (as<IRLoop>(callBlock->getTerminator()))
-                                return false; // The var is used in a loop, must return false.
+                            if (auto loop = as<IRLoop>(idom->getTerminator()))
+                            {
+                                if (!dom->dominates(loop->getBreakBlock(), callBlock))
+                                    return false; // The var is used in a loop, must return false.
+                            }
                         }
                         // If we reach here, the var is used as an inout parameter for the call, but the call
                         // is not nested in a loop at an higher nesting level than where the var is defined,
