@@ -2053,6 +2053,14 @@ private:
     ConstantMap m_constantMap;
 };
 
+struct IRDominatorTree;
+
+struct IRAnalysis
+{
+    RefPtr<RefObject> domTree;
+    IRDominatorTree* getDominatorTree();
+};
+
 struct IRModule : RefObject
 {
 public:
@@ -2071,6 +2079,17 @@ public:
     SLANG_FORCE_INLINE void setObfuscatedSourceMap(IBoxValue<SourceMap>* sourceMap) { m_obfuscatedSourceMap = sourceMap; }
 
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
+
+    IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
+    {
+        IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
+        if (analysis)
+            return analysis->getDominatorTree();
+        return nullptr;
+    }
+    IRDominatorTree* findOrCreateDominatorTree(IRGlobalValueWithCode* func);
+    void invalidateDominatorTree(IRGlobalValueWithCode* func) { m_mapInstToAnalysis.remove(func); }
+    void invalidateAllAnalysis() { m_mapInstToAnalysis.clear(); }
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
 
@@ -2139,6 +2158,8 @@ private:
 
         /// Holds the obfuscated source map for this module if applicable
     ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
+
+    Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
 };
 
 struct IRSpecializationDictionaryItem : public IRInst

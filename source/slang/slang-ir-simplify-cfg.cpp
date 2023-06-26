@@ -742,6 +742,12 @@ static bool processFunc(IRGlobalValueWithCode* func)
         if (!blocksRemoved)
             break;
     }
+    if (changed)
+    {
+        auto module = func->getModule();
+        if (module)
+            module->invalidateDominatorTree(func);
+    }
     return changed;
 }
 

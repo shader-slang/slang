@@ -40,28 +40,31 @@ public:
             for (auto inst : block->getChildren())
             {
                 // Is this inst known to not have global side effect/analyzable?
-                if (inst->mightHaveSideEffects())
+                switch (inst->getOp())
                 {
-                    switch (inst->getOp())
+                case kIROp_ifElse:
+                case kIROp_unconditionalBranch:
+                case kIROp_Switch:
+                case kIROp_Return:
+                case kIROp_loop:
+                case kIROp_Call:
+                case kIROp_Param:
+                case kIROp_Unreachable:
+                case kIROp_Store:
+                case kIROp_SwizzledStore:
+                    break;
+                default:
+                    if (inst->mightHaveSideEffects())
                     {
-                    case kIROp_ifElse:
-                    case kIROp_unconditionalBranch:
-                    case kIROp_Switch:
-                    case kIROp_Return:
-                    case kIROp_loop:
-                    case kIROp_Call:
-                    case kIROp_Param:
-                    case kIROp_Unreachable:
-                    case kIROp_Store:
-                    case kIROp_SwizzledStore:
-                        break;
-                    default:
                         // We have a inst that has side effect and is not understood by this method.
                         // e.g. bufferStore, discard, etc.
                         hasSideEffectCall = true;
-                        break;
                     }
+                    break;
                 }
+
+                if (hasSideEffectCall)
+                    break;
 
                 if (auto call = as<IRCall>(inst))
                 {
@@ -238,34 +241,37 @@ public:
         {
             for (auto inst : block->getChildren())
             {
-                // Is this inst known to not have global side effect/analyzable?
-                if (inst->mightHaveSideEffects())
+                switch (inst->getOp())
                 {
-                    switch (inst->getOp())
+                case kIROp_ifElse:
+                case kIROp_unconditionalBranch:
+                case kIROp_Switch:
+                case kIROp_Return:
+                case kIROp_loop:
+                case kIROp_Call:
+                case kIROp_Param:
+                case kIROp_Unreachable:
+                case kIROp_Store:
+                case kIROp_SwizzledStore:
+                    break;
+                default:
+                    // Is this inst known to not have global side effect/analyzable?
+                    if (inst->mightHaveSideEffects())
                     {
-                    case kIROp_ifElse:
-                    case kIROp_unconditionalBranch:
-                    case kIROp_Switch:
-                    case kIROp_Return:
-                    case kIROp_loop:
-                    case kIROp_Call:
-                    case kIROp_Param:
-                    case kIROp_Unreachable:
-                    case kIROp_Store:
-                    case kIROp_SwizzledStore:
-                        break;
-                    default:
                         // We have a inst that has side effect and is not understood by this method.
                         // e.g. bufferStore, discard, etc.
                         hasSideEffectCall = true;
                         break;
                     }
+                    else
+                    {
+                        // A side effect free inst can't generate side effects for the function.
+                        continue;
+                    }
                 }
-                else
-                {
-                    // A side effect free inst can't generate side effects for the function.
-                    continue;
-                }
+
+                if (hasSideEffectCall)
+                    break;
 
                 if (auto call = as<IRCall>(inst))
                 {

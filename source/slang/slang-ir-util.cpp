@@ -665,6 +665,11 @@ bool areCallArgumentsSideEffectFree(IRCall* call)
                 return false;
         }
 
+        auto module = parentFunc->getModule();
+        if (!module)
+            return false;
+        auto dom = module->findDominatorTree(parentFunc);
+
         if (arg->getOp() == kIROp_Var && getParentFunc(arg) == parentFunc)
         {
             // If the pointer argument is a local variable (thus can't alias with other addresses)
@@ -688,9 +693,45 @@ bool areCallArgumentsSideEffectFree(IRCall* call)
                     // are not dependent on whatever we do in the call here.
                     continue;
                 default:
-                    // Skip the call itself, since we are checking if the call has side effect.
+                    // Skip the call itself if the var is used as an argument to an out parameter
+                    // since we are checking if the call has side effect.
+                    // We can't treat the call as side effect free if var is used as an inout parameter,
+                    // because if the call is inside a loop there will be a visible side effect after
+                    // the call.
                     if (use->getUser() == call)
+                    {
+                        auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
+                        if (!funcType)
+                            return false;
+                        if (funcType->getParamCount() > i && as<IROutType>(funcType->getParamType(i)))
+                            continue;
+
+                        // We are an argument to an inout parameter.
+                        // We can only treat the call as side effect free if the call is not inside a loop.
+                        // 
+                        // If we don't have the loop information here, we will conservatively return false.
+                        //
+                        if (!dom)
+                            return false;
+
+                        // If we have dominator tree available, use it to check if the call is inside a loop.
+                        auto callBlock = as<IRBlock>(call->getParent());
+                        if (!callBlock) return false;
+                        auto varBlock = as<IRBlock>(arg->getParent());
+                        if (!varBlock) return false;
+                        while (callBlock != varBlock)
+                        {
+                            callBlock = dom->getImmediateDominator(callBlock);
+                            if (!callBlock)
+                                return false; // If we are here, var does not dominate the call, which should never happen.
+                            if (as<IRLoop>(callBlock->getTerminator()))
+                                return false; // The var is used in a loop, must return false.
+                        }
+                        // If we reach here, the var is used as an inout parameter for the call, but the call
+                        // is not nested in a loop at an higher nesting level than where the var is defined,
+                        // so we can treat the use as side effect free.
                         continue;
+                    }
                     // We have some other unknown use of the variable address, they can
                     // be loads, or calls using addresses derived from the variable,
                     // we will treat the call as having side effect to be safe.
@@ -718,6 +759,11 @@ bool isPureFunctionalCall(IRCall* call)
 
 bool isSideEffectFreeFunctionalCall(IRCall* call)
 {
+    // If the call has been marked as no-side-effect, we
+    // will treat it so, by-passing all other checks.
+    if (call->findDecoration<IRNoSideEffectDecoration>())
+        return false;
+
     if (!doesCalleeHaveSideEffect(call->getCallee()))
     {
         return areCallArgumentsSideEffectFree(call);
