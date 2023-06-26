@@ -966,6 +966,7 @@ namespace Slang
                     if (AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
                         break;
 
+                    
                     parser->ReadToken(TokenType::Comma);
                 }
             }
@@ -975,8 +976,8 @@ namespace Slang
             if (AdvanceIfMatch(parser, MatchedTokenType::SquareBrackets))
                 break;
 
-            parser->ReadToken(TokenType::Comma);
-            
+            // If there is a comma consume it. It appears that the comma is optional.
+            AdvanceIf(parser, TokenType::Comma);
         }
 
         if (hasDoubleBracket)
