@@ -2724,6 +2724,46 @@ void legalizeEntryPointForGLSL(
     // TODO: we should technically be constructing
     // a new `EntryPointLayout` here to reflect
     // the way that things have been moved around.
+
+    // Let's fix the size array type globals now that we know the maximum index
+    {
+        for (const auto& a : context.systemNameToGlobalMap)
+        {
+            const auto& value = a.value;
+
+            auto type = value.globalParam->getDataType();
+
+            // Strip out if there is one
+            auto outType = as<IROutType>(type);
+            if (outType)
+            {
+                type = outType->getValueType();
+            }
+
+            // Get the array type
+            auto arrayType = as<IRArrayType>(type);
+            if (!arrayType)
+            {
+                continue;
+            }
+
+            // Get the element type
+            auto elementType = arrayType->getElementType();
+
+            // Create an new array type
+            auto elementCountInst = builder.getIntValue(builder.getIntType(), value.maxIndex + 1);
+            IRType* sizedArrayType = builder.getArrayType(elementType, elementCountInst);
+
+            // Re-add out if there was one on the input
+            if (outType)
+            {
+                sizedArrayType = builder.getOutType(sizedArrayType);
+            }
+
+            // Change the globals type
+            value.globalParam->setFullType(sizedArrayType);
+        }
+    }
 }
 
 void legalizeEntryPointsForGLSL(
