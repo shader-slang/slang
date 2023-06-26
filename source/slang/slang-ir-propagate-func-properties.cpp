@@ -67,12 +67,9 @@ public:
                         // We have a inst that has side effect and is not understood by this method.
                         // e.g. bufferStore, discard, etc.
                         hasSideEffectCall = true;
+                        break;
                     }
-                    break;
                 }
-
-                if (hasSideEffectCall)
-                    break;
 
                 if (auto call = as<IRCall>(inst))
                 {
@@ -265,9 +262,6 @@ public:
                         continue;
                     }
                 }
-
-                if (hasSideEffectCall)
-                    break;
 
                 if (auto call = as<IRCall>(inst))
                 {
