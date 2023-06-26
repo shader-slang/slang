@@ -4362,7 +4362,7 @@ namespace Slang
             nullptr, // no semantics visitor available yet
             name,
             parser->currentScope);
-        if(!lookupResult.isValid() || lookupResult.isOverloaded())
+        if (!lookupResult.isValid() || lookupResult.isOverloaded())
             return false;
 
         return _isType(lookupResult.item.declRef.getDecl());
@@ -4370,7 +4370,7 @@ namespace Slang
 
     static bool peekTypeName(Parser* parser)
     {
-        if(!parser->LookAheadToken(TokenType::Identifier))
+        if (!parser->LookAheadToken(TokenType::Identifier))
             return false;
 
         auto name = parser->tokenReader.peekToken().getName();
@@ -5597,13 +5597,25 @@ namespace Slang
         case TokenType::LParent:
             {
                 Token openParen = parser->ReadToken(TokenType::LParent);
-                Expr* typeExpr = nullptr;
-                if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent))
+
+                // Only handles cases of `(type)`, where type is a single identifier,
+                // and at this point the type is known
+                if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
                 {
-                    TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
-                    parser->FillPosition(tcexpr);
-                    tcexpr->functionExpr = typeExpr;
+                    // Get the identifier for the type
+                    const Token typeToken = advanceToken(parser);
+                    // Consume the closing `)`
                     parser->ReadToken(TokenType::RParent);
+
+                    auto varExpr = parser->astBuilder->create<VarExpr>();
+                    varExpr->scope = parser->currentScope;
+                    varExpr->loc = typeToken.loc;
+                    varExpr->name = typeToken.getName();
+
+                    TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
+                    tcexpr->loc = openParen.loc;
+
+                    tcexpr->functionExpr = varExpr;
 
                     auto arg = parsePrefixExpr(parser);
                     tcexpr->arguments.add(arg);
