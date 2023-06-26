@@ -223,7 +223,7 @@ struct ScalarizedVal
         // or write.
         typeAdapter,
 
-        // The IRInst is an array index
+        // Array index to the irValue. The actual index is stored in impl as ScalarizedArrayIndexValImpl
         arrayIndex,
     };
 
@@ -333,7 +333,7 @@ struct GLSLSystemValueInfo
 
     // If the built in GLSL variable is an array, holds the index into the array.
     // If < 0, then there is no array indexing
-    int arrayIndex;
+    Index arrayIndex;
 };
 
 static void leafAddressesImpl(List<IRInst*>& ret, const ScalarizedVal& v)
@@ -383,6 +383,11 @@ struct GLSLLegalizationContext
 
     struct SystemSemanticGlobal
     {
+        void addIndex(Index index)
+        {
+            maxIndex = (index > maxIndex) ? index : maxIndex;
+        }
+
         IRGlobalParam* globalParam;
         Count maxIndex;
     };
@@ -955,15 +960,12 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         type = systemValueInfo->requiredType;
     }
 
-    if (systemValueInfo && systemValueInfo->arrayIndex >= 0)
+    // If we have a declarator, we just use the normal logic, as that seems to work correctly
+    // 
+    if (systemValueInfo && systemValueInfo->arrayIndex >= 0 && declarator == nullptr)
     {
-        // If dd is set we have a problem, because we can't have an array of arrays
+        // If declarator is set we have a problem, because we can't have an array of arrays
         // so for now that's just an error
-        if (declarator)
-        {
-            SLANG_ABORT_COMPILATION("Can't handle array of arrays. This system semantic is an array type.");
-        }
-
         if (kind != LayoutResourceKind::VaryingOutput)
         {
             SLANG_ABORT_COMPILATION("Can't handle anything but VaryingOutput.");
@@ -1011,10 +1013,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         }
 
         // Update the max
-        if (semanticGlobal->maxIndex < systemValueInfo->arrayIndex)
-        {
-            semanticGlobal->maxIndex = systemValueInfo->arrayIndex;
-        }
+        semanticGlobal->addIndex(systemValueInfo->arrayIndex);
 
         // Make it an array index
         ScalarizedVal val = ScalarizedVal::scalarizedArrayIndex(semanticGlobal->globalParam, systemValueInfo->arrayIndex);
