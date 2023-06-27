@@ -121,11 +121,11 @@ struct IRGLSLOuterArrayDecoration : IRDecoration
     enum { kOp = kIROp_GLSLOuterArrayDecoration };
     IR_LEAF_ISA(GLSLOuterArrayDecoration)
 
-    IRStringLit* getOuterArraynameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    IRStringLit* getOuterArrayNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getOuterArrayName()
     {
-        return getOuterArraynameOperand()->getStringSlice();
+        return getOuterArrayNameOperand()->getStringSlice();
     }
 };
 
@@ -1496,6 +1496,52 @@ struct IRArrayTypeLayout : IRTypeLayout
         void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
 
         IRTypeLayout* m_elementTypeLayout;
+    };
+};
+
+/* TODO(JS): 
+
+It would arguably be "more correct" if the IRPointerTypeLayout, contained a refence to the value/target
+type layout. Ie...
+
+```
+IRTypeLayout* m_valueTypeLayout;
+```
+
+Unfortunately that doesn't work because it leads to an infinite loop if the target contains a Ptr to the containing struct.
+
+This isn't so simple to fix (as has been done with similar problems elsewhere), because Layout 
+also hoists/deduped layouts. 
+
+As it stands the "attributes" describing the layout fields are held as operands and as such are part 
+of the hash that is used for deduping. That makes sense (if the fields change depending on where/how 
+a struct type is used), but creates a problem because we can't lookup the type until it is "complete" 
+(ie has all the fields) and we can't have all the fields if one is a pointer that causes infinite recursion 
+in lookup.
+
+The work around for now is to observe that layout of a Ptr doesn't depend on what is being pointed to
+and as such we don't store the this in the pointer.
+*/
+struct IRPointerTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(PointerTypeLayout)
+
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder)
+            : Super::Builder(irBuilder)
+        {}
+
+        IRPointerTypeLayout* build()
+        {
+            return cast<IRPointerTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_PointerTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
     };
 };
 

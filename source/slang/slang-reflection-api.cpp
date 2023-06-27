@@ -310,7 +310,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     auto type = convert(inType);
     if(!type) return SLANG_TYPE_KIND_NONE;
 
-    // TODO(tfoley: Don't emit the same type more than once...
+    // TODO(tfoley): Don't emit the same type more than once...
 
     if (const auto basicType = as<BasicExpressionType>(type))
     {
@@ -359,6 +359,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     else if (const auto feedbackType = as<FeedbackType>(type))
     {
         return SLANG_TYPE_KIND_FEEDBACK;
+    }
+    else if (const auto ptrType = as<PtrType>(type))
+    {
+        return SLANG_TYPE_KIND_POINTER;
     }
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE)                          \
@@ -992,6 +996,10 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     else if (auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout))
     {
         return convert(matrixTypeLayout->elementTypeLayout);
+    }
+    else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
+    {
+        return convert(ptrTypeLayout->valueTypeLayout.Ptr());
     }
     return nullptr;
 }

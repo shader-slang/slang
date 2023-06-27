@@ -104,6 +104,9 @@ struct DeadCodeEliminationContext
     bool processInst(IRInst* root)
     {
         bool result = false;
+
+        module->invalidateAllAnalysis();
+
         for (;;)
         {
             liveInsts.clear();
@@ -185,6 +188,12 @@ struct DeadCodeEliminationContext
                 // decision of whether a child (or decoration)
                 // should be live when its parent is to a subroutine.
                 //
+
+                if (auto func = as<IRGlobalValueWithCode>(inst))
+                {
+                    module->findOrCreateDominatorTree(func);
+                }
+
                 for (auto child : inst->getDecorationsAndChildren())
                 {
                     if (shouldInstBeLiveIfParentIsLive(child))
@@ -208,6 +217,8 @@ struct DeadCodeEliminationContext
             //
             phiRemoved = false;
             result |= eliminateDeadInstsRec(root);
+
+
             if (!phiRemoved)
                 break;
         }
@@ -270,6 +281,12 @@ struct DeadCodeEliminationContext
             for(IRInst* child : children)
             {
                 changed |= eliminateDeadInstsRec(child);
+            }
+            if (changed)
+            {
+                // If the function body is changed, invalidate its dominator tree.
+                if (auto func = as<IRGlobalValueWithCode>(inst))
+                    module->invalidateAnalysisForInst(func);
             }
         }
         return changed;

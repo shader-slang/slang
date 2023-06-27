@@ -45,6 +45,11 @@ namespace cpu
             m_info.timestampFrequency = 1000000000;
         }
 
+        // Can support pointers (or something akin to that)
+        {
+            m_features.add("has-ptr");
+        }
+
         return SLANG_OK;
     }
 

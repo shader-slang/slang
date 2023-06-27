@@ -1219,7 +1219,44 @@ LegalType legalizeTypeImpl(
     }
     else if (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        auto legalValueType = legalizeType(context, ptrType->getValueType());
+        typedef TypeLegalizationContext::PointerValue PointerValue;
+
+        auto valueType = ptrType->getValueType();
+
+        {
+            const Index activeIndex = context->activePointerValues.findFirstIndex([valueType](const PointerValue& value) -> bool { return value.type == valueType; });
+
+            if (activeIndex >= 0)
+            {
+                context->activePointerValues[activeIndex].usedCount++;
+                // If it's *active* then it's currently being legalized. 
+                // We will *assume* that value type will be the same type.
+                return LegalType::simple(ptrType);
+            }
+        }
+
+        // Add the value type so we don't end up in a recursive loop
+        context->activePointerValues.add(PointerValue{valueType, 0});
+
+        auto legalValueType = legalizeType(context, valueType);
+
+        const auto lastPointerValue = context->activePointerValues.getLast();
+        // Remove it as we don't need anymore
+        context->activePointerValues.removeLast();
+
+        if (lastPointerValue.usedCount)
+        {
+            // It was recursively used, so we want to make sure our previous assumption was correct
+            if (legalValueType.flavor != LegalType::Flavor::simple ||
+                legalValueType.obj != nullptr ||
+                legalValueType.irType != valueType)
+            {
+                // TODO(JS): 
+                // Ideally we'd handle this in some better way...
+                SLANG_ASSERT(!"We assumed a Ptr behavior if recursive, but that assumption didn't seem to work out");
+            }
+        }
+        
         // If element type hasn't change, return original type.
         if (legalValueType.flavor == LegalType::Flavor::simple &&
             legalValueType.getSimple() == ptrType->getValueType())

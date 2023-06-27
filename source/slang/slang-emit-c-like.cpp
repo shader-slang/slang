@@ -2792,6 +2792,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
             {
                 auto ifRegion = (IfRegion*) region;
 
+                emitIfDecorationsImpl(ifRegion->ifElseInst);
+
                 // TODO: consider simplifying the code in
                 // the case where `ifRegion == null`
                 // so that we output `if(!condition) { elseRegion }`
@@ -2858,6 +2860,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
             {
                 auto switchRegion = (SwitchRegion*) region;
 
+                emitSwitchDecorationsImpl(switchRegion->switchInst);
+                
                 // Emit the start of our statement.
                 m_writer->emit("switch(");
                 emitOperand(switchRegion->getCondition(), getInfo(EmitOp::General));
@@ -3734,6 +3738,21 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     auto requiredLevel = EmitAction::Definition;
     switch (inst->getOp())
     {
+    case kIROp_PtrType:
+    {
+        auto ptrType = static_cast<IRPtrType*>(inst);
+        auto valueType = ptrType->getValueType();
+
+        if (ctx->openInsts.contains(valueType))
+        {
+            requiredLevel = EmitAction::ForwardDeclaration;
+        }
+        else
+        {
+            requiredLevel = EmitAction::Definition;
+        }
+        break;
+    }
     case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;

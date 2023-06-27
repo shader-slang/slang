@@ -1,0 +1,124 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "inputBuffer",
+            "binding": {"kind": "uniform", "offset": 0, "size": 16},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "struct",
+                    "name": "SomeStruct",
+                    "fields": [
+                        {
+                            "name": "ptrInt",
+                            "type": {
+                                "kind": "pointer",
+                                "valueType": "int"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                        },
+                        {
+                            "name": "ptrInt2",
+                            "type": {
+                                "kind": "pointer",
+                                "valueType": "int"
+                            },
+                            "binding": {"kind": "uniform", "offset": 8, "size": 8}
+                        },
+                        {
+                            "name": "anInt",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 16, "size": 4}
+                        },
+                        {
+                            "name": "another",
+                            "type": {
+                                "kind": "struct",
+                                "name": "AnotherStruct",
+                                "fields": [
+                                    {
+                                        "name": "a",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                    },
+                                    {
+                                        "name": "b",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "int32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                                    },
+                                    {
+                                        "name": "ptrC",
+                                        "type": {
+                                            "kind": "pointer",
+                                            "valueType": "int"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 8, "size": 8}
+                                    }
+                                ]
+                            },
+                            "binding": {"kind": "uniform", "offset": 24, "size": 16}
+                        },
+                        {
+                            "name": "anotherPtr",
+                            "type": {
+                                "kind": "pointer",
+                                "valueType": "AnotherStruct"
+                            },
+                            "binding": {"kind": "uniform", "offset": 40, "size": 8}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "outputBuffer",
+            "binding": {"kind": "uniform", "offset": 16, "size": 16},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "int32"
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "computeMain",
+            "stage:": "compute",
+            "parameters": [
+                {
+                    "name": "dispatchThreadID",
+                    "semanticName": "SV_DISPATCHTHREADID",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 3,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "uint32"
+                        }
+                    }
+                }
+            ],
+            "threadGroupSize": [4, 1, 1]
+        }
+    ]
+}
+}

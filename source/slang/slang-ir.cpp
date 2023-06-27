@@ -5,6 +5,8 @@
 
 #include "../core/slang-basic.h"
 
+#include "slang-ir-dominators.h"
+
 #include "slang-mangle.h"
 
 namespace Slang
@@ -963,6 +965,18 @@ namespace Slang
     void IRArrayTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
     {
         ioOperands.add(m_elementTypeLayout);
+    }
+
+    // 
+    // IRPointerTypeLayout
+    //
+
+    void IRPointerTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
+    {
+        SLANG_UNUSED(ioOperands);
+        // TODO(JS): For now we don't store the value types layout to avoid 
+        // infinite recursion.
+        //ioOperands.add(m_valueTypeLayout);
     }
 
     //
@@ -4067,6 +4081,20 @@ namespace Slang
         return module;
     }
 
+    IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func)
+    {
+        IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
+        if (analysis)
+            return analysis->getDominatorTree();
+        else
+        {
+            m_mapInstToAnalysis[func] = IRAnalysis();
+            analysis = m_mapInstToAnalysis.tryGetValue(func);
+        }
+        analysis->domTree = computeDominatorTree(func);
+        return analysis->getDominatorTree();
+    }
+
     void addGlobalValue(
         IRBuilder*  builder,
         IRInst*     value)
@@ -7082,6 +7110,8 @@ namespace Slang
                 module->getDeduplicationContext()->getConstantMap().remove(IRConstantKey{ constInst });
             }
             module->getDeduplicationContext()->getInstReplacementMap().remove(this);
+            if (auto func = as<IRGlobalValueWithCode>(this))
+                module->invalidateAnalysisForInst(func);
         }
         removeArguments();
         removeFromParent();
@@ -7153,10 +7183,6 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
-                // If the call has been marked as no-side-effect, we
-                // will treat it so, by-passing all other checks.
-                if (call->findDecoration<IRNoSideEffectDecoration>())
-                    return false;
                 return !isSideEffectFreeFunctionalCall(call);
             }
             break;
@@ -7608,6 +7634,11 @@ namespace Slang
             return findGenericReturnVal(gen);
         }
         return inst;
+    }
+
+    IRDominatorTree* IRAnalysis::getDominatorTree()
+    {
+        return static_cast<IRDominatorTree*>(domTree.get());
     }
 
 } // namespace Slang

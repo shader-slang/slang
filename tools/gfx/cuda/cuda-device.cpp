@@ -185,6 +185,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
         
         // CUDA has support for realtime clock
         m_features.add("realtime-clock");
+
+        // Allows use of a ptr like type
+        m_features.add("has-ptr");
     }
 
     cudaDeviceProp deviceProps;
