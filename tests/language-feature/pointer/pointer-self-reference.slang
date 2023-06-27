@@ -1,7 +1,6 @@
 // pointer-self-reference.slang
 
-// Test is disabled for now because emit doesn't work currently.
-//DISABLE_TEST(compute):SIMPLE:-target cpp -entry computeMain -stage compute
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -12,7 +11,7 @@ struct Thing
     Ptr<Thing> next;
 };
 
-[numthreads(1, 1, 1)]
+[numthreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
@@ -27,7 +26,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     
     Ptr<Thing> cur = &things[0];
     
-    for (int i = 0; i < idx; ++i)
+    for (int i = 0; cur && i < idx; ++i)
     {
         cur = cur.next;
     }
