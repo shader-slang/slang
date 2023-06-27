@@ -826,6 +826,18 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         emitType(varType, getName(var));
         m_writer->emit(";\n\n");
     }
+    else if (name == "gl_ClipDistance")
+    {
+        auto varType = var->getDataType();
+        if (auto outType = as<IROutType>(varType))
+        {
+            varType = outType->getValueType();
+        }
+
+        m_writer->emit("out ");
+        emitType(varType, getName(var));
+        m_writer->emit(";\n\n");
+    }
 }
 
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)
