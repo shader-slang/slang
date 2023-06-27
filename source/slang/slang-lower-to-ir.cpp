@@ -140,13 +140,15 @@ struct LoweredValInfo
     {
         IRInst*             val;
         ExtendedValueInfo*  ext;
+
         // We can compare any of the pointers above by comparing this pointer. If the union
         // ever becomes something other than a union of pointers, this would no longer be applicable.
         void*               aliasPtr;
     };
     Flavor flavor;
 
-        // NOTE! This relies on 
+        // NOTE! This relies on the union, allowing the comparison of any of the pointer type in the union.
+        // Assumes equality is the same as val pointer/or ext pointer being equal. 
     bool operator==(const ThisType& rhs) const { return flavor == rhs.flavor && aliasPtr == rhs.aliasPtr; }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
