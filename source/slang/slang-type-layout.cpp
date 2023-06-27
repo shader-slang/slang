@@ -100,6 +100,12 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         }
     }
 
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // We'll assume 64 pointers by default, with 8 byte alignment
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+    }
+
     SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
@@ -250,6 +256,15 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         return vectorInfo;
     }
 
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // TODO(JS): 
+        // We'll assume 64 bit "pointer". If we are using these extensions... 
+        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_buffer_reference.txt
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_buffer_device_address.html.
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(int64_t), sizeof(int64_t));
+    }
+
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         // The size of an array must be rounded up to be a multiple of its alignment.
@@ -330,6 +345,12 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // Not supported on HLSL currently...
+        return SimpleLayoutInfo();
+    }
+
     UniformLayoutInfo BeginStructLayout() override
     {
         return UniformLayoutInfo(0, 16);
@@ -394,6 +415,16 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
             // This always returns a layout where the size is the same as the alignment.
             default: return Super::GetScalarLayout(baseType);
         }
+    }
+
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // TODO(JS):
+        // NOTE! We are assuming that the layout is the same for the *target* that it is for 
+        // the compilation.
+        // If we are emitting C++, then there is no way in general to know how that C++ will be compiled
+        // it could be 32 or 64 (or other) sizes. For now we just assume they are the same.
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
@@ -471,6 +502,12 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
 
             default: return Super::GetScalarLayout(baseType);
         }
+    }
+
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // CUDA/NVTRC only support 64 bit pointers
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(int64_t), sizeof(int64_t));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
@@ -587,6 +624,13 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
             getKind(),
             1);
     }
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // For pointers assume same logic as for scalars
+        return SimpleLayoutInfo(
+            getKind(),
+            1);
+    }
 
     SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t) override
     {
@@ -627,6 +671,13 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
     SimpleLayoutInfo GetScalarLayout(BaseType) override
     {
         // Assume that all scalars take up one "slot"
+        return SimpleLayoutInfo(
+            getKind(),
+            1);
+    }
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // In a sense pointer are just like ScalarLayout, so we'll use the same logic...
         return SimpleLayoutInfo(
             getKind(),
             1);
@@ -3435,11 +3486,66 @@ static TypeLayoutResult createArrayLikeTypeLayout(
     return TypeLayoutResult(typeLayout, arrayUniformInfo);
 }
 
+static void _addLayout(TypeLayoutContext const& context,
+    Type* type,
+    TypeLayout* layout)
+{
+    // Add it *without info*.
+    // The info can be added with _updateLayout
+    context.layoutMap[type] = TypeLayoutResult(layout, SimpleLayoutInfo());
+}
+
+static void _addLayout(TypeLayoutContext const& context,
+    Type* type,
+    const TypeLayoutResult& result)
+{
+    context.layoutMap[type] = result;
+}
+
+static TypeLayoutResult _updateLayout(TypeLayoutContext const& context,
+    Type* type,
+    TypeLayout* layout,
+    const SimpleLayoutInfo& info)
+{
+    auto layoutResultPtr = context.layoutMap.tryGetValue(type);
+    SLANG_ASSERT(layoutResultPtr);
+    if (layoutResultPtr)
+    {
+        // Check the layout is the same!
+        SLANG_ASSERT(layoutResultPtr->layout.get() == layout);
+        // Update the info
+        layoutResultPtr->info = info;
+    }
+
+    return TypeLayoutResult(layout, info);
+}
+
+static TypeLayoutResult _updateLayout(TypeLayoutContext const& context,
+    Type* type,
+    const TypeLayoutResult& result)
+{
+    auto layoutResultPtr = context.layoutMap.tryGetValue(type);
+    SLANG_ASSERT(layoutResultPtr);
+    if (layoutResultPtr)
+    {
+        // Check the layout is the same!
+        SLANG_ASSERT(layoutResultPtr->layout.get() == result.layout);
+        // Update the info
+        layoutResultPtr->info = result.info;
+    }
+
+    return result;
+}
 
 static TypeLayoutResult _createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type)
 {
+    if (auto layoutResultPtr = context.layoutMap.tryGetValue(type))
+    {
+        return *layoutResultPtr; 
+    }
+
     auto rules = context.rules;
 
     if (auto parameterGroupType = as<ParameterGroupType>(type))
@@ -3702,6 +3808,30 @@ static TypeLayoutResult _createTypeLayout(
     {
         return createArrayLikeTypeLayout(context, arrayType, arrayType->getElementType(), arrayType->getElementCount());
     }
+    else if (auto ptrType = as<PtrType>(type))
+    {
+        RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
+
+        const auto info = rules->GetPointerLayout();
+
+        const TypeLayoutResult result(ptrLayout, info);
+        _addLayout(context, type, result);
+
+        ptrLayout->type = type;
+        ptrLayout->rules = rules;
+
+        ptrLayout->uniformAlignment = info.alignment;
+
+        ptrLayout->addResourceUsage(info.kind, info.size);
+
+        const auto valueTypeLayout = _createTypeLayout(
+            context,
+            ptrType->getValueType());
+
+        ptrLayout->valueTypeLayout = valueTypeLayout.layout;
+
+        return result;
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
@@ -3713,6 +3843,8 @@ static TypeLayoutResult _createTypeLayout(
 
             typeLayoutBuilder.beginLayout(type, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
+
+            _addLayout(context, type, typeLayout);
 
             // First, add all fields with explicit offsets.
             for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
@@ -3790,7 +3922,7 @@ static TypeLayoutResult _createTypeLayout(
                 typeLayout->pendingDataTypeLayout = pendingDataTypeLayout;
             }
 
-            return typeLayoutBuilder.getTypeLayoutResult();
+            return _updateLayout(context, type, typeLayoutBuilder.getTypeLayoutResult());
         }
         else if (auto globalGenericParamDecl = declRef.as<GlobalGenericParamDecl>())
         {
@@ -4092,6 +4224,9 @@ static TypeLayoutResult _createTypeLayout(
         UniformLayoutInfo info(0, 1);
 
         RefPtr<TaggedUnionTypeLayout> taggedUnionLayout = new TaggedUnionTypeLayout();
+
+        _addLayout(context, type, taggedUnionLayout);
+
         taggedUnionLayout->type = type;
         taggedUnionLayout->rules = rules;
 
@@ -4155,7 +4290,7 @@ static TypeLayoutResult _createTypeLayout(
         taggedUnionLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->count = info.size;
         taggedUnionLayout->uniformAlignment = info.alignment;
 
-        return TypeLayoutResult(taggedUnionLayout, info);
+        return _updateLayout(context, type, taggedUnionLayout, info);
     }
     else if( auto existentialSpecializedType = as<ExistentialSpecializedType>(type) )
     {
@@ -4171,6 +4306,9 @@ static TypeLayoutResult _createTypeLayout(
         rules->AddStructField(&info, baseTypeLayoutResult.info.getUniformLayout());
 
         RefPtr<ExistentialSpecializedTypeLayout> typeLayout = new ExistentialSpecializedTypeLayout();
+
+        _addLayout(context, type, typeLayout);
+
         typeLayout->type = type;
         typeLayout->rules = rules;
 
@@ -4215,7 +4353,7 @@ static TypeLayoutResult _createTypeLayout(
             typeLayout->addResourceUsage(LayoutResourceKind::Uniform, info.size);
         }
 
-        return makeTypeLayoutResult(typeLayout);
+        return _updateLayout(context, type, makeTypeLayoutResult(typeLayout));
     }
 
     // catch-all case in case nothing matched

@@ -967,6 +967,18 @@ namespace Slang
         ioOperands.add(m_elementTypeLayout);
     }
 
+    // 
+    // IRPointerTypeLayout
+    //
+
+    void IRPointerTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
+    {
+        SLANG_UNUSED(ioOperands);
+        // TODO(JS): For now we don't store the value types layout to avoid 
+        // infinite recursion.
+        //ioOperands.add(m_valueTypeLayout);
+    }
+
     //
     // IRStreamOutputTypeLayout
     //

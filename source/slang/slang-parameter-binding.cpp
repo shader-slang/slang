@@ -1997,6 +1997,18 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
     else if(const auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
     else if(const auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
+    else if (auto ptrType = as<PtrType>(type))
+    {
+        SLANG_ASSERT(ptrType->astNodeType == ASTNodeType::PtrType);
+
+        // Work out the layout for the value/target type
+        auto valueTypeLayout = processEntryPointVaryingParameter(context, ptrType->getValueType(), state, varLayout);
+
+        RefPtr<PointerTypeLayout> ptrTypeLayout = new PointerTypeLayout();
+        ptrTypeLayout->valueTypeLayout = valueTypeLayout;
+
+        return ptrTypeLayout;
+    }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
     else if( auto declRefType = as<DeclRefType>(type) )
@@ -2136,6 +2148,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             SLANG_UNEXPECTED("unhandled type kind");
         }
     }
+    
     // If we ran into an error in checking the user's code, then skip this parameter
     else if( const auto errorType = as<ErrorType>(type) )
     {

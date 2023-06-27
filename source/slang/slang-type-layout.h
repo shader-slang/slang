@@ -613,6 +613,17 @@ public:
     RefPtr<TypeLayout> originalElementTypeLayout;
 };
 
+/// Type layout for an pointer type
+class PointerTypeLayout : public TypeLayout
+{
+public:
+    // TODO(JS): 
+    // Should this derive from SequenceTypeLayout? A pointer is kind of like an array without
+    // bounds - in that it can be indexed. Of it it can be looked at as an indirection to a value.
+    // Is the "Just Work"iness applicable?
+    RefPtr<TypeLayout> valueTypeLayout;
+};
+
 // type layout for a variable with stream-output type
 class StreamOutputTypeLayout : public TypeLayout
 {
@@ -917,6 +928,9 @@ struct SimpleLayoutRulesImpl
     // Get size and alignment for an array of elements
     virtual SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) = 0;
 
+    /// Get pointer layout
+    virtual SimpleLayoutInfo GetPointerLayout() = 0;
+
     // Get layout for a vector or matrix type
     virtual SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
     virtual SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) = 0;
@@ -949,7 +963,10 @@ struct LayoutRulesImpl
     {
         return simpleRules->GetScalarLayout(baseType);
     }
-
+    SimpleLayoutInfo GetPointerLayout()
+    {
+        return simpleRules->GetPointerLayout();
+    }
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
     {
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
@@ -1013,6 +1030,30 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getStructuredBufferRules(TargetRequest* request) = 0;
 };
 
+    /// A custom tuple to capture the outputs of type layout
+struct TypeLayoutResult
+{
+        /// The actual heap-allocated layout object with all the details
+    RefPtr<TypeLayout>  layout;
+
+        /// A simplified representation of layout information.
+        ///
+        /// This information is suitable for the case where a type only
+        /// consumes a single resource.
+        ///
+    SimpleLayoutInfo    info;
+
+        /// Default constructor.
+    TypeLayoutResult()
+    {}
+
+        /// Construct a result from the given layout object and simple layout info.
+    TypeLayoutResult(RefPtr<TypeLayout> inLayout, SimpleLayoutInfo const& inInfo)
+        : layout(inLayout)
+        , info(inInfo)
+    {}
+};
+
 struct TypeLayoutContext
 {
     ASTBuilder* astBuilder;
@@ -1039,6 +1080,9 @@ struct TypeLayoutContext
     //
     Int                                 specializationArgCount = 0;
     ExpandedSpecializationArg const*    specializationArgs = nullptr;
+
+    // Map types to their type layout
+    Dictionary<Type*, TypeLayoutResult>      layoutMap;
 
     LayoutRulesImpl* getRules() { return rules; }
     LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }
@@ -1088,29 +1132,7 @@ struct TypeLayoutContext
 
 //
 
-    /// A custom tuple to capture the outputs of type layout
-struct TypeLayoutResult
-{
-        /// The actual heap-allocated layout object with all the details
-    RefPtr<TypeLayout>  layout;
 
-        /// A simplified representation of layout information.
-        ///
-        /// This information is suitable for the case where a type only
-        /// consumes a single resource.
-        ///
-    SimpleLayoutInfo    info;
-
-        /// Default constructor.
-    TypeLayoutResult()
-    {}
-
-        /// Construct a result from the given layout object and simple layout info.
-    TypeLayoutResult(RefPtr<TypeLayout> inLayout, SimpleLayoutInfo const& inInfo)
-        : layout(inLayout)
-        , info(inInfo)
-    {}
-};
 
     /// Helper type for building `struct` type layouts
 struct StructTypeLayoutBuilder
