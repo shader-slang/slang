@@ -5750,8 +5750,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // must obey any API-imposed restrictions.
     //
     __target_intrinsic(hlsl)
-    [__NoSideEffect]
-    [mutating]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -5773,8 +5771,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     [__unsafeForceInlineEarly]
     __specialized_for_target(glsl)
-    [__NoSideEffect]
-    [mutating]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -5808,8 +5804,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryProceedEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__NoSideEffect]
-    [mutating]
     bool Proceed();
 
     // Causes the ray query to terminate.
@@ -5821,8 +5815,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __target_intrinsic(glsl, rayQueryTerminateEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__NoSideEffect]
-    [mutating]
     void Abort();
 
     // Get the type of candidate hit being considered.
