@@ -6956,6 +6956,23 @@ namespace Slang
         {
             if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
             {
+                // Check that imaginary arguments with lvalue set to true correspond to
+                // parameters that have OutTypeBase attribute.
+                //
+                auto funcType = as<FuncType>(calleeDeclRef->type);
+                for (Index ii = 0; ii < imaginaryArguments.getCount(); ++ii)
+                {
+                    if (imaginaryArguments[ii]->type.isLeftValue)
+                    {
+                        if (!as<OutTypeBase>(funcType->getParamType(ii)))
+                        {
+                            visitor->getSink()->diagnose(
+                                attr, Diagnostics::invalidCustomDerivative);
+                            return;
+                        }
+                    }
+                }
+
                 attr->funcExpr = calleeDeclRef;
                 if (attr->args.getCount())
                     attr->args[0] = attr->funcExpr;
@@ -7044,9 +7061,14 @@ namespace Slang
                 if (auto pairType = as<DifferentialPairType>(visitor->getDifferentialPairType(param->getType())))
                 {
                     arg->type.type = pairType;
+
+                    // in T : IDifferentiable -> inout DifferentialPair<T>
+                    // inout T : IDifferentiable -> inout DifferentialPair<T>
+                    arg->type.isLeftValue = true;
+
                     if (isOutParam(param))
                     {
-                        // out T -> in T.Differential
+                        // out T : IDifferentiable -> in T.Differential
                         arg->type.isLeftValue = false;
                         arg->type.type = visitor->tryGetDifferentialType(
                             visitor->getASTBuilder(), pairType->getPrimalType());

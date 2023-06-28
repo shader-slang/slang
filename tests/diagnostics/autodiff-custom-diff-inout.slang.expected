@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/autodiff-custom-diff-inout.slang(3): error 31145: invalid custom derivative attribute.
+[BackwardDerivative(__d_f)]
+ ^~~~~~~~~~~~~~~~~~
+}
+standard output = {
+}
