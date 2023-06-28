@@ -4677,6 +4677,23 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 {
     static bool _isLValueContext() { return true; }
 
+    LoweredValInfo visitLValueImplicitCastExpr(LValueImplicitCastExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        auto loweredArg = lowerLValueExpr(context, expr->arguments[0]);
+
+        // It should be a ptr, because it is a LValue
+        SLANG_ASSERT(loweredArg.flavor == LoweredValInfo::Flavor::Ptr);
+
+        // We have the irValue (which should be a Ptr because it's an LValue)
+        auto irLValue = loweredArg.val;
+
+        auto builder = getBuilder();
+        auto lValueImplicitCast = builder->emitLValueImplicitCast(irType, irLValue);
+
+        return LoweredValInfo::simple(lValueImplicitCast);
+    }
+
     // When visiting a swizzle expression in an l-value context,
     // we need to construct a "swizzled l-value."
     LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)

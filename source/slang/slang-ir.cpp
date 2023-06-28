@@ -3130,6 +3130,10 @@ namespace Slang
     {
         return emitIntrinsicInst((IRType*)type, kIROp_Reinterpret, 1, &value);
     }
+    IRInst* IRBuilder::emitLValueImplicitCast(IRInst* type, IRInst* value)
+    {
+        return emitIntrinsicInst((IRType*)type, kIROp_LValueImplicitCast, 1, &value);
+    }
 
     IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
     {

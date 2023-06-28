@@ -1952,6 +1952,47 @@ namespace Slang
         return checkedExpr;
     }
 
+    bool _canLValueCoerceScalarType(Type* a, Type* b)
+    {
+        if (a == b)
+        {
+            return true;
+        }
+
+        auto basicTypeA = as<BasicExpressionType>(a);
+        auto basicTypeB = as<BasicExpressionType>(b);
+
+        if (basicTypeA && basicTypeB)
+        {
+            return (basicTypeA->baseType == BaseType::Int || basicTypeA->baseType == BaseType::UInt) &&
+                (basicTypeB->baseType == BaseType::Int || basicTypeB->baseType == BaseType::UInt);
+        }
+        return false;
+    }
+
+    bool _canLValueCoerce(Type* a, Type* b)
+    {
+        {
+            auto matA = as<MatrixExpressionType>(a);
+            auto matB = as<MatrixExpressionType>(b);
+
+            if (matA && matB)
+            {
+                return _canLValueCoerceScalarType(matA->getElementType(), matB->getElementType());
+            }
+        }
+        {
+            auto vecA = as<VectorExpressionType>(a);
+            auto vecB = as<VectorExpressionType>(b);
+
+            if (vecA && vecB)
+            {
+                return _canLValueCoerceScalarType(vecA->getScalarType(), vecB->getScalarType());
+            }
+        }
+        return _canLValueCoerceScalarType(a, b);
+    }
+
     Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
     {
         auto rs = ResolveInvoke(expr);
@@ -1985,23 +2026,52 @@ namespace Slang
                         if( pp < expr->arguments.getCount() )
                         {
                             auto argExpr = expr->arguments[pp];
-                            if( !argExpr->type.isLeftValue )
+                            if( !argExpr->type.isLeftValue)
                             {
-                                getSink()->diagnose(
-                                    argExpr,
-                                    Diagnostics::argumentExpectedLValue,
-                                    pp);
+                                auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
-                                if( auto implicitCastExpr = as<ImplicitCastExpr>(argExpr) )
+                                if (implicitCastExpr && _canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
+                                {
+                                    // This is a bit of a hack to work around something like
+                                    //
+                                    // ```
+                                    // int a = 0;
+                                    // uint b = 1;
+                                    // a += b;
+                                    // ```
+                                    // That strictly speaking it's not allowed, but we are going to allow it for now 
+                                    // for situations were the types are uint/int and vector/matrix varieties of those types
+                                    // 
+                                    // Then in lowering we are going to insert code to do something like
+                                    // ```
+                                    // var OutType: tmp = arg;
+                                    // f(... tmp);
+                                    // arg = tmp;
+                                    // ```
+
+                                    auto lValueImplicitCast = getASTBuilder()->create<LValueImplicitCastExpr>(*implicitCastExpr);
+
+                                    // Replace the expression. This should make this situation easier to detect.
+                                    expr->arguments[pp] = lValueImplicitCast;
+                                }
+                                else
                                 {
                                     getSink()->diagnose(
                                         argExpr,
-                                        Diagnostics::implicitCastUsedAsLValue,
-                                        implicitCastExpr->arguments[0]->type,
-                                        implicitCastExpr->type);
-                                }
+                                        Diagnostics::argumentExpectedLValue,
+                                        pp);
 
-                                maybeDiagnoseThisNotLValue(argExpr);
+                                    if(implicitCastExpr)
+                                    {
+                                        getSink()->diagnose(
+                                            argExpr,
+                                            Diagnostics::implicitCastUsedAsLValue,
+                                            implicitCastExpr->arguments[pp]->type,
+                                            implicitCastExpr->type);
+                                    }
+
+                                    maybeDiagnoseThisNotLValue(argExpr);
+                                }
                             }
                         }
                         else
