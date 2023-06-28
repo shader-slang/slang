@@ -1434,10 +1434,8 @@ static const ImageFormatInfo kImageFormatInfos[] =
 #undef SLANG_IMAGE_FORMAT_INFO
 };
 
-bool findImageFormatByName(char const* inName, ImageFormat* outFormat)
+bool findImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFormat)
 {
-    const UnownedStringSlice name(inName);
-
     for (Index i = 0; i < SLANG_COUNT_OF(kImageFormatInfos); ++i)
     {
         const auto& info = kImageFormatInfos[i];
@@ -1450,11 +1448,54 @@ bool findImageFormatByName(char const* inName, ImageFormat* outFormat)
     return false;
 }
 
+// https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#id71
+#define SLANG_VK_TO_IMAGE_FORMAT(x) \
+    x(r11g11b10f, r11f_g11f_b10f) \
+    x(rgb10a2, rgb10_a2) \
+    x(rgb10a2ui, rgb10_a2ui) 
+
+struct VkImageFormatInfo
+{
+    UnownedStringSlice name;
+    ImageFormat format;
+};
+static const VkImageFormatInfo kVkImageFormatInfos[] =
+{
+#define SLANG_VK_IMAGE_FORMAT_INFO(name, format) { toSlice(#name), ImageFormat::format },
+    SLANG_VK_TO_IMAGE_FORMAT(SLANG_VK_IMAGE_FORMAT_INFO)
+};
+
+static const auto kSNorm = UnownedStringSlice::fromLiteral("snorm");
+
+bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFormat)
+{
+    // Handle names ending in snorm
+    if (name.endsWith(kSNorm))
+    {
+        StringBuilder buf;
+        //  format names end with snormal after a '_', so replace with that
+        buf << name.head(name.getLength() - kSNorm.getLength()) << "_" << kSNorm;
+        return findImageFormatByName(buf.getUnownedSlice(), outFormat);
+    }
+    
+    // Handle the special cases
+    for (const auto& vkInfo : kVkImageFormatInfos)
+    {
+        if (vkInfo.name == name)
+        {
+            *outFormat = vkInfo.format;
+            return true;
+        }
+    }
+
+    // Default to the regular lookup mechanism for everything else
+    return findImageFormatByName(name, outFormat);
+}
+
 char const* getGLSLNameForImageFormat(ImageFormat format)
 {
     return kImageFormatInfos[Index(format)].name.begin();
 }
-
 
 const ImageFormatInfo& getImageFormatInfo(ImageFormat format)
 {
