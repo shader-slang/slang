@@ -4679,7 +4679,11 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 
     LoweredValInfo visitLValueImplicitCastExpr(LValueImplicitCastExpr* expr)
     {
+        auto builder = getBuilder();
+
         auto irType = lowerType(context, expr->type);
+        auto irPtrType = builder->getPtrType(irType);
+
         auto loweredArg = lowerLValueExpr(context, expr->arguments[0]);
 
         // It should be a ptr, because it is a LValue
@@ -4688,10 +4692,9 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         // We have the irValue (which should be a Ptr because it's an LValue)
         auto irLValue = loweredArg.val;
 
-        auto builder = getBuilder();
-        auto lValueImplicitCast = builder->emitLValueImplicitCast(irType, irLValue);
+        auto lValueImplicitCast = builder->emitLValueImplicitCast(irPtrType, irLValue);
 
-        return LoweredValInfo::simple(lValueImplicitCast);
+        return LoweredValInfo::ptr(lValueImplicitCast);
     }
 
     // When visiting a swizzle expression in an l-value context,
