@@ -23,4 +23,6 @@ void legalizeEntryPointsForGLSL(
 
 void legalizeImageSubscriptForGLSL(IRModule* module);
 
+void legalizeConstantBufferLoadForGLSL(IRModule* module);
+
 }

@@ -184,7 +184,7 @@ namespace Slang
         void parseSourceFile(ModuleDecl* program);
         Decl* ParseStruct();
         ClassDecl* ParseClass();
-        Stmt* ParseStatement();
+        Stmt* ParseStatement(Stmt* parentStmt = nullptr);
         Stmt* parseBlockStatement();
         Stmt* parseLabelStatement();
         DeclStmt* parseVarDeclrStatement(Modifiers modifiers);
@@ -4438,7 +4438,7 @@ namespace Slang
         }
     }
 
-    Stmt* Parser::ParseStatement()
+    Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         auto modifiers = ParseModifiers(this);
 
@@ -4575,6 +4575,13 @@ namespace Slang
         }
         else if (LookAheadToken(TokenType::Semicolon))
         {
+            if (as<IfStmt>(parentStmt))
+            {
+                // An empty statement after an `if` is probably a mistake,
+                // so we will diagnose it as such.
+                //
+                sink->diagnose(tokenReader.peekLoc(), Diagnostics::unintendedEmptyStatement);
+            }
             statement = astBuilder->create<EmptyStmt>();
             FillPosition(statement);
             ReadToken(TokenType::Semicolon);
@@ -4690,11 +4697,11 @@ namespace Slang
         ReadToken(TokenType::LParent);
         ifStatement->predicate = ParseExpression();
         ReadToken(TokenType::RParent);
-        ifStatement->positiveStatement = ParseStatement();
+        ifStatement->positiveStatement = ParseStatement(ifStatement);
         if (LookAheadToken("else"))
         {
             ReadToken("else");
-            ifStatement->negativeStatement = ParseStatement();
+            ifStatement->negativeStatement = ParseStatement(ifStatement);
         }
         return ifStatement;
     }
