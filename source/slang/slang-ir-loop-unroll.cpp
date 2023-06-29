@@ -88,7 +88,7 @@ List<IRBlock*> collectBlocksInLoop(IRGlobalValueWithCode* func,  IRLoop* loopIns
 
 static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
 {
-    static constexpr int kMaxIterationsToAttempt = 256;
+    static constexpr int kMaxIterationsToAttempt = 4096;
 
     auto forceUnrollDecor = loopInst->findDecoration<IRForceUnrollDecoration>();
     if (!forceUnrollDecor)
