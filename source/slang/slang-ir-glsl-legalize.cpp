@@ -2807,7 +2807,7 @@ void legalizeConstantBufferLoadForGLSL(IRModule* module)
                         builder.setInsertBefore(load);
                         for (auto field : elementType->getFields())
                         {
-                            auto fieldAddr = builder.emitFieldAddress(field->getFieldType(), load->getPtr(), field->getKey());
+                            auto fieldAddr = builder.emitFieldAddress(builder.getPtrType(field->getFieldType()), load->getPtr(), field->getKey());
                             auto fieldValue = builder.emitLoad(field->getFieldType(), fieldAddr);
                             elements.add(fieldValue);
                         }
