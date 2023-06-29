@@ -783,12 +783,13 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Legalize `ImageSubscript` for GLSL.
+    // Legalize `ImageSubscript` and constant buffer loads for GLSL.
     switch (target)
     {
     case CodeGenTarget::GLSL:
         {
             legalizeImageSubscriptForGLSL(irModule);
+            legalizeConstantBufferLoadForGLSL(irModule);
         }
         break;
     default:

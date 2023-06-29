@@ -234,6 +234,8 @@ DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as eit
 
 DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
 
+DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
+
 //
 // 3xxxx - Semantic analysis
 //
