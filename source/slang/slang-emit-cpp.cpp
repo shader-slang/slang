@@ -1200,7 +1200,9 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         {
             return false;
         }
-        case kIROp_LValueImplicitCast:
+       
+        case kIROp_InOutImplicitCast:
+        case kIROp_OutImplicitCast:
         {
             // We'll just the LValue to be the desired type
             m_writer->emit("reinterpret_cast<");

@@ -3302,7 +3302,8 @@ public:
     IRUndefined* emitUndefined(IRType* type);
 
     IRInst* emitReinterpret(IRInst* type, IRInst* value);
-    IRInst* emitLValueImplicitCast(IRInst* type, IRInst* value);
+    IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
+    IRInst* emitInOutImplicitCast(IRInst* type, IRInst* value);
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(

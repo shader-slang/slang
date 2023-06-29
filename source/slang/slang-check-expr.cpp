@@ -2036,7 +2036,7 @@ namespace Slang
 
                                 if (implicitCastExpr && _canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
                                 {
-                                    // This is a bit of a hack to work around something like
+                                    // This is to work around issues like
                                     //
                                     // ```
                                     // int a = 0;
@@ -2053,7 +2053,18 @@ namespace Slang
                                     // arg = tmp;
                                     // ```
 
-                                    auto lValueImplicitCast = getASTBuilder()->create<LValueImplicitCastExpr>(*implicitCastExpr);
+                                    TypeCastExpr* lValueImplicitCast;
+
+                                    // We want to record if the cast is being used for `out` or `inout`/`ref` as 
+                                    // if it's just `out` we won't need to convert before passing in.
+                                    if (as<OutType>(paramType))
+                                    {
+                                        lValueImplicitCast = getASTBuilder()->create<OutImplicitCastExpr>(*implicitCastExpr);
+                                    }
+                                    else
+                                    {
+                                        lValueImplicitCast = getASTBuilder()->create<InOutImplicitCastExpr>(*implicitCastExpr);
+                                    }
 
                                     // Replace the expression. This should make this situation easier to detect.
                                     expr->arguments[pp] = lValueImplicitCast;

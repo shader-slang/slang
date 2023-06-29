@@ -294,9 +294,6 @@ class TypeCastExpr: public InvokeExpr
 class ExplicitCastExpr: public TypeCastExpr
 {
     SLANG_AST_CLASS(ExplicitCastExpr)
-
-    
-
 };
 
 // An implicit type-cast inserted during semantic checking
@@ -305,14 +302,30 @@ class ImplicitCastExpr : public TypeCastExpr
     SLANG_AST_CLASS(ImplicitCastExpr)
 };
 
-// A bit of a hack to work around situations like int += uint
-// where we want to allow an LValue to work with an implicit cast.
 class LValueImplicitCastExpr : public TypeCastExpr
 {
     SLANG_AST_CLASS(LValueImplicitCastExpr)
 
-        /// Allow explict construction from any TypeCastExpr
     explicit LValueImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
+};
+
+// To work around situations like int += uint
+// where we want to allow an LValue to work with an implicit cast.
+// The argument being cast *must* be an LValue.
+class OutImplicitCastExpr : public LValueImplicitCastExpr
+{
+    SLANG_AST_CLASS(OutImplicitCastExpr)
+
+        /// Allow explict construction from any TypeCastExpr
+    explicit OutImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
+};
+
+class InOutImplicitCastExpr : public LValueImplicitCastExpr
+{
+    SLANG_AST_CLASS(InOutImplicitCastExpr)
+
+    /// Allow explict construction from any TypeCastExpr
+    explicit InOutImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
 };
 
     /// A cast of a value to a super-type of its type.
