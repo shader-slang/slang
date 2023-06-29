@@ -1952,42 +1952,46 @@ namespace Slang
         return checkedExpr;
     }
 
-    bool _canLValueCoerceScalarType(Type* a, Type* b)
+    static bool _canLValueCoerceScalarType(Type* a, Type* b)
     {
-        if (a == b)
-        {
-            return true;
-        }
-
         auto basicTypeA = as<BasicExpressionType>(a);
         auto basicTypeB = as<BasicExpressionType>(b);
 
         if (basicTypeA && basicTypeB)
         {
-            return (basicTypeA->baseType == BaseType::Int || basicTypeA->baseType == BaseType::UInt) &&
-                (basicTypeB->baseType == BaseType::Int || basicTypeB->baseType == BaseType::UInt);
+            const auto& infoA = BaseTypeInfo::getInfo(basicTypeA->baseType);
+            const auto& infoB = BaseTypeInfo::getInfo(basicTypeB->baseType);
+
+            // TODO(JS): Initially this tries to limit where LValueImplict casts happen.
+            // We could in principal allow different sizes, as long as we converted to a temprorary
+            // and back again. 
+            // 
+            // For now we just stick with the simple case. 
+            // // We only allow on integer types for now. In effect just allowing any size uint/int conversions
+            if (infoA.sizeInBytes == infoB.sizeInBytes && 
+                (infoA.flags & infoB.flags & BaseTypeInfo::Flag::Integer))
+            {
+                return true;
+            }
+
         }
         return false;
     }
 
-    bool _canLValueCoerce(Type* a, Type* b)
+    static bool _canLValueCoerce(Type* a, Type* b)
     {
+        // We can *assume* here that if they are coercable, that dimensions of vectors
+        // and matrices match. We might want to assert to be sure...
+        SLANG_ASSERT(a != b);
+        if (a->astNodeType == b->astNodeType)
         {
-            auto matA = as<MatrixExpressionType>(a);
-            auto matB = as<MatrixExpressionType>(b);
-
-            if (matA && matB)
+            if (auto matA = as<MatrixExpressionType>(a))
             {
-                return _canLValueCoerceScalarType(matA->getElementType(), matB->getElementType());
+                return _canLValueCoerceScalarType(matA->getElementType(), static_cast<MatrixExpressionType*>(b)->getElementType());   
             }
-        }
-        {
-            auto vecA = as<VectorExpressionType>(a);
-            auto vecB = as<VectorExpressionType>(b);
-
-            if (vecA && vecB)
+            else if (auto vecA = as<VectorExpressionType>(a))
             {
-                return _canLValueCoerceScalarType(vecA->getScalarType(), vecB->getScalarType());
+                return  _canLValueCoerceScalarType(vecA->getScalarType(), static_cast<VectorExpressionType*>(b)->getScalarType());   
             }
         }
         return _canLValueCoerceScalarType(a, b);
