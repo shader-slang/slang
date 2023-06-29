@@ -7045,37 +7045,6 @@ namespace Slang
         return "PrimalSubstitute";
     }
 
-    // TODO: Can probably use the existing code in lower-to-ir.cpp by moving it somewhere
-    // common.. 
-    //
-    ParameterDirection getParamDirectionFromDecl(ParamDecl* paramDecl)
-    {
-        if( paramDecl->hasModifier<RefModifier>() )
-        {
-            // The AST specified `ref`:
-            return kParameterDirection_Ref;
-        }
-        if( paramDecl->hasModifier<InOutModifier>() )
-        {
-            // The AST specified `inout`:
-            return kParameterDirection_InOut;
-        }
-        if (paramDecl->hasModifier<OutModifier>())
-        {
-            // We saw an `out` modifier, so now we need
-            // to check if there was a paired `in`.
-            if(paramDecl->hasModifier<InModifier>())
-                return kParameterDirection_InOut;
-            else
-                return kParameterDirection_Out;
-        }
-        else
-        {
-            // No direction modifier, or just `in`:
-            return kParameterDirection_In;
-        }
-    }
-
     ArgsWithDirectionInfo getImaginaryArgsToFunc(ASTBuilder* astBuilder, FunctionDeclBase* func, SourceLoc loc)
     {
         List<Expr*> imaginaryArguments;
@@ -7088,7 +7057,7 @@ namespace Slang
             arg->type.type = param->getType();
             arg->loc = loc;
             imaginaryArguments.add(arg);
-            directions.add(getParamDirectionFromDecl(param));
+            directions.add(getParameterDirection(param));
         }
         return { imaginaryArguments, directions };
     }
@@ -7117,7 +7086,7 @@ namespace Slang
         List<ParameterDirection> expectedParamDirections;
         for (auto param : originalFuncDecl->getParameters())
         {
-            expectedParamDirections.add(getParamDirectionFromDecl(param));
+            expectedParamDirections.add(getParameterDirection(param));
         }
 
         return { imaginaryArguments, expectedParamDirections };
@@ -7142,7 +7111,7 @@ namespace Slang
             arg->type.type = param->getType();
             arg->loc = loc;
 
-            ParameterDirection direction = getParamDirectionFromDecl(param);
+            ParameterDirection direction = getParameterDirection(param);
 
             bool isDiffParam = (!param->findModifier<NoDiffModifier>());
             if (isDiffParam)
