@@ -2,8 +2,10 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-extract-value-from-type.h"
-#include "slang-ir-layout.h"
+
+#include "slang-ir-clone.h"
+
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -121,11 +123,11 @@ struct LValueCastLoweringContext
         return false;
     }
 
-    void _processLValueCast(IRInst* inst)
+    void _processLValueCast(IRInst* castInst)
     {
-        auto operand = inst->getOperand(0);
-        auto fromType = operand->getDataType();
-        auto toType = inst->getDataType();
+        auto castOperand = castInst->getOperand(0);
+        auto fromType = castOperand->getDataType();
+        auto toType = castInst->getDataType();
 
         switch (m_sourceLanguage)
         {
@@ -135,8 +137,8 @@ struct LValueCastLoweringContext
                 // HLSL doens't care about any of these so we can just remove the cast
                 if (_canReinterpret(fromType, toType))
                 {
-                    inst->replaceUsesWith(operand);
-                    inst->removeAndDeallocate();
+                    castInst->replaceUsesWith(castOperand);
+                    castInst->removeAndDeallocate();
                     return;
                 }
                 break;
@@ -155,6 +157,62 @@ struct LValueCastLoweringContext
         }
 
         // Okay we are going to replace the implicit casts with temporaries around call sites/uses.
+
+        List<IRInst*> useSites;
+        for (auto use = castInst->firstUse; use; use = use->nextUse)
+        {
+            auto useSite = use->getUser();
+
+            if (useSites.indexOf(useSite) < 0)
+            {
+                useSites.add(useSite);
+            }
+        }
+
+        auto nameHintDecoration = castOperand->findDecoration<IRNameHintDecoration>();
+
+        IRBuilder builder(m_module);
+        
+        IRType* toValueType = as<IRPtrType>(toType)->getValueType();
+        IRType* fromValueType = as<IRPtrType>(fromType)->getValueType();
+
+        for (auto useSite : useSites)
+        {
+            builder.setInsertBefore(useSite);
+            auto tmpVar = builder.emitVar(toValueType);
+
+            if (nameHintDecoration)
+            {
+                cloneDecoration(nameHintDecoration, tmpVar);
+            }
+
+            // If it's inout we convert via cast whats in the variable
+            if (castInst->getOp() == kIROp_InOutImplicitCast)
+            {
+                builder.emitStore(tmpVar, builder.emitCast(toValueType, builder.emitLoad(castOperand)));
+            }
+
+            // Convert the temporary back to the original location
+            builder.setInsertAfter(useSite);
+            builder.emitStore(castOperand, builder.emitCast(fromValueType, builder.emitLoad(tmpVar)));
+
+            // Go through all of the operands of the inst relacing 
+
+            const auto operandCount = Count(useSite->getOperandCount());
+            auto operands = useSite->getOperands();
+
+            for (Index i = 0; i < operandCount; ++i)
+            {
+                auto& callSiteOperand = operands[i];
+                if(callSiteOperand.get() == castInst)
+                {
+                    callSiteOperand.set(tmpVar);
+                }
+            }
+        }
+
+        // When we are done we can destroy the inst
+        castInst->removeAndDeallocate();
     }
 
 

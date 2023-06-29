@@ -1,3 +1,4 @@
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -vk
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -cpu
 

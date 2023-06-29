@@ -1,5 +1,7 @@
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -vk
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -cpu
+
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
