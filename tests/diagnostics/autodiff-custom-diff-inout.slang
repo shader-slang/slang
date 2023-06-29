@@ -6,7 +6,7 @@ float f(float x)
     return x * x;
 }
 
-void __d_f(DifferentialPair<float> x, float.Differential dout)
+void __d_f(float x, float.Differential dout)
 {
 }
 
