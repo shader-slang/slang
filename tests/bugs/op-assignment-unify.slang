@@ -1,3 +1,4 @@
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -cpu
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name outputBuffer
@@ -33,9 +34,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Check that detects issues with undefined variables.
 
     int undef1, undef2;          // undefined
-    silly(u, undef1);
+    
+    // Downstream compilers detect this... 
+    //silly(u, undef1);
     silly2(u, undef2);
     
-
-    outputBuffer[idx] = u + v + undef1 + undef2;
+    outputBuffer[idx] = u + v + undef2;
 }

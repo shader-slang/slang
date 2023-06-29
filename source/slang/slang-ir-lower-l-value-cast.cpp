@@ -234,7 +234,7 @@ struct LValueCastLoweringContext
 };
 
 void lowerLValueCast(TargetRequest* targetReq, IRModule* module)
-{
+{ 
     LValueCastLoweringContext context(targetReq, module);
     context.processModule();
 }
