@@ -62,7 +62,8 @@ struct LValueCastLoweringContext
         }
     }
 
-    bool _canReinterpret(IRType* a, IRType* b)
+    
+    bool _canReinterpretCast(IRType* a, IRType* b)
     {
         auto ptrA = as<IRPtrType>(a);
         auto ptrB = as<IRPtrType>(b);
@@ -123,6 +124,14 @@ struct LValueCastLoweringContext
         return false;
     }
 
+    bool _canRemoveCastForHLSL(IRType* a, IRType* b)
+    {
+        // Currently _canReinterpret is exactly the same class of types that we can just ignore the cast totally 
+        // for HLSL
+        // If _canReinterpretCast changes, this will need to be updated
+        return _canReinterpretCast(a, b);
+    }
+
     void _processLValueCast(IRInst* castInst)
     {
         auto castOperand = castInst->getOperand(0);
@@ -133,9 +142,8 @@ struct LValueCastLoweringContext
         {
             case SourceLanguage::HLSL:
             {
-                // We only allow reinterpret of int conversions of the same size. 
-                // HLSL doens't care about any of these so we can just remove the cast
-                if (_canReinterpret(fromType, toType))
+                // If the conversion can just be ignored for HLSL, just remove it
+                if (_canRemoveCastForHLSL(fromType, toType))
                 {
                     castInst->replaceUsesWith(castOperand);
                     castInst->removeAndDeallocate();
@@ -147,7 +155,9 @@ struct LValueCastLoweringContext
             case SourceLanguage::CPP:
             case SourceLanguage::CUDA:
             {
-                if (_canReinterpret(fromType, toType))
+                // For languages with pointers, out parameter differences can *sometimes* just be sidestepped with 
+                // a reinterpret cast.
+                if (_canReinterpretCast(fromType, toType))
                 {
                     return;
                 }
@@ -157,7 +167,6 @@ struct LValueCastLoweringContext
         }
 
         // Okay we are going to replace the implicit casts with temporaries around call sites/uses.
-
         List<IRInst*> useSites;
         for (auto use = castInst->firstUse; use; use = use->nextUse)
         {
