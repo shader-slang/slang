@@ -1461,9 +1461,9 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
             IF_MATCH \
         } else
 
-#define TERMINATING_CASE \
+#define TERMINATING_CASE(x) \
         { \
-            SLANG_UNREACHABLE("constant folding of FuncCallIntVal"); \
+            x \
         }
 
         // Handle the cases using the macros
@@ -1485,7 +1485,7 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
         SPECIAL_OPERATOR_CASE(!, resultValue = ((constArgs[0]->value != 0) ? 1 : 0);)
         SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->value; )
         SPECIAL_OPERATOR_CASE("?:", constArgs[0]->value != 0 ? constArgs[1]->value : constArgs[2]->value; )
-        TERMINATING_CASE
+        TERMINATING_CASE(SLANG_UNREACHABLE("constant folding of FuncCallIntVal");)
 
         return astBuilder->getIntVal(resultType, resultValue);
 
