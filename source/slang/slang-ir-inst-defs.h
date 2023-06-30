@@ -923,7 +923,7 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
-INST(OutImplicitCast,                   outImplicitCast,         1, 0)
+INST(OutImplicitCast,                   outImplicitCast,           1, 0)
 INST(InOutImplicitCast,                 inOutImplicitCast,         1, 0)
 INST(IntCast, intCast, 1, 0)
 INST(FloatCast, floatCast, 1, 0)

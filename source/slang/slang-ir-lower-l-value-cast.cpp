@@ -62,7 +62,9 @@ struct LValueCastLoweringContext
         }
     }
 
-    
+        /// True if the conversion from a to b, can be achieved 
+        /// via a reinterpret cast/bitcast
+        /// Only some targets can allow such conversions
     bool _canReinterpretCast(IRType* a, IRType* b)
     {
         auto ptrA = as<IRPtrType>(a);
@@ -124,6 +126,7 @@ struct LValueCastLoweringContext
         return false;
     }
 
+        /// True if for HLSL the cast can be removed entirely
     bool _canRemoveCastForHLSL(IRType* a, IRType* b)
     {
         // Currently _canReinterpret is exactly the same class of types that we can just ignore the cast totally 
@@ -138,7 +141,7 @@ struct LValueCastLoweringContext
         auto fromType = castOperand->getDataType();
         auto toType = castInst->getDataType();
 
-        switch (m_sourceLanguage)
+        switch (m_intermediateSourceLanguage)
         {
             case SourceLanguage::HLSL:
             {
@@ -166,6 +169,13 @@ struct LValueCastLoweringContext
             default: break;
         }
 
+        // If we can't use the other mechanisms we are going to do a conversion
+        // via a cast into a temporary of the approprite time before the useSite,
+        // then immediately after converting back into the original location.
+        //
+        // With a special case for uses which are just out - where we don't need to
+        // convert in.
+        
         // Okay we are going to replace the implicit casts with temporaries around call sites/uses.
         List<IRInst*> useSites;
         for (auto use = castInst->firstUse; use; use = use->nextUse)
@@ -178,6 +188,7 @@ struct LValueCastLoweringContext
             }
         }
 
+        // If there is a name hint on the source, we'll copy it over to the temporaries
         auto nameHintDecoration = castOperand->findDecoration<IRNameHintDecoration>();
 
         IRBuilder builder(m_module);
@@ -195,7 +206,7 @@ struct LValueCastLoweringContext
                 cloneDecoration(nameHintDecoration, tmpVar);
             }
 
-            // If it's inout we convert via cast whats in the variable
+            // If it's inout we convert via cast whats in the castOperand
             if (castInst->getOp() == kIROp_InOutImplicitCast)
             {
                 builder.emitStore(tmpVar, builder.emitCast(toValueType, builder.emitLoad(castOperand)));
@@ -205,8 +216,7 @@ struct LValueCastLoweringContext
             builder.setInsertAfter(useSite);
             builder.emitStore(castOperand, builder.emitCast(fromValueType, builder.emitLoad(tmpVar)));
 
-            // Go through all of the operands of the inst relacing 
-
+            // Go through all of the operands of the use inst relacing, with the temporary
             const auto operandCount = Count(useSite->getOperandCount());
             auto operands = useSite->getOperands();
 
@@ -224,77 +234,16 @@ struct LValueCastLoweringContext
         castInst->removeAndDeallocate();
     }
 
-
     LValueCastLoweringContext(TargetRequest* targetRequest, IRModule* module):
         m_targetReq(targetRequest),
         m_module(module)
     {
-        m_sourceLanguage = _calcIntermediateSourceLanguage(targetRequest);
+        m_intermediateSourceLanguage = getIntermediateSourceLanguageForTarget(targetRequest);
     }
 
-    // TODO(JS):
-    // This would probably be better served elsewhere, as it bakes in the knowledge of *how* 
-    // code generate is performed which could change
-    static SourceLanguage _calcIntermediateSourceLanguage(TargetRequest* req)
-    {
-        // If we are emitting directly just do the default thing
-        if (req->shouldEmitSPIRVDirectly())
-        {
-            return SourceLanguage::Unknown;
-        }
-
-        switch (req->getTarget())
-        {
-            case CodeGenTarget::GLSL:
-            case CodeGenTarget::GLSL_Vulkan:
-            case CodeGenTarget::GLSL_Vulkan_OneDesc:
-            // If we aren't emitting directly we are going to output GLSL to feed to GLSLANG
-            case CodeGenTarget::SPIRV:
-            case CodeGenTarget::SPIRVAssembly:
-            {
-                return SourceLanguage::GLSL;
-            }
-            case CodeGenTarget::HLSL:
-            case CodeGenTarget::DXBytecode:
-            case CodeGenTarget::DXBytecodeAssembly:
-            case CodeGenTarget::DXIL:
-            case CodeGenTarget::DXILAssembly:
-            {
-                return SourceLanguage::HLSL;
-            }
-            case CodeGenTarget::CSource:
-            {
-                return SourceLanguage::C;
-            }
-            case CodeGenTarget::ShaderSharedLibrary:
-            case CodeGenTarget::ObjectCode:
-            case CodeGenTarget::HostExecutable:
-            case CodeGenTarget::HostHostCallable:
-            case CodeGenTarget::ShaderHostCallable:
-            {
-                return SourceLanguage::CPP;
-            }
-            case CodeGenTarget::CPPSource:
-            case CodeGenTarget::HostCPPSource:
-            case CodeGenTarget::PyTorchCppBinding:
-            {
-                return SourceLanguage::CPP;
-            }
-            case CodeGenTarget::CUDAObjectCode:
-            case CodeGenTarget::CUDASource:
-            case CodeGenTarget::PTX:
-            {
-                return SourceLanguage::CUDA;
-            }
-            default: break;
-        }
-
-
-        return SourceLanguage::Unknown;
-    }
-
-    // If the source language is not known, will translate into temps and copies
-    SourceLanguage m_sourceLanguage = SourceLanguage::Unknown;
+    // The intermediate source language used to produce code for the target.
+    // If no intermediate source language is used will be SourceLanguage::Unknown.
+    SourceLanguage m_intermediateSourceLanguage = SourceLanguage::Unknown;
     TargetRequest* m_targetReq;
     IRModule* m_module;
     OrderedHashSet<IRInst*> m_workList;
