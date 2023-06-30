@@ -12,20 +12,9 @@ namespace Slang
 
 struct LValueCastLoweringContext
 {    
-    static bool _isGeneric(IRInst* inst)
-    {
-        // Check if inst is generic
-        for (auto cur = inst->getParent(); cur; cur = cur->getParent())
-        {
-            if (as<IRGeneric>(cur))
-                return true;
-        }
-        return false;
-    }
-
     void _addToWorkList(IRInst* inst)
     {
-        if (!_isGeneric(inst) && !m_workList.contains(inst))
+        if (!findOuterGeneric(inst) && !m_workList.contains(inst))
         {
             m_workList.add(inst);
         }
