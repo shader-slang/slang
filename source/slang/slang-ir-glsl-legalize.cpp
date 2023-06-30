@@ -2778,4 +2778,48 @@ void legalizeEntryPointsForGLSL(
     }
 }
 
+void legalizeConstantBufferLoadForGLSL(IRModule* module)
+{
+    // Constant buffers and parameter blocks are represented as `uniform` blocks
+    // in GLSL. These uniform blocks can't be used directly as a value of the underlying
+    // struct type. If we see a direct load of the constant buffer pointer,
+    // we need to replace it with a `MakeStruct` inst where each field is separately
+    // loaded.
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRGlobalValueWithCode>(globalInst))
+        {
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst = block->getFirstInst(); inst;)
+                {
+                    auto load = as<IRLoad>(inst);
+                    inst = inst->next;
+                    if (!load) continue;
+                    auto bufferType = load->getPtr()->getDataType();
+                    if (as<IRConstantBufferType>(bufferType) || as<IRParameterBlockType>(bufferType))
+                    {
+                        auto parameterGroupType = as<IRUniformParameterGroupType>(bufferType);
+                        auto elementType = as<IRStructType>(parameterGroupType->getElementType());
+                        if (!elementType) continue;
+                        List<IRInst*> elements;
+                        builder.setInsertBefore(load);
+                        for (auto field : elementType->getFields())
+                        {
+                            auto fieldAddr = builder.emitFieldAddress(builder.getPtrType(field->getFieldType()), load->getPtr(), field->getKey());
+                            auto fieldValue = builder.emitLoad(field->getFieldType(), fieldAddr);
+                            elements.add(fieldValue);
+                        }
+                        auto makeStruct = builder.emitMakeStruct(elementType, elements.getCount(), elements.getBuffer());
+                        load->replaceUsesWith(makeStruct);
+                        load->removeAndDeallocate();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 } // namespace Slang

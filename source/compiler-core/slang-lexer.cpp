@@ -438,6 +438,22 @@ namespace Slang
 
     static bool _maybeLexNumberExponent(Lexer* lexer, int base)
     {
+        if (_peek(lexer) == '#')
+        {
+            // Special case #INF 
+            const auto inf = toSlice("#INF");
+            for (auto c : inf)
+            {
+                if (_peek(lexer) != c)
+                {
+                    return false;
+                }
+                _advance(lexer);
+            }
+
+            return true;
+        }
+
         if(!_isNumberExponent(_peek(lexer), base))
             return false;
 
@@ -623,6 +639,24 @@ namespace Slang
             if(seenDot)
             {
                 divisor *= radix;
+            }
+        }
+
+        if (*cursor == '#')
+        {
+            // It must be INF
+            const auto inf = toSlice("#INF");
+
+            if (UnownedStringSlice(cursor, end).startsWith(inf))
+            {
+                if(outSuffix)
+                {
+                    *outSuffix = UnownedStringSlice(cursor + inf.getLength(), end);
+                }
+
+                value = INFINITY;
+
+                return value;
             }
         }
 
