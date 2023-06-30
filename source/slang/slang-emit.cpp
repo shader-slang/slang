@@ -400,6 +400,9 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
+            applySparseConditionalConstantPropagationForGlobalScope(
+                irModule, codeGenContext->getSink());
+
             if (!unrollLoopsInModule(irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }

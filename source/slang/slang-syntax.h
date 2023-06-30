@@ -319,6 +319,8 @@ namespace Slang
         const Substitutions* substs,
         InterfaceDecl* interfaceDecl);
 
+    ParameterDirection getParameterDirection(VarDeclBase* varDecl);
+
     enum class UserDefinedAttributeTargets
     {
         None = 0,
