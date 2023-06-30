@@ -99,7 +99,7 @@ static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
     if (maxIterCount && maxIterCount->getValue() != 0)
     {
         maxIterations =
-            Math::Clamp(maxIterations, (int)maxIterCount->getValue() + 1, kMaxIterationsToAttempt);
+            Math::Min((int)maxIterCount->getValue() + 1, kMaxIterationsToAttempt);
     }
     return maxIterations;
 }
