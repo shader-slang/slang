@@ -2630,7 +2630,7 @@ namespace Slang
     {
         if (!type)
         {
-            return nullptr;
+            return false;
         }
 
         if (as<ArithmeticExpressionType>(type) ||
