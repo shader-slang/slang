@@ -1633,6 +1633,12 @@ namespace Slang
         /// Are we generating code for a CUDA API (CUDA / OptiX)?
     bool isCUDATarget(TargetRequest* targetReq);
 
+        /// Given a target request returns which (if any) intermediate source language is required
+        /// to produce it.
+        ///
+        /// If no intermediate source language is required, will return SourceLanguage::Unknown
+    SourceLanguage getIntermediateSourceLanguageForTarget(TargetRequest* req);
+
         /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?
     bool areResourceTypesBindlessOnTarget(TargetRequest* target);
 

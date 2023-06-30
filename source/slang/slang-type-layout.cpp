@@ -1689,6 +1689,62 @@ bool isCUDATarget(TargetRequest* targetReq)
     }
 }
 
+SourceLanguage getIntermediateSourceLanguageForTarget(TargetRequest* req)
+{
+    // If we are emitting directly, there is no intermediate source language
+    if (req->shouldEmitSPIRVDirectly())
+    {
+        return SourceLanguage::Unknown;
+    }
+
+    switch (req->getTarget())
+    {
+        case CodeGenTarget::GLSL:
+        case CodeGenTarget::GLSL_Vulkan:
+        case CodeGenTarget::GLSL_Vulkan_OneDesc:
+            // If we aren't emitting directly we are going to output GLSL to feed to GLSLANG
+        case CodeGenTarget::SPIRV:
+        case CodeGenTarget::SPIRVAssembly:
+        {
+            return SourceLanguage::GLSL;
+        }
+        case CodeGenTarget::HLSL:
+        case CodeGenTarget::DXBytecode:
+        case CodeGenTarget::DXBytecodeAssembly:
+        case CodeGenTarget::DXIL:
+        case CodeGenTarget::DXILAssembly:
+        {
+            // Currently DXBytecode and DXIL are generated via HLSL
+            return SourceLanguage::HLSL;
+        }
+        case CodeGenTarget::CSource:
+        {
+            return SourceLanguage::C;
+        }
+        case CodeGenTarget::ShaderSharedLibrary:
+        case CodeGenTarget::ObjectCode:
+        case CodeGenTarget::HostExecutable:
+        case CodeGenTarget::HostHostCallable:
+        case CodeGenTarget::ShaderHostCallable:
+        case CodeGenTarget::CPPSource:
+        case CodeGenTarget::HostCPPSource:
+        case CodeGenTarget::PyTorchCppBinding:
+        {
+            // For CPU based scenarios are generated via C++
+            return SourceLanguage::CPP;
+        }
+        case CodeGenTarget::CUDAObjectCode:
+        case CodeGenTarget::CUDASource:
+        case CodeGenTarget::PTX:
+        {
+            return SourceLanguage::CUDA;
+        }
+        default: break;
+    }
+
+    return SourceLanguage::Unknown;
+}
+
 bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 {
     return isCPUTarget(targetReq) || isCUDATarget(targetReq);
