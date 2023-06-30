@@ -1,0 +1,11 @@
+result code = -1
+standard error = {
+tests/diagnostics/autodiff-custom-diff-inout.slang(3): error 30019: expected an expression of type 'float', got 'DifferentialPair<float>'
+[BackwardDerivative(__d_f)]
+ ^~~~~~~~~~~~~~~~~~
+tests/diagnostics/autodiff-custom-diff-inout.slang(3): error 31149: invalid custom derivative. parameter type mismatch at position 0. expected 'InOut<DifferentialPair<float>>', got 'float'
+[BackwardDerivative(__d_f)]
+ ^~~~~~~~~~~~~~~~~~
+}
+standard output = {
+}
