@@ -32,6 +32,9 @@
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 
+// Natural layout 
+#include "slang-ast-natural-layout.h"
+
 namespace Slang
 {
 
@@ -3375,6 +3378,33 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         auto arrayType = as<IRArrayType>(type);
         SLANG_ASSERT(arrayType);
         return LoweredValInfo::simple(arrayType->getElementCount());
+    }
+
+    LoweredValInfo visitSizeOfExpr(SizeOfExpr* sizeOfExpr)
+    {
+        // Lets try and lower to a constant
+        ASTNaturalLayoutContext naturalLayoutContext(getASTBuilder(), nullptr);
+
+        ASTNaturalLayoutContext::NaturalSize size;
+
+        if (SLANG_FAILED(naturalLayoutContext.calcLayout(sizeOfExpr->sizeOfType, size)))
+        {
+            /* TODO(JS):
+
+            In the future we will want to support lowering of SizeOfExpr into IR.
+            This would allow use sizeof in generics and other situations where the front end
+            can't resolve a size.
+            */
+
+            context->getSink()->diagnose(sizeOfExpr, Diagnostics::unableToLowerSizeOf, sizeOfExpr->sizeOfType);
+
+            SLANG_UNEXPECTED("sizeof currently isn't lowerable to IR currently");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
+
+        auto builder = getBuilder();
+
+        return LoweredValInfo::simple(getBuilder()->getIntValue(builder->getUIntType(), size.size));
     }
 
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)

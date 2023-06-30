@@ -350,6 +350,17 @@ class AsTypeExpr : public Expr
 
 };
 
+class SizeOfExpr : public Expr
+{
+    SLANG_AST_CLASS(SizeOfExpr);
+
+    // Set during the parse, could be an expression, a variable or a type
+    Expr* value = nullptr;
+
+    // The type the size of needs to operate on. Set during traversal of SemanticsExprVisitor
+    Type* sizeOfType = nullptr;
+};
+
 class MakeOptionalExpr : public Expr
 {
     SLANG_AST_CLASS(MakeOptionalExpr)

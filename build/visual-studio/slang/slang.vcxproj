@@ -317,6 +317,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ast-expr.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-iterator.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-modifier.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ast-natural-layout.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-print.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-reflect.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-stmt.h" />
@@ -511,6 +512,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ast-decl.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-dump.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-modifier.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ast-natural-layout.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-print.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-reflect.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-substitutions.cpp" />

@@ -34,7 +34,8 @@ static const char* kStmtKeywords[] = {
     "extension", "associatedtype", "this",      "namespace", "This",    "using",
     "__generic", "__exported",     "import",    "enum",      "break",   "continue",
     "discard",   "defer",          "cbuffer",   "tbuffer",   "func",    "is",
-    "as",        "nullptr",        "none",      "true",      "false",   "functype"};
+    "as",        "nullptr",        "none",      "true",      "false",   "functype", 
+    "sizeof"};
 
 static const char* hlslSemanticNames[] = {
     "register",

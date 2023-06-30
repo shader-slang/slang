@@ -1933,6 +1933,8 @@ namespace Slang
             : SemanticsVisitor(outer)
         {}
 
+        Expr* visitSizeOfExpr(SizeOfExpr* expr);
+
         Expr* visitIncompleteExpr(IncompleteExpr* expr);
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
         Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
