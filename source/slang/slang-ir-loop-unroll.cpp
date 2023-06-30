@@ -88,7 +88,7 @@ List<IRBlock*> collectBlocksInLoop(IRGlobalValueWithCode* func,  IRLoop* loopIns
 
 static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
 {
-    static constexpr int kMaxIterationsToAttempt = 256;
+    static constexpr int kMaxIterationsToAttempt = 4096;
 
     auto forceUnrollDecor = loopInst->findDecoration<IRForceUnrollDecoration>();
     if (!forceUnrollDecor)
@@ -99,7 +99,7 @@ static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
     if (maxIterCount && maxIterCount->getValue() != 0)
     {
         maxIterations =
-            Math::Clamp(maxIterations, (int)maxIterCount->getValue() + 1, kMaxIterationsToAttempt);
+            Math::Min((int)maxIterCount->getValue() + 1, kMaxIterationsToAttempt);
     }
     return maxIterations;
 }
