@@ -279,16 +279,33 @@ struct DepthFirstSearchContext
     template<typename SuccessorFunc>
     void walk(IRBlock* block, const SuccessorFunc& getSuccessors)
     {
+        List<IRBlock*> nodeStack;
+        nodeStack.add(block);
         visited.add(block);
         preVisit(block);
-        for(auto succ : getSuccessors(block))
+
+        while (nodeStack.getCount())
         {
-            if(!visited.contains(succ))
+            auto curNode = nodeStack.getLast();
+            bool pushedChild = false;
+            for (auto succ : getSuccessors(curNode))
             {
-                walk(succ, getSuccessors);
+                if (!visited.contains(succ))
+                {
+                    pushedChild = true;
+                    nodeStack.add(succ);
+                    visited.add(succ);
+
+                    preVisit(succ);
+                    break;
+                }
+            }
+            if (!pushedChild)
+            {
+                postVisit(curNode);
+                nodeStack.removeLast();
             }
         }
-        postVisit(block);
     }
 
     /// Overridable action to perform on first entering a CFG node.
