@@ -235,7 +235,7 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
             // Set the cached result to the size.
             m_typeToSize.set(type, size);
 
-            return size;
+            return size; 
         }
         else if (const auto typeDef = declRefType->declRef.as<TypeDefDecl>())
         {

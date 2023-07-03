@@ -376,15 +376,25 @@ class AsTypeExpr : public Expr
 
 };
 
-class SizeOfExpr : public Expr
+class SizeOfLikeExpr : public Expr
 {
-    SLANG_AST_CLASS(SizeOfExpr);
+    SLANG_AST_CLASS(SizeOfLikeExpr);
 
     // Set during the parse, could be an expression, a variable or a type
     Expr* value = nullptr;
 
-    // The type the size of needs to operate on. Set during traversal of SemanticsExprVisitor
-    Type* sizeOfType = nullptr;
+    // The type the size/alignment needs to operate on. Set during traversal of SemanticsExprVisitor
+    Type* sizedType = nullptr;
+};
+
+class SizeOfExpr : public SizeOfLikeExpr
+{
+    SLANG_AST_CLASS(SizeOfExpr);
+};
+
+class AlignOfExpr : public SizeOfLikeExpr
+{
+    SLANG_AST_CLASS(AlignOfExpr);
 };
 
 class MakeOptionalExpr : public Expr

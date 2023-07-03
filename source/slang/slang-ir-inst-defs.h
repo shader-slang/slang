@@ -934,6 +934,9 @@ INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
 
+INST(SizeOf,                            sizeOf,                     1, 0)
+INST(AlignOf,                           alignOf,                    1, 0)
+
 INST(IsType, IsType, 3, 0)
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 

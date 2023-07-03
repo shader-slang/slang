@@ -3380,12 +3380,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(arrayType->getElementCount());
     }
 
-    LoweredValInfo visitSizeOfExpr(SizeOfExpr* sizeOfExpr)
+    LoweredValInfo visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
         // Lets try and lower to a constant
         ASTNaturalLayoutContext naturalLayoutContext(getASTBuilder(), nullptr);
 
-        const auto size = naturalLayoutContext.calcSize(sizeOfExpr->sizeOfType);
+        const auto size = naturalLayoutContext.calcSize(sizeOfLikeExpr->sizedType);
 
         if (!size)
         {
@@ -3396,15 +3396,20 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             can't resolve a size.
             */
 
-            context->getSink()->diagnose(sizeOfExpr, Diagnostics::unableToLowerSizeOf, sizeOfExpr->sizeOfType);
+            context->getSink()->diagnose(sizeOfLikeExpr, Diagnostics::unableToLowerSizeOf, sizeOfLikeExpr->sizedType);
 
-            SLANG_UNEXPECTED("sizeof currently isn't lowerable to IR currently");
+            SLANG_UNEXPECTED("sizeof/alignof currently isn't lowerable to IR currently");
             UNREACHABLE_RETURN(LoweredValInfo());
         }
 
         auto builder = getBuilder();
 
-        return LoweredValInfo::simple(getBuilder()->getIntValue(builder->getUIntType(), size.size));
+        const auto value = 
+            as<SizeOfExpr>(sizeOfLikeExpr) ? 
+                size.size : 
+                size.alignment;
+
+        return LoweredValInfo::simple(getBuilder()->getIntValue(builder->getUIntType(), value));
     }
 
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)

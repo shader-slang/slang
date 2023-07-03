@@ -1533,18 +1533,7 @@ namespace Slang
         SubstExpr<Expr>                 expr,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
-        if (auto sizeOfExpr = as<SizeOfExpr>(expr.getExpr()))
-        {
-            ASTNaturalLayoutContext context(getASTBuilder(), nullptr);
-            const auto size = context.calcSize(sizeOfExpr->sizeOfType);
-            if (!size)
-            {
-                return nullptr;
-            }
-            // We can return as an IntVal
-            return getASTBuilder()->getIntVal(expr.getExpr()->type, size.size);
-        }
-
+        
         // Unwrap any "identity" expressions
         while (auto parenExpr = expr.as<ParenExpr>())
         {
@@ -1640,6 +1629,22 @@ namespace Slang
             auto val = tryConstantFoldExpr(invokeExpr, circularityInfo);
             if (val)
                 return val;
+        }
+        else if (auto sizeOfLikeExpr = as<SizeOfLikeExpr>(expr.getExpr()))
+        {
+            ASTNaturalLayoutContext context(getASTBuilder(), nullptr);
+            const auto size = context.calcSize(sizeOfLikeExpr->sizedType);
+            if (!size)
+            {
+                return nullptr;
+            }
+
+            auto value = as<AlignOfExpr>(sizeOfLikeExpr) ? 
+                size.alignment :
+                size.size;
+            
+            // We can return as an IntVal
+            return getASTBuilder()->getIntVal(expr.getExpr()->type, value);
         }
         
         return nullptr;
@@ -2732,9 +2737,9 @@ namespace Slang
         return false;
     }
 
-    Expr* SemanticsExprVisitor::visitSizeOfExpr(SizeOfExpr* sizeOfExpr)
+    Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
-        auto valueExpr = dispatch(sizeOfExpr->value);
+        auto valueExpr = dispatch(sizeOfLikeExpr->value);
         
         Type* type = nullptr;
 
@@ -2758,15 +2763,15 @@ namespace Slang
 
         if (!_isSizeOfType(type))
         {
-            getSink()->diagnose(sizeOfExpr, Diagnostics::sizeOfArgumentIsInvalid);
+            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfArgumentIsInvalid);
 
-            sizeOfExpr->type = m_astBuilder->getErrorType();
-            return sizeOfExpr;
+            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
+            return sizeOfLikeExpr;
         }
 
-        sizeOfExpr->sizeOfType = type;
+        sizeOfLikeExpr->sizedType = type;
 
-        return sizeOfExpr;
+        return sizeOfLikeExpr;
     }
 
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
