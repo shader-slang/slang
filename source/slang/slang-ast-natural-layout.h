@@ -11,33 +11,40 @@ struct NaturalSize
     typedef NaturalSize ThisType;
 
         // We are going to use 0 as invalid for alignment. This has a few nice propeties
-        // * Will natural produce 0 size in the normal `calcAligned` operation
-        // * Is fast to test for
-        // * Easy to make a fast 'max' such that a max with invalid always returns `invalid`
+        // 
+        // * Will naturally produce 0 size when used with `calcAligned` operation
+        // * Is fast to test 
+        // * Is easy to make a fast 'max' such that a max with invalid always returns `invalid`
         //
-        // We also structure such that when a invalid the `size` member is 0.
-        // This is desirable such that equality testing doesn't require anything special.
+        // We also desire that when invalid the `size` member is 0.
+        // This is so that equality testing doesn't require anything special.
     SLANG_FORCE_INLINE static Count calcAligned(Count size, Count alignment) { return (size + alignment - 1) & ~(alignment - 1); }
         // Use to get the max of two alignments. Uses some maths such that `invalid` is always max
     SLANG_FORCE_INLINE static Count maxAlignment(Count a, Count b) { return (UCount(a) - 1) > (UCount(b) - 1) ? a : b; }
 
-        /// Given two sizes, returns a size that can hold the union.
+        /// Given two sizes, returns a result that can hold the union.
     static NaturalSize calcUnion(NaturalSize a, NaturalSize b);
 
-    /// Value chosen such that normal combining operations produce an invalid result 
-    /// as typically a max.
+        /// Value chosen such that normal combining operations produce an invalid result 
+        /// as typically a max.
     static const Count kInvalidAlignment = 0;
 
-    /// Get the stride, which is the same as the aligned size
+        /// Get the stride, which is equivalent to the size aligned 
     SLANG_FORCE_INLINE Count getStride() const { return calcAligned(size, alignment); }
 
         /// Append rhs to this.
         /// If rhs is invalid or this is the result will also be invalid
     void append(const ThisType& rhs)
     {
-        // If valid align and add the size
-        size = calcAligned(size, rhs.alignment) + rhs.size;
-        alignment = maxAlignment(alignment, rhs.alignment);
+        const auto newAlignment = maxAlignment(alignment, rhs.alignment);
+
+        // If the new alignment is valid we calculate the size, else it's 0
+        size = (newAlignment != kInvalidAlignment) ? 
+            (calcAligned(size, rhs.alignment) + rhs.size) :
+            0;
+            
+        // Set the new alignment
+        alignment = newAlignment;
     }
 
     SLANG_FORCE_INLINE bool isInvalid() const { return alignment == kInvalidAlignment; }
