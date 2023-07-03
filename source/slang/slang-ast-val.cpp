@@ -1457,7 +1457,7 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
 
 
 #define SPECIAL_OPERATOR_CASE(op, IF_MATCH) \
-        if (opNameSlice == toSlice(#op)) \
+        if (opNameSlice == toSlice(op)) \
         { \
             IF_MATCH \
         } else
@@ -1483,7 +1483,8 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
         DIV_OPERATOR_CASE(%)
         LOGICAL_OPERATOR_CASE(&&)
         LOGICAL_OPERATOR_CASE(||)
-        SPECIAL_OPERATOR_CASE(!, resultValue = ((constArgs[0]->value != 0) ? 1 : 0);)
+        // Special cases need their "operator" names quoted.
+        SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->value != 0) ? 1 : 0);)
         SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->value;)
         SPECIAL_OPERATOR_CASE("?:", resultValue = constArgs[0]->value != 0 ? constArgs[1]->value : constArgs[2]->value;)
         TERMINATING_CASE(SLANG_UNREACHABLE("constant folding of FuncCallIntVal");)
