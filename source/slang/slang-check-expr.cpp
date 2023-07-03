@@ -1536,14 +1536,11 @@ namespace Slang
         if (auto sizeOfExpr = as<SizeOfExpr>(expr.getExpr()))
         {
             ASTNaturalLayoutContext context(getASTBuilder(), nullptr);
-
-            ASTNaturalLayoutContext::NaturalSize size;
-
-            if (SLANG_FAILED(context.calcLayout(sizeOfExpr->sizeOfType, size)))
+            const auto size = context.calcSize(sizeOfExpr->sizeOfType);
+            if (!size)
             {
                 return nullptr;
             }
-
             // We can return as an IntVal
             return getASTBuilder()->getIntVal(expr.getExpr()->type, size.size);
         }

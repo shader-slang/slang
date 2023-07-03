@@ -9,12 +9,48 @@
 namespace Slang
 {
 
-SlangResult ASTNaturalLayoutContext::_getInt(IntVal* intVal, Count& outValue)
+/* !!!!!!!!!!!!!!!!!!!!!!!!! NaturalSize !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+
+NaturalSize NaturalSize::operator*(Count count) const
+{
+    // If the count is < 0 or the size is invalid, the result is invalid
+    if (isInvalid() || count < 0)
+    {
+        return makeInvalid();
+    }
+
+    if (count <= 0)
+    {
+        // If the count is 0, in effect the result doesn't take up any space
+        return makeEmpty();
+    }
+    else 
+    {
+        // We don't want to produce an aligned size, as we allow the last element to not 
+        // take up a whole stride (only up to size)
+        return make(size + (getStride() * (count - 1)), alignment);
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTNaturalLayoutContext !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+ASTNaturalLayoutContext::ASTNaturalLayoutContext(ASTBuilder* astBuilder, DiagnosticSink* sink):
+    m_astBuilder(astBuilder),
+    m_sink(sink)
+{
+    // A null type always maps to invalid
+    m_typeToSize.add(nullptr, NaturalSize::makeInvalid());
+}
+
+Count ASTNaturalLayoutContext::_getCount(IntVal* intVal)
 {
     if (auto constIntVal = as<ConstantIntVal>(intVal))
     {
-        outValue = Count(constIntVal->value);
-        return SLANG_OK;
+        if (constIntVal->value >= 0)
+        {
+            return Count(constIntVal->value);
+        }
     }
 
     if (m_sink)
@@ -22,105 +58,99 @@ SlangResult ASTNaturalLayoutContext::_getInt(IntVal* intVal, Count& outValue)
         // Could output an error
     }
 
-    return SLANG_FAIL;
+    return -1;
 }
 
-SLANG_FORCE_INLINE static Count _calcAligned(Count size, Count alignment)
+NaturalSize ASTNaturalLayoutContext::calcSize(Type* type)
 {
-    return (size + alignment - 1) & ~(alignment - 1);
-}
-
-SlangResult ASTNaturalLayoutContext::calcLayout(Type* type, NaturalSize& outSize)
-{
-    if (!type)
+    if (auto sizePtr = m_typeToSize.tryGetValue(type))
     {
-        return SLANG_FAIL;
+        return *sizePtr;
     }
 
+    // Calc the size
+    const NaturalSize size = _calcSizeImpl(type);
+
+    // We want to add to the cache, but we need to special case 
+    // in case there is an aggregate type that `poisoned` the cache entry, to stop infinite recursion.
+    // 
+    // A requirement is that when the agg type completes it must set the cache entry, and return the same result.
+    if (auto foundSize = m_typeToSize.tryGetValueOrAdd(type, size))
+    {
+        // If there is a found size, it must match. If not we update the state as invalid.
+        if (*foundSize != size)
+        {
+            *foundSize = NaturalSize::makeInvalid();
+            return *foundSize;
+        }
+    }
+
+    return size;
+}
+
+NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
+{
     if (VectorExpressionType* vecType = as<VectorExpressionType>(type))
     {
-        // The number of elements
-        Count elementCount;
-        SLANG_RETURN_ON_FAIL(_getInt(vecType->elementCount, elementCount));
-        SLANG_RETURN_ON_FAIL(calcLayout(vecType->elementType, outSize));
-
-        outSize.stride *= elementCount;
-        outSize.size = outSize.stride;
-        return SLANG_OK;
+        const Count elementCount = _getCount(vecType->elementCount);
+        return (elementCount > 0) ? 
+            calcSize(vecType->elementType) * elementCount : 
+            NaturalSize::makeInvalid();
     }
     else if (auto matType = as<MatrixExpressionType>(type))
     {
-        Count colCount, rowCount;
-
-        SLANG_RETURN_ON_FAIL(_getInt(matType->getRowCount(), rowCount));
-        SLANG_RETURN_ON_FAIL(_getInt(matType->getColumnCount(), colCount));
-
-        SLANG_RETURN_ON_FAIL(calcLayout(matType->getElementType(), outSize));
-
-        outSize.stride *= colCount * rowCount;
-        outSize.size = outSize.stride;
-        return SLANG_OK;
+        const Count colCount = _getCount(matType->getColumnCount());
+        const Count rowCount = _getCount(matType->getRowCount());
+        return (colCount > 0 && rowCount > 0) ? 
+            calcSize(matType->getElementType()) * (colCount * rowCount) : 
+            NaturalSize::makeInvalid();
     }
     else if (auto basicType = as<BasicExpressionType>(type))
     {
-        auto info = BaseTypeInfo::getInfo(basicType->baseType);
-
-        outSize.alignment = info.sizeInBytes;
-        outSize.size = info.sizeInBytes;
-        outSize.stride = info.sizeInBytes;
-        return SLANG_OK;
-    }
-    else if (auto ptrType = as<PtrTypeBase>(type))
-    {
-        // We assume 64 bits/8 bytes across the board
-        auto info = BaseTypeInfo::getInfo(BaseType::Int64);
-
-        outSize.alignment = info.sizeInBytes;
-        outSize.size = info.sizeInBytes;
-        outSize.stride = info.sizeInBytes;
-        return SLANG_OK;
-    }
-    else if (auto arrayType = as<ArrayExpressionType>(type))
-    {
-        // The number of elements
-        Count elementCount;
-        SLANG_RETURN_ON_FAIL(_getInt(arrayType->getElementCount(), elementCount));
-        SLANG_RETURN_ON_FAIL(calcLayout(arrayType->getElementType(), outSize));
-
-        if (elementCount > 0)
+        // Special case void
+        if (basicType->baseType == BaseType::Void)
         {
-            // We are going to be careful about the last element.
-
-            const auto stride = outSize.stride;
-            const Count strideSizeMinusOne = (elementCount - 1) * stride;
-            outSize.size += strideSizeMinusOne;
-            outSize.stride = strideSizeMinusOne + stride;
+            return NaturalSize::makeEmpty();
         }
         else
         {
-            outSize.stride = 0;
-            outSize.alignment = 1;
-            outSize.size = 0;
+            // In "natural" layout the alignment of a base type is always the same
+            // as the size of the type itself
+            auto info = BaseTypeInfo::getInfo(basicType->baseType);
+            return NaturalSize::make(info.sizeInBytes, info.sizeInBytes);
         }
-        return SLANG_OK;
+    }
+    else if (as<PtrTypeBase>(type) || as<NullPtrType>(type))
+    {
+        // We assume 64 bits/8 bytes across the board
+        auto info = BaseTypeInfo::getInfo(BaseType::Int64);
+        return NaturalSize::make(info.sizeInBytes, info.sizeInBytes);
+    }
+    else if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        const Count elementCount = _getCount(arrayType->getElementCount());
+        return (elementCount > 0) ? 
+            calcSize(arrayType->getElementType()) * elementCount : 
+            NaturalSize::makeInvalid();
     }
     else if (auto namedType = as<NamedExpressionType>(type))
     {
-        return calcLayout(namedType->innerType, outSize);
+        return calcSize(namedType->innerType);
     }
     else if( auto declRefType = as<DeclRefType>(type) )
     {
         if (const auto enumDeclRef = declRefType->declRef.as<EnumDecl>())
         {
             Type* tagType = getTagType(m_astBuilder, enumDeclRef);
-            return calcLayout(tagType, outSize);
+            return calcSize(tagType);
         }
         else if(const auto structDeclRef = declRefType->declRef.as<StructDecl>())
         {
-            NaturalSize size;
-            size.alignment = 1;
-            size.stride = 0;
-            size.size = 0;
+            // Poison the cache whilst we construct
+            m_typeToSize.add(type, NaturalSize::makeInvalid());
+
+            // Initialize empty
+            NaturalSize size = NaturalSize::makeEmpty();
 
             for (auto inherited : structDeclRef.getDecl()->getMembersOfType<InheritanceDecl>())
             {
@@ -130,41 +160,39 @@ SlangResult ASTNaturalLayoutContext::calcLayout(Type* type, NaturalSize& outSize
                     if (auto parentDecl = inheritedDeclRef->declRef.as<StructDecl>())
                     {
                         // We can only inherit from one thing
-                        SLANG_RETURN_ON_FAIL(calcLayout(inherited->base.type, size));
+                        size = calcSize(inherited->base.type);
+                        if (!size)
+                        {
+                            return size;
+                        }
                         break;
                     }
                 }
             }
 
-            Count maxAlignment = size.alignment;
-
+            // Accumulate over all of the fields
             for (auto field : structDeclRef.getDecl()->getFields())
             {
-                NaturalSize fieldSize;
-                SLANG_RETURN_ON_FAIL(calcLayout(field->getType(), fieldSize));
-
-                // Align and add the size
-                size.size = _calcAligned(size.size, fieldSize.alignment) + fieldSize.size;
-
-                // Work out the max alignment
-                maxAlignment = Math::Max(fieldSize.alignment, maxAlignment);
+                const auto fieldSize = calcSize(field->getType());
+                if (!fieldSize)
+                {
+                    return NaturalSize::makeInvalid();
+                }
+                size.append(fieldSize);
             }
 
-            // The strided size is equal to the size with alignment
-            size.stride = _calcAligned(size.size, maxAlignment);
-            size.alignment = maxAlignment;
+            // Set the cached result to the size.
+            m_typeToSize.set(type, size);
 
-            // Set the size
-            outSize = size;
-            return SLANG_OK;
+            return size;
         }
         else if (const auto typeDef = declRefType->declRef.as<TypeDefDecl>())
         {
-            return calcLayout(typeDef.getDecl()->type, outSize);
+            return calcSize(typeDef.getDecl()->type);
         }
     }
 
-    return SLANG_FAIL;
+    return NaturalSize::makeInvalid();
 }
 
 } // namespace Slang

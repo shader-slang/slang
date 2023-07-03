@@ -3385,9 +3385,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // Lets try and lower to a constant
         ASTNaturalLayoutContext naturalLayoutContext(getASTBuilder(), nullptr);
 
-        ASTNaturalLayoutContext::NaturalSize size;
+        const auto size = naturalLayoutContext.calcSize(sizeOfExpr->sizeOfType);
 
-        if (SLANG_FAILED(naturalLayoutContext.calcLayout(sizeOfExpr->sizeOfType, size)))
+        if (!size)
         {
             /* TODO(JS):
 
