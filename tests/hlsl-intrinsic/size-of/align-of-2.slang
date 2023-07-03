@@ -17,6 +17,12 @@ enum Enum
     B = 20,
 };
 
+enum Enum8 : uint8_t
+{
+    A = 20,
+    B = 19,
+};
+
 // Check type aliases
 
 typedef Enum EnumTypeDef;
