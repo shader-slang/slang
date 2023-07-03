@@ -298,7 +298,6 @@ public:
                         hasSideEffectCall = true;
                         break;
                     }
-                    break;
                 }
             }
             if (hasSideEffectCall)

@@ -1964,6 +1964,51 @@ namespace Slang
         return checkedExpr;
     }
 
+    static bool _canLValueCoerceScalarType(Type* a, Type* b)
+    {
+        auto basicTypeA = as<BasicExpressionType>(a);
+        auto basicTypeB = as<BasicExpressionType>(b);
+
+        if (basicTypeA && basicTypeB)
+        {
+            const auto& infoA = BaseTypeInfo::getInfo(basicTypeA->baseType);
+            const auto& infoB = BaseTypeInfo::getInfo(basicTypeB->baseType);
+
+            // TODO(JS): Initially this tries to limit where LValueImplict casts happen.
+            // We could in principal allow different sizes, as long as we converted to a temprorary
+            // and back again. 
+            // 
+            // For now we just stick with the simple case. 
+            // // We only allow on integer types for now. In effect just allowing any size uint/int conversions
+            if (infoA.sizeInBytes == infoB.sizeInBytes && 
+                (infoA.flags & infoB.flags & BaseTypeInfo::Flag::Integer))
+            {
+                return true;
+            }
+
+        }
+        return false;
+    }
+
+    static bool _canLValueCoerce(Type* a, Type* b)
+    {
+        // We can *assume* here that if they are coercable, that dimensions of vectors
+        // and matrices match. We might want to assert to be sure...
+        SLANG_ASSERT(a != b);
+        if (a->astNodeType == b->astNodeType)
+        {
+            if (auto matA = as<MatrixExpressionType>(a))
+            {
+                return _canLValueCoerceScalarType(matA->getElementType(), static_cast<MatrixExpressionType*>(b)->getElementType());   
+            }
+            else if (auto vecA = as<VectorExpressionType>(a))
+            {
+                return  _canLValueCoerceScalarType(vecA->getScalarType(), static_cast<VectorExpressionType*>(b)->getScalarType());   
+            }
+        }
+        return _canLValueCoerceScalarType(a, b);
+    }
+
     Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
     {
         auto rs = ResolveInvoke(expr);
@@ -1997,23 +2042,63 @@ namespace Slang
                         if( pp < expr->arguments.getCount() )
                         {
                             auto argExpr = expr->arguments[pp];
-                            if( !argExpr->type.isLeftValue )
+                            if( !argExpr->type.isLeftValue)
                             {
-                                getSink()->diagnose(
-                                    argExpr,
-                                    Diagnostics::argumentExpectedLValue,
-                                    pp);
+                                auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
-                                if( auto implicitCastExpr = as<ImplicitCastExpr>(argExpr) )
+                                if (implicitCastExpr && _canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
+                                {
+                                    // This is to work around issues like
+                                    //
+                                    // ```
+                                    // int a = 0;
+                                    // uint b = 1;
+                                    // a += b;
+                                    // ```
+                                    // That strictly speaking it's not allowed, but we are going to allow it for now 
+                                    // for situations were the types are uint/int and vector/matrix varieties of those types
+                                    // 
+                                    // Then in lowering we are going to insert code to do something like
+                                    // ```
+                                    // var OutType: tmp = arg;
+                                    // f(... tmp);
+                                    // arg = tmp;
+                                    // ```
+
+                                    TypeCastExpr* lValueImplicitCast;
+
+                                    // We want to record if the cast is being used for `out` or `inout`/`ref` as 
+                                    // if it's just `out` we won't need to convert before passing in.
+                                    if (as<OutType>(paramType))
+                                    {
+                                        lValueImplicitCast = getASTBuilder()->create<OutImplicitCastExpr>(*implicitCastExpr);
+                                    }
+                                    else
+                                    {
+                                        lValueImplicitCast = getASTBuilder()->create<InOutImplicitCastExpr>(*implicitCastExpr);
+                                    }
+
+                                    // Replace the expression. This should make this situation easier to detect.
+                                    expr->arguments[pp] = lValueImplicitCast;
+                                }
+                                else
                                 {
                                     getSink()->diagnose(
                                         argExpr,
-                                        Diagnostics::implicitCastUsedAsLValue,
-                                        implicitCastExpr->arguments[0]->type,
-                                        implicitCastExpr->type);
-                                }
+                                        Diagnostics::argumentExpectedLValue,
+                                        pp);
 
-                                maybeDiagnoseThisNotLValue(argExpr);
+                                    if(implicitCastExpr)
+                                    {
+                                        getSink()->diagnose(
+                                            argExpr,
+                                            Diagnostics::implicitCastUsedAsLValue,
+                                            implicitCastExpr->arguments[pp]->type,
+                                            implicitCastExpr->type);
+                                    }
+
+                                    maybeDiagnoseThisNotLValue(argExpr);
+                                }
                             }
                         }
                         else

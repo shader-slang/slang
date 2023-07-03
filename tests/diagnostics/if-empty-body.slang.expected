@@ -1,0 +1,8 @@
+result code = 0
+standard error = {
+tests/diagnostics/if-empty-body.slang(9): warning 20101: potentially unintended empty statement at this location; use {} instead.
+    if (1+1==2);
+               ^
+}
+standard output = {
+}
