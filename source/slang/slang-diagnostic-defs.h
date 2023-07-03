@@ -627,7 +627,8 @@ DIAGNOSTIC(41023, Error, getStringHashMustBeOnStringLiteral, "getStringHash can 
 DIAGNOSTIC(41901, Error, unsupportedUseOfLValueForAutoDiff, "unsupported use of L-value for auto differentiation.")
 DIAGNOSTIC(41902, Error, cannotDifferentiateDynamicallyIndexedData, "cannot auto-differentiate mixed read/write access to dynamically indexed data in '$0'.")
 
-DIAGNOSTIC(41903, Error, unableToLowerSizeOf, "sizeof could not be performed for type '$0'.")
+DIAGNOSTIC(41903, Error, unableToSizeOf, "sizeof could not be performed for type '$0'.")
+DIAGNOSTIC(41904, Error, unableToAlignOf, "alignof could not be performed for type '$0'.")
 
 DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use of TorchTensor type in device/kernel functions. use `TensorView` instead.")
 

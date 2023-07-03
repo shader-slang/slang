@@ -3387,22 +3387,27 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         const auto size = naturalLayoutContext.calcSize(sizeOfLikeExpr->sizedType);
 
+        auto builder = getBuilder();
+
         if (!size)
         {
-            /* TODO(JS):
+            auto sizedType = lowerType(context, sizeOfLikeExpr->sizedType);
 
-            In the future we will want to support lowering of SizeOfExpr into IR.
-            This would allow use sizeof in generics and other situations where the front end
-            can't resolve a size.
-            */
+            // We can create an inst
 
-            context->getSink()->diagnose(sizeOfLikeExpr, Diagnostics::unableToLowerSizeOf, sizeOfLikeExpr->sizedType);
+            IRInst* inst = nullptr;
 
-            SLANG_UNEXPECTED("sizeof/alignof currently isn't lowerable to IR currently");
-            UNREACHABLE_RETURN(LoweredValInfo());
+            if (as<AlignOfExpr>(sizeOfLikeExpr))
+            {
+                inst = builder->emitAlignOf(sizedType);
+            }
+            else
+            {
+                inst = builder->emitSizeOf(sizedType);
+            }
+
+            return LoweredValInfo::simple(inst);
         }
-
-        auto builder = getBuilder();
 
         const auto value = 
             as<SizeOfExpr>(sizeOfLikeExpr) ? 

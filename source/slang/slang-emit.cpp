@@ -36,6 +36,7 @@
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-l-value-cast.h"
+#include "slang-ir-lower-size-of.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-metadata.h"
@@ -866,6 +867,10 @@ Result linkAndOptimizeIR(
     {
         legalizeUniformBufferLoad(irModule);
     }
+
+    // Lower sizeof/alignof
+
+    lowerSizeOfLike(targetRequest, irModule, sink);
 
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     lowerLValueCast(targetRequest, irModule);
