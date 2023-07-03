@@ -24,6 +24,17 @@ int getParamSizeWithDirection(inout uint3 v)
     return sizeof(v);
 }
 
+struct TestThis
+{
+    int getSize()
+    {
+        return sizeof(This);
+    }
+
+    float a;
+    int b[2];
+};
+
 static const float4 staticConstValueA = float4(-1);
 
 [numthreads(8, 1, 1)]
@@ -48,7 +59,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         case 5:     size = getParamSize(vec); break;
         
         case 6:     size = sizeof(staticConstValueA); break;
-        
+        case 7:
+        {
+            TestThis t;
+            size = t.getSize(); 
+            break;
+        }
         default:    size = -1; break;
     }
 
