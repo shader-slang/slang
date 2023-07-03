@@ -34,7 +34,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     double doub = 13.0;
     uint16_t u16 = 10;
 
-    uint3 vec;
+    uint3 vec = uint3(0);
 
     int size = 0;
     switch (idx)

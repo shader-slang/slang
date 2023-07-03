@@ -5241,6 +5241,23 @@ namespace Slang
         return parser->astBuilder->create<NoneLiteralExpr>();
     }
 
+    static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
+    {
+        // We could have a type or a variable or an expression
+        SizeOfExpr* sizeOfExpr = parser->astBuilder->create<SizeOfExpr>();
+      
+        parser->ReadMatchingToken(TokenType::LParent);
+
+        // The return type is always a UInt
+        sizeOfExpr->type = parser->astBuilder->getUIntType();
+
+        sizeOfExpr->value = parser->ParseExpression();
+
+        parser->ReadMatchingToken(TokenType::RParent);
+
+        return sizeOfExpr;
+    }
+
     static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
     {
         auto tryExpr = parser->astBuilder->create<TryExpr>();
@@ -6166,25 +6183,7 @@ namespace Slang
                 }
                 return newExpr;
             }
-            else if (identifierTokenContent == toSlice("sizeof"))
-            {
-                // We could have a type or a variable or an expression
-
-                SizeOfExpr* sizeOfExpr = parser->astBuilder->create<SizeOfExpr>();
-                parser->FillPosition(sizeOfExpr);
-                parser->ReadToken();
-
-                parser->ReadMatchingToken(TokenType::LParent);
-
-                // The return type is always a UInt
-                sizeOfExpr->type = parser->astBuilder->getUIntType();
-
-                sizeOfExpr->value = parser->ParseExpression();
-
-                parser->ReadMatchingToken(TokenType::RParent);
-                
-                return sizeOfExpr;
-            }
+            
 
             return parsePostfixExpr(parser);
         }
@@ -6896,7 +6895,8 @@ namespace Slang
         _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
         _makeParseExpr("fwd_diff", parseForwardDifferentiate),
         _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
-        _makeParseExpr("__dispatch_kernel", parseDispatchKernel)
+        _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
+        _makeParseExpr("sizeof", parseSizeOfExpr),
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()
