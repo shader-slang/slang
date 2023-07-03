@@ -5265,6 +5265,23 @@ namespace Slang
         return sizeOfExpr;
     }
 
+    static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
+    {
+        // We could have a type or a variable or an expression
+        AlignOfExpr* alignOfExpr = parser->astBuilder->create<AlignOfExpr>();
+
+        parser->ReadMatchingToken(TokenType::LParent);
+
+        // The return type is always a UInt
+        alignOfExpr->type = parser->astBuilder->getUIntType();
+
+        alignOfExpr->value = parser->ParseExpression();
+
+        parser->ReadMatchingToken(TokenType::RParent);
+
+        return alignOfExpr;
+    }
+
     static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
     {
         auto tryExpr = parser->astBuilder->create<TryExpr>();
@@ -6904,6 +6921,7 @@ namespace Slang
         _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
         _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
         _makeParseExpr("sizeof", parseSizeOfExpr),
+        _makeParseExpr("alignof", parseAlignOfExpr),
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()
