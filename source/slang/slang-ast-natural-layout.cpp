@@ -33,6 +33,29 @@ NaturalSize NaturalSize::operator*(Count count) const
     }
 }
 
+/* static */NaturalSize NaturalSize::makeFromBaseType(BaseType baseType)
+{
+    // Special case void
+    if (baseType == BaseType::Void)
+    {
+        return makeEmpty();
+    }
+    else
+    {
+        // In "natural" layout the alignment of a base type is always the same
+        // as the size of the type itself
+        auto info = BaseTypeInfo::getInfo(baseType);
+        return make(info.sizeInBytes, info.sizeInBytes);
+    }
+}
+
+/* static */NaturalSize NaturalSize::calcUnion(NaturalSize a, NaturalSize b)
+{
+    const auto alignment = maxAlignment(a.alignment, b.alignment);
+    Count size = (alignment == kInvalidAlignment) ? 0 : Math::Max(a.size, b.size);
+    return make(size, alignment);
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTNaturalLayoutContext !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 ASTNaturalLayoutContext::ASTNaturalLayoutContext(ASTBuilder* astBuilder, DiagnosticSink* sink):
@@ -107,24 +130,12 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     }
     else if (auto basicType = as<BasicExpressionType>(type))
     {
-        // Special case void
-        if (basicType->baseType == BaseType::Void)
-        {
-            return NaturalSize::makeEmpty();
-        }
-        else
-        {
-            // In "natural" layout the alignment of a base type is always the same
-            // as the size of the type itself
-            auto info = BaseTypeInfo::getInfo(basicType->baseType);
-            return NaturalSize::make(info.sizeInBytes, info.sizeInBytes);
-        }
+        return NaturalSize::makeFromBaseType(basicType->baseType);
     }
     else if (as<PtrTypeBase>(type) || as<NullPtrType>(type))
     {
         // We assume 64 bits/8 bytes across the board
-        auto info = BaseTypeInfo::getInfo(BaseType::Int64);
-        return NaturalSize::make(info.sizeInBytes, info.sizeInBytes);
+        return NaturalSize::makeFromBaseType(BaseType::UInt64);
     }
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {
@@ -136,6 +147,46 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     else if (auto namedType = as<NamedExpressionType>(type))
     {
         return calcSize(namedType->innerType);
+    }
+    else if (const auto tupleType = as<TupleType>(type))
+    {
+        // Initialize empty
+        NaturalSize size = NaturalSize::makeEmpty();
+
+        // Accumulate over all the member types
+        for (auto cur : tupleType->memberTypes)
+        {
+            const auto curSize = calcSize(cur);
+            if (!curSize)
+            {
+                return NaturalSize::makeInvalid();
+            }
+            size.append(curSize);
+        }
+
+        return size;
+    }
+    else if (const auto taggedUnion = as<TaggedUnionType>(type))
+    {
+        NaturalSize size = NaturalSize::makeInvalid();
+
+        for( auto caseType : taggedUnion->caseTypes )
+        {
+            const NaturalSize caseSize = calcSize(caseType);
+            if (!caseSize)
+            {
+                return NaturalSize::makeInvalid();
+            }
+            size = NaturalSize::calcUnion(size, caseSize);
+        }
+
+        // After we've computed the size required to hold all the
+        // case types, we will allocate space for the tag field.
+        
+        // Currently we assume uint32_t on all targets
+        size.append(NaturalSize::makeFromBaseType(BaseType::UInt));
+
+        return size;
     }
     else if( auto declRefType = as<DeclRefType>(type) )
     {

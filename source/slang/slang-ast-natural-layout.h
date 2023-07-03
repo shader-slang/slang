@@ -21,6 +21,9 @@ struct NaturalSize
         // Use to get the max of two alignments. Uses some maths such that `invalid` is always max
     SLANG_FORCE_INLINE static Count maxAlignment(Count a, Count b) { return (UCount(a) - 1) > (UCount(b) - 1) ? a : b; }
 
+        /// Given two sizes, returns a size that can hold the union.
+    static NaturalSize calcUnion(NaturalSize a, NaturalSize b);
+
     /// Value chosen such that normal combining operations produce an invalid result 
     /// as typically a max.
     static const Count kInvalidAlignment = 0;
@@ -52,6 +55,9 @@ struct NaturalSize
     static ThisType makeInvalid() { return ThisType{ 0, kInvalidAlignment }; }
         /// Make a size with an amount of bytes and the alignment
     static ThisType make(Count size, Count alignment) { return ThisType{size, alignment}; }
+
+        /// Given a base type returns it's size
+    static ThisType makeFromBaseType(BaseType baseType);
 
         /// Multiply by a count. 
         /// Will return invalid if count < 0 or this is already invalid
