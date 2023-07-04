@@ -605,9 +605,11 @@ void RenderTestApp::_initializeRenderPass()
     ITransientResourceHeap::Desc transientHeapDesc = {};
     transientHeapDesc.constantBufferSize = 4096 * 1024;
     m_transientHeap = m_device->createTransientResourceHeap(transientHeapDesc);
+    SLANG_ASSERT(m_transientHeap);
 
     ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
     m_queue = m_device->createCommandQueue(queueDesc);
+    SLANG_ASSERT(m_queue);
     
     gfx::ITextureResource::Desc depthBufferDesc;
     depthBufferDesc.type = IResource::Type::Texture2D;
@@ -621,6 +623,7 @@ void RenderTestApp::_initializeRenderPass()
 
     ComPtr<gfx::ITextureResource> depthBufferResource =
         m_device->createTextureResource(depthBufferDesc, nullptr);
+    SLANG_ASSERT(depthBufferResource);
 
     gfx::ITextureResource::Desc colorBufferDesc;
     colorBufferDesc.type = IResource::Type::Texture2D;
@@ -632,6 +635,7 @@ void RenderTestApp::_initializeRenderPass()
     colorBufferDesc.defaultState = ResourceState::RenderTarget;
     colorBufferDesc.allowedStates = ResourceState::RenderTarget;
     m_colorBuffer = m_device->createTextureResource(colorBufferDesc, nullptr);
+    SLANG_ASSERT(m_colorBuffer);
 
     gfx::IResourceView::Desc colorBufferViewDesc = {};
     memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
@@ -640,6 +644,7 @@ void RenderTestApp::_initializeRenderPass()
     colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
     ComPtr<gfx::IResourceView> rtv =
         m_device->createTextureView(m_colorBuffer.get(), colorBufferViewDesc);
+    SLANG_ASSERT(rtv);
 
     gfx::IResourceView::Desc depthBufferViewDesc = {};
     memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
@@ -648,6 +653,7 @@ void RenderTestApp::_initializeRenderPass()
     depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
     ComPtr<gfx::IResourceView> dsv =
         m_device->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
+    SLANG_ASSERT(dsv);
 
     IFramebufferLayout::TargetLayout colorTarget = {gfx::Format::R8G8B8A8_UNORM, 1};
     IFramebufferLayout::TargetLayout depthTarget = {gfx::Format::D32_FLOAT, 1};
