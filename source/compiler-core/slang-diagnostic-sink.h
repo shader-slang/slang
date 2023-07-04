@@ -162,39 +162,11 @@ public:
         /// Get the total amount of errors that have taken place on this DiagnosticSink
     SLANG_FORCE_INLINE int getErrorCount() { return m_errorCount; }
 
-    void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info)
-    {
-        diagnoseImpl(pos, info, 0, nullptr);
-    }
-
-    void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0)
-    {
-        DiagnosticArg const* args[] = { &arg0 };
-        diagnoseImpl(pos, info, 1, args);
-    }
-
-    void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1)
-    {
-        DiagnosticArg const* args[] = { &arg0, &arg1 };
-        diagnoseImpl(pos, info, 2, args);
-    }
-
-    void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1, DiagnosticArg const& arg2)
-    {
-        DiagnosticArg const* args[] = { &arg0, &arg1, &arg2 };
-        diagnoseImpl(pos, info, 3, args);
-    }
-
-    void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1, DiagnosticArg const& arg2, DiagnosticArg const& arg3)
-    {
-        DiagnosticArg const* args[] = { &arg0, &arg1, &arg2, &arg3 };
-        diagnoseImpl(pos, info, 4, args);
-    }
-
     template<typename P, typename... Args>
     void diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args )
     {
-        diagnoseDispatch(getDiagnosticPos(pos), info, args...);
+        DiagnosticArg as[] = { DiagnosticArg(args)... };
+        diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
     }
 
         // Add a diagnostic with raw text
@@ -267,7 +239,7 @@ public:
     ISlangWriter* writer = nullptr;
 
 protected:
-    void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* const* args);
+    void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* args);
     void diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
     Severity getEffectiveMessageSeverity(DiagnosticInfo const& info);
