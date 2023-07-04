@@ -7105,3 +7105,648 @@ func saturated_cooperation_using<A, B, C>(
         return fallback(input, otherArg);
     }
 }
+
+${{{{
+//
+// Texture Footprint Queries
+//
+// This section introduces the types and methods related
+// to the `GL_NV_shader_texture_footprint` GLSL extension,
+// and the matching NVAPI operations.
+//
+// Footprint queries are allowed on both 2D and 3D textures,
+// and are structurally similar for the two, so we will
+// use a meta-loop to deduplicate the code for the two
+// cases.
+//
+static const struct FootprintTextureShape
+{
+    int rank;
+    char const* suffix;
+    char const* texelIndexType;
+    char const* sampleCoordsType;
+} kFootprintTextureShapes[] =
+{
+    { 2, "2D", "uint2", "float2" },
+    { 3, "3D", "uint3", "float3" },
+};
+for(auto shape : kFootprintTextureShapes)
+{
+    auto ND = shape.suffix;
+    auto anchorType = shape.texelIndexType;
+    auto offsetType = shape.texelIndexType;
+    auto coordsType = shape.sampleCoordsType;
+
+// A footprint query yields a data structure
+// that describes blocks of texels that
+// conservatively cover the data that might
+// be fetched in the query.
+//
+// A given sampling operation might access two
+// mip levels of a texture when, e.g., trilinear
+// filtering is on. A footprint query may ask for
+// a footprint in either the coarse or fine level
+// of the pair.
+//
+// We first define a `struct` type that closely maps
+// to how a footprint is defined for each of the
+// implementations we support, and then wrap that
+// in a derived `struct` that includes the extra
+// data that is returned by the GLSL API via the
+// function reuslt.
+//
+}}}}
+
+__glsl_version(450)
+__glsl_extension(GL_NV_shader_texture_footprint)
+__target_intrinsic(glsl, gl_TextureFootprint$(ND)NV)
+__target_intrinsic(hlsl, uint4)
+struct __TextureFootprintData$(ND)
+{
+    typealias Anchor        = $(anchorType);
+    typealias Offset        = $(offsetType);
+    typealias Mask          = uint2;
+    typealias LOD           = uint;
+    typealias Granularity   = uint;
+
+    property anchor : Anchor
+    {
+        [__NoSideEffect]
+        [__requiresNVAPI]
+        __target_intrinsic(hlsl, NvFootprintExtractAnchorTileLoc$(ND))
+        __target_intrinsic(glsl, "$0.anchor")
+        get;
+    }
+
+    property offset : Offset
+    {
+        [__NoSideEffect]
+        [__requiresNVAPI]
+        __target_intrinsic(hlsl, NvFootprintExtractOffset$(ND))
+        __target_intrinsic(glsl, "$0.offset")
+        get;
+    }
+
+    property mask : Mask
+    {
+        [__NoSideEffect]
+        [__requiresNVAPI]
+        __target_intrinsic(hlsl, NvFootprintExtractBitmask)
+        __target_intrinsic(glsl, "$0.mask")
+        get;
+    }
+
+    property lod : LOD
+    {
+        [__NoSideEffect]
+        [__requiresNVAPI]
+        __target_intrinsic(hlsl, NvFootprintExtractLOD)
+        __target_intrinsic(glsl, "$0.lod")
+        get;
+    }
+
+    property granularity : Granularity
+    {
+        [__NoSideEffect]
+        [__requiresNVAPI]
+        __target_intrinsic(hlsl, NvFootprintExtractReturnGran)
+        __target_intrinsic(glsl, "$0.granularity")
+        get;
+    }
+}
+
+struct TextureFootprint$(ND) : __TextureFootprintData$(ND)
+{
+    bool _isSingleLevel;
+
+    property isSingleLevel : bool
+    {
+        [__NoSideEffect]
+        get
+        {
+            return _isSingleLevel;
+        }
+    }
+}
+
+${
+// The NVAPI operations are defined to take the space/register
+// indices of their texture and sampler parameters, rather than
+// taking the texture/sampler objects directly.
+//
+// In order to support this approach, we need intrinsics that
+// can magically fetch the binding information for a resource.
+//
+// TODO: These operations are kind of *screaming* for us to
+// have a built-in `interface` that all of the opaque resource
+// types conform to, so that we can define builtins that work
+// for any resource type.
+}
+
+__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T>(Texture2D<T> texture);
+__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T>(Texture3D<T> texture);
+__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace(SamplerState sampler);
+
+__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex<T>(Texture2D<T> texture);
+__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex<T>(Texture3D<T> texture);
+__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex(SamplerState sampler);
+
+${
+// We define the new operations via an `extension`
+// on the relevant texture type(s), rather than
+// further clutter the original type declarations.
+}
+
+__generic<T>
+extension Texture$(ND)<T>
+{
+${
+// We introduce a few convenience type aliases here,
+// which both keep our declarations simpler and easier
+// to understand, but which might *also* be useful to
+// users of the stdlib, so that they can write things
+// like `Texture2D.Footprint`, and also have auto-complete
+// help them find such members.
+//
+// TODO: The `Coords` type really ought to be something
+// defined on the base texture types, rather than via
+// this `extension`.
+}
+    typealias Coords = $(coordsType);
+    typealias Footprint = TextureFootprint$(ND);
+    typealias __FootprintData = __TextureFootprintData$(ND);
+    typealias FootprintGranularity = Footprint.Granularity;
+
+${
+// For the GLSL extension, the choice between the
+// coarse and fine level is modeled as a `bool`
+// parameter to the query operation(s). We define
+// the GLSL functions here as intrinsics, so that
+// we can refer to them later in the definitions
+// of our stdlib operaitons.
+//
+// Note: despite the GLSL extension defining the `granularity`
+// member of the query result as having type `uint`, the
+// function signatures all take `int` parameters for the
+// granularity instead.
+//
+}
+
+    [__NoSideEffect]
+    __glsl_version(450)
+    __glsl_extension(GL_NV_shader_texture_footprint)
+    __target_intrinsic(glsl,
+        "textureFootprintNV($p, $*2)")
+    bool __queryFootprintGLSL(
+            SamplerState    sampler,
+            Coords          coords,
+            int             granularity,
+            bool            useCoarseLevel,
+        out __FootprintData footprint);
+
+    [__NoSideEffect]
+    __glsl_version(450)
+    __glsl_extension(GL_NV_shader_texture_footprint)
+    __target_intrinsic(glsl,
+        "textureFootprintNV($p, $*2)")
+    bool __queryFootprintGLSL(
+            SamplerState    sampler,
+            Coords          coords,
+            int             granularity,
+            bool            useCoarseLevel,
+        out __FootprintData footprint,
+            float           bias);
+
+    [__NoSideEffect]
+    __glsl_version(450)
+    __glsl_extension(GL_NV_shader_texture_footprint)
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    __target_intrinsic(glsl,
+        "textureFootprintClampNV($p, $*2)")
+    bool __queryFootprintClampGLSL(
+            SamplerState    sampler,
+            Coords          coords,
+            float           lodClamp,
+            int             granularity,
+            bool            useCoarseLevel,
+        out __FootprintData footprint);
+
+    [__NoSideEffect]
+    __glsl_version(450)
+    __glsl_extension(GL_NV_shader_texture_footprint)
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    __target_intrinsic(glsl,
+        "textureFootprintClampNV($p, $*2)")
+    bool __queryFootprintClampGLSL(
+            SamplerState    sampler,
+            Coords          coords,
+            float           lodClamp,
+            int             granularity,
+            bool            useCoarseLevel,
+        out __FootprintData footprint,
+            float           bias);
+
+    [__NoSideEffect]
+    __glsl_version(450)
+    __glsl_extension(GL_NV_shader_texture_footprint)
+    __target_intrinsic(glsl,
+        "textureFootprintLodNV($p, $*2)")
+    [__requiresNVAPI]
+    bool __queryFootprintLodGLSL(
+            SamplerState            sampler,
+            Coords                  coords,
+            float                   lod,
+            int                     granularity,
+            bool                    useCoarseLevel,
+        out __FootprintData         footprint);
+
+
+${{{
+    // Texture sampling with gradient is only available for 2D textures.
+    if(shape.rank == 2) {
+}}}
+    [__NoSideEffect]
+    __glsl_version(450)
+    __glsl_extension(GL_NV_shader_texture_footprint)
+    __target_intrinsic(glsl,
+        "textureFootprintGradNV($p, $*2)")
+    [__requiresNVAPI]
+    bool __queryFootprintGradGLSL(
+            SamplerState    sampler,
+            Coords          coords,
+            Coords          dx,
+            Coords          dy,
+            int             granularity,
+            bool            useCoarseLevel,
+        out __FootprintData footprint);
+
+    [__NoSideEffect]
+    __glsl_version(450)
+    __glsl_extension(GL_NV_shader_texture_footprint)
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    __target_intrinsic(glsl,
+        "textureFootprintGradClampNV($p, $*2)")
+    bool __queryFootprintGradClampGLSL(
+            SamplerState    sampler,
+            Coords          coords,
+            Coords          dx,
+            Coords          dy,
+            float           lodClamp,
+            int             granularity,
+            bool            useCoarseLevel,
+        out __FootprintData footprint);
+${{{
+    }
+}}}
+
+
+${{{{
+// The NVAPI texture query operations encode the choice
+// between coarse and fine levels as part of the function
+// name, and so we are forced to match this convention
+// if we want to provide a more portable API.
+//
+// TODO: We could conceivably define the functions to use
+// a parameter for the coarse/fine choice, which is required
+// to be `constexpr` for the HLSL/NVAPI target.
+//
+static const struct LevelChoice
+{
+char const* name;
+char const* isCoarseVal;
+} kLevelChoices[] =
+{
+    { "Coarse", "true" },
+    { "Fine", "false" },
+};
+for(auto levelChoice : kLevelChoices)
+{
+    auto CoarseOrFine = levelChoice.name;
+    auto isCoarseVal = levelChoice.isCoarseVal;
+
+// We now go ahead and define the intrinsics provided by NVAPI,
+// which have a very different signature from the GLSL ones.
+//
+// Note: the NVAPI functions also support an optional texel
+// offset parameter. For now we are not including overloads
+// with that parameter, since they have no equivalent in
+// the GLSL extension.
+//
+}}}}
+
+    [__NoSideEffect]
+    [__requiresNVAPI]
+    __target_intrinsic(hlsl,
+        "NvFootprint$(CoarseOrFine)($0, $1, $2, $3, NV_EXTN_TEXTURE_$(ND), $*4)")
+    static __FootprintData __queryFootprint$(CoarseOrFine)NVAPI(
+        uint                    textureSpace,
+        uint                    textureIndex,
+        uint                    samplerSpace,
+        uint                    samplerIndex,
+        Coords                  coords,
+        FootprintGranularity    granularity);
+
+    [__NoSideEffect]
+    [__requiresNVAPI]
+    __target_intrinsic(hlsl,
+        "NvFootprint$(CoarseOrFine)Bias($0, $1, $2, $3, NV_EXTN_TEXTURE_$(ND), $*4)")
+    static __FootprintData __queryFootprint$(CoarseOrFine)BiasNVAPI(
+        uint                    textureSpace,
+        uint                    textureIndex,
+        uint                    samplerSpace,
+        uint                    samplerIndex,
+        Coords                  coords,
+        FootprintGranularity    granularity,
+        float                   lodBias);
+
+    [__NoSideEffect]
+    [__requiresNVAPI]
+    __target_intrinsic(hlsl,
+        "NvFootprint$(CoarseOrFine)Level($0, $1, $2, $3, NV_EXTN_TEXTURE_$(ND), $*4)")
+    static __FootprintData __queryFootprint$(CoarseOrFine)LevelNVAPI(
+        uint                    textureSpace,
+        uint                    textureIndex,
+        uint                    samplerSpace,
+        uint                    samplerIndex,
+        Coords                  coords,
+        FootprintGranularity    granularity,
+        float                   lod);
+
+${{{
+    // Texture sampling with gradient is only available for 2D textures.
+    if(shape.rank == 2) {
+}}}
+    [__NoSideEffect]
+    [__requiresNVAPI]
+    __target_intrinsic(hlsl,
+        "NvFootprint$(CoarseOrFine)Grad($0, $1, $2, $3, NV_EXTN_TEXTURE_$(ND), $*4)")
+    static __FootprintData __queryFootprint$(CoarseOrFine)GradNVAPI(
+        uint                    textureSpace,
+        uint                    textureIndex,
+        uint                    samplerSpace,
+        uint                    samplerIndex,
+        Coords                  coords,
+        FootprintGranularity    granularity,
+        Coords                  dx,
+        Coords                  dy);
+${{{
+    }
+}}}
+
+${
+// We now define the portable operations that will be officially
+// supported by the standard library. For each operation, we
+// need to provide both a version that maps to the GLSL extension,
+// and a version that uses the NVAPI functions.
+//
+// Some function variations are only available with one extension
+// or the other, so we try our best to only define them where
+// each is available.
+}
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.Sample(sampler, coords);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(glsl)
+    Footprint queryFootprint$(CoarseOrFine)(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords)
+    {
+        Footprint footprint;
+        footprint._isSingleLevel = __queryFootprintGLSL(sampler, coords, granularity, $(isCoarseVal), footprint);
+        return footprint;
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.Sample(sampler, coords);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(hlsl)
+    Footprint queryFootprint$(CoarseOrFine)(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords)
+    {
+        return { __queryFootprint$(CoarseOrFine)NVAPI(
+            __getRegisterSpace(this), __getRegisterIndex(this),
+            __getRegisterSpace(sampler), __getRegisterIndex(sampler),
+            coords, granularity), false };
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleBias(sampler, coords, lodBias);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(glsl)
+    Footprint queryFootprint$(CoarseOrFine)Bias(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            float                   lodBias)
+    {
+        Footprint footprint;
+        footprint._isSingleLevel = __queryFootprintGLSL(sampler, coords, granularity, $(isCoarseVal), footprint, lodBias);
+        return footprint;
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleBias(sampler, coords, lodBias);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(hlsl)
+    Footprint queryFootprint$(CoarseOrFine)Bias(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            float                   lodBias)
+    {
+        return { __queryFootprint$(CoarseOrFine)BiasNVAPI(
+            __getRegisterSpace(this), __getRegisterIndex(this),
+            __getRegisterSpace(sampler), __getRegisterIndex(sampler),
+            coords, granularity, lodBias), false };
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleClamp(sampler, coords, lodClamp);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(glsl)
+    Footprint queryFootprint$(CoarseOrFine)Clamp(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            float                   lodClamp)
+    {
+        Footprint footprint;
+        footprint._isSingleLevel = __queryFootprintClampGLSL(sampler, coords, lodClamp, granularity, $(isCoarseVal), footprint);
+        return footprint;
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleBiasClamp(sampler, coords, lodBias, lodClamp);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(glsl)
+    Footprint queryFootprint$(CoarseOrFine)BiasClamp(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            float                   lodBias,
+            float                   lodClamp)
+    {
+        Footprint footprint;
+        footprint._isSingleLevel = __queryFootprintClampGLSL(sampler, coords, lodClamp, granularity, $(isCoarseVal), footprint, lodBias);
+        return footprint;
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleLevel(sampler, coords, lod);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(glsl)
+    Footprint queryFootprint$(CoarseOrFine)Level(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            float                   lod)
+    {
+        Footprint footprint;
+        footprint._isSingleLevel = __queryFootprintLodGLSL(sampler, coords, lod, granularity, $(isCoarseVal), footprint);
+        return footprint;
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleLevel(sampler, coords, lod);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(hlsl)
+    Footprint queryFootprint$(CoarseOrFine)Level(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            float                   lod)
+    {
+        return { __queryFootprint$(CoarseOrFine)LevelNVAPI(
+            __getRegisterSpace(this), __getRegisterIndex(this),
+            __getRegisterSpace(sampler), __getRegisterIndex(sampler),
+            coords, granularity, lod), false };
+    }
+
+
+${{{
+    // Texture sampling with gradient is only available for 2D textures.
+    if(shape.rank == 2) {
+}}}
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleGrad(sampler, coords, dx, dy);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(glsl)
+    Footprint queryFootprint$(CoarseOrFine)Grad(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            Coords                  dx,
+            Coords                  dy)
+    {
+        Footprint footprint;
+        footprint._isSingleLevel = __queryFootprintGradGLSL(sampler, coords, dx, dy, granularity, $(isCoarseVal), footprint);
+        return footprint;
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleGrad(sampler, coords, dx, dy);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(hlsl)
+    Footprint queryFootprint$(CoarseOrFine)Grad(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            Coords                  dx,
+            Coords                  dy)
+    {
+        return { __queryFootprint$(CoarseOrFine)GradNVAPI(
+            __getRegisterSpace(this), __getRegisterIndex(this),
+            __getRegisterSpace(sampler), __getRegisterIndex(sampler),
+            coords, granularity, dx, dy), false };
+    }
+
+    /// Query the footprint that would be accessed by a texture sampling operation.
+    ///
+    /// This operation queries the footprint that would be accessed
+    /// by a comparable call to:
+    ///
+    ///     t.SampleGradClamp(sampler, coords, dx, dy, lodClamp);
+    ///
+    [__NoSideEffect]
+    __specialized_for_target(glsl)
+    Footprint queryFootprint$(CoarseOrFine)GradClamp(
+            FootprintGranularity    granularity,
+            SamplerState            sampler,
+            Coords                  coords,
+            Coords                  dx,
+            Coords                  dy,
+            float                   lodClamp)
+    {
+        Footprint footprint;
+        footprint._isSingleLevel = __queryFootprintGradClampGLSL(sampler, coords, dx, dy, lodClamp, granularity, $(isCoarseVal), footprint);
+        return footprint;
+    }
+
+${{{
+    } // if(shape.rank == 2)
+}}}
+
+${{{{
+}
+}}}}
+
+} // extension
+
+${{{{
+}
+}}}}

@@ -804,6 +804,29 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
+        case '*':
+        {
+            // An escape like `$*3` indicates that all arguments
+            // from index 3 (in this example) and up should be
+            // emitted as comma-separated expressions.
+            //
+            // We therefore expect the next byte to be a digit:
+            //
+            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+            Index firstArgIndex = (*cursor++) - '0' + m_argIndexOffset;
+            SLANG_RELEASE_ASSERT(m_argCount > firstArgIndex);
+
+            for (Index argIndex = firstArgIndex; argIndex < m_argCount; ++argIndex)
+            {
+                if (argIndex != firstArgIndex)
+                {
+                    m_writer->emit(", ");
+                }
+                m_emitter->emitOperand(m_args[argIndex].get(), getInfo(EmitOp::General));
+            }
+        }
+        break;
+
         default:
             SLANG_UNEXPECTED("bad format in intrinsic definition");
             break;

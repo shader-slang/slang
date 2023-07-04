@@ -2680,6 +2680,26 @@ struct IRLiveRangeEnd : IRLiveRangeMarker
     IR_LEAF_ISA(LiveRangeEnd);
 };
 
+/// An instruction that queries binding information about an opaque/resource value.
+///
+struct IRBindingQuery : IRInst
+{
+    IR_PARENT_ISA(BindingQuery);
+
+    IRInst* getOpaqueValue() { return getOperand(0); }
+};
+
+struct IRGetRegisterIndex : IRBindingQuery
+{
+    IR_LEAF_ISA(GetRegisterIndex);
+};
+
+struct IRGetRegisterSpace : IRBindingQuery
+{
+    IR_LEAF_ISA(GetRegisterSpace);
+};
+
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder

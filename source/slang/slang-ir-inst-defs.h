@@ -620,6 +620,14 @@ INST(TorchTensorGetView, TorchTensorGetView, 0, 0)
 
 INST(AllocateOpaqueHandle, allocateOpaqueHandle, 0, 0)
 
+    // Return the register index thtat a resource is bound to.
+    INST(GetRegisterIndex, getRegisterIndex, 1, 0)
+
+    // Return the registe space that a resource is bound to.
+    INST(GetRegisterSpace, getRegisterSpace, 1, 0)
+
+INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
+
 /* Decoration */
 
 INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
