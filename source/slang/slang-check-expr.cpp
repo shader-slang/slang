@@ -2034,7 +2034,20 @@ namespace Slang
                             {
                                 auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
-                                if (implicitCastExpr && _canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
+                                // NOTE: 
+                                // This is currently only enabled for in/inout based scenarios. Ie NOT ref.
+                                // 
+                                // Depending on the target there can be an issue around atomics.
+                                // The fall back transformation with InOut/OutImplicitCast is to introduce 
+                                // a temporary, and do the work on that and copy back.
+                                // 
+                                // This doesn't work with an atomic. So the work around is to not enable
+                                // the transformation with ref types, which atomics are defined on.
+                                // 
+                                // An argument can be made that transformation shouldn't apply to the ref scenario in general.
+                                if (implicitCastExpr && 
+                                    as<OutTypeBase>(paramType) && 
+                                    _canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
                                 {
                                     // This is to work around issues like
                                     //
@@ -2076,11 +2089,29 @@ namespace Slang
                                         Diagnostics::argumentExpectedLValue,
                                         pp);
 
+                                    
                                     if(implicitCastExpr)
                                     {
+                                        const DiagnosticInfo* diagnostic = nullptr;
+
+                                        // Try and determine reason for failure
+                                        if (as<RefType>(paramType))
+                                        {
+                                            diagnostic = &Diagnostics::implicitCastUsedAsLValueRef;
+                                        }
+                                        else if (!_canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
+                                        {
+                                            diagnostic = &Diagnostics::implicitCastUsedAsLValueType;
+                                        }
+                                        else
+                                        {
+                                            // Fall back, in case there other reasons...
+                                            diagnostic = &Diagnostics::implicitCastUsedAsLValue;
+                                        }
+
                                         getSink()->diagnose(
                                             argExpr,
-                                            Diagnostics::implicitCastUsedAsLValue,
+                                            *diagnostic,
                                             implicitCastExpr->arguments[pp]->type,
                                             implicitCastExpr->type);
                                     }

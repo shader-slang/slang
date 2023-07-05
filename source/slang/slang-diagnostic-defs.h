@@ -270,8 +270,9 @@ DIAGNOSTIC(30031, Error, projectTypeMismatch, "'project': expression must evalua
 DIAGNOSTIC(30033, Error, invalidTypeForLocalVariable, "cannot declare a local variable of this type.")
 DIAGNOSTIC(30035, Error, componentOverloadTypeMismatch, "'$0': type of overloaded component mismatches previous definition.")
 DIAGNOSTIC(30041, Error, bitOperationNonIntegral, "bit operation: operand must be integral type.")
+DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 DIAGNOSTIC(30047, Error, argumentExpectedLValue, "argument passed to parameter '$0' must be l-value.")
-DIAGNOSTIC(30048, Note,  implicitCastUsedAsLValue, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value")
+
 DIAGNOSTIC(30049, Note,  thisIsImmutableByDefault, "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`")
 DIAGNOSTIC(30050, Error,  mutatingMethodOnImmutableValue, "mutating method '$0' cannot be called on an immutable value")
 
@@ -284,10 +285,12 @@ DIAGNOSTIC(30056, Warning, useOfNonShortCircuitingOperator, "non-short-circuitin
 DIAGNOSTIC(30057, Error, assignmentInPredicateExpr, "use an assignment operation as predicate expression is not allowed, wrap the assignment with '()' to clarify the intent.")
 DIAGNOSTIC(30058, Warning, danglingEqualityExpr, "result of '==' not used, did you intend '='?")
 
-DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
-
 DIAGNOSTIC(30060, Error, expectedAType, "expected a type, got a '$0'")
 DIAGNOSTIC(30061, Error, expectedANamespace, "expected a namespace, got a '$0'")
+
+DIAGNOSTIC(30062, Note,  implicitCastUsedAsLValueRef, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value with a reference")
+DIAGNOSTIC(30063, Note,  implicitCastUsedAsLValueType, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value with this type")
+DIAGNOSTIC(30064, Note,  implicitCastUsedAsLValue, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value for this usage")
 
 DIAGNOSTIC(30065, Error, newCanOnlyBeUsedToInitializeAClass, "`new` can only be used to initialize a class")
 DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be initialized by a `new` clause")
