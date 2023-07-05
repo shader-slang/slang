@@ -869,7 +869,7 @@ static LoweredValInfo _emitCallToAccessor(
     /// encapsulates the reference to the storage so that downstream
     /// code can decide which accessor(s) to invoke.
     ///
-
+[[maybe_unused]]
 static LoweredValInfo lowerStorageReference(
     IRGenContext*           context,
     IRType*                 type,
