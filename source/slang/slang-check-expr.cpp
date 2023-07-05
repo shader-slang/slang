@@ -2097,15 +2097,18 @@ namespace Slang
                                         // Try and determine reason for failure
                                         if (as<RefType>(paramType))
                                         {
+                                            // Ref types are not allowed to use this mechanism because it breaks atomics 
                                             diagnostic = &Diagnostics::implicitCastUsedAsLValueRef;
                                         }
                                         else if (!_canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
                                         {
+                                            // We restict what types can use this mechanism - currently int/uint and same sized matrix/vectors
+                                            // of those types.
                                             diagnostic = &Diagnostics::implicitCastUsedAsLValueType;
                                         }
                                         else
                                         {
-                                            // Fall back, in case there other reasons...
+                                            // Fall back, in case there are other reasons...
                                             diagnostic = &Diagnostics::implicitCastUsedAsLValue;
                                         }
 
