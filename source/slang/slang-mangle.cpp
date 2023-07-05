@@ -484,7 +484,7 @@ namespace Slang
                     for (auto type : constraint.value)
                     {
                         emitRaw(context, "C");
-                        emitQualifiedName(context, DeclRef<Decl>(constraint.key, nullptr));
+                        emitQualifiedName(context, context->astBuilder->getSpecializedDeclRef(constraint.key, nullptr));
                             emitType(context, type);
                     }
                 }

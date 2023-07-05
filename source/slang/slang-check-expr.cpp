@@ -538,7 +538,7 @@ namespace Slang
                 synthesizedDecl = structDecl;
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = getName("Differential");
-                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, DeclRef<Decl>(structDecl, nullptr));
+                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this,m_astBuilder->getSpecializedDeclRef(structDecl, nullptr));
                 typeDef->type.type = m_astBuilder->getOrCreateDeclRefType(declRef.decl, declRef.substitutions);
                 typeDef->parentDecl = structDecl;
                 structDecl->members.add(typeDef);

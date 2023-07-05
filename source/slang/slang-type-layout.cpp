@@ -3903,7 +3903,7 @@ static TypeLayoutResult _createTypeLayout(
             _addLayout(context, type, typeLayout);
 
             // First, add all fields with explicit offsets.
-            for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
+            for (auto field : getFields(context.astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
                 // If the field has an explicit offset, then we will
                 // use that to place it.
@@ -3919,7 +3919,7 @@ static TypeLayoutResult _createTypeLayout(
                 }
                 
             }
-            for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
+            for (auto field : getFields(context.astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
                 if (const auto packOffsetModifier = field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
                     continue;

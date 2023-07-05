@@ -232,19 +232,19 @@ String getDeclKindString(DeclRef<Decl> declRef)
     }
     else if (auto varDecl = declRef.as<VarDeclBase>())
     {
-        auto parent = declRef.getParent();
+        auto parent = declRef.getDecl()->parentDecl;
         if (as<GenericDecl>(parent))
-            parent = parent.getParent();
-        if (parent.as<InterfaceDecl>())
+            parent = parent->parentDecl;
+        if (as<InterfaceDecl>(parent))
         {
             return "(associated constant) ";
         }
-        else if (parent.as<AggTypeDeclBase>())
+        else if (as<AggTypeDeclBase>(parent))
         {
             return "(field) ";
         }
         const char* scopeKind = "";
-        if (parent.as<NamespaceDeclBase>())
+        if (as<NamespaceDeclBase>(parent))
             scopeKind = "global ";
         else if (getParentDecl(declRef.getDecl()))
             scopeKind = "local ";
@@ -707,11 +707,11 @@ SlangResult LanguageServer::hover(
     }
     else if (auto decl = as<Decl>(leafNode))
     {
-        fillDeclRefHoverInfo(DeclRef<Decl>(decl));
+        fillDeclRefHoverInfo(version->linkage->getASTBuilder()->getSpecializedDeclRef(decl, nullptr));
     }
     else if (auto attr = as<Attribute>(leafNode))
     {
-        fillDeclRefHoverInfo(DeclRef<Decl>(attr->attributeDecl, nullptr));
+        fillDeclRefHoverInfo(version->linkage->getASTBuilder()->getSpecializedDeclRef(attr->attributeDecl, nullptr));
     }
     if (sb.getLength() == 0)
     {

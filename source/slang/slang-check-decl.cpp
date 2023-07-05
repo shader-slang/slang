@@ -7247,8 +7247,7 @@ namespace Slang
         auto derivativeAttr = visitor->getASTBuilder()->create<TDerivativeAttr>();
         derivativeAttr->loc = derivativeOfAttr->loc;
         auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
-        auto declRef =
-            DeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
+        auto declRef = visitor->getASTBuilder()->getSpecializedDeclRef((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
         auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, derivativeOfAttr->loc, nullptr);
         declRefExpr->type.type = nullptr;
         derivativeAttr->args.add(declRefExpr);
