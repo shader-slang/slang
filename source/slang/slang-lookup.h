@@ -18,7 +18,8 @@ LookupResult lookUp(
     SemanticsVisitor*   semantics,
     Name*               name,
     Scope*              scope,
-    LookupMask          mask = LookupMask::Default);
+    LookupMask          mask = LookupMask::Default,
+    bool                considerAllLocalNamesInScope = false);
 
 // Perform member lookup in the context of a type
 LookupResult lookUpMember(

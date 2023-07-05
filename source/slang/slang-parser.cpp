@@ -1021,7 +1021,9 @@ namespace Slang
             parser->astBuilder,
             nullptr, // no semantics visitor available yet
             name,
-            parser->currentScope);
+            parser->currentScope,
+            LookupMask::Default,
+            true);
 
         // If we didn't find anything, or the result was overloaded,
         // then we aren't going to be able to extract a single decl.

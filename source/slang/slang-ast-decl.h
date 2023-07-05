@@ -552,4 +552,6 @@ class BackwardDerivativeRequirementDecl : public DerivativeRequirementDecl
 bool isInterfaceRequirement(Decl* decl);
 InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 
+bool isLocalVar(const Decl* decl);
+
 } // namespace Slang

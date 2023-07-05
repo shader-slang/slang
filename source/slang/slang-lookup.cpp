@@ -139,6 +139,13 @@ static void _lookUpMembersInValue(
     LookupResult&	        ioResult,
     BreadcrumbInfo*	        breadcrumbs);
 
+static bool _isUncheckedLocalVar(const Decl* decl)
+{
+    auto checkStateExt = decl->checkState;
+    auto isUnchecked = checkStateExt.getState() == DeclCheckState::Unchecked || checkStateExt.isBeingChecked();
+    return isUnchecked && isLocalVar(decl);
+}
+
     /// Look up direct members (those declared in `containerDeclRef` itself, as well
     /// as transitively through any direct members that are marked "transparent."
     ///
@@ -162,6 +169,8 @@ static void _lookUpDirectAndTransparentMembers(
         // return all the members that are available.
         for (auto member : containerDecl->members)
         {
+            if(!request.shouldConsiderAllLocalNames() && _isUncheckedLocalVar(member))
+                continue;
             if (!DeclPassesLookupMask(member, request.mask))
                 continue;
             AddToLookupResult(
@@ -182,6 +191,12 @@ static void _lookUpDirectAndTransparentMembers(
         // type declarations.
         for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
         {
+            // Skip this declaration if we are checking and this hasn't been
+            // checked yet. Because we traverse block statements in order, if
+            // it's unchecked or being checked then it isn't declared yet.
+            if(!request.shouldConsiderAllLocalNames() && _isUncheckedLocalVar(m))
+                continue;
+
             if (!DeclPassesLookupMask(m, request.mask))
                 continue;
 
@@ -948,10 +963,14 @@ LookupResult lookUp(
     SemanticsVisitor*   semantics,
     Name*               name,
     Scope*              scope,
-    LookupMask          mask)
+    LookupMask          mask,
+    bool                considerAllLocalNamesInScope)
 {
     LookupResult result;
-    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
+    const auto options = considerAllLocalNamesInScope
+        ? LookupOptions::ConsiderAllLocalNamesInScope
+        : LookupOptions::None;
+    LookupRequest request = initLookupRequest(semantics, name, mask, options, scope);
     _lookUpInScopes(astBuilder, name, request, result);
     return result;
 }

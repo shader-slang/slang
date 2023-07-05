@@ -1,11 +1,8 @@
 result code = -1
 standard error = {
-tests/diagnostics/local-used-before-declared.slang(13): error 39999: local variable 'd' is being used before its declaration.
+tests/diagnostics/local-used-before-declared.slang(13): error 30015: undefined identifier 'd'.
     float c = d + 1.0;
               ^
-tests/diagnostics/local-used-before-declared.slang(14): note: declared here
-    int d = 0;
-        ^
 }
 standard output = {
 }
