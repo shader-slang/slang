@@ -444,7 +444,8 @@ namespace Slang
                 {
                     if(_isLocalVar(varDecl))
                     {
-                        sema->getSink()->diagnose(varDecl, Diagnostics::localVariableUsedBeforeDeclared, varDecl);
+                        sema->getSink()->diagnose(loc, Diagnostics::localVariableUsedBeforeDeclared, varDecl);
+                        sema->getSink()->diagnose(varDecl, Diagnostics::declaredHere);
                         return QualType(astBuilder->getErrorType());
                     }
                 }
