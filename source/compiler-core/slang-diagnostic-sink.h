@@ -169,6 +169,19 @@ public:
         diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
     }
 
+    // Useful for notes on existing diagnostics, where it would be redundant to display the same line again.
+    // (Ideally we would print the error/warning and notes in one call...)
+    template<typename P, typename... Args>
+    void diagnoseWithoutSourceView(P const& pos, DiagnosticInfo const& info, Args const&... args )
+    {
+        const auto fs = this->getFlags();
+        this->resetFlag(Flag::SourceLocationLine);
+
+        diagnose(pos, info, args...);
+
+        this->setFlags(fs);
+    }
+
         // Add a diagnostic with raw text
         // (used when we get errors from a downstream compiler)
     void diagnoseRaw(Severity severity, char const* message);

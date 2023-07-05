@@ -459,9 +459,7 @@ static void formatDiagnostic(
         _tokenLengthNoteDiagnostic(sink, sourceView, sourceLoc, sb);
     }
 
-    // We don't don't output source line information if this is a 'note' as a note is extra information for one
-    // of the other main severity types, and so the information should already be output on the initial line
-    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.severity != Severity::Note)
+    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.loc.isValid())
     {
         _sourceLocationNoteDiagnostic(sink, sourceView, sourceLoc, sb);
     }

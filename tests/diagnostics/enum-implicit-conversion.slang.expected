@@ -16,7 +16,11 @@ tests/diagnostics/enum-implicit-conversion.slang(42): error 39999: ambiguous cal
     int z = foo(c);
                ^
 tests/diagnostics/enum-implicit-conversion.slang(18): note 39999: candidate: func foo(uint) -> int
+int foo(uint x) { return x * 256 * 16; }
+    ^~~
 tests/diagnostics/enum-implicit-conversion.slang(17): note 39999: candidate: func foo(int) -> int
+int foo(int  x) { return x * 16; }
+    ^~~
 }
 standard output = {
 }
