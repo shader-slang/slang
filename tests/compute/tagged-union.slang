@@ -10,7 +10,7 @@
 // and without code changes.
 
 // We are going to define a dummy interface just for testing
-// purposes, that can be used to see which implmentation
+// purposes, that can be used to see which implementation
 // got invoked at runtime.
 //
 interface IFrobnicator
@@ -18,7 +18,7 @@ interface IFrobnicator
     int frobnicate(int value);
 }
 
-// Now we will define two different implemetnations that
+// Now we will define two different implementations that
 // "frobnicate" values differently. The first will just
 // add to the value from a member variable.
 //
@@ -87,7 +87,7 @@ void computeMain
 // since it was the second option in our `__TaggedUnion`.
 //
 // In the Vulkan case the size of both `A` and `B` is 16 bytes
-// (because they round up structure sizes to their alignement)
+// (because they round up structure sizes to their alignment)
 // and so the tag value will be the fifth 32-bit value.
 // We will thus set up the same data buffer to look like an `A`
 // value to Vulkan!

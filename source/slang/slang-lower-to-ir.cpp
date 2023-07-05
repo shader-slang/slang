@@ -32,6 +32,9 @@
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 
+// Natural layout 
+#include "slang-ast-natural-layout.h"
+
 namespace Slang
 {
 
@@ -3374,6 +3377,43 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         auto arrayType = as<IRArrayType>(type);
         SLANG_ASSERT(arrayType);
         return LoweredValInfo::simple(arrayType->getElementCount());
+    }
+
+    LoweredValInfo visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
+    {
+        // Lets try and lower to a constant
+        ASTNaturalLayoutContext naturalLayoutContext(getASTBuilder(), nullptr);
+
+        const auto size = naturalLayoutContext.calcSize(sizeOfLikeExpr->sizedType);
+
+        auto builder = getBuilder();
+
+        if (!size)
+        {
+            auto sizedType = lowerType(context, sizeOfLikeExpr->sizedType);
+
+            // We can create an inst
+
+            IRInst* inst = nullptr;
+
+            if (as<AlignOfExpr>(sizeOfLikeExpr))
+            {
+                inst = builder->emitAlignOf(sizedType);
+            }
+            else
+            {
+                inst = builder->emitSizeOf(sizedType);
+            }
+
+            return LoweredValInfo::simple(inst);
+        }
+
+        const auto value = 
+            as<SizeOfExpr>(sizeOfLikeExpr) ? 
+                size.size : 
+                size.alignment;
+
+        return LoweredValInfo::simple(getBuilder()->getIntValue(builder->getUIntType(), value));
     }
 
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)

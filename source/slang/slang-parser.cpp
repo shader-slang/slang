@@ -4940,9 +4940,6 @@ namespace Slang
             return Associativity::Left;
     }
 
-
-
-
     Precedence GetOpLevel(Parser* parser, const Token& token)
     {
         switch(token.type)
@@ -4998,11 +4995,14 @@ namespace Slang
         case TokenType::OpMod:
             return Precedence::Multiplicative;
         default:
-            if (token.getContent() == "is" || token.getContent() == "as")
+        {
+            const auto content = token.getContent();
+            if (content == "is" || content == "as")
             {
                 return Precedence::RelationalComparison;
             }
             return Precedence::Invalid;
+        }
         }
     }
 
@@ -5060,7 +5060,9 @@ namespace Slang
             // Special case the "is" and "as" operators.
             if (opToken.type == TokenType::Identifier)
             {
-                if (opToken.getContent() == "is")
+                const auto content = opToken.getContent();
+
+                if (content == "is")
                 {
                     auto isExpr = parser->astBuilder->create<IsTypeExpr>();
                     isExpr->value = expr;
@@ -5070,7 +5072,7 @@ namespace Slang
                     expr = isExpr;
                     continue;
                 }
-                else if (opToken.getContent() == "as")
+                else if (content == "as")
                 {
                     auto asExpr = parser->astBuilder->create<AsTypeExpr>();
                     asExpr->value = expr;
@@ -5244,6 +5246,40 @@ namespace Slang
     static NodeBase* parseNoneExpr(Parser* parser, void* /*userData*/)
     {
         return parser->astBuilder->create<NoneLiteralExpr>();
+    }
+
+    static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
+    {
+        // We could have a type or a variable or an expression
+        SizeOfExpr* sizeOfExpr = parser->astBuilder->create<SizeOfExpr>();
+      
+        parser->ReadMatchingToken(TokenType::LParent);
+
+        // The return type is always a UInt
+        sizeOfExpr->type = parser->astBuilder->getUIntType();
+
+        sizeOfExpr->value = parser->ParseExpression();
+
+        parser->ReadMatchingToken(TokenType::RParent);
+
+        return sizeOfExpr;
+    }
+
+    static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
+    {
+        // We could have a type or a variable or an expression
+        AlignOfExpr* alignOfExpr = parser->astBuilder->create<AlignOfExpr>();
+
+        parser->ReadMatchingToken(TokenType::LParent);
+
+        // The return type is always a UInt
+        alignOfExpr->type = parser->astBuilder->getUIntType();
+
+        alignOfExpr->value = parser->ParseExpression();
+
+        parser->ReadMatchingToken(TokenType::RParent);
+
+        return alignOfExpr;
     }
 
     static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
@@ -6040,7 +6076,7 @@ namespace Slang
                 }
                 break;
 
-            // Call oepration `f(x)`
+            // Call operation `f(x)`
             case TokenType::LParent:
                 {
                     InvokeExpr* invokeExpr = parser->astBuilder->create<InvokeExpr>();
@@ -6144,8 +6180,11 @@ namespace Slang
         auto tokenType = peekTokenType(parser);
         switch( tokenType )
         {
-        default:
-            if (parser->LookAheadToken("new"))
+        case TokenType::Identifier:
+        {
+            auto identifierToken = peekToken(parser);
+            const auto identifierTokenContent = identifierToken.getContent();
+            if (identifierTokenContent == toSlice("new"))
             {
                 NewExpr* newExpr = parser->astBuilder->create<NewExpr>();
                 parser->FillPosition(newExpr);
@@ -6168,7 +6207,14 @@ namespace Slang
                 }
                 return newExpr;
             }
+            
+
             return parsePostfixExpr(parser);
+        }
+        default:
+        {
+            return parsePostfixExpr(parser);
+        }
         case TokenType::OpNot:
         case TokenType::OpInc:
         case TokenType::OpDec:
@@ -6873,7 +6919,9 @@ namespace Slang
         _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
         _makeParseExpr("fwd_diff", parseForwardDifferentiate),
         _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
-        _makeParseExpr("__dispatch_kernel", parseDispatchKernel)
+        _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
+        _makeParseExpr("sizeof", parseSizeOfExpr),
+        _makeParseExpr("alignof", parseAlignOfExpr),
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()
