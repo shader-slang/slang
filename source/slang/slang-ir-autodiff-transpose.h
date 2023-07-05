@@ -2295,8 +2295,8 @@ struct DiffTransposePass
 
         if (auto vectorType = as<IRVectorType>(baseType))
         {
-            IRInst* elementCountInst = as<IRVectorType>(baseType)->getElementCount();
-            elementType = as<IRVectorType>(baseType)->getElementType();
+            IRInst* elementCountInst = vectorType->getElementCount();
+            elementType = vectorType->getElementType();
             primalElementType = as<IRVectorType>(aggPrimalType)->getElementType();
             SLANG_ASSERT(as<IRIntLit>(elementCountInst));
             elementCount = as<IRIntLit>(elementCountInst)->getValue();

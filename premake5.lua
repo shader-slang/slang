@@ -374,8 +374,10 @@ workspace "slang"
         }
     filter { "toolset:gcc*", "language:C++" }
         buildoptions { "-Wno-class-memaccess" }
+    filter { "toolset:clang", "language:C++" }
+        buildoptions { "-Wno-assume" }
     filter { "toolset:clang or gcc*", "language:C++" }
-        buildoptions { "-Wno-reorder", "-Wno-invalid-offsetof", "-Wno-assume" }
+        buildoptions { "-Wno-reorder", "-Wno-invalid-offsetof" }
 
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,

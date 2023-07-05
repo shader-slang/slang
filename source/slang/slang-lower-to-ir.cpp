@@ -872,7 +872,7 @@ static LoweredValInfo _emitCallToAccessor(
     /// encapsulates the reference to the storage so that downstream
     /// code can decide which accessor(s) to invoke.
     ///
-
+[[maybe_unused]]
 static LoweredValInfo lowerStorageReference(
     IRGenContext*           context,
     IRType*                 type,
@@ -1448,7 +1448,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
-        TryClauseEnvironment tryEnv;
         auto baseVal = lowerVal(context, val->base);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
         auto type = lowerType(context, val->type);
