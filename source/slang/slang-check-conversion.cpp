@@ -165,7 +165,7 @@ namespace Slang
 
     DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef)
     {
-        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(structTypeDeclRef).getFirstOrNull();
+        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(astBuilder, structTypeDeclRef).getFirstOrNull();
         if(!inheritanceDecl)
             return nullptr;
 
@@ -184,7 +184,7 @@ namespace Slang
 
     DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef)
     {
-        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(structTypeDeclRef).getFirstOrNull();
+        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(astBuilder, structTypeDeclRef).getFirstOrNull();
         if (!inheritanceDecl)
             return DeclRef<StructDecl>();
 
@@ -454,7 +454,7 @@ namespace Slang
                 // We will go through the fields in order and try to match them
                 // up with initializer arguments.
                 //
-                for(auto fieldDeclRef : getMembersOfType<VarDecl>(toStructDeclRef, MemberFilterStyle::Instance))
+                for(auto fieldDeclRef : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
                 {
                     Expr* coercedArg = nullptr;
                     bool argResult = _readValueFromInitializerList(

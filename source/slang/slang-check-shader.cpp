@@ -101,7 +101,7 @@ namespace Slang
                 // A structure type should recursively introduce
                 // existential slots for its fields.
                 //
-                for( auto fieldDeclRef : getFields(structDeclRef, MemberFilterStyle::Instance) )
+                for( auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance) )
                 {
                     _collectExistentialSpecializationParamsRec(
                         astBuilder,
@@ -206,7 +206,7 @@ namespace Slang
         //
         if( auto funcDeclRef = getFuncDeclRef() )
         {
-            for( auto paramDeclRef : getParameters(funcDeclRef) )
+            for( auto paramDeclRef : getParameters(getLinkage()->getASTBuilder(), funcDeclRef) )
             {
                 ShaderParamInfo shaderParamInfo;
                 shaderParamInfo.paramDeclRef = paramDeclRef;
@@ -1059,7 +1059,7 @@ namespace Slang
                     for(auto constraintDecl : genericTypeParamDecl->getMembersOfType<GenericTypeConstraintDecl>())
                     {
                         // Get the type that the constraint is enforcing conformance to
-                        auto interfaceType = getSup(getLinkage()->getASTBuilder(), DeclRef<GenericTypeConstraintDecl>(constraintDecl, nullptr));
+                        auto interfaceType = getSup(getLinkage()->getASTBuilder(), DeclRef<GenericTypeConstraintDecl>(constraintDecl));
 
                         // Use our semantic-checking logic to search for a witness to the required conformance
                         auto witness = visitor.tryGetSubtypeWitness(argType, interfaceType);
@@ -1193,7 +1193,7 @@ namespace Slang
             // the semantic checking machinery to expand out
             // the rest of the arguments via inference...
 
-            auto genericDeclRef = m_funcDeclRef.getParent().as<GenericDecl>();
+            auto genericDeclRef = m_funcDeclRef.getParent(getLinkage()->getASTBuilder()).as<GenericDecl>();
             SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
 
             List<Val*> genericArgs;
@@ -1214,7 +1214,7 @@ namespace Slang
                 auto constraintSubst = genericDeclRef.substitutions;
                 constraintSubst.substitutions = genericSubst;
 
-                DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
+                DeclRef<GenericTypeConstraintDecl> constraintDeclRef = getLinkage()->getASTBuilder()->getSpecializedDeclRef(
                     constraintDecl, constraintSubst);
 
                 ASTBuilder* astBuilder = getLinkage()->getASTBuilder();

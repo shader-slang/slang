@@ -13,8 +13,7 @@ namespace Slang
         DeclaredSubtypeWitness* witness = m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
             breadcrumb->sub,
             breadcrumb->sup,
-            breadcrumb->declRef.decl,
-            breadcrumb->declRef.substitutions.substitutions);
+            m_astBuilder->getSpecializedDeclRef(breadcrumb->declRef.decl, breadcrumb->declRef.substitutions.substitutions));
         return witness;
     }
 
@@ -144,7 +143,7 @@ namespace Slang
             {
                 DeclaredSubtypeWitness* declaredWitness =
                     m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
-                        bb->sub, bb->sup, bb->declRef.decl, bb->declRef.substitutions.substitutions);
+                        bb->sub, bb->sup, m_astBuilder->getSpecializedDeclRef(bb->declRef.decl, bb->declRef.substitutions.substitutions));
 
                 TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>();
                 transitiveWitness->sub = subType;
@@ -200,7 +199,7 @@ namespace Slang
     bool SemanticsVisitor::isInterfaceSafeForTaggedUnion(
         DeclRef<InterfaceDecl> interfaceDeclRef)
     {
-        for( auto memberDeclRef : getMembers(interfaceDeclRef) )
+        for( auto memberDeclRef : getMembers(m_astBuilder, interfaceDeclRef) )
         {
             if(!isInterfaceRequirementSafeForTaggedUnion(interfaceDeclRef, memberDeclRef))
                 return false;
@@ -328,7 +327,7 @@ namespace Slang
                     return true;
 
                 // if an inheritance decl is not found, try to find a GenericTypeConstraintDecl
-                for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef))
+                for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, aggTypeDeclRef))
                 {
                     ensureDecl(genConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
                     auto inheritedType = getSup(m_astBuilder, genConstraintDeclRef);
@@ -348,10 +347,10 @@ namespace Slang
                 // We need to enumerate the constraints placed on this type by its outer
                 // generic declaration, and see if any of them guarantees that we
                 // satisfy the given interface..
-                auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
+                auto genericDeclRef = genericTypeParamDeclRef.getParent(m_astBuilder).as<GenericDecl>();
                 SLANG_ASSERT(genericDeclRef);
 
-                for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
+                for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef) )
                 {
                     ensureDecl(constraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
                     auto sub = getSub(m_astBuilder, constraintDeclRef);

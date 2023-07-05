@@ -67,7 +67,7 @@ Expr* ASTSynthesizer::emitVarExpr(VarDecl* varDecl)
 Expr* ASTSynthesizer::emitVarExpr(VarDecl* var, Type* type)
 {
     auto expr = m_builder->create<VarExpr>();
-    expr->declRef = DeclRef<Decl>(var, nullptr);
+    expr->declRef = DeclRef<Decl>(var);
     expr->type.type = type;
     expr->type.isLeftValue = true;
     return expr;
@@ -76,7 +76,7 @@ Expr* ASTSynthesizer::emitVarExpr(VarDecl* var, Type* type)
 Expr* ASTSynthesizer::emitVarExpr(DeclStmt* varStmt, Type* type)
 {
     auto expr = m_builder->create<VarExpr>();
-    expr->declRef = DeclRef<Decl>(as<Decl>(varStmt->decl), nullptr);
+    expr->declRef = DeclRef<Decl>(as<Decl>(varStmt->decl));
     expr->type.type = type;
     expr->type.isLeftValue = true;
     return expr;
