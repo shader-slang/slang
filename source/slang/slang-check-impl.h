@@ -57,13 +57,13 @@ namespace Slang
         {
             return getRaw() == other.getRaw();
         }
-        static BasicTypeKey invalid() { return BasicTypeKey{ 0xff, 0, 0 }; }
+        static BasicTypeKey invalid() { return BasicTypeKey{ 0xff, 0, 0, 0, 0, 0 }; }
     };
 
     SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(BaseType baseType, IntegerLiteralValue dim1 = 0, IntegerLiteralValue dim2 = 0)
     {
         SLANG_ASSERT(dim1 >= 0 && dim2 >= 0);
-        return BasicTypeKey{ uint8_t(baseType), uint8_t(dim1), uint8_t(dim2) };
+        return BasicTypeKey{ uint8_t(baseType), uint8_t(dim1), uint8_t(dim2), 0, 0, 0 };
     }
 
     inline BasicTypeKey makeBasicTypeKey(Type* typeIn, Expr* exprIn = nullptr)
