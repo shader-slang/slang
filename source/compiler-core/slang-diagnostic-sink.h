@@ -169,6 +169,13 @@ public:
         diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
     }
 
+    template<typename P>
+    void diagnose(P const& pos, DiagnosticInfo const& info)
+    {
+        // MSVC gets upset with the zero sized array above, so overload that case here
+        diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
+    }
+
     // Useful for notes on existing diagnostics, where it would be redundant to display the same line again.
     // (Ideally we would print the error/warning and notes in one call...)
     template<typename P, typename... Args>
