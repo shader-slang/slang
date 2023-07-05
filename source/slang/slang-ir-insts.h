@@ -3622,6 +3622,12 @@ public:
         IRType* type,
         IRInst* val);
 
+    IRInst* emitSizeOf(
+        IRInst* sizedType);
+
+    IRInst* emitAlignOf(
+        IRInst* sizedType);
+
     IRInst* emitCastPtrToBool(IRInst* val);
 
     IRGlobalConstant* emitGlobalConstant(

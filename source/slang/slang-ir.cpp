@@ -5268,6 +5268,31 @@ namespace Slang
         return inst;
     }
 
+
+    IRInst* IRBuilder::emitSizeOf(
+        IRInst* sizedType)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_SizeOf,
+            getUIntType(),
+            sizedType);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitAlignOf(
+        IRInst* sizedType)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_AlignOf,
+            getUIntType(),
+            sizedType);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBitCast(
         IRType* type,
         IRInst* val)
