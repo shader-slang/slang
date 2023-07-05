@@ -11,6 +11,8 @@
 //
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
+#include "slang-ast-natural-layout.h"
+
 #include "slang-lookup.h"
 
 #include "slang-ast-print.h"
@@ -1279,8 +1281,6 @@ namespace Slang
             return nullptr;
         }
 
-
-
         // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
         static const int kMaxArgs = 8;
         auto argCount = getArgCount(invokeExpr);
@@ -1533,6 +1533,7 @@ namespace Slang
         SubstExpr<Expr>                 expr,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
+        
         // Unwrap any "identity" expressions
         while (auto parenExpr = expr.as<ParenExpr>())
         {
@@ -1629,7 +1630,23 @@ namespace Slang
             if (val)
                 return val;
         }
+        else if (auto sizeOfLikeExpr = as<SizeOfLikeExpr>(expr.getExpr()))
+        {
+            ASTNaturalLayoutContext context(getASTBuilder(), nullptr);
+            const auto size = context.calcSize(sizeOfLikeExpr->sizedType);
+            if (!size)
+            {
+                return nullptr;
+            }
 
+            auto value = as<AlignOfExpr>(sizeOfLikeExpr) ? 
+                size.alignment :
+                size.size;
+            
+            // We can return as an IntVal
+            return getASTBuilder()->getIntVal(expr.getExpr()->type, value);
+        }
+        
         return nullptr;
     }
 
@@ -2179,6 +2196,7 @@ namespace Slang
         return rs;
     }
 
+
     Expr* SemanticsExprVisitor::visitSelectExpr(SelectExpr* expr)
     {
         auto result = visitInvokeExpr(expr);
@@ -2727,6 +2745,67 @@ namespace Slang
             expr->type = m_astBuilder->getErrorType();
         }
         return expr;
+    }
+
+    static bool _isSizeOfType(Type* type)
+    {
+        if (!type)
+        {
+            return false;
+        }
+
+        if (as<ArithmeticExpressionType>(type) ||
+            as<ArrayExpressionType>(type) ||
+            as<PtrTypeBase>(type) ||
+            as<TupleType>(type) ||
+            as<GenericDeclRefType>(type))
+        {
+            return true;
+        }
+
+        if (as<DeclRefType>(type))
+        {
+            return true;
+        }
+        
+        return false;
+    }
+
+    Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
+    {
+        auto valueExpr = dispatch(sizeOfLikeExpr->value);
+        
+        Type* type = nullptr;
+
+        if (as<TypeType>(valueExpr->type))
+        {
+            TypeExp typeExp;
+            typeExp.exp = valueExpr;
+
+            auto properTypeExpr = CoerceToProperType(typeExp);
+
+            type = properTypeExpr.type;
+        }
+        else
+        {
+            // Is this a proper type?
+            TypeExp typeExp(valueExpr->type);
+            TypeExp properType = tryCoerceToProperType(typeExp);
+
+            type = properType.type;
+        }
+
+        if (!_isSizeOfType(type))
+        {
+            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfArgumentIsInvalid);
+
+            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
+            return sizeOfLikeExpr;
+        }
+
+        sizeOfLikeExpr->sizedType = type;
+
+        return sizeOfLikeExpr;
     }
 
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
