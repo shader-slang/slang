@@ -3205,7 +3205,7 @@ int NonUniformResourceIndex(int index)
 /// HLSL allows NonUniformResourceIndex around non int/uint types. 
 /// It's effect is presumably to ignore it, which the following implementation does.
 /// We should also look to add a warning for this scenario.
-
+[__unsafeForceInlineEarly] 
 T NonUniformResourceIndex<T>(T value) { return value; }
 
 // Normalize a vector
