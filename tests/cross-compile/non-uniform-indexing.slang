@@ -1,7 +1,7 @@
 //TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
 //TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment -verify-debug-serial-ir
 
-// Confirm that `NonUniformResourceIndex` translates to SPIR-V as expeted
+// Confirm that `NonUniformResourceIndex` translates to SPIR-V as expected
 
 Texture2D t[10];
 SamplerState s;

@@ -28,6 +28,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += acos(f);
     ft += atan(f);
     
+    ft += length(f - 0.5);
+    
     ft += atan2(f, 2.0);
     
     {
