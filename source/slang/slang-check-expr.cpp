@@ -213,8 +213,8 @@ namespace Slang
                 // to the chosen interface decl must be the first substitution on
                 // the list (which is a linked list from the "inside" out).
                 //
-                auto thisTypeSubst = as<ThisTypeSubstitution>(interfaceDeclRef.substitutions.substitutions);
-                if(thisTypeSubst && thisTypeSubst->interfaceDecl == interfaceDeclRef.decl)
+                auto thisTypeSubst = as<ThisTypeSubstitution>(interfaceDeclRef.getSubst());
+                if(thisTypeSubst && thisTypeSubst->interfaceDecl == interfaceDeclRef.getDecl())
                 {
                     // This isn't really an existential type, because somebody
                     // has already filled in a this-type substitution.
@@ -538,8 +538,8 @@ namespace Slang
                 synthesizedDecl = structDecl;
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = getName("Differential");
-                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this,m_astBuilder->getSpecializedDeclRef(structDecl, nullptr));
-                typeDef->type.type = m_astBuilder->getOrCreateDeclRefType(declRef.decl, declRef.substitutions);
+                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
+                typeDef->type.type = m_astBuilder->getOrCreateDeclRefType(declRef);
                 typeDef->parentDecl = structDecl;
                 structDecl->members.add(typeDef);
             }
@@ -1052,7 +1052,7 @@ namespace Slang
             {
                 foreachDirectOrExtensionMemberOfType<InheritanceDecl>(this, aggTypeDeclRef, [&](DeclRef<InheritanceDecl> member)
                     {
-                        auto subType = m_astBuilder->getOrCreateDeclRefType(member.getDecl(), nullptr);
+                        auto subType = m_astBuilder->getOrCreateDeclRefType(member);
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, subType);
                     });
                 foreachDirectOrExtensionMemberOfType<VarDeclBase>(this, aggTypeDeclRef, [&](DeclRef<VarDeclBase> member)
@@ -1061,7 +1061,7 @@ namespace Slang
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, fieldType);
                     });
             }
-            for (auto subst = declRefType->declRef.substitutions.substitutions; subst; subst = subst->outer)
+            for (auto subst = declRefType->declRef.getSubst(); subst; subst = subst->outer)
             {
                 if (auto genSubst = as<GenericSubstitution>(subst))
                 {
@@ -1507,7 +1507,7 @@ namespace Slang
 
         if (isInterfaceRequirement(decl))
         {
-            for (auto subst = declRef.substitutions.substitutions; subst; subst = subst->outer)
+            for (auto subst = declRef.getSubst(); subst; subst = subst->outer)
             {
                 if (auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
                 {
@@ -1524,7 +1524,7 @@ namespace Slang
         if (!getInitExpr(m_astBuilder, declRef))
             return nullptr;
 
-        ensureDecl(declRef.decl, DeclCheckState::Checked);
+        ensureDecl(declRef.getDecl(), DeclCheckState::Checked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
         return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), &newCircularityInfo);
     }
@@ -1579,7 +1579,7 @@ namespace Slang
                     declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
                     m_astBuilder->getSpecializedDeclRef(
                         genericValParamRef.getDecl(),
-                        genericValParamRef.substitutions.substitutions));
+                        genericValParamRef.getSubst()));
                 valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
                 return as<IntVal>(valResult);
             }
@@ -2475,7 +2475,7 @@ namespace Slang
                     // Get inner function
                     DeclRef<Decl> unspecializedInnerRef = astBuilder->getSpecializedDeclRef<Decl>(
                         getInner(baseFuncGenericDeclRef),
-                        baseFuncGenericDeclRef.substitutions);
+                        baseFuncGenericDeclRef.getSubst());
                     auto callableDeclRef = unspecializedInnerRef.as<CallableDecl>();
                     if (!callableDeclRef)
                         return nullptr;

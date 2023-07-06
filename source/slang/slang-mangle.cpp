@@ -423,7 +423,7 @@ namespace Slang
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.
 
-            auto subst = findInnerMostGenericSubstitution(declRef.substitutions);
+            auto subst = findInnerMostGenericSubstitution(declRef.getSubst());
             if( subst && subst->genericDecl == parentGenericDeclRef.getDecl() )
             {
                 // This is the case where we *do* have substitutions.
@@ -568,11 +568,11 @@ namespace Slang
             // mangling the generic and the inner entity
             emitRaw(context, "G");
 
-            SLANG_ASSERT(genericDecl.substitutions == nullptr);
+            SLANG_ASSERT(genericDecl.getSubst() == nullptr);
 
-            auto innerDecl = makeDeclRef(getInner(genericDecl));
+            auto innerDecl = getInner(genericDecl);
 
-            emitQualifiedName(context, innerDecl);
+            emitQualifiedName(context, makeDeclRef(innerDecl));
             return;
         }
         else if (as<ForwardDerivativeRequirementDecl>(decl))

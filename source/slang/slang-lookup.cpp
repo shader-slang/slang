@@ -176,7 +176,7 @@ static void _lookUpDirectAndTransparentMembers(
             AddToLookupResult(
                 result,
                 CreateLookupResultItem(
-                    astBuilder->getSpecializedDeclRef<Decl>(member, containerDeclRef.substitutions), inBreadcrumbs));
+                    astBuilder->getSpecializedDeclRef<Decl>(member, containerDeclRef.getSubst()), inBreadcrumbs));
         }
     }
     else
@@ -201,7 +201,7 @@ static void _lookUpDirectAndTransparentMembers(
                 continue;
 
             // The declaration passed the test, so add it!
-            AddToLookupResult(result, CreateLookupResultItem(astBuilder->getSpecializedDeclRef<Decl>(m, containerDeclRef.substitutions), inBreadcrumbs));
+            AddToLookupResult(result, CreateLookupResultItem(astBuilder->getSpecializedDeclRef<Decl>(m, containerDeclRef.getSubst()), inBreadcrumbs));
         }
     }
 
@@ -211,7 +211,7 @@ static void _lookUpDirectAndTransparentMembers(
     {
         // The reference to the transparent member should use whatever
         // substitutions we used in referring to its outer container
-        DeclRef<Decl> transparentMemberDeclRef = astBuilder->getSpecializedDeclRef(transparentInfo.decl, containerDeclRef.substitutions);
+        DeclRef<Decl> transparentMemberDeclRef = astBuilder->getSpecializedDeclRef(transparentInfo.decl, containerDeclRef.getSubst());
 
         // We need to leave a breadcrumb so that we know that the result
         // of lookup involves a member lookup step here
@@ -320,7 +320,7 @@ static Type* _maybeSpecializeSuperType(
             ThisTypeSubstitution* thisTypeSubst = astBuilder->create<ThisTypeSubstitution>();
             thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
             thisTypeSubst->witness = subIsSuperWitness;
-            thisTypeSubst->outer = superInterfaceDeclRef.substitutions.substitutions;
+            thisTypeSubst->outer = superInterfaceDeclRef.getSubst();
 
             auto specializedInterfaceDeclRef = astBuilder->getSpecializedDeclRef<Decl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
 
@@ -403,7 +403,7 @@ static void _lookUpMembersInSuperType(
 {
     if( request.semantics )
     {
-        ensureDecl(request.semantics, intermediateIsSuperConstraint, DeclCheckState::CanUseBaseOfInheritanceDecl);
+        ensureDecl(request.semantics, intermediateIsSuperConstraint.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
     }
 
     // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
@@ -450,11 +450,11 @@ static void _lookUpMembersInSuperTypeDeclImpl(
         auto genericDeclRef = genericTypeParamDeclRef.getParent(astBuilder).as<GenericDecl>();
         assert(genericDeclRef);
 
-        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDeclRef))
+        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(astBuilder, DeclRef<ContainerDecl>(genericDeclRef)))
         {
             if( semantics )
             {
-                ensureDecl(semantics, constraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
+                ensureDecl(semantics, constraintDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
             }
 
             // Does this constraint pertain to the type we are working on?

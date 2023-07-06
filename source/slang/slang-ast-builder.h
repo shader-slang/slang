@@ -257,13 +257,19 @@ public:
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, Substitutions* subst)
     {
-        return DeclRef<T>(this, decl, subst);
+        if (!subst)
+        {
+            auto& defaultDeclRef = static_cast<Decl*>(decl)->defaultDeclRef;
+            if (defaultDeclRef)
+                return defaultDeclRef;
+        }
+        return getOrCreate<DeclRefBase>(decl, subst);
     }
 
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, SubstitutionSet subst)
     {
-        return DeclRef<T>(this, decl, subst);
+        return getOrCreate<DeclRefBase>(decl, subst.substitutions);
     }
 
     ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
@@ -271,17 +277,9 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    DeclRefType* getOrCreateDeclRefType(Decl* decl, Substitutions* outer)
+    DeclRefType* getOrCreateDeclRefType(DeclRefBase* declRef)
     {
-        NodeDesc desc;
-        desc.type = DeclRefType::kType;
-        desc.operands.add(decl);
-        if (outer)
-        {
-            desc.operands.add(outer);
-        }
-        auto result = (DeclRefType*)_getOrCreateImpl(desc, [&]() {return create<DeclRefType>(getSpecializedDeclRef(decl, outer)); });
-        return result;
+        return getOrCreate<DeclRefType>(declRef);
     }
 
     GenericSubstitution* getOrCreateGenericSubstitution(GenericDecl* decl, const List<Val*>& args, Substitutions* outer)

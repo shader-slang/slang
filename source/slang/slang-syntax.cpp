@@ -64,6 +64,12 @@ SourceLoc getDiagnosticPos(TypeExp const& typeExp)
     return typeExp.exp->loc;
 }
 
+SourceLoc getDiagnosticPos(DeclRefBase* declRef)
+{
+    if (!declRef)
+        return SourceLoc();
+    return declRef->getDecl()->loc;
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!  Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -327,7 +333,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     // So, in order to get the *right* end result, we need to apply
                     // the substitutions from the inheritance decl-ref to the witness.
                     //
-                    requirementWitness = requirementWitness.specialize(astBuilder, inheritanceDeclRef.substitutions);
+                    requirementWitness = requirementWitness.specialize(astBuilder, inheritanceDeclRef.getSubst());
 
                     return requirementWitness;
                 }
@@ -338,14 +344,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if (auto declaredSubtypeWitnessMidToSup = as<DeclaredSubtypeWitness>(transitiveTypeWitness->midToSup))
             {
                 auto midKey = declaredSubtypeWitnessMidToSup->declRef;
-                auto midWitness = tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(transitiveTypeWitness->subToMid), midKey);
+                auto midWitness = tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(transitiveTypeWitness->subToMid), midKey.getDecl());
                 if (midWitness.getFlavor() == RequirementWitness::Flavor::witnessTable)
                 {
                     auto table = midWitness.getWitnessTable();
                     RequirementWitness result;
                     if (table->requirementDictionary.tryGetValue(requirementKey, result))
                     {
-                        result = result.specialize(astBuilder, midKey.substitutions);
+                        result = result.specialize(astBuilder, midKey.getSubst());
                     }
                     return result;
                 }
@@ -436,7 +442,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                 // We have a generic ancestor, but do we have an substitutions for it?
                 GenericSubstitution* foundSubst = nullptr;
-                for(auto s = declRef.substitutions.substitutions; s; s = s->outer)
+                for(auto s = declRef.getSubst(); s; s = s->outer)
                 {
                     auto genSubst = as<GenericSubstitution>(s);
                     if(!genSubst)
@@ -489,7 +495,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         else if (auto magicMod = declRef.getDecl()->findModifier<MagicTypeModifier>())
         {
             GenericSubstitution* subst = nullptr;
-            for(auto s = declRef.substitutions.substitutions; s; s = s->outer)
+            for(auto s = declRef.getSubst(); s; s = s->outer)
             {
                 if(auto genericSubst = as<GenericSubstitution>(s))
                 {
@@ -581,7 +587,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             else if (magicMod->magicName == #n)                         \
             {                                                           \
                 auto type = astBuilder->getOrCreateWithDefaultCtor<T>(  \
-                    declRef.decl, declRef.substitutions.substitutions); \
+                    declRef.getDecl(), declRef.getSubst()); \
                 type->declRef = declRef;                                \
                 return type;                                            \
             }
@@ -663,7 +669,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
         else
         {
-            return astBuilder->getOrCreateDeclRefType(declRef.decl, declRef.substitutions.substitutions);
+            return astBuilder->getOrCreateDeclRefType(declRef.declRefBase);
         }
     }
 
@@ -697,13 +703,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return Slang::as<Type>(type->substitute(astBuilder, substitutions));
     }
 
-    DeclRefBase DeclRefBase::substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const
+    DeclRefBase* DeclRefBase::substitute(ASTBuilder* astBuilder, DeclRefBase* declRef) const
     {
         if(!substitutions)
             return declRef;
 
         int diff = 0;
-        return declRef.substituteImpl(astBuilder, substitutions, &diff);
+        return declRef->substituteImpl(astBuilder, substitutions, &diff);
     }
 
     SubstExpr<Expr> DeclRefBase::substitute(ASTBuilder* /* astBuilder*/, Expr* expr) const
@@ -723,7 +729,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         int diff = 0;
         auto declRefBase = declRef.substituteImpl(astBuilder, substs, &diff);
-        return astBuilder->getSpecializedDeclRef<Decl>(declRefBase.decl, declRefBase.substitutions);
+        return astBuilder->getSpecializedDeclRef<Decl>(declRefBase.getDecl(), declRefBase.getSubst());
     }
 
     Type* substituteType(SubstitutionSet const& substs, ASTBuilder* astBuilder, Type* type)
@@ -944,11 +950,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    DeclRefBase DeclRefBase::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet substSet, int* ioDiff) const
+    DeclRefBase* DeclRefBase::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet substSet, int* ioDiff) const
     {
         // Nothing to do when we have no declaration.
         if(!decl)
-            return *this;
+            return const_cast<DeclRefBase*>(this);
 
         // Apply the given substitutions to any specializations
         // that have already been applied to this declaration.
@@ -957,18 +963,16 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         auto substSubst = specializeSubstitutions(
             astBuilder,
             decl,
-            substitutions.substitutions,
+            substitutions,
             substSet.substitutions,
             &diff);
 
         if (!diff)
-            return *this;
+            return const_cast<DeclRefBase*>(this);
 
         *ioDiff += diff;
 
-        DeclRefBase substDeclRef;
-        substDeclRef.decl = decl;
-        substDeclRef.substitutions = substSubst;
+        DeclRefBase* substDeclRef = astBuilder->getSpecializedDeclRef(decl, substSubst);
 
         // TODO: The old code here used to try to translate a decl-ref
         // to an associated type in a decl-ref for the concrete type
@@ -980,13 +984,21 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substDeclRef;
     }
 
+    bool DeclRefBase::_equalsValOverride(Val* val)
+    {
+        if (auto otherDeclRef = as<DeclRefBase>(val))
+            return equals(otherDeclRef);
+        return false;
+    }
 
     // Check if this is an equivalent declaration reference to another
-    bool DeclRefBase::equals(DeclRefBase const& declRef) const
+    bool DeclRefBase::equals(DeclRefBase* declRef) const
     {
-        if (decl != declRef.decl)
+        if (!declRef)
             return false;
-        if (!substitutions.equals(declRef.substitutions))
+        if (decl != declRef->decl)
+            return false;
+        if (!SubstitutionSet(substitutions).equals(declRef->substitutions))
             return false;
 
         return true;
@@ -1006,7 +1018,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return decl->loc;
     }
 
-    DeclRefBase DeclRefBase::getParent(ASTBuilder* astBuilder) const
+    DeclRefBase* DeclRefBase::getParent(ASTBuilder* astBuilder) const
     {
         // Want access to the free function (the 'as' method by default gets priority)
         // Can access as method with this->as because it removes any ambiguity.
@@ -1014,11 +1026,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         auto parentDecl = decl->parentDecl;
         if (!parentDecl)
-            return DeclRefBase();
+            return nullptr;
 
         // Default is to apply the same set of substitutions/specializations
         // to the parent declaration as were applied to the child.
-        Substitutions* substToApply = substitutions.substitutions;
+        Substitutions* substToApply = substitutions;
 
         if(auto interfaceDecl = as<InterfaceDecl>(decl))
         {
@@ -1059,7 +1071,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     HashCode DeclRefBase::getHashCode() const
     {
-        return combineHash(PointerHash<1>::getHashCode(decl), substitutions.getHashCode());
+        return combineHash(PointerHash<1>::getHashCode(decl), SubstitutionSet(substitutions).getHashCode());
     }
 
     // IntVal
@@ -1080,12 +1092,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     Type* HLSLPatchType::getElementType()
     {
-        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+        return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
     }
 
     IntVal* HLSLPatchType::getElementCount()
     {
-        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
+        return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[1]);
     }
 
     // MeshOutputType
@@ -1096,12 +1108,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     Type* MeshOutputType::getElementType()
     {
-        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+        return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
     }
 
     IntVal* MeshOutputType::getMaxElementCount()
     {
-        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
+        return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[1]);
     }
 
     // Constructors for types
@@ -1212,7 +1224,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         auto substAssocTypeDecl = substDeclRef.getDecl();
 
-        for (auto s = substDeclRef.substitutions.substitutions; s; s = s->outer)
+        for (auto s = substDeclRef.getSubst(); s; s = s->outer)
         {
             auto thisSubst = as<ThisTypeSubstitution>(s);
             if (!thisSubst)
@@ -1252,7 +1264,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         auto innerDeclRefType = as<DeclRefType>(thisSubst->witness->sub);
                         if (!innerDeclRefType)
                             return nullptr;
-                        auto innerBuiltinReq = innerDeclRefType->declRef.decl->findModifier<BuiltinRequirementModifier>();
+                        auto innerBuiltinReq = innerDeclRefType->declRef.getDecl()->findModifier<BuiltinRequirementModifier>();
                         if (!innerBuiltinReq)
                             return nullptr;
                         if (innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialType)
@@ -1281,7 +1293,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     // Prints a partially qualified type name with generic substitutions.
-    void _printNestedDecl(const Substitutions* substitutions, Decl* decl, StringBuilder& out)
+    void _printNestedDecl(const Substitutions* substitutions, const Decl* decl, StringBuilder& out)
     {
         // If there is a parent scope for the declaration, print it first.
         // Exclude top-level namespaces like `tu0` or `core`.
@@ -1307,7 +1319,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // type instead.
         for (;;)
         {
-            if (auto interfaceDecl = as<InterfaceDecl>(decl))
+            if (auto interfaceDecl = const_cast<InterfaceDecl*>(as<InterfaceDecl>(decl)))
             {
                 if (auto thisSubst = findThisTypeSubstitution(substitutions, interfaceDecl))
                 {

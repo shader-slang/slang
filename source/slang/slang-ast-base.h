@@ -16,13 +16,15 @@
 namespace Slang
 {  
 
+void initDecl(ASTBuilder* builder, NodeBase* node);
+
 class NodeBase 
 {
     SLANG_ABSTRACT_AST_CLASS(NodeBase)
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.
-    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /* astBuilder*/)
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* astBuilder)
     {
         astNodeType = inAstNodeType;
 #ifdef _DEBUG
@@ -33,6 +35,10 @@ class NodeBase
         if (breakValue != 0 && _debugUID == breakValue)
             SLANG_BREAKPOINT(0)
 #endif
+        if (this->isDerivedFrom(ASTNodeType::Decl))
+        {
+            initDecl(astBuilder, this);
+        }
     }
 
         /// Get the class info 
@@ -339,6 +345,79 @@ class ThisTypeSubstitution : public Substitutions
     {}
 };
 
+class Decl;
+
+// A reference to a declaration, which may include
+// substitutions for generic parameters.
+class DeclRefBase : public Val
+{
+    SLANG_AST_CLASS(DeclRefBase)
+
+    // The underlying declaration
+    Decl* decl = nullptr;
+    Decl* getDecl() const { return decl; }
+
+    // Optionally, a chain of substitutions to perform
+    Substitutions* substitutions;
+
+    DeclRefBase(Decl* decl)
+        :decl(decl)
+    {
+    }
+
+    DeclRefBase(Decl* decl, Substitutions* subst)
+        :decl(decl), substitutions(subst)
+    {
+    }
+
+    // Apply substitutions to a type or declaration
+    Type* substitute(ASTBuilder* astBuilder, Type* type) const;
+
+    DeclRefBase* substitute(ASTBuilder* astBuilder, DeclRefBase* declRef) const;
+
+    // Apply substitutions to an expression
+    SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const;
+
+    // Apply substitutions to this declaration reference
+    DeclRefBase* substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const;
+
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+    {
+        return substituteImpl(astBuilder, subst, ioDiff);
+    }
+    bool _equalsValOverride(Val* val);
+
+    bool _equalsImplOverride(DeclRefBase* declRef) { return equals(declRef); }
+
+    // Returns true if 'as' will return a valid cast
+    template <typename T>
+    bool is() const { return Slang::as<T>(decl) != nullptr; }
+
+    // Check if this is an equivalent declaration reference to another
+    bool equals(DeclRefBase* declRef) const;
+
+    // Convenience accessors for common properties of declarations
+    Name* getName() const;
+    SourceLoc getNameLoc() const;
+    SourceLoc getLoc() const;
+    DeclRefBase* getParent(ASTBuilder* astBuilder) const;
+
+    HashCode getHashCode() const;
+
+    // Debugging:
+    String toString() const;
+    void toText(StringBuilder& out) const;
+};
+
+SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase* declRef) { declRef->toText(io); return io; }
+
+SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const Decl* decl)
+{
+    if (decl)
+        _printNestedDecl(nullptr, decl, io);
+    return io;
+}
+
 class SyntaxNode : public SyntaxNodeBase
 {
     SLANG_ABSTRACT_AST_CLASS(SyntaxNode);
@@ -405,20 +484,22 @@ public:
 
     ContainerDecl* parentDecl = nullptr;
 
+    DeclRefBase* defaultDeclRef = nullptr;
+
     NameLoc nameAndLoc;
 
     RefPtr<MarkupEntry> markup;
 
-    Name*     getName()       { return nameAndLoc.name; }
-    SourceLoc getNameLoc()    { return nameAndLoc.loc ; }
-    NameLoc   getNameAndLoc() { return nameAndLoc     ; }
+    Name*     getName() const      { return nameAndLoc.name; }
+    SourceLoc getNameLoc() const   { return nameAndLoc.loc ; }
+    NameLoc   getNameAndLoc() const { return nameAndLoc     ; }
 
     DeclCheckStateExt checkState = DeclCheckState::Unchecked;
 
     // The next declaration defined in the same container with the same name
     Decl* nextInContainerWithSameName = nullptr;
 
-    bool isChecked(DeclCheckState state) { return checkState >= state; }
+    bool isChecked(DeclCheckState state) const { return checkState >= state; }
     void setCheckState(DeclCheckState state)
     {
         SLANG_RELEASE_ASSERT(state >= checkState.getState());

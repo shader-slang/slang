@@ -1414,10 +1414,11 @@ namespace Slang
         {
             if (auto declRefType = as<DeclRefType>(sharedTypeExpr->base))
             {
-                declRefType->declRef.substitutions = createDefaultSubstitutions(m_astBuilder, this, declRefType->declRef.getDecl());
-
+                auto subst = createDefaultSubstitutions(m_astBuilder, this, declRefType->declRef.getDecl());
+                auto newType = m_astBuilder->getOrCreateDeclRefType(m_astBuilder->getSpecializedDeclRef(declRefType->declRef.getDecl(), subst));
+                sharedTypeExpr->base.type = newType;
                 if (auto typetype = as<TypeType>(typeExp.exp->type))
-                    typetype->type = declRefType;
+                    typetype->type = newType;
             }
         }
     }
@@ -1466,19 +1467,19 @@ namespace Slang
         // apply it to the newly synthesized decl.
         SubstitutionSet substSet;
         if (auto thisTypeSusbt = findThisTypeSubstitution(
-            requirementDeclRef.substitutions,
-            as<InterfaceDecl>(requirementDeclRef.getDecl()->parentDecl)))
+            requirementDeclRef.getSubst(),
+            as<InterfaceDecl>(requirementDeclRef.getParent(m_astBuilder))))
         {
             if (auto declRefType = as<DeclRefType>(thisTypeSusbt->witness->sub))
             {
-                substSet = declRefType->declRef.substitutions;
+                substSet = declRefType->declRef.getSubst();
             }
         }
-        auto satisfyingType = m_astBuilder->getOrCreateDeclRefType(aggTypeDecl, substSet);
+        auto satisfyingType = m_astBuilder->getOrCreateDeclRefType(m_astBuilder->getSpecializedDeclRef(aggTypeDecl, substSet));
 
         // Helper function to add a `diffType` field into the synthesized type for the original
         // `member`.
-        auto differentialType = DeclRefType::create(m_astBuilder, makeDeclRef(aggTypeDecl));
+        auto differentialType = DeclRefType::create(m_astBuilder, DeclRef<Decl>(makeDeclRef(aggTypeDecl)));
         auto addDiffMember = [&](Decl* member, Type* diffMemberType)
         {
             // If the field is differentiable, add a corresponding field in the associated Differential type.
@@ -2089,7 +2090,7 @@ namespace Slang
         for( auto p : mapRequiredToSatisfyingAccessorDeclRef )
         {
             witnessTable->add(
-                p.key,
+                p.key.getDecl(),
                 RequirementWitness(p.value));
         }
         //
@@ -2141,7 +2142,7 @@ namespace Slang
         if (satisfyingVal)
         {
             witnessTable->add(
-                requiredMemberDeclRef,
+                requiredMemberDeclRef.getDecl(),
                 RequirementWitness(satisfyingVal));
         }
         else
@@ -2272,7 +2273,7 @@ namespace Slang
                     requiredValueParamDeclRef.getDecl()->getType(),
                     m_astBuilder->getSpecializedDeclRef(
                         satisfyingValueParamDeclRef.getDecl(),
-                        satisfyingValueParamDeclRef.substitutions.substitutions));
+                        satisfyingValueParamDeclRef.getSubst()));
                 satisfyingVal->declRef = satisfyingValueParamDeclRef;
 
                 requiredSubstArgs.add(satisfyingVal);
@@ -2300,7 +2301,7 @@ namespace Slang
         GenericSubstitution* requiredSubst = m_astBuilder->getOrCreateGenericSubstitution(
             requiredGenericDeclRef.getDecl(),
             requiredSubstArgs,
-            requiredGenericDeclRef.substitutions);
+            requiredGenericDeclRef.getSubst());
 
         // Now that we have computed a set of specialization arguments that will
         // specialize the generic requirement at the type parameters of the satisfying
@@ -2386,7 +2387,7 @@ namespace Slang
         // declaration (whatever it is) for an exact match.
         //
         return doesMemberSatisfyRequirement(
-            m_astBuilder->getSpecializedDeclRef<Decl>(satisfyingGenericDeclRef.getDecl()->inner, satisfyingGenericDeclRef.substitutions),
+            m_astBuilder->getSpecializedDeclRef<Decl>(satisfyingGenericDeclRef.getDecl()->inner, satisfyingGenericDeclRef.getSubst()),
             m_astBuilder->getSpecializedDeclRef<Decl>(requiredGenericDeclRef.getDecl()->inner, requiredSubst),
             witnessTable);
     }
@@ -2409,7 +2410,7 @@ namespace Slang
             {
                 // If a subtype witness was found, then the conformance
                 // appears to hold, and we can satisfy that requirement.
-                witnessTable->add(requiredConstraintDeclRef, RequirementWitness(witness));
+                witnessTable->add(requiredConstraintDeclRef.getDecl(), RequirementWitness(witness));
             }
             else
             {
@@ -2728,7 +2729,7 @@ namespace Slang
                 witnessTable->add(bwdReq, RequirementWitness(val));
             }
         }
-        witnessTable->add(requiredMemberDeclRef, RequirementWitness(satisfyingMemberDeclRef));
+        witnessTable->add(requiredMemberDeclRef.getDecl(), RequirementWitness(satisfyingMemberDeclRef));
     }
 
     bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
@@ -3242,9 +3243,9 @@ namespace Slang
         //
         for(auto p : mapRequiredAccessorToSynAccessor)
         {
-            witnessTable->add(p.key, RequirementWitness(makeDeclRef(p.value)));
+            witnessTable->add(p.key.getDecl(), RequirementWitness(makeDeclRef(p.value)));
         }
-        witnessTable->add(requiredMemberDeclRef,
+        witnessTable->add(requiredMemberDeclRef.getDecl(),
             RequirementWitness(makeDeclRef(synPropertyDecl)));
         return true;
     }
@@ -3475,16 +3476,16 @@ namespace Slang
         // generic substitution for outer generic parameters, and apply it here.
         SubstitutionSet substSet;
         if (auto thisTypeSusbt = findThisTypeSubstitution(
-            requirementDeclRef.substitutions,
+            requirementDeclRef.getSubst(),
             as<InterfaceDecl>(requirementDeclRef.getDecl()->parentDecl)))
         {
             if (auto declRefType = as<DeclRefType>(thisTypeSusbt->witness->sub))
             {
-                substSet = declRefType->declRef.substitutions;
+                substSet = declRefType->declRef.getSubst();
             }
         }
 
-        witnessTable->add(requirementDeclRef, RequirementWitness(m_astBuilder->getSpecializedDeclRef<Decl>(synFunc, substSet)));
+        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(m_astBuilder->getSpecializedDeclRef<Decl>(synFunc, substSet)));
         return true;
     }
 
@@ -3540,7 +3541,7 @@ namespace Slang
                     reqType,
                     m_astBuilder->getSpecializedDeclRef(
                         requiredInheritanceDeclRef.getDecl(),
-                        requiredInheritanceDeclRef.substitutions.substitutions));
+                        requiredInheritanceDeclRef.getSubst()));
             // ...
 
             TransitiveSubtypeWitness* subIsReqWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(subType, reqType, interfaceIsReqWitness);
@@ -3742,7 +3743,7 @@ namespace Slang
         ThisTypeSubstitution* thisTypeSubst = m_astBuilder->create<ThisTypeSubstitution>();
         thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
         thisTypeSubst->witness = subTypeConformsToSuperInterfaceWitness;
-        thisTypeSubst->outer = superInterfaceDeclRef.substitutions.substitutions;
+        thisTypeSubst->outer = superInterfaceDeclRef.getSubst();
 
         auto specializedSuperInterfaceDeclRef = m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
 
@@ -3778,7 +3779,7 @@ namespace Slang
         //
         for(auto requiredMemberDeclRef : getMembers(m_astBuilder, specializedSuperInterfaceDeclRef))
         {
-            if(!isAssociatedTypeDecl(requiredMemberDeclRef))
+            if(!isAssociatedTypeDecl(requiredMemberDeclRef.getDecl()))
                 continue;
 
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
@@ -3795,7 +3796,7 @@ namespace Slang
         }
         for(auto requiredMemberDeclRef : getMembers(m_astBuilder, specializedSuperInterfaceDeclRef))
         {
-            if(isAssociatedTypeDecl(requiredMemberDeclRef))
+            if(isAssociatedTypeDecl(requiredMemberDeclRef.getDecl()))
                 continue;
             if (requiredMemberDeclRef.as<DerivativeRequirementDecl>())
                 continue;
@@ -4080,7 +4081,7 @@ namespace Slang
         {
             return;
         }
-        auto baseDecl = baseDeclRefType->declRef.decl;
+        auto baseDecl = baseDeclRefType->declRef.getDecl();
 
         // Using the parent/child hierarchy baked into `Decl`s we
         // can find the modules that contain both the `decl` doing
@@ -5195,7 +5196,7 @@ namespace Slang
             if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl, &subst))
                 return SLANG_OK;
 
-            oldDeclRef.substitutions.substitutions = subst;
+            oldDeclRef = getASTBuilder()->getSpecializedDeclRef(oldDecl, subst);
         }
 
         // If the parameter signatures don't match, then don't worry
@@ -6220,20 +6221,20 @@ namespace Slang
                         {
                             // Looks like we have a match in the types,
                             // now let's see if we have a this-type substitution.
-                            if(auto appThisTypeSubst = as<ThisTypeSubstitution>(appInterfaceDeclRef.substitutions.substitutions))
+                            if(auto appThisTypeSubst = as<ThisTypeSubstitution>(appInterfaceDeclRef.getSubst()))
                             {
                                 if(appThisTypeSubst->interfaceDecl == appInterfaceDeclRef.getDecl())
                                 {
                                     // The type we want to apply to has a this-type substitution,
                                     // and (by construction) the target type currently does not.
                                     //
-                                    SLANG_ASSERT(!as<ThisTypeSubstitution>(targetInterfaceDeclRef.substitutions.substitutions));
+                                    SLANG_ASSERT(!as<ThisTypeSubstitution>(targetInterfaceDeclRef.getSubst()));
 
                                     // We will create a new substitution to apply to the target type.
                                     ThisTypeSubstitution* newTargetSubst = m_astBuilder->create<ThisTypeSubstitution>();
                                     newTargetSubst->interfaceDecl = appThisTypeSubst->interfaceDecl;
                                     newTargetSubst->witness = appThisTypeSubst->witness;
-                                    newTargetSubst->outer = targetInterfaceDeclRef.substitutions.substitutions;
+                                    newTargetSubst->outer = targetInterfaceDeclRef.getSubst();
 
                                     targetType = DeclRefType::create(m_astBuilder,
                                         m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(targetInterfaceDeclRef.getDecl(), newTargetSubst));
@@ -6248,7 +6249,7 @@ namespace Slang
                                     ThisTypeSubstitution* newExtSubst = m_astBuilder->create<ThisTypeSubstitution>();
                                     newExtSubst->interfaceDecl = appThisTypeSubst->interfaceDecl;
                                     newExtSubst->witness = appThisTypeSubst->witness;
-                                    newExtSubst->outer = extDeclRef.substitutions.substitutions;
+                                    newExtSubst->outer = extDeclRef.getSubst();
 
                                     extDeclRef = m_astBuilder->getSpecializedDeclRef<ExtensionDecl>(
                                         extDeclRef.getDecl(),
@@ -6390,7 +6391,7 @@ namespace Slang
         {
             if( auto namespaceDeclRef = declRefExpr->declRef.as<NamespaceDeclBase>() )
             {
-                SLANG_ASSERT(!namespaceDeclRef.substitutions.substitutions);
+                SLANG_ASSERT(!namespaceDeclRef.getSubst());
                 namespaceDecl = namespaceDeclRef.getDecl();
             }
         }
@@ -6649,7 +6650,7 @@ namespace Slang
                 if (auto declRefExpr = as<DeclRefExpr>(primalSubst->funcExpr))
                 {
                     if (auto primalSubstFunc = declRefExpr->declRef.as<FunctionDeclBase>())
-                        return _getFuncDifferentiableLevelImpl(primalSubstFunc, recurseLimit - 1);
+                        return _getFuncDifferentiableLevelImpl(primalSubstFunc.getDecl(), recurseLimit - 1);
                 }
             }
         }
@@ -6713,7 +6714,7 @@ namespace Slang
         SemanticsVisitor*               semantics,
         DeclRef<ContainerDecl> const&   containerDeclRef,
         SyntaxClassBase const&          syntaxClass,
-        void                            (*callback)(DeclRefBase, void*),
+        void                            (*callback)(DeclRefBase*, void*),
         void const*                     userData)
     {
         // We are being asked to invoke the given callback on
@@ -6725,7 +6726,7 @@ namespace Slang
         //
         for( auto memberDeclRef : getMembers(semantics->getASTBuilder(), containerDeclRef))
         {
-            if( memberDeclRef.decl->getClass().isSubClassOfImpl(syntaxClass) )
+            if( memberDeclRef.getDecl()->getClass().isSubClassOfImpl(syntaxClass))
             {
                 callback(memberDeclRef, (void*)userData);
             }
@@ -6757,7 +6758,7 @@ namespace Slang
 
                 for( auto memberDeclRef : getMembers(semantics->getASTBuilder(), extDeclRef) )
                 {
-                    if( memberDeclRef.decl->getClass().isSubClassOfImpl(syntaxClass) )
+                    if( memberDeclRef.getDecl()->getClass().isSubClassOfImpl(syntaxClass))
                     {
                         callback(memberDeclRef, (void*)userData);
                     }
@@ -6858,7 +6859,7 @@ namespace Slang
         {
             if (auto concreteType = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(m_astBuilder, declRefType->declRef))
                 return as<Type>(concreteType);
-            for (auto subst = declRefType->declRef.substitutions.substitutions; subst; subst=subst->outer)
+            for (auto subst = declRefType->declRef.getSubst(); subst; subst=subst->outer)
             {
                 if (auto genericSubst = as<GenericSubstitution>(subst))
                 {
@@ -7022,7 +7023,7 @@ namespace Slang
         for (auto param : func->getParameters())
         {
             auto arg = astBuilder->create<VarExpr>();
-            arg->declRef.decl = param;
+            arg->declRef = makeDeclRef(param);
             arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
             arg->type.type = param->getType();
             arg->loc = loc;
@@ -7038,7 +7039,7 @@ namespace Slang
         for (auto param : originalFuncDecl->getParameters())
         {
             auto arg = visitor->getASTBuilder()->create<VarExpr>();
-            arg->declRef.decl = param;
+            arg->declRef = makeDeclRef(param);
             arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
             arg->type.type = param->getType();
             arg->loc = loc;
@@ -7076,7 +7077,7 @@ namespace Slang
         for (auto param : originalFuncDecl->getParameters())
         {
             auto arg = visitor->getASTBuilder()->create<VarExpr>();
-            arg->declRef.decl = param;
+            arg->declRef = makeDeclRef(param);
             arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
             arg->type.type = param->getType();
             arg->loc = loc;
@@ -7216,7 +7217,7 @@ namespace Slang
         auto derivativeAttr = visitor->getASTBuilder()->create<TDerivativeAttr>();
         derivativeAttr->loc = derivativeOfAttr->loc;
         auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
-        auto declRef = visitor->getASTBuilder()->getSpecializedDeclRef((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
+        auto declRef = makeDeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl));
         auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, derivativeOfAttr->loc, nullptr);
         declRefExpr->type.type = nullptr;
         derivativeAttr->args.add(declRefExpr);
