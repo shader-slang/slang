@@ -355,7 +355,7 @@ namespace Slang
         ManglingContext*    context,
         DeclRef<Decl>       declRef)
     {
-        auto parentDeclRef = declRef.getParent();
+        auto parentDeclRef = declRef.getParent(context->astBuilder);
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )
         {
@@ -441,7 +441,7 @@ namespace Slang
                 // information about the parameters of the generic here.
                 emitRaw(context, "g");
                 UInt genericParameterCount = 0;
-                for( auto mm : getMembers(parentGenericDeclRef) )
+                for( auto mm : getMembers(context->astBuilder, parentGenericDeclRef) )
                 {
                     if(mm.is<GenericTypeParamDecl>())
                     {
@@ -463,7 +463,7 @@ namespace Slang
                 emit(context, genericParameterCount);
 
                 OrderedDictionary<GenericTypeParamDecl*, List<Type*>> genericConstraints;
-                for (auto mm : getMembers(parentGenericDeclRef))
+                for (auto mm : getMembers(context->astBuilder, parentGenericDeclRef))
                 {
                     if (auto genericTypeParamDecl = mm.as<GenericTypeParamDecl>())
                     {
@@ -478,13 +478,13 @@ namespace Slang
                     {}
                 }
 
-                auto canonicalizedConstraints = getCanonicalGenericConstraints(parentGenericDeclRef);
+                auto canonicalizedConstraints = getCanonicalGenericConstraints(context->astBuilder, parentGenericDeclRef);
                 for (auto& constraint : canonicalizedConstraints)
                 {
                     for (auto type : constraint.value)
                     {
                         emitRaw(context, "C");
-                        emitQualifiedName(context, DeclRef<Decl>(constraint.key, nullptr));
+                        emitQualifiedName(context, context->astBuilder->getSpecializedDeclRef(constraint.key, nullptr));
                             emitType(context, type);
                     }
                 }
@@ -501,7 +501,7 @@ namespace Slang
         //
         if( auto callableDeclRef = declRef.as<CallableDecl>())
         {
-            auto parameters = getParameters(callableDeclRef);
+            auto parameters = getParameters(context->astBuilder, callableDeclRef);
             UInt parameterCount = parameters.getCount();
 
             emitRaw(context, "p");
@@ -598,7 +598,7 @@ namespace Slang
     String getMangledName(ASTBuilder* astBuilder, DeclRefBase const & declRef)
     {
         return getMangledName(astBuilder,
-            DeclRef<Decl>(declRef.decl, declRef.substitutions));
+            astBuilder->getSpecializedDeclRef<Decl>(declRef.decl, declRef.substitutions));
     }
 
     String getMangledName(ASTBuilder* astBuilder, Decl* decl)

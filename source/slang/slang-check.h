@@ -24,5 +24,5 @@ namespace Slang
     void registerBuiltinDecls(Session* session, Decl* decl);
 
     OrderedDictionary<GenericTypeParamDecl*, List<Type*>> getCanonicalGenericConstraints(
-        DeclRef<ContainerDecl> genericDecl);
+        ASTBuilder* builder, DeclRef<ContainerDecl> genericDecl);
 }

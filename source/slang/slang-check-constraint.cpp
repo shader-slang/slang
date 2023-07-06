@@ -285,7 +285,7 @@ namespace Slang
         // These seem more reasonable to have influence constraint solving, since it could
         // conceivably let us specialize a `X<T> : IContainer` to `X<Int>` if we find
         // that `X<T>.IndexType == T`.
-        for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
+        for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef) )
         {
             if(!TryUnifyTypes(*system, getSub(m_astBuilder, constraintDeclRef), getSup(m_astBuilder, constraintDeclRef)))
                 return SubstitutionSet();
@@ -323,7 +323,7 @@ namespace Slang
         // and try to solve for each.
         //
         Count paramCounter = 0;
-        for (auto m : getMembers(genericDeclRef))
+        for (auto m : getMembers(m_astBuilder, genericDeclRef))
         {
             if (auto typeParam = m.as<GenericTypeParamDecl>())
             {
@@ -461,7 +461,7 @@ namespace Slang
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
-            DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getSpecializedDeclRef(
                 constraintDecl,
                 solvedSubst);
 

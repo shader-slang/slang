@@ -777,7 +777,7 @@ DeclRef<InterfaceDecl> ExtractExistentialType::getSpecializedInterfaceDeclRef()
     openedThisType->interfaceDecl = interfaceDecl;
     openedThisType->witness = openedWitness;
 
-    DeclRef<InterfaceDecl> specialiedInterfaceDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
+    DeclRef<InterfaceDecl> specialiedInterfaceDeclRef = m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
 
     this->cachedSpecializedInterfaceDeclRef = specialiedInterfaceDeclRef;
     return specialiedInterfaceDeclRef;

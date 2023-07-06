@@ -723,7 +723,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         int diff = 0;
         auto declRefBase = declRef.substituteImpl(astBuilder, substs, &diff);
-        return DeclRef<Decl>(declRefBase.decl, declRefBase.substitutions);
+        return astBuilder->getSpecializedDeclRef<Decl>(declRefBase.decl, declRefBase.substitutions);
     }
 
     Type* substituteType(SubstitutionSet const& substs, ASTBuilder* astBuilder, Type* type)
@@ -1006,7 +1006,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return decl->loc;
     }
 
-    DeclRefBase DeclRefBase::getParent() const
+    DeclRefBase DeclRefBase::getParent(ASTBuilder* astBuilder) const
     {
         // Want access to the free function (the 'as' method by default gets priority)
         // Can access as method with this->as because it removes any ambiguity.
@@ -1054,7 +1054,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             }
         }
 
-        return DeclRefBase(parentDecl, substToApply);
+        return astBuilder->getSpecializedDeclRef(parentDecl, substToApply);
     }
 
     HashCode DeclRefBase::getHashCode() const
@@ -1138,7 +1138,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         funcType->resultType = getResultType(astBuilder, declRef);
         funcType->errorType = getErrorCodeType(astBuilder, declRef);
-        for (auto paramDeclRef : getParameters(declRef))
+        for (auto paramDeclRef : getParameters(astBuilder, declRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
             auto paramType = getParamType(astBuilder, paramDeclRef);

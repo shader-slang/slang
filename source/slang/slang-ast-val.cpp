@@ -349,7 +349,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
     }
 
     DeclaredSubtypeWitness* rs = astBuilder->getOrCreate<DeclaredSubtypeWitness>(
-        substSub, substSup, substDeclRef.getDecl(), substDeclRef.substitutions.substitutions);
+        substSub, substSup, astBuilder->getSpecializedDeclRef(substDeclRef.getDecl(), substDeclRef.substitutions.substitutions));
     rs->sub = substSub;
     rs->sup = substSup;
     rs->declRef = substDeclRef;

@@ -3209,6 +3209,13 @@ int NonUniformResourceIndex(int index)
     return index;
 }
 
+/// HLSL allows NonUniformResourceIndex around non int/uint types. 
+/// It's effect is presumably to ignore it, which the following implementation does.
+/// We should also look to add a warning for this scenario.
+[__unsafeForceInlineEarly] 
+[deprecated("NonUniformResourceIndex on a type other than uint/int is depreciated and has no effect")]
+T NonUniformResourceIndex<T>(T value) { return value; }
+
 // Normalize a vector
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
