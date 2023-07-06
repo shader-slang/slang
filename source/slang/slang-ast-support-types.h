@@ -764,28 +764,9 @@ namespace Slang
             :declRefBase(nullptr)
         {}
         
-        void init(DeclRefBase* base)
-        {
-            if (base && !Slang::as<T>(base->getDecl()))
-                declRefBase = nullptr;
-            else
-                declRefBase = base;
-        }
+        void init(DeclRefBase* base);
 
-        DeclRef(Decl* decl)
-        {
-            DeclRefBase* declRef = nullptr;
-            if (decl)
-            {
-                SLANG_ASSERT(decl->defaultDeclRef);
-                declRef = decl->defaultDeclRef;
-            }
-            else
-            {
-                declRef = nullptr;
-            }
-            init(declRef);
-        }
+        DeclRef(Decl* decl);
 
         DeclRef(DeclRefBase* base)
         {
@@ -799,72 +780,25 @@ namespace Slang
         {
         }
 
-        T* getDecl() const
-        {
-            return declRefBase ? (T*)declRefBase->getDecl() : nullptr;
-        }
+        T* getDecl() const;
+        Substitutions* getSubst() const;
 
-        Substitutions* getSubst() const
-        {
-            return declRefBase ? declRefBase->substitutions : nullptr;
-        }
-
-        Name* getName() const
-        {
-            if (declRefBase)
-                return declRefBase->getName();
-            return nullptr;
-
-        }
+        Name* getName() const;
         
-        SourceLoc getNameLoc() const
-        {
-            if (declRefBase) return declRefBase->getNameLoc();
-            return SourceLoc();
-        }
-        SourceLoc getLoc() const
-        {
-            if (declRefBase) return declRefBase->getLoc();
-            return SourceLoc();
-        }
-        DeclRef<ContainerDecl> getParent(ASTBuilder* astBuilder) const
-        {
-            if (declRefBase) return DeclRef<ContainerDecl>(declRefBase->getParent(astBuilder));
-            return DeclRef<ContainerDecl>((DeclRefBase*)nullptr);
-        }
+        SourceLoc getNameLoc() const;
+        SourceLoc getLoc() const;
+        DeclRef<ContainerDecl> getParent(ASTBuilder* astBuilder) const;
+        HashCode getHashCode() const;
+        Type* substitute(ASTBuilder* astBuilder, Type* type) const;
 
-        HashCode getHashCode() const
-        {
-            if (declRefBase) return declRefBase->getHashCode();
-            return 0;
-        }
-
-        Type* substitute(ASTBuilder* astBuilder, Type* type) const
-        {
-            SLANG_ASSERT(declRefBase);
-            return declRefBase->substitute(astBuilder, type);
-        }
-
-        SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const
-        {
-            SLANG_ASSERT(declRefBase);
-            return declRefBase->substitute(astBuilder, expr);
-        }
+        SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const;
 
         // Apply substitutions to a type or declaration
         template<typename U>
-        DeclRef<U> substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const
-        {
-            SLANG_ASSERT(declRefBase);
-            return DeclRef<U>(declRefBase->substitute(astBuilder, declRef.declRefBase));
-        }
+        DeclRef<U> substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const;
 
         // Apply substitutions to this declaration reference
-        DeclRef<T> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const
-        {
-            SLANG_ASSERT(declRefBase);
-            return DeclRef<T>(declRefBase->substituteImpl(astBuilder, subst, ioDiff));
-        }
+        DeclRef<T> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const;
 
         template<typename U>
         DeclRef<U> as() const
@@ -890,10 +824,7 @@ namespace Slang
         }
 
         template<typename U>
-        bool equals(DeclRef<U> other) const
-        {
-            return declRefBase == other.declRefBase || (declRefBase&&declRefBase->equals(other.declRefBase));
-        }
+        bool equals(DeclRef<U> other) const;
 
         template<typename U>
         bool operator == (DeclRef<U> other) const

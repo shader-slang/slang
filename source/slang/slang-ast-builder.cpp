@@ -340,7 +340,7 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(
 
 DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterface()
 {
-    DeclRef<InterfaceDecl> declRef = getBuiltinDeclRef("DifferentiableType", nullptr);
+    DeclRef<InterfaceDecl> declRef = DeclRef<InterfaceDecl>(getBuiltinDeclRef("DifferentiableType", nullptr));
     return declRef;
 }
 
