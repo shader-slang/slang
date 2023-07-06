@@ -85,7 +85,7 @@ template<typename T>
 T* as(const DeclRefBase* declRefBase) = delete;
 
 template<typename T, typename U>
-DeclRef<T> as(DeclRef<U> declRef) { return declRef.as<T>(); }
+DeclRef<T> as(DeclRef<U> declRef) { return DeclRef<T>(declRef); }
 
 struct Scope : public NodeBase
 {
