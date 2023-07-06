@@ -10222,7 +10222,7 @@ IRTypeLayout* lowerTypeLayout(
                 // so that if we run into another type layout for the
                 // same entry point we will re-use the same keys.
                 //
-                if( !context->mapEntryPointParamToKey.tryGetValue(paramDecl, irFieldKey) )
+                if( !context->mapEntryPointParamToKey.tryGetValue(paramDecl.getDecl(), irFieldKey))
                 {
                     irFieldKey = context->irBuilder->createStructKey();
 
@@ -10239,7 +10239,7 @@ IRTypeLayout* lowerTypeLayout(
                     // of these keys will be local to a single `IREntryPointLayout`,
                     // and we don't support combination at a finer granularity than that.
 
-                    context->mapEntryPointParamToKey.add(paramDecl, irFieldKey);
+                    context->mapEntryPointParamToKey.add(paramDecl.getDecl(), irFieldKey);
                 }
             }
             else

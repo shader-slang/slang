@@ -254,22 +254,29 @@ public:
             });
     }
 
+    // This is the bottlneck through which all DeclRefs are created.
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, Substitutions* subst)
     {
+        // We never create an actual DeclRefBase node to point to a null decl.
+        if (!decl)
+            return DeclRef<T>();
+
+        // If we don't have substitutions, use the default decl ref if it is created.
         if (!subst)
         {
             auto& defaultDeclRef = static_cast<Decl*>(decl)->defaultDeclRef;
             if (defaultDeclRef)
                 return defaultDeclRef;
         }
+
         return getOrCreate<DeclRefBase>(decl, subst);
     }
 
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, SubstitutionSet subst)
     {
-        return getOrCreate<DeclRefBase>(decl, subst.substitutions);
+        return getSpecializedDeclRef(decl, subst.substitutions);
     }
 
     ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
@@ -446,6 +453,11 @@ protected:
         {
             // Keep such that dtor can be run on ASTBuilder being dtored
             m_dtorNodes.add(node);
+        }
+        if (node->getClassInfo().isSubClassOf(*ASTClassInfo::getInfo(Decl::kType)))
+        {
+            auto decl = (Decl*)(node);
+            decl->defaultDeclRef = getSpecializedDeclRef(decl, nullptr);
         }
         return node;
     }

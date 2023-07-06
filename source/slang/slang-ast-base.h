@@ -16,15 +16,13 @@
 namespace Slang
 {  
 
-void initDecl(ASTBuilder* builder, NodeBase* node);
-
 class NodeBase 
 {
     SLANG_ABSTRACT_AST_CLASS(NodeBase)
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.
-    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* astBuilder)
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /*astBuilder*/)
     {
         astNodeType = inAstNodeType;
 #ifdef _DEBUG
@@ -35,10 +33,6 @@ class NodeBase
         if (breakValue != 0 && _debugUID == breakValue)
             SLANG_BREAKPOINT(0)
 #endif
-        if (this->isDerivedFrom(ASTNodeType::Decl))
-        {
-            initDecl(astBuilder, this);
-        }
     }
 
         /// Get the class info 
@@ -83,6 +77,15 @@ SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 {
     return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
 }
+
+// Because DeclRefBase is now a `Val`, we prevent casting it directly into other nodes
+// to avoid confusion and bugs. Instead, use the `as<>()` method on `DeclRefBase` to
+// get a `DeclRef<T>` for a specific node type.
+template<typename T>
+T* as(const DeclRefBase* declRefBase) = delete;
+
+template<typename T, typename U>
+DeclRef<T> as(DeclRef<U> declRef) { return declRef.as<T>(); }
 
 struct Scope : public NodeBase
 {

@@ -1468,7 +1468,7 @@ namespace Slang
         SubstitutionSet substSet;
         if (auto thisTypeSusbt = findThisTypeSubstitution(
             requirementDeclRef.getSubst(),
-            as<InterfaceDecl>(requirementDeclRef.getParent(m_astBuilder))))
+            as<InterfaceDecl>(requirementDeclRef.getParent(m_astBuilder)).getDecl()))
         {
             if (auto declRefType = as<DeclRefType>(thisTypeSusbt->witness->sub))
             {

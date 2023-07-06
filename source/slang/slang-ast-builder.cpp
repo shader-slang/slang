@@ -484,10 +484,4 @@ DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substituti
     return builder->getSpecializedDeclRef(decl, subst);
 }
 
-void initDecl(ASTBuilder* builder, NodeBase* node)
-{
-    auto decl = static_cast<Decl*>(node);
-    decl->defaultDeclRef = builder->getSpecializedDeclRef(decl, nullptr);
-}
-
 } // namespace Slang

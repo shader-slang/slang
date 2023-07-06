@@ -1621,7 +1621,8 @@ namespace Slang
                 while (auto hoInner = as<HigherOrderInvokeExpr>(inner))
                 {
                     lastInner = hoInner;
-                    hoInner->type = innerRef.substitute(m_astBuilder, hoInner->type.type);
+                    if (innerRef)
+                        hoInner->type = innerRef.substitute(m_astBuilder, hoInner->type.type);
                     inner = hoInner->baseFunction;
                 }
                 // Set inner expression to resolved declref expr.

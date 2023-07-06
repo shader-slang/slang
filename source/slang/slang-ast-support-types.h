@@ -761,21 +761,34 @@ namespace Slang
         DeclRef()
             :declRefBase(nullptr)
         {}
+        
+        void init(DeclRefBase* base)
+        {
+            if (base && !Slang::as<T>(base->getDecl()))
+                declRefBase = nullptr;
+            else
+                declRefBase = base;
+        }
+
         DeclRef(Decl* decl)
         {
+            DeclRefBase* declRef = nullptr;
             if (decl)
             {
                 SLANG_ASSERT(decl->defaultDeclRef);
-                declRefBase = decl->defaultDeclRef;
+                declRef = decl->defaultDeclRef;
             }
             else
             {
-                declRefBase = nullptr;
+                declRef = nullptr;
             }
+            init(declRef);
         }
+
         DeclRef(DeclRefBase* base)
-            :declRefBase(base)
-        {}
+        {
+            init(base);
+        }
 
         template <typename U>
         DeclRef(DeclRef<U> const& other,
