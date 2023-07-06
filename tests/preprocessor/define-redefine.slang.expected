@@ -4,6 +4,8 @@ tests/preprocessor/define-redefine.slang(10): warning 15400: redefinition of mac
 #define FOO 2.0f
         ^~~
 tests/preprocessor/define-redefine.slang(6): note: see previous definition of 'FOO'
+#define FOO 1.0f
+        ^~~
 }
 standard output = {
 }

@@ -395,20 +395,12 @@ namespace Slang
         return true;
     }
 
-    static bool _isLocalVar(VarDeclBase* varDecl)
+    [[maybe_unused]]
+    static bool _isUncheckedLocalVar(const Decl* decl)
     {
-        auto pp = varDecl->parentDecl;
-
-        if(as<ScopeDecl>(pp))
-            return true;
-
-        if(auto genericDecl = as<GenericDecl>(pp))
-            pp = genericDecl;
-
-        if(as<FuncDecl>(pp))
-            return true;
-
-        return false;
+        auto checkStateExt = decl->checkState;
+        auto isUnchecked = checkStateExt.getState() == DeclCheckState::Unchecked || checkStateExt.isBeingChecked();
+        return isUnchecked && isLocalVar(decl);
     }
 
     // Get the type to use when referencing a declaration
@@ -422,35 +414,12 @@ namespace Slang
     {
         if( sema )
         {
-            // Hack: if we are somehow referencing a local variable declaration
-            // before the line of code that defines it, then we need to diagnose
-            // an error.
-            //
-            // TODO: The right answer is that lookup should have been performed in
-            // the scope that was in place *before* the variable was declared, but
-            // this is a quick fix that at least alerts the user to how we are
-            // interpreting their code.
-            //
-            // We detect the problematic case by looking for an attempt to reference
-            // a local variable declaration when it is unchecked, or in the process
-            // of being checked (the latter case catches a local variable that refers
-            // to itself in its initial-value expression).
-            //
-            auto checkStateExt = declRef.getDecl()->checkState;
-            if( checkStateExt.getState() == DeclCheckState::Unchecked
-                || checkStateExt.isBeingChecked() )
-            {
-                if(auto varDecl = as<VarDecl>(declRef.getDecl()))
-                {
-                    if(_isLocalVar(varDecl))
-                    {
-                        sema->getSink()->diagnose(varDecl, Diagnostics::localVariableUsedBeforeDeclared, varDecl);
-                        return QualType(astBuilder->getErrorType());
-                    }
-                }
-            }
+            // If this is a local variable which hasn't been checked yet then
+            // it's probably a declare-after-use which has incorrectly got
+            // through declref resolution.
+            SLANG_ASSERT(!_isUncheckedLocalVar(declRef.getDecl()));
 
-            // Once we've rules out the case of referencing a local declaration
+            // Once we've ruled out the case of referencing a local declaration
             // before it has been checked, we will go ahead and ensure that
             // semantic checking has been performed on the chosen declaration,
             // at least up to the point where we can query its type.

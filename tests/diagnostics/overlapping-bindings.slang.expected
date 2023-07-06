@@ -4,6 +4,8 @@ tests/diagnostics/overlapping-bindings.slang(9): warning 39001: explicit binding
 Texture2D b : register(t0);
           ^
 tests/diagnostics/overlapping-bindings.slang(7): note: see declaration of 'a'
+Texture2D a : register(t0);
+          ^
 }
 standard output = {
 }
