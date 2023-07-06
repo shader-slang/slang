@@ -210,4 +210,9 @@ namespace Slang
             throw;
         }
     }
+
+    ASTBuilder* semanticsVisitorGetASTBuilder(SemanticsVisitor* sv)
+    {
+        return sv->getASTBuilder();
+    }
 }
