@@ -2596,6 +2596,13 @@ T length(vector<T, N> x)
     return sqrt(dot(x, x));
 }
 
+// Scalar float length
+__generic<T : __BuiltinFloatingPointType>
+T length(T x) 
+{ 
+    return abs(x); 
+}
+
 // Linear interpolation
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
