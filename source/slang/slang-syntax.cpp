@@ -20,6 +20,11 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
     sb << getText(decl->getName());
 }
 
+void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase)
+{
+    printDiagnosticArg(sb, declRefBase->getDecl());
+}
+
 void printDiagnosticArg(StringBuilder& sb, Type* type)
 {
     if (!type)

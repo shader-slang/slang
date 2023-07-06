@@ -392,6 +392,8 @@ class DeclRefBase : public Val
 
     bool _equalsImplOverride(DeclRefBase* declRef) { return equals(declRef); }
 
+    void _toTextOverride(StringBuilder& out) { toText(out); }
+
     // Returns true if 'as' will return a valid cast
     template <typename T>
     bool is() const { return Slang::as<T>(decl) != nullptr; }

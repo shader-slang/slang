@@ -63,6 +63,8 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
     void printDiagnosticArg(StringBuilder& sb, QualType const& type);
     void printDiagnosticArg(StringBuilder& sb, Val* val);
+    void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase);
+
 
     class SyntaxNode;
     SourceLoc getDiagnosticPos(SyntaxNode const* syntax);
