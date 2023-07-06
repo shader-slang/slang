@@ -457,8 +457,7 @@ bool ASTBuilder::NodeDesc::operator==(NodeDesc const& that) const
         // via a `NodeDesc` *should* all be going through the
         // deduplication path anyway, as should their operands.
         // 
-        if (operands[i].values.nodeOperand[0] != that.operands[i].values.nodeOperand[0]) return false;
-        if (operands[i].values.nodeOperand[1] != that.operands[i].values.nodeOperand[1]) return false;
+        if (operands[i].values.nodeOperand != that.operands[i].values.nodeOperand) return false;
     }
     return true;
 }
@@ -473,8 +472,7 @@ HashCode ASTBuilder::NodeDesc::getHashCode() const
         // to match the semantics implemented for `==` on
         // `NodeDesc`.
         //
-        hasher.hashValue(operands[i].values.nodeOperand[0]);
-        hasher.hashValue(operands[i].values.nodeOperand[1]);
+        hasher.hashValue(operands[i].values.nodeOperand);
     }
     return hasher.getResult();
 }

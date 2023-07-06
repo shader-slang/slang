@@ -114,21 +114,19 @@ public:
     {
         union
         {
-            NodeBase* nodeOperand[2];
-            int64_t intOperand[2];
+            NodeBase* nodeOperand;
+            int64_t intOperand;
         } values;
         NodeOperand()
         {
-            values.nodeOperand[0] = nullptr;
-            values.nodeOperand[1] = nullptr;
+            values.nodeOperand = nullptr;
         }
-        NodeOperand(NodeBase* node) { values.nodeOperand[0] = node; values.nodeOperand[1] = nullptr; }
+        NodeOperand(NodeBase* node) { values.nodeOperand = node; }
         template<typename EnumType>
         NodeOperand(EnumType intVal)
         {
             static_assert(sizeof(EnumType) <= sizeof(values), "size of operand must be less than pointer size.");
-            values.intOperand[0] = 0;
-            values.intOperand[1] = 0;
+            values.intOperand = 0;
             memcpy(&values, &intVal, sizeof(intVal));
         }
     };
