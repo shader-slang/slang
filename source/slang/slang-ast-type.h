@@ -80,10 +80,6 @@ protected:
     DeclRefType(DeclRef<Decl> declRef)
         : declRef(declRef)
     {}
-
-    DeclRefType(Decl* decl, Substitutions* substitutions)
-        : declRef(decl, substitutions)
-    {}
 };
 
 // Base class for types that can be used in arithmetic expressions

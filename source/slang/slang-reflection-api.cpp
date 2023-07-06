@@ -432,7 +432,11 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
-            return (unsigned int)getFields(structDeclRef, MemberFilterStyle::Instance).getCount();
+            return (unsigned int)getFields(
+                       getModule(declRef.decl)->getLinkage()->getASTBuilder(),
+                       structDeclRef,
+                       MemberFilterStyle::Instance)
+                .getCount();
         }
     }
 
@@ -451,7 +455,8 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
-            auto fields = getFields(structDeclRef, MemberFilterStyle::Instance);
+            auto fields = getFields(
+                getModule(declRef)->getLinkage()->getASTBuilder(), structDeclRef, MemberFilterStyle::Instance);
             auto fieldDeclRef = fields[index];
             return (SlangReflectionVariable*) fieldDeclRef.getDecl();
         }

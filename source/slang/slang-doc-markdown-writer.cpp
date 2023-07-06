@@ -271,7 +271,7 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
     List<ASTPrinter::Part> parts;
    
     ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
-    printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
+    printer.addDeclSignature(m_astBuilder->getSpecializedDeclRef<Decl>(callableDecl, nullptr));
 
     Signature signature;
     getSignature(parts, signature);
@@ -689,7 +689,7 @@ void DocMarkdownWriter::writeCallableOverridable(const ASTMarkup::Entry& entry, 
     {
         // Output the overridable path (ie without terminal generic parameters)
         ASTPrinter printer(m_astBuilder);
-        printer.addOverridableDeclPath(DeclRef<Decl>(callableDecl, nullptr));
+        printer.addOverridableDeclPath(DeclRef<Decl>(callableDecl));
         // Extract the name
         out << toSlice("# `") << printer.getStringBuilder() << toSlice("`\n\n");
     }
@@ -938,7 +938,7 @@ void DocMarkdownWriter::_appendAggTypeName(AggTypeDeclBase* aggTypeDecl)
     // This could be lots of different things - struct/class/extension/interface/..
 
     ASTPrinter printer(m_astBuilder);
-    printer.addDeclPath(DeclRef<Decl>(aggTypeDecl, nullptr));
+    printer.addDeclPath(DeclRef<Decl>(aggTypeDecl));
 
     if (as<StructDecl>(aggTypeDecl))
     {
@@ -972,7 +972,7 @@ void DocMarkdownWriter::writeAggType(const ASTMarkup::Entry& entry, AggTypeDeclB
     // We can write out he name using the printer
 
     ASTPrinter printer(m_astBuilder);
-    printer.addDeclPath(DeclRef<Decl>(aggTypeDecl, nullptr));
+    printer.addDeclPath(DeclRef<Decl>(aggTypeDecl));
 
     out << toSlice("# `");
     _appendAggTypeName(aggTypeDecl);
