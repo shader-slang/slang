@@ -1,0 +1,63 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Windows Build CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: [Windows, self-hosted]
+    strategy:
+      matrix:
+        configuration: ['Release']
+        platform: ['x64']
+        include:
+          - platform: Win32
+            testPlatform: x86
+          - platform: x64
+            testPlatform: x64
+          - testCategory: quick
+          - platform: x64
+            testCategory: full
+          - configuration: Debug
+            testCategory: smoke
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
+    - name: setup-msbuild
+      uses: microsoft/setup-msbuild@v1
+    - name: build
+      run: |
+        .\premake.bat vs2019 --arch=${{matrix.platform}} --deps=true --no-progress=true --enable-cuda=true
+        
+        .\make-slang-tag-version.bat
+        
+        MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0 -warnAsError
+    - uses: actions/upload-artifact@v3
+      with:
+        name: slang-build-${{matrix.configuration}}-${{matrix.platform}}-${{matrix.compiler}}
+        path: |
+          slang.h
+          slang-com-helper.h
+          slang-com-ptr.h
+          slang-tag-version.h
+          slang-gfx.h
+          prelude/*.h
+          bin/**/*.dll
+          bin/**/*.exe
+          bin/**/*.so
+          bin/**/slangc
+          bin/**/slangd
+          docs/*.md
+    - name: test
+      run: |
+        $slangTestBinDir = ".\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\";
+        $env:Path += ";$slangTestBinDir";
+        & "$slangTestBinDir\slang-test.exe" -appveyor -bindir "$slangTestBinDir\" -platform ${{matrix.testPlatform}} -configuration ${{matrix.configuration}} -category ${{matrix.testCategory}} 2>&1;
+    
