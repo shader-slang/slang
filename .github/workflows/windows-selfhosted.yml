@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Windows Build CI
+name: Windows Self-Hosted Build and Test
 
 on:
   push:
@@ -16,15 +16,10 @@ jobs:
         configuration: ['Release']
         platform: ['x64']
         include:
-          - platform: Win32
-            testPlatform: x86
           - platform: x64
             testPlatform: x64
-          - testCategory: quick
           - platform: x64
             testCategory: full
-          - configuration: Debug
-            testCategory: smoke
     steps:
     - uses: actions/checkout@v3
       with:
