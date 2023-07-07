@@ -4,6 +4,8 @@ tests/diagnostics/parameter-already-defined.slang(4): error 30200: declaration o
 int foo( int a, float a ) { return 0; }
                       ^
 tests/diagnostics/parameter-already-defined.slang(4): note: see previous declaration of 'a'
+int foo( int a, float a ) { return 0; }
+             ^
 }
 standard output = {
 }

@@ -75,7 +75,7 @@ SourceLoc getDiagnosticPos(Token const& token)
 }
 
 // Take the format string for a diagnostic message, along with its arguments, and turn it into a
-static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int argCount, DiagnosticArg const* const* args)
+static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int argCount, DiagnosticArg const* args)
 {
     char const* spanBegin = format;
     for(;;)
@@ -116,8 +116,8 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
                 }
                 else
                 {
-                    DiagnosticArg const* arg = args[index];
-                    arg->printFunc(sb, arg->data);
+                    DiagnosticArg const& arg = args[index];
+                    arg.printFunc(sb, arg.data);
                 }
             }
             break;
@@ -459,9 +459,7 @@ static void formatDiagnostic(
         _tokenLengthNoteDiagnostic(sink, sourceView, sourceLoc, sb);
     }
 
-    // We don't don't output source line information if this is a 'note' as a note is extra information for one
-    // of the other main severity types, and so the information should already be output on the initial line
-    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.severity != Severity::Note)
+    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.loc.isValid())
     {
         _sourceLocationNoteDiagnostic(sink, sourceView, sourceLoc, sb);
     }
@@ -600,7 +598,7 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
     return effectiveSeverity;
 }
 
-void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* const* args)
+void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* args)
 {
     // Override the severity in the 'info' structure to pass it further into formatDiagnostics
     info.severity = getEffectiveMessageSeverity(info);

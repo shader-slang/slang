@@ -41,6 +41,8 @@ DIAGNOSTIC(-1, Note, seeRequirementDeclaration, "see requirement declaration")
 DIAGNOSTIC(-1, Note, doYouForgetToMakeComponentAccessible, "do you forget to make component '$0' acessible from '$1' (missing public qualifier)?")
 
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
+// An alternate wording of the above note, emphasing the position rather than content of the declaration.
+DIAGNOSTIC(-1, Note, declaredHere, "declared here")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
 DIAGNOSTIC(-1, Note, includeOutput, "include $0")

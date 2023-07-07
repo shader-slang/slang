@@ -21,6 +21,7 @@
 #include "slang-ref-object-reflect.h"
 
 #include <assert.h>
+#include <type_traits>
 
 namespace Slang
 {
@@ -1181,7 +1182,17 @@ namespace Slang
         IgnoreBaseInterfaces = 1 << 0,
         Completion = 1 << 1, ///< Lookup all applicable decls for code completion suggestions
         NoDeref = 1 << 2,
+        ConsiderAllLocalNamesInScope = 1 << 3,
+        ///^ Normally we rely on the checking state of local names to determine
+        /// if they have been declared. If the scopes are currently
+        /// "under-construction" and not being checked, then it's safe to
+        /// consider all names we've inserted so far. This is used when
+        /// checking to see if a keyword is shadowed.
     };
+    inline LookupOptions operator&(LookupOptions a, LookupOptions b)
+    {
+        return (LookupOptions)((std::underlying_type_t<LookupOptions>)a & (std::underlying_type_t<LookupOptions>)b);
+    }
 
     class SerialRefObject;
 
@@ -1423,7 +1434,8 @@ namespace Slang
         LookupMask          mask        = LookupMask::Default;
         LookupOptions       options     = LookupOptions::None;
 
-        bool isCompletionRequest() const { return ((int)options & (int)LookupOptions::Completion) != 0; }
+        bool isCompletionRequest() const { return (options & LookupOptions::Completion) != LookupOptions::None; }
+        bool shouldConsiderAllLocalNames() const { return (options & LookupOptions::ConsiderAllLocalNamesInScope) != LookupOptions::None; }
     };
 
     struct WitnessTable;

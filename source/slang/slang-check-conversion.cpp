@@ -1115,7 +1115,7 @@ namespace Slang
                 if (cost >= kConversionCost_Explicit)
                 {
                     getSink()->diagnose(fromExpr, Diagnostics::typeMismatch, toType, fromType);
-                    getSink()->diagnose(
+                    getSink()->diagnoseWithoutSourceView(
                         fromExpr, Diagnostics::noteExplicitConversionPossible, fromType, toType);
                 }
                 else if (cost >= kConversionCost_Default)

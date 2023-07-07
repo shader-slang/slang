@@ -1909,7 +1909,7 @@ namespace Slang
         {
             if(!thisExpr->type.isLeftValue)
             {
-                getSink()->diagnose(thisExpr, Diagnostics::thisIsImmutableByDefault);
+                getSink()->diagnoseWithoutSourceView(thisExpr, Diagnostics::thisIsImmutableByDefault);
             }
         }
     }
@@ -2130,7 +2130,7 @@ namespace Slang
                                             diagnostic = &Diagnostics::implicitCastUsedAsLValue;
                                         }
 
-                                        getSink()->diagnose(
+                                        getSink()->diagnoseWithoutSourceView(
                                             argExpr,
                                             *diagnostic,
                                             implicitCastExpr->arguments[pp]->type,

@@ -4,6 +4,8 @@ tests/diagnostics/single-target-intrinsic.slang(13): error 30201: function 'doTh
 T doThing<T>(T in);
   ^~~~~~~
 tests/diagnostics/single-target-intrinsic.slang(10): note: see previous definition of 'doThing'
+T doThing<T>(T in);
+  ^~~~~~~
 }
 standard output = {
 }

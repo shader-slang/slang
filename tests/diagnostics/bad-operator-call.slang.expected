@@ -22,6 +22,8 @@ core.meta.slang(2425): note 39999: candidate: func +(half, half) -> half
 core.meta.slang(2417): note 39999: candidate: func +(intptr_t, intptr_t) -> intptr_t
 core.meta.slang(2409): note 39999: candidate: func +(int64_t, int64_t) -> int64_t
 tests/diagnostics/bad-operator-call.slang(20): note 39999: 3 more overload candidates
+    a = a + b;
+          ^
 tests/diagnostics/bad-operator-call.slang(22): error 39999: no overload for '~' applicable to arguments of type (S)
     a = ~b;
         ^
@@ -61,6 +63,8 @@ core.meta.slang(2469): note 39999: candidate: func +<3>(uint, uint3) -> uint3
 core.meta.slang(2465): note 39999: candidate: func +(uint, uint) -> uint
 core.meta.slang(2463): note 39999: candidate: func +<4>(uint16_t4, uint16_t) -> uint16_t4
 tests/diagnostics/bad-operator-call.slang(33): note 39999: 29 more overload candidates
+    d = c + d;
+          ^
 }
 standard output = {
 }
