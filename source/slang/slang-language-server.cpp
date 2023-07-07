@@ -707,11 +707,11 @@ SlangResult LanguageServer::hover(
     }
     else if (auto decl = as<Decl>(leafNode))
     {
-        fillDeclRefHoverInfo(version->linkage->getASTBuilder()->getSpecializedDeclRef(decl, nullptr));
+        fillDeclRefHoverInfo(makeDeclRef(decl));
     }
     else if (auto attr = as<Attribute>(leafNode))
     {
-        fillDeclRefHoverInfo(version->linkage->getASTBuilder()->getSpecializedDeclRef(attr->attributeDecl, nullptr));
+        fillDeclRefHoverInfo(makeDeclRef(attr->attributeDecl));
     }
     if (sb.getLength() == 0)
     {
@@ -1320,7 +1320,7 @@ SlangResult LanguageServer::signatureHelp(
             // Look for initializers
             for (auto member : aggDecl->getMembersOfType<ConstructorDecl>())
             {
-                addDeclRef(version->linkage->getASTBuilder()->getSpecializedDeclRef<Decl>(member, declRefExpr->declRef.substitutions));
+                addDeclRef(version->linkage->getASTBuilder()->getSpecializedDeclRef<Decl>(member, declRefExpr->declRef.getSubst()));
             }
         }
         else

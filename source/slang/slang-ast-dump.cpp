@@ -436,7 +436,7 @@ struct ASTDumpContext
         m_writer->emit("}");
     }
 
-    void dump(DeclRefBase declRef)
+    void dump(DeclRefBase* declRef)
     {
         StringBuilder sb;
         sb << declRef;

@@ -13,7 +13,7 @@ namespace Slang
         DeclaredSubtypeWitness* witness = m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
             breadcrumb->sub,
             breadcrumb->sup,
-            m_astBuilder->getSpecializedDeclRef(breadcrumb->declRef.decl, breadcrumb->declRef.substitutions.substitutions));
+            breadcrumb->declRef);
         return witness;
     }
 
@@ -143,7 +143,7 @@ namespace Slang
             {
                 DeclaredSubtypeWitness* declaredWitness =
                     m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
-                        bb->sub, bb->sup, m_astBuilder->getSpecializedDeclRef(bb->declRef.decl, bb->declRef.substitutions.substitutions));
+                        bb->sub, bb->sup, bb->declRef);
 
                 TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>();
                 transitiveWitness->sub = subType;
@@ -472,7 +472,7 @@ namespace Slang
             leftBreadcrumb.prev = inBreadcrumbs;
             leftBreadcrumb.sub = andType;
             leftBreadcrumb.sup = DeclRefType::create(m_astBuilder, superTypeDeclRef);
-            leftBreadcrumb.declRef = makeDeclRef((Decl*)nullptr);
+            leftBreadcrumb.declRef = DeclRef<Decl>();
             leftBreadcrumb.flavor = TypeWitnessBreadcrumb::Flavor::AndTypeLeftFlavor;
 
             if(_isDeclaredSubtype(originalSubType, andType->left, superTypeDeclRef, outWitness, &leftBreadcrumb))
@@ -484,7 +484,7 @@ namespace Slang
             rightBreadcrumb.prev = inBreadcrumbs;
             rightBreadcrumb.sub = andType;
             rightBreadcrumb.sup = DeclRefType::create(m_astBuilder, superTypeDeclRef);
-            rightBreadcrumb.declRef = makeDeclRef((Decl*)nullptr);
+            rightBreadcrumb.declRef = DeclRef<Decl>();
             rightBreadcrumb.flavor = TypeWitnessBreadcrumb::Flavor::AndTypeRightFlavor;
 
             if(_isDeclaredSubtype(originalSubType, andType->right, superTypeDeclRef, outWitness, &rightBreadcrumb))

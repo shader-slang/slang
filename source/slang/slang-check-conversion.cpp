@@ -163,7 +163,7 @@ namespace Slang
             ioInitArgIndex);
     }
 
-    DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef)
+    DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef)
     {
         auto inheritanceDecl = getMembersOfType<InheritanceDecl>(astBuilder, structTypeDeclRef).getFirstOrNull();
         if(!inheritanceDecl)
@@ -182,7 +182,7 @@ namespace Slang
         return baseDeclRefType;
     }
 
-    DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef)
+    DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef)
     {
         auto inheritanceDecl = getMembersOfType<InheritanceDecl>(astBuilder, structTypeDeclRef).getFirstOrNull();
         if (!inheritanceDecl)

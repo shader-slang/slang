@@ -3984,7 +3984,7 @@ static TypeLayoutResult _createTypeLayout(
         {
             if( auto concreteType = findGlobalGenericSpecializationArg(
                 context,
-                globalGenericParamDecl) )
+                globalGenericParamDecl.getDecl()) )
             {
                 // If we know what concrete type has been used to specialize
                 // the global generic type parameter, then we should use
@@ -3997,7 +3997,7 @@ static TypeLayoutResult _createTypeLayout(
                 // Otherwise we must create a type layout that represents
                 // the generic type parameter itself.
                 //
-                return _createTypeLayoutForGlobalGenericTypeParam(context, type, globalGenericParamDecl);
+                return _createTypeLayoutForGlobalGenericTypeParam(context, type, globalGenericParamDecl.getDecl());
             }
         }
         else if (auto assocTypeParam = declRef.as<AssocTypeDecl>())

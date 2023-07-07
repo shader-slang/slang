@@ -52,22 +52,22 @@ namespace Slang
         DeclRef<AggTypeDecl> const& declRef,
         SemanticsVisitor*           semantics);
 
-    inline FilteredMemberRefList<Decl> getMembers(ASTBuilder* astBuilder, DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
+    inline FilteredMemberRefList<Decl> getMembers(ASTBuilder* astBuilder, DeclRef<ContainerDecl> declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<Decl>(astBuilder, declRef.getDecl()->members, declRef.substitutions, filterStyle);
+        return FilteredMemberRefList<Decl>(astBuilder, declRef.getDecl()->members, declRef.getSubst(), filterStyle);
     }
 
     template<typename T>
-    inline FilteredMemberRefList<T> getMembersOfType(ASTBuilder* astBuilder, DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
+    inline FilteredMemberRefList<T> getMembersOfType(ASTBuilder* astBuilder, DeclRef<ContainerDecl> declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<T>(astBuilder, declRef.getDecl()->members, declRef.substitutions, filterStyle);
+        return FilteredMemberRefList<T>(astBuilder, declRef.getDecl()->members, declRef.getSubst(), filterStyle);
     }
 
     void _foreachDirectOrExtensionMemberOfType(
         SemanticsVisitor*               semantics,
         DeclRef<ContainerDecl> const&   declRef,
         SyntaxClassBase const&          syntaxClass,
-        void                            (*callback)(DeclRefBase, void*),
+        void                            (*callback)(DeclRefBase*, void*),
         void const*                     userData);
 
     DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst);
@@ -82,9 +82,9 @@ namespace Slang
         {
             const F* userFunc;
             SemanticsVisitor* semanticsVisitor;
-            static void callback(DeclRefBase declRef, void* userData)
+            static void callback(DeclRefBase* declRef, void* userData)
             {
-                (*((*(Helper*)userData).userFunc))(_getSpecializedDeclRef(semanticsVisitorGetASTBuilder((*(Helper*)userData).semanticsVisitor), declRef.decl, declRef.substitutions).template as<T>());
+                (*((*(Helper*)userData).userFunc))(DeclRef<T>(declRef));
             }
         };
         Helper helper;
@@ -108,72 +108,72 @@ namespace Slang
         ///
     Name* getReflectionName(VarDeclBase* varDecl);
 
-    inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
+    inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
         /// same as getType, but take into account the additional type modifiers from the parameter's modifier list
         /// and return a ModifiedType if such modifiers exist.
-    Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& paramDeclRef);
+    Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
 
-    inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
+    inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->initExpr);
     }
 
-    inline Type* getType(ASTBuilder* astBuilder, DeclRef<PropertyDecl> const& declRef)
+    inline Type* getType(ASTBuilder* astBuilder, DeclRef<PropertyDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
-    inline Type* getType(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> const& declRef)
+    inline Type* getType(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
-    inline SubstExpr<Expr> getTagExpr(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> const& declRef)
+    inline SubstExpr<Expr> getTagExpr(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->tagExpr);
     }
 
-    inline Type* getTargetType(ASTBuilder* astBuilder, DeclRef<ExtensionDecl> const& declRef)
+    inline Type* getTargetType(ASTBuilder* astBuilder, DeclRef<ExtensionDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->targetType.Ptr());
     }
     
-    inline FilteredMemberRefList<VarDecl> getFields(ASTBuilder* astBuilder, DeclRef<StructDecl> const& declRef, MemberFilterStyle filterStyle)
+    inline FilteredMemberRefList<VarDecl> getFields(ASTBuilder* astBuilder, DeclRef<StructDecl> declRef, MemberFilterStyle filterStyle)
     {
         return getMembersOfType<VarDecl>(astBuilder, declRef, filterStyle);
     }
 
             /// If the given `structTypeDeclRef` inherits from another struct type, return that base type
-    DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef);
+    DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef);
 
         /// If the given `structTypeDeclRef` inherits from another struct type, return that base struct decl
-    DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef);
+    DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef);
 
-    inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> const& declRef)
+    inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->tagType);
     }
 
-    inline Type* getBaseType(ASTBuilder* astBuilder, DeclRef<InheritanceDecl> const& declRef)
+    inline Type* getBaseType(ASTBuilder* astBuilder, DeclRef<InheritanceDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->base.type);
     }
     
-    inline Type* getType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef)
+    inline Type* getType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
-    inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
+    inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
     }
 
-    inline Type* getErrorCodeType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
+    inline Type* getErrorCodeType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
     {
         if (declRef.getDecl()->errorType.type)
         {
@@ -185,12 +185,12 @@ namespace Slang
         }
     }
 
-    inline FilteredMemberRefList<ParamDecl> getParameters(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
+    inline FilteredMemberRefList<ParamDecl> getParameters(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
     {
         return getMembersOfType<ParamDecl>(astBuilder, declRef);
     }
 
-    inline Decl* getInner(DeclRef<GenericDecl> const& declRef)
+    inline Decl* getInner(DeclRef<GenericDecl> declRef)
     {
         // TODO: Should really return a `DeclRef<Decl>` for the inner
         // declaration, and not just a raw pointer

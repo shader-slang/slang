@@ -62,7 +62,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                         return;
                     SemanticToken token =
                         _createSemanticToken(manager, declRef->loc, declRef->name);
-                    auto target = declRef->declRef.decl;
+                    auto target = declRef->declRef.getDecl();
                     if (as<AggTypeDecl>(target))
                     {
                         if (target->hasModifier<BuiltinTypeModifier>())

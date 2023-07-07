@@ -290,7 +290,7 @@ namespace Slang
             if(!TryUnifyTypes(*system, getSub(m_astBuilder, constraintDeclRef), getSup(m_astBuilder, constraintDeclRef)))
                 return SubstitutionSet();
         }
-        SubstitutionSet resultSubst = genericDeclRef.substitutions;
+        SubstitutionSet resultSubst = genericDeclRef.getSubst();
 
         // Once have built up the full list of constraints we are trying to satisfy,
         // we will attempt to solve for each parameter in a way that satisfies all
@@ -457,7 +457,7 @@ namespace Slang
         // apply the substitutions we already know...
 
         GenericSubstitution* solvedSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getDecl(), args, genericDeclRef.substitutions.substitutions);
+            genericDeclRef.getDecl(), args, genericDeclRef.getSubst());
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
@@ -510,7 +510,7 @@ namespace Slang
         }
 
         resultSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getDecl(), args, genericDeclRef.substitutions.substitutions);
+            genericDeclRef.getDecl(), args, genericDeclRef.getSubst());
         return resultSubst;
     }
 
@@ -737,8 +737,8 @@ namespace Slang
                 // to each declaration reference.
                 if (!tryUnifySubstitutions(
                     constraints,
-                    fstDeclRef.substitutions.substitutions,
-                    sndDeclRef.substitutions.substitutions))
+                    fstDeclRef.getSubst(),
+                    sndDeclRef.getSubst()))
                 {
                     return false;
                 }

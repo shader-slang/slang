@@ -172,7 +172,7 @@ namespace Slang
                     // Look at a candidate definition to be called and
                     // see if it gives us a key to work with.
                     //
-                    Decl* funcDecl = item.declRef.decl;
+                    Decl* funcDecl = item.declRef.getDecl();
                     if (auto genDecl = as<GenericDecl>(funcDecl))
                         funcDecl = genDecl->inner;
 
@@ -707,9 +707,9 @@ namespace Slang
         void ensureDecl(Decl* decl, DeclCheckState state, SemanticsContext* baseContext = nullptr);
 
             /// Helper routine allowing `ensureDecl` to be called on a `DeclRef`
-        void ensureDecl(DeclRefBase const& declRef, DeclCheckState state)
+        void ensureDecl(DeclRefBase* declRef, DeclCheckState state)
         {
-            ensureDecl(declRef.getDecl(), state);
+            ensureDecl(declRef->getDecl(), state);
         }
 
             /// Helper routine allowing `ensureDecl` to be used on a `DeclBase`

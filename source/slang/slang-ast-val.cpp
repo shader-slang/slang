@@ -317,7 +317,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
     // so we'll need to change this location in the code if we ever clean
     // up the hierarchy.
     //
-    if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(substDeclRef.decl))
+    if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(substDeclRef.getDecl()))
     {
         if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->parentDecl))
         {
@@ -326,7 +326,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
                 // At this point we have a constraint decl for an associated type,
                 // and we nee to see if we are dealing with a concrete substitution
                 // for the interface around that associated type.
-                if (auto thisTypeSubst = findThisTypeSubstitution(substDeclRef.substitutions, interfaceDecl))
+                if (auto thisTypeSubst = findThisTypeSubstitution(substDeclRef.getSubst(), interfaceDecl))
                 {
                     // We need to look up the declaration that satisfies
                     // the requirement named by the associated type.
@@ -349,7 +349,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
     }
 
     DeclaredSubtypeWitness* rs = astBuilder->getOrCreate<DeclaredSubtypeWitness>(
-        substSub, substSup, astBuilder->getSpecializedDeclRef(substDeclRef.getDecl(), substDeclRef.substitutions.substitutions));
+        substSub, substSup, astBuilder->getSpecializedDeclRef(substDeclRef.getDecl(), substDeclRef.getSubst()));
     rs->sub = substSub;
     rs->sup = substSup;
     rs->declRef = substDeclRef;

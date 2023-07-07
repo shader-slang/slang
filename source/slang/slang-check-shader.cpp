@@ -583,7 +583,7 @@ namespace Slang
         return varDecl->getName();
     }
 
-    Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& paramDeclRef)
+    Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     {
         auto paramType = getType(astBuilder, paramDeclRef);
         if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
@@ -1207,17 +1207,15 @@ namespace Slang
                 getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
                     genericDeclRef.getDecl(),
                     genericArgs,
-                    genericDeclRef.substitutions.substitutions);
+                    genericDeclRef.getSubst());
+            ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
-            for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
+            for (auto constraintDecl : getMembersOfType<GenericTypeConstraintDecl>(
+                     getLinkage()->getASTBuilder(), DeclRef<ContainerDecl>(genericDeclRef)))
             {
-                auto constraintSubst = genericDeclRef.substitutions;
-                constraintSubst.substitutions = genericSubst;
+                DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getSpecializedDeclRef(
+                    constraintDecl.getDecl(), genericSubst);
 
-                DeclRef<GenericTypeConstraintDecl> constraintDeclRef = getLinkage()->getASTBuilder()->getSpecializedDeclRef(
-                    constraintDecl, constraintSubst);
-
-                ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
                 auto sub = getSub(astBuilder, constraintDeclRef);
                 auto sup = getSup(astBuilder, constraintDeclRef);
@@ -1239,8 +1237,8 @@ namespace Slang
                 getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
                     genericDeclRef.getDecl(),
                     genericArgs,
-                    genericDeclRef.substitutions.substitutions);
-            specializedFuncDeclRef.substitutions.substitutions = genericSubst;
+                    genericDeclRef.getSubst());
+            specializedFuncDeclRef = astBuilder->getSpecializedDeclRef(specializedFuncDeclRef.getDecl(), genericSubst);
         }
 
         info->specializedFuncDeclRef = specializedFuncDeclRef;

@@ -156,7 +156,7 @@ namespace Slang
     {
         auto expr = context.originalExpr;
 
-        auto decl = candidate.item.declRef.decl;
+        auto decl = candidate.item.declRef.getDecl();
 
         if(const auto prefixExpr = as<PrefixExpr>(expr))
         {
@@ -516,16 +516,14 @@ namespace Slang
         SLANG_ASSERT(subst);
 
         subst->genericDecl = genericDeclRef.getDecl();
-        subst->outer = genericDeclRef.substitutions.substitutions;
+        subst->outer = genericDeclRef.getSubst();
 
         List<Val*> newArgs = subst->getArgs();
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
-            auto subset = genericDeclRef.substitutions;
-            subset.substitutions = subst;
             DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getSpecializedDeclRef(
-                constraintDecl, subset);
+                constraintDecl, subst);
 
             auto sub = getSub(m_astBuilder, constraintDeclRef);
             auto sup = getSup(m_astBuilder, constraintDeclRef);
@@ -545,7 +543,7 @@ namespace Slang
             }
         }
 
-        candidate.subst = m_astBuilder->getOrCreateGenericSubstitution(genericDeclRef.getDecl(), newArgs, genericDeclRef.substitutions.substitutions);
+        candidate.subst = m_astBuilder->getOrCreateGenericSubstitution(genericDeclRef.getDecl(), newArgs, genericDeclRef.getSubst());
 
         // Done checking all the constraints, hooray.
         return true;
@@ -596,7 +594,7 @@ namespace Slang
         }
 
         subst->genericDecl = baseGenericRef.getDecl();
-        subst->outer = baseGenericRef.substitutions.substitutions;
+        subst->outer = baseGenericRef.getSubst();
 
         DeclRef<Decl> innerDeclRef = m_astBuilder->getSpecializedDeclRef<Decl>(getInner(baseGenericRef), subst);
 
@@ -822,8 +820,8 @@ namespace Slang
         // directly (it is only visible through the requirement witness
         // information for inheritance declarations).
         //
-        bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef);
-        bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef);
+        bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
+        bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
         if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
             return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
 
@@ -1233,7 +1231,7 @@ namespace Slang
         // use any substitutions that were in place for referring to the
         // generic itself.
         //
-        Substitutions* substForInnerDecl = genericDeclRef.substitutions;
+        Substitutions* substForInnerDecl = genericDeclRef.getSubst();
         //
         // In the case where we have explicit/known arguments,
         // we will use those as our baseline substitutions.
@@ -1274,7 +1272,7 @@ namespace Slang
             //
             if (valueArgCount > valueParamCount)
             {
-                return DeclRef<Decl>(nullptr);
+                return DeclRef<Decl>();
             }
 
             // If any of the arguments were specified explicitly (and are thus known),
@@ -1310,7 +1308,7 @@ namespace Slang
         else
         {
             // TODO(tfoley): any other cases needed here?
-            return DeclRef<Decl>(nullptr);
+            return DeclRef<Decl>();
         }
 
         // Once we have added all the appropriate constraints to the system, we
@@ -1338,7 +1336,7 @@ namespace Slang
             // diagnostics), or this code could have a "just trying" vs. "actually
             // do things" distinction like some other steps.
             //
-            return DeclRef<Decl>(nullptr);
+            return DeclRef<Decl>();
         }
 
         // If we found a solution (that is, a set of argument values that satisfy
@@ -1623,7 +1621,8 @@ namespace Slang
                 while (auto hoInner = as<HigherOrderInvokeExpr>(inner))
                 {
                     lastInner = hoInner;
-                    hoInner->type = innerRef.substitute(m_astBuilder, hoInner->type.type);
+                    if (innerRef)
+                        hoInner->type = innerRef.substitute(m_astBuilder, hoInner->type.type);
                     inner = hoInner->baseFunction;
                 }
                 // Set inner expression to resolved declref expr.

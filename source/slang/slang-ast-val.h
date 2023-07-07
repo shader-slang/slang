@@ -129,7 +129,7 @@ public:
                 if (thisGenParam->equalsVal(thatGenParam))
                     return power < other.power;
                 else
-                    return thisGenParam->declRef.decl < thatGenParam->declRef.decl;
+                    return thisGenParam->declRef.getDecl() < thatGenParam->declRef.getDecl();
             }
             else
             {

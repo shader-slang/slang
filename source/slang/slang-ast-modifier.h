@@ -1055,7 +1055,7 @@ class DifferentiableAttribute : public Attribute
     SLANG_AST_CLASS(DifferentiableAttribute)
 
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-    OrderedDictionary<DeclRefBase, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+    OrderedDictionary<DeclRefBase*, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
 
     SLANG_UNREFLECTED ValSet m_typeRegistrationWorkingSet;
 };

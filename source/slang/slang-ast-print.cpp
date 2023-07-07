@@ -172,7 +172,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
         !declRef.as<GenericValueParamDecl>() &&
         !declRef.as<GenericTypeParamDecl>())
     {
-        auto genSubst = as<GenericSubstitution>(declRef.substitutions.substitutions);
+        auto genSubst = as<GenericSubstitution>(declRef.getSubst());
         if (genSubst)
         {
             SLANG_RELEASE_ASSERT(genSubst);
@@ -276,7 +276,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
 
             auto rangeStart = sb.getLength();
 
-            ParamDecl* paramDecl = paramDeclRef;
+            ParamDecl* paramDecl = paramDeclRef.getDecl();
 
             {
                 ScopePart scopePart(this, Part::Type::ParamType);
@@ -331,7 +331,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
     {
         addGenericParams(genericDeclRef);
 
-        addDeclParams(m_astBuilder->getSpecializedDeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.substitutions), outParamRange);
+        addDeclParams(m_astBuilder->getSpecializedDeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.getSubst()), outParamRange);
     }
     else
     {
@@ -443,10 +443,10 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     DeclRef<Decl> declRef = inDeclRef;
     if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
-        declRef = m_astBuilder->getSpecializedDeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.substitutions);
+        declRef = m_astBuilder->getSpecializedDeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.getSubst());
     }
 
-    if (as<ConstructorDecl>(declRef))
+    if (declRef.as<ConstructorDecl>())
     {
     }
     else if (auto callableDeclRef = declRef.as<CallableDecl>())

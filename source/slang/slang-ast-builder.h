@@ -114,21 +114,26 @@ public:
     {
         union
         {
-            NodeBase* nodeOperand[2];
-            int64_t intOperand[2];
+            NodeBase* nodeOperand;
+            int64_t intOperand;
         } values;
+        
         NodeOperand()
         {
-            values.nodeOperand[0] = nullptr;
-            values.nodeOperand[1] = nullptr;
+            values.nodeOperand = nullptr;
         }
-        NodeOperand(NodeBase* node) { values.nodeOperand[0] = node; values.nodeOperand[1] = nullptr; }
+        
+        NodeOperand(NodeBase* node) { values.nodeOperand = node; }
+        
+        template<typename T>
+        NodeOperand(DeclRef<T> declRef) { values.nodeOperand = declRef.declRefBase; }
+
         template<typename EnumType>
         NodeOperand(EnumType intVal)
         {
+            static_assert(std::is_trivial<EnumType>::value, "Type to construct NodeOperand must be trivial.");
             static_assert(sizeof(EnumType) <= sizeof(values), "size of operand must be less than pointer size.");
-            values.intOperand[0] = 0;
-            values.intOperand[1] = 0;
+            values.intOperand = 0;
             memcpy(&values, &intVal, sizeof(intVal));
         }
     };
@@ -254,16 +259,29 @@ public:
             });
     }
 
+    // This is the bottlneck through which all DeclRefs are created.
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, Substitutions* subst)
     {
-        return DeclRef<T>(this, decl, subst);
+        // We never create an actual DeclRefBase node to point to a null decl.
+        if (!decl)
+            return DeclRef<T>();
+
+        // If we don't have substitutions, use the default decl ref if it is created.
+        if (!subst)
+        {
+            auto defaultDeclRef = static_cast<Decl*>(decl)->defaultDeclRef;
+            if (defaultDeclRef)
+                return defaultDeclRef;
+        }
+
+        return getOrCreate<DeclRefBase>(decl, subst);
     }
 
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, SubstitutionSet subst)
     {
-        return DeclRef<T>(this, decl, subst);
+        return getSpecializedDeclRef(decl, subst.substitutions);
     }
 
     ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
@@ -271,17 +289,9 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    DeclRefType* getOrCreateDeclRefType(Decl* decl, Substitutions* outer)
+    DeclRefType* getOrCreateDeclRefType(DeclRefBase* declRef)
     {
-        NodeDesc desc;
-        desc.type = DeclRefType::kType;
-        desc.operands.add(decl);
-        if (outer)
-        {
-            desc.operands.add(outer);
-        }
-        auto result = (DeclRefType*)_getOrCreateImpl(desc, [&]() {return create<DeclRefType>(getSpecializedDeclRef(decl, outer)); });
-        return result;
+        return getOrCreate<DeclRefType>(declRef);
     }
 
     GenericSubstitution* getOrCreateGenericSubstitution(GenericDecl* decl, const List<Val*>& args, Substitutions* outer)
@@ -448,6 +458,11 @@ protected:
         {
             // Keep such that dtor can be run on ASTBuilder being dtored
             m_dtorNodes.add(node);
+        }
+        if (node->getClassInfo().isSubClassOf(*ASTClassInfo::getInfo(Decl::kType)))
+        {
+            auto decl = (Decl*)(node);
+            decl->defaultDeclRef = getSpecializedDeclRef(decl, nullptr);
         }
         return node;
     }

@@ -803,7 +803,7 @@ LoweredValInfo emitCallToDeclRef(
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {
-        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.decl) && !as<InterfaceDecl>(ctorDeclRef.decl->parentDecl))
+        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.getDecl()) && !as<InterfaceDecl>(ctorDeclRef.getParent(context->astBuilder).getDecl()))
         {
             SLANG_UNREACHABLE("stdlib error: __init() has no definition.");
         }
@@ -1398,7 +1398,7 @@ void getGenericTypeConformances(IRGenContext* context, ShortList<IRType*>& supTy
         {
             if (auto declRefType = as<DeclRefType>(typeConstraint->sub.type))
             {
-                if (declRefType->declRef.decl == genericParamDecl)
+                if (declRefType->declRef.getDecl() == genericParamDecl)
                 {
                     supTypes.add(lowerType(context, typeConstraint->getSup().type));
                 }
@@ -1531,7 +1531,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         if (auto declaredMidToSup = as<DeclaredSubtypeWitness>(val->midToSup))
         {
-            midToSup = getInterfaceRequirementKey(context, declaredMidToSup->declRef.decl);
+            midToSup = getInterfaceRequirementKey(context, declaredMidToSup->declRef.getDecl());
         }
         else
         {
@@ -2049,7 +2049,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRInst*> operands;
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
-        _collectSubstitutionArgs(operands, type->declRef.substitutions.substitutions);
+        _collectSubstitutionArgs(operands, type->declRef.getSubst());
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),
@@ -2821,9 +2821,8 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, SemanticsVisitor* semantics, Decl* decl)
 {
-    DeclRef<Decl> declRef;
-    declRef.decl = decl;
-    declRef.substitutions = createDefaultSubstitutions(context->astBuilder, semantics, decl);
+    DeclRef<Decl> declRef = context->astBuilder->getSpecializedDeclRef(
+        decl, createDefaultSubstitutions(context->astBuilder, semantics, decl));
     return declRef;
 }
 //
@@ -2964,8 +2963,8 @@ IRLoweringParameterInfo getParameterInfo(
     IRLoweringParameterInfo info;
 
     info.type = getParamType(context->astBuilder, paramDecl);
-    info.decl = paramDecl;
-    info.direction = getParameterDirection(paramDecl);
+    info.decl = paramDecl.getDecl();
+    info.direction = getParameterDirection(paramDecl.getDecl());
     info.isThisParam = false;
     return info;
 }
@@ -3039,13 +3038,13 @@ void collectParameterLists(
         // the outer declaration. The most important question here
         // is whether parameters of the outer declaration should
         // also count as parameters of the inner declaration.
-        ParameterListCollectMode innerMode = getModeForCollectingParentParameters(declRef, parentDeclRef);
+        ParameterListCollectMode innerMode = getModeForCollectingParentParameters(declRef.getDecl(), parentDeclRef.getDecl());
 
         // Don't down-grade our `static`-ness along the chain.
         if(innerMode < mode)
             innerMode = mode;
 
-        ParameterDirection innerThisParamDirection = getThisParamDirection(declRef, thisParamDirection);
+        ParameterDirection innerThisParamDirection = getThisParamDirection(declRef.getDecl(), thisParamDirection);
 
 
         // Now collect any parameters from the parent declaration itself
@@ -8010,7 +8009,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             if (auto declRefType = as<DeclRefType>(constraintDecl->sub.type))
             {
-                auto typeParamDeclVal = subContext->findLoweredDecl(declRefType->declRef.decl);
+                auto typeParamDeclVal = subContext->findLoweredDecl(declRefType->declRef.getDecl());
                 SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
                 subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
             }
@@ -9531,8 +9530,8 @@ LoweredValInfo emitDeclRef(
 {
     return emitDeclRef(
         context,
-        declRef.decl,
-        declRef.substitutions.substitutions,
+        declRef.getDecl(),
+        declRef.getSubst(),
         type);
 }
 
@@ -10008,7 +10007,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
                 auto shaderParam = module->getShaderParam(ii);
                 auto specializationArgCount = shaderParam.specializationParamCount;
 
-                IRInst* irParam = getSimpleVal(context, ensureDecl(context, shaderParam.paramDeclRef));
+                IRInst* irParam = getSimpleVal(context, ensureDecl(context, shaderParam.paramDeclRef.getDecl()));
                 List<IRInst*> irSlotArgs;
                 // Tracks if there are any type args that is not an IRDynamicType.
                 bool hasConcreteTypeArg = false;
@@ -10223,7 +10222,7 @@ IRTypeLayout* lowerTypeLayout(
                 // so that if we run into another type layout for the
                 // same entry point we will re-use the same keys.
                 //
-                if( !context->mapEntryPointParamToKey.tryGetValue(paramDecl, irFieldKey) )
+                if( !context->mapEntryPointParamToKey.tryGetValue(paramDecl.getDecl(), irFieldKey))
                 {
                     irFieldKey = context->irBuilder->createStructKey();
 
@@ -10240,13 +10239,13 @@ IRTypeLayout* lowerTypeLayout(
                     // of these keys will be local to a single `IREntryPointLayout`,
                     // and we don't support combination at a finer granularity than that.
 
-                    context->mapEntryPointParamToKey.add(paramDecl, irFieldKey);
+                    context->mapEntryPointParamToKey.add(paramDecl.getDecl(), irFieldKey);
                 }
             }
             else
             {
                 irFieldKey = getSimpleVal(context,
-                    ensureDecl(context, fieldDecl));
+                    ensureDecl(context, fieldDecl.getDecl()));
             }
             SLANG_ASSERT(irFieldKey);
 
@@ -10465,7 +10464,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // has been emitted to this module, so that we will have something
         // to decorate.
         //
-        auto irVar = getSimpleVal(context, ensureDecl(context, varDecl));
+        auto irVar = getSimpleVal(context, ensureDecl(context, varDecl.getDecl()));
 
         auto irLayout = lowerVarLayout(context, varLayout);
 

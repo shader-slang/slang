@@ -66,7 +66,6 @@ class DeclRefType : public Type
 
     DeclRef<Decl> declRef;
 
-    
     static DeclRefType* create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
     // Overrides should be public so base classes can access
@@ -76,9 +75,8 @@ class DeclRefType : public Type
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-protected:
-    DeclRefType(DeclRef<Decl> declRef)
-        : declRef(declRef)
+    DeclRefType(DeclRefBase* declRefBase)
+        : declRef(declRefBase)
     {}
 };
 

@@ -271,7 +271,7 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
     List<ASTPrinter::Part> parts;
    
     ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
-    printer.addDeclSignature(m_astBuilder->getSpecializedDeclRef<Decl>(callableDecl, nullptr));
+    printer.addDeclSignature(makeDeclRef(callableDecl));
 
     Signature signature;
     getSignature(parts, signature);

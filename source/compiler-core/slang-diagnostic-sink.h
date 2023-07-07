@@ -112,7 +112,7 @@ void printDiagnosticArg(StringBuilder& sb, RefPtr<T> ptr)
 inline SourceLoc getDiagnosticPos(SourceLoc const& pos) { return pos;  }
 
 SourceLoc getDiagnosticPos(Token const& token);
-    
+
 
 template<typename T>
 SourceLoc getDiagnosticPos(RefPtr<T> const& ptr)

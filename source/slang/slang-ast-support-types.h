@@ -63,10 +63,13 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
     void printDiagnosticArg(StringBuilder& sb, QualType const& type);
     void printDiagnosticArg(StringBuilder& sb, Val* val);
+    void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase);
+
 
     class SyntaxNode;
     SourceLoc getDiagnosticPos(SyntaxNode const* syntax);
     SourceLoc getDiagnosticPos(TypeExp const& typeExp);
+    SourceLoc getDiagnosticPos(DeclRefBase* declRef);
 
     typedef NodeBase* (*SyntaxParseCallback)(Parser* parser, void* userData);
 
@@ -743,184 +746,107 @@ namespace Slang
     struct DeclRef;
     Module* getModule(Decl* decl);
 
-    // A reference to a declaration, which may include
-    // substitutions for generic parameters.
-    struct DeclRefBase
-    {
-        typedef Decl DeclType;
-
-        // The underlying declaration
-        Decl* decl = nullptr;
-        Decl* getDecl() const { return decl; }
-
-        // Optionally, a chain of substitutions to perform
-        SubstitutionSet substitutions;
-
-        DeclRefBase()
-        {}
-        
-        DeclRefBase(Decl* decl)
-            :decl(decl)
-        {
-        }
-
-        DeclRefBase(ASTBuilder* astBuilder, Decl* decl, SubstitutionSet subst)
-            :decl(decl),
-            substitutions(subst)
-        {
-            SLANG_RELEASE_ASSERT(astBuilder);
-        }
-
-        DeclRefBase(ASTBuilder* astBuilder, Decl* decl, Substitutions* subst)
-            : decl(decl)
-            , substitutions(subst)
-        {
-            SLANG_RELEASE_ASSERT(astBuilder);
-        }
-
-        // Apply substitutions to a type or declaration
-        Type* substitute(ASTBuilder* astBuilder, Type* type) const;
-
-        DeclRefBase substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const;
-
-        // Apply substitutions to an expression
-        SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const;
-
-        // Apply substitutions to this declaration reference
-        DeclRefBase substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const;
-
-        // Returns true if 'as' will return a valid cast
-        template <typename T>
-        bool is() const { return Slang::as<T>(decl) != nullptr; }
-
-        // "dynamic cast" to a more specific declaration reference type
-        template<typename T>
-        DeclRef<T> as() const;
-
-        // Check if this is an equivalent declaration reference to another
-        bool equals(DeclRefBase const& declRef) const;
-        bool operator == (const DeclRefBase& other) const
-        {
-            return equals(other);
-        }
-
-        // Convenience accessors for common properties of declarations
-        Name* getName() const;
-        SourceLoc getNameLoc() const;
-        SourceLoc getLoc() const;
-        DeclRefBase getParent(ASTBuilder* astBuilder) const;
-
-        HashCode getHashCode() const;
-
-        // Debugging:
-        String toString() const;
-        void toText(StringBuilder& out) const;
-    };
 
     // If this is a declref to an associatedtype with a ThisTypeSubsitution,
     // try to find the concrete decl that satisfies the associatedtype requirement from the
     // concrete type supplied by ThisTypeSubstittution.
     Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef);
-    void _printNestedDecl(const Substitutions* substitutions, Decl* decl, StringBuilder& out);
+    void _printNestedDecl(const Substitutions* substitutions, const Decl* decl, StringBuilder& out);
 
     template<typename T>
-    struct DeclRef : DeclRefBase
+    struct DeclRef
     {
         friend class ASTBuilder;
-    private:
-        DeclRef(ASTBuilder* builder, T* decl, SubstitutionSet subst)
-            : DeclRefBase(builder, decl, subst)
-        {}
-
-        DeclRef(ASTBuilder* builder, T* decl, Substitutions* subst)
-            : DeclRefBase(builder, decl, SubstitutionSet(subst))
-        {}
     public:
         typedef T DeclType;
-
+        DeclRefBase* declRefBase;
         DeclRef()
+            :declRefBase(nullptr)
         {}
+        
+        void init(DeclRefBase* base);
 
-        DeclRef(T* decl)
-            : DeclRefBase(decl)
-        {}
+        DeclRef(Decl* decl);
+
+        DeclRef(DeclRefBase* base)
+        {
+            init(base);
+        }
 
         template <typename U>
         DeclRef(DeclRef<U> const& other,
             typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
+            : declRefBase(other.declRefBase)
         {
-            this->decl = other.decl;
-            this->substitutions = other.substitutions;
         }
 
-        T* getDecl() const
-        {
-            return (T*)decl;
-        }
+        T* getDecl() const;
+        Substitutions* getSubst() const;
 
-        operator T*() const
-        {
-            return getDecl();
-        }
+        Name* getName() const;
+        
+        SourceLoc getNameLoc() const;
+        SourceLoc getLoc() const;
+        DeclRef<ContainerDecl> getParent(ASTBuilder* astBuilder) const;
+        HashCode getHashCode() const;
+        Type* substitute(ASTBuilder* astBuilder, Type* type) const;
 
-        //
-        static DeclRef<T> unsafeInit(DeclRefBase const& declRef)
-        {
-            DeclRef<T> rs;
-            rs.decl = declRef.decl;
-            rs.substitutions = declRef.substitutions;
-            return rs;
-        }
-
-        Type* substitute(ASTBuilder* astBuilder, Type* type) const
-        {
-            return DeclRefBase::substitute(astBuilder, type);
-        }
-
-        SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const
-        {
-            return DeclRefBase::substitute(astBuilder, expr);
-        }
+        SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const;
 
         // Apply substitutions to a type or declaration
         template<typename U>
-        DeclRef<U> substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const
-        {
-            return DeclRef<U>::unsafeInit(DeclRefBase::substitute(astBuilder, declRef));
-        }
+        DeclRef<U> substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const;
 
         // Apply substitutions to this declaration reference
-        DeclRef<T> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const
+        DeclRef<T> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const;
+
+        template<typename U>
+        DeclRef<U> as() const
         {
-            return DeclRef<T>::unsafeInit(DeclRefBase::substituteImpl(astBuilder, subst, ioDiff));
+            DeclRef<U> result = DeclRef<U>(declRefBase);
+            return result;
         }
 
-        DeclRef<ContainerDecl> getParent(ASTBuilder* astBuilder) const
+        template<typename U>
+        bool is() const
         {
-            return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::getParent(astBuilder));
+            return Slang::as<U>(static_cast<NodeBase*>(getDecl())) != nullptr;
+        }
+
+        operator DeclRefBase* () const
+        {
+            return declRefBase;
+        }
+
+        operator DeclRef<Decl>() const
+        {
+            return DeclRef<Decl>(declRefBase);
+        }
+
+        template<typename U>
+        bool equals(DeclRef<U> other) const;
+
+        template<typename U>
+        bool operator == (DeclRef<U> other) const
+        {
+            return equals(other);
+        }
+
+        explicit operator bool() const
+        {
+            return declRefBase;
         }
     };
-
-    SubstExpr<Expr> substituteExpr(SubstitutionSet const& substs, Expr* expr);
-    DeclRef<Decl> substituteDeclRef(SubstitutionSet const& substs, ASTBuilder* astBuilder, DeclRef<Decl> const& declRef);
-    Type* substituteType(SubstitutionSet const& substs, ASTBuilder* astBuilder, Type* type);
-
-    SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase& declRef) { declRef.toText(io); return io; }
-
-    template<typename T>
-    DeclRef<T> DeclRefBase::as() const
-    {
-        DeclRef<T> result;
-        result.decl = Slang::as<T>(decl);
-        result.substitutions = substitutions;
-        return result;
-    }
 
     template<typename T>
     inline DeclRef<T> makeDeclRef(T* decl)
     {
         return DeclRef<T>(decl);
     }
+
+    SubstExpr<Expr> substituteExpr(SubstitutionSet const& substs, Expr* expr);
+    DeclRef<Decl> substituteDeclRef(SubstitutionSet const& substs, ASTBuilder* astBuilder, DeclRef<Decl> const& declRef);
+    Type* substituteType(SubstitutionSet const& substs, ASTBuilder* astBuilder, Type* type);
 
     enum class MemberFilterStyle
     {
@@ -1450,7 +1376,7 @@ namespace Slang
             : m_flavor(Flavor::none)
         {}
 
-        RequirementWitness(DeclRef<Decl> declRef)
+        RequirementWitness(DeclRefBase* declRef)
             : m_flavor(Flavor::declRef)
             , m_declRef(declRef)
         {}
