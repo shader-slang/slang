@@ -484,7 +484,7 @@ namespace Slang
                     for (auto type : constraint.value)
                     {
                         emitRaw(context, "C");
-                        emitQualifiedName(context, context->astBuilder->getSpecializedDeclRef(constraint.key, nullptr));
+                        emitQualifiedName(context, makeDeclRef(constraint.key));
                             emitType(context, type);
                     }
                 }
@@ -531,6 +531,7 @@ namespace Slang
         // are asked to mangle the name of a `typedef`?
 
         auto decl = declRef.getDecl();
+        if (!decl) return;
 
         // Handle `__extern_cpp` modifier by simply emitting
         // the given name.
@@ -588,17 +589,16 @@ namespace Slang
         emitQualifiedName(context, declRef);
     }
 
-    String getMangledName(ASTBuilder* astBuilder, DeclRef<Decl> const& declRef)
+    static String getMangledName(ASTBuilder* astBuilder, DeclRef<Decl> const& declRef)
     {
         ManglingContext context(astBuilder);
         mangleName(&context, declRef);
         return context.sb.produceString();
     }
 
-    String getMangledName(ASTBuilder* astBuilder, DeclRefBase const & declRef)
+    String getMangledName(ASTBuilder* astBuilder, DeclRefBase* declRef)
     {
-        return getMangledName(astBuilder,
-            astBuilder->getSpecializedDeclRef<Decl>(declRef.decl, declRef.substitutions));
+        return getMangledName(astBuilder, DeclRef<Decl>(declRef));
     }
 
     String getMangledName(ASTBuilder* astBuilder, Decl* decl)

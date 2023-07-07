@@ -2271,9 +2271,7 @@ namespace Slang
 
                 auto satisfyingVal = m_astBuilder->getOrCreate<GenericParamIntVal>(
                     requiredValueParamDeclRef.getDecl()->getType(),
-                    m_astBuilder->getSpecializedDeclRef(
-                        satisfyingValueParamDeclRef.getDecl(),
-                        satisfyingValueParamDeclRef.getSubst()));
+                    satisfyingValueParamDeclRef);
                 satisfyingVal->declRef = satisfyingValueParamDeclRef;
 
                 requiredSubstArgs.add(satisfyingVal);
@@ -3539,9 +3537,7 @@ namespace Slang
                 m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
                     superInterfaceType,
                     reqType,
-                    m_astBuilder->getSpecializedDeclRef(
-                        requiredInheritanceDeclRef.getDecl(),
-                        requiredInheritanceDeclRef.getSubst()));
+                    requiredInheritanceDeclRef);
             // ...
 
             TransitiveSubtypeWitness* subIsReqWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(subType, reqType, interfaceIsReqWitness);
@@ -6188,7 +6184,7 @@ namespace Slang
 
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
-            auto constraintSubst = trySolveConstraintSystem(&constraints, m_astBuilder->getSpecializedDeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>());
+            auto constraintSubst = trySolveConstraintSystem(&constraints, makeDeclRef(extGenericDecl));
             if (!constraintSubst)
             {
                 return DeclRef<ExtensionDecl>();

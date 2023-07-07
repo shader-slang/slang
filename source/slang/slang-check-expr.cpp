@@ -1577,9 +1577,7 @@ namespace Slang
             {
                 Val* valResult = m_astBuilder->getOrCreate<GenericParamIntVal>(
                     declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
-                    m_astBuilder->getSpecializedDeclRef(
-                        genericValParamRef.getDecl(),
-                        genericValParamRef.getSubst()));
+                    genericValParamRef);
                 valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
                 return as<IntVal>(valResult);
             }

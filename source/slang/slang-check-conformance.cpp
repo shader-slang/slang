@@ -13,7 +13,7 @@ namespace Slang
         DeclaredSubtypeWitness* witness = m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
             breadcrumb->sub,
             breadcrumb->sup,
-            m_astBuilder->getSpecializedDeclRef(breadcrumb->declRef.getDecl(), breadcrumb->declRef.getSubst()));
+            breadcrumb->declRef);
         return witness;
     }
 
@@ -143,7 +143,7 @@ namespace Slang
             {
                 DeclaredSubtypeWitness* declaredWitness =
                     m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
-                        bb->sub, bb->sup, m_astBuilder->getSpecializedDeclRef(bb->declRef.getDecl(), bb->declRef.getSubst()));
+                        bb->sub, bb->sup, bb->declRef);
 
                 TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>();
                 transitiveWitness->sub = subType;

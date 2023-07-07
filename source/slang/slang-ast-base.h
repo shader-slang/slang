@@ -356,12 +356,9 @@ class DeclRefBase : public Val
 {
     SLANG_AST_CLASS(DeclRefBase)
 
-    // The underlying declaration
-    Decl* decl = nullptr;
     Decl* getDecl() const { return decl; }
 
-    // Optionally, a chain of substitutions to perform
-    Substitutions* substitutions;
+    Substitutions* getSubst() const { return substitutions; }
 
     DeclRefBase(Decl* decl)
         :decl(decl)
@@ -412,6 +409,14 @@ class DeclRefBase : public Val
     // Debugging:
     String toString() const;
     void toText(StringBuilder& out) const;
+
+private:
+
+    // The underlying declaration
+    Decl* decl = nullptr;
+    // Optionally, a chain of substitutions to perform
+    Substitutions* substitutions;
+
 };
 
 SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase* declRef) { declRef->toText(io); return io; }
@@ -567,7 +572,7 @@ T* DeclRef<T>::getDecl() const
 template<typename T>
 Substitutions* DeclRef<T>::getSubst() const
 {
-    return declRefBase ? declRefBase->substitutions : nullptr;
+    return declRefBase ? declRefBase->getSubst() : nullptr;
 }
 
 template<typename T>

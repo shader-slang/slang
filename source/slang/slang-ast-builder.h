@@ -117,14 +117,21 @@ public:
             NodeBase* nodeOperand;
             int64_t intOperand;
         } values;
+        
         NodeOperand()
         {
             values.nodeOperand = nullptr;
         }
+        
         NodeOperand(NodeBase* node) { values.nodeOperand = node; }
+        
+        template<typename T>
+        NodeOperand(DeclRef<T> declRef) { values.nodeOperand = declRef.declRefBase; }
+
         template<typename EnumType>
         NodeOperand(EnumType intVal)
         {
+            static_assert(std::is_trivial<EnumType>::value, "Type to construct NodeOperand must be trivial.");
             static_assert(sizeof(EnumType) <= sizeof(values), "size of operand must be less than pointer size.");
             values.intOperand = 0;
             memcpy(&values, &intVal, sizeof(intVal));
