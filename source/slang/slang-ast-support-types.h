@@ -1347,7 +1347,9 @@ namespace Slang
         }
     };
 
+    // A helper to avoid having to include slang-check-impl.h in slang-syntax.h
     struct SemanticsVisitor;
+    ASTBuilder* semanticsVisitorGetASTBuilder(SemanticsVisitor*);
 
     struct LookupRequest
     {
