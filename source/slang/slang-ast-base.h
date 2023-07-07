@@ -489,6 +489,11 @@ public:
 
     ContainerDecl* parentDecl = nullptr;
 
+    // A direct DeclRef to this Decl.
+    // For every Decl, we create a DeclRef node representing a direct reference to it
+    // upon the creation of the Decl (implemented in ASTBuilder), and store that
+    // DeclRef here so we can get a direct DeclRef from a Decl* (by calling makeDeclRef)
+    // without requiring a ASTBuilder to be available.
     DeclRefBase* defaultDeclRef = nullptr;
 
     NameLoc nameAndLoc;
@@ -550,10 +555,6 @@ DeclRef<T>::DeclRef(Decl* decl)
         SLANG_ASSERT(decl->defaultDeclRef);
         declRef = decl->defaultDeclRef;
     }
-    else
-    {
-        declRef = nullptr;
-    }
     init(declRef);
 }
 
@@ -608,14 +609,14 @@ HashCode DeclRef<T>::getHashCode() const
 template<typename T>
 Type* DeclRef<T>::substitute(ASTBuilder* astBuilder, Type* type) const
 {
-    SLANG_ASSERT(declRefBase);
+    if (!declRefBase) return type;
     return declRefBase->substitute(astBuilder, type);
 }
 
 template<typename T>
 SubstExpr<Expr> DeclRef<T>::substitute(ASTBuilder* astBuilder, Expr* expr) const
 {
-    SLANG_ASSERT(declRefBase);
+    if (!declRefBase) return expr;
     return declRefBase->substitute(astBuilder, expr);
 }
 
@@ -624,7 +625,7 @@ template<typename T>
 template<typename U>
 DeclRef<U> DeclRef<T>::substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const
 {
-    SLANG_ASSERT(declRefBase);
+    if (!declRefBase) return declRef;
     return DeclRef<U>(declRefBase->substitute(astBuilder, declRef.declRefBase));
 }
 
@@ -632,7 +633,7 @@ DeclRef<U> DeclRef<T>::substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) co
 template<typename T>
 DeclRef<T> DeclRef<T>::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const
 {
-    SLANG_ASSERT(declRefBase);
+    if (!declRefBase) return *this;
     return DeclRef<T>(declRefBase->substituteImpl(astBuilder, subst, ioDiff));
 }
 

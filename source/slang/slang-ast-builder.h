@@ -263,7 +263,7 @@ public:
         // If we don't have substitutions, use the default decl ref if it is created.
         if (!subst)
         {
-            auto& defaultDeclRef = static_cast<Decl*>(decl)->defaultDeclRef;
+            auto defaultDeclRef = static_cast<Decl*>(decl)->defaultDeclRef;
             if (defaultDeclRef)
                 return defaultDeclRef;
         }
