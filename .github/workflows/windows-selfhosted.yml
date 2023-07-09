@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Windows Self-Hosted Build and Test
+name: Full GPU Tests (Windows)
 
 on:
   push:
