@@ -160,6 +160,9 @@ inline IRInst* unwrapAttributedType(IRInst* type)
     return type;
 }
 
+// Remove hlsl's 'unorm' and 'snorm' modifiers
+IRType* dropNormAttributes(IRType* const t);
+
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
 void copyNameHintDecoration(IRInst* dest, IRInst* src);
 IRInst* getRootAddr(IRInst* addrInst);
