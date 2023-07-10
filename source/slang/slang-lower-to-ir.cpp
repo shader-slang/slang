@@ -8577,6 +8577,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else
             outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
+        FuncDeclBaseTypeInfo info;
+        _lowerFuncDeclBaseTypeInfo(
+            subContext,
+            createDefaultSpecializedDeclRef(context, nullptr, decl),
+            info);
+
         // need to create an IR function here
 
         IRFunc* irFunc = subBuilder->createFunc();
@@ -8597,12 +8603,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addForceInlineDecoration(irFunc);
             }
         }
-
-        FuncDeclBaseTypeInfo info;
-        _lowerFuncDeclBaseTypeInfo(
-            subContext,
-            createDefaultSpecializedDeclRef(context, nullptr, decl),
-            info);
 
         auto irFuncType = info.type;
         auto& irResultType = info.resultType;
