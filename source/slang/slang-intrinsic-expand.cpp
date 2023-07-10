@@ -2,6 +2,7 @@
 #include "slang-intrinsic-expand.h"
 
 #include "slang-emit-cuda.h"
+#include "slang-ir-util.h"
 
 namespace Slang {
 
@@ -512,6 +513,10 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 SLANG_UNEXPECTED("bad format in intrinsic definition");
             }
 
+            // unorm and snorm attributes are currently ignored by glslang
+            // https://github.com/KhronosGroup/glslang/blob/main/glslang/HLSL/hlslGrammar.cpp#L1476
+            elementType = dropNormAttributes(elementType);
+
             SLANG_ASSERT(elementType);
             if (const auto basicType = as<IRBasicType>(elementType))
             {
@@ -528,6 +533,10 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
                     m_writer->emit(swiz[elementCount]);
                 }
+            }
+            else if (const auto attrType = as<IRAttributedType>(elementType))
+            {
+                SLANG_UNEXPECTED("unhandled attributed type in intrinsic definition");
             }
             else
             {

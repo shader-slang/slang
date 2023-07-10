@@ -1570,6 +1570,10 @@ namespace Slang
 
             parent = mergeCandidateParentsForHoistableInst(parent, operandParent);
         }
+        if (inst->getFullType())
+        {
+            parent = mergeCandidateParentsForHoistableInst(parent, inst->getFullType()->getParent());
+        }
 
         // We better have ended up with a parent to insert into,
         // or else the invariants of our IR have been violated.

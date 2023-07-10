@@ -1742,6 +1742,7 @@ struct IRAttributedType : IRType
     IR_LEAF_ISA(AttributedType)
 
     IRType* getBaseType() { return (IRType*) getOperand(0); }
+    IRInst* getAttr() { return getOperand(1); }
 };
 
 /// Represents a tuple. Tuples are created by `IRMakeTuple` and its elements

@@ -106,7 +106,7 @@ struct WitnessLookupLoweringContext
                     translatedOperands.add(translateType(builder, type->getOperand(i)));
                 }
                 auto translated = builder.emitIntrinsicInst(
-                    builder.getTypeKind(),
+                    type->getFullType(),
                     type->getOp(),
                     (UInt)translatedOperands.getCount(),
                     translatedOperands.getBuffer());

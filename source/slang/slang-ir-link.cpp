@@ -1198,10 +1198,11 @@ IRInst* cloneInst(
         IRInst* clonedArg = cloneValue(context, originalArg);
         newArgs[aa] = clonedArg;
     }
+    auto funcType = cloneType(context, originalInst->getFullType());
     context->builder = oldBuilder;
 
     IRInst* clonedInst = builder->createIntrinsicInst(
-        cloneType(context, originalInst->getFullType()),
+        funcType,
         originalInst->getOp(),
         argCount, newArgs.getArrayView().getBuffer());
     builder->addInst(clonedInst);
