@@ -1944,7 +1944,7 @@ struct TextureTypeInfo
                 sb << "float" << base.coordCount + isArray << " location, ";
                 sb << "float compareValue";
                 sb << ");\n";
-                sb << "__target_intrinsic(glsl, \"texture($p, vec" << arrCoordCount + 1 << "($2, $3))\")";
+                sb << "__target_intrinsic(glsl, \"textureLod($p, vec" << arrCoordCount + 1 << "($2, $3), 0)\")";
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
