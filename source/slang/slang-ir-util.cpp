@@ -1074,4 +1074,18 @@ IRInst* GenericChildrenMigrationContext::cloneInst(IRBuilder* builder, IRInst* s
     return impl->cloneInst(builder, src);
 }
 
+IRType* dropNormAttributes(IRType* const t)
+{
+    if(const auto a = as<IRAttributedType>(t))
+    {
+        switch(a->getAttr()->getOp())
+        {
+            case kIROp_UNormAttr:
+            case kIROp_SNormAttr:
+                return dropNormAttributes(a->getBaseType());
+        }
+    }
+    return t;
+}
+
 }

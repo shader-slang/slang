@@ -4,6 +4,7 @@
 #include "../core/slang-writer.h"
 
 #include "slang-emit-source-writer.h"
+#include "slang-ir-util.h"
 #include "slang-mangled-lexer.h"
 
 #include "slang-legalize-types.h"
@@ -691,6 +692,8 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
 
 void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
 {
+    type = dropNormAttributes(type);
+
     switch (type->getOp())
     {
         case kIROp_FloatType:
