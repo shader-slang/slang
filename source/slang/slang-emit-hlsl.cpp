@@ -926,7 +926,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
         case kIROp_HitObjectType:
         {
-            m_writer->emit("HitObject");
+            m_writer->emit("NvHitObject");
             return;
         }
         default: break;
