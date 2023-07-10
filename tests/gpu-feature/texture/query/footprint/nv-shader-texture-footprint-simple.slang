@@ -65,7 +65,6 @@ void fragmentMain(
 // SPIRV: Extension  "SPV_NV_shader_image_footprint"
 // SPIRV: ImageSampleFootprintNV
 
-// HLSL: #include "nvHLSLExtns.h"
 // HLSL: NvFootprintCoarse
 
     outputBuffer[index] = r;
