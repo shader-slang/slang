@@ -2001,6 +2001,7 @@ struct TextureTypeInfo
                 // saying they only exclude `offset` for cube maps (which makes
                 // sense). I'm going to assume the documentation for `SampleCmp`
                 // is just wrong.
+                sb << "__target_intrinsic(glsl, \"textureOffset($p, vec" << arrCoordCount + 1 << "($2, $3), $4)\")";
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 sb << "float SampleCmp(SamplerComparisonState s, ";
@@ -2008,6 +2009,7 @@ struct TextureTypeInfo
                 sb << "float compareValue, ";
                 sb << "constexpr int" << base.coordCount << " offset);\n";
 
+                sb << "__target_intrinsic(glsl, \"textureLodOffset($p, vec" << arrCoordCount + 1 << "($2, $3), 0, $4)\")";
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
