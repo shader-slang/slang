@@ -622,7 +622,7 @@ namespace Slang
 #   pragma warning(disable:4702)
 #endif
     SlangResult CodeGenContext::emitEntryPointsSource(ComPtr<IArtifact>& outArtifact)
-    {        
+    {
         outArtifact.setNull();
 
         SLANG_RETURN_ON_FAIL(requireTranslationUnitSourceFiles());

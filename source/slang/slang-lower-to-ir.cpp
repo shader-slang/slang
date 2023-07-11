@@ -6,6 +6,7 @@
 #include "../core/slang-random-generator.h"
 #include "../core/slang-hash.h"
 #include "../core/slang-char-util.h"
+#include "../core/slang-performance-profiler.h"
 
 #include "slang-check.h"
 #include "slang-ir.h"
@@ -9704,6 +9705,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     ASTBuilder* astBuilder,
     TranslationUnitRequest* translationUnit)
 {
+    SLANG_PROFILE;
+
     auto session = translationUnit->getSession();
     auto compileRequest = translationUnit->compileRequest;
 

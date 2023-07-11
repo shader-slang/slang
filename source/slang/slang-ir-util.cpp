@@ -645,7 +645,7 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
     }
 }
 
-bool areCallArgumentsSideEffectFree(IRCall* call)
+bool areCallArgumentsSideEffectFree(IRCall* call, bool useDominanceTree)
 {
     // If the function has no side effect and is not writing to any outputs,
     // we can safely treat the call as a normal inst.
@@ -668,10 +668,13 @@ bool areCallArgumentsSideEffectFree(IRCall* call)
         auto module = parentFunc->getModule();
         if (!module)
             return false;
-        auto dom = module->findDominatorTree(parentFunc);
 
         if (arg->getOp() == kIROp_Var && getParentFunc(arg) == parentFunc)
         {
+            IRDominatorTree* dom = nullptr;
+            if (useDominanceTree)
+                dom = module->findOrCreateDominatorTree(parentFunc);
+
             // If the pointer argument is a local variable (thus can't alias with other addresses)
             // and it is never read from in the function, we can safely treat the call as having
             // no side-effect.
@@ -751,17 +754,17 @@ bool areCallArgumentsSideEffectFree(IRCall* call)
     return true;
 }
 
-bool isPureFunctionalCall(IRCall* call)
+bool isPureFunctionalCall(IRCall* call, bool useDominanceTree)
 {
     auto callee = getResolvedInstForDecorations(call->getCallee());
     if (callee->findDecoration<IRReadNoneDecoration>())
     {
-        return areCallArgumentsSideEffectFree(call);
+        return areCallArgumentsSideEffectFree(call, useDominanceTree);
     }
     return false;
 }
 
-bool isSideEffectFreeFunctionalCall(IRCall* call)
+bool isSideEffectFreeFunctionalCall(IRCall* call, bool useDominanceTree)
 {
     // If the call has been marked as no-side-effect, we
     // will treat it so, by-passing all other checks.
@@ -770,7 +773,7 @@ bool isSideEffectFreeFunctionalCall(IRCall* call)
 
     if (!doesCalleeHaveSideEffect(call->getCallee()))
     {
-        return areCallArgumentsSideEffectFree(call);
+        return areCallArgumentsSideEffectFree(call, useDominanceTree);
     }
     return false;
 }
@@ -961,6 +964,34 @@ bool isOne(IRInst* inst)
         return isOne(inst->getOperand(0));
     default:
         return false;
+    }
+}
+
+void initializeScratchData(IRInst* inst)
+{
+    List<IRInst*> workList;
+    workList.add(inst);
+    while (workList.getCount() != 0)
+    {
+        auto item = workList.getLast();
+        workList.removeLast();
+        item->scratchData = 0;
+        for (auto child = item->getLastDecorationOrChild(); child; child = child->getPrevInst())
+            workList.add(child);
+    }   
+}
+
+void resetScratchDataBit(IRInst* inst, int bitIndex)
+{
+    List<IRInst*> workList;
+    workList.add(inst);
+    while (workList.getCount() != 0)
+    {
+        auto item = workList.getLast();
+        workList.removeLast();
+        item->scratchData &= ~(1ULL << bitIndex);
+        for (auto child = item->getLastDecorationOrChild(); child; child = child->getPrevInst())
+            workList.add(child);
     }
 }
 

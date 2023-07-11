@@ -733,6 +733,11 @@ struct IRInst
         getOperands()[index].init(this, value);
     }
 
+    // Reserved memory space for use by individual IR passes.
+    // This field is not supposed to be valid outside an IR pass,
+    // and each IR pass should always treat it as uninitialized
+    // upon entry.
+    UInt64 scratchData;
 
     //
 
@@ -785,7 +790,7 @@ struct IRInst
     /// It is possible that this instruction has side effects?
     ///
     /// This is a conservative test, and will return `true` if an exact answer can't be determined.
-    bool mightHaveSideEffects();
+    bool mightHaveSideEffects(bool useDominanceTree = false);
 
     // RTTI support
     static bool isaImpl(IROp) { return true; }
@@ -1971,12 +1976,41 @@ struct IRModule;
 // Description of an instruction to be used for global value numbering
 struct IRInstKey
 {
-    IRInst* inst;
+private:
+    IRInst* inst = nullptr;
+    HashCode hashCode = 0;
+    HashCode _getHashCode();
 
-    HashCode getHashCode();
+public:
+    IRInstKey() = default;
+    IRInstKey(const IRInstKey& key) = default;
+    IRInstKey(IRInst* i)
+        : inst(i)
+    {
+        hashCode = _getHashCode();
+    }
+    HashCode getHashCode() const { return hashCode; }
+    IRInst* getInst() const { return inst; }
+
+    bool operator==(IRInstKey const& right) const
+    {
+        if (hashCode != right.getHashCode()) return false;
+        if (getInst()->getOp() != right.getInst()->getOp()) return false;
+        if (getInst()->getFullType() != right.getInst()->getFullType()) return false;
+        if (getInst()->operandCount != right.getInst()->operandCount) return false;
+
+        auto argCount = getInst()->operandCount;
+        auto leftArgs = getInst()->getOperands();
+        auto rightArgs = right.getInst()->getOperands();
+        for (UInt aa = 0; aa < argCount; ++aa)
+        {
+            if (leftArgs[aa].get() != rightArgs[aa].get())
+                return false;
+        }
+
+        return true;
+    }
 };
-
-bool operator==(IRInstKey const& left, IRInstKey const& right);
 
 struct IRConstantKey
 {
