@@ -7,6 +7,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-dce.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -2340,6 +2341,7 @@ bool specializeModule(
     IRModule*   module,
     DiagnosticSink* sink)
 {
+    SLANG_PROFILE;
     SpecializationContext context;
     context.module = module;
     context.sink = sink;

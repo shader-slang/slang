@@ -11,6 +11,7 @@
 #include "slang-ir-remove-unused-generic-param.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-propagate-func-properties.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -18,6 +19,7 @@ namespace Slang
     // until no more changes are possible.
     void simplifyIR(IRModule* module, DiagnosticSink* sink)
     {
+        SLANG_PROFILE;
         bool changed = true;
         const int kMaxIterations = 8;
         const int kMaxFuncIterations = 16;

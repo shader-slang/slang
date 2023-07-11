@@ -3,6 +3,7 @@
 
 #include "slang-ir-ssa-simplification.h"
 
+#include "../core/slang-performance-profiler.h"
 // This file provides general facilities for inlining function calls.
 
 //
@@ -671,6 +672,8 @@ struct MandatoryEarlyInliningPass : InliningPassBase
 
 void performMandatoryEarlyInlining(IRModule* module)
 {
+    SLANG_PROFILE;
+
     MandatoryEarlyInliningPass pass(module);
     pass.considerAllCallSites();
 }
@@ -785,6 +788,8 @@ struct ForceInliningPass : InliningPassBase
 
 void performForceInlining(IRModule* module)
 {
+    SLANG_PROFILE;
+
     ForceInliningPass pass(module);
     pass.considerAllCallSites();
 }

@@ -2646,6 +2646,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) SLANG_OVERRIDE;
         void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
@@ -2691,6 +2692,9 @@ namespace Slang
         bool m_isCommandLineCompile = false;
 
         bool m_reportDownstreamCompileTime = false;
+
+        // If set, will print out compiler performance benchmark results.
+        bool m_reportPerfBenchmark = false;
         
         String m_diagnosticOutput;
 

@@ -7,6 +7,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-dce.h"
+#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -508,6 +509,8 @@ bool unrollLoopsInFunc(
 
 bool unrollLoopsInModule(IRModule* module, DiagnosticSink* sink)
 {
+    SLANG_PROFILE;
+
     for (auto inst : module->getGlobalInsts())
     {
         if (auto genFunc = as<IRGeneric>(inst))
