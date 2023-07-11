@@ -134,8 +134,7 @@ int wmain(int argc, wchar_t** argv)
         {
             argBuffers.add(args[ii].getBuffer());
         }
-        //for (int i = 0; i<10;i++)
-            result = MAIN(argc, (char**) &argBuffers[0]);
+        result = MAIN(argc, (char**) &argBuffers[0]);
     }
 
 #ifdef _MSC_VER
