@@ -902,7 +902,23 @@ namespace Slang
                 if(auto witness = tryGetSubtypeWitness(fromType, toAggTypeDeclRef))
                 {
                     if (outToExpr)
+                    {
                         *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
+
+                        // If the original expression was an l-value, then the result
+                        // of the cast may be an l-value itself. We want to be able
+                        // to invoke `[mutating]` methods on a value that is cast to
+                        // an interface it conforms to, and we also expect to be able
+                        // to pass a value of a derived `struct` type into methods that
+                        // expect a value of its base type.
+                        //
+                        // TODO: vet this logic for correctness.
+                        //
+                        if (fromExpr && fromExpr->type.isLeftValue)
+                        {
+                            (*outToExpr)->type.isLeftValue = true;
+                        }
+                    }
                     if (outCost)
                         *outCost = kConversionCost_CastToInterface;
                     return true;

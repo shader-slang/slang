@@ -30,6 +30,7 @@
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-result-type.h"
@@ -855,6 +856,10 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     cleanUpVoidType(irModule);
+
+    // Lower the `getRegisterIndex` and `getRegisterSpace` intrinsics.
+    //
+    lowerBindingQueries(irModule, sink);
 
     // For some small improvement in type safety we represent these as opaque
     // structs instead of regular arrays.

@@ -6805,6 +6805,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 //
                 auto irKey = getBuilder()->createStructKey();
                 addLinkageDecoration(context, irKey, inheritanceDecl);
+                getBuilder()->addNameHintDecoration(irKey, UnownedTerminatedStringSlice("base"));
                 auto keyVal = LoweredValInfo::simple(irKey);
                 context->setGlobalValue(inheritanceDecl, keyVal);
                 return keyVal;

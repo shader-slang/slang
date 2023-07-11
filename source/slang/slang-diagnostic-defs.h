@@ -710,6 +710,7 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 
 DIAGNOSTIC(81110, Error, nvapiMacroMismatch, "conflicting definitions for NVAPI macro '$0': '$1' and '$2'")
 
+DIAGNOSTIC(81111, Error, opaqueReferenceMustResolveToGlobal, "could not determine register/space for a resource or sampler used with NVAPI")
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
