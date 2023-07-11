@@ -9,6 +9,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-module-library.h"
 
+#include "../core/slang-performance-profiler.h"
 #include "../compiler-core/slang-artifact.h"
 
 namespace Slang
@@ -1428,6 +1429,8 @@ static bool _isPublicOrHLSLExported(IRInst* inst)
 LinkedIR linkIR(
     CodeGenContext* codeGenContext)
 {
+    SLANG_PROFILE;
+
     auto linkage = codeGenContext->getLinkage();
     auto program = codeGenContext->getProgram();
     auto session = codeGenContext->getSession();

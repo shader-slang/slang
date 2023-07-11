@@ -11,6 +11,7 @@
 // that the concrete type of everything is known.
 
 #include "../compiler-core/slang-name.h"
+#include "../core/slang-performance-profiler.h"
 
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
@@ -3843,6 +3844,8 @@ void legalizeResourceTypes(
     IRModule*       module,
     DiagnosticSink* sink)
 {
+    SLANG_PROFILE;
+
     SLANG_UNUSED(sink);
 
     IRResourceTypeLegalizationContext context(module);
@@ -3853,6 +3856,8 @@ void legalizeExistentialTypeLayout(
     IRModule*       module,
     DiagnosticSink* sink)
 {
+    SLANG_PROFILE;
+
     SLANG_UNUSED(module);
     SLANG_UNUSED(sink);
 

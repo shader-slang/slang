@@ -143,7 +143,7 @@ DIAGNOSTIC(    99, Error, unknownDebugOption, "unknown debug option, known optio
 DIAGNOSTIC(  100, Error, failedToLoadDownstreamCompiler, "failed to load downstream compiler '$0'")
 DIAGNOSTIC(  101, Error, downstreamCompilerDoesntSupportWholeProgramCompilation, "downstream compiler '$0' doesn't support whole program compilation")
 DIAGNOSTIC(  102, Note,  downstreamCompileTime, "downstream compile time: $0s")
-
+DIAGNOSTIC(  103, Note,  performanceBenchmarkResult, "compiler performance benchmark:\n$0")
 DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
 //
