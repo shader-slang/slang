@@ -167,7 +167,7 @@ SharedASTBuilder::~SharedASTBuilder()
 
 void SharedASTBuilder::registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modifier)
 {
-    auto type = DeclRefType::create(m_astBuilder, DeclRef<Decl>(decl, nullptr));
+    auto type = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
     m_builtinTypes[Index(modifier->tag)] = type;
 }
 
@@ -294,12 +294,12 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         elementCount = getIntVal(getIntType(), kUnsizedArrayMagicLength);
 
     auto result = getOrCreate<ArrayExpressionType>(elementType, elementCount);
-    if (!result->declRef.decl)
+    if (!result->declRef.getDecl())
     {
         auto arrayGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("ArrayType"));
         auto arrayTypeDecl = arrayGenericDecl->inner;
         auto substitutions = getOrCreate<GenericSubstitution>(arrayGenericDecl, elementType, elementCount);
-        result->declRef = DeclRef<Decl>(arrayTypeDecl, substitutions);
+        result->declRef = getSpecializedDeclRef<Decl>(arrayTypeDecl, substitutions);
     }
     return result;
 }
@@ -309,12 +309,12 @@ VectorExpressionType* ASTBuilder::getVectorType(
     IntVal*  elementCount)
 {
     auto result = getOrCreate<VectorExpressionType>(elementType, elementCount);
-    if (!result->declRef.decl)
+    if (!result->declRef.getDecl())
     {
         auto vectorGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("Vector"));
         auto vectorTypeDecl = vectorGenericDecl->inner;
         auto substitutions = getOrCreate<GenericSubstitution>(vectorGenericDecl, elementType, elementCount);
-        result->declRef = DeclRef<Decl>(vectorTypeDecl, substitutions);
+        result->declRef = getSpecializedDeclRef<Decl>(vectorTypeDecl, substitutions);
     }
     return result;
 }
@@ -332,7 +332,7 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(
         valueType,
         primalIsDifferentialWitness);
 
-    auto declRef = DeclRef<Decl>(typeDecl, substitutions);
+    auto declRef = getSpecializedDeclRef<Decl>(typeDecl, substitutions);
     auto rsType = DeclRefType::create(this, declRef);
 
     return as<DifferentialPairType>(rsType);
@@ -340,8 +340,7 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(
 
 DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterface()
 {
-    DeclRef<InterfaceDecl> declRef;
-    declRef.decl = dynamicCast<InterfaceDecl>(m_sharedASTBuilder->findMagicDecl("DifferentiableType"));
+    DeclRef<InterfaceDecl> declRef = DeclRef<InterfaceDecl>(getBuiltinDeclRef("DifferentiableType", nullptr));
     return declRef;
 }
 
@@ -373,7 +372,7 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
         elementType,
         maxElementCount);
 
-    auto declRef = DeclRef<Decl>(typeDecl, substitutions);
+    auto declRef = getSpecializedDeclRef<Decl>(typeDecl, substitutions);
     auto rsType = DeclRefType::create(this, declRef);
 
     return as<MeshOutputType>(rsType);
@@ -381,22 +380,22 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
 
 DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg)
 {
-    DeclRef<Decl> declRef;
-    declRef.decl = m_sharedASTBuilder->findMagicDecl(builtinMagicTypeName);
-    if (auto genericDecl = as<GenericDecl>(declRef.decl))
+    auto decl = m_sharedASTBuilder->findMagicDecl(builtinMagicTypeName);
+    if (auto genericDecl = as<GenericDecl>(decl))
     {
+        decl = genericDecl->inner;
+        Substitutions* subst = nullptr;
         if (genericArg)
         {
-            auto substitutions = getOrCreate<GenericSubstitution>(genericDecl, genericArg);
-            declRef.substitutions = substitutions;
+            subst = getOrCreate<GenericSubstitution>(genericDecl, genericArg);
         }
-        declRef.decl = genericDecl->inner;
+        return getSpecializedDeclRef(decl, subst);
     }
     else
     {
         SLANG_ASSERT(!genericArg);
     }
-    return declRef;
+    return makeDeclRef(decl);
 }
 
 Type* ASTBuilder::getAndType(Type* left, Type* right)
@@ -458,7 +457,7 @@ bool ASTBuilder::NodeDesc::operator==(NodeDesc const& that) const
         // via a `NodeDesc` *should* all be going through the
         // deduplication path anyway, as should their operands.
         // 
-        if(operands[i].values.nodeOperand != that.operands[i].values.nodeOperand) return false;
+        if (operands[i].values.nodeOperand != that.operands[i].values.nodeOperand) return false;
     }
     return true;
 }
@@ -476,6 +475,11 @@ HashCode ASTBuilder::NodeDesc::getHashCode() const
         hasher.hashValue(operands[i].values.nodeOperand);
     }
     return hasher.getResult();
+}
+
+DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst)
+{
+    return builder->getSpecializedDeclRef(decl, subst);
 }
 
 } // namespace Slang

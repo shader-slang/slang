@@ -139,6 +139,13 @@ static void _lookUpMembersInValue(
     LookupResult&	        ioResult,
     BreadcrumbInfo*	        breadcrumbs);
 
+static bool _isUncheckedLocalVar(const Decl* decl)
+{
+    auto checkStateExt = decl->checkState;
+    auto isUnchecked = checkStateExt.getState() == DeclCheckState::Unchecked || checkStateExt.isBeingChecked();
+    return isUnchecked && isLocalVar(decl);
+}
+
     /// Look up direct members (those declared in `containerDeclRef` itself, as well
     /// as transitively through any direct members that are marked "transparent."
     ///
@@ -162,12 +169,14 @@ static void _lookUpDirectAndTransparentMembers(
         // return all the members that are available.
         for (auto member : containerDecl->members)
         {
+            if(!request.shouldConsiderAllLocalNames() && _isUncheckedLocalVar(member))
+                continue;
             if (!DeclPassesLookupMask(member, request.mask))
                 continue;
             AddToLookupResult(
                 result,
                 CreateLookupResultItem(
-                    DeclRef<Decl>(member, containerDeclRef.substitutions), inBreadcrumbs));
+                    astBuilder->getSpecializedDeclRef<Decl>(member, containerDeclRef.getSubst()), inBreadcrumbs));
         }
     }
     else
@@ -182,11 +191,17 @@ static void _lookUpDirectAndTransparentMembers(
         // type declarations.
         for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
         {
+            // Skip this declaration if we are checking and this hasn't been
+            // checked yet. Because we traverse block statements in order, if
+            // it's unchecked or being checked then it isn't declared yet.
+            if(!request.shouldConsiderAllLocalNames() && _isUncheckedLocalVar(m))
+                continue;
+
             if (!DeclPassesLookupMask(m, request.mask))
                 continue;
 
             // The declaration passed the test, so add it!
-            AddToLookupResult(result, CreateLookupResultItem(DeclRef<Decl>(m, containerDeclRef.substitutions), inBreadcrumbs));
+            AddToLookupResult(result, CreateLookupResultItem(astBuilder->getSpecializedDeclRef<Decl>(m, containerDeclRef.getSubst()), inBreadcrumbs));
         }
     }
 
@@ -196,7 +211,7 @@ static void _lookUpDirectAndTransparentMembers(
     {
         // The reference to the transparent member should use whatever
         // substitutions we used in referring to its outer container
-        DeclRef<Decl> transparentMemberDeclRef(transparentInfo.decl, containerDeclRef.substitutions);
+        DeclRef<Decl> transparentMemberDeclRef = astBuilder->getSpecializedDeclRef(transparentInfo.decl, containerDeclRef.getSubst());
 
         // We need to leave a breadcrumb so that we know that the result
         // of lookup involves a member lookup step here
@@ -305,9 +320,9 @@ static Type* _maybeSpecializeSuperType(
             ThisTypeSubstitution* thisTypeSubst = astBuilder->create<ThisTypeSubstitution>();
             thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
             thisTypeSubst->witness = subIsSuperWitness;
-            thisTypeSubst->outer = superInterfaceDeclRef.substitutions.substitutions;
+            thisTypeSubst->outer = superInterfaceDeclRef.getSubst();
 
-            auto specializedInterfaceDeclRef = DeclRef<Decl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
+            auto specializedInterfaceDeclRef = astBuilder->getSpecializedDeclRef<Decl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
 
             auto specializedInterfaceType = DeclRefType::create(astBuilder, specializedInterfaceDeclRef);
             return specializedInterfaceType;
@@ -388,7 +403,7 @@ static void _lookUpMembersInSuperType(
 {
     if( request.semantics )
     {
-        ensureDecl(request.semantics, intermediateIsSuperConstraint, DeclCheckState::CanUseBaseOfInheritanceDecl);
+        ensureDecl(request.semantics, intermediateIsSuperConstraint.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
     }
 
     // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
@@ -432,14 +447,14 @@ static void _lookUpMembersInSuperTypeDeclImpl(
         // then the members it provides can only be discovered by looking
         // at the constraints that are placed on that type.
 
-        auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
+        auto genericDeclRef = genericTypeParamDeclRef.getParent(astBuilder).as<GenericDecl>();
         assert(genericDeclRef);
 
-        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
+        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(astBuilder, DeclRef<ContainerDecl>(genericDeclRef)))
         {
             if( semantics )
             {
-                ensureDecl(semantics, constraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
+                ensureDecl(semantics, constraintDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
             }
 
             // Does this constraint pertain to the type we are working on?
@@ -467,7 +482,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     }
     else if (declRef.as<AssocTypeDecl>() || declRef.as<GlobalGenericParamDecl>())
     {
-        for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.as<ContainerDecl>()))
+        for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(astBuilder, declRef.as<ContainerDecl>()))
         {
             _lookUpMembersInSuperType(
                 astBuilder,
@@ -534,7 +549,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             // through the declared inheritance relationships on each declaration.
             //
             ensureDecl(semantics, aggTypeDeclBaseRef.getDecl(), DeclCheckState::CanEnumerateBases);
-            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclBaseRef))
+            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(astBuilder, aggTypeDeclBaseRef))
             {
                 ensureDecl(semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
 
@@ -801,7 +816,7 @@ static void _lookUpInScopes(
             // just a decl.
             //
             DeclRef<ContainerDecl> containerDeclRef =
-                DeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, request.semantics, containerDecl)).as<ContainerDecl>();
+                astBuilder->getSpecializedDeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, request.semantics, containerDecl)).as<ContainerDecl>();
 
             // If the container we are looking into represents a type
             // or an `extension` of a type, then we need to treat
@@ -948,10 +963,14 @@ LookupResult lookUp(
     SemanticsVisitor*   semantics,
     Name*               name,
     Scope*              scope,
-    LookupMask          mask)
+    LookupMask          mask,
+    bool                considerAllLocalNamesInScope)
 {
     LookupResult result;
-    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
+    const auto options = considerAllLocalNamesInScope
+        ? LookupOptions::ConsiderAllLocalNamesInScope
+        : LookupOptions::None;
+    LookupRequest request = initLookupRequest(semantics, name, mask, options, scope);
     _lookUpInScopes(astBuilder, name, request, result);
     return result;
 }

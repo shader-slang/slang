@@ -4,6 +4,8 @@ tests/diagnostics/generic-type-inference-fail.slang(66): error 39999: could not 
     var obj3 = CreateT_Assoc_Inner(1); // ERROR.
                                   ^
 tests/diagnostics/generic-type-inference-fail.slang(18): note 39999: see declaration of func CreateT_Assoc_Inner<T>(int) -> T.TAssoc
+T.TAssoc CreateT_Assoc_Inner<T:IInterface>(int inVal)
+         ^~~~~~~~~~~~~~~~~~~
 }
 standard output = {
 }

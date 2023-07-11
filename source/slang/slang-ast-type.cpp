@@ -274,7 +274,7 @@ BasicExpressionType* BasicExpressionType::_getScalarTypeOverride()
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TensorViewType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* TensorViewType::getElementType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
 }
 
 
@@ -304,17 +304,17 @@ BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
 
 Type* MatrixExpressionType::getElementType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
 }
 
 IntVal* MatrixExpressionType::getRowCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
+    return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[1]);
 }
 
 IntVal* MatrixExpressionType::getColumnCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[2]);
+    return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[2]);
 }
 
 Type* MatrixExpressionType::getRowType()
@@ -330,12 +330,12 @@ Type* MatrixExpressionType::getRowType()
 
 Type* ArrayExpressionType::getElementType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
 }
 
 IntVal* ArrayExpressionType::getElementCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
+    return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[1]);
 }
 
 void ArrayExpressionType::_toTextOverride(StringBuilder& out)
@@ -441,7 +441,7 @@ Type* NamespaceType::_createCanonicalTypeOverride()
 
 Type* DifferentialPairType::getPrimalType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
 }
 
 
@@ -449,12 +449,12 @@ Type* DifferentialPairType::getPrimalType()
 
 Type* PtrTypeBase::getValueType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
 }
 
 Type* OptionalType::getValueType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -463,7 +463,7 @@ void NamedExpressionType::_toTextOverride(StringBuilder& out)
 {
     if (declRef.getDecl())
     {
-        _printNestedDecl(declRef.substitutions, declRef.getDecl(), out);
+        _printNestedDecl(declRef.getSubst(), declRef.getDecl(), out);
     }
 }
 
@@ -773,11 +773,11 @@ DeclRef<InterfaceDecl> ExtractExistentialType::getSpecializedInterfaceDeclRef()
     SubtypeWitness* openedWitness = getSubtypeWitness();
 
     ThisTypeSubstitution* openedThisType = m_astBuilder->create<ThisTypeSubstitution>();
-    openedThisType->outer = originalInterfaceDeclRef.substitutions.substitutions;
+    openedThisType->outer = originalInterfaceDeclRef.getSubst();
     openedThisType->interfaceDecl = interfaceDecl;
     openedThisType->witness = openedWitness;
 
-    DeclRef<InterfaceDecl> specialiedInterfaceDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
+    DeclRef<InterfaceDecl> specialiedInterfaceDeclRef = m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
 
     this->cachedSpecializedInterfaceDeclRef = specialiedInterfaceDeclRef;
     return specialiedInterfaceDeclRef;

@@ -4,6 +4,8 @@ tests/diagnostics/interfaces/mutating-impl-of-non-mutating-req.slang(10): error 
 struct Counter : IThing
                  ^~~~~~
 tests/diagnostics/interfaces/mutating-impl-of-non-mutating-req.slang(7): note: see declaration of 'processValue'
+    int processValue(int inValue);
+        ^~~~~~~~~~~~
 }
 standard output = {
 }

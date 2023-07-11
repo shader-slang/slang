@@ -39,52 +39,9 @@ struct SerialTypeInfo<SyntaxClass<T>>
     }
 };
 
-// All the templates for DeclRef<T> can use this implementation.
-struct SerialDeclRefBaseTypeInfo
-{
-    typedef DeclRefBase NativeType;
-    struct SerialType
-    {
-        SerialIndex substitutions;
-        SerialIndex decl;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
-    {
-        SerialType& serial = *(SerialType*)outSerial;
-        const NativeType& native = *(const NativeType*)inNative;
-
-        serial.decl = writer->addPointer(native.decl);
-        serial.substitutions = writer->addPointer(native.substitutions.substitutions);
-    }
-    static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
-    {
-        DeclRefBase& native = *(DeclRefBase*)(outNative);
-        const SerialType& serial = *(const SerialType*)inSerial;
-
-        native.decl = reader->getPointer(serial.decl).dynamicCast<Decl>();
-        native.substitutions.substitutions = reader->getPointer(serial.substitutions).dynamicCast<Substitutions>();
-    }
-    static const SerialFieldType* getFieldType()
-    {
-        static const SerialFieldType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
-        return &type;
-    }
-};
-// Special case DeclRef, because it always uses the same type
-template <typename T>
-struct SerialGetFieldType<DeclRef<T>>
-{
-    static const SerialFieldType* getFieldType() { return SerialDeclRefBaseTypeInfo::getFieldType(); }
-};
-
 
 template <typename T>
-struct SerialTypeInfo<DeclRef<T>> : public SerialDeclRefBaseTypeInfo {};
-
-template<>
-struct SerialTypeInfo<DeclRefBase> : public SerialDeclRefBaseTypeInfo {};
+struct SerialTypeInfo<DeclRef<T>> : public SerialTypeInfo<DeclRefBase*> {};
 
 // MatrixCoord can just go as is
 template <>

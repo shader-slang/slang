@@ -4,6 +4,8 @@ tests/diagnostics/extension-visibility.slang(17): error 39999: could not special
     return helper(thing);
                  ^
 tests/diagnostics/extension-visibility-a.slang(14): note 39999: see declaration of func helper<T>(T) -> int
+int helper<T : IThing>(T thing)
+    ^~~~~~
 }
 standard output = {
 }

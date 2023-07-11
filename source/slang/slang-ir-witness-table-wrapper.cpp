@@ -190,7 +190,7 @@ namespace Slang
             if (!sharedContext->doesTypeFitInAnyValue(concreteType, interfaceType, &typeSize, &sizeLimit))
             {
                 sharedContext->sink->diagnose(concreteType, Diagnostics::typeDoesNotFitAnyValueSize, concreteType);
-                sharedContext->sink->diagnose(concreteType, Diagnostics::typeAndLimit, concreteType, typeSize, sizeLimit);
+                sharedContext->sink->diagnoseWithoutSourceView(concreteType, Diagnostics::typeAndLimit, concreteType, typeSize, sizeLimit);
                 return;
             }
 

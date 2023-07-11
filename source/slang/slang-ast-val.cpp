@@ -317,7 +317,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
     // so we'll need to change this location in the code if we ever clean
     // up the hierarchy.
     //
-    if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(substDeclRef.decl))
+    if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(substDeclRef.getDecl()))
     {
         if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->parentDecl))
         {
@@ -326,7 +326,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
                 // At this point we have a constraint decl for an associated type,
                 // and we nee to see if we are dealing with a concrete substitution
                 // for the interface around that associated type.
-                if (auto thisTypeSubst = findThisTypeSubstitution(substDeclRef.substitutions, interfaceDecl))
+                if (auto thisTypeSubst = findThisTypeSubstitution(substDeclRef.getSubst(), interfaceDecl))
                 {
                     // We need to look up the declaration that satisfies
                     // the requirement named by the associated type.
@@ -349,7 +349,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
     }
 
     DeclaredSubtypeWitness* rs = astBuilder->getOrCreate<DeclaredSubtypeWitness>(
-        substSub, substSup, substDeclRef.getDecl(), substDeclRef.substitutions.substitutions);
+        substSub, substSup, astBuilder->getSpecializedDeclRef(substDeclRef.getDecl(), substDeclRef.getSubst()));
     rs->sub = substSub;
     rs->sup = substSup;
     rs->declRef = substDeclRef;
@@ -1400,13 +1400,6 @@ HashCode FuncCallIntVal::_getHashCodeOverride()
     return result;
 }
 
-static bool nameIs(Name* name, const char* val)
-{
-    if (name && name->text.getUnownedSlice() == val)
-        return true;
-    return false;
-}
-
 Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink)
 {
     // Are all args const now?
@@ -1428,29 +1421,24 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
     {
         // Evaluate the function.
         auto opName = newFuncDecl.getName();
+        SLANG_ASSERT(opName);
+
+        const auto opNameSlice = opName->text.getUnownedSlice();
+
         IntegerLiteralValue resultValue = 0;
-        if (nameIs(opName, "=="))
-        {
-            resultValue = constArgs[0]->value / constArgs[1]->value;
-        }
+        
+        // Define convenience macros. 
+        // The last macro used in the list *must* be
+        // TERMINATING_CASE, as this handles the closing else, and matches if nothing else does.
+
 #define BINARY_OPERATOR_CASE(op) \
-        else if (nameIs(opName, #op)) \
+        if (opNameSlice == toSlice(#op)) \
         { \
             resultValue = constArgs[0]->value op constArgs[1]->value; \
-        }
-        BINARY_OPERATOR_CASE(>=)
-        BINARY_OPERATOR_CASE(<=)
-        BINARY_OPERATOR_CASE(>)
-        BINARY_OPERATOR_CASE(<)
-        BINARY_OPERATOR_CASE(!=)
-        BINARY_OPERATOR_CASE(<<)
-        BINARY_OPERATOR_CASE(>>)
-        BINARY_OPERATOR_CASE(&)
-        BINARY_OPERATOR_CASE(|)
-        BINARY_OPERATOR_CASE(^)
-#undef BINARY_OPERATOR_CASE
+        } else
+
 #define DIV_OPERATOR_CASE(op)                                                        \
-        else if (nameIs(opName, #op))                                                \
+        if (opNameSlice == toSlice(#op))                                             \
         {                                                                            \
             if (constArgs[1]->value == 0)                                            \
             {                                                                        \
@@ -1459,35 +1447,56 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
                 return nullptr;                                                      \
             }                                                                        \
             resultValue = constArgs[0]->value op constArgs[1]->value;                \
-        }
-        DIV_OPERATOR_CASE(/)
-        DIV_OPERATOR_CASE(%)
-#undef DIV_OPERATOR_CASE
+        } else
+
 #define LOGICAL_OPERATOR_CASE(op) \
-        else if (nameIs(opName, #op)) \
+        if (opNameSlice == toSlice(#op)) \
         { \
             resultValue = (((constArgs[0]->value!=0) op (constArgs[1]->value!=0)) ? 1 : 0); \
+        } else
+
+
+#define SPECIAL_OPERATOR_CASE(op, IF_MATCH) \
+        if (opNameSlice == toSlice(op)) \
+        { \
+            IF_MATCH \
+        } else
+
+#define TERMINATING_CASE(MATCH) \
+        { \
+            MATCH \
         }
+
+        // Handle the cases using the macros
+        BINARY_OPERATOR_CASE(>=)
+        BINARY_OPERATOR_CASE(<=)
+        BINARY_OPERATOR_CASE(>)
+        BINARY_OPERATOR_CASE(<)
+        BINARY_OPERATOR_CASE(!=)
+        BINARY_OPERATOR_CASE(==)
+        BINARY_OPERATOR_CASE(<<)
+        BINARY_OPERATOR_CASE(>>)
+        BINARY_OPERATOR_CASE(&)
+        BINARY_OPERATOR_CASE(|)
+        BINARY_OPERATOR_CASE(^)
+        DIV_OPERATOR_CASE(/)
+        DIV_OPERATOR_CASE(%)
         LOGICAL_OPERATOR_CASE(&&)
-        LOGICAL_OPERATOR_CASE(|| )
-#undef LOGICAL_OPERATOR_CASE
-        else if (nameIs(opName, "!"))
-        {
-            resultValue = ((constArgs[0]->value != 0) ? 1 : 0);
-        }
-        else if (nameIs(opName, "~"))
-        {
-            resultValue = ~constArgs[0]->value;
-        }
-        else if (nameIs(opName, "?:"))
-        {
-            resultValue = constArgs[0]->value != 0 ? constArgs[1]->value : constArgs[2]->value;
-        }
-        else
-        {
-            SLANG_UNREACHABLE("constant folding of FuncCallIntVal");
-        }
+        LOGICAL_OPERATOR_CASE(||)
+        // Special cases need their "operator" names quoted.
+        SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->value != 0) ? 1 : 0);)
+        SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->value;)
+        SPECIAL_OPERATOR_CASE("?:", resultValue = constArgs[0]->value != 0 ? constArgs[1]->value : constArgs[2]->value;)
+        TERMINATING_CASE(SLANG_UNREACHABLE("constant folding of FuncCallIntVal");)
+
         return astBuilder->getIntVal(resultType, resultValue);
+
+        // The macros for the cases are no longer needed so undef them all.
+#undef BINARY_OPERATOR_CASE
+#undef DIV_OPERATOR_CASE                                                        
+#undef LOGICAL_OPERATOR_CASE
+#undef SPECIAL_OPERATOR_CASE 
+#undef TERMINATING_CASE
     }
     return nullptr;
 }

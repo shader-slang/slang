@@ -372,7 +372,7 @@ namespace Slang
             auto varDecl = as<VarDecl>(varStmt->decl);
             if (!varDecl)
                 return;
-            initialVar.decl = varDecl;
+            initialVar = makeDeclRef<Decl>(varDecl);
             initialVal = varDecl->initExpr;
         }
         else if (auto exprStmt = as<ExpressionStmt>(stmt->initialStatement))

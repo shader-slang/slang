@@ -310,7 +310,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     auto type = convert(inType);
     if(!type) return SLANG_TYPE_KIND_NONE;
 
-    // TODO(tfoley: Don't emit the same type more than once...
+    // TODO(tfoley): Don't emit the same type more than once...
 
     if (const auto basicType = as<BasicExpressionType>(type))
     {
@@ -359,6 +359,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     else if (const auto feedbackType = as<FeedbackType>(type))
     {
         return SLANG_TYPE_KIND_FEEDBACK;
+    }
+    else if (const auto ptrType = as<PtrType>(type))
+    {
+        return SLANG_TYPE_KIND_POINTER;
     }
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE)                          \
@@ -428,7 +432,11 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
-            return (unsigned int)getFields(structDeclRef, MemberFilterStyle::Instance).getCount();
+            return (unsigned int)getFields(
+                       getModule(declRef.getDecl())->getLinkage()->getASTBuilder(),
+                       structDeclRef,
+                       MemberFilterStyle::Instance)
+                .getCount();
         }
     }
 
@@ -447,7 +455,8 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
-            auto fields = getFields(structDeclRef, MemberFilterStyle::Instance);
+            auto fields = getFields(
+                getModule(declRef.getDecl())->getLinkage()->getASTBuilder(), structDeclRef, MemberFilterStyle::Instance);
             auto fieldDeclRef = fields[index];
             return (SlangReflectionVariable*) fieldDeclRef.getDecl();
         }
@@ -915,7 +924,7 @@ SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTy
         for(Index f = 0; f < fieldCount; ++f)
         {
             auto field = structTypeLayout->fields[f];
-            if(getReflectionName(field->varDecl)->text.getUnownedSlice() == name)
+            if(getReflectionName(field->varDecl.getDecl())->text.getUnownedSlice() == name)
                 return f;
         }
     }
@@ -992,6 +1001,10 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     else if (auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout))
     {
         return convert(matrixTypeLayout->elementTypeLayout);
+    }
+    else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
+    {
+        return convert(ptrTypeLayout->valueTypeLayout.Ptr());
     }
     return nullptr;
 }

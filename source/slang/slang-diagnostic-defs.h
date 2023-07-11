@@ -41,6 +41,8 @@ DIAGNOSTIC(-1, Note, seeRequirementDeclaration, "see requirement declaration")
 DIAGNOSTIC(-1, Note, doYouForgetToMakeComponentAccessible, "do you forget to make component '$0' acessible from '$1' (missing public qualifier)?")
 
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
+// An alternate wording of the above note, emphasing the position rather than content of the declaration.
+DIAGNOSTIC(-1, Note, declaredHere, "declared here")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
 DIAGNOSTIC(-1, Note, includeOutput, "include $0")
@@ -234,6 +236,8 @@ DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as eit
 
 DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
 
+DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
+
 //
 // 3xxxx - Semantic analysis
 //
@@ -268,8 +272,9 @@ DIAGNOSTIC(30031, Error, projectTypeMismatch, "'project': expression must evalua
 DIAGNOSTIC(30033, Error, invalidTypeForLocalVariable, "cannot declare a local variable of this type.")
 DIAGNOSTIC(30035, Error, componentOverloadTypeMismatch, "'$0': type of overloaded component mismatches previous definition.")
 DIAGNOSTIC(30041, Error, bitOperationNonIntegral, "bit operation: operand must be integral type.")
+DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 DIAGNOSTIC(30047, Error, argumentExpectedLValue, "argument passed to parameter '$0' must be l-value.")
-DIAGNOSTIC(30048, Note,  implicitCastUsedAsLValue, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value")
+
 DIAGNOSTIC(30049, Note,  thisIsImmutableByDefault, "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`")
 DIAGNOSTIC(30050, Error,  mutatingMethodOnImmutableValue, "mutating method '$0' cannot be called on an immutable value")
 
@@ -282,10 +287,12 @@ DIAGNOSTIC(30056, Warning, useOfNonShortCircuitingOperator, "non-short-circuitin
 DIAGNOSTIC(30057, Error, assignmentInPredicateExpr, "use an assignment operation as predicate expression is not allowed, wrap the assignment with '()' to clarify the intent.")
 DIAGNOSTIC(30058, Warning, danglingEqualityExpr, "result of '==' not used, did you intend '='?")
 
-DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
-
 DIAGNOSTIC(30060, Error, expectedAType, "expected a type, got a '$0'")
 DIAGNOSTIC(30061, Error, expectedANamespace, "expected a namespace, got a '$0'")
+
+DIAGNOSTIC(30062, Note,  implicitCastUsedAsLValueRef, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value with a reference")
+DIAGNOSTIC(30063, Note,  implicitCastUsedAsLValueType, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value with this type")
+DIAGNOSTIC(30064, Note,  implicitCastUsedAsLValue, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value for this usage")
 
 DIAGNOSTIC(30065, Error, newCanOnlyBeUsedToInitializeAClass, "`new` can only be used to initialize a class")
 DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be initialized by a `new` clause")
@@ -315,6 +322,8 @@ DIAGNOSTIC(30095, Error, errorTypeOfCalleeIncompatibleWithCaller, "the error typ
 DIAGNOSTIC(30096, Error, differentialTypeShouldServeAsItsOwnDifferentialType, "type '$0' is used as a `Differential` type, therefore it must serve as its own `Differential` type.")
 DIAGNOSTIC(30097, Error, functionNotMarkedAsDifferentiable, "function '$0' is not marked as $1-differentiable.")
 DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-static function reference '$0' is not allowed here.")
+
+DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 
 DIAGNOSTIC(-1, Note, noteSeeUseOfDifferentialType, "see use of '$0' as Differential of '$1'.")
 
@@ -360,6 +369,8 @@ DIAGNOSTIC(31145, Error, invalidCustomDerivative, "invalid custom derivative att
 DIAGNOSTIC(31146, Error, declAlreadyHasAttribute, "'$0' already has attribute '[$1]'.")
 DIAGNOSTIC(31147, Error, cannotResolveOriginalFunctionForDerivative, "cannot resolve the original function for the the custom derivative.")
 DIAGNOSTIC(31148, Error, cannotResolveDerivativeFunction, "cannot resolve the custom derivative function")
+DIAGNOSTIC(31149, Error, customDerivativeSignatureMismatchAtPosition, "invalid custom derivative. parameter type mismatch at position $0. expected '$1', got '$2'")
+DIAGNOSTIC(31150, Error, customDerivativeSignatureMismatch, "invalid custom derivative. could not resolve function with expected signature '$0'")
 
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 
@@ -621,6 +632,9 @@ DIAGNOSTIC(41023, Error, getStringHashMustBeOnStringLiteral, "getStringHash can 
 DIAGNOSTIC(41901, Error, unsupportedUseOfLValueForAutoDiff, "unsupported use of L-value for auto differentiation.")
 DIAGNOSTIC(41902, Error, cannotDifferentiateDynamicallyIndexedData, "cannot auto-differentiate mixed read/write access to dynamically indexed data in '$0'.")
 
+DIAGNOSTIC(41903, Error, unableToSizeOf, "sizeof could not be performed for type '$0'.")
+DIAGNOSTIC(41904, Error, unableToAlignOf, "alignof could not be performed for type '$0'.")
+
 DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use of TorchTensor type in device/kernel functions. use `TensorView` instead.")
 
 //
@@ -696,6 +710,7 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 
 DIAGNOSTIC(81110, Error, nvapiMacroMismatch, "conflicting definitions for NVAPI macro '$0': '$1' and '$2'")
 
+DIAGNOSTIC(81111, Error, opaqueReferenceMustResolveToGlobal, "could not determine register/space for a resource or sampler used with NVAPI")
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 

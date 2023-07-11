@@ -5,6 +5,8 @@
 
 #include "../core/slang-basic.h"
 
+#include "slang-ir-dominators.h"
+
 #include "slang-mangle.h"
 
 namespace Slang
@@ -965,6 +967,18 @@ namespace Slang
         ioOperands.add(m_elementTypeLayout);
     }
 
+    // 
+    // IRPointerTypeLayout
+    //
+
+    void IRPointerTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
+    {
+        SLANG_UNUSED(ioOperands);
+        // TODO(JS): For now we don't store the value types layout to avoid 
+        // infinite recursion.
+        //ioOperands.add(m_valueTypeLayout);
+    }
+
     //
     // IRStreamOutputTypeLayout
     //
@@ -1555,6 +1569,10 @@ namespace Slang
             auto operandParent = operand->getParent();
 
             parent = mergeCandidateParentsForHoistableInst(parent, operandParent);
+        }
+        if (inst->getFullType())
+        {
+            parent = mergeCandidateParentsForHoistableInst(parent, inst->getFullType()->getParent());
         }
 
         // We better have ended up with a parent to insert into,
@@ -3116,7 +3134,14 @@ namespace Slang
     {
         return emitIntrinsicInst((IRType*)type, kIROp_Reinterpret, 1, &value);
     }
-
+    IRInst* IRBuilder::emitInOutImplicitCast(IRInst* type, IRInst* value)
+    {
+        return emitIntrinsicInst((IRType*)type, kIROp_InOutImplicitCast, 1, &value);
+    }
+    IRInst* IRBuilder::emitOutImplicitCast(IRInst* type, IRInst* value)
+    {
+        return emitIntrinsicInst((IRType*)type, kIROp_OutImplicitCast, 1, &value);
+    }
     IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
     {
         // This instruction doesn't produce any result, 
@@ -4065,6 +4090,20 @@ namespace Slang
         moduleInst->module = module;
 
         return module;
+    }
+
+    IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func)
+    {
+        IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
+        if (analysis)
+            return analysis->getDominatorTree();
+        else
+        {
+            m_mapInstToAnalysis[func] = IRAnalysis();
+            analysis = m_mapInstToAnalysis.tryGetValue(func);
+        }
+        analysis->domTree = computeDominatorTree(func);
+        return analysis->getDominatorTree();
     }
 
     void addGlobalValue(
@@ -5229,6 +5268,31 @@ namespace Slang
             type,
             val,
             tag);
+        addInst(inst);
+        return inst;
+    }
+
+
+    IRInst* IRBuilder::emitSizeOf(
+        IRInst* sizedType)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_SizeOf,
+            getUIntType(),
+            sizedType);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitAlignOf(
+        IRInst* sizedType)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_AlignOf,
+            getUIntType(),
+            sizedType);
         addInst(inst);
         return inst;
     }
@@ -7082,6 +7146,8 @@ namespace Slang
                 module->getDeduplicationContext()->getConstantMap().remove(IRConstantKey{ constInst });
             }
             module->getDeduplicationContext()->getInstReplacementMap().remove(this);
+            if (auto func = as<IRGlobalValueWithCode>(this))
+                module->invalidateAnalysisForInst(func);
         }
         removeArguments();
         removeFromParent();
@@ -7153,10 +7219,6 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
-                // If the call has been marked as no-side-effect, we
-                // will treat it so, by-passing all other checks.
-                if (call->findDecoration<IRNoSideEffectDecoration>())
-                    return false;
                 return !isSideEffectFreeFunctionalCall(call);
             }
             break;
@@ -7608,6 +7670,11 @@ namespace Slang
             return findGenericReturnVal(gen);
         }
         return inst;
+    }
+
+    IRDominatorTree* IRAnalysis::getDominatorTree()
+    {
+        return static_cast<IRDominatorTree*>(domTree.get());
     }
 
 } // namespace Slang

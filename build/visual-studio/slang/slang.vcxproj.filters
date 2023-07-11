@@ -39,6 +39,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ast-modifier.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ast-natural-layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ast-print.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -297,6 +300,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-loop-unroll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-binding-query.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-bit-cast.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -321,6 +327,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-l-value-cast.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-optional-type.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -328,6 +337,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-result-type.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-size-of.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h">
@@ -617,6 +629,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ast-modifier.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ast-natural-layout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ast-print.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -887,6 +902,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-loop-unroll.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-binding-query.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-bit-cast.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -911,6 +929,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-l-value-cast.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-optional-type.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -918,6 +939,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-result-type.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-size-of.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp">

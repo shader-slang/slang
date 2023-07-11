@@ -30,11 +30,14 @@
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-lower-l-value-cast.h"
+#include "slang-ir-lower-size-of.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-metadata.h"
@@ -399,6 +402,9 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
+            applySparseConditionalConstantPropagationForGlobalScope(
+                irModule, codeGenContext->getSink());
+
             if (!unrollLoopsInModule(irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }
@@ -783,12 +789,13 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Legalize `ImageSubscript` for GLSL.
+    // Legalize `ImageSubscript` and constant buffer loads for GLSL.
     switch (target)
     {
     case CodeGenTarget::GLSL:
         {
             legalizeImageSubscriptForGLSL(irModule);
+            legalizeConstantBufferLoadForGLSL(irModule);
         }
         break;
     default:
@@ -850,6 +857,10 @@ Result linkAndOptimizeIR(
 
     cleanUpVoidType(irModule);
 
+    // Lower the `getRegisterIndex` and `getRegisterSpace` intrinsics.
+    //
+    lowerBindingQueries(irModule, sink);
+
     // For some small improvement in type safety we represent these as opaque
     // structs instead of regular arrays.
     //
@@ -861,6 +872,13 @@ Result linkAndOptimizeIR(
     {
         legalizeUniformBufferLoad(irModule);
     }
+
+    // Lower sizeof/alignof
+
+    lowerSizeOfLike(targetRequest, irModule, sink);
+
+    // Lower all the LValue implict casts (used for out/inout/ref scenarios)
+    lowerLValueCast(targetRequest, irModule);
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.

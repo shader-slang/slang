@@ -4,6 +4,7 @@
 #include "../core/slang-writer.h"
 
 #include "slang-emit-source-writer.h"
+#include "slang-ir-util.h"
 #include "slang-mangled-lexer.h"
 
 #include "slang-legalize-types.h"
@@ -691,6 +692,8 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
 
 void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
 {
+    type = dropNormAttributes(type);
+
     switch (type->getOp())
     {
         case kIROp_FloatType:
@@ -821,6 +824,18 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
                 &IRGlobalParam::getDataType,
                 &IROutTypeBase::getValueType);
         SLANG_ASSERT(varType && "Indices mesh output dind't have an 'out' type");
+
+        m_writer->emit("out ");
+        emitType(varType, getName(var));
+        m_writer->emit(";\n\n");
+    }
+    else if (name == "gl_ClipDistance")
+    {
+        auto varType = var->getDataType();
+        if (auto outType = as<IROutType>(varType))
+        {
+            varType = outType->getValueType();
+        }
 
         m_writer->emit("out ");
         emitType(varType, getName(var));

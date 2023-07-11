@@ -3738,6 +3738,21 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     auto requiredLevel = EmitAction::Definition;
     switch (inst->getOp())
     {
+    case kIROp_PtrType:
+    {
+        auto ptrType = static_cast<IRPtrType*>(inst);
+        auto valueType = ptrType->getValueType();
+
+        if (ctx->openInsts.contains(valueType))
+        {
+            requiredLevel = EmitAction::ForwardDeclaration;
+        }
+        else
+        {
+            requiredLevel = EmitAction::Definition;
+        }
+        break;
+    }
     case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;

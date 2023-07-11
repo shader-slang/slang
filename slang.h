@@ -1943,6 +1943,7 @@ extern "C"
         SLANG_TYPE_KIND_MESH_OUTPUT,
         SLANG_TYPE_KIND_SPECIALIZED,
         SLANG_TYPE_KIND_FEEDBACK,
+        SLANG_TYPE_KIND_POINTER,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -2476,6 +2477,7 @@ namespace slang
             OutputStream = SLANG_TYPE_KIND_OUTPUT_STREAM,
             Specialized = SLANG_TYPE_KIND_SPECIALIZED,
             Feedback = SLANG_TYPE_KIND_FEEDBACK,
+            Pointer = SLANG_TYPE_KIND_POINTER,
         };
 
         enum ScalarType : SlangScalarTypeIntegral

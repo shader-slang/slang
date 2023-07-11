@@ -53,11 +53,6 @@ class GenericParamIntVal : public IntVal
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-    GenericParamIntVal(Type* inType, VarDeclBase* inDecl, Substitutions* inSubst)
-        : IntVal(inType), declRef(inDecl, inSubst)
-    {}
-
-protected:
     GenericParamIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef)
         : IntVal(inType), declRef(inDeclRef)
     {}
@@ -134,7 +129,7 @@ public:
                 if (thisGenParam->equalsVal(thatGenParam))
                     return power < other.power;
                 else
-                    return thisGenParam->declRef.decl < thatGenParam->declRef.decl;
+                    return thisGenParam->declRef.getDecl() < thatGenParam->declRef.getDecl();
             }
             else
             {
@@ -335,8 +330,8 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-    DeclaredSubtypeWitness(Type* inSub, Type* inSup, Decl* decl, Substitutions* subst)
-        : declRef(decl, subst)
+    DeclaredSubtypeWitness(Type* inSub, Type* inSup, DeclRef<Decl> inDeclRef)
+        : declRef(inDeclRef)
     {
         sub = inSub;
         sup = inSup;

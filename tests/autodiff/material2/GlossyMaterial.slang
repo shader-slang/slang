@@ -23,7 +23,7 @@ struct GlossyMaterial : IMaterial
 
     [BackwardDerivativeOf(getAlbedo)]
     [TreatAsDifferentiable]
-    void __bwd_d_getAlbedo(DifferentialPair<float3> dpAlbedo, float3 dOut)
+    void __bwd_d_getAlbedo(inout DifferentialPair<float3> dpAlbedo, float3 dOut)
     {
         [unroll]
         for (int j = 0; j < 3; j++) outputBuffer[j + 3] += dOut[j];

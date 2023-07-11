@@ -4,6 +4,8 @@ tests/diagnostics/interface-requirement-not-satisfied.slang(10): error 38100: ty
 struct T : IFoo
            ^~~~
 tests/diagnostics/interface-requirement-not-satisfied.slang(7): note: see declaration of 'bar'
+    void bar();
+         ^~~
 }
 standard output = {
 }

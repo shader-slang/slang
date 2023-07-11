@@ -632,6 +632,22 @@ struct IRTypeLegalizationContext
         ///
     Dictionary<IRFunc*, RefPtr<LegalFuncInfo>> mapFuncToInfo;
 
+        /// 
+        /// Special handling for pointer types. If we have a situation where 
+        /// a type could end up in a loop pointing to itself, the activePointerValues
+        /// stack records which pointer value types (ie the thing being pointed to)
+        /// are "active". The usedCount is to indicate how many times the type was
+        /// used whilst active. If it's !=0, we should check the assumption about what 
+        /// should have been produced.
+        /// 
+    struct PointerValue
+    {
+        IRType* type = nullptr;
+        Index usedCount = 0;
+    };
+
+    List<PointerValue> activePointerValues;
+
     IRBuilder* getBuilder() { return builder; }
 
         /// Customization point to decide what types are "special."

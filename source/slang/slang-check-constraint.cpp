@@ -285,12 +285,12 @@ namespace Slang
         // These seem more reasonable to have influence constraint solving, since it could
         // conceivably let us specialize a `X<T> : IContainer` to `X<Int>` if we find
         // that `X<T>.IndexType == T`.
-        for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
+        for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef) )
         {
             if(!TryUnifyTypes(*system, getSub(m_astBuilder, constraintDeclRef), getSup(m_astBuilder, constraintDeclRef)))
                 return SubstitutionSet();
         }
-        SubstitutionSet resultSubst = genericDeclRef.substitutions;
+        SubstitutionSet resultSubst = genericDeclRef.getSubst();
 
         // Once have built up the full list of constraints we are trying to satisfy,
         // we will attempt to solve for each parameter in a way that satisfies all
@@ -323,7 +323,7 @@ namespace Slang
         // and try to solve for each.
         //
         Count paramCounter = 0;
-        for (auto m : getMembers(genericDeclRef))
+        for (auto m : getMembers(m_astBuilder, genericDeclRef))
         {
             if (auto typeParam = m.as<GenericTypeParamDecl>())
             {
@@ -457,11 +457,11 @@ namespace Slang
         // apply the substitutions we already know...
 
         GenericSubstitution* solvedSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getDecl(), args, genericDeclRef.substitutions.substitutions);
+            genericDeclRef.getDecl(), args, genericDeclRef.getSubst());
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
-            DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getSpecializedDeclRef(
                 constraintDecl,
                 solvedSubst);
 
@@ -510,7 +510,7 @@ namespace Slang
         }
 
         resultSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getDecl(), args, genericDeclRef.substitutions.substitutions);
+            genericDeclRef.getDecl(), args, genericDeclRef.getSubst());
         return resultSubst;
     }
 
@@ -737,8 +737,8 @@ namespace Slang
                 // to each declaration reference.
                 if (!tryUnifySubstitutions(
                     constraints,
-                    fstDeclRef.substitutions.substitutions,
-                    sndDeclRef.substitutions.substitutions))
+                    fstDeclRef.getSubst(),
+                    sndDeclRef.getSubst()))
                 {
                     return false;
                 }

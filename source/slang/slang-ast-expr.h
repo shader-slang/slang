@@ -302,6 +302,32 @@ class ImplicitCastExpr : public TypeCastExpr
     SLANG_AST_CLASS(ImplicitCastExpr)
 };
 
+class LValueImplicitCastExpr : public TypeCastExpr
+{
+    SLANG_AST_CLASS(LValueImplicitCastExpr)
+
+    explicit LValueImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
+};
+
+// To work around situations like int += uint
+// where we want to allow an LValue to work with an implicit cast.
+// The argument being cast *must* be an LValue.
+class OutImplicitCastExpr : public LValueImplicitCastExpr
+{
+    SLANG_AST_CLASS(OutImplicitCastExpr)
+
+        /// Allow explict construction from any TypeCastExpr
+    explicit OutImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
+};
+
+class InOutImplicitCastExpr : public LValueImplicitCastExpr
+{
+    SLANG_AST_CLASS(InOutImplicitCastExpr)
+
+    /// Allow explict construction from any TypeCastExpr
+    explicit InOutImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
+};
+
     /// A cast of a value to a super-type of its type.
     ///
     /// The type being cast to is stored as this expression's `type`.
@@ -348,6 +374,27 @@ class AsTypeExpr : public Expr
     // A witness showing that `typeExpr` is a subtype of `typeof(value)`.
     Val* witnessArg = nullptr;
 
+};
+
+class SizeOfLikeExpr : public Expr
+{
+    SLANG_AST_CLASS(SizeOfLikeExpr);
+
+    // Set during the parse, could be an expression, a variable or a type
+    Expr* value = nullptr;
+
+    // The type the size/alignment needs to operate on. Set during traversal of SemanticsExprVisitor
+    Type* sizedType = nullptr;
+};
+
+class SizeOfExpr : public SizeOfLikeExpr
+{
+    SLANG_AST_CLASS(SizeOfExpr);
+};
+
+class AlignOfExpr : public SizeOfLikeExpr
+{
+    SLANG_AST_CLASS(AlignOfExpr);
 };
 
 class MakeOptionalExpr : public Expr

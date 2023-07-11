@@ -292,6 +292,7 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(MIXED, mixed);
     CASE(REGISTER_SPACE, registerSpace);
     CASE(GENERIC, generic);
+
     #undef CASE
 
         default:
@@ -769,6 +770,16 @@ static void emitReflectionTypeInfoJSON(
             emitReflectionTypeJSON(writer, arrayType->getElementType());
         }
         break;
+    case slang::TypeReflection::Kind::Pointer:
+        {
+            auto pointerType = type;
+            writer.maybeComma();
+            writer << "\"kind\": \"pointer\"";
+            writer.maybeComma();
+            writer << "\"targetType\": ";
+            emitReflectionTypeJSON(writer, pointerType->getElementType());
+        }
+        break;
 
     case slang::TypeReflection::Kind::Struct:
         {
@@ -888,6 +899,40 @@ static void emitReflectionTypeLayoutInfoJSON(
         emitReflectionTypeInfoJSON(writer, typeLayout->getType());
         break;
 
+    case slang::TypeReflection::Kind::Pointer:
+        {
+            auto valueTypeLayout = typeLayout->getElementTypeLayout();
+            SLANG_ASSERT(valueTypeLayout);
+
+            writer.maybeComma();
+            writer << "\"kind\": \"pointer\"";
+
+            writer.maybeComma();
+            writer << "\"valueType\": ";
+
+            auto typeName = valueTypeLayout->getType()->getName();
+
+            if (typeName && typeName[0])
+            {
+                // TODO(JS):
+                // We can't emit the type layout, because the type could contain
+                // a pointer and we end up in a recursive loop. For now we output the typename.
+                writer.writeEscapedString(UnownedStringSlice(typeName));
+            }
+            else
+            {
+                // TODO(JS): We will need to generate name that we will associate with this type 
+                // as it doesn't seem to have one
+                writer.writeEscapedString(toSlice("unknown name!"));
+                SLANG_ASSERT(!"Doesn't have an associated name");
+            }
+
+            /*
+            emitReflectionTypeLayoutJSON(
+                writer,
+                valueTypeLayout); */
+        }
+        break;
     case slang::TypeReflection::Kind::Array:
         {
             auto arrayTypeLayout = typeLayout;

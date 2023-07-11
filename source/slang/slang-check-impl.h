@@ -57,13 +57,13 @@ namespace Slang
         {
             return getRaw() == other.getRaw();
         }
-        static BasicTypeKey invalid() { return BasicTypeKey{ 0xff, 0, 0 }; }
+        static BasicTypeKey invalid() { return BasicTypeKey{ 0xff, 0, 0, 0, 0, 0 }; }
     };
 
     SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(BaseType baseType, IntegerLiteralValue dim1 = 0, IntegerLiteralValue dim2 = 0)
     {
         SLANG_ASSERT(dim1 >= 0 && dim2 >= 0);
-        return BasicTypeKey{ uint8_t(baseType), uint8_t(dim1), uint8_t(dim2) };
+        return BasicTypeKey{ uint8_t(baseType), uint8_t(dim1), uint8_t(dim2), 0, 0, 0 };
     }
 
     inline BasicTypeKey makeBasicTypeKey(Type* typeIn, Expr* exprIn = nullptr)
@@ -172,7 +172,7 @@ namespace Slang
                     // Look at a candidate definition to be called and
                     // see if it gives us a key to work with.
                     //
-                    Decl* funcDecl = item.declRef.decl;
+                    Decl* funcDecl = item.declRef.getDecl();
                     if (auto genDecl = as<GenericDecl>(funcDecl))
                         funcDecl = genDecl->inner;
 
@@ -707,9 +707,9 @@ namespace Slang
         void ensureDecl(Decl* decl, DeclCheckState state, SemanticsContext* baseContext = nullptr);
 
             /// Helper routine allowing `ensureDecl` to be called on a `DeclRef`
-        void ensureDecl(DeclRefBase const& declRef, DeclCheckState state)
+        void ensureDecl(DeclRefBase* declRef, DeclCheckState state)
         {
-            ensureDecl(declRef.getDecl(), state);
+            ensureDecl(declRef->getDecl(), state);
         }
 
             /// Helper routine allowing `ensureDecl` to be used on a `DeclBase`
@@ -1932,6 +1932,8 @@ namespace Slang
         SemanticsExprVisitor(SemanticsContext const& outer)
             : SemanticsVisitor(outer)
         {}
+
+        Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
 
         Expr* visitIncompleteExpr(IncompleteExpr* expr);
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);

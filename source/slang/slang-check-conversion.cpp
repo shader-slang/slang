@@ -163,9 +163,9 @@ namespace Slang
             ioInitArgIndex);
     }
 
-    DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef)
+    DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef)
     {
-        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(structTypeDeclRef).getFirstOrNull();
+        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(astBuilder, structTypeDeclRef).getFirstOrNull();
         if(!inheritanceDecl)
             return nullptr;
 
@@ -182,9 +182,9 @@ namespace Slang
         return baseDeclRefType;
     }
 
-    DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef)
+    DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef)
     {
-        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(structTypeDeclRef).getFirstOrNull();
+        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(astBuilder, structTypeDeclRef).getFirstOrNull();
         if (!inheritanceDecl)
             return DeclRef<StructDecl>();
 
@@ -454,7 +454,7 @@ namespace Slang
                 // We will go through the fields in order and try to match them
                 // up with initializer arguments.
                 //
-                for(auto fieldDeclRef : getMembersOfType<VarDecl>(toStructDeclRef, MemberFilterStyle::Instance))
+                for(auto fieldDeclRef : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
                 {
                     Expr* coercedArg = nullptr;
                     bool argResult = _readValueFromInitializerList(
@@ -902,7 +902,23 @@ namespace Slang
                 if(auto witness = tryGetSubtypeWitness(fromType, toAggTypeDeclRef))
                 {
                     if (outToExpr)
+                    {
                         *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
+
+                        // If the original expression was an l-value, then the result
+                        // of the cast may be an l-value itself. We want to be able
+                        // to invoke `[mutating]` methods on a value that is cast to
+                        // an interface it conforms to, and we also expect to be able
+                        // to pass a value of a derived `struct` type into methods that
+                        // expect a value of its base type.
+                        //
+                        // TODO: vet this logic for correctness.
+                        //
+                        if (fromExpr && fromExpr->type.isLeftValue)
+                        {
+                            (*outToExpr)->type.isLeftValue = true;
+                        }
+                    }
                     if (outCost)
                         *outCost = kConversionCost_CastToInterface;
                     return true;
@@ -1115,7 +1131,7 @@ namespace Slang
                 if (cost >= kConversionCost_Explicit)
                 {
                     getSink()->diagnose(fromExpr, Diagnostics::typeMismatch, toType, fromType);
-                    getSink()->diagnose(
+                    getSink()->diagnoseWithoutSourceView(
                         fromExpr, Diagnostics::noteExplicitConversionPossible, fromType, toType);
                 }
                 else if (cost >= kConversionCost_Default)

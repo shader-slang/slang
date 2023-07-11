@@ -620,6 +620,14 @@ INST(TorchTensorGetView, TorchTensorGetView, 0, 0)
 
 INST(AllocateOpaqueHandle, allocateOpaqueHandle, 0, 0)
 
+    // Return the register index thtat a resource is bound to.
+    INST(GetRegisterIndex, getRegisterIndex, 1, 0)
+
+    // Return the registe space that a resource is bound to.
+    INST(GetRegisterSpace, getRegisterSpace, 1, 0)
+
+INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
+
 /* Decoration */
 
 INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
@@ -923,6 +931,8 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
+INST(OutImplicitCast,                   outImplicitCast,           1, 0)
+INST(InOutImplicitCast,                 inOutImplicitCast,         1, 0)
 INST(IntCast, intCast, 1, 0)
 INST(FloatCast, floatCast, 1, 0)
 INST(CastIntToFloat, castIntToFloat, 1, 0)
@@ -931,6 +941,9 @@ INST(CastPtrToBool, CastPtrToBool, 1, 0)
 INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
+
+INST(SizeOf,                            sizeOf,                     1, 0)
+INST(AlignOf,                           alignOf,                    1, 0)
 
 INST(IsType, IsType, 3, 0)
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
@@ -967,7 +980,9 @@ INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
         INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, HOISTABLE)
         INST(ExistentialTypeLayout, existentialTypeLayout, 0, HOISTABLE)
         INST(StructTypeLayout, structTypeLayout, 0, HOISTABLE)
-    INST_RANGE(TypeLayout, TypeLayoutBase, StructTypeLayout)
+        // TODO(JS): Ideally we'd have the layout to the pointed to value type (ie 1 instead of 0 here). But to avoid infinite recursion we don't.
+        INST(PointerTypeLayout, ptrTypeLayout, 0, HOISTABLE)
+    INST_RANGE(TypeLayout, TypeLayoutBase, PointerTypeLayout)
 
     INST(EntryPointLayout, EntryPointLayout, 1, HOISTABLE)
 INST_RANGE(Layout, VarLayout, EntryPointLayout)

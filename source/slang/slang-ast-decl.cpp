@@ -102,4 +102,20 @@ void ContainerDecl::buildMemberDictionary()
     SLANG_ASSERT(isMemberDictionaryValid());
 }
 
+bool isLocalVar(const Decl* decl)
+{
+    const auto varDecl = as<VarDecl>(decl);
+    if(!varDecl)
+        return false;
+    const Decl* pp = varDecl->parentDecl;
+    if(as<ScopeDecl>(pp))
+        return true;
+    while(auto genericDecl = as<GenericDecl>(pp))
+        pp = genericDecl->inner;
+    if(as<FunctionDeclBase>(pp))
+        return true;
+
+    return false;
+}
+
 } // namespace Slang

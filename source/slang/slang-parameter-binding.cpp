@@ -960,7 +960,7 @@ static void addExplicitParameterBindings_HLSL(
             // TODO: warning here!
         }
 
-        addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
+        addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
     }
 }
 
@@ -1048,7 +1048,7 @@ static void addExplicitParameterBindings_GLSL(
         auto count = resInfo->count;
         semanticInfo.kind = kind;
 
-        addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
+        addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
         return;
     }
 
@@ -1071,7 +1071,7 @@ static void addExplicitParameterBindings_GLSL(
         // 
         // TODO(JS): I suppose there is some ambiguity here, because if we did a semantic lookup, and it didn't have a vulkanKind
         // or didn't parse correctly we wouldn't issue this message.
-        getSink(context)->diagnose(varDecl, Diagnostics::cannotInferVulkanBindingWithoutRegisterModifier, varDecl);
+        getSink(context)->diagnose(varDecl.getDecl(), Diagnostics::cannotInferVulkanBindingWithoutRegisterModifier, varDecl);
         return;
     }
             
@@ -1098,7 +1098,7 @@ static void addExplicitParameterBindings_GLSL(
     {
         // If we made it here, there are shift options, but there isn't one for the space/kind specified
         // That could be a problem and unexpected, so issue a warning
-        getSink(context)->diagnose(varDecl, Diagnostics::hlslToVulkanMappingNotFound, varDecl);
+        getSink(context)->diagnose(varDecl.getDecl(), Diagnostics::hlslToVulkanMappingNotFound, varDecl);
         return;
     }
 
@@ -1111,7 +1111,7 @@ static void addExplicitParameterBindings_GLSL(
                     
     const LayoutSize count = resInfo->count;
 
-    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
+    addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
 }
 
 // Given a single parameter, collect whatever information we have on
@@ -1997,6 +1997,18 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
     else if(const auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
     else if(const auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
+    else if (auto ptrType = as<PtrType>(type))
+    {
+        SLANG_ASSERT(ptrType->astNodeType == ASTNodeType::PtrType);
+
+        // Work out the layout for the value/target type
+        auto valueTypeLayout = processEntryPointVaryingParameter(context, ptrType->getValueType(), state, varLayout);
+
+        RefPtr<PointerTypeLayout> ptrTypeLayout = new PointerTypeLayout();
+        ptrTypeLayout->valueTypeLayout = valueTypeLayout;
+
+        return ptrTypeLayout;
+    }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
     else if( auto declRefType = as<DeclRefType>(type) )
@@ -2025,7 +2037,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             //
             Decl* firstExplicit = nullptr;
             Decl* firstImplicit = nullptr;
-            for( auto field : getFields(structDeclRef, MemberFilterStyle::Instance) )
+            for( auto field : getFields(context->getASTBuilder(), structDeclRef, MemberFilterStyle::Instance) )
             {
                 RefPtr<VarLayout> fieldVarLayout = new VarLayout();
                 fieldVarLayout->varDecl = field;
@@ -2059,7 +2071,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     auto fieldResInfo = fieldVarLayout->FindResourceInfo(kind);
                     if( !fieldResInfo )
                     {
-                        if(!firstImplicit) firstImplicit = field;
+                        if(!firstImplicit) firstImplicit = field.getDecl();
 
                         // In the implicit-layout case, we assign the field
                         // the next available offset after the fields that
@@ -2071,7 +2083,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     }
                     else
                     {
-                        if(!firstExplicit) firstExplicit = field;
+                        if(!firstExplicit) firstExplicit = field.getDecl();
 
                         // In the explicit case, the field already has offset
                         // information, and we just need to update the computed
@@ -2096,7 +2108,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             if( auto concreteType = findGlobalGenericSpecializationArg(
                 layoutContext,
-                globalGenericParamDecl) )
+                globalGenericParamDecl.getDecl()) )
             {
                 // If we know what concrete type has been used to specialize
                 // the global generic type parameter, then we should use
@@ -2122,7 +2134,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 // to the generic type, since we can't know how many "slots"
                 // of varying input/output it would consume.
                 //
-                return createTypeLayoutForGlobalGenericTypeParam(layoutContext, type, globalGenericParamDecl);
+                return createTypeLayoutForGlobalGenericTypeParam(layoutContext, type, globalGenericParamDecl.getDecl());
             }
         }
         else if (auto associatedTypeParam = declRef.as<AssocTypeDecl>())
@@ -2136,6 +2148,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             SLANG_UNEXPECTED("unhandled type kind");
         }
     }
+    
     // If we ran into an error in checking the user's code, then skip this parameter
     else if( const auto errorType = as<ErrorType>(type) )
     {
@@ -2713,7 +2726,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
 
         // Any generic specialization applied to the entry-point function
         // must also be applied to its parameters.
-        paramDeclRef.substitutions = entryPointFuncDeclRef.substitutions;
+        paramDeclRef = context->getASTBuilder()->getSpecializedDeclRef(paramDeclRef.getDecl(), entryPointFuncDeclRef.getSubst());
 
         // When computing layout for an entry-point parameter,
         // we want to make sure that the layout context has access
@@ -3769,7 +3782,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
             if( varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
             {
                 needDefaultConstantBuffer = true;
-                diagnoseGlobalUniform(&sharedContext, varLayout->varDecl);
+                diagnoseGlobalUniform(&sharedContext, varLayout->varDecl.getDecl());
             }
         }
     }

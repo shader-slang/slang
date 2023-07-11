@@ -22,7 +22,7 @@ class NodeBase
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.
-    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /* astBuilder*/)
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /*astBuilder*/)
     {
         astNodeType = inAstNodeType;
 #ifdef _DEBUG
@@ -77,6 +77,15 @@ SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 {
     return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
 }
+
+// Because DeclRefBase is now a `Val`, we prevent casting it directly into other nodes
+// to avoid confusion and bugs. Instead, use the `as<>()` method on `DeclRefBase` to
+// get a `DeclRef<T>` for a specific node type.
+template<typename T>
+T* as(const DeclRefBase* declRefBase) = delete;
+
+template<typename T, typename U>
+DeclRef<T> as(DeclRef<U> declRef) { return DeclRef<T>(declRef); }
 
 struct Scope : public NodeBase
 {
@@ -208,7 +217,7 @@ SLANG_FORCE_INLINE const T* as(const Type* obj);
 // `typedef` which gives them a good name when printed as
 // part of diagnostic messages.
 //
-// In order to operation on types, though, we often want
+// In order to operate on types, though, we often want
 // to look past any sugar, and operate on an underlying
 // "canonical" type. The representation caches a pointer to
 // a canonical type on every type, so we can easily
@@ -339,6 +348,86 @@ class ThisTypeSubstitution : public Substitutions
     {}
 };
 
+class Decl;
+
+// A reference to a declaration, which may include
+// substitutions for generic parameters.
+class DeclRefBase : public Val
+{
+    SLANG_AST_CLASS(DeclRefBase)
+
+    Decl* getDecl() const { return decl; }
+
+    Substitutions* getSubst() const { return substitutions; }
+
+    DeclRefBase(Decl* decl)
+        :decl(decl)
+    {
+    }
+
+    DeclRefBase(Decl* decl, Substitutions* subst)
+        :decl(decl), substitutions(subst)
+    {
+    }
+
+    // Apply substitutions to a type or declaration
+    Type* substitute(ASTBuilder* astBuilder, Type* type) const;
+
+    DeclRefBase* substitute(ASTBuilder* astBuilder, DeclRefBase* declRef) const;
+
+    // Apply substitutions to an expression
+    SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const;
+
+    // Apply substitutions to this declaration reference
+    DeclRefBase* substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const;
+
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+    {
+        return substituteImpl(astBuilder, subst, ioDiff);
+    }
+    bool _equalsValOverride(Val* val);
+
+    bool _equalsImplOverride(DeclRefBase* declRef) { return equals(declRef); }
+
+    void _toTextOverride(StringBuilder& out) { toText(out); }
+
+    // Returns true if 'as' will return a valid cast
+    template <typename T>
+    bool is() const { return Slang::as<T>(decl) != nullptr; }
+
+    // Check if this is an equivalent declaration reference to another
+    bool equals(DeclRefBase* declRef) const;
+
+    // Convenience accessors for common properties of declarations
+    Name* getName() const;
+    SourceLoc getNameLoc() const;
+    SourceLoc getLoc() const;
+    DeclRefBase* getParent(ASTBuilder* astBuilder) const;
+
+    HashCode getHashCode() const;
+
+    // Debugging:
+    String toString() const;
+    void toText(StringBuilder& out) const;
+
+private:
+
+    // The underlying declaration
+    Decl* decl = nullptr;
+    // Optionally, a chain of substitutions to perform
+    Substitutions* substitutions;
+
+};
+
+SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase* declRef) { declRef->toText(io); return io; }
+
+SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const Decl* decl)
+{
+    if (decl)
+        _printNestedDecl(nullptr, decl, io);
+    return io;
+}
+
 class SyntaxNode : public SyntaxNodeBase
 {
     SLANG_ABSTRACT_AST_CLASS(SyntaxNode);
@@ -405,20 +494,27 @@ public:
 
     ContainerDecl* parentDecl = nullptr;
 
+    // A direct DeclRef to this Decl.
+    // For every Decl, we create a DeclRef node representing a direct reference to it
+    // upon the creation of the Decl (implemented in ASTBuilder), and store that
+    // DeclRef here so we can get a direct DeclRef from a Decl* (by calling makeDeclRef)
+    // without requiring a ASTBuilder to be available.
+    DeclRefBase* defaultDeclRef = nullptr;
+
     NameLoc nameAndLoc;
 
     RefPtr<MarkupEntry> markup;
 
-    Name*     getName()       { return nameAndLoc.name; }
-    SourceLoc getNameLoc()    { return nameAndLoc.loc ; }
-    NameLoc   getNameAndLoc() { return nameAndLoc     ; }
+    Name*     getName() const      { return nameAndLoc.name; }
+    SourceLoc getNameLoc() const   { return nameAndLoc.loc ; }
+    NameLoc   getNameAndLoc() const { return nameAndLoc     ; }
 
     DeclCheckStateExt checkState = DeclCheckState::Unchecked;
 
     // The next declaration defined in the same container with the same name
     Decl* nextInContainerWithSameName = nullptr;
 
-    bool isChecked(DeclCheckState state) { return checkState >= state; }
+    bool isChecked(DeclCheckState state) const { return checkState >= state; }
     void setCheckState(DeclCheckState state)
     {
         SLANG_RELEASE_ASSERT(state >= checkState.getState());
@@ -446,5 +542,111 @@ class Stmt : public ModifiableSyntaxNode
     void accept(IStmtVisitor* visitor, void* extra);
 };
 
+template<typename T>
+void DeclRef<T>::init(DeclRefBase* base)
+{
+    if (base && !Slang::as<T>(base->getDecl()))
+        declRefBase = nullptr;
+    else
+        declRefBase = base;
+}
+
+template<typename T>
+DeclRef<T>::DeclRef(Decl* decl)
+{
+    DeclRefBase* declRef = nullptr;
+    if (decl)
+    {
+        SLANG_ASSERT(decl->defaultDeclRef);
+        declRef = decl->defaultDeclRef;
+    }
+    init(declRef);
+}
+
+template<typename T>
+T* DeclRef<T>::getDecl() const
+{
+    return declRefBase ? (T*)declRefBase->getDecl() : nullptr;
+}
+
+template<typename T>
+Substitutions* DeclRef<T>::getSubst() const
+{
+    return declRefBase ? declRefBase->getSubst() : nullptr;
+}
+
+template<typename T>
+Name* DeclRef<T>::getName() const
+{
+    if (declRefBase)
+        return declRefBase->getName();
+    return nullptr;
+}
+
+template<typename T>
+SourceLoc DeclRef<T>::getNameLoc() const
+{
+    if (declRefBase) return declRefBase->getNameLoc();
+    return SourceLoc();
+}
+
+template<typename T>
+SourceLoc DeclRef<T>::getLoc() const
+{
+    if (declRefBase) return declRefBase->getLoc();
+    return SourceLoc();
+}
+
+template<typename T>
+DeclRef<ContainerDecl> DeclRef<T>::getParent(ASTBuilder* astBuilder) const
+{
+    if (declRefBase) return DeclRef<ContainerDecl>(declRefBase->getParent(astBuilder));
+    return DeclRef<ContainerDecl>((DeclRefBase*)nullptr);
+}
+
+template<typename T>
+HashCode DeclRef<T>::getHashCode() const
+{
+    if (declRefBase) return declRefBase->getHashCode();
+    return 0;
+}
+
+template<typename T>
+Type* DeclRef<T>::substitute(ASTBuilder* astBuilder, Type* type) const
+{
+    if (!declRefBase) return type;
+    return declRefBase->substitute(astBuilder, type);
+}
+
+template<typename T>
+SubstExpr<Expr> DeclRef<T>::substitute(ASTBuilder* astBuilder, Expr* expr) const
+{
+    if (!declRefBase) return expr;
+    return declRefBase->substitute(astBuilder, expr);
+}
+
+// Apply substitutions to a type or declaration
+template<typename T>
+template<typename U>
+DeclRef<U> DeclRef<T>::substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const
+{
+    if (!declRefBase) return declRef;
+    return DeclRef<U>(declRefBase->substitute(astBuilder, declRef.declRefBase));
+}
+
+// Apply substitutions to this declaration reference
+template<typename T>
+DeclRef<T> DeclRef<T>::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const
+{
+    if (!declRefBase) return *this;
+    return DeclRef<T>(declRefBase->substituteImpl(astBuilder, subst, ioDiff));
+}
+
+template<typename T>
+template<typename U>
+bool DeclRef<T>::equals(DeclRef<U> other) const
+{
+    return declRefBase == other.declRefBase || (declRefBase && declRefBase->equals(other.declRefBase));
+}
 
 } // namespace Slang

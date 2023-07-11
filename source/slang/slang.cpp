@@ -4010,8 +4010,8 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
 
     void collectReferencedModules(DeclRefBase const& declRef)
     {
-        collectReferencedModules(declRef.decl);
-        collectReferencedModules(declRef.substitutions);
+        collectReferencedModules(declRef.getDecl());
+        collectReferencedModules(declRef.getSubst());
     }
 
     void collectReferencedModules(Type* type)

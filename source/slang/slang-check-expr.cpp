@@ -11,6 +11,8 @@
 //
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
+#include "slang-ast-natural-layout.h"
+
 #include "slang-lookup.h"
 
 #include "slang-ast-print.h"
@@ -211,8 +213,8 @@ namespace Slang
                 // to the chosen interface decl must be the first substitution on
                 // the list (which is a linked list from the "inside" out).
                 //
-                auto thisTypeSubst = as<ThisTypeSubstitution>(interfaceDeclRef.substitutions.substitutions);
-                if(thisTypeSubst && thisTypeSubst->interfaceDecl == interfaceDeclRef.decl)
+                auto thisTypeSubst = as<ThisTypeSubstitution>(interfaceDeclRef.getSubst());
+                if(thisTypeSubst && thisTypeSubst->interfaceDecl == interfaceDeclRef.getDecl())
                 {
                     // This isn't really an existential type, because somebody
                     // has already filled in a this-type substitution.
@@ -536,8 +538,8 @@ namespace Slang
                 synthesizedDecl = structDecl;
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = getName("Differential");
-                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, DeclRef<Decl>(structDecl, nullptr));
-                typeDef->type.type = m_astBuilder->getOrCreateDeclRefType(declRef.decl, declRef.substitutions);
+                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
+                typeDef->type.type = m_astBuilder->getOrCreateDeclRefType(declRef);
                 typeDef->parentDecl = structDecl;
                 structDecl->members.add(typeDef);
             }
@@ -1050,7 +1052,7 @@ namespace Slang
             {
                 foreachDirectOrExtensionMemberOfType<InheritanceDecl>(this, aggTypeDeclRef, [&](DeclRef<InheritanceDecl> member)
                     {
-                        auto subType = m_astBuilder->getOrCreateDeclRefType(member.getDecl(), nullptr);
+                        auto subType = m_astBuilder->getOrCreateDeclRefType(member);
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, subType);
                     });
                 foreachDirectOrExtensionMemberOfType<VarDeclBase>(this, aggTypeDeclRef, [&](DeclRef<VarDeclBase> member)
@@ -1059,7 +1061,7 @@ namespace Slang
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, fieldType);
                     });
             }
-            for (auto subst = declRefType->declRef.substitutions.substitutions; subst; subst = subst->outer)
+            for (auto subst = declRefType->declRef.getSubst(); subst; subst = subst->outer)
             {
                 if (auto genSubst = as<GenericSubstitution>(subst))
                 {
@@ -1278,8 +1280,6 @@ namespace Slang
             // that can be lowered to our bytecode...
             return nullptr;
         }
-
-
 
         // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
         static const int kMaxArgs = 8;
@@ -1507,7 +1507,7 @@ namespace Slang
 
         if (isInterfaceRequirement(decl))
         {
-            for (auto subst = declRef.substitutions.substitutions; subst; subst = subst->outer)
+            for (auto subst = declRef.getSubst(); subst; subst = subst->outer)
             {
                 if (auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
                 {
@@ -1524,7 +1524,7 @@ namespace Slang
         if (!getInitExpr(m_astBuilder, declRef))
             return nullptr;
 
-        ensureDecl(declRef.decl, DeclCheckState::Checked);
+        ensureDecl(declRef.getDecl(), DeclCheckState::Checked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
         return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), &newCircularityInfo);
     }
@@ -1533,6 +1533,7 @@ namespace Slang
         SubstExpr<Expr>                 expr,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
+        
         // Unwrap any "identity" expressions
         while (auto parenExpr = expr.as<ParenExpr>())
         {
@@ -1576,8 +1577,7 @@ namespace Slang
             {
                 Val* valResult = m_astBuilder->getOrCreate<GenericParamIntVal>(
                     declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
-                    genericValParamRef.getDecl(),
-                    genericValParamRef.substitutions.substitutions);
+                    genericValParamRef);
                 valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
                 return as<IntVal>(valResult);
             }
@@ -1629,7 +1629,23 @@ namespace Slang
             if (val)
                 return val;
         }
+        else if (auto sizeOfLikeExpr = as<SizeOfLikeExpr>(expr.getExpr()))
+        {
+            ASTNaturalLayoutContext context(getASTBuilder(), nullptr);
+            const auto size = context.calcSize(sizeOfLikeExpr->sizedType);
+            if (!size)
+            {
+                return nullptr;
+            }
 
+            auto value = as<AlignOfExpr>(sizeOfLikeExpr) ? 
+                size.alignment :
+                size.size;
+            
+            // We can return as an IntVal
+            return getASTBuilder()->getIntVal(expr.getExpr()->type, value);
+        }
+        
         return nullptr;
     }
 
@@ -1891,7 +1907,7 @@ namespace Slang
         {
             if(!thisExpr->type.isLeftValue)
             {
-                getSink()->diagnose(thisExpr, Diagnostics::thisIsImmutableByDefault);
+                getSink()->diagnoseWithoutSourceView(thisExpr, Diagnostics::thisIsImmutableByDefault);
             }
         }
     }
@@ -1952,6 +1968,51 @@ namespace Slang
         return checkedExpr;
     }
 
+    static bool _canLValueCoerceScalarType(Type* a, Type* b)
+    {
+        auto basicTypeA = as<BasicExpressionType>(a);
+        auto basicTypeB = as<BasicExpressionType>(b);
+
+        if (basicTypeA && basicTypeB)
+        {
+            const auto& infoA = BaseTypeInfo::getInfo(basicTypeA->baseType);
+            const auto& infoB = BaseTypeInfo::getInfo(basicTypeB->baseType);
+
+            // TODO(JS): Initially this tries to limit where LValueImplict casts happen.
+            // We could in principal allow different sizes, as long as we converted to a temprorary
+            // and back again. 
+            // 
+            // For now we just stick with the simple case. 
+            // // We only allow on integer types for now. In effect just allowing any size uint/int conversions
+            if (infoA.sizeInBytes == infoB.sizeInBytes && 
+                (infoA.flags & infoB.flags & BaseTypeInfo::Flag::Integer))
+            {
+                return true;
+            }
+
+        }
+        return false;
+    }
+
+    static bool _canLValueCoerce(Type* a, Type* b)
+    {
+        // We can *assume* here that if they are coercable, that dimensions of vectors
+        // and matrices match. We might want to assert to be sure...
+        SLANG_ASSERT(a != b);
+        if (a->astNodeType == b->astNodeType)
+        {
+            if (auto matA = as<MatrixExpressionType>(a))
+            {
+                return _canLValueCoerceScalarType(matA->getElementType(), static_cast<MatrixExpressionType*>(b)->getElementType());   
+            }
+            else if (auto vecA = as<VectorExpressionType>(a))
+            {
+                return  _canLValueCoerceScalarType(vecA->getScalarType(), static_cast<VectorExpressionType*>(b)->getScalarType());   
+            }
+        }
+        return _canLValueCoerceScalarType(a, b);
+    }
+
     Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
     {
         auto rs = ResolveInvoke(expr);
@@ -1985,23 +2046,97 @@ namespace Slang
                         if( pp < expr->arguments.getCount() )
                         {
                             auto argExpr = expr->arguments[pp];
-                            if( !argExpr->type.isLeftValue )
+                            if( !argExpr->type.isLeftValue)
                             {
-                                getSink()->diagnose(
-                                    argExpr,
-                                    Diagnostics::argumentExpectedLValue,
-                                    pp);
+                                auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
-                                if( auto implicitCastExpr = as<ImplicitCastExpr>(argExpr) )
+                                // NOTE: 
+                                // This is currently only enabled for in/inout based scenarios. Ie NOT ref.
+                                // 
+                                // Depending on the target there can be an issue around atomics.
+                                // The fall back transformation with InOut/OutImplicitCast is to introduce 
+                                // a temporary, and do the work on that and copy back.
+                                // 
+                                // This doesn't work with an atomic. So the work around is to not enable
+                                // the transformation with ref types, which atomics are defined on.
+                                // 
+                                // An argument can be made that transformation shouldn't apply to the ref scenario in general.
+                                if (implicitCastExpr && 
+                                    as<OutTypeBase>(paramType) && 
+                                    _canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
+                                {
+                                    // This is to work around issues like
+                                    //
+                                    // ```
+                                    // int a = 0;
+                                    // uint b = 1;
+                                    // a += b;
+                                    // ```
+                                    // That strictly speaking it's not allowed, but we are going to allow it for now 
+                                    // for situations were the types are uint/int and vector/matrix varieties of those types
+                                    // 
+                                    // Then in lowering we are going to insert code to do something like
+                                    // ```
+                                    // var OutType: tmp = arg;
+                                    // f(... tmp);
+                                    // arg = tmp;
+                                    // ```
+
+                                    TypeCastExpr* lValueImplicitCast;
+
+                                    // We want to record if the cast is being used for `out` or `inout`/`ref` as 
+                                    // if it's just `out` we won't need to convert before passing in.
+                                    if (as<OutType>(paramType))
+                                    {
+                                        lValueImplicitCast = getASTBuilder()->create<OutImplicitCastExpr>(*implicitCastExpr);
+                                    }
+                                    else
+                                    {
+                                        lValueImplicitCast = getASTBuilder()->create<InOutImplicitCastExpr>(*implicitCastExpr);
+                                    }
+
+                                    // Replace the expression. This should make this situation easier to detect.
+                                    expr->arguments[pp] = lValueImplicitCast;
+                                }
+                                else
                                 {
                                     getSink()->diagnose(
                                         argExpr,
-                                        Diagnostics::implicitCastUsedAsLValue,
-                                        implicitCastExpr->arguments[0]->type,
-                                        implicitCastExpr->type);
-                                }
+                                        Diagnostics::argumentExpectedLValue,
+                                        pp);
 
-                                maybeDiagnoseThisNotLValue(argExpr);
+                                    
+                                    if(implicitCastExpr)
+                                    {
+                                        const DiagnosticInfo* diagnostic = nullptr;
+
+                                        // Try and determine reason for failure
+                                        if (as<RefType>(paramType))
+                                        {
+                                            // Ref types are not allowed to use this mechanism because it breaks atomics 
+                                            diagnostic = &Diagnostics::implicitCastUsedAsLValueRef;
+                                        }
+                                        else if (!_canLValueCoerce(implicitCastExpr->arguments[0]->type, implicitCastExpr->type))
+                                        {
+                                            // We restict what types can use this mechanism - currently int/uint and same sized matrix/vectors
+                                            // of those types.
+                                            diagnostic = &Diagnostics::implicitCastUsedAsLValueType;
+                                        }
+                                        else
+                                        {
+                                            // Fall back, in case there are other reasons...
+                                            diagnostic = &Diagnostics::implicitCastUsedAsLValue;
+                                        }
+
+                                        getSink()->diagnoseWithoutSourceView(
+                                            argExpr,
+                                            *diagnostic,
+                                            implicitCastExpr->arguments[pp]->type,
+                                            implicitCastExpr->type);
+                                    }
+
+                                    maybeDiagnoseThisNotLValue(argExpr);
+                                }
                             }
                         }
                         else
@@ -2059,6 +2194,7 @@ namespace Slang
         }
         return rs;
     }
+
 
     Expr* SemanticsExprVisitor::visitSelectExpr(SelectExpr* expr)
     {
@@ -2335,9 +2471,9 @@ namespace Slang
                 if (auto baseFuncGenericDeclRef = declRefExpr->declRef.as<GenericDecl>())
                 {
                     // Get inner function
-                    DeclRef<Decl> unspecializedInnerRef = DeclRef<Decl>(
+                    DeclRef<Decl> unspecializedInnerRef = astBuilder->getSpecializedDeclRef<Decl>(
                         getInner(baseFuncGenericDeclRef),
-                        baseFuncGenericDeclRef.substitutions);
+                        baseFuncGenericDeclRef.getSubst());
                     auto callableDeclRef = unspecializedInnerRef.as<CallableDecl>();
                     if (!callableDeclRef)
                         return nullptr;
@@ -2608,6 +2744,67 @@ namespace Slang
             expr->type = m_astBuilder->getErrorType();
         }
         return expr;
+    }
+
+    static bool _isSizeOfType(Type* type)
+    {
+        if (!type)
+        {
+            return false;
+        }
+
+        if (as<ArithmeticExpressionType>(type) ||
+            as<ArrayExpressionType>(type) ||
+            as<PtrTypeBase>(type) ||
+            as<TupleType>(type) ||
+            as<GenericDeclRefType>(type))
+        {
+            return true;
+        }
+
+        if (as<DeclRefType>(type))
+        {
+            return true;
+        }
+        
+        return false;
+    }
+
+    Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
+    {
+        auto valueExpr = dispatch(sizeOfLikeExpr->value);
+        
+        Type* type = nullptr;
+
+        if (as<TypeType>(valueExpr->type))
+        {
+            TypeExp typeExp;
+            typeExp.exp = valueExpr;
+
+            auto properTypeExpr = CoerceToProperType(typeExp);
+
+            type = properTypeExpr.type;
+        }
+        else
+        {
+            // Is this a proper type?
+            TypeExp typeExp(valueExpr->type);
+            TypeExp properType = tryCoerceToProperType(typeExp);
+
+            type = properType.type;
+        }
+
+        if (!_isSizeOfType(type))
+        {
+            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfArgumentIsInvalid);
+
+            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
+            return sizeOfLikeExpr;
+        }
+
+        sizeOfLikeExpr->sizedType = type;
+
+        return sizeOfLikeExpr;
     }
 
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
@@ -3378,7 +3575,7 @@ namespace Slang
             for (auto lookupResult : overloadedExpr->lookupResult2)
             {
                 bool shouldRemove = false;
-                if (lookupResult.declRef.getParent().as<InterfaceDecl>())
+                if (lookupResult.declRef.getParent(m_astBuilder).as<InterfaceDecl>())
                 {
                     shouldRemove = true;
                 }

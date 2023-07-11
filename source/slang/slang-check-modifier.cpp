@@ -591,9 +591,20 @@ namespace Slang
             }
 
             ImageFormat format = ImageFormat::unknown;
-            if(!findImageFormatByName(formatName.getBuffer(), &format))
+
+            if (attr->keywordName->text.getUnownedSlice() == toSlice("image"))
             {
-                getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
+                if(!findImageFormatByName(formatName.getUnownedSlice(), &format))
+                {
+                    getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
+                }
+            }
+            else
+            {
+                if (!findVkImageFormatByName(formatName.getUnownedSlice(), &format))
+                {
+                    getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
+                }
             }
 
             formatAttr->format = format;

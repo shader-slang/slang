@@ -2,6 +2,7 @@
 #include "slang-intrinsic-expand.h"
 
 #include "slang-emit-cuda.h"
+#include "slang-ir-util.h"
 
 namespace Slang {
 
@@ -512,6 +513,10 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 SLANG_UNEXPECTED("bad format in intrinsic definition");
             }
 
+            // unorm and snorm attributes are currently ignored by glslang
+            // https://github.com/KhronosGroup/glslang/blob/main/glslang/HLSL/hlslGrammar.cpp#L1476
+            elementType = dropNormAttributes(elementType);
+
             SLANG_ASSERT(elementType);
             if (const auto basicType = as<IRBasicType>(elementType))
             {
@@ -528,6 +533,10 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
                     m_writer->emit(swiz[elementCount]);
                 }
+            }
+            else if (const auto attrType = as<IRAttributedType>(elementType))
+            {
+                SLANG_UNEXPECTED("unhandled attributed type in intrinsic definition");
             }
             else
             {
@@ -801,6 +810,29 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     break;
             }
             m_writer->emit(str);
+        }
+        break;
+
+        case '*':
+        {
+            // An escape like `$*3` indicates that all arguments
+            // from index 3 (in this example) and up should be
+            // emitted as comma-separated expressions.
+            //
+            // We therefore expect the next byte to be a digit:
+            //
+            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+            Index firstArgIndex = (*cursor++) - '0' + m_argIndexOffset;
+            SLANG_RELEASE_ASSERT(m_argCount > firstArgIndex);
+
+            for (Index argIndex = firstArgIndex; argIndex < m_argCount; ++argIndex)
+            {
+                if (argIndex != firstArgIndex)
+                {
+                    m_writer->emit(", ");
+                }
+                m_emitter->emitOperand(m_args[argIndex].get(), getInfo(EmitOp::General));
+            }
         }
         break;
 

@@ -43,5 +43,7 @@ FORMAT(rg8ui,           (UINT8,   2, sizeof(uint8_t) * 2))
 FORMAT(r32ui,           (UINT32,  1, sizeof(uint32_t)))
 FORMAT(r16ui,           (UINT16,  1, sizeof(uint16_t)))
 FORMAT(r8ui,            (UINT8,   1, sizeof(uint8_t)))
+FORMAT(r64ui,           (UINT64,   1, sizeof(uint64_t)))
+FORMAT(r64i,            (INT64,   1, sizeof(int64_t)))
 
 #undef FORMAT
