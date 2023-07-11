@@ -134,6 +134,7 @@ int wmain(int argc, wchar_t** argv)
         {
             argBuffers.add(args[ii].getBuffer());
         }
+
         result = MAIN(argc, (char**) &argBuffers[0]);
     }
 
