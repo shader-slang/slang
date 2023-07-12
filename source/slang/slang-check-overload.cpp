@@ -1416,14 +1416,6 @@ namespace Slang
             candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
             candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
 
-            if(candidate.item.declRef.getName()->text == "__shl")
-            {
-                candidate = candidate;
-            }
-
-            // HACK(tess): debugging logic:
-            inferGenericArguments(genericDeclRef, context, substWithKnownGenericArgs);
-
             AddOverloadCandidateInner(context, candidate);
         }
     }
