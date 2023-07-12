@@ -72,6 +72,7 @@ enum class OptionKind
     InputFilesRemain,
     EmitIr,
     ReportDownstreamTime,
+    ReportPerfBenchmark,
 
     SourceEmbedStyle,
     SourceEmbedName,
@@ -427,6 +428,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DumpWarningDiagnostics, "-dump-warning-diagnostics", nullptr, "Dump to output list of warning diagnostic numeric and name ids." },
         { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."},
         { OptionKind::ReportDownstreamTime, "-report-downstream-time", nullptr, "Reports the time spent in the downstream compiler." },
+        { OptionKind::ReportPerfBenchmark, "-report-perf-benchmark", nullptr, "Reports compiler performance benchmark results." },
         { OptionKind::SourceEmbedStyle, "-source-embed-style", "-source-embed-style <source-embed-style>",
         "If source embedding is enabled, defines the style used. When enabled (with any style other than `none`), "
         "will write compile results into embeddable source for the target language. "
@@ -1865,6 +1867,11 @@ SlangResult OptionsParser::_parse(
             case OptionKind::ReportDownstreamTime:
             {
                 m_compileRequest->setReportDownstreamTime(true);
+                break;
+            }
+            case OptionKind::ReportPerfBenchmark:
+            {
+                m_compileRequest->setReportPerfBenchmark(true);
                 break;
             }
             case OptionKind::ModuleName:

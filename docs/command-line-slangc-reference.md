@@ -238,6 +238,11 @@ Treat the rest of the command line as input files.
 Reports the time spent in the downstream compiler. 
 
 
+<a id="report-perf-benchmark"></a>
+## -report-perf-benchmark
+Reports compiler performance benchmark results. 
+
+
 <a id="source-embed-style-1"></a>
 ## -source-embed-style
 

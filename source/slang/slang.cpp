@@ -7,7 +7,7 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 #include "../core/slang-castable.h"
-
+#include "../core/slang-performance-profiler.h"
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -4813,6 +4813,11 @@ void EndToEndCompileRequest::setReportDownstreamTime(bool value)
     m_reportDownstreamCompileTime = value;
 }
 
+void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
+{
+    m_reportPerfBenchmark = value;
+}
+
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)
 {
     ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, WriterFlag::IsConsole));
@@ -5181,7 +5186,12 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
         double downstreamTime = downstreamEndTime - downstreamStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
-
+    }
+    if (m_reportPerfBenchmark)
+    {
+        StringBuilder perfResult;
+        PerformanceProfiler::getProfiler()->getResult(perfResult);
+        getSink()->diagnose(SourceLoc(), Diagnostics::performanceBenchmarkResult, perfResult.produceString());
     }
 
     // Repro dump handling

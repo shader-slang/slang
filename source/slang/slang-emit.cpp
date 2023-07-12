@@ -89,6 +89,7 @@
 #include "../compiler-core/slang-artifact-associated-impl.h"
 
 #include "../core/slang-castable.h"
+#include "../core/slang-performance-profiler.h"
 
 #include <assert.h>
 
@@ -199,6 +200,7 @@ Result linkAndOptimizeIR(
     LinkingAndOptimizationOptions const&    options,
     LinkedIR&                               outLinkedIR)
 {
+    SLANG_PROFILE;
     auto session = codeGenContext->getSession();
     auto sink = codeGenContext->getSink();
     auto target = codeGenContext->getTargetFormat();
