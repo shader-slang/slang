@@ -981,6 +981,8 @@ Result linkAndOptimizeIR(
 
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)
 {
+    SLANG_PROFILE;
+
     outArtifact.setNull();
 
     auto session = getSession();

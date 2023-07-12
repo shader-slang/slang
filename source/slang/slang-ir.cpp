@@ -1982,25 +1982,7 @@ namespace Slang
     }
     //
 
-    bool operator==(IRInstKey const& left, IRInstKey const& right)
-    {
-        if(left.inst->getOp() != right.inst->getOp()) return false;
-        if(left.inst->getFullType() != right.inst->getFullType()) return false;
-        if(left.inst->operandCount != right.inst->operandCount) return false;
-
-        auto argCount = left.inst->operandCount;
-        auto leftArgs = left.inst->getOperands();
-        auto rightArgs = right.inst->getOperands();
-        for( UInt aa = 0; aa < argCount; ++aa )
-        {
-            if(leftArgs[aa].get() != rightArgs[aa].get())
-                return false;
-        }
-
-        return true;
-    }
-
-    HashCode IRInstKey::getHashCode()
+    HashCode IRInstKey::_getHashCode()
     {
         auto code = Slang::getHashCode(inst->getOp());
         code = combineHash(code, Slang::getHashCode(inst->getFullType()));
@@ -3232,6 +3214,17 @@ namespace Slang
             kIROp_PrimalSubstitute,
             type,
             baseFn);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst *IRBuilder::emitDetachDerivative(IRType *type, IRInst *value)
+    {
+        auto inst = createInst<IRDetachDerivative>(
+            this,
+            kIROp_DetachDerivative,
+            type,
+            value);
         addInst(inst);
         return inst;
     }
@@ -7175,7 +7168,7 @@ namespace Slang
         }
     }
 
-    bool IRInst::mightHaveSideEffects()
+    bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     {
         // TODO: We should drive this based on flags specified
         // in `ir-inst-defs.h` isntead of hard-coding things here,
@@ -7219,7 +7212,7 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
-                return !isSideEffectFreeFunctionalCall(call);
+                return !isSideEffectFreeFunctionalCall(call, options);
             }
             break;
 

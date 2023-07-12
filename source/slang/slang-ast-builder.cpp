@@ -679,6 +679,7 @@ SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
 
 bool ASTBuilder::NodeDesc::operator==(NodeDesc const& that) const
 {
+    if (hashCode != that.hashCode) return false;
     if(type != that.type) return false;
     if(operands.getCount() != that.operands.getCount()) return false;
     for(Index i = 0; i < operands.getCount(); ++i)
@@ -695,7 +696,8 @@ bool ASTBuilder::NodeDesc::operator==(NodeDesc const& that) const
     }
     return true;
 }
-HashCode ASTBuilder::NodeDesc::getHashCode() const
+
+void ASTBuilder::NodeDesc::init()
 {
     Hasher hasher;
     hasher.hashValue(Int(type));
@@ -708,7 +710,7 @@ HashCode ASTBuilder::NodeDesc::getHashCode() const
         //
         hasher.hashValue(operands[i].values.nodeOperand);
     }
-    return hasher.getResult();
+    hashCode = hasher.getResult();
 }
 
 DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst)

@@ -143,7 +143,10 @@ public:
         ShortList<NodeOperand, 4> operands;
 
         bool operator==(NodeDesc const& that) const;
-        HashCode getHashCode() const;
+        HashCode getHashCode() const { return hashCode; }
+        void init();
+    private:
+        HashCode hashCode = 0;
     };
 
     template<typename NodeCreateFunc>
@@ -218,6 +221,7 @@ public:
         NodeDesc desc;
         desc.type = T::kType;
         addOrAppendToNodeList(desc.operands, args...);
+        desc.init();
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>(args...);
@@ -231,6 +235,7 @@ public:
 
         NodeDesc desc;
         desc.type = T::kType;
+        desc.init();
         return (T*)_getOrCreateImpl(desc, [this]() { return create<T>(); });
     }
 
@@ -241,6 +246,7 @@ public:
         NodeDesc desc;
         desc.type = T::kType;
         addOrAppendToNodeList(desc.operands, args...);
+        desc.init();
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>();
@@ -254,6 +260,7 @@ public:
         NodeDesc desc;
         desc.type = T::kType;
         desc.operands.addRange(operands);
+        desc.init();
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>();
@@ -306,6 +313,7 @@ public:
         {
             desc.operands.add(outer);
         }
+        desc.init();
         auto result = (GenericSubstitution*)_getOrCreateImpl(desc, [this]() {return create<GenericSubstitution>(); });
         if (result->args.getCount() != args.getCount())
         {
@@ -327,6 +335,7 @@ public:
         {
             desc.operands.add(outer);
         }
+        desc.init();
         auto result = (ThisTypeSubstitution*)_getOrCreateImpl(desc, [this]() {return create<ThisTypeSubstitution>(); });
         result->interfaceDecl = interfaceDecl;
         result->witness = subtypeWitness;

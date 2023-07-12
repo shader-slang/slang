@@ -2712,7 +2712,7 @@ namespace Slang
         {
             innerExpr = parenExpr->base;
         }
-        if (!as<InvokeExpr>(innerExpr))
+        if (!as<InvokeExpr>(innerExpr) && !as<IndexExpr>(innerExpr))
         {
             getSink()->diagnose(expr, Diagnostics::invalidUseOfNoDiff);
         }
