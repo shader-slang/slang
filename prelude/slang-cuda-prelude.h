@@ -11,6 +11,7 @@
 #else
 
 #include <cstdint>
+#include <stdio.h>
 
 #endif
 
