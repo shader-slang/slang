@@ -548,6 +548,12 @@ private:
     IRInst* m_inst = nullptr;
 };
 
+enum class SideEffectAnalysisOptions
+{
+    None,
+    UseDominanceTree,
+};
+
 // Every value in the IR is an instruction (even things
 // like literal values).
 //
@@ -790,7 +796,7 @@ struct IRInst
     /// It is possible that this instruction has side effects?
     ///
     /// This is a conservative test, and will return `true` if an exact answer can't be determined.
-    bool mightHaveSideEffects(bool useDominanceTree = false);
+    bool mightHaveSideEffects(SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
 
     // RTTI support
     static bool isaImpl(IROp) { return true; }

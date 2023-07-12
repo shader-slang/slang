@@ -645,7 +645,7 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
     }
 }
 
-bool areCallArgumentsSideEffectFree(IRCall* call, bool useDominanceTree)
+bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions options)
 {
     // If the function has no side effect and is not writing to any outputs,
     // we can safely treat the call as a normal inst.
@@ -672,7 +672,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, bool useDominanceTree)
         if (arg->getOp() == kIROp_Var && getParentFunc(arg) == parentFunc)
         {
             IRDominatorTree* dom = nullptr;
-            if (useDominanceTree)
+            if (isBitSet(options, SideEffectAnalysisOptions::UseDominanceTree))
                 dom = module->findOrCreateDominatorTree(parentFunc);
 
             // If the pointer argument is a local variable (thus can't alias with other addresses)
@@ -754,17 +754,17 @@ bool areCallArgumentsSideEffectFree(IRCall* call, bool useDominanceTree)
     return true;
 }
 
-bool isPureFunctionalCall(IRCall* call, bool useDominanceTree)
+bool isPureFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
 {
     auto callee = getResolvedInstForDecorations(call->getCallee());
     if (callee->findDecoration<IRReadNoneDecoration>())
     {
-        return areCallArgumentsSideEffectFree(call, useDominanceTree);
+        return areCallArgumentsSideEffectFree(call, options);
     }
     return false;
 }
 
-bool isSideEffectFreeFunctionalCall(IRCall* call, bool useDominanceTree)
+bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
 {
     // If the call has been marked as no-side-effect, we
     // will treat it so, by-passing all other checks.
@@ -773,7 +773,7 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, bool useDominanceTree)
 
     if (!doesCalleeHaveSideEffect(call->getCallee()))
     {
-        return areCallArgumentsSideEffectFree(call, useDominanceTree);
+        return areCallArgumentsSideEffectFree(call, options);
     }
     return false;
 }

@@ -7157,7 +7157,7 @@ namespace Slang
         }
     }
 
-    bool IRInst::mightHaveSideEffects(bool useDominanceTree)
+    bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     {
         // TODO: We should drive this based on flags specified
         // in `ir-inst-defs.h` isntead of hard-coding things here,
@@ -7201,7 +7201,7 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
-                return !isSideEffectFreeFunctionalCall(call, useDominanceTree);
+                return !isSideEffectFreeFunctionalCall(call, options);
             }
             break;
 

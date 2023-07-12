@@ -312,7 +312,7 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     // First, if `inst` is an instruction that might have some effects
     // when it is executed, then we should keep it around.
     //
-    if (inst->mightHaveSideEffects())
+    if (inst->mightHaveSideEffects(SideEffectAnalysisOptions::UseDominanceTree))
     {
         return true;
     }

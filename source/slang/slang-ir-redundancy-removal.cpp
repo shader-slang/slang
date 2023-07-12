@@ -80,7 +80,7 @@ struct RedundancyRemovalContext
         case kIROp_OutType:
             return true;
         case kIROp_Call:
-            return isPureFunctionalCall(as<IRCall>(inst), false);
+            return isPureFunctionalCall(as<IRCall>(inst));
         case kIROp_Load:
             // Load is generally not movable, an exception is loading a global constant buffer.
             if (auto load = as<IRLoad>(inst))
