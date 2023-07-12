@@ -118,13 +118,13 @@ for `square`, and expose it to PyTorch as an autograd function.
 
 First we need to tell Slang compiler that we need the `square` function to be considered a differentiable function so Slang compiler can generate a backward derivative propagation function for it:
 ```csharp
-[BackwardDifferentiable]
+[Differentiable]
 float square(float x)
 {
     return x * x;
 }
 ```
-This is done by simply adding a `[BackwardDifferentiable]` attribute to our `square`function.
+This is done by simply adding a `[Differentiable]` attribute to our `square`function.
 
 With that, we can now define `square_bwd_kernel` that performs backward propagation as:
 
@@ -139,17 +139,17 @@ void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_out, Tens
 
     DifferentialPair<float> dpInput = diffPair(input[globalIdx.xy]);
     var gradInElem = grad_out[globalIdx.xy];
-    __bwd_diff(square)(dpInput, gradInElem);
+    bwd_diff(square)(dpInput, gradInElem);
     grad_propagated[globalIdx.xy] = dpInput.d;
 }
 ```
 
 Note that the function follows the same structure of `square_fwd_kernel`, with the only difference being that
-instead of calling into `square` to compute the forward value for each tensor element, we are calling `__bwd_diff(square)`
+instead of calling into `square` to compute the forward value for each tensor element, we are calling `bwd_diff(square)`
 that represents the automatically generated backward propagation function of `square`.
-`__bwd_diff(square)` will have the following signature:
+`bwd_diff(square)` will have the following signature:
 ```csharp
-void __bwd_diff_square(inout DifferentialPair<float> dpInput, float dOut);
+void bwd_diff_square(inout DifferentialPair<float> dpInput, float dOut);
 ```
 
 Where the first parameter, `dpInput` represents a pair of original and derivative value for `input`, and the second parameter,
@@ -159,7 +159,7 @@ derivative will be stored in `dpInput.d`. For example:
 ```csharp
 // construct a pair where the primal value is 3, and derivative value is 0.
 var dp = diffPair(3.0);
-__bwd_diff(square)(dp, 1.0);
+bwd_diff(square)(dp, 1.0);
 // dp.d is now 6.0
 ```
 
@@ -201,7 +201,7 @@ class MySquareFuncInSlang(torch.autograd.Function):
 Now we can use the autograd function `MySquareFuncInSlang` in our python script:
 
 ```python
-x = torch.tensor([[3.0, 4.0],[0.0, 1.0]], requires_grad=True, device=cuda_device)
+x = torch.tensor([[3.0, 4.0],[0.0, 1.0]], requires_grad=True, device='cuda')
 print(f"X = {x}")
 y_pred = MySquareFuncInSlang.apply(x)
 loss = y_pred.sum()
@@ -280,8 +280,8 @@ void boxFilter_fwd(TensorView<float> input, TensorView<float> output)
 ```
 
 How do we define the backward derivative propagation kernel? Note that in this example, there
-isn't a function like `square` that we can just mark as `[BackwardDifferentiable]` and
-call `__bwd_diff(square)` to get back the derivative of an input parameter.
+isn't a function like `square` that we can just mark as `[Differentiable]` and
+call `bwd_diff(square)` to get back the derivative of an input parameter.
 
 In this example, the input comes from multiple elements in a tensor. How do we propagate the
 derivatives to those input elements?
@@ -305,7 +305,7 @@ Now we can replace all direct accesses to `input` with a call to `getInputElemen
 `computeOutputPixel` can be implemented as following:
 
 ```csharp
-[BackwardDifferentiable]
+[Differentiable]
 float computeOutputPixel(
     TensorView<float> input,
     TensorView<float> inputGradToPropagateTo,
@@ -345,7 +345,7 @@ float computeOutputPixel(
 The main changes compared to our original version of `computeOutputPixel` are:
 - Added a `inputGradToPropagateTo` parameter.
 - Modified `input[x,y]` with a call to `getInputElement`.
-- Added a `[BackwardDifferentiable]` attribute to the function.
+- Added a `[Differentiable]` attribute to the function.
 
 With that, we can define our backward kernel function:
 
@@ -362,11 +362,11 @@ void boxFilter_bwd(
     if (pixelLoc.x >= width) return;
     if (pixelLoc.y >= height) return;
 
-    __bwd_diff(computeOutputPixel)(input, inputGradToPropagateTo, pixelLoc);
+    bwd_diff(computeOutputPixel)(input, inputGradToPropagateTo, pixelLoc);
 }
 ```
 
-The kernel function simply calls `__bwd_diff(computeOutputPixel)` without taking any return values from the call
+The kernel function simply calls `bwd_diff(computeOutputPixel)` without taking any return values from the call
 and without writing to any elements in the final `inputGradToPropagateTo` tensor. But when exactly does the proapgated
 output get written to the output gradient tensor (`inputGradToPropagateTo`)?
 
@@ -387,7 +387,7 @@ void getInputElement_bwd(
 Here, we are providing a custom defined backward propagation function for `getInputElement`.
 In this function, we simply add `derivative` to the element in `inputGradToPropagateTo` tensor.
 
-When we call `__bwd_diff(computeOutputPixel)` in `boxFilter_bwd`, the Slang compiler will automatically
+When we call `bwd_diff(computeOutputPixel)` in `boxFilter_bwd`, the Slang compiler will automatically
 differentiate all operations and function calls in `computeOutputPixel`. By wrapping the tensor element access
 with `getInputElement` and by providing a custom backward propagation function of `getInputElement`, we are effectively
 telling the compiler what to do when a derivative propagates to an input tensor element. Inside the body
