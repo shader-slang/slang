@@ -737,7 +737,7 @@ struct IRInst
     // This field is not supposed to be valid outside an IR pass,
     // and each IR pass should always treat it as uninitialized
     // upon entry.
-    UInt64 scratchData;
+    UInt64 scratchData = 0;
 
     //
 
