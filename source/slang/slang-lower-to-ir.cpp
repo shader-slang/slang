@@ -3333,9 +3333,45 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
-        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableDecoration);
-        return baseVal;
+
+        IRInst* innerInst = nullptr;
+        if (baseVal.flavor != LoweredValInfo::Flavor::Simple)
+        {
+            if (!isLValueContext())
+            {
+                auto materializedVal = materialize(context, baseVal);
+
+                // TODO(Sai): We might be missing the case where a single materialize could create
+                // multiple calls (multiple index operations?). Not quite sure what the right way
+                // to handle that case might be.
+                // 
+                if (as<IRCall>(materializedVal.val))
+                    getBuilder()->addDecoration(materializedVal.val, kIROp_TreatAsDifferentiableDecoration);
+
+                innerInst = getSimpleVal(context, materializedVal);
+                
+                // We'll special case handle 'loads' here in order to allow TreatAsDifferentiable to be 
+                // used on array index operations. (This is to avoid a discrepancy between using no_diff
+                // on local variable indexing vs. resource indexing.)
+                // 
+                if (as<IRLoad>(innerInst))
+                    innerInst = getBuilder()->emitDetachDerivative(innerInst->getDataType(), innerInst);
+            }
+            else
+            {
+                SLANG_ASSERT("TreatAsDifferentiableExpr on non-simple l-values not properly defined.");
+            }
+        }
+        else
+        {
+            if (as<IRCall>(baseVal.val))
+                getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableDecoration);
+            innerInst = baseVal.val;
+        }
+
+        SLANG_ASSERT(innerInst);
+        
+        return LoweredValInfo::simple(innerInst);
     }
 
     // Emit IR to denote the forward-mode derivative

@@ -3236,6 +3236,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst *IRBuilder::emitDetachDerivative(IRType *type, IRInst *value)
+    {
+        auto inst = createInst<IRDetachDerivative>(
+            this,
+            kIROp_DetachDerivative,
+            type,
+            value);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn)
     {
         auto inst = createInst<IRBackwardDifferentiate>(
