@@ -201,7 +201,7 @@ namespace Slang
                 auto witness = extractExistentialType->getSubtypeWitness();
                 return witness;
             }
-            return false;
+            return nullptr;
         }
         //
         // TODO(tfoley): We should probably just remove `TaggedUnionType`,
@@ -245,7 +245,7 @@ namespace Slang
             if( auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>() )
             {
                 if(!isInterfaceSafeForTaggedUnion(superInterfaceDeclRef))
-                    return false;
+                    return nullptr;
             }
 
             // If we reach this point then we have a concrete
