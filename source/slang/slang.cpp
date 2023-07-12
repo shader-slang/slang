@@ -2351,6 +2351,8 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
 void FrontEndCompileRequest::checkAllTranslationUnits()
 {
+    SLANG_PROFILE;
+
     LoadedModuleDictionary loadedModules;
     if (additionalLoadedModules)
         loadedModules = *additionalLoadedModules;
