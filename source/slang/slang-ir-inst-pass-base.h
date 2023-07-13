@@ -13,8 +13,8 @@ namespace Slang
     {
     protected:
         IRModule* module;
-        List<IRInst*> workList;
-        HashSet<IRInst*> workListSet;
+        InstWorkList workList;
+        InstHashSet workListSet;
         void addToWorkList(IRInst* inst)
         {
             if (workListSet.contains(inst))
@@ -38,7 +38,7 @@ namespace Slang
 
     public:
         InstPassBase(IRModule* inModule)
-            : module(inModule)
+            : module(inModule), workList(inModule), workListSet(inModule)
         {}
 
         template <typename InstType, typename Func>

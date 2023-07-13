@@ -19,6 +19,7 @@
 #include "../compiler-core/slang-source-map.h"
 
 #include "slang-type-system-shared.h"
+#include "slang-container-pool.h"
 
 namespace Slang {
 
@@ -2168,6 +2169,10 @@ public:
         return (T*) _allocateInst(op, operandCount, sizeof(T));
     }
 
+    ContainerPool& getContainerPool()
+    {
+        return m_containerPool;
+    }
 private:
     IRModule() = delete;
 
@@ -2194,6 +2199,10 @@ private:
         /// The memory arena from which all IR instructions (and any associated state) in this module are allocated.
     MemoryArena m_memoryArena;
 
+        /// A pool to allow reuse of common types of containers to reduce memory allocations
+        /// and rehashing.
+    ContainerPool m_containerPool;
+
         /// Shared contexts for constructing and deduplicating the IR.
     mutable IRDeduplicationContext m_deduplicationContext;
 
@@ -2201,7 +2210,95 @@ private:
     ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
 
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
+
 };
+
+
+struct InstWorkList
+{
+    List<IRInst*>* workList = nullptr;
+    ContainerPool* pool = nullptr;
+
+    InstWorkList() = default;
+    InstWorkList(IRModule* module)
+    {
+        pool = &module->getContainerPool();
+        workList = module->getContainerPool().getList<IRInst>();
+    }
+    ~InstWorkList()
+    {
+        if (pool)
+            pool->free(workList);
+    }
+    InstWorkList(const InstWorkList&) = delete;
+    InstWorkList(InstWorkList&& other)
+    {
+        workList = other.workList;
+        pool = other.pool;
+        other.workList = nullptr;
+        other.pool = nullptr;
+    }
+    InstWorkList& operator=(InstWorkList&& other)
+    {
+        workList = other.workList;
+        pool = other.pool;
+        other.workList = nullptr;
+        other.pool = nullptr;
+        return *this;
+    }
+    IRInst* operator[](Index i) { return (*workList)[i]; }
+    Index getCount() { return workList->getCount(); }
+    IRInst** begin() { return workList->begin(); }
+    IRInst** end() { return workList->end(); }
+    IRInst* getLast() { return workList->getLast(); }
+    void removeLast() { workList->removeLast(); }
+    void remove(IRInst* val) { workList->remove(val); }
+    void fastRemoveAt(Index index) { workList->fastRemoveAt(index); }
+    void add(IRInst* inst) { workList->add(inst); }
+    void clear() { workList->clear(); }
+    void setCount(Index count) { workList->setCount(count); }
+};
+
+struct InstHashSet
+{
+    HashSet<IRInst*>* set = nullptr;
+    ContainerPool* pool = nullptr;
+
+    InstHashSet() = default;
+    InstHashSet(IRModule* module)
+    {
+        pool = &module->getContainerPool();
+        set = module->getContainerPool().getHashSet<IRInst>();
+    }
+    ~InstHashSet()
+    {
+        if (pool)
+            pool->free(set);
+    }
+    InstHashSet(const InstHashSet&) = delete;
+    InstHashSet(InstHashSet&& other)
+    {
+        set = other.set;
+        pool = other.pool;
+        other.set = nullptr;
+        other.pool = nullptr;
+    }
+    InstHashSet& operator=(InstHashSet&& other)
+    {
+        set = other.set;
+        pool = other.pool;
+        other.set = nullptr;
+        other.pool = nullptr;
+        return *this;
+    }
+
+    Index getCount() { return set->getCount(); }
+    bool add(IRInst* inst) { return set->add(inst); }
+    bool contains(IRInst* inst) { return set->contains(inst); }
+    void remove(IRInst* inst) { set->remove(inst); }
+    void clear() { set->clear(); }
+};
+
 
 struct IRSpecializationDictionaryItem : public IRInst
 {

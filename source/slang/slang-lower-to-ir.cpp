@@ -8204,7 +8204,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             child = child->getParent();
         return child != nullptr;
     }
-    static void markInstsToClone(HashSet<IRInst*>& valuesToClone, IRInst* parentBlock, IRInst* value)
+    static void markInstsToClone(InstHashSet& valuesToClone, IRInst* parentBlock, IRInst* value)
     {
         if (!isChildOf(value, parentBlock))
             return;
@@ -8264,7 +8264,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             IRCloneEnv cloneEnv = {};
             if (returnType)
             {
-                HashSet<IRInst*> valuesToClone;
+                InstHashSet valuesToClone(subBuilder->getModule());
                 markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
                 // For Function Types, we always clone all generic parameters regardless of whether
                 // the generic parameter appears in the function signature or not.

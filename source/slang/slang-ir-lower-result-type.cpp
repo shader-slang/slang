@@ -11,8 +11,12 @@ namespace Slang
         IRModule* module;
         DiagnosticSink* sink;
 
-        List<IRInst*> workList;
-        HashSet<IRInst*> workListSet;
+        InstWorkList workList;
+        InstHashSet workListSet;
+
+        ResultTypeLoweringContext(IRModule* inModule)
+            :module(inModule), workList(inModule), workListSet(inModule)
+        {}
 
         struct LoweredResultTypeInfo : public RefObject
         {
@@ -296,8 +300,7 @@ namespace Slang
     
     void lowerResultType(IRModule* module, DiagnosticSink* sink)
     {
-        ResultTypeLoweringContext context;
-        context.module = module;
+        ResultTypeLoweringContext context(module);
         context.sink = sink;
         context.processModule();
     }

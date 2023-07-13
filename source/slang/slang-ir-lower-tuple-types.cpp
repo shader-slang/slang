@@ -11,8 +11,12 @@ namespace Slang
         IRModule* module;
         DiagnosticSink* sink;
 
-        List<IRInst*> workList;
-        HashSet<IRInst*> workListSet;
+        InstWorkList workList;
+        InstHashSet workListSet;
+
+        TupleLoweringContext(IRModule* inModule)
+            :module(inModule), workList(inModule), workListSet(inModule)
+        {}
 
         struct LoweredTupleInfo : public RefObject
         {
@@ -175,8 +179,7 @@ namespace Slang
     
     void lowerTuples(IRModule* module, DiagnosticSink* sink)
     {
-        TupleLoweringContext context;
-        context.module = module;
+        TupleLoweringContext context(module);
         context.sink = sink;
         context.processModule();
     }
