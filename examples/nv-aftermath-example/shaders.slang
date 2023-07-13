@@ -10,6 +10,10 @@
 cbuffer Uniforms
 {
     float4x4 modelViewProjection;
+
+    // We want to make things fail so we can get an aftermath capture, 
+    // so lets have a count that makes things really slow.
+    int failCount;
 }
 
 // Per-vertex attributes to be assembled from bound vertex buffers.
@@ -62,5 +66,21 @@ float4 fragmentMain(
 {
     float3 color = coarseVertex.color;
 
-    return float4(color, 1.0);
+    float factor = 0.0f;
+
+    for (int i = 0; i < failCount; ++i)
+    {
+        factor += 1.0e-20 * sin(float(i & 0xffff));
+        factor += 1.0e-21 * cos(float(i & 0xfff) + 1.0);
+        factor += 1.0e-8f * tan(float(i & 0xfffff));
+    }
+
+    factor = abs(factor);
+
+    while (factor < 0.25)
+    {
+        factor += factor;
+    }
+
+    return float4(color, 1.0) * factor;
 }

@@ -5,6 +5,7 @@
 #include "gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
 #include "slang-com-ptr.h"
+#include "../../source/core/slang-io.h"
 #include "source/core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 
@@ -42,11 +43,7 @@ struct AftermathCrashExample : public WindowedAppBase
 
     virtual void renderFrame(int frameBufferIndex) override;
     
-    void aftermathCrashDump(const void* data, const uint32_t dataSizeInBytes)
-    {
-        // NOTE! This method can be called from *any* thread.
-
-    }
+    void aftermathCrashDump(const void* data, const uint32_t dataSizeInBytes);
 
     // Create accessors so we don't have to use g prefixed variables.
     gfx::IDevice* getDevice() { return gDevice; }
@@ -59,6 +56,8 @@ struct AftermathCrashExample : public WindowedAppBase
 
     ComPtr<gfx::IPipelineState> m_pipelineState;
     ComPtr<gfx::IBufferResource> m_vertexBuffer;
+
+    std::atomic<int> m_uniqueId = 0;
 };
 
 void AftermathCrashExample::diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
@@ -67,6 +66,21 @@ void AftermathCrashExample::diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
     {
         printf("%s", (const char*)diagnosticsBlob->getBufferPointer());
     }
+}
+
+
+void AftermathCrashExample::aftermathCrashDump(const void* data, const uint32_t dataSizeInBytes)
+{
+    // NOTE! This method can be called from *any* thread.
+    const auto id = m_uniqueId++;
+
+    // Dump out as a file
+    Slang::StringBuilder filename;
+    filename << "aftermath-dump-" << id << ".bin";
+    
+    File::writeAllBytes(filename, data, dataSizeInBytes);
+    
+    //SLANG_BREAKPOINT(0);
 }
 
 gfx::Result AftermathCrashExample::loadShaderProgram(
@@ -138,6 +152,10 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     gfx::IShaderProgram::Desc programDesc = {};
     programDesc.slangGlobalScope = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
+
+    // We want to dump out source maps
+
+
 
     return SLANG_OK;
 }
@@ -231,6 +249,9 @@ void AftermathCrashExample::renderFrame(int frameBufferIndex)
 
     rootCursor["Uniforms"]["modelViewProjection"].setData(
         deviceInfo.identityProjectionMatrix, sizeof(float) * 16);
+
+    int32_t failCount = 0x3fffffff;
+    rootCursor["Uniforms"]["failCount"].setData(&failCount, sizeof(failCount));
 
     // We also need to set up a few pieces of fixed-function pipeline
     // state that are not bound by the pipeline state above.
