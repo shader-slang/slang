@@ -340,7 +340,21 @@ struct DiffUnzipPass
                     // the remerged diff pair.
                     auto diffPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(arg->getDataType())->getValueType());
                     auto primalValueType = diffPairType->getValueType();
-                    auto diffPairRef = diffBuilder->emitReverseGradientDiffPairRef(arg->getDataType(), primalArg, diffArg);
+                    
+                    // We can't simply reuse primalArg for an inout parameter since this will represent the value 
+                    // after the primal call which can potentially alter primalArg. Therefore, we will find the
+                    // first store into primalArg, and create a temp var holding that value (i.e. value prior to primal call)
+                    // 
+                    auto storeUse = findUniqueStoredVal(cast<IRVar>(primalArg));
+                    auto storeInst = cast<IRStore>(storeUse->getUser());
+
+                    auto storedVal = storeInst->getVal();
+
+                    // Emit the temp var into the primal blocks since it's holding a primal value.
+                    auto tempPrimalVar = primalBuilder->emitVar(primalValueType);
+                    primalBuilder->emitStore(tempPrimalVar, storedVal);
+                    
+                    auto diffPairRef = diffBuilder->emitReverseGradientDiffPairRef(arg->getDataType(), tempPrimalVar, diffArg);
                     diffBuilder->markInstAsDifferential(diffPairRef, primalValueType);
                     diffArgs.add(diffPairRef);
                 }
