@@ -220,6 +220,14 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+    trigger     = "enable-aftermath",
+    description = "(Optional) Enable aftermath in GFX, and add aftermath crash example to project",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -236,6 +244,7 @@ deployGLSLang = (_OPTIONS["deploy-slang-glslang"] == "true")
 fullDebugValidation = (_OPTIONS["full-debug-validation"] == "true")
 enableAsan = (_OPTIONS["enable-asan"] == "true")
 dxOnVk = (_OPTIONS["dx-on-vk"] == "true")
+enableAftermath = (_OPTIONS["enable-aftermath"] == "true")
 
 -- If stdlib embedding is enabled, disable stdlib source embedding by default
 disableStdlibSource = enableEmbedStdLib
@@ -243,6 +252,19 @@ disableStdlibSource = enableEmbedStdLib
 -- If embedding is enabled, and the setting `disable-stdlib-source` setting is set, use it's value
 if enableEmbedStdLib and _OPTIONS["disable-stdlib-source"] ~= nil then
     disableStdlibSource = (_OPTIONS["disable-stdlib-source"] == "true")   
+end
+
+
+
+if enableAftermath then
+    aftermathPath = "external/nv-aftermath"
+    
+    if not os.isfile(path.join(aftermathPath, "nsight-aftermath-usage-guidelines.txt")) then
+        print("external/nv-aftermath directory must hold aftermath SDK")
+        os.exit(0)
+    end
+    
+    printf("Enabled aftermath")
 end
 
 -- Determine the target info
@@ -364,6 +386,12 @@ workspace "slang"
     filter { "toolset:clang or gcc*", "files:source/compiler-core/slang-dxc-compiler.cpp" }
         -- For the DXC headers
         buildoptions { "-fms-extensions" }
+
+    -- If aftermath is enabled add a define
+    
+    if enableAftermath then
+        defines { "SLANG_AFTERMATH" }
+    end
 
     -- Disable some warnings
     filter { "toolset:clang or gcc*" }
@@ -808,6 +836,16 @@ example "cpu-com-example"
 
 example "cpu-hello-world"
     kind "ConsoleApp"
+
+if enableAftermath then
+    example "nv-aftermath-example"
+    
+    filter {}
+    
+    local aftermathIncludePath = path.join(aftermathPath, "include") 
+    
+    includedirs { aftermathIncludePath }
+end
 
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
