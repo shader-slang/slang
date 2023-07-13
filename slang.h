@@ -4513,6 +4513,18 @@ namespace slang
             IBlob**     outCode,
             IBlob**     outDiagnostics = nullptr) = 0;
 
+            /** Get the compilation result as a file system.
+
+            Has the same requirements as getEntryPointCode.
+
+            The result is not written to the actual OS file system, but is made avaiable as an
+            in memory representation.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
+            SlangInt    entryPointIndex,
+            SlangInt    targetIndex, 
+            ISlangMutableFileSystem** outFileSystem) = 0;
+
             /** Compute a hash for the entry point at `entryPointIndex` for the chosen `targetIndex`.
 
             This computes a hash based on all the dependencies for this component type as well as the

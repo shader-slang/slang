@@ -83,6 +83,103 @@ void AftermathCrashExample::aftermathCrashDump(const void* data, const uint32_t 
     //SLANG_BREAKPOINT(0);
 }
 
+struct FileSystemEntry
+{
+    SlangPathType type;
+    String path;
+};
+
+static SlangResult _findPaths(ISlangFileSystemExt* fileSystem, const char* rootPath, List<FileSystemEntry>& outEntries)
+{
+    {
+        SlangPathType type;
+        SLANG_RETURN_ON_FAIL(fileSystem->getPathType(rootPath, &type));
+        outEntries.add(FileSystemEntry{ type, rootPath });
+    }
+
+    struct Context
+    {
+        List<FileSystemEntry>& entries;
+        String path;
+    };
+
+    for (Index i = outEntries.getCount() - 1; i < outEntries.getCount(); ++i)
+    {
+        const auto& entry = outEntries[i];
+
+        if (entry.type == SLANG_PATH_TYPE_DIRECTORY)
+        {
+            Context context{outEntries, entry.path };
+
+            fileSystem->enumeratePathContents(entry.path.getBuffer(), 
+                [](SlangPathType pathType, const char* name, void* userData) -> void {
+                    Context* context = reinterpret_cast<Context*>(userData);
+
+                    context->entries.add({pathType, Path::combine(context->path, name)});
+                }, 
+                &context);
+        }
+    }
+
+    return SLANG_OK;
+}
+
+
+
+struct MapEntry
+{
+    String fileName;
+    ComPtr<ISlangBlob> blob;
+};
+
+static SlangResult _addMaps(ISlangFileSystemExt* fileSystem, const char* prefix, List<MapEntry>& ioEntries)
+{
+    List<FileSystemEntry> fileSystemEntries;
+    SLANG_RETURN_ON_FAIL(_findPaths(fileSystem, ".", fileSystemEntries));
+
+    for (const auto& fileSystemEntry : fileSystemEntries)
+    {
+        if (fileSystemEntry.type != SLANG_PATH_TYPE_FILE)
+        {
+            continue;
+        }
+
+        const auto ext = Path::getPathExt(fileSystemEntry.path);
+
+        if (ext != toSlice("map"))
+        {
+            continue;
+        }
+
+        auto fileName = Path::getFileNameWithoutExt(fileSystemEntry.path);
+
+        if (fileName.endsWith(toSlice("-obfuscated")))
+        {
+            fileName = Path::getFileName(fileSystemEntry.path);
+        }
+        else
+        {
+            StringBuilder buf;
+            buf << prefix << "-" << fileName << "." << ext;
+            fileName = buf;
+        }
+
+
+        if (ioEntries.findFirstIndex([&](const MapEntry& entry) -> bool { 
+            return entry.fileName == fileName;
+            }) < 0)
+        {
+            ComPtr<ISlangBlob> blob;
+            SLANG_RETURN_ON_FAIL(fileSystem->loadFile(fileSystemEntry.path.getBuffer(), blob.writeRef()));
+
+            ioEntries.add(MapEntry{fileName, blob});
+        }
+
+    }
+
+    return SLANG_OK;
+}
+
 gfx::Result AftermathCrashExample::loadShaderProgram(
     gfx::IDevice* device,
     gfx::IShaderProgram** outProgram)
@@ -90,12 +187,28 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     ComPtr<slang::ISession> slangSession;
     slangSession = device->getSlangSession();
 
+    // This is a little bit of a work around. We want to set some options that are only available
+    // via processCommandLineArguments, but we need a request to be able to set them up
+    // The setting actually sets the parameters on the Linkage, so they will be used for the later 
+    // actual compilation
+    {
+        ComPtr<slang::ICompileRequest> request;
+
+        SLANG_RETURN_ON_FAIL(slangSession->createCompileRequest(request.writeRef()));
+
+        // Turn on obfuscation
+        // Turn on source map for line numbers
+        const char* args[] = { "-obfuscate", "-line-directive-mode", "source-map" };
+        request->processCommandLineArguments(args, SLANG_COUNT_OF(args));
+    }
+
     ComPtr<slang::IBlob> diagnosticsBlob;
     slang::IModule* module = slangSession->loadModule("shaders", diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if (!module)
         return SLANG_FAIL;
 
+    // Lets compile and set the entry point
     ComPtr<slang::IEntryPoint> vertexEntryPoint;
     SLANG_RETURN_ON_FAIL(module->findEntryPointByName("vertexMain", vertexEntryPoint.writeRef()));
     //
@@ -144,6 +257,38 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
 
+    const Index targetIndex = 0;
+
+    {
+        ComPtr<ISlangBlob> code;
+        ComPtr<ISlangBlob> diagnostics;
+
+        SLANG_RETURN_ON_FAIL(linkedProgram->getEntryPointCode(vertexEntryPointIndex, targetIndex, code.writeRef(), diagnostics.writeRef()));
+        SLANG_RETURN_ON_FAIL(linkedProgram->getEntryPointCode(fragmentEntryPointIndex, targetIndex, code.writeRef(), diagnostics.writeRef()));
+    }
+
+    {
+        // Okay look for all the unique map names
+
+        List<MapEntry> mapEntries;
+
+        ComPtr<ISlangMutableFileSystem> vertexFileSystem;
+        SLANG_RETURN_ON_FAIL(linkedProgram->getResultAsFileSystem(vertexEntryPointIndex, targetIndex, vertexFileSystem.writeRef()));
+
+        SLANG_RETURN_ON_FAIL(_addMaps(vertexFileSystem, "vertex", mapEntries));
+        
+        ComPtr<ISlangMutableFileSystem> fragmentFileSystem;
+        SLANG_RETURN_ON_FAIL(linkedProgram->getResultAsFileSystem(fragmentEntryPointIndex, targetIndex, fragmentFileSystem.writeRef()));
+
+        SLANG_RETURN_ON_FAIL(_addMaps(fragmentFileSystem, "fragment", mapEntries));
+
+        // Now dump them all out
+        for (const auto& mapEntry : mapEntries)
+        {
+            SLANG_RETURN_ON_FAIL(File::writeAllBytes(mapEntry.fileName, mapEntry.blob->getBufferPointer(), mapEntry.blob->getBufferSize()));
+        }
+    }
+
     // Once we've described the particular composition of entry points
     // that we want to compile, we defer to the graphics API layer
     // to extract compiled kernel code and load it into the API-specific
@@ -154,7 +299,6 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 
     // We want to dump out source maps
-
 
 
     return SLANG_OK;
