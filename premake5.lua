@@ -843,8 +843,28 @@ if enableAftermath then
     filter {}
     
     local aftermathIncludePath = path.join(aftermathPath, "include") 
+    local aftermathLibPath = path.join(aftermathPath, "lib") 
     
     includedirs { aftermathIncludePath }
+    
+    
+    filter { "platforms:x86" }
+        local libPath = path.join(aftermathLibPath, "x86")
+        libdirs { libPath }
+        links { "GFSDK_Aftermath_Lib.x86" }
+
+        postbuildcommands {
+                '{COPY} "$(SolutionDir)"' .. libPath .. '/*.* "%{cfg.targetdir}"'
+            }
+
+    filter { "platforms:x64" }
+        local libPath = path.join(aftermathLibPath, "x64")
+        libdirs { libPath }
+        links { "GFSDK_Aftermath_Lib.x64" }
+        
+        postbuildcommands {
+                '{COPY} "$(SolutionDir)"' .. libPath .. '/*.* "%{cfg.targetdir}"'
+            }
 end
 
 -- Most of the other projects have more interesting configuration going

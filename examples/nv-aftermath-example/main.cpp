@@ -9,6 +9,7 @@
 #include "examples/example-base/example-base.h"
 
 #include "GFSDK_Aftermath.h"
+#include "GFSDK_Aftermath_GpuCrashDump.h"
 
 using namespace gfx;
 using namespace Slang;
@@ -41,7 +42,12 @@ struct AftermathCrashExample : public WindowedAppBase
 
     virtual void renderFrame(int frameBufferIndex) override;
     
-    
+    void aftermathCrashDump(const void* data, const uint32_t dataSizeInBytes)
+    {
+        // NOTE! This method can be called from *any* thread.
+
+    }
+
     // Create accessors so we don't have to use g prefixed variables.
     gfx::IDevice* getDevice() { return gDevice; }
     gfx::ICommandQueue* getQueue() { return gQueue; }
@@ -136,8 +142,25 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     return SLANG_OK;
 }
 
+static void GFSDK_AFTERMATH_CALL _dumpCallback(const void* pGpuCrashDump, const uint32_t gpuCrashDumpSize, void* pUserData)
+{
+    reinterpret_cast<AftermathCrashExample*>(pUserData)->aftermathCrashDump(pGpuCrashDump, gpuCrashDumpSize);
+}
+
 Slang::Result AftermathCrashExample::initialize()
 {
+    // As per docs must be called before any device is created
+
+    GFSDK_Aftermath_EnableGpuCrashDumps(
+        GFSDK_Aftermath_Version_API,
+        GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX | GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_Vulkan,
+        GFSDK_Aftermath_GpuCrashDumpFeatureFlags_Default,
+        _dumpCallback, 
+        nullptr,
+        nullptr,
+        nullptr,
+        this);
+
     initializeBase("aftermath-crash-example", 1024, 768);
 
     auto device = getDevice();
@@ -191,7 +214,7 @@ Slang::Result AftermathCrashExample::initialize()
 
 void AftermathCrashExample::renderFrame(int frameBufferIndex) 
 {
-    ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
+    ComPtr<ICommandBuffer> commandBuffer = getTransientHeaps()[frameBufferIndex]->createCommandBuffer();
     auto renderEncoder = commandBuffer->encodeRenderCommands(gRenderPass, getFrameBuffers()[frameBufferIndex]);
 
     gfx::Viewport viewport = {};
@@ -202,7 +225,7 @@ void AftermathCrashExample::renderFrame(int frameBufferIndex)
 
     auto rootObject = renderEncoder->bindPipeline(m_pipelineState);
 
-    auto deviceInfo = gDevice->getDeviceInfo();
+    auto deviceInfo = getDevice()->getDeviceInfo();
 
     ShaderCursor rootCursor(rootObject);
 
@@ -220,11 +243,15 @@ void AftermathCrashExample::renderFrame(int frameBufferIndex)
     renderEncoder->draw(3);
     renderEncoder->endEncoding();
     commandBuffer->close();
-    gQueue->executeCommandBuffer(commandBuffer);
+    getQueue()->executeCommandBuffer(commandBuffer);
 
     // With that, we are done drawing for one frame, and ready for the next.
     //
-    gSwapchain->present();
+    getSwapChain()->present();
+
+    // We only want to present one frame...
+
+    platform::Application::quit();
 }
 
 // This macro instantiates an appropriate main function to
