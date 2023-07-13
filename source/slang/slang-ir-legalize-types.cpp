@@ -3472,7 +3472,7 @@ static constexpr int kHasBeenAddedScratchBitIndex = 1;
 
 struct IRTypeLegalizationPass
 {
-    IRTypeLegalizationContext* context;
+    IRTypeLegalizationContext* context = nullptr;
 
     // The goal of this pass is to ensure that legalization has been
     // applied to each instruction in a module. We also want to
@@ -3484,6 +3484,11 @@ struct IRTypeLegalizationPass
     // instructions have ever been added to the work list.
 
     List<IRInst*> workList;
+
+    IRTypeLegalizationPass()
+    {
+        workList.reserve(8192);
+    }
 
     bool hasBeenAddedOrProcessed(IRInst* inst)
     {

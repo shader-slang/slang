@@ -177,11 +177,6 @@ struct DeadCodeEliminationContext
                 // should be live when its parent is to a subroutine.
                 //
 
-                if (auto func = as<IRGlobalValueWithCode>(inst))
-                {
-                    module->findOrCreateDominatorTree(func);
-                }
-
                 for (auto child : inst->getDecorationsAndChildren())
                 {
                     if (shouldInstBeLiveIfParentIsLive(child))

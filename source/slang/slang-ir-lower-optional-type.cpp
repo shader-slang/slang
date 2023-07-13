@@ -12,8 +12,12 @@ namespace Slang
         IRModule* module;
         DiagnosticSink* sink;
 
-        List<IRInst*> workList;
-        HashSet<IRInst*> workListSet;
+        InstWorkList workList;
+        InstHashSet workListSet;
+
+        OptionalTypeLoweringContext(IRModule* inModule)
+            :module(inModule), workList(inModule), workListSet(inModule)
+        {}
 
         struct LoweredOptionalTypeInfo : public RefObject
         {
@@ -275,8 +279,7 @@ namespace Slang
     
     void lowerOptionalType(IRModule* module, DiagnosticSink* sink)
     {
-        OptionalTypeLoweringContext context;
-        context.module = module;
+        OptionalTypeLoweringContext context(module);
         context.sink = sink;
         context.processModule();
     }

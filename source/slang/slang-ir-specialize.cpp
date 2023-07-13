@@ -1339,8 +1339,8 @@ struct SpecializationContext
         // TODO: We probably need/want a more robust test here.
         // For now we are just look into the dependency graph of the inst and
         // see if there are any opcodes that are causing problems.
-        List<IRInst*> localWorkList;
-        HashSet<IRInst*> processedInsts;
+        InstWorkList localWorkList(inst->getModule());
+        InstHashSet processedInsts(inst->getModule());
         localWorkList.add(inst);
         processedInsts.add(inst);
 

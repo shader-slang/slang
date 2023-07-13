@@ -254,7 +254,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     {
         bool hasNonStoreUse = false;
         // If the entire access chain doesn't non-store use, we can safely remove it.
-        HashSet<IRInst*> knownAccessChain;
+        InstHashSet knownAccessChain(func->getModule());
         for (auto accessChain = store->getPtr(); accessChain;)
         {
             knownAccessChain.add(accessChain);

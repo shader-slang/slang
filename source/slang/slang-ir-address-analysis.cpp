@@ -11,8 +11,8 @@ namespace Slang
         if (domTree->isUnreachable(as<IRBlock>(inst->getParent())))
             return;
 
-        List<IRBlock*> blocks;
-        HashSet<IRInst*> operandInsts;
+        InstWorkList blocks(func->getModule());
+        InstHashSet operandInsts(func->getModule());
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
             operandInsts.add(inst->getOperand(i));

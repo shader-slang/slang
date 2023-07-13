@@ -76,8 +76,12 @@ namespace Slang
         // itself is straightforward, and not anything
         // that hasn't been seen in other files.
 
-        List<IRInst*> workList;
-        HashSet<IRInst*> workListSet;
+        InstWorkList workList;
+        InstHashSet workListSet;
+
+        WorkListPass(IRModule* inModule)
+            : module(inModule), workList(inModule), workListSet(inModule), toBeDeleted(inModule), toBeDeletedSet(inModule)
+        {}
 
         void addToWorkList(IRInst* inst)
         {
@@ -111,8 +115,8 @@ namespace Slang
         // frequent need to buffer up instructions to
         // be deleted when a pass is complete.
 
-        List<IRInst*> toBeDeleted;
-        HashSet<IRInst*> toBeDeletedSet;
+        InstWorkList toBeDeleted;
+        InstHashSet toBeDeletedSet;
 
         void addToBeDeleted(IRInst* inst)
         {
@@ -139,6 +143,10 @@ namespace Slang
     //
     struct BindingQueryLoweringContext : public WorkListPass
     {
+        BindingQueryLoweringContext(IRModule* inModule)
+            : WorkListPass(inModule)
+        {}
+
         // All of the intrinsics we will be processing use
         // the same result type (`uint`), so it is helpful
         // to cache a pointer to the IR type at the start
@@ -602,8 +610,7 @@ namespace Slang
         IRModule* module,
         DiagnosticSink* sink)
     {
-        BindingQueryLoweringContext context;
-        context.module = module;
+        BindingQueryLoweringContext context(module);
         context.sink = sink;
         context.processModule();
     }

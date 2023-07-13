@@ -261,9 +261,9 @@ public:
         // `produceDiffSet`.
         // `expectDiffSet` is a set of insts that expects their operands to produce a diff. It is an error
         // if they don't.
-        HashSet<IRInst*> produceDiffSet;
-        HashSet<IRInst*> expectDiffSet;
-        HashSet<IRInst*> carryNonTrivialDiffSet;
+        InstHashSet produceDiffSet(funcInst->getModule());
+        InstHashSet expectDiffSet(funcInst->getModule());
+        InstHashSet carryNonTrivialDiffSet(funcInst->getModule());
 
         int differentiableOutputs = 0;
         bool isDifferentiableReturnType = false;

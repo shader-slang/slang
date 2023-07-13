@@ -10,8 +10,14 @@ namespace Slang
     {
         IRModule* module;
 
-        List<IRInst*> workList;
-        HashSet<IRInst*> workListSet;
+        InstWorkList workList;
+        InstHashSet workListSet;
+
+        CleanUpVoidContext(IRModule* inModule)
+            : module(inModule)
+            , workList(inModule)
+            , workListSet(inModule)
+        {}
 
         void addToWorkList(
             IRInst* inst)
@@ -174,8 +180,7 @@ namespace Slang
     
     void cleanUpVoidType(IRModule* module)
     {
-        CleanUpVoidContext context;
-        context.module = module;
+        CleanUpVoidContext context(module);
         context.processModule();
     }
 }
