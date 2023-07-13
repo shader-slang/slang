@@ -415,7 +415,7 @@ private:
     // The underlying declaration
     Decl* decl = nullptr;
     // Optionally, a chain of substitutions to perform
-    Substitutions* substitutions;
+    Substitutions* substitutions = nullptr;
 
 };
 

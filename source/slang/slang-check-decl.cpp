@@ -587,11 +587,6 @@ namespace Slang
         return semantics->ApplyExtensionToType(extDecl, type);
     }
 
-    void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)
-    {
-        visitor->ensureDecl(decl, state);
-    }
-
     GenericSubstitution* createDefaultSubstitutionsForGeneric(
         ASTBuilder*             astBuilder,
         SemanticsVisitor* semantics,
@@ -636,8 +631,8 @@ namespace Slang
                     ensureDecl(semantics, genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
                 }
                 auto constraintDeclRef = astBuilder->getSpecializedDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl, outerSubst);
-                DeclaredSubtypeWitness* witness =
-                    astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+                auto witness =
+                    astBuilder->getDeclaredSubtypeWitness(
                         getSub(astBuilder, constraintDeclRef),
                         getSup(astBuilder, constraintDeclRef),
                         astBuilder->getSpecializedDeclRef(genericTypeConstraintDecl, outerSubst));
@@ -1530,7 +1525,7 @@ namespace Slang
         {
             if (auto declRefType = as<DeclRefType>(inheritanceDecl->base.type))
             {
-                if (declRefType->declRef == m_astBuilder->getDifferentiableInterface())
+                if (declRefType->declRef == m_astBuilder->getDifferentiableInterfaceDecl())
                 {
                     hasDifferentialConformance = true;
                     break;
@@ -1732,7 +1727,7 @@ namespace Slang
             auto baseType = as<DeclRefType>(inheritanceDecl->witnessTable->baseType);
             if (!baseType)
                 return;
-            if (baseType->declRef.getDecl() != m_astBuilder->getDifferentiableInterface().getDecl())
+            if (baseType->declRef.getDecl() != m_astBuilder->getDifferentiableInterfaceDecl().getDecl())
                 return;
             RequirementWitness witnessValue;
             auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(BuiltinRequirementKind::DifferentialType);
@@ -2287,10 +2282,10 @@ namespace Slang
                 auto satisfyingConstraintDeclRef = satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
                 SLANG_ASSERT(satisfyingConstraintDeclRef);
 
-                auto satisfyingWitness = m_astBuilder->getOrCreate<DeclaredSubtypeWitness>();
-                satisfyingWitness->sub = getSub(m_astBuilder, satisfyingConstraintDeclRef);
-                satisfyingWitness->sup = getSup(m_astBuilder, satisfyingConstraintDeclRef);
-                satisfyingWitness->declRef = satisfyingConstraintDeclRef;
+                auto satisfyingWitness = m_astBuilder->getDeclaredSubtypeWitness(
+                    getSub(m_astBuilder, satisfyingConstraintDeclRef),
+                    getSup(m_astBuilder, satisfyingConstraintDeclRef),
+                    satisfyingConstraintDeclRef);
 
                 requiredSubstArgs.add(satisfyingWitness);
             }
@@ -3533,18 +3528,16 @@ namespace Slang
 
             auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
 
-            DeclaredSubtypeWitness* interfaceIsReqWitness =
-                m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+            auto interfaceIsReqWitness =
+                m_astBuilder->getDeclaredSubtypeWitness(
                     superInterfaceType,
                     reqType,
                     requiredInheritanceDeclRef);
             // ...
 
-            TransitiveSubtypeWitness* subIsReqWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(subType, reqType, interfaceIsReqWitness);
-            subIsReqWitness->sub = subType;
-            subIsReqWitness->sup = reqType;
-            subIsReqWitness->subToMid = subTypeConformsToSuperInterfaceWitness;
-            subIsReqWitness->midToSup = interfaceIsReqWitness;
+            auto subIsReqWitness = m_astBuilder->getTransitiveSubtypeWitness(
+                subTypeConformsToSuperInterfaceWitness,
+                interfaceIsReqWitness);
             // ...
 
             RefPtr<WitnessTable> satisfyingWitnessTable = new WitnessTable();
@@ -6762,7 +6755,6 @@ namespace Slang
             }
         }
     }
-
 
     static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SemanticsContext const& shared)
     {

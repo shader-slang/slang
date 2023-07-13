@@ -671,6 +671,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-check-expr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-check-inheritance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-check-modifier.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

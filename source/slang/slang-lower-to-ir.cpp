@@ -1862,15 +1862,21 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitConjunctionSubtypeWitness(ConjunctionSubtypeWitness* val)
     {
-        // A witness `T : L & R` for a conformance of `T` to a conjunction of
-        // types `L` and `R` will be lowered as a tuple of two witnesses: one
-        // for `T : L` and one for `T : R`. Luckily, those two conformances
-        // are exactly what the `ConjunctionSubtypeWitness` stores, so we just
-        // need to lower them individually and make a tuple.
+        // A witness `W = X & Y & ...` will lower as a tuple of the sub-witnesses
+        // `X`, `Y`, etc.
         //
-        auto left   = lowerSimpleVal(context, val->leftWitness);
-        auto right  = lowerSimpleVal(context, val->rightWitness);
-        return LoweredValInfo::simple(getBuilder()->emitMakeTuple(left, right));
+        // The AST representation of a conjunction of witnesses matches this
+        // tuple-like encoding very closely, so we can simply lower each of
+        // the component witnesses to produce our result.
+        //
+        List<IRInst*> componentWitnesses;
+        auto componentCount = val->getComponentCount();
+        for (Index i = 0; i < componentCount; ++i)
+        {
+            auto componentWitness = lowerSimpleVal(context, val->getComponentWitness(i));
+            componentWitnesses.add(componentWitness);
+        }
+        return LoweredValInfo::simple(getBuilder()->emitMakeTuple(componentWitnesses));
     }
 
     LoweredValInfo visitExtractFromConjunctionSubtypeWitness(ExtractFromConjunctionSubtypeWitness* val)

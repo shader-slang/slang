@@ -75,12 +75,12 @@ namespace Slang
             vectorType->elementCount);
     }
 
-    Type* SemanticsVisitor::TryJoinTypeWithInterface(
-        Type*            type,
-        DeclRef<InterfaceDecl>      interfaceDeclRef)
+    Type* SemanticsVisitor::_tryJoinTypeWithInterface(
+        Type*                   type,
+        Type*                   interfaceType)
     {
         // The most basic test here should be: does the type declare conformance to the trait.
-        if(isDeclaredSubtype(type, interfaceDeclRef))
+        if(isSubtype(type, interfaceType))
             return type;
 
         // Just because `type` doesn't conform to the given `interfaceDeclRef`, that
@@ -119,7 +119,7 @@ namespace Slang
                     continue;
 
                 // We only want to consider types that implement the target interface.
-                if(!isDeclaredSubtype(candidateType, interfaceDeclRef))
+                if(!isSubtype(candidateType, interfaceType))
                     continue;
 
                 // We only want to consider types where we can implicitly convert from `type`
@@ -245,7 +245,7 @@ namespace Slang
             if( auto leftInterfaceRef = leftDeclRefType->declRef.as<InterfaceDecl>() )
             {
                 //
-                return TryJoinTypeWithInterface(right, leftInterfaceRef);
+                return _tryJoinTypeWithInterface(right, left);
             }
         }
         if(auto rightDeclRefType = as<DeclRefType>(right))
@@ -253,7 +253,7 @@ namespace Slang
             if( auto rightInterfaceRef = rightDeclRefType->declRef.as<InterfaceDecl>() )
             {
                 //
-                return TryJoinTypeWithInterface(left, rightInterfaceRef);
+                return _tryJoinTypeWithInterface(left, right);
             }
         }
 
@@ -480,7 +480,7 @@ namespace Slang
             }
 
             // Search for a witness that shows the constraint is satisfied.
-            auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
+            auto subTypeWitness = isSubtype(sub, sup);
             if(subTypeWitness)
             {
                 // We found a witness, so it will become an (implicit) argument.
