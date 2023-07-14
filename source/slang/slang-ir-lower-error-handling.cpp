@@ -13,8 +13,14 @@ struct ErrorHandlingLoweringContext
     IRModule* module;
     DiagnosticSink* diagnosticSink;
 
-    List<IRInst*> workList;
-    HashSet<IRInst*> workListSet;
+    InstWorkList workList;
+    InstHashSet workListSet;
+
+    ErrorHandlingLoweringContext(IRModule* inModule)
+        : module(inModule)
+        , workList(inModule)
+        , workListSet(inModule)
+    {}
 
     void addToWorkList(IRInst* inst)
     {
@@ -222,8 +228,7 @@ struct ErrorHandlingLoweringContext
 
 void lowerErrorHandling(IRModule* module, DiagnosticSink* sink)
 {
-    ErrorHandlingLoweringContext context;
-    context.module = module;
+    ErrorHandlingLoweringContext context(module);
     context.diagnosticSink = sink;
     return context.processModule();
 }

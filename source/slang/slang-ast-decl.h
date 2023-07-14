@@ -100,14 +100,14 @@ class LetDecl : public VarDecl
     SLANG_AST_CLASS(LetDecl)
 };
 
-// An `AggTypeDeclBase` captures the shared functionality
-// between true aggregate type declarations and extension
-// declarations:
-//
-// - Both can container members (they are `ContainerDecl`s)
-// - Both can have declared bases
-// - Both expose a `this` variable in their body
-//
+    // An `AggTypeDeclBase` captures the shared functionality
+    // between true aggregate type declarations and extension
+    // declarations:
+    //
+    // - Both can contain members (they are `ContainerDecl`s)
+    // - Both can have declared bases
+    // - Both expose a `this` variable in their body
+    //
 class AggTypeDeclBase : public ContainerDecl
 {
     SLANG_ABSTRACT_AST_CLASS(AggTypeDeclBase);

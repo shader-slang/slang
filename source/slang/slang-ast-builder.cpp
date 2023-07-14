@@ -338,7 +338,7 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(
     return as<DifferentialPairType>(rsType);
 }
 
-DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterface()
+DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterfaceDecl()
 {
     DeclRef<InterfaceDecl> declRef = DeclRef<InterfaceDecl>(getBuiltinDeclRef("DifferentiableType", nullptr));
     return declRef;
@@ -376,6 +376,11 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
     auto rsType = DeclRefType::create(this, declRef);
 
     return as<MeshOutputType>(rsType);
+}
+
+Type* ASTBuilder::getDifferentiableInterfaceType()
+{
+    return DeclRefType::create(this, getDifferentiableInterfaceDecl());
 }
 
 DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg)
@@ -443,8 +448,238 @@ TypeType* ASTBuilder::getTypeType(Type* type)
     return getOrCreate<TypeType>(type);
 }
 
+TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(
+    Type* type)
+{
+    return getOrCreate<TypeEqualityWitness>(type);
+}
+
+
+SubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
+    Type*                   subType,
+    Type*                   superType,
+    DeclRef<Decl> const&    declRef)
+{
+    auto witness = getOrCreate<DeclaredSubtypeWitness>(
+        subType, superType, declRef.declRefBase);
+    return witness;
+}
+
+SubtypeWitness* ASTBuilder::getTransitiveSubtypeWitness(
+    SubtypeWitness* aIsSubtypeOfBWitness,
+    SubtypeWitness* bIsSubtypeOfCWitness)
+{
+top:
+    // Our job is to take the witnesses that `a <: b` and `b <: c`
+    // and produce a valid witness that `a <: c`
+    //
+    // There are some special cases we want to handle, in order
+    // to simplify logic elesewhere in the compiler. For example,
+    // if either of the input witnesses is a type *equality* witness,
+    // then the other witness can be returned as-is.
+    //
+    // If `a == b`, then the `b <: c` witness is also a witness of `a <: c`.
+    //
+    if(as<TypeEqualityWitness>(aIsSubtypeOfBWitness))
+    {
+        return bIsSubtypeOfCWitness;
+    }
+
+    // Similarly, if `b == c`, then the `a <: b` witness is a witness for `a <: c`
+    //
+    if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
+    {
+        return aIsSubtypeOfBWitness;
+    }
+
+    // HACK: There is downstream code generation logic that assumes that
+    // a `TransitiveSubtypeWitness` will never have a transitive witness
+    // as its `b <: c` witness. If we are at risk of creating such a witness here,
+    // we will shift things around to make that not be the case:
+    //
+    if (auto bIsTransitiveSubtypeOfCWitness = as<TransitiveSubtypeWitness>(bIsSubtypeOfCWitness))
+    {
+        // Let's call the intermediate type here `x`, we know that the `b <: c`
+        // witness is based on witnesses that `b <: x` and `x <: c`:
+        //
+        auto bIsSubtypeOfXWitness = bIsTransitiveSubtypeOfCWitness->subToMid;
+        auto xIsSubtypeOfCWitness = bIsTransitiveSubtypeOfCWitness->midToSup;
+
+        // We can recursively call this operation to produce a witness that
+        // `a <: x`, based on the witnesses we already have for `a <: b` and `b <: x`:
+        //
+        auto aIsSubtypeOfXWitness = getTransitiveSubtypeWitness(
+            aIsSubtypeOfBWitness,
+            bIsSubtypeOfXWitness);
+
+        // Now we can perform a "tail recursive" call to this function (via `goto`
+        // to combine the `a <: x` witness with our `x <: c` witness:
+        //
+        aIsSubtypeOfBWitness = aIsSubtypeOfXWitness;
+        bIsSubtypeOfCWitness = xIsSubtypeOfCWitness;
+        goto top;
+    }
+
+    auto aType = aIsSubtypeOfBWitness->sub;
+    auto cType = bIsSubtypeOfCWitness->sup;
+
+    // If the right-hand side is a conjunction witness for `B <: C`
+    // of the form `(B <: X)&(B <: Y)`, then we have it that `C = X&Y`
+    // and we'd rather form a conjunction witness for `A <: C`
+    // that is of the form `(A <: X)&(A <: Y)`.
+    //
+    if(auto bIsSubtypeOfXAndY = as<ConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
+    {
+        auto bIsSubtypeOfXWitness = bIsSubtypeOfXAndY->getLeftWitness();
+        auto bIsSubtypeOfYWitness = bIsSubtypeOfXAndY->getRightWitness();
+
+        return getConjunctionSubtypeWitness(
+            aType,
+            cType,
+            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfXWitness),
+            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfYWitness));
+    }
+
+    // If the right-hand witness `R` is of the form `extract(i, W)`, then
+    // `W` is a witness that `B <: X&Y&...` for some conjunction, where `C`
+    // is one component of that conjunction.
+    //
+    if(auto bIsSubtypeViaExtraction = as<ExtractFromConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
+    {
+        // We decompose the witness `extract(i, W)` to get both
+        // the witness `W` that `B <: X&Y&...` as well as the index
+        // `i` of `C` within the conjunction.
+        //
+        auto bIsSubtypeOfConjunction = bIsSubtypeViaExtraction->conjunctionWitness;
+        auto indexOfCInConjunction = bIsSubtypeViaExtraction->indexInConjunction;
+
+        // We lift the extraction to the outside of the composition, by
+        // forming a witness for `A <: C` that is of the form
+        // `extract(i, L . W )`, where `L` is the left-hand witnes (for `A <: B`).
+        // The composition `L . W` is a witness that `A <: X&Y&...`, and
+        // the `i`th component of it should be a witness that `A <: C`.
+        //
+        return getExtractFromConjunctionSubtypeWitness(
+            aType,
+            cType,
+            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfConjunction),
+            indexOfCInConjunction);
+    }
+
+    // If none of the above special cases applied, then we are just going to create
+    // a `TransitiveSubtypeWitness` directly.
+    //
+    // TODO: Identify other cases that we can potentially simplify.
+    // It is particularly notable that we do not have simplification rules that
+    // detect when the left-hand side of a composition has some particular
+    // structure. This may be fine, or it may not; we should write down a more
+    // formal set of rules for the allowed structure of our witnesses to
+    // guarantee that our simplifications are sufficient.
+
+    TransitiveSubtypeWitness* transitiveWitness = getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(
+        aType,
+        cType,
+        aIsSubtypeOfBWitness,
+        bIsSubtypeOfCWitness);
+    transitiveWitness->sub = aType;
+    transitiveWitness->sup = cType;
+    transitiveWitness->subToMid = aIsSubtypeOfBWitness;
+    transitiveWitness->midToSup = bIsSubtypeOfCWitness;
+
+    return transitiveWitness;
+}
+
+SubtypeWitness* ASTBuilder::getExtractFromConjunctionSubtypeWitness(
+    Type*           subType,
+    Type*           superType,
+    SubtypeWitness* conjunctionWitness,
+    int             indexOfSuperTypeInConjunction)
+{
+    // We are taking a witness `W` for `S <: L&R` and
+    // using it to produce a witness for `S <: L`
+    // or `S <: R`.
+
+    // If it turns out that the witness `W` is itself
+    // formed as a conjuction of witnesses: `(S <: L) & (S <: R)`,
+    // then we can simply re-use the appropriate sub-witness.
+    //
+    if (auto conjWitness = as<ConjunctionSubtypeWitness>(conjunctionWitness))
+    {
+        return conjWitness->getComponentWitness(indexOfSuperTypeInConjunction);
+    }
+
+    // TODO: Are there other simplification cases we should be paying attention
+    // to here? For example:
+    //
+    // * What if the original witness is transitive?
+
+    auto witness = getOrCreateWithDefaultCtor<ExtractFromConjunctionSubtypeWitness>(
+        subType,
+        superType,
+        conjunctionWitness,
+        indexOfSuperTypeInConjunction);
+
+    witness->sub = subType;
+    witness->sup = superType;
+    witness->conjunctionWitness = conjunctionWitness;
+    witness->indexInConjunction = indexOfSuperTypeInConjunction;
+    return witness;
+}
+
+SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
+    Type*           sub,
+    Type*           lAndR,
+    SubtypeWitness* subIsLWitness,
+    SubtypeWitness* subIsRWitness)
+{
+    // If a conjunction witness for `S <: L&R` is being formed,
+    // where the constituent witnesses for `S <: L` and `S <: R`
+    // are themselves extractions of the first and second
+    // components, respectively, of a single witness `W`, then
+    // we can simply use `W` as-is.
+    //
+    auto lExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsLWitness);
+    auto rExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsRWitness);
+    if(lExtract && rExtract)
+    {
+        if (lExtract->indexInConjunction == 0
+            && rExtract->indexInConjunction == 1)
+        {
+            auto lInner = lExtract->conjunctionWitness;
+            auto rInner = rExtract->conjunctionWitness;
+            if (lInner == rInner)
+            {
+                return lInner;
+            }
+        }
+    }
+
+    // TODO: Depending on how we decide our canonicalized witnesses
+    // should be structured, we could detect the case where the
+    // `S <: L` and `S <: R` witnesses are both transitive compositions
+    // of the form `X . A` and `X . B`, such that we *could* form
+    // a composition around a conjunction - that is, produce
+    // `X . (A & B)` rather than `(X . A) & (X . B)`.
+    //
+    // For now we are favoring putting the composition (transitive
+    // witness) deeper, so that we have more chances to expose a
+    // conjunction witness at higher levels.
+
+    auto witness = getOrCreateWithDefaultCtor<ConjunctionSubtypeWitness>(
+        sub,
+        lAndR,
+        subIsLWitness,
+        subIsRWitness);
+    witness->componentWitnesses[0] = subIsLWitness;
+    witness->componentWitnesses[1] = subIsRWitness;
+    witness->sub = sub;
+    witness->sup = lAndR;
+    return witness;
+}
+
 bool ASTBuilder::NodeDesc::operator==(NodeDesc const& that) const
 {
+    if (hashCode != that.hashCode) return false;
     if(type != that.type) return false;
     if(operands.getCount() != that.operands.getCount()) return false;
     for(Index i = 0; i < operands.getCount(); ++i)
@@ -461,7 +696,8 @@ bool ASTBuilder::NodeDesc::operator==(NodeDesc const& that) const
     }
     return true;
 }
-HashCode ASTBuilder::NodeDesc::getHashCode() const
+
+void ASTBuilder::NodeDesc::init()
 {
     Hasher hasher;
     hasher.hashValue(Int(type));
@@ -474,7 +710,7 @@ HashCode ASTBuilder::NodeDesc::getHashCode() const
         //
         hasher.hashValue(operands[i].values.nodeOperand);
     }
-    return hasher.getResult();
+    hashCode = hasher.getResult();
 }
 
 DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst)

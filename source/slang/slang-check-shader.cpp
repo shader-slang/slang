@@ -1062,8 +1062,8 @@ namespace Slang
                         auto interfaceType = getSup(getLinkage()->getASTBuilder(), DeclRef<GenericTypeConstraintDecl>(constraintDecl));
 
                         // Use our semantic-checking logic to search for a witness to the required conformance
-                        auto witness = visitor.tryGetSubtypeWitness(argType, interfaceType);
-                        if (!witness)
+                        auto witness = visitor.isSubtype(argType, interfaceType);
+                        if(!witness)
                         {
                             // If no witness was found, then we will be unable to satisfy
                             // the conformances required.
@@ -1094,7 +1094,7 @@ namespace Slang
                         argType = getLinkage()->getASTBuilder()->getErrorType();
                     }
 
-                    auto witness = visitor.tryGetSubtypeWitness(argType, interfaceType);
+                    auto witness = visitor.isSubtype(argType, interfaceType);
                     if (!witness)
                     {
                             // If no witness was found, then we will be unable to satisfy
@@ -1220,7 +1220,7 @@ namespace Slang
                 auto sub = getSub(astBuilder, constraintDeclRef);
                 auto sup = getSup(astBuilder, constraintDeclRef);
 
-                auto subTypeWitness = visitor.tryGetSubtypeWitness(sub, sup);
+                auto subTypeWitness = visitor.isSubtype(sub, sup);
                 if(subTypeWitness)
                 {
                     genericArgs.add(subTypeWitness);
@@ -1264,7 +1264,7 @@ namespace Slang
             auto paramType = as<Type>(param.object);
             auto argType = as<Type>(specializationArg.val);
 
-            auto witness = visitor.tryGetSubtypeWitness(argType, paramType);
+            auto witness = visitor.isSubtype(argType, paramType);
             if (!witness)
             {
                 // If no witness was found, then we will be unable to satisfy
@@ -1414,7 +1414,7 @@ namespace Slang
 
             ExpandedSpecializationArg arg;
             arg.val = argType;
-            arg.witness = visitor.tryGetSubtypeWitness(argType, paramType);
+            arg.witness = visitor.isSubtype(argType, paramType);
             specializationArgs.add(arg);
         }
 

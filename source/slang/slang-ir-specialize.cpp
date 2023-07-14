@@ -7,6 +7,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-util.h"
 #include "../core/slang-performance-profiler.h"
 
 namespace Slang
@@ -57,14 +58,29 @@ struct SpecializationContext
     // specialized-ness of an instruction depends on the
     // fully-specialized-ness of its operands.
     //
-    // We will build an explicit hash set to encode those
-    // instructions that are fully specialized.
+    // We will use an inst's scratchData to represent whether or not
+    // the inst is considered as fully specialized.
     //
-    HashSet<IRInst*> fullySpecializedInsts;
-
-    // An instruction is then fully specialized if and only
-    // if it is in our set.
-    //
+    void setFullySpecializedBit(IRInst* inst)
+    {
+        inst->scratchData |= 1;
+    }
+    bool getFullySpecializedBit(IRInst* inst)
+    {
+        return (inst->scratchData & 1) != 0;
+    }
+    void setCleanBit(IRInst* inst)
+    {
+        inst->scratchData |= 2;
+    }
+    void resetCleanBit(IRInst* inst)
+    {
+        inst->scratchData &= (~2);
+    }
+    bool getCleanBit(IRInst* inst)
+    {
+        return (inst->scratchData & 2) != 0;
+    }
     bool isInstFullySpecialized(
         IRInst* inst)
     {
@@ -111,7 +127,7 @@ struct SpecializationContext
             }
         }
 
-        return fullySpecializedInsts.contains(inst);
+        return getFullySpecializedBit(inst);
     }
 
     // When an instruction isn't fully specialized, but its operands *are*
@@ -140,7 +156,6 @@ struct SpecializationContext
     // whether generic, existential, etc.
     //
     OrderedHashSet<IRInst*> workList;
-    HashSet<IRInst*> cleanInsts;
 
     void addToWorkList(
         IRInst* inst)
@@ -166,7 +181,7 @@ struct SpecializationContext
 
         if (workList.add(inst))
         {
-            cleanInsts.remove(inst);
+            resetCleanBit(inst);
 
             addUsersToWorkList(inst);
         }
@@ -194,9 +209,9 @@ struct SpecializationContext
     void markInstAsFullySpecialized(
         IRInst* inst)
     {
-        if(fullySpecializedInsts.contains(inst))
+        if(getFullySpecializedBit(inst))
             return;
-        fullySpecializedInsts.add(inst);
+        setFullySpecializedBit(inst);
 
         // If we know that an instruction is fully specialized,
         // then we should start to consider its uses and children
@@ -874,6 +889,9 @@ struct SpecializationContext
         for (;;)
         {
             bool iterChanged = false;
+
+            initializeScratchData(module->getModuleInst());
+
             addToWorkList(module->getModuleInst());
 
             while (workList.getCount() != 0)
@@ -886,7 +904,7 @@ struct SpecializationContext
 
                     workList.removeLast();
 
-                    cleanInsts.add(inst);
+                    setCleanBit(inst);
 
                     // For each instruction we process, we want to perform
                     // a few steps.
@@ -959,7 +977,7 @@ struct SpecializationContext
 
     void addDirtyInstsToWorkListRec(IRInst* inst)
     {
-        if( !cleanInsts.contains(inst) )
+        if( !getCleanBit(inst) )
         {
             addToWorkList(inst);
         }
@@ -1321,8 +1339,8 @@ struct SpecializationContext
         // TODO: We probably need/want a more robust test here.
         // For now we are just look into the dependency graph of the inst and
         // see if there are any opcodes that are causing problems.
-        List<IRInst*> localWorkList;
-        HashSet<IRInst*> processedInsts;
+        InstWorkList localWorkList(inst->getModule());
+        InstHashSet processedInsts(inst->getModule());
         localWorkList.add(inst);
         processedInsts.add(inst);
 
@@ -1555,7 +1573,7 @@ struct SpecializationContext
         // "fully specialized" by the rules used for doing
         // generic specialization elsewhere in this pass.
         //
-        fullySpecializedInsts.add(newFuncType);
+        setFullySpecializedBit(newFuncType);
 
         // The above steps have accomplished the "first phase"
         // of cloning the function (since `IRFunc`s have no

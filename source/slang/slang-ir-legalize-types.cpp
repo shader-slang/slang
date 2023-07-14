@@ -18,6 +18,7 @@
 #include "slang-ir-insts.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -3466,9 +3467,12 @@ static LegalVal legalizeGlobalParam(
     }
 }
 
+static constexpr int kHasBeenAddedOrProcessedScratchBitIndex = 0;
+static constexpr int kHasBeenAddedScratchBitIndex = 1;
+
 struct IRTypeLegalizationPass
 {
-    IRTypeLegalizationContext* context;
+    IRTypeLegalizationContext* context = nullptr;
 
     // The goal of this pass is to ensure that legalization has been
     // applied to each instruction in a module. We also want to
@@ -3480,13 +3484,34 @@ struct IRTypeLegalizationPass
     // instructions have ever been added to the work list.
 
     List<IRInst*> workList;
-    HashSet<IRInst*> hasBeenAddedOrProcessedSet;
-    HashSet<IRInst*> addedToWorkListSet;
+
+    IRTypeLegalizationPass()
+    {
+        workList.reserve(8192);
+    }
+
+    bool hasBeenAddedOrProcessed(IRInst* inst)
+    {
+        if (!inst) return true;
+        return (inst->scratchData & (1 << kHasBeenAddedOrProcessedScratchBitIndex)) != 0;
+    }
+    void setHasBeenAddedOrProcessed(IRInst* inst)
+    {
+        inst->scratchData |= (1 << kHasBeenAddedOrProcessedScratchBitIndex);
+    }
+    bool addedToWorkList(IRInst* inst)
+    {
+        return (inst->scratchData & (1 << kHasBeenAddedScratchBitIndex)) != 0;
+    }
+    void setAddedToWorkList(IRInst* inst)
+    {
+        inst->scratchData |= (1 << kHasBeenAddedScratchBitIndex);
+    }
 
     bool hasBeenAddedToWorkListOrProcessed(IRInst* inst)
     {
-        if (hasBeenAddedToWorkList(inst)) return true;
-        return hasBeenAddedOrProcessedSet.contains(inst);
+        if (!inst) return true;
+        return (inst->scratchData != 0);
     }
 
     // We will add a simple query to check whether an instruciton
@@ -3526,7 +3551,7 @@ struct IRTypeLegalizationPass
         //
         if(inst->getOp() == kIROp_InterfaceRequirementEntry) return true;
 
-        return addedToWorkListSet.contains(inst);
+        return addedToWorkList(inst);
     }
 
     // Next we define a convenience routine for adding something to the work list.
@@ -3535,15 +3560,17 @@ struct IRTypeLegalizationPass
     {
         // We want to avoid adding anything we've already added or processed.
         //
-        if(addedToWorkListSet.contains(inst))
+        if(addedToWorkList(inst))
             return;
         workList.add(inst);
-        addedToWorkListSet.add(inst);
-        hasBeenAddedOrProcessedSet.add(inst);
+        setAddedToWorkList(inst);
+        setHasBeenAddedOrProcessed(inst);
     }
 
     void processModule(IRModule* module)
     {
+        initializeScratchData(module->getModuleInst());
+
         // In order to process an entire module, we start by adding the
         // root module insturction to our work list, and then we will
         // proceed to process instructions until the work list goes dry.
@@ -3568,7 +3595,8 @@ struct IRTypeLegalizationPass
                 //
                 List<IRInst*> workListCopy;
                 Swap(workListCopy, workList);
-                addedToWorkListSet.clear();
+
+                resetScratchDataBit(module->getModuleInst(), kHasBeenAddedScratchBitIndex);
 
                 // Now we simply process each instruction on the copy of
                 // the work list, knowing that `processInst` may add additional

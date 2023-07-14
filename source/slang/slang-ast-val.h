@@ -309,6 +309,13 @@ class TypeEqualityWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(TypeEqualityWitness)
 
+    TypeEqualityWitness(
+        Type* type)
+    {
+        this->sub = type;
+        this->sup = type;
+    }
+
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
@@ -360,7 +367,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     {}
 };
 
-// A witness taht `sub : sup` because `sub` was wrapped into
+// A witness that `sub : sup` because `sub` was wrapped into
 // an existential of type `sup`.
 class ExtractExistentialSubtypeWitness : public SubtypeWitness 
 {
@@ -387,7 +394,7 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     // Witnesses that each of the "case" types in the union
     // is a subtype of `sup`.
     //
-    List<Val*> caseWitnesses;
+    List<SubtypeWitness*> caseWitnesses;
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
@@ -414,11 +421,23 @@ class ConjunctionSubtypeWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(ConjunctionSubtypeWitness)
 
-        /// Witness that `sub : sup->left`
-    Val* leftWitness;
+    // At the operational level, this class of witness is
+    // an operation that takes two witness tables `leftWitness`
+    // and `rightWitness`, and forms a pair/tuple of
+    // `(leftWitness, rightWitness)`.
 
-        /// Witness that `sub : sup->right`
-    Val* rightWitness;
+    static const Count kComponentCount = 2;
+    SubtypeWitness* componentWitnesses[kComponentCount];
+
+    SubtypeWitness* getLeftWitness() const { return componentWitnesses[0]; }
+    SubtypeWitness* getRightWitness() const { return componentWitnesses[1]; }
+
+    Count getComponentCount() const { return kComponentCount; }
+    SubtypeWitness* getComponentWitness(Index index) const
+    {
+        SLANG_ASSERT(index >= 0 && index < kComponentCount);
+        return componentWitnesses[index];
+    }
 
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
@@ -426,18 +445,23 @@ class ConjunctionSubtypeWitness : public SubtypeWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
-    /// A witness that `T : X` because `T : X & Y` or `T : Y & X`
+    /// A witness that `T <: L` or `T <: R` because `T <: L&R`
 class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(ExtractFromConjunctionSubtypeWitness)
 
-        /// Witness that `T : L & R` for some `R`
-    Val* conjunctionWitness;
+    // At the operational level, this class of witness is
+    // an operation that takes a pair/tuple of witness tables
+    // `(leftWtiness, rightWitness)` and extracts one of the
+    // elements of it.
+
+        /// Witness that `T < L & R`
+    SubtypeWitness* conjunctionWitness;
 
         /// The zero-based index of the super-type we care about in the conjunction
         ///
-        /// If `conjunctionWitness` is `T : X & Y` then this index should be zero if
-        /// we want to represent `T : X` and one if we want `T : Y`.
+        /// If `conjunctionWitness` is `T < L & R` then this index should be zero if
+        /// we want to represent `T < L` and one if we want `T < R`.
         ///
     int indexInConjunction;
 

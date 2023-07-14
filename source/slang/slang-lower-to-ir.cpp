@@ -6,6 +6,7 @@
 #include "../core/slang-random-generator.h"
 #include "../core/slang-hash.h"
 #include "../core/slang-char-util.h"
+#include "../core/slang-performance-profiler.h"
 
 #include "slang-check.h"
 #include "slang-ir.h"
@@ -1861,15 +1862,21 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitConjunctionSubtypeWitness(ConjunctionSubtypeWitness* val)
     {
-        // A witness `T : L & R` for a conformance of `T` to a conjunction of
-        // types `L` and `R` will be lowered as a tuple of two witnesses: one
-        // for `T : L` and one for `T : R`. Luckily, those two conformances
-        // are exactly what the `ConjunctionSubtypeWitness` stores, so we just
-        // need to lower them individually and make a tuple.
+        // A witness `W = X & Y & ...` will lower as a tuple of the sub-witnesses
+        // `X`, `Y`, etc.
         //
-        auto left   = lowerSimpleVal(context, val->leftWitness);
-        auto right  = lowerSimpleVal(context, val->rightWitness);
-        return LoweredValInfo::simple(getBuilder()->emitMakeTuple(left, right));
+        // The AST representation of a conjunction of witnesses matches this
+        // tuple-like encoding very closely, so we can simply lower each of
+        // the component witnesses to produce our result.
+        //
+        List<IRInst*> componentWitnesses;
+        auto componentCount = val->getComponentCount();
+        for (Index i = 0; i < componentCount; ++i)
+        {
+            auto componentWitness = lowerSimpleVal(context, val->getComponentWitness(i));
+            componentWitnesses.add(componentWitness);
+        }
+        return LoweredValInfo::simple(getBuilder()->emitMakeTuple(componentWitnesses));
     }
 
     LoweredValInfo visitExtractFromConjunctionSubtypeWitness(ExtractFromConjunctionSubtypeWitness* val)
@@ -3333,9 +3340,45 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
-        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableDecoration);
-        return baseVal;
+
+        IRInst* innerInst = nullptr;
+        if (baseVal.flavor != LoweredValInfo::Flavor::Simple)
+        {
+            if (!isLValueContext())
+            {
+                auto materializedVal = materialize(context, baseVal);
+
+                // TODO(Sai): We might be missing the case where a single materialize could create
+                // multiple calls (multiple index operations?). Not quite sure what the right way
+                // to handle that case might be.
+                // 
+                if (as<IRCall>(materializedVal.val))
+                    getBuilder()->addDecoration(materializedVal.val, kIROp_TreatAsDifferentiableDecoration);
+
+                innerInst = getSimpleVal(context, materializedVal);
+                
+                // We'll special case handle 'loads' here in order to allow TreatAsDifferentiable to be 
+                // used on array index operations. (This is to avoid a discrepancy between using no_diff
+                // on local variable indexing vs. resource indexing.)
+                // 
+                if (as<IRLoad>(innerInst))
+                    innerInst = getBuilder()->emitDetachDerivative(innerInst->getDataType(), innerInst);
+            }
+            else
+            {
+                SLANG_ASSERT("TreatAsDifferentiableExpr on non-simple l-values not properly defined.");
+            }
+        }
+        else
+        {
+            if (as<IRCall>(baseVal.val))
+                getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableDecoration);
+            innerInst = baseVal.val;
+        }
+
+        SLANG_ASSERT(innerInst);
+        
+        return LoweredValInfo::simple(innerInst);
     }
 
     // Emit IR to denote the forward-mode derivative
@@ -8161,7 +8204,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             child = child->getParent();
         return child != nullptr;
     }
-    static void markInstsToClone(HashSet<IRInst*>& valuesToClone, IRInst* parentBlock, IRInst* value)
+    static void markInstsToClone(InstHashSet& valuesToClone, IRInst* parentBlock, IRInst* value)
     {
         if (!isChildOf(value, parentBlock))
             return;
@@ -8221,7 +8264,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             IRCloneEnv cloneEnv = {};
             if (returnType)
             {
-                HashSet<IRInst*> valuesToClone;
+                InstHashSet valuesToClone(subBuilder->getModule());
                 markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
                 // For Function Types, we always clone all generic parameters regardless of whether
                 // the generic parameter appears in the function signature or not.
@@ -9704,6 +9747,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     ASTBuilder* astBuilder,
     TranslationUnitRequest* translationUnit)
 {
+    SLANG_PROFILE;
+
     auto session = translationUnit->getSession();
     auto compileRequest = translationUnit->compileRequest;
 

@@ -40,8 +40,8 @@ struct WitnessLookupLoweringContext
         if (!type)
             return false;
         
-        HashSet<IRInst*> processedSet;
-        List<IRInst*> workList;
+        InstHashSet processedSet(type->getModule());
+        InstWorkList workList(type->getModule());
         workList.add(type);
         processedSet.add(type);
         for (Index i = 0; i < workList.getCount(); i++)

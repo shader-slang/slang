@@ -76,6 +76,12 @@ namespace Slang
     template <typename T>
     SLANG_FORCE_INLINE T* clone(IClonable* clonable) { return (T*)clonable->clone(T::getTypeGuid()); }
 
+    template <typename T>
+    inline bool isBitSet(T value, T bitToTest)
+    {
+        static_assert(sizeof(T) <= sizeof(uint32_t), "Only support up to 32 bit enums");
+        return (T)((uint32_t)value & (uint32_t)bitToTest) == bitToTest;
+    }
 }
 
 // TODO: Shouldn't these be SLANG_ prefixed?

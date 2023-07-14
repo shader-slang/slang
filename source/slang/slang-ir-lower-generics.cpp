@@ -183,9 +183,8 @@ namespace Slang
     {
         SLANG_PROFILE;
 
-        SharedGenericsLoweringContext sharedContext;
+        SharedGenericsLoweringContext sharedContext(module);
         sharedContext.targetReq = targetReq;
-        sharedContext.module = module;
         sharedContext.sink = sink;
 
         checkTypeConformanceExists(&sharedContext);

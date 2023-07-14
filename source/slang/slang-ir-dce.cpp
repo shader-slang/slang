@@ -29,30 +29,15 @@ struct DeadCodeEliminationContext
     // there could be new DCE opportunities.
     bool phiRemoved = false;
 
-    // Our overall process is going to be to determine
-    // which instructions in the module are "live"
-    // and then eliminate anything that wasn't found to
-    // be live.
-    //
-    // We will track the liveness state by keeping
-    // a set of all instructions we have so far determined
-    // to be live.
-    //
-    HashSet<IRInst*> liveInsts;
-
     // Querying whether an instruction has been
     // determined to be live is easy.
+    // To speedup the test, we use the
+    // `scratchData` field of each inst as the marker.
     //
-    bool isInstLive(IRInst* inst)
+    bool isInstAlive(IRInst* inst)
     {
-        // The only wrinkle is that we want to safeguard
-        // against a null instruction (there are some
-        // corner cases where we still construct IR
-        // instructions with a null type).
-        //
-        if(!inst) return false;
-
-        return liveInsts.contains(inst);
+        if (!inst) return false;
+        return inst->scratchData != 0;
     }
 
     // We are going to do an iterative analysis
@@ -81,10 +66,11 @@ struct DeadCodeEliminationContext
         //
         if(!inst) return;
 
-        if(liveInsts.contains(inst))
-            return;
-        liveInsts.add(inst);
-        workList.add(inst);
+        if (!inst->scratchData)
+        {
+            inst->scratchData = 1;
+            workList.add(inst);
+        }
     }
 
     IRInst* getUndefInst()
@@ -109,7 +95,9 @@ struct DeadCodeEliminationContext
 
         for (;;)
         {
-            liveInsts.clear();
+            // Clear the `alive` bits by initializing all scratchData to 0.
+            initializeScratchData(root);
+
             workList.clear();
 
             // First of all, we know that the root instruction
@@ -189,11 +177,6 @@ struct DeadCodeEliminationContext
                 // should be live when its parent is to a subroutine.
                 //
 
-                if (auto func = as<IRGlobalValueWithCode>(inst))
-                {
-                    module->findOrCreateDominatorTree(func);
-                }
-
                 for (auto child : inst->getDecorationsAndChildren())
                 {
                     if (shouldInstBeLiveIfParentIsLive(child))
@@ -242,7 +225,7 @@ struct DeadCodeEliminationContext
         //
         // The easy case is if `inst` is dead (that is, not live).
         //
-        if( !isInstLive(inst) )
+        if( !isInstAlive(inst) )
         {
             // We can simply remove and deallocate `inst` because it is
             // dead, and not worry about any of its descendents,
@@ -324,7 +307,7 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     // First, if `inst` is an instruction that might have some effects
     // when it is executed, then we should keep it around.
     //
-    if (inst->mightHaveSideEffects())
+    if (inst->mightHaveSideEffects(SideEffectAnalysisOptions::UseDominanceTree))
     {
         return true;
     }

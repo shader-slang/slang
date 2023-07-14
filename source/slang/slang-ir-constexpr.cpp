@@ -15,8 +15,14 @@ struct PropagateConstExprContext
 
     IRBuilder builder;
 
-    List<IRInst*> workList;
-    HashSet<IRInst*> onWorkList;
+    InstWorkList workList;
+    InstHashSet onWorkList;
+
+    PropagateConstExprContext(IRModule* module)
+        : module(module)
+        , workList(module)
+        , onWorkList(module)
+    {}
 
     IRBuilder* getBuilder() { return &builder; }
 
@@ -497,8 +503,7 @@ void propagateConstExpr(
     IRModule*       module,
     DiagnosticSink* sink)
 {
-    PropagateConstExprContext context;
-    context.module = module;
+    PropagateConstExprContext context(module);
     context.sink = sink;
     context.builder = IRBuilder(module);
 

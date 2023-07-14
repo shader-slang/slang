@@ -7,20 +7,6 @@
 #include <stdexcept>
 #include <string>
 
-#ifndef SLANG_NO_THROW
-#   define SLANG_NO_THROW
-#endif
-
-#ifndef SLANG_STDCALL
-#   define SLANG_STDCALL
-#endif
-#ifndef SLANG_MCALL
-#   define SLANG_MCALL SLANG_STDCALL
-#endif
-#ifndef SLANG_FORCE_INLINE
-#    define SLANG_FORCE_INLINE inline
-#endif
-
 #ifdef SLANG_LLVM
 #include "slang-llvm.h"
 #else // SLANG_LLVM
@@ -37,6 +23,8 @@
 #   include <string.h>
 #   include <stdint.h>
 #endif // SLANG_LLVM
+
+#include "../source/core/slang-string.h"
 
 #if defined(_MSC_VER)
 #   define SLANG_PRELUDE_SHARED_LIB_EXPORT __declspec(dllexport)
@@ -55,11 +43,23 @@
 #   define SLANG_PRELUDE_EXTERN_C_END 
 #endif    
 
-
 #define SLANG_PRELUDE_NAMESPACE
 
+#ifndef SLANG_NO_THROW
+#   define SLANG_NO_THROW
+#endif
+#ifndef SLANG_STDCALL
+#   define SLANG_STDCALL
+#endif
+#ifndef SLANG_MCALL
+#   define SLANG_MCALL SLANG_STDCALL
+#endif
+#ifndef SLANG_FORCE_INLINE
+#    define SLANG_FORCE_INLINE inline
+#endif
 #include "slang-cpp-types-core.h"
 #include "slang-cpp-scalar-intrinsics.h"
+
 
 static const int kSlangTorchTensorMaxDim = 5;
 
