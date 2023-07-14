@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-target glsl -profile ps_4_0 -entry main -fvk-t-shift 5 all -fvk-t-shift 7 2  -fvk-s-shift -3 0 -fvk-b-shift 1 2
+//TEST:REFLECTION:-target glsl -profile ps_4_0 -entry main -fvk-t-shift 5 all -fvk-t-shift 7 2  -fvk-s-shift -3 0 -fvk-u-shift 0 all -fvk-u-shift 1 2 -fvk-b-shift 1 0
 
 struct Data
 {

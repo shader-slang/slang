@@ -32,15 +32,36 @@ public:
         Index index = -1;
     };
 
+    // https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ
     // {b|s|t|u} 
     enum class Kind
     {
         Invalid = -1,
 
-        Buffer,             ///< Buffer 
-        Sampler,            ///< Sampler
-        Texture,            ///< Texture
-        Uniform,            ///< Uniform
+            /// Unordered access view (u) 
+            ///
+            /// RWByteAddressBuffer/RWStructuredBuffer
+            /// Append/ConsumeStructuredBuffer
+            /// RWBuffer
+            /// RWTextureXD/Array
+        UnorderedAccess,    
+
+            /// Sampler (s)
+            ///
+            /// SamplerXD
+            /// SamplerState/SamplerComparisonState
+        Sampler,
+
+            /// Shader Resource (t)
+            ///
+            /// TextureXD/Array
+            /// ByteAddressBuffer/StructuredBuffer/Buffer/TBuffer
+        ShaderResource,            
+
+            /// Constant buffer (b)
+            /// 
+            /// ConstantBufferViews, CBuffer
+        ConstantBuffer,     
 
         CountOf,
     };

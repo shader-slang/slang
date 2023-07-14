@@ -575,7 +575,7 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     return info;
 }
 
-LayoutSemanticInfo ExtractLayoutSemanticInfo(
+static LayoutSemanticInfo _extractLayoutSemanticInfo(
     ParameterBindingContext*    context,
     HLSLLayoutSemantic*         semantic)
 {
@@ -938,7 +938,7 @@ static void addExplicitParameterBindings_HLSL(
     for (auto semantic : varDecl.getDecl()->getModifiersOfType<HLSLLayoutSemantic>())
     {
         // Need to extract the information encoded in the semantic
-        LayoutSemanticInfo semanticInfo = ExtractLayoutSemanticInfo(context, semantic);
+        LayoutSemanticInfo semanticInfo = _extractLayoutSemanticInfo(context, semantic);
         auto kind = semanticInfo.kind;
         if (kind == LayoutResourceKind::None)
             continue;
@@ -1076,7 +1076,7 @@ static void addExplicitParameterBindings_GLSL(
     }
             
     // Get the HLSL binding info
-    const auto hlslInfo = ExtractLayoutSemanticInfo(context, hlslRegSemantic);
+    const auto hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     if (hlslInfo.kind == LayoutResourceKind::None)
     {
         // Is no hlsl resource binding
