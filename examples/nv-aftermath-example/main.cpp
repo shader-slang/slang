@@ -15,10 +15,20 @@
 using namespace gfx;
 using namespace Slang;
 
-// For the purposes of a small example, we will define the vertex data for a
-// single triangle directly in the source file. It should be easy to extend
-// this example to load data from an external source, if desired.
+// This example demonstrates is based on the "triangle" sample which 
+// is commented to demonstrate how to use the gfx library to render a triangle.
 //
+// This examples purpose is to show how to use the aftermath SDK to capture
+// a crash dump.
+// 
+// * [nsight aftermath](https://developer.nvidia.com/nsight-aftermath)
+// 
+// In addition it uses obfuscation and source maps to allow source level 
+// debugging via aftermath even with obfuscation.
+//
+// * [obfuscation](https://github.com/shader-slang/slang/blob/master/docs/user-guide/a1-03-obfuscation.md)
+// * [source map](https://github.com/source-map/source-map-spec)
+
 struct Vertex
 {
     float position[3];
@@ -57,6 +67,7 @@ struct AftermathCrashExample : public WindowedAppBase
     ComPtr<gfx::IPipelineState> m_pipelineState;
     ComPtr<gfx::IBufferResource> m_vertexBuffer;
 
+        /// A counter such that we can make aftermath dump file names unique
     std::atomic<int> m_uniqueId = 0;
 };
 
@@ -67,7 +78,6 @@ void AftermathCrashExample::diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
         printf("%s", (const char*)diagnosticsBlob->getBufferPointer());
     }
 }
-
 
 void AftermathCrashExample::aftermathCrashDump(const void* data, const uint32_t dataSizeInBytes)
 {
@@ -85,11 +95,24 @@ void AftermathCrashExample::aftermathCrashDump(const void* data, const uint32_t 
 
 struct FileSystemEntry
 {
-    SlangPathType type;
-    String path;
+    SlangPathType type;     ///< The type of the entry
+    String path;            ///< The path to the entr
 };
 
-static SlangResult _findPaths(ISlangFileSystemExt* fileSystem, const char* rootPath, List<FileSystemEntry>& outEntries)
+struct CompileProduct
+{
+    String fileName;                ///< The filename to write the compile product out to
+    ComPtr<ISlangBlob> blob;        ///< A blob holding the products contents
+};
+
+/* Currently the mechanism to access the contents of a compilation that might consist of many items is through 
+representing the contents as a "file system".
+
+The file system is just a somewhat convenient/simple in memory representation of the compilation products.
+
+This function transverses the file system and adds everything found into outEntries.
+*/
+static SlangResult _findFileSystemContents(ISlangFileSystemExt* fileSystem, const char* rootPath, List<FileSystemEntry>& outEntries)
 {
     {
         SlangPathType type;
@@ -97,16 +120,18 @@ static SlangResult _findPaths(ISlangFileSystemExt* fileSystem, const char* rootP
         outEntries.add(FileSystemEntry{ type, rootPath });
     }
 
+    // A context used to hold state, when using enumeratePathContents
     struct Context
     {
-        List<FileSystemEntry>& entries;
-        String path;
+        List<FileSystemEntry>& entries; // The entries to be accumulated to
+        String path;                    // The path being enumerated
     };
 
     for (Index i = outEntries.getCount() - 1; i < outEntries.getCount(); ++i)
     {
         const auto& entry = outEntries[i];
 
+        // If it's a directory we want to traverse it's contents
         if (entry.type == SLANG_PATH_TYPE_DIRECTORY)
         {
             Context context{outEntries, entry.path };
@@ -115,7 +140,9 @@ static SlangResult _findPaths(ISlangFileSystemExt* fileSystem, const char* rootP
                 [](SlangPathType pathType, const char* name, void* userData) -> void {
                     Context* context = reinterpret_cast<Context*>(userData);
 
-                    context->entries.add({pathType, Path::combine(context->path, name)});
+                    const String path = Path::simplify(Path::combine(context->path, name));
+
+                    context->entries.add({pathType, path});
                 }, 
                 &context);
         }
@@ -124,18 +151,17 @@ static SlangResult _findPaths(ISlangFileSystemExt* fileSystem, const char* rootP
     return SLANG_OK;
 }
 
+/* This function takes a compile results file system, and finds items that should be written out. 
 
+This is somewhat complicated because the names of products from different compilations might have the same names.
+So a "prefix" is passed in, and for files that don't have unique names, they are uniqified via the prefix.
 
-struct MapEntry
-{
-    String fileName;
-    ComPtr<ISlangBlob> blob;
-};
-
-static SlangResult _addMaps(ISlangFileSystemExt* fileSystem, const char* prefix, List<MapEntry>& ioEntries)
+The same product may appear in multiple compilations, for example obfuscated source maps so a product is not added 
+if there is already a product with the same name */
+static SlangResult _addCompileProducts(ISlangFileSystemExt* fileSystem, const char* prefix, List<CompileProduct>& ioProducts)
 {
     List<FileSystemEntry> fileSystemEntries;
-    SLANG_RETURN_ON_FAIL(_findPaths(fileSystem, ".", fileSystemEntries));
+    SLANG_RETURN_ON_FAIL(_findFileSystemContents(fileSystem, ".", fileSystemEntries));
 
     for (const auto& fileSystemEntry : fileSystemEntries)
     {
@@ -146,35 +172,45 @@ static SlangResult _addMaps(ISlangFileSystemExt* fileSystem, const char* prefix,
 
         const auto ext = Path::getPathExt(fileSystemEntry.path);
 
-        if (ext != toSlice("map"))
+        String outFileName;
+        
+        // Some filenames need special handling, and their names are already unique
+        // Others will be the same between differen fileSystem that represent the 
+        // compilation products. 
+        //
+        // Source maps that are obfuscated are unique.
         {
-            continue;
+            String inFileName = Path::getFileNameWithoutExt(fileSystemEntry.path);
+        
+            // If it's an obfuscated source map, we can just use the filename we have
+            if (ext == toSlice("map") && inFileName.endsWith(toSlice("-obfuscated")))
+            {
+                outFileName = inFileName;
+            }
+            else 
+            {
+                // Uniquify with the prefix
+                StringBuilder buf;
+                buf << prefix << "-" << inFileName << "." << ext;
+                outFileName = buf;   
+            }
         }
-
-        auto fileName = Path::getFileNameWithoutExt(fileSystemEntry.path);
-
-        if (fileName.endsWith(toSlice("-obfuscated")))
+        
+        // If we have an output filename
+        if (outFileName.getLength())
         {
-            fileName = Path::getFileName(fileSystemEntry.path);
+            // And that filename isn't already used
+            if (ioProducts.findFirstIndex([&](const CompileProduct& product) -> bool {
+                return product.fileName == outFileName;
+                }) < 0)
+            {
+                ComPtr<ISlangBlob> blob;
+                SLANG_RETURN_ON_FAIL(fileSystem->loadFile(fileSystemEntry.path.getBuffer(), blob.writeRef()));
+
+                // Add to the results
+                ioProducts.add(CompileProduct{ outFileName, blob });
+            }
         }
-        else
-        {
-            StringBuilder buf;
-            buf << prefix << "-" << fileName << "." << ext;
-            fileName = buf;
-        }
-
-
-        if (ioEntries.findFirstIndex([&](const MapEntry& entry) -> bool { 
-            return entry.fileName == fileName;
-            }) < 0)
-        {
-            ComPtr<ISlangBlob> blob;
-            SLANG_RETURN_ON_FAIL(fileSystem->loadFile(fileSystemEntry.path.getBuffer(), blob.writeRef()));
-
-            ioEntries.add(MapEntry{fileName, blob});
-        }
-
     }
 
     return SLANG_OK;
@@ -187,7 +223,9 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     ComPtr<slang::ISession> slangSession;
     slangSession = device->getSlangSession();
 
-    // This is a little bit of a work around. We want to set some options that are only available
+    // This is a little bit of a work around. 
+    // 
+    // We want to set some options that are only available
     // via processCommandLineArguments, but we need a request to be able to set them up
     // The setting actually sets the parameters on the Linkage, so they will be used for the later 
     // actual compilation
@@ -197,7 +235,8 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
         SLANG_RETURN_ON_FAIL(slangSession->createCompileRequest(request.writeRef()));
 
         // Turn on obfuscation
-        // Turn on source map for line numbers
+        // Turn on source map as the line directive, this will lead to an "emit source map"
+        // and no #line directives in generated source.
         const char* args[] = { "-obfuscate", "-line-directive-mode", "source-map" };
         request->processCommandLineArguments(args, SLANG_COUNT_OF(args));
     }
@@ -208,7 +247,7 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     if (!module)
         return SLANG_FAIL;
 
-    // Lets compile and set the entry point
+    // Find the entry points
     ComPtr<slang::IEntryPoint> vertexEntryPoint;
     SLANG_RETURN_ON_FAIL(module->findEntryPointByName("vertexMain", vertexEntryPoint.writeRef()));
     //
@@ -259,6 +298,8 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
 
     const Index targetIndex = 0;
 
+    // Trigger compilation by requesting the code.
+    // Normally gfx would compile as needed.
     {
         ComPtr<ISlangBlob> code;
         ComPtr<ISlangBlob> diagnostics;
@@ -268,24 +309,31 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     }
 
     {
-        // Okay look for all the unique map names
+        // We want to find all the compilation products. In particular we want to get the emit source map, and the obfuscated 
+        // source maps
 
-        List<MapEntry> mapEntries;
+        List<CompileProduct> compileProducts;
+
+        // The current mechanism for getting access to compilation products other than result blob/diagnostics is to 
+        // return it as a compilation result "file system"
 
         ComPtr<ISlangMutableFileSystem> vertexFileSystem;
         SLANG_RETURN_ON_FAIL(linkedProgram->getResultAsFileSystem(vertexEntryPointIndex, targetIndex, vertexFileSystem.writeRef()));
 
-        SLANG_RETURN_ON_FAIL(_addMaps(vertexFileSystem, "vertex", mapEntries));
-        
         ComPtr<ISlangMutableFileSystem> fragmentFileSystem;
         SLANG_RETURN_ON_FAIL(linkedProgram->getResultAsFileSystem(fragmentEntryPointIndex, targetIndex, fragmentFileSystem.writeRef()));
 
-        SLANG_RETURN_ON_FAIL(_addMaps(fragmentFileSystem, "fragment", mapEntries));
+        // Add the contents of the compile result file systems into compileProducts
+        // Some products might appear in both file systems, so compileProducts is just the unique products.
+        // Additionally because some products may have the same name, we pass in a "prefix" to make the products name 
+        // unique.
+        SLANG_RETURN_ON_FAIL(_addCompileProducts(vertexFileSystem, "vertex", compileProducts));
+        SLANG_RETURN_ON_FAIL(_addCompileProducts(fragmentFileSystem, "fragment", compileProducts));
 
         // Now dump them all out
-        for (const auto& mapEntry : mapEntries)
+        for (const auto& product : compileProducts)
         {
-            SLANG_RETURN_ON_FAIL(File::writeAllBytes(mapEntry.fileName, mapEntry.blob->getBufferPointer(), mapEntry.blob->getBufferSize()));
+            SLANG_RETURN_ON_FAIL(File::writeAllBytes(product.fileName, product.blob->getBufferPointer(), product.blob->getBufferSize()));
         }
     }
 
@@ -298,9 +346,6 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     programDesc.slangGlobalScope = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 
-    // We want to dump out source maps
-
-
     return SLANG_OK;
 }
 
@@ -312,7 +357,6 @@ static void GFSDK_AFTERMATH_CALL _dumpCallback(const void* pGpuCrashDump, const 
 Slang::Result AftermathCrashExample::initialize()
 {
     // As per docs must be called before any device is created
-
     GFSDK_Aftermath_EnableGpuCrashDumps(
         GFSDK_Aftermath_Version_API,
         GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX | GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_Vulkan,
@@ -394,6 +438,9 @@ void AftermathCrashExample::renderFrame(int frameBufferIndex)
     rootCursor["Uniforms"]["modelViewProjection"].setData(
         deviceInfo.identityProjectionMatrix, sizeof(float) * 16);
 
+    // We are going to extra efforts to create a shader that we know will time 
+    // out because we *want* a GPU "crash", such we can capture via nsight aftermath.
+    // The failCount is just a number that is large enought to make things take too long.
     int32_t failCount = 0x3fffffff;
     rootCursor["Uniforms"]["failCount"].setData(&failCount, sizeof(failCount));
 
