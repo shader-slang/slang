@@ -2351,12 +2351,16 @@ SlangResult OptionsParser::_parse(
         }
     }
 
-    // If there are no layout settings, we don't need to carry this state
-    if (m_hlslToVulkanLayoutOptions->isReset())
+    // If there is state set on HLSL to Vulkan layout settings, set on the end to end request
+    // such can be added when target requests are setup
+    if (!m_hlslToVulkanLayoutOptions->isReset())
     {
-        m_hlslToVulkanLayoutOptions.setNull();
+        m_requestImpl->setHLSLToVulkanLayoutOptions(m_hlslToVulkanLayoutOptions);
     }
 
+    // No longer need to track
+    m_hlslToVulkanLayoutOptions.setNull();
+    
     if (m_compileStdLib)
     {
         SLANG_RETURN_ON_FAIL(m_session->compileStdLib(m_compileStdLibFlags));
@@ -2761,8 +2765,6 @@ SlangResult OptionsParser::_parse(
     {
         int targetID = m_compileRequest->addCodeGenTarget(SlangCompileTarget(rawTarget.format));
         rawTarget.targetID = targetID;
-
-        m_requestImpl->setHLSLToVulkanLayoutOptions(targetID, m_hlslToVulkanLayoutOptions);
 
         if (rawTarget.profileVersion != ProfileVersion::Unknown)
         {
