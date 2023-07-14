@@ -56,7 +56,6 @@ void __bwd_d_getAlbedo(uint length, float3 dOut)
 }
 
 [BackwardDifferentiable]
-[PreferRecompute]
 void handleHit(inout PathData pathData)
 {
     if (pathData.length >= 2)
@@ -92,8 +91,6 @@ float3 tracePath()
         if (pathData.isHit)
         {
             handleHit(pathData);
-
-            if (pathData.terminated) break;
 
             //pathData.isHit = traceRayInline(pathData.length);
             if (!traceRayInline(pathData.length)) pathData.isHit = false;
