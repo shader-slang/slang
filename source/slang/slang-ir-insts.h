@@ -3069,6 +3069,7 @@ public:
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
+    IRInst* emitDetachDerivative(IRType* type, IRInst* value);
 
     IRInst* emitDispatchKernelInst(IRType* type, IRInst* baseFn, IRInst* threadGroupSize, IRInst* dispatchSize, Int argCount, IRInst* const* inArgs);
     IRInst* emitCudaKernelLaunch(IRInst* baseFn, IRInst* gridDim, IRInst* blockDim, IRInst* argsArray, IRInst* cudaStream);

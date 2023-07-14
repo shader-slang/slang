@@ -8,8 +8,14 @@ struct AugmentMakeExistentialContext
 {
     IRModule* module;
 
-    List<IRInst*> workList;
-    HashSet<IRInst*> workListSet;
+    InstWorkList workList;
+    InstHashSet workListSet;
+
+    AugmentMakeExistentialContext(IRModule* inModule)
+        : module(inModule)
+        , workList(inModule)
+        , workListSet(inModule)
+    {}
 
     void addToWorkList(IRInst* inst)
     {
@@ -70,8 +76,7 @@ struct AugmentMakeExistentialContext
 
 void augmentMakeExistentialInsts(IRModule* module)
 {
-    AugmentMakeExistentialContext context;
-    context.module = module;
+    AugmentMakeExistentialContext context(module);
     context.processModule();
 }
 } // namespace Slang

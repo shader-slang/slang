@@ -1320,7 +1320,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         SharedSemanticsContext sharedSemanticsContext(this, nullptr, &sink);
         SemanticsVisitor visitor(&sharedSemanticsContext);
         auto witness =
-            visitor.tryGetSubtypeWitness((Slang::Type*)type, (Slang::Type*)interfaceType);
+            visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
@@ -2351,6 +2351,8 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
 void FrontEndCompileRequest::checkAllTranslationUnits()
 {
+    SLANG_PROFILE;
+
     LoadedModuleDictionary loadedModules;
     if (additionalLoadedModules)
         loadedModules = *additionalLoadedModules;

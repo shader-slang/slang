@@ -44,8 +44,14 @@ namespace Slang
         // We will use a single work list of instructions that need
         // to be considered for lowering.
         //
-        List<IRInst*> workList;
-        HashSet<IRInst*> workListSet;
+        InstWorkList workList;
+        InstHashSet workListSet;
+        
+        SharedGenericsLoweringContext(IRModule* inModule)
+            : module(inModule)
+            , workList(inModule)
+            , workListSet(inModule)
+        {}
 
         void addToWorkList(
             IRInst* inst)

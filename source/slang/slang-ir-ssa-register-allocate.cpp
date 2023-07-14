@@ -156,8 +156,8 @@ struct RegisterAllocateContext
         // This order allows us to easily track what is dominating the current inst.
 
         // We track the insts dominating the current location in a stack.
-        List<IRInst*> dominatingInsts;
-        HashSet<IRInst*> dominatingInstSet;
+        InstWorkList dominatingInsts(func->getModule());
+        InstHashSet dominatingInstSet(func->getModule());
 
         struct WorkStackItem
         {

@@ -537,6 +537,7 @@ namespace Slang
             {
                 if(context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
+                    subTypeWitness = tryGetSubtypeWitness(sub, sup);
                     getSink()->diagnose(context.loc, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
                 }
                 return false;

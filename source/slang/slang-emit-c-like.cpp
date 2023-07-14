@@ -36,7 +36,7 @@ namespace Slang {
 struct CLikeSourceEmitter::ComputeEmitActionsContext
 {
     IRInst*             moduleInst;
-    HashSet<IRInst*>    openInsts;
+    InstHashSet         openInsts;
     Dictionary<IRInst*, EmitAction::Level> mapInstToLevel;
     List<EmitAction>*   actions;
 };
@@ -3880,6 +3880,7 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     ComputeEmitActionsContext ctx;
     ctx.moduleInst = module->getModuleInst();
     ctx.actions = &ioActions;
+    ctx.openInsts = InstHashSet(module);
 
     for(auto inst : module->getGlobalInsts())
     {

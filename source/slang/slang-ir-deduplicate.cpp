@@ -13,8 +13,8 @@ namespace Slang
 
     void IRDeduplicationContext::removeHoistableInstFromGlobalNumberingMap(IRInst* instToRemove)
     {
-        HashSet<IRInst*> userWorkListSet;
-        List<IRInst*> userWorkList;
+        InstHashSet userWorkListSet(instToRemove->getModule());
+        InstWorkList userWorkList(instToRemove->getModule());
         auto addToWorkList = [&](IRInst* i)
         {
             if (userWorkListSet.add(i))
@@ -37,8 +37,8 @@ namespace Slang
 
     void IRDeduplicationContext::tryHoistInst(IRInst* inst)
     {
-        List<IRInst*> workList;
-        HashSet<IRInst*> workListSet;
+        InstWorkList workList(inst->getModule());
+        InstHashSet workListSet(inst->getModule());
         workList.add(inst);
         workListSet.add(inst);
         IRBuilder builder(inst->getModule());

@@ -9,7 +9,7 @@ namespace Slang
 void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
 {
     IRBuilder builder(module);
-    HashSet<IRInst*> userSet;
+    InstHashSet userSet(module);
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())

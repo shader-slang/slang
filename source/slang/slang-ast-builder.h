@@ -143,7 +143,10 @@ public:
         ShortList<NodeOperand, 4> operands;
 
         bool operator==(NodeDesc const& that) const;
-        HashCode getHashCode() const;
+        HashCode getHashCode() const { return hashCode; }
+        void init();
+    private:
+        HashCode hashCode = 0;
     };
 
     template<typename NodeCreateFunc>
@@ -192,6 +195,7 @@ public:
         };
     };
 
+    MemoryArena& getArena() { return m_arena; }
 
         /// Create AST types 
     template <typename T>
@@ -217,6 +221,7 @@ public:
         NodeDesc desc;
         desc.type = T::kType;
         addOrAppendToNodeList(desc.operands, args...);
+        desc.init();
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>(args...);
@@ -230,6 +235,7 @@ public:
 
         NodeDesc desc;
         desc.type = T::kType;
+        desc.init();
         return (T*)_getOrCreateImpl(desc, [this]() { return create<T>(); });
     }
 
@@ -240,6 +246,7 @@ public:
         NodeDesc desc;
         desc.type = T::kType;
         addOrAppendToNodeList(desc.operands, args...);
+        desc.init();
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>();
@@ -253,6 +260,7 @@ public:
         NodeDesc desc;
         desc.type = T::kType;
         desc.operands.addRange(operands);
+        desc.init();
         return (T*)_getOrCreateImpl(desc, [&]()
             {
                 return create<T>();
@@ -305,6 +313,7 @@ public:
         {
             desc.operands.add(outer);
         }
+        desc.init();
         auto result = (GenericSubstitution*)_getOrCreateImpl(desc, [this]() {return create<GenericSubstitution>(); });
         if (result->args.getCount() != args.getCount())
         {
@@ -326,6 +335,7 @@ public:
         {
             desc.operands.add(outer);
         }
+        desc.init();
         auto result = (ThisTypeSubstitution*)_getOrCreateImpl(desc, [this]() {return create<ThisTypeSubstitution>(); });
         result->interfaceDecl = interfaceDecl;
         result->witness = subtypeWitness;
@@ -390,7 +400,8 @@ public:
         Type* valueType,
         Witness* primalIsDifferentialWitness);
 
-    DeclRef<InterfaceDecl> getDifferentiableInterface();
+    DeclRef<InterfaceDecl> getDifferentiableInterfaceDecl();
+    Type* getDifferentiableInterfaceType();
     Decl* getDifferentiableAssociatedTypeRequirement();
 
     bool isDifferentiableInterfaceAvailable();
@@ -418,6 +429,34 @@ public:
     Type* getFuncType(List<Type*> parameters, Type* result);
 
     TypeType* getTypeType(Type* type);
+
+        /// Produce a witness that `T : T` for any type `T`
+    TypeEqualityWitness* getTypeEqualityWitness(
+        Type* type);
+
+    SubtypeWitness* getDeclaredSubtypeWitness(
+        Type*                   subType,
+        Type*                   superType,
+        DeclRef<Decl> const&    declRef);
+
+        /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
+    SubtypeWitness* getTransitiveSubtypeWitness(
+        SubtypeWitness*    aIsSubtypeOfBWitness,
+        SubtypeWitness*    bIsSubtypeOfCWitness);
+
+        /// Produce a witness that `T <: L` or `T <: R` given `T <: L&R`
+    SubtypeWitness* getExtractFromConjunctionSubtypeWitness(
+        Type*           subType,
+        Type*           superType,
+        SubtypeWitness* subIsSubtypeOfConjunction,
+        int             indexOfSuperTypeInConjunction);
+
+        /// Produce a witnes that `S <: L&R` given witnesses that `S <: L` and `S <: R`
+    SubtypeWitness* getConjunctionSubtypeWitness(
+        Type*           sub,
+        Type*           lAndR,
+        SubtypeWitness* subIsLWitness,
+        SubtypeWitness* subIsRWitness);
 
         /// Helpers to get type info from the SharedASTBuilder
     const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findClassInfo(slice); }
