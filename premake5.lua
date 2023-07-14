@@ -387,12 +387,6 @@ workspace "slang"
         -- For the DXC headers
         buildoptions { "-fms-extensions" }
 
-    -- If aftermath is enabled add a define
-    
-    if enableAftermath then
-        defines { "SLANG_AFTERMATH" }
-    end
-
     -- Disable some warnings
     filter { "toolset:clang or gcc*" }
         buildoptions {
@@ -845,8 +839,13 @@ if enableAftermath then
     local aftermathIncludePath = path.join(aftermathPath, "include") 
     local aftermathLibPath = path.join(aftermathPath, "lib") 
     
+    -- Add the aftermath includes 
+    
     includedirs { aftermathIncludePath }
     
+    -- Add the libs directory.
+    -- Additionally we need to copy dlls that are needed for aftermath usage such that they 
+    -- are available from the executable.
     
     filter { "platforms:x86" }
         local libPath = path.join(aftermathLibPath, "x86")

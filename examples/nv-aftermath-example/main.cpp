@@ -182,18 +182,19 @@ static SlangResult _addCompileProducts(ISlangFileSystemExt* fileSystem, const ch
         {
             String inFileName = Path::getFileNameWithoutExt(fileSystemEntry.path);
         
-            // If it's an obfuscated source map, we can just use the filename we have
-            if (ext == toSlice("map") && inFileName.endsWith(toSlice("-obfuscated")))
-            {
-                outFileName = inFileName;
-            }
-            else 
+            // If it's an obfuscated source map, it's name is already unique (it includes the hash)
+            const bool isUniqueName = (ext == toSlice("map") && inFileName.endsWith(toSlice("-obfuscated")));
+
+            StringBuilder buf;
+            // If it's not a uniquename make it unique via the prefix
+            if (!isUniqueName)
             {
                 // Uniquify with the prefix
-                StringBuilder buf;
-                buf << prefix << "-" << inFileName << "." << ext;
-                outFileName = buf;   
+                buf << prefix << "-";
             }
+
+            buf << inFileName << "." << ext;
+            outFileName = buf;
         }
         
         // If we have an output filename
@@ -237,7 +238,10 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
         // Turn on obfuscation
         // Turn on source map as the line directive, this will lead to an "emit source map"
         // and no #line directives in generated source.
-        const char* args[] = { "-obfuscate", "-line-directive-mode", "source-map" };
+        //
+        // It isn't necessary to use the "source-map" line directive mode with obfuscation
+        // If it's not enabled, the #line directives will specify
+        const char* args[] = { "-obfuscate" }; // , "-line-directive-mode", "source-map" };
         request->processCommandLineArguments(args, SLANG_COUNT_OF(args));
     }
 
@@ -367,7 +371,15 @@ Slang::Result AftermathCrashExample::initialize()
         nullptr,
         this);
 
-    initializeBase("aftermath-crash-example", 1024, 768);
+    // Set to a specific render API if needed
+    // 
+    // * gfx::DeviceType::Default
+    // * gfx::DeviceType::Vulkan
+    // * gfx::DeviceType::DirectX12
+
+    const gfx::DeviceType deviceType = gfx::DeviceType::Default;
+    
+    initializeBase("aftermath-crash-example", 1024, 768, deviceType);
 
     auto device = getDevice();
 

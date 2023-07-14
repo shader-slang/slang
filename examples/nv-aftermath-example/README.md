@@ -1,8 +1,9 @@
-Aftermath Crash Example
-=======================
+Nsight Aftermath Crash Example
+==============================
 
 * Demonstrates use of aftermath API
 * Uses source map obfuscation
+* Demonstrates use of file system compile products
 
 The example requires aftermath SDK to be in the directory "external/nv-aftermath".
 
@@ -11,3 +12,7 @@ The example demo is not enabled by default. Enabling can be achieved by passing 
 ```
 premake vs2019 --deps=true --enable-aftermath=true
 ```
+
+* [nsight aftermath](https://developer.nvidia.com/nsight-aftermath)
+* [obfuscation](https://github.com/shader-slang/slang/blob/master/docs/user-guide/a1-03-obfuscation.md)
+* [source map](https://github.com/source-map/source-map-spec)
