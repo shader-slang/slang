@@ -1540,8 +1540,7 @@ namespace Slang
     {
     public:
         
-        TargetRequest(Linkage* linkage, CodeGenTarget format);
-
+        
         void addTargetFlags(SlangTargetFlags flags)
         {
             targetFlags |= flags;
@@ -1607,6 +1606,12 @@ namespace Slang
         Dictionary<Type*, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
 
         TypeLayout* getTypeLayout(Type* type);
+
+            /// Copy into this target request all (appropriate) state from the rhs
+        void copy(const TargetRequest& rhs);
+        
+            /// Ctor
+        TargetRequest(Linkage* linkage, CodeGenTarget format);
 
     private:
         Linkage*                linkage = nullptr;

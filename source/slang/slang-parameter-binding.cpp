@@ -285,7 +285,7 @@ struct ParameterBindingInfo
 {
     size_t              space = 0;
     size_t              index = 0;
-    LayoutSize          count;
+    LayoutSize          count = 0;
 };
 
 struct ParameterBindingAndKindInfo : ParameterBindingInfo
@@ -311,19 +311,7 @@ struct ParameterInfo : RefObject
     // Layout info for the variable that represents this parameter
     RefPtr<VarLayout> varLayout;
 
-    ParameterBindingInfo    bindingInfo[kLayoutResourceKindCount];
-
-    // The translation unit this parameter is specific to, if any
-//    TranslationUnitRequest* translationUnit = nullptr;
-
-    ParameterInfo()
-    {
-        // Make sure we aren't claiming any resources yet
-        for( int ii = 0; ii < kLayoutResourceKindCount; ++ii )
-        {
-            bindingInfo[ii].count = 0;
-        }
-    }
+    ParameterBindingInfo bindingInfo[kLayoutResourceKindCount];
 };
 
 struct EntryPointParameterBindingContext
@@ -341,10 +329,12 @@ struct SharedParameterBindingContext
         LayoutRulesFamilyImpl*  defaultLayoutRules,
         ProgramLayout*          programLayout,
         TargetRequest*          targetReq,
+        ProgramLayout*          existingProgramLayout,
         DiagnosticSink*         sink)
         : defaultLayoutRules(defaultLayoutRules)
         , programLayout(programLayout)
         , targetRequest(targetReq)
+        , existingProgramLayout(existingProgramLayout)
         , m_sink(sink)
     {
     }
@@ -368,6 +358,11 @@ struct SharedParameterBindingContext
 
     // The program layout we are trying to construct
     RefPtr<ProgramLayout> programLayout;
+
+    // Sometimes we need to drive layout from a preexisting layout
+    // for example when using vk-shift-* to infer layout 
+    // from HLSL style layout
+    RefPtr<ProgramLayout> existingProgramLayout;
 
     // What ranges of resources bindings are already claimed at the global scope?
     // We store one of these for each declared binding space/set.
@@ -1067,6 +1062,11 @@ static void addExplicitParameterBindings_GLSL(
     auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
     if (hlslRegSemantic == nullptr)
     {
+        if (ProgramLayout* existingProgramLayout = context->shared->existingProgramLayout)
+        {
+
+        }
+
         // We don't have a HLSL binding, so no inferance can occur, issue a warning
         // 
         // TODO(JS): I suppose there is some ambiguity here, because if we did a semantic lookup, and it didn't have a vulkanKind
@@ -3456,7 +3456,7 @@ static void _completeBindings(
     componentType->acceptVisitor(&flushVisitor, nullptr);
 }
 
-    /// "Complete" binding of parametesr in the given `program`.
+    /// "Complete" binding of parameters in the given `program`.
     ///
     /// Completing binding involves both assigning registers/bindings
     /// to an parameters that didn't get explicit locations, and then
@@ -3561,9 +3561,12 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     return false;
 }
 
-RefPtr<ProgramLayout> generateParameterBindings(
+
+
+static RefPtr<ProgramLayout> _generateParameterBindingsImpl(
     TargetProgram*  targetProgram,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    ProgramLayout*  existingProgramLayout)
 {
     auto program = targetProgram->getProgram();
     auto targetReq = targetProgram->getTargetReq();
@@ -3590,6 +3593,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
         layoutContext.getRulesFamily(),
         programLayout,
         targetReq,
+        existingProgramLayout,
         sink);
 
     // Create a sub-context to collect parameters that get
@@ -3732,7 +3736,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     RefPtr<VarLayout> globalScopeVarLayout;
 
     // If we have a space/binding assigned for use for globals in Vulkan, 
-    // we can't use *that* as the default space, so we allocate if
+    // we can't use *that* as the default space, so we allocate it.
     if (auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions())
     {
         const auto& globalBinding = vulkanOptions->getGlobalsBinding();
@@ -3889,6 +3893,32 @@ RefPtr<ProgramLayout> generateParameterBindings(
     }
 
     return programLayout;
+}
+
+RefPtr<ProgramLayout> generateParameterBindings(
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
+{
+    RefPtr<ProgramLayout> existingProgramLayout;
+
+    auto targetReq = targetProgram->getTargetReq();
+    if (auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions())
+    {
+        // We are going to layout first using HLSL style target. 
+        // Create a temporary hlslTargetReq
+        RefPtr<TargetRequest> hlslTargetReq(new TargetRequest(targetReq->getLinkage(), CodeGenTarget::HLSL));
+
+        // Copy other state from current targetReq
+        hlslTargetReq->copy(*targetReq);
+        
+        // Create a target program
+        RefPtr<TargetProgram> hlslTargetProgram(new TargetProgram(targetProgram->getProgram(), hlslTargetReq));
+
+        // Do the layout
+        existingProgramLayout = _generateParameterBindingsImpl(hlslTargetProgram, sink, nullptr);
+    }
+ 
+    return _generateParameterBindingsImpl(targetProgram, sink, existingProgramLayout);
 }
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)

@@ -1442,6 +1442,30 @@ TargetRequest::TargetRequest(Linkage* linkage, CodeGenTarget format)
     , format(format)
 {}
 
+void TargetRequest::copy(const TargetRequest& rhs)
+{
+    SLANG_ASSERT(this != &rhs);
+
+    targetFlags = rhs.targetFlags;
+    targetProfile = rhs.targetProfile;
+    floatingPointMode = rhs.floatingPointMode;
+    rawCapabilities = rhs.rawCapabilities;
+    cookedCapabilities = rhs.cookedCapabilities;
+    lineDirectiveMode = rhs.lineDirectiveMode;
+    dumpIntermediates = rhs.dumpIntermediates;
+    enableLivenessTracking = rhs.enableLivenessTracking;
+
+    if (isKhronosTarget(this))
+    {
+        forceGLSLScalarBufferLayout = rhs.forceGLSLScalarBufferLayout;
+        hlslToVulkanLayoutOptions = rhs.hlslToVulkanLayoutOptions;
+    }
+    else
+    {
+        forceGLSLScalarBufferLayout = false;
+        hlslToVulkanLayoutOptions.setNull();
+    }
+}
 
 Session* TargetRequest::getSession()
 {
