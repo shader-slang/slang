@@ -11,12 +11,12 @@ bool isCUDATarget(TargetRequest* targetReq);
 struct SimplifyForEmitContext : public InstPassBase
 {
     SimplifyForEmitContext(IRModule* inModule, TargetRequest* inTargetReq)
-        : InstPassBase(inModule), targetReq(inTargetReq)
+        : InstPassBase(inModule), targetReq(inTargetReq), followUpWorkList(inModule), followUpWorkListSet(inModule)
     {}
 
     TargetRequest* targetReq;
-    List<IRInst*> followUpWorkList;
-    HashSet<IRInst*> followUpWorkListSet;
+    InstWorkList followUpWorkList;
+    InstHashSet followUpWorkListSet;
 
     void addToFollowUpWorkList(IRInst* inst)
     {

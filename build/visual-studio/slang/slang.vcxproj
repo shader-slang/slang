@@ -330,6 +330,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check.h" />
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-container-pool.h" />
     <ClInclude Include="..\..\..\source\slang\slang-content-assist-info.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h" />
@@ -529,6 +530,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-check-conversion.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-decl.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-expr.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-check-inheritance.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-modifier.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-overload.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-shader.cpp" />
@@ -536,6 +538,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-check-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-compiler.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-container-pool.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-doc-ast.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-doc-markdown-writer.cpp" />

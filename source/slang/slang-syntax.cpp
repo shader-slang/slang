@@ -366,10 +366,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             if (auto conjunctionTypeWitness = as<ConjunctionSubtypeWitness>(extractFromConjunctionTypeWitness->conjunctionWitness))
             {
-                if (extractFromConjunctionTypeWitness->indexInConjunction == 0)
-                    return tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(conjunctionTypeWitness->leftWitness), requirementKey);
-                else
-                    return tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(conjunctionTypeWitness->rightWitness), requirementKey);
+                auto componentWitness = as<SubtypeWitness>(
+                    conjunctionTypeWitness->getComponentWitness(
+                        extractFromConjunctionTypeWitness->indexInConjunction));
+
+                return tryLookUpRequirementWitness(astBuilder, componentWitness, requirementKey);
             }
         }
         // TODO: should handle the transitive case here too

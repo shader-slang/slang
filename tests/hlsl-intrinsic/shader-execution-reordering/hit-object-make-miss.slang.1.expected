@@ -32,7 +32,7 @@ void main()
     hitObjectRecordMissNV(hitObj_0, _S2, ray_0.Origin_0, ray_0.TMin_0, ray_0.Direction_0, ray_0.TMax_0);
     bool _S3 = (hitObjectIsMissNV((hitObj_0)));
     uint _S4 = uint(int(_S3));
-    ((outputBuffer_0)._data[(uint(idx_0))]) = _S4;
+    ((outputBuffer_0)._data[(_S2)]) = _S4;
     return;
 }
 

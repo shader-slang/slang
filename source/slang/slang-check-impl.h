@@ -264,6 +264,274 @@ namespace Slang
         Initializer,
     };
 
+    struct FacetImpl;
+
+        /// Information about one "facet" of a type or declaration
+        ///
+        /// In the simplest terms, a facet represents a grouping of
+        /// member declarations that were all originally declared
+        /// as part of the same `{}`-enclosed body.
+        ///
+        /// A given *entity* (a type, type declaration, or `extension`
+        /// declaration) may have multiple facets, depending on what it
+        /// declares, what it inherits from, or what `extension`s apply to it.
+        ///
+        /// Broadly, an entity will have:
+        ///
+        /// * A *self facet*, if it has a body, that contains the members
+        ///   the entity directly declares.
+        ///
+        /// * An *inherited facet* for each base type that it (transitively)
+        ///   inherits from. Inherited facets are either *direct*, if the
+        ///   original entity stated the inheritance relationship, or
+        ///   *indirect* if they arise from the transitive closure of the
+        ///   inheritance relationship. Each inherited facet contains the
+        ///   members of the entity that was inherited from.
+        ///
+        /// * An *extension facet* for each `extension` declaration that
+        ///   is known to apply to the entity in the context where semantic
+        ///   checking is being performed. Each extension facet contains the
+        ///   members of the `extension` that applied.
+        ///
+    struct Facet
+    {
+    public:
+            /// Kinds of facets that can occur
+        enum class Kind
+        {
+            Type,
+            Extension,
+        };
+
+            /// How many indirections away from the self facet?
+        typedef unsigned int DirectnessVal;
+        enum class Directness : DirectnessVal
+        {
+            Self = 0,
+            Direct = 1,
+        };
+
+            /// The *origin* of a facet is the type and/or declaration
+            /// that the facet's members belong to.
+            ///
+        struct Origin
+        {
+            /// A `DeclRef` to the declaration this facet corresponds to, if any.
+            ///
+            /// This might be a type declaration, an `extension` declaration,
+            /// or nothing.
+            ///
+            DeclRef<Decl> declRef;
+
+            /// The type that this facet corresponds to, if any
+            Type* type = nullptr;
+
+            Origin()
+            {}
+
+            explicit Origin(DeclRef<Decl> declRef, Type* type = nullptr)
+                : declRef(declRef)
+                , type(type)
+            {}
+        };
+
+        Facet()
+        {}
+
+        typedef FacetImpl Impl;
+
+        Facet(Impl* impl)
+            : _impl(impl)
+        {}
+
+        Impl* getImpl() const { return _impl; }
+        Impl* operator->() const { return _impl; }
+
+    private:
+        Impl* _impl = nullptr;
+    };
+
+
+        /// Do the origins of `left` and `right` match,
+        /// such that they are both facets for the same
+        /// base type or `extension`?
+        ///
+    bool originsMatch(Facet left, Facet right);
+
+    inline bool operator!(Facet facet) { return !facet.getImpl(); }
+
+    bool operator==(Facet::Origin left, Facet::Origin right);
+
+    inline bool operator!=(Facet::Origin left, Facet::Origin right)
+    {
+        return !(left == right);
+    }
+
+        /// Heap-allocated implementation of a single facet.
+    struct FacetImpl
+    {
+            /// The kind of this facet
+        Facet::Kind kind = Facet::Kind::Type;
+
+            /// How many indirections away from the self facet?
+        Facet::Directness directness = Facet::Directness::Self;
+
+            /// The origin of this facet.
+            ///
+            /// This is the type or declaration that the facet
+            /// corresponds to.
+            ///
+        Facet::Origin origin;
+
+        Type* getType() const { return origin.type; }
+        DeclRef<Decl> getDeclRef() const { return origin.declRef; }
+
+            /// A witness that the type this facet belongs to
+            /// is a subtype of `origin.type` (if both of those
+            /// types exist).
+            ///
+        SubtypeWitness* subtypeWitness = nullptr;
+
+            /// The next facet in the linearized inheritance list of the entity.
+        Facet next;
+
+        FacetImpl()
+        {}
+
+        FacetImpl(
+            Facet::Kind         kind,
+            Facet::Directness   directness,
+            DeclRef<Decl>       declRef,
+            Type*               type,
+            SubtypeWitness*     subtypeWitness)
+            : kind(kind)
+            , directness(directness)
+            , origin(declRef, type)
+            , subtypeWitness(subtypeWitness)
+        {}
+    };
+
+    struct FacetListBuilder;
+
+        /// A singly linked list of facets.
+    struct FacetList
+    {
+    public:
+        FacetList()
+        {}
+
+        explicit FacetList(Facet head)
+            : _head(head)
+        {}
+
+        Facet getHead() const { return _head; }
+        Facet& getHead() { return _head; }
+
+        Facet advanceHead()
+        {
+            SLANG_ASSERT(_head.getImpl());
+            auto facet = _head;
+            _head = facet->next;
+            return facet;
+        }
+
+        Facet popHead()
+        {
+            auto facet = advanceHead();
+            facet->next = nullptr;
+            return facet;
+        }
+
+        FacetList getTail() const
+        {
+            SLANG_ASSERT(_head.getImpl());
+            return FacetList(_head->next);
+        }
+
+        bool containsMatchFor(Facet facet) const;
+
+        bool isEmpty() const { return _head.getImpl() == nullptr; }
+
+        struct Iterator
+        {
+        public:
+            Iterator()
+            {}
+
+            Iterator(Facet::Impl* cursor)
+                : _cursor(cursor)
+            {}
+
+            bool operator!=(Iterator const& that) const
+            {
+                return this->_cursor != that._cursor;
+            }
+
+            void operator++()
+            {
+                SLANG_ASSERT(_cursor);
+                _cursor = _cursor->next.getImpl();
+            }
+
+            Facet operator*() const
+            {
+                return _cursor;
+            }
+
+        private:
+            Facet::Impl* _cursor = nullptr;
+        };
+
+        Iterator begin() const { return Iterator(_head.getImpl()); }
+        Iterator end() const { return Iterator(); }
+
+        struct Appender
+        {
+        public:
+            Appender(FacetList& list)
+            {
+                _link = &list._head;
+            }
+
+            void add(Facet facet)
+            {
+                *_link = facet;
+                _link = &facet->next;
+            }
+
+        protected:
+            Appender()
+            {}
+
+            Facet* _link = nullptr;
+        };
+
+        typedef FacetListBuilder Builder;
+
+    protected:
+
+        Facet _head;
+    };
+
+    struct FacetListBuilder : FacetList, FacetList::Appender
+    {
+    public:
+        FacetListBuilder()
+        {
+            _link = &_head;
+        }
+    };
+
+        /// Information about the inheritance of an entity (type or declaration)
+        ///
+        /// Currently this is only used to store a linearized list of the
+        /// `Facet`s that the type/declaration transitively inherits.
+        ///
+    struct InheritanceInfo
+    {
+        FacetList facets;
+    };
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -338,7 +606,13 @@ namespace Slang
         bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
         FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(FunctionDeclBase* func, int recurseLimit);
         FunctionDifferentiableLevel getFuncDifferentiableLevel(FunctionDeclBase* func);
-        
+
+            /// Get the processed inheritance information for `type`, including all its facets
+        InheritanceInfo getInheritanceInfo(Type* type);
+
+            /// Get the processed inheritance information for `extension`, including all its facets
+        InheritanceInfo getInheritanceInfo(DeclRef<ExtensionDecl> const& extension);
+
     private:
             /// Mapping from type declarations to the known extensiosn that apply to them
         Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -359,6 +633,96 @@ namespace Slang
             /// Add associated decls declared in `moduleDecl` to `m_mapDeclToAssociatedDecls`
         void _addDeclAssociationsFromModule(ModuleDecl* moduleDecl);
 
+        ASTBuilder* _getASTBuilder() { return m_linkage->getASTBuilder(); }
+
+        InheritanceInfo _getInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType);
+        InheritanceInfo _calcInheritanceInfo(Type* type);
+        InheritanceInfo _calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType);
+
+        struct DirectBaseInfo
+        {
+            FacetList facets;
+
+            Facet::Impl facetImpl;
+
+            DirectBaseInfo* next = nullptr;
+        };
+
+        struct DirectBaseListBuilder;
+
+        struct DirectBaseList
+        {
+        public:
+            struct Iterator
+            {
+            public:
+                Iterator()
+                {}
+
+                Iterator(DirectBaseInfo* cursor)
+                    : _cursor(cursor)
+                {}
+
+                bool operator!=(Iterator that) const
+                {
+                    return _cursor != that._cursor;
+                }
+
+                void operator++()
+                {
+                    SLANG_ASSERT(_cursor);
+                    _cursor = _cursor->next;
+                }
+
+                DirectBaseInfo* operator*()
+                {
+                    return _cursor;
+                }
+
+            private:
+                DirectBaseInfo* _cursor = nullptr;
+            };
+
+            Iterator begin() const { return Iterator(_head); }
+            Iterator end() const { return Iterator(); }
+
+            bool isEmpty() const
+            {
+                return _head == nullptr;
+            }
+
+            bool doesAnyTailContainMatchFor(Facet facet) const;
+
+            void removeEmptyLists();
+
+            typedef DirectBaseListBuilder Builder;
+
+        public:
+            DirectBaseInfo* _head = nullptr;
+        };
+
+        struct DirectBaseListBuilder : DirectBaseList
+        {
+        public:
+            DirectBaseListBuilder()
+            {
+                _link = &_head;
+            }
+
+            void add(DirectBaseInfo* base)
+            {
+                *_link = base;
+                _link = &base->next;
+            }
+
+        private:
+            DirectBaseInfo** _link = nullptr;
+        };
+
+        void _mergeFacetLists(DirectBaseList bases, FacetList baseFacets, FacetList::Builder& ioMergedFacets);
+
+        Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
+        Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     };
 
         /// Local/scoped state of the semantic-checking system
@@ -1399,48 +1763,6 @@ namespace Slang
             VectorExpressionType* vectorType,
             BasicExpressionType*  scalarType);
 
-        struct TypeWitnessBreadcrumb
-        {
-            TypeWitnessBreadcrumb*  prev;
-
-            Type*            sub = nullptr;
-            Type*            sup = nullptr;
-            DeclRef<Decl>           declRef;
-
-            enum Flavor 
-            {
-                // Describes a sub-type super-type relationship through a 
-                // reference to an inhertiance declaration.
-                DeclFlavor,
-
-                // Describes a sub-type super-type relationship through 
-                // conjunction. This doesn't necessarily have a corresponding declaration
-                // since AndTypes cannot actually be used as types.
-                // i.e. if (A & B) subtype C because A subtype C, then we use AndTypeLeft to represent
-                // that relationship.
-                AndTypeLeftFlavor,
-                AndTypeRightFlavor
-            };
-
-            Flavor flavor = DeclFlavor;
-        };
-
-            // Create a subtype witness based on the declared relationship
-            // found in a single breadcrumb
-        DeclaredSubtypeWitness* createSimpleSubtypeWitness(
-            TypeWitnessBreadcrumb*  breadcrumb);
-
-            /// Create a witness that `subType` is a sub-type of `superTypeDeclRef`.
-            ///
-            /// The `inBreadcrumbs` parameter represents a linked list of steps
-            /// in the process that validated the sub-type relationship, which
-            /// will be used to inform the construction of the witness.
-            ///
-        Val* createTypeWitness(
-            Type*            subType,
-            DeclRef<AggTypeDecl>  superTypeDeclRef,
-            TypeWitnessBreadcrumb*  inBreadcrumbs);
-    
             /// Is the given interface one that a tagged-union type can conform to?
             ///
             /// If a tagged union type `__TaggedUnion(A,B)` is going to be
@@ -1462,35 +1784,16 @@ namespace Slang
             DeclRef<InterfaceDecl>  interfaceDeclRef,
             DeclRef<Decl>           requirementDeclRef);
 
-            /// Check whether `subType` is declared a sub-type of `superTypeDeclRef`
+            /// Check whether `subType` is a subtype of `superType`
             ///
-            /// If this function returns `true` (because the subtype relationship holds),
-            /// then `outWitness` will be set to a value that serves as a witness
-            /// to the subtype relationship.
+            /// If `subType` is a subtype of `superType`, returns
+            /// a witness value for the subtype relationship.
             ///
-            /// This function may be used to validate a transitive subtype relationship
-            /// where, e.g., `A : C` becase `A : B` and `B : C`. In such a case, a recursive
-            /// call to `_isDeclaredSubtype` may occur where `originalSubType` is `A`,
-            /// `subType` is `C`, and `superTypeDeclRef` is `C`. The `inBreadcrumbs` in that
-            /// case would include information for the `A : B` relationship, which can be
-            /// used to construct a witness for `A : C` from the `A : B` and `B : C` witnesses.
+            /// If `subType` is *not* a subtype of `superType`, returns null.
             ///
-        bool _isDeclaredSubtype(
-            Type*            originalSubType,
-            Type*            subType,
-            DeclRef<AggTypeDecl>    superTypeDeclRef,
-            Val**            outWitness,
-            TypeWitnessBreadcrumb*  inBreadcrumbs);
-
-            /// Check whether `subType` is a sub-type of `superTypeDeclRef`.
-        bool isDeclaredSubtype(
-            Type*            subType,
-            DeclRef<AggTypeDecl>    superTypeDeclRef);
-
-        /// Check whether `subType` is a sub-type of `supType`.
-        bool isDeclaredSubtype(
-            Type* subType,
-            Type* supType);
+        SubtypeWitness* isSubtype(
+            Type*                   subType,
+            Type*                   superType);
 
         bool isInterfaceType(Type* type);
 
@@ -1500,9 +1803,12 @@ namespace Slang
             /// and return a witness to the sub-type relationship if it holds
             /// (return null otherwise).
             ///
-        Val* tryGetSubtypeWitness(
-            Type*            subType,
-            DeclRef<AggTypeDecl>    superTypeDeclRef);
+        SubtypeWitness* tryGetSubtypeWitness(
+            Type* subType,
+            Type* superType)
+        {
+            return isSubtype(subType, superType);
+        }
 
             /// Check whether `type` conforms to `interfaceDeclRef`,
             /// and return a witness to the conformance if it holds
@@ -1510,9 +1816,9 @@ namespace Slang
             ///
             /// This function is equivalent to `tryGetSubtypeWitness()`.
             ///
-        Val* tryGetInterfaceConformanceWitness(
-            Type*            type,
-            DeclRef<InterfaceDecl>  interfaceDeclRef);
+        SubtypeWitness* tryGetInterfaceConformanceWitness(
+            Type* type,
+            Type* interfaceType);
 
         Expr* createCastToSuperTypeExpr(
             Type*    toType,
@@ -1528,9 +1834,9 @@ namespace Slang
             Type* toType,
             Type* fromType);
 
-        Type* TryJoinTypeWithInterface(
-            Type*            type,
-            DeclRef<InterfaceDecl>      interfaceDeclRef);
+        Type* _tryJoinTypeWithInterface(
+            Type*                   type,
+            Type*                   interfaceType);
 
         // Try to compute the "join" between two types
         Type* TryJoinTypes(
@@ -1649,14 +1955,8 @@ namespace Slang
 
         // Create a witness that attests to the fact that `type`
         // is equal to itself.
-        Val* createTypeEqualityWitness(
+        TypeEqualityWitness* createTypeEqualityWitness(
             Type*  type);
-
-        // If `sub` is a subtype of `sup`, then return a value that
-        // can serve as a "witness" for that fact.
-        Val* tryGetSubtypeWitness(
-            Type*    sub,
-            Type*    sup);
 
         // In the case where we are explicitly applying a generic
         // to arguments (e.g., `G<A,B>`) check that the constraints
@@ -1923,6 +2223,18 @@ namespace Slang
         void suggestCompletionItems(
             CompletionSuggestions::ScopeKind scopeKind, LookupResult const& lookupResult);
     };
+
+
+    inline void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)
+    {
+        visitor->ensureDecl(decl, state);
+    }
+
+    DeclRef<ExtensionDecl> ApplyExtensionToType(
+        SemanticsVisitor*   semantics,
+        ExtensionDecl*      extDecl,
+        Type*               type);
+
 
     struct SemanticsExprVisitor
         : public SemanticsVisitor

@@ -935,7 +935,7 @@ namespace Slang
                     return type;
                 }
             }
-            if (const auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterface())))
+            if (const auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterfaceType())))
             {
                 auto diffTypeLookupResult = lookUpMember(
                     getASTBuilder(),
@@ -1044,7 +1044,7 @@ namespace Slang
         if (auto declRefType = as<DeclRefType>(type))
         {
             if (auto subtypeWitness = as<SubtypeWitness>(
-                tryGetInterfaceConformanceWitness(type, getASTBuilder()->getDifferentiableInterface())))
+                tryGetInterfaceConformanceWitness(type, getASTBuilder()->getDifferentiableInterfaceType())))
             {
                 addDifferentiableTypeToDiffTypeRegistry((DeclRefType*)type, subtypeWitness);
             }
@@ -2359,9 +2359,9 @@ namespace Slang
         }
 
         // Get a reference to the builtin 'IDifferentiable' interface
-        auto differentiableInterface = m_astBuilder->getDifferentiableInterface();
-        
-        SubtypeWitness* conformanceWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(primalType, differentiableInterface));
+        auto differentiableInterface = getASTBuilder()->getDifferentiableInterfaceType();
+
+        auto conformanceWitness = as<Witness>(isSubtype(primalType, differentiableInterface));
         // Check if the provided type inherits from IDifferentiable.
         // If not, return the original type.
         if (conformanceWitness)
@@ -2712,7 +2712,7 @@ namespace Slang
         {
             innerExpr = parenExpr->base;
         }
-        if (!as<InvokeExpr>(innerExpr))
+        if (!as<InvokeExpr>(innerExpr) && !as<IndexExpr>(innerExpr))
         {
             getSink()->diagnose(expr, Diagnostics::invalidUseOfNoDiff);
         }
@@ -2960,7 +2960,7 @@ namespace Slang
         expr->value = originalVal;
 
         // If value is a subtype of `type`, then this expr is always true.
-        if (isDeclaredSubtype(expr->value->type.type, expr->typeExpr.type))
+        if(isSubtype(expr->value->type.type, expr->typeExpr.type))
         {
             // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
             // so that the language server can still see the original syntax tree.

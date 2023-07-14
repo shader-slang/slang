@@ -23,6 +23,7 @@ struct RedundancyRemovalContext
         case kIROp_And:
         case kIROp_Or:
         case kIROp_Not:
+        case kIROp_Neg:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
         case kIROp_GetElement:
@@ -43,6 +44,7 @@ struct RedundancyRemovalContext
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MakeVectorFromScalar:
         case kIROp_swizzle:
+        case kIROp_swizzleSet:
         case kIROp_MatrixReshape:
         case kIROp_MakeString:
         case kIROp_MakeResultError:
@@ -59,6 +61,8 @@ struct RedundancyRemovalContext
         case kIROp_BitOr:
         case kIROp_BitXor:
         case kIROp_BitCast:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
         case kIROp_Reinterpret:
         case kIROp_Greater:
         case kIROp_Less:
@@ -250,7 +254,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     {
         bool hasNonStoreUse = false;
         // If the entire access chain doesn't non-store use, we can safely remove it.
-        HashSet<IRInst*> knownAccessChain;
+        InstHashSet knownAccessChain(func->getModule());
         for (auto accessChain = store->getPtr(); accessChain;)
         {
             knownAccessChain.add(accessChain);

@@ -173,12 +173,12 @@ String dumpIRToString(IRInst* root);
 // Returns whether a call insts can be treated as a pure functional inst, and thus can be
 // DCE'd and deduplicated.
 // (no writes to memory, no reads from unknown memory, no side effects).
-bool isPureFunctionalCall(IRCall* callInst);
+bool isPureFunctionalCall(IRCall* callInst, SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
 
 // Returns whether a call insts can be treated as a pure functional inst, and thus can be
 // DCE'd (but not necessarily deduplicated).
 // (no side effects).
-bool isSideEffectFreeFunctionalCall(IRCall* call);
+bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
 
 bool doesCalleeHaveSideEffect(IRInst* callee);
 
@@ -221,6 +221,9 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
 bool isZero(IRInst* inst);
 
 bool isOne(IRInst* inst);
+
+void initializeScratchData(IRInst* inst);
+void resetScratchDataBit(IRInst* inst, int bitIndex);
 }
 
 #endif

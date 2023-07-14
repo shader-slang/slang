@@ -1574,7 +1574,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             
             if (m_hasString)
             {
-                m_writer->emit("toTerminatedSlice(");
+                m_writer->emit("Slang::toTerminatedSlice(");
                 m_writer->emit(buf);
                 m_writer->emit(")");
             }
