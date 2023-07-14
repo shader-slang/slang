@@ -15,7 +15,7 @@ https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ
 static NamesDescriptionValue s_vulkanShiftKinds[] =
 {
     { ValueInt(ShiftKind::ConstantBuffer),  "b", "Constant buffer view" },
-    { ValueInt(ShiftKind::Sampler),         "s", "Samplers" },
+    { ValueInt(ShiftKind::Sampler),         "s", "Sampler" },
     { ValueInt(ShiftKind::ShaderResource),  "t", "Shader resource view" },
     { ValueInt(ShiftKind::UnorderedAccess), "u", "Unorderd access view" },
 };
