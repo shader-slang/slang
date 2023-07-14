@@ -2911,7 +2911,7 @@ UInt Linkage::addTarget(
 
     Index result = targets.getCount();
     targets.add(targetReq);
-    return (int) result;
+    return UInt(result);
 }
 
 void Linkage::loadParsedModule(
@@ -4679,19 +4679,36 @@ void EndToEndCompileRequest::setCommandLineCompilerMode()
     m_isCommandLineCompile = true;
 }
 
+void EndToEndCompileRequest::_completeTargetRequest(UInt targetIndex)
+{
+    auto linkage = getLinkage();
+
+    TargetRequest* targetRequest = linkage->targets[Index(targetIndex)];
+
+    // If we have vulkan layout options, and the target is khronos add the options
+    if (m_hlslToVulkanLayoutOptions && isKhronosTarget(targetRequest))
+    {
+        targetRequest->setHLSLToVulkanLayoutOptions(m_hlslToVulkanLayoutOptions);
+    }
+
+    // Set the current line directive
+    targetRequest->setLineDirectiveMode(m_lineDirectiveMode);
+}
+
 void EndToEndCompileRequest::setCodeGenTarget(SlangCompileTarget target)
 {
     auto linkage = getLinkage();
     linkage->targets.clear();
-    linkage->addTarget(CodeGenTarget(target));
-    linkage->targets[0]->setLineDirectiveMode(m_lineDirectiveMode);
+    const auto targetIndex = linkage->addTarget(CodeGenTarget(target));
+    SLANG_ASSERT(targetIndex == 0);
+    _completeTargetRequest(0);
 }
 
 int EndToEndCompileRequest::addCodeGenTarget(SlangCompileTarget target)
 {
-    int targetIndex = (int)getLinkage()->addTarget(CodeGenTarget(target));
-    getLinkage()->targets[targetIndex]->setLineDirectiveMode(m_lineDirectiveMode);
-    return targetIndex;
+    const auto targetIndex = getLinkage()->addTarget(CodeGenTarget(target));
+    _completeTargetRequest(targetIndex);
+    return int(targetIndex);
 }
 
 void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID profile)
