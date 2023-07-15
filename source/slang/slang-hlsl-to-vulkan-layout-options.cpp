@@ -8,14 +8,16 @@ namespace { // anonymous
 
 typedef HLSLToVulkanLayoutOptions::Kind ShiftKind;
 
-/* {b|s|t|u} */
+/* {b|s|t|u} 
 
+https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ
+*/
 static NamesDescriptionValue s_vulkanShiftKinds[] =
 {
-    { ValueInt(ShiftKind::Buffer),  "b", "Vulkan Buffer resource" },
-    { ValueInt(ShiftKind::Sampler), "s", "Vulkan Sampler resource" },
-    { ValueInt(ShiftKind::Texture), "t", "Vulkan Texture resource" },
-    { ValueInt(ShiftKind::Uniform), "u", "Vulkan Uniform resource" },
+    { ValueInt(ShiftKind::ConstantBuffer),  "b", "Constant buffer view" },
+    { ValueInt(ShiftKind::Sampler),         "s", "Sampler" },
+    { ValueInt(ShiftKind::ShaderResource),  "t", "Shader resource view" },
+    { ValueInt(ShiftKind::UnorderedAccess), "u", "Unorderd access view" },
 };
 
 } // anonymous
@@ -136,10 +138,10 @@ HLSLToVulkanLayoutOptions::Binding HLSLToVulkanLayoutOptions::inferBinding(Kind 
         case ParameterCategory::Uniform:
         case ParameterCategory::ConstantBuffer: 
         {
-            return Kind::Uniform;
+            return Kind::ConstantBuffer;
         }
-        case ParameterCategory::ShaderResource:     return Kind::Texture;
-        case ParameterCategory::UnorderedAccess:    return Kind::Buffer;
+        case ParameterCategory::ShaderResource:     return Kind::ShaderResource;
+        case ParameterCategory::UnorderedAccess:    return Kind::UnorderedAccess;
         case ParameterCategory::SamplerState:       return Kind::Sampler;
         
         default:
