@@ -236,12 +236,20 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
         SLANG_RETURN_ON_FAIL(slangSession->createCompileRequest(request.writeRef()));
 
         // Turn on obfuscation
-        // Turn on source map as the line directive, this will lead to an "emit source map"
+        // 
+        // Turns on source map as the line directive, this will lead to an "emit source map"
         // and no #line directives in generated source.
         //
-        // It isn't necessary to use the "source-map" line directive mode with obfuscation
-        // If it's not enabled, the #line directives will specify
-        const char* args[] = { "-obfuscate" }; // , "-line-directive-mode", "source-map" };
+        // It isn't necessary to use the "source-map" line directive mode, and just use
+        // #line directives, and have source locations to obfuscated source file directly embedded.
+        // 
+        // To do this replace the line below with
+        //
+        // ```
+        // const char* args[] = { "-obfuscate" };
+        // ```
+        const char* args[] = { "-obfuscate", "-line-directive-mode", "source-map" };
+     
         request->processCommandLineArguments(args, SLANG_COUNT_OF(args));
     }
 

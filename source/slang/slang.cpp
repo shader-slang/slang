@@ -5083,7 +5083,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
                 if (name.getLength())
                 {
                     auto sourceFile = sourceManager->findSourceFileByPathRecursively(name);
-                    sourceFile->setSourceMap(sourceMap);
+                    sourceFile->setSourceMap(sourceMap, SourceMapKind::Obfuscated);
                 }
             }
         }
