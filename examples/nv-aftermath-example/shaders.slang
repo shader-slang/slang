@@ -1,10 +1,4 @@
-// shaders.slang
-
-//
-// This file provides a simple vertex and fragment shader that can be compiled
-// using Slang. This code should also be valid as HLSL, and thus it does not
-// use any of the new language features supported by Slang.
-//
+// This shader is purposefully designed to be so slow it will cause a GPU timeout/crash.
 
 // Uniform data to be passed from application -> shader.
 cbuffer Uniforms
@@ -68,6 +62,7 @@ float4 fragmentMain(
 
     float factor = 0.0f;
 
+    // Waste lots of cycles
     for (int i = 0; i < failCount; ++i)
     {
         factor += 1.0e-20 * sin(float(i & 0xffff));

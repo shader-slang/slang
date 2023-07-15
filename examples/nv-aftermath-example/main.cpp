@@ -15,8 +15,7 @@
 using namespace gfx;
 using namespace Slang;
 
-// This example demonstrates is based on the "triangle" sample which 
-// is commented to demonstrate how to use the gfx library to render a triangle.
+// This example is based on the "triangle" sample.
 //
 // This examples purpose is to show how to use the aftermath SDK to capture
 // a crash dump.
@@ -105,7 +104,7 @@ struct CompileProduct
     ComPtr<ISlangBlob> blob;        ///< A blob holding the products contents
 };
 
-/* Currently the mechanism to access the contents of a compilation that might consist of many items is through 
+/* Currently the mechanism to access the contents of a compilation that might consist of many products is through 
 representing the contents as a "file system".
 
 The file system is just a somewhat convenient/simple in memory representation of the compilation products.
@@ -327,7 +326,7 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
         List<CompileProduct> compileProducts;
 
         // The current mechanism for getting access to compilation products other than result blob/diagnostics is to 
-        // return it as a compilation result "file system"
+        // return it as a compilation result "file system". 
 
         ComPtr<ISlangMutableFileSystem> vertexFileSystem;
         SLANG_RETURN_ON_FAIL(linkedProgram->getResultAsFileSystem(vertexEntryPointIndex, targetIndex, vertexFileSystem.writeRef()));
@@ -342,7 +341,7 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
         SLANG_RETURN_ON_FAIL(_addCompileProducts(vertexFileSystem, "vertex", compileProducts));
         SLANG_RETURN_ON_FAIL(_addCompileProducts(fragmentFileSystem, "fragment", compileProducts));
 
-        // Now dump them all out
+        // Now write all of the products out 
         for (const auto& product : compileProducts)
         {
             SLANG_RETURN_ON_FAIL(File::writeAllBytes(product.fileName, product.blob->getBufferPointer(), product.blob->getBufferSize()));
