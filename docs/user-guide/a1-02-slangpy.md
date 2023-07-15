@@ -216,6 +216,54 @@ X = tensor([[3., 4.],
 dX = tensor([[6., 8.],
         [0., 2.]])
 ```
+## Specializing shaders using slangpy
+
+`slangpy.loadModule` allows specialization parameters to be specified since it might be easier to write shaders with placeholder definitions that can be substituted at load-time.
+For instance, here's a sphere tracer that uses a _compile-time_ specialization parameter for its maximum number of steps (`N`):
+
+```csharp
+float sphereTrace<let N:int>(Ray ray, SDF sdf)
+{
+    var pt = ray.o;
+    for (int i = 0; i < N; i++)
+    {
+        pt += sdf.eval(pt) * ray.d;
+    }
+
+    return pt;
+}
+
+float render(Ray ray)
+{
+    // Use N=20 for sphere tracing.
+    float3 pt = sphereTrace<20>(ray, sdf);
+    return shade(pt, sdf.normal());
+}
+```
+
+However, instead of using a fixed `20` steps, the renderer can be configured to use an arbitrary compile-time constant.
+
+```csharp
+// Compile-time constant. Expect "MAX_STEPS" to be set by the loadModule call.
+static const uint kMaxSteps = MAX_STEPS;
+
+float render(Ray ray)
+{
+    float3 pt = sphereTrace<kMaxSteps>(ray, sdf);
+    return shade(pt, sdf.normal());
+}
+```
+
+Then multiple versions of this shader can be compiled from Python using the `defines` argument:
+```python
+import slangpy
+
+sdfRenderer20Steps = slangpy.loadModule('sdf.slang', defines={"MAX_STEPS": 20})
+sdfRenderer50Steps = slangpy.loadModule('sdf.slang', defines={"MAX_STEPS": 50})
+...
+```
+
+This is often helpful for code re-use, parameter sweeping, comparison/ablation studies, and more, from the convenience of Python.
 
 ## Back-propagating Derivatives through Complex Access Patterns
 

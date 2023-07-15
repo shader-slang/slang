@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE:-target glsl -profile ps_4_0 -entry main -fvk-t-shift 5 all -fvk-t-shift 7 2  -fvk-s-shift -3 0 -fvk-b-shift 1 2 -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE:-target glsl -profile ps_4_0 -entry main -fvk-t-shift 5 all -fvk-t-shift 7 2  -fvk-s-shift -3 0 -fvk-u-shift 1 2 -no-codegen
 
 struct Data
 {
