@@ -297,11 +297,6 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    DeclRefType* getOrCreateDeclRefType(DeclRefBase* declRef)
-    {
-        return getOrCreate<DeclRefType>(declRef);
-    }
-
     GenericSubstitution* getOrCreateGenericSubstitution(GenericDecl* decl, const List<Val*>& args, Substitutions* outer)
     {
         NodeDesc desc;

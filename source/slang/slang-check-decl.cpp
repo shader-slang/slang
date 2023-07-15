@@ -1410,7 +1410,7 @@ namespace Slang
             if (auto declRefType = as<DeclRefType>(sharedTypeExpr->base))
             {
                 auto subst = createDefaultSubstitutions(m_astBuilder, this, declRefType->declRef.getDecl());
-                auto newType = m_astBuilder->getOrCreateDeclRefType(m_astBuilder->getSpecializedDeclRef(declRefType->declRef.getDecl(), subst));
+                auto newType = DeclRefType::create(m_astBuilder, m_astBuilder->getSpecializedDeclRef(declRefType->declRef.getDecl(), subst));
                 sharedTypeExpr->base.type = newType;
                 if (auto typetype = as<TypeType>(typeExp.exp->type))
                     typetype->type = newType;
@@ -1470,7 +1470,7 @@ namespace Slang
                 substSet = declRefType->declRef.getSubst();
             }
         }
-        auto satisfyingType = m_astBuilder->getOrCreateDeclRefType(m_astBuilder->getSpecializedDeclRef(aggTypeDecl, substSet));
+        auto satisfyingType = DeclRefType::create(m_astBuilder, m_astBuilder->getSpecializedDeclRef(aggTypeDecl, substSet));
 
         // Helper function to add a `diffType` field into the synthesized type for the original
         // `member`.
@@ -6533,6 +6533,10 @@ namespace Slang
         //
         m_candidateExtensionListsBuilt = false;
         m_mapTypeDeclToCandidateExtensions.clear();
+
+        // Invalidate the cached inheritanceInfo.
+        m_mapTypeToInheritanceInfo.clear();
+        m_mapDeclRefToInheritanceInfo.clear();
     }
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)

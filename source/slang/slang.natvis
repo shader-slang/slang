@@ -10,30 +10,25 @@
     </Expand>
   </Type>
   <Type Name="Slang::DeclRef&lt;*&gt;">
-    <SmartPointer Usage="Minimal">declRefBase ? ($T1*)(declRefBase->decl) : ($T1*)0</SmartPointer>
     <DisplayString Condition="declRefBase == 0">DeclRef nullptr</DisplayString>
     <DisplayString Condition="declRefBase != 0">{*declRefBase}</DisplayString>
-    <!--
     <Expand>
-      <ExpandedItem>decl ? ($T1*)(decl) : ($T1*)0</ExpandedItem>
+      <ExpandedItem>declRefBase ? ($T1*)(declRefBase->decl) : ($T1*)0</ExpandedItem>
       <Synthetic Name="[Substitutions]">
         <Expand>
             <LinkedListItems>
-                <HeadPointer>substitutions.substitutions</HeadPointer>
+                <HeadPointer>declRefBase->substitutions</HeadPointer>
                 <NextPointer>outer</NextPointer>
                 <ValueNode>this</ValueNode>
             </LinkedListItems>
         </Expand>
       </Synthetic>
     </Expand>
-    -->
   </Type>
     <Type Name="Slang::DeclRefBase">
-      <SmartPointer Usage="Minimal">decl</SmartPointer>
       <DisplayString Condition="decl != 0 &amp;&amp; substitutions != 0">{*decl}{*substitutions}</DisplayString>
       <DisplayString Condition="decl != 0">{*decl}</DisplayString>
       <DisplayString Condition="decl == 0">DeclRefBase nullptr</DisplayString>
-      <!--
       <Expand>
           <ExpandedItem>decl</ExpandedItem>
           <Synthetic Name="[Substitutions]">
@@ -46,7 +41,6 @@
               </Expand>
           </Synthetic>
       </Expand>
-      -->
     </Type>
     <Type Name="Slang::GenericSubstitution">
         <DisplayString>GenSubst {(*genericDecl).nameAndLoc}</DisplayString>

@@ -675,7 +675,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
         else
         {
-            return astBuilder->getOrCreateDeclRefType(declRef.declRefBase);
+            return astBuilder->getOrCreate<DeclRefType>(declRef.declRefBase);
         }
     }
 

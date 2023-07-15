@@ -539,7 +539,7 @@ namespace Slang
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = getName("Differential");
                 auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
-                typeDef->type.type = m_astBuilder->getOrCreateDeclRefType(declRef);
+                typeDef->type.type = DeclRefType::create(m_astBuilder, declRef);
                 typeDef->parentDecl = structDecl;
                 structDecl->members.add(typeDef);
             }
@@ -1052,7 +1052,7 @@ namespace Slang
             {
                 foreachDirectOrExtensionMemberOfType<InheritanceDecl>(this, aggTypeDeclRef, [&](DeclRef<InheritanceDecl> member)
                     {
-                        auto subType = m_astBuilder->getOrCreateDeclRefType(member);
+                        auto subType = DeclRefType::create(m_astBuilder, member);
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, subType);
                     });
                 foreachDirectOrExtensionMemberOfType<VarDeclBase>(this, aggTypeDeclRef, [&](DeclRef<VarDeclBase> member)

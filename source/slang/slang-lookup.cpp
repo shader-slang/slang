@@ -300,17 +300,28 @@ static SubtypeWitness* _makeSubtypeWitness(
     }
 }
 
-static SubtypeWitness* _makeSubtypeWitness(
-    ASTBuilder*                 astBuilder,
-    Type*                       subType,
-    SubtypeWitness*             subToMidWitness,
-    Type*                       superType,
-    DeclRef<TypeConstraintDecl> midToSuperConstraint)
+// Specialize `declRefToSpecialize` with ThisType info if `superType` is an interface type.
+DeclRef<Decl> _maybeSpecializeSuperTypeDeclRef(
+    ASTBuilder* astBuilder,
+    DeclRef<Decl> declRefToSpecialize,
+    Type* superType,
+    SubtypeWitness* subIsSuperWitness)
 {
-    auto midToSuperWitness = astBuilder->getDeclaredSubtypeWitness(
-        subType, superType, midToSuperConstraint);
-    return _makeSubtypeWitness(
-        astBuilder, subType, subToMidWitness, superType, midToSuperWitness);
+    if (auto superDeclRefType = as<DeclRefType>(superType))
+    {
+        if (auto superInterfaceDeclRef = superDeclRefType->declRef.as<InterfaceDecl>())
+        {
+            ThisTypeSubstitution* thisTypeSubst = astBuilder->create<ThisTypeSubstitution>();
+            thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
+            thisTypeSubst->witness = subIsSuperWitness;
+            thisTypeSubst->outer = declRefToSpecialize.getSubst();
+
+            auto specializedDeclRef = astBuilder->getSpecializedDeclRef<Decl>(declRefToSpecialize.getDecl(), thisTypeSubst);
+
+            return specializedDeclRef;
+        }
+    }
+    return declRefToSpecialize;
 }
 
 // Same as the above, but we are specializing a type instead of a decl-ref
@@ -321,18 +332,8 @@ static Type* _maybeSpecializeSuperType(
 {
     if (auto superDeclRefType = as<DeclRefType>(superType))
     {
-        if (auto superInterfaceDeclRef = superDeclRefType->declRef.as<InterfaceDecl>())
-        {
-            ThisTypeSubstitution* thisTypeSubst = astBuilder->create<ThisTypeSubstitution>();
-            thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
-            thisTypeSubst->witness = subIsSuperWitness;
-            thisTypeSubst->outer = superInterfaceDeclRef.getSubst();
-
-            auto specializedInterfaceDeclRef = astBuilder->getSpecializedDeclRef<Decl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
-
-            auto specializedInterfaceType = DeclRefType::create(astBuilder, specializedInterfaceDeclRef);
-            return specializedInterfaceType;
-        }
+        auto specializedDeclRef = _maybeSpecializeSuperTypeDeclRef(astBuilder, superDeclRefType->declRef, superType, subIsSuperWitness);
+        return DeclRefType::create(astBuilder, specializedDeclRef);
     }
 
     return superType;
@@ -389,189 +390,119 @@ static void _lookUpMembersInSuperType(
     _lookUpMembersInSuperTypeImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, request, ioResult, &breadcrumb);
 }
 
-static void _lookUpMembersInSuperType(
-    ASTBuilder*                 astBuilder, 
-    Name*                       name,
-    Type*                       leafType,
-    SubtypeWitness*             leafIsIntermediateWitness,
-    DeclRef<TypeConstraintDecl> intermediateIsSuperConstraint,
-    LookupRequest const&        request,
-    LookupResult&               ioResult,
-    BreadcrumbInfo*             inBreadcrumbs)
-{
-    if( request.semantics )
-    {
-        ensureDecl(request.semantics, intermediateIsSuperConstraint.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
-    }
-
-    // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
-    // will tell us a type we should use for lookup.
-    //
-    auto superType = getSup(astBuilder, intermediateIsSuperConstraint);
-    //
-    // We will go ahead and perform lookup using `superType`,
-    // after dealing with some details.
-
-    auto leafIsSuperWitness = _makeSubtypeWitness(
-        astBuilder,
-        leafType,
-        leafIsIntermediateWitness,
-        superType,
-        intermediateIsSuperConstraint);
-
-    return _lookUpMembersInSuperType(astBuilder, name, leafType, superType, leafIsSuperWitness, request, ioResult, inBreadcrumbs);
-}
-
 static void _lookUpMembersInSuperTypeDeclImpl(
     ASTBuilder*             astBuilder,
     Name*                   name,
-    Type*                   leafType,
-    Type*                   superType,
-    SubtypeWitness*         leafIsSuperWitness,
     DeclRef<Decl>           declRef,
     LookupRequest const&    request,
     LookupResult&           ioResult,
     BreadcrumbInfo*         inBreadcrumbs)
 {
     auto semantics = request.semantics;
-    if( semantics )
+
+    // If the semantics context hasn't been established yet (e.g. when looking up during parsing),
+    // we simply do a direct lookup without considering subtypes or extensions.
+    //
+    if (!semantics)
     {
-        ensureDecl(semantics, declRef.getDecl(), DeclCheckState::ReadyForLookup);
-    }
-
-    if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDecl>())
-    {
-        // If the type we are doing lookup in is a generic type parameter,
-        // then the members it provides can only be discovered by looking
-        // at the constraints that are placed on that type.
-
-        auto genericDeclRef = genericTypeParamDeclRef.getParent(astBuilder).as<GenericDecl>();
-        assert(genericDeclRef);
-
-        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(astBuilder, DeclRef<ContainerDecl>(genericDeclRef)))
+        // In this case we can only lookup in an aggregate type.
+        if (auto aggTypeDeclBaseRef = declRef.as<AggTypeDeclBase>())
         {
-            if( semantics )
-            {
-                ensureDecl(semantics, constraintDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
-            }
-
-            // Does this constraint pertain to the type we are working on?
-            //
-            // We want constraints of the form `T : Foo` where `T` is the
-            // generic parameter in question, and `Foo` is whatever we are
-            // constraining it to.
-            auto subType = getSub(astBuilder, constraintDeclRef);
-            auto subDeclRefType = as<DeclRefType>(subType);
-            if(!subDeclRefType)
-                continue;
-            if(!subDeclRefType->declRef.equals(genericTypeParamDeclRef))
-                continue;
-
-            _lookUpMembersInSuperType(
-                astBuilder,
-                name,
-                leafType,
-                leafIsSuperWitness,
-                constraintDeclRef,
-                request,
-                ioResult,
-                inBreadcrumbs);
+            _lookUpDirectAndTransparentMembers(astBuilder, name, aggTypeDeclBaseRef, request, ioResult, inBreadcrumbs);
         }
+        return;
     }
-    else if (declRef.as<AssocTypeDecl>() || declRef.as<GlobalGenericParamDecl>())
+
+    ensureDecl(semantics, declRef.getDecl(), DeclCheckState::ReadyForLookup);
+
+    // With semantics context, we can do a comprehensive lookup by scanning through
+    // the linearized inheritance list.
+
+    InheritanceInfo inheritanceInfo;
+    if (auto extDeclRef = declRef.as<ExtensionDecl>())
     {
-        for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(astBuilder, declRef.as<ContainerDecl>()))
-        {
-            _lookUpMembersInSuperType(
-                astBuilder,
-                name,
-                leafType,
-                leafIsSuperWitness,
-                constraintDeclRef,
-                request,
-                ioResult,
-                inBreadcrumbs);
-        }
+        inheritanceInfo = semantics->getShared()->getInheritanceInfo(extDeclRef);
     }
-    else if(auto aggTypeDeclBaseRef = declRef.as<AggTypeDeclBase>())
+    else
     {
-        // In this case we are peforming lookup in the context of an aggregate
-        // type or an `extension`, so the first thing to do is to look for
-        // matching members declared directly in the body of the type/`extension`.
+        auto selfType = DeclRefType::create(astBuilder, declRef);
+        inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
+    }
+        
+    for (auto facet : inheritanceInfo.facets)
+    {
+        auto containerDeclRef = facet->getDeclRef().as<ContainerDecl>();
+        if (!containerDeclRef)
+            continue;
+
+        // Check for cases where we should skip this facet for lookup.
         //
-        _lookUpDirectAndTransparentMembers(astBuilder, name, aggTypeDeclBaseRef, request, ioResult, inBreadcrumbs);
-
-        // There are further lookup steps that we can only perform when a
-        // semantic checking context is available to us. That means that
-        // during parsing, lookup will fail to find members under `name`
-        // if they required following these paths.
-        //
-        if(semantics)
+        // If the facet doesn't correspond to a type, we can't lookup.
+        if (!facet->getType() || !facet->subtypeWitness)
         {
-            if(auto aggTypeDeclRef = aggTypeDeclBaseRef.as<AggTypeDecl>())
-            {
-                // If the declaration we are looking at is a nominal type declaration,
-                // then we want to consider any `extension`s that have been associated
-                // directly with that type.
-                //
-                ensureDecl(request.semantics, aggTypeDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
-                for(auto extDecl : getCandidateExtensions(aggTypeDeclRef, semantics))
-                {
-                    // Note: In this case `extDecl` is an extension that was declared to apply
-                    // (conditionally) to `aggTypeDeclRef`, which is the decl-ref part of
-                    // `superType`. Thus when looking for a substitution to apply to the
-                    // extension, we need to apply it to `superType` and not to `leafType`.
-                    //
-                    auto extDeclRef = ApplyExtensionToType(request.semantics, extDecl, superType);
-                    if (!extDeclRef)
-                        continue;
+            continue;
+        }
 
-                    // TODO: eventually we need to insert a breadcrumb here so that
-                    // the constructed result can somehow indicate that a member
-                    // was found through an extension.
-                    //
-                    _lookUpMembersInSuperTypeDeclImpl(
-                        astBuilder,
-                        name,
-                        leafType,
-                        superType,
-                        leafIsSuperWitness,
-                        extDeclRef,
-                        request,
-                        ioResult,
-                        inBreadcrumbs);
-                }
-            }
+        // If we are looking up in an interface, and the lookup request told us
+        // to skip interfaces, we should do so here.
+        if (auto baseInterfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
+        {
+            if (int(request.options) & int(LookupOptions::IgnoreBaseInterfaces))
+                continue;
+        }
 
-            // For both aggregate types and their `extension`s, we want lookup to follow
-            // through the declared inheritance relationships on each declaration.
+        // Some things that are syntactically `InheritanceDecl`s don't actually
+        // represent a subtype/supertype relationship, and thus we shouldn't
+        // include members from the base type when doing lookup in the
+        // derived type.
+        //
+        // TODO: this check currently only works when the facet is a direct
+        // basee type of the type we are looking up in. This is OK because the
+        // only case where we use `IgnoreForLookupModifier` is for skipping the
+        // underlying int type of an enum type. We should either makes this
+        // check more general, or just explicitly detect this case here without
+        // relying on the modifier.
+        if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(facet->subtypeWitness))
+        {
+            auto inheritanceDeclRef = declaredSubtypeWitness->declRef;
+            if (inheritanceDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
+                continue;
+        }
+
+        // We are now going to lookup in the facet.
+
+        BreadcrumbInfo* newBreadcrumbs = inBreadcrumbs;
+        BreadcrumbInfo subtypeInfo;
+        if (facet->directness != Facet::Directness::Self)
+        {
+            // Depending on the type of the facet, we may want to specialize the
+            // declRef that we are going to lookup in. If the facet represents
+            // an extension, we should just lookup in the extension decl.
+            // 
+            // If the facet is an extension to an interface type, we should
+            // specialize the interface declRef to the concrete type that this
+            // extension applied to.
             //
-            ensureDecl(semantics, aggTypeDeclBaseRef.getDecl(), DeclCheckState::CanEnumerateBases);
-            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(astBuilder, aggTypeDeclBaseRef))
+            // If the facet represents an implementation of interface type,
+            // we should also specialize the interface declRef with the concrete
+            // type info.
+            //
+            containerDeclRef = _maybeSpecializeSuperTypeDeclRef(
+                astBuilder, containerDeclRef, facet->getType(), facet->subtypeWitness)
+                .as<ContainerDecl>();
+
+            // If we are looking up in a base type, we also need to make sure
+            // to create a breadcrumb to track the sub to super indirection.
+            if (facet->kind == Facet::Kind::Type)
             {
-                ensureDecl(semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
-
-                // Some things that are syntactically `InheritanceDecl`s don't actually
-                // represent a subtype/supertype relationship, and thus we shouldn't
-                // include members from the base type when doing lookup in the
-                // derived type.
-                //
-                if(inheritanceDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
-                    continue;
-
-                auto baseType = getSup(astBuilder, inheritanceDeclRef);
-                if( auto baseDeclRefType = as<DeclRefType>(baseType) )
-                {
-                    if( auto baseInterfaceDeclRef = baseDeclRefType->declRef.as<InterfaceDecl>() )
-                    {
-                        if( int(request.options) & int(LookupOptions::IgnoreBaseInterfaces) )
-                            continue;
-                    }
-                }
-
-                _lookUpMembersInSuperType(astBuilder, name, leafType, leafIsSuperWitness, inheritanceDeclRef, request, ioResult, inBreadcrumbs);
+                subtypeInfo.kind = LookupResultItem_Breadcrumb::Kind::SuperType;
+                subtypeInfo.val = facet->subtypeWitness;
+                subtypeInfo.prev = inBreadcrumbs;
+                subtypeInfo.declRef = facet->getDeclRef();
+                newBreadcrumbs = &subtypeInfo;
             }
         }
+        _lookUpDirectAndTransparentMembers(astBuilder, name, containerDeclRef, request, ioResult, newBreadcrumbs);
     }
 }
 
@@ -611,7 +542,7 @@ static void _lookUpMembersInSuperTypeImpl(
     {
         auto declRef = declRefType->declRef;
 
-        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, declRef, request, ioResult, inBreadcrumbs);
+        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, declRef, request, ioResult, inBreadcrumbs);
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(superType))
     {
@@ -621,7 +552,7 @@ static void _lookUpMembersInSuperTypeImpl(
         // types, etc. used in the signature of a method to resolve correctly).
         //
         auto interfaceDeclRef = extractExistentialType->getSpecializedInterfaceDeclRef();
-        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, interfaceDeclRef, request, ioResult, inBreadcrumbs);
+        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, interfaceDeclRef, request, ioResult, inBreadcrumbs);
     }
     else if( auto thisType = as<ThisType>(superType) )
     {
