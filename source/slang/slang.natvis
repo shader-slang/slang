@@ -97,18 +97,6 @@
       </CustomListItems>
       <Item Name="[value]" Condition="m_op == kIROp_StringLit">((IRStringLit*)this)->value.stringVal.chars,[((IRStringLit*)this)->value.stringVal.numChars]s8</Item>
       <Item Name="[value]" Condition="m_op == kIROp_IntLit">((IRIntLit*)this)->value.intVal</Item>
-	  <!--
-      <Synthetic Name="[operands]">
-        <DisplayString>{{count = {operandCount}}}</DisplayString>
-        <Expand>
-          <Item Name="[count]">operandCount</Item>
-          <ArrayItems>
-            <Size>operandCount</Size>
-            <ValuePointer>(IRUse*)(&amp;(typeUse) + 1)</ValuePointer>
-          </ArrayItems>
-        </Expand>
-      </Synthetic>
-	  -->
       <CustomListItems MaxItemsPerView="10">
 	    <Variable Name="index" InitialValue="0"/>
 	    <Variable Name="nameDecoration" InitialValue="(IRInst*)nullptr"/>

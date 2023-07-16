@@ -200,7 +200,7 @@ static void _lookUpDirectAndTransparentMembers(
             // Skip this declaration if we are checking and this hasn't been
             // checked yet. Because we traverse block statements in order, if
             // it's unchecked or being checked then it isn't declared yet.
-            if(!request.shouldConsiderAllLocalNames() && _isUncheckedLocalVar(m))
+            if(!request.shouldConsiderAllLocalNames() && request.semantics && _isUncheckedLocalVar(m))
                 continue;
 
             if (!DeclPassesLookupMask(m, request.mask))
