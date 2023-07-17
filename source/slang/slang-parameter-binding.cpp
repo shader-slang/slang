@@ -986,13 +986,11 @@ static VarLayout* _findLayoutForDeclaration(ProgramLayout* programLayout, VarLay
     auto paramsLayout = programLayout->parametersLayout;
     auto typeLayout = paramsLayout->getTypeLayout();
 
-    StructTypeLayout* existingStructLayout = as<StructTypeLayout>(typeLayout);
-
-    for (auto field : existingStructLayout->fields)
+    if (StructTypeLayout* existingStructLayout = as<StructTypeLayout>(typeLayout))
     {
-        if (field->getVariable() == varDecl.getDecl())
+        if (auto layoutPtr = existingStructLayout->mapVarToLayout.tryGetValue(varDecl.getDecl()))
         {
-            return field;
+            return *layoutPtr;
         }
     }
 
