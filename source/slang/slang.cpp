@@ -5210,6 +5210,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
     {
         StringBuilder perfResult;
         PerformanceProfiler::getProfiler()->getResult(perfResult);
+        perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
         getSink()->diagnose(SourceLoc(), Diagnostics::performanceBenchmarkResult, perfResult.produceString());
     }
 
