@@ -53,9 +53,6 @@ struct DeduplicateContext
             if (deduplicatedOperand != value->getOperand(i))
                 value->unsafeSetOperand(i, deduplicatedOperand);
         }
-        auto deduplicatedType = (IRType*)deduplicate(value->getFullType(), shouldDeduplicate);
-        if (deduplicatedType != value->getFullType())
-            value->setFullType(deduplicatedType);
         if (auto newValue = deduplicateMap.tryGetValue(key))
             return *newValue;
         deduplicateMap[key] = value;

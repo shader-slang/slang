@@ -6849,6 +6849,18 @@ namespace Slang
             thisInst = workItem.thisInst;
             other = workItem.otherInst;
 
+            // If `other` has been replaced by something else, use that.
+            if (getIROpInfo(thisInst->getOp()).isHoistable())
+            {
+                if (!dedupContext)
+                {
+                    SLANG_ASSERT(thisInst->getModule());
+                    dedupContext = thisInst->getModule()->getDeduplicationContext();
+                }
+                dedupContext->getInstReplacementMap().tryGetValue(other, other);
+            }
+            SLANG_ASSERT(other);
+
             // Safety check: don't try to replace something with itself.
             if (other == thisInst)
                 continue;
@@ -6861,10 +6873,6 @@ namespace Slang
                     dedupContext = thisInst->getModule()->getDeduplicationContext();
                 }
                 dedupContext->getInstReplacementMap()[thisInst] = other;
-                
-                // If thisInst is hoistable, remove it from global dedup map now since
-                // we don't want to other insts to be replaced with thisInst.
-                dedupContext->getGlobalValueNumberingMap().remove(thisInst);
             }
 
      

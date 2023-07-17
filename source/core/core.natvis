@@ -58,7 +58,7 @@
     <DisplayString>{{ size={m_count} }}</DisplayString>
     <Expand>
         <Item Name="[size]">m_count</Item>
-        <Item Name="[capacity]">m_bucketSizeMinusOne + 1</Item>
+        <Item Name="[capacity]">m_bucketCountMinusOne + 1</Item>
         <CustomListItems MaxItemsPerView="5000" ExcludeView="Test">
             <Variable Name="iBucket" InitialValue="0" />
             <Variable Name="pBucket" InitialValue="m_hashMap" />
@@ -67,12 +67,12 @@
             <Size>m_count</Size>
             <Exec>pBucket = m_hashMap</Exec>
             <Loop>
-                <If Condition="iBucket &gt;= m_bucketSizeMinusOne + 1">
+                <If Condition="iBucket &gt;= m_bucketCountMinusOne">
                     <Break/>
                 </If>
                 <Exec>
                     isDeleted = m_marks.m_buffer.m_count &gt; (iBucket*2+1)/32
-                      ? ((marks.m_buffer.m_buffer[(iBucket*2+1)/32]&amp;(1&lt;&lt;(iBucket*2+1)%32)) != 0)
+                    ? ((m_marks.m_buffer.m_buffer[(iBucket*2+1)/32]&amp;(1&lt;&lt;(iBucket*2+1)%32)) != 0)
                       : 0
                  </Exec>
                 <Exec>
