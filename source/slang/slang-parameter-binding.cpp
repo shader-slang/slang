@@ -324,6 +324,20 @@ struct EntryPointParameterBindingContext
     UsedRangeSet usedRangeSet;
 };
 
+/* A holds information about a layout that will be used as a `reference` for other 
+layout. For example HLSL layout being used to infer via vk-shift-* options Vulkan bindings.
+
+We keep references to more than just programLayout (which is the main thing needed) to keep 
+everything in scope, because several of the associated pointers in these structures do 
+not ref count.
+*/
+struct ReferenceTargetLayout : public RefObject
+{
+    RefPtr<TargetRequest> targetRequest;
+    RefPtr<TargetProgram> targetProgram;
+    RefPtr<ProgramLayout> programLayout;
+};
+
 
 // State that is shared during parameter binding,
 // across all translation units
@@ -364,7 +378,7 @@ struct SharedParameterBindingContext
     // Sometimes we need to drive layout from a preexisting layout
     // for example when using vk-shift-* to infer layout 
     // from HLSL style layout
-    RefPtr<ProgramLayout> existingProgramLayout;
+    RefPtr<ReferenceTargetLayout> referenceTargetLayout;
 
     // What ranges of resources bindings are already claimed at the global scope?
     // We store one of these for each declared binding space/set.
@@ -999,28 +1013,31 @@ static VarLayout* _findLayoutForDeclaration(ProgramLayout* programLayout, VarLay
 
 static ProgramLayout* _getOrCreateHLSLProgramLayout(ParameterBindingContext* context)
 {
-    if (ProgramLayout* hlslProgramLayout = context->shared->existingProgramLayout)
+    if (auto hlslTargetLayout = context->shared->referenceTargetLayout)
     {
-        return hlslProgramLayout;
+        return hlslTargetLayout->programLayout;
     }
 
     auto sink = context->shared->getSink();
+
+    // Create a new 
+    context->shared->referenceTargetLayout = new ReferenceTargetLayout;
+    auto hlslTargetLayout = context->shared->referenceTargetLayout.get();
 
     auto targetProgram = context->shared->programLayout->getTargetProgram();
     auto targetReq = targetProgram->getTargetReq();
 
     // We are going to layout first using HLSL style target. 
     // Create a clone, but make the target HLSL
-    auto hlslTargetReq = targetReq->createClone(targetReq->getLinkage(), CodeGenTarget::HLSL);
+    hlslTargetLayout->targetRequest= targetReq->createClone(targetReq->getLinkage(), CodeGenTarget::HLSL);
 
     // Create a target program
-    RefPtr<TargetProgram> hlslTargetProgram = new TargetProgram(targetProgram->getProgram(), hlslTargetReq);
+    hlslTargetLayout->targetProgram = new TargetProgram(targetProgram->getProgram(), hlslTargetLayout->targetRequest);
 
     // Do the layout for HLSL
-    RefPtr<ProgramLayout> hlslProgramLayout = _generateParameterBindings(hlslTargetProgram, sink);
+    hlslTargetLayout->programLayout = _generateParameterBindings(hlslTargetLayout->targetProgram, sink);
 
-    context->shared->existingProgramLayout = hlslProgramLayout;
-    return hlslProgramLayout;
+    return hlslTargetLayout->programLayout;
 }
 
 static void addExplicitParameterBindings_GLSL(
