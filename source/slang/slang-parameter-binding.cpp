@@ -13,6 +13,10 @@
 
 namespace Slang {
 
+static RefPtr<ProgramLayout> _generateParameterBindings(
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink);
+
 struct ParameterInfo;
 
 // Information on ranges of registers already claimed/used
@@ -329,12 +333,10 @@ struct SharedParameterBindingContext
         LayoutRulesFamilyImpl*  defaultLayoutRules,
         ProgramLayout*          programLayout,
         TargetRequest*          targetReq,
-        ProgramLayout*          existingProgramLayout,
         DiagnosticSink*         sink)
         : defaultLayoutRules(defaultLayoutRules)
         , programLayout(programLayout)
         , targetRequest(targetReq)
-        , existingProgramLayout(existingProgramLayout)
         , m_sink(sink)
     {
     }
@@ -997,6 +999,32 @@ static VarLayout* _findLayoutForDeclaration(ProgramLayout* programLayout, VarLay
     return nullptr;
 }
 
+static ProgramLayout* _getOrCreateHLSLProgramLayout(ParameterBindingContext* context)
+{
+    if (ProgramLayout* hlslProgramLayout = context->shared->existingProgramLayout)
+    {
+        return hlslProgramLayout;
+    }
+
+    auto sink = context->shared->getSink();
+
+    auto targetProgram = context->shared->programLayout->getTargetProgram();
+    auto targetReq = targetProgram->getTargetReq();
+
+    // We are going to layout first using HLSL style target. 
+    // Create a clone, but make the target HLSL
+    auto hlslTargetReq = targetReq->createClone(targetReq->getLinkage(), CodeGenTarget::HLSL);
+
+    // Create a target program
+    RefPtr<TargetProgram> hlslTargetProgram = new TargetProgram(targetProgram->getProgram(), hlslTargetReq);
+
+    // Do the layout for HLSL
+    RefPtr<ProgramLayout> hlslProgramLayout = _generateParameterBindings(hlslTargetProgram, sink);
+
+    context->shared->existingProgramLayout = hlslProgramLayout;
+    return hlslProgramLayout;
+}
+
 static void addExplicitParameterBindings_GLSL(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo,
@@ -1097,7 +1125,7 @@ static void addExplicitParameterBindings_GLSL(
     {
         // We don't have a binding semantic. If we have an existingProgramLayout (which for Vulkan/GLSL binding)
         // will be HLSL layout, iff hlslToVulkanLayoutOptions with inference is available
-        if (ProgramLayout* hlslProgramLayout = context->shared->existingProgramLayout)
+        if (ProgramLayout* hlslProgramLayout = _getOrCreateHLSLProgramLayout(context))
         {
             // Find the variable in HLSL layout
             if (VarLayout* hlslVarLayout = _findLayoutForDeclaration(hlslProgramLayout, varLayout))
@@ -3610,12 +3638,9 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     return false;
 }
 
-
-
-static RefPtr<ProgramLayout> _generateParameterBindingsImpl(
+static RefPtr<ProgramLayout> _generateParameterBindings(
     TargetProgram*  targetProgram,
-    DiagnosticSink* sink,
-    ProgramLayout*  existingProgramLayout)
+    DiagnosticSink* sink)
 {
     auto program = targetProgram->getProgram();
     auto targetReq = targetProgram->getTargetReq();
@@ -3642,7 +3667,6 @@ static RefPtr<ProgramLayout> _generateParameterBindingsImpl(
         layoutContext.getRulesFamily(),
         programLayout,
         targetReq,
-        existingProgramLayout,
         sink);
 
     // Create a sub-context to collect parameters that get
@@ -3944,41 +3968,11 @@ static RefPtr<ProgramLayout> _generateParameterBindingsImpl(
     return programLayout;
 }
 
-RefPtr<ProgramLayout> generateParameterBindings(
-    TargetProgram* targetProgram,
-    DiagnosticSink* sink)
-{
-    auto targetReq = targetProgram->getTargetReq();
-    
-    // If we have hlslToVulkanLayout options *and* they specify binding inference, we need to
-    // do HLSL layout first.
-    if (auto hlslToVulkanLayoutOptions = targetReq->getHLSLToVulkanLayoutOptions())
-    {
-        if (hlslToVulkanLayoutOptions->canInferBindings())
-        {
-            // We are going to layout first using HLSL style target. 
-            // Create a clone, but make the target HLSL
-            auto hlslTargetReq = targetReq->createClone(targetReq->getLinkage(), CodeGenTarget::HLSL);
-            
-            // Create a target program
-            RefPtr<TargetProgram> hlslTargetProgram = new TargetProgram(targetProgram->getProgram(), hlslTargetReq);
-
-            // Do the layout for HLSL
-            RefPtr<ProgramLayout> hlslProgramLayout = _generateParameterBindingsImpl(hlslTargetProgram, sink, nullptr);
-
-            // Do the final layout using HLSL layout as the existing layout 
-            return _generateParameterBindingsImpl(targetProgram, sink, hlslProgramLayout);
-        }
-    }
- 
-    return _generateParameterBindingsImpl(targetProgram, sink, nullptr);
-}
-
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 {
     if( !m_layout )
     {
-        m_layout = generateParameterBindings(this, sink);
+        m_layout = _generateParameterBindings(this, sink);
         if( m_layout )
         {
             m_irModuleForLayout = createIRModuleForLayout(sink);
