@@ -1442,29 +1442,20 @@ TargetRequest::TargetRequest(Linkage* linkage, CodeGenTarget format)
     , format(format)
 {}
 
-void TargetRequest::copy(const TargetRequest& rhs)
+RefPtr<TargetRequest> TargetRequest::createClone(Linkage* inLinkage, CodeGenTarget inFormat)
 {
-    SLANG_ASSERT(this != &rhs);
+    RefPtr<TargetRequest> clone = new TargetRequest(*this);
 
-    targetFlags = rhs.targetFlags;
-    targetProfile = rhs.targetProfile;
-    floatingPointMode = rhs.floatingPointMode;
-    rawCapabilities = rhs.rawCapabilities;
-    cookedCapabilities = rhs.cookedCapabilities;
-    lineDirectiveMode = rhs.lineDirectiveMode;
-    dumpIntermediates = rhs.dumpIntermediates;
-    enableLivenessTracking = rhs.enableLivenessTracking;
+    clone->format = inFormat;
+    clone->linkage = inLinkage;
 
-    if (isKhronosTarget(this))
+    if (!isKhronosTarget(clone))
     {
-        forceGLSLScalarBufferLayout = rhs.forceGLSLScalarBufferLayout;
-        hlslToVulkanLayoutOptions = rhs.hlslToVulkanLayoutOptions;
+        clone->forceGLSLScalarBufferLayout = false;
+        clone->hlslToVulkanLayoutOptions.setNull();
     }
-    else
-    {
-        forceGLSLScalarBufferLayout = false;
-        hlslToVulkanLayoutOptions.setNull();
-    }
+
+    return clone;
 }
 
 Session* TargetRequest::getSession()

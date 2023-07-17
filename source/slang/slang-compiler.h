@@ -1607,13 +1607,14 @@ namespace Slang
 
         TypeLayout* getTypeLayout(Type* type);
 
-            /// Copy into this target request all (appropriate) state from the rhs
-        void copy(const TargetRequest& rhs);
+            /// Create a clone, but with linkage and specified format
+        RefPtr<TargetRequest> createClone(Linkage* linkage, CodeGenTarget format);
         
             /// Ctor
         TargetRequest(Linkage* linkage, CodeGenTarget format);
 
     private:
+
         Linkage*                linkage = nullptr;
         CodeGenTarget           format = CodeGenTarget::Unknown;
         SlangTargetFlags        targetFlags = 0;

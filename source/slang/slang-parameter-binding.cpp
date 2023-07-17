@@ -1086,25 +1086,28 @@ static void addExplicitParameterBindings_GLSL(
     LayoutSemanticInfo hlslInfo; 
     hlslInfo.init();
 
-    // We need an HLSL register semantic to to infer from
+    // See if we have a HLSLRegisterSemantic to infer from
     auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
     if (hlslRegSemantic)
     {
-        // Get the HLSL binding info
+        // Get the HLSL binding info from the semantic
         hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     }
     else
     {
-        if (ProgramLayout* existingProgramLayout = context->shared->existingProgramLayout)
+        // We don't have a binding semantic. If we have an existingProgramLayout (which for Vulkan/GLSL binding)
+        // will be HLSL layout, iff hlslToVulkanLayoutOptions with inference is available
+        if (ProgramLayout* hlslProgramLayout = context->shared->existingProgramLayout)
         {
-            if (VarLayout* existingVarLayout = _findLayoutForDeclaration(context->shared->existingProgramLayout, varLayout))
+            // Find the variable in HLSL layout
+            if (VarLayout* hlslVarLayout = _findLayoutForDeclaration(hlslProgramLayout, varLayout))
             {
                 // This is only going to work if there is *one* resource type associated
-                if (existingVarLayout->resourceInfos.getCount() == 1)
+                if (hlslVarLayout->resourceInfos.getCount() == 1)
                 {
-                    const auto& resourceInfo = existingVarLayout->resourceInfos[0];
+                    const auto& resourceInfo = hlslVarLayout->resourceInfos[0];
 
-                    // Copy the info over
+                    // Copy over the info found for the variable for HLSL layout
                     hlslInfo.kind = resourceInfo.kind;
                     hlslInfo.index = resourceInfo.index;
                     hlslInfo.space = resourceInfo.space;
@@ -1112,9 +1115,9 @@ static void addExplicitParameterBindings_GLSL(
             }
         }
 
+        // We don't have a HLSL binding, so no inferance can occur, issue a warning
         if (hlslInfo.kind == LayoutResourceKind::None)
         {
-            // We don't have a HLSL binding, so no inferance can occur, issue a warning
             // 
             // TODO(JS): I suppose there is some ambiguity here, because if we did a semantic lookup, and it didn't have a vulkanKind
             // or didn't parse correctly we wouldn't issue this message.
@@ -3945,30 +3948,30 @@ RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram* targetProgram,
     DiagnosticSink* sink)
 {
-    // Define here so they in scope throughout the final _generateParameterBindingsImpl run
-    // These are only needed if we are going to infer vk bindings from HLSL bindings
-    // using the vk-shift-* mechanism/s
-    RefPtr<ProgramLayout> hlslProgramLayout;
-    RefPtr<TargetProgram> hlslTargetProgram;
-
     auto targetReq = targetProgram->getTargetReq();
-    if (auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions())
+    
+    // If we have hlslToVulkanLayout options *and* they specify binding inference, we need to
+    // do HLSL layout first.
+    if (auto hlslToVulkanLayoutOptions = targetReq->getHLSLToVulkanLayoutOptions())
     {
-        // We are going to layout first using HLSL style target. 
-        // Create a temporary hlslTargetReq
-        RefPtr<TargetRequest> hlslTargetReq(new TargetRequest(targetReq->getLinkage(), CodeGenTarget::HLSL));
+        if (hlslToVulkanLayoutOptions->canInferBindings())
+        {
+            // We are going to layout first using HLSL style target. 
+            // Create a clone, but make the target HLSL
+            auto hlslTargetReq = targetReq->createClone(targetReq->getLinkage(), CodeGenTarget::HLSL);
+            
+            // Create a target program
+            RefPtr<TargetProgram> hlslTargetProgram = new TargetProgram(targetProgram->getProgram(), hlslTargetReq);
 
-        // Copy other state from current targetReq
-        hlslTargetReq->copy(*targetReq);
-        
-        // Create a target program
-        hlslTargetProgram = new TargetProgram(targetProgram->getProgram(), hlslTargetReq);
+            // Do the layout for HLSL
+            RefPtr<ProgramLayout> hlslProgramLayout = _generateParameterBindingsImpl(hlslTargetProgram, sink, nullptr);
 
-        // Do the layout
-        hlslProgramLayout = _generateParameterBindingsImpl(hlslTargetProgram, sink, nullptr);
+            // Do the final layout using HLSL layout as the existing layout 
+            return _generateParameterBindingsImpl(targetProgram, sink, hlslProgramLayout);
+        }
     }
  
-    return _generateParameterBindingsImpl(targetProgram, sink, hlslProgramLayout);
+    return _generateParameterBindingsImpl(targetProgram, sink, nullptr);
 }
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
