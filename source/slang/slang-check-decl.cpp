@@ -6535,6 +6535,7 @@ namespace Slang
         // Invalidate the cached inheritanceInfo.
         m_mapTypeToInheritanceInfo.clear();
         m_mapDeclRefToInheritanceInfo.clear();
+        m_mapTypePairToSubtypeWitness.clear();
     }
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)

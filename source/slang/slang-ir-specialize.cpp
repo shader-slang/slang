@@ -51,6 +51,14 @@ struct SpecializationContext
 
     bool changed = false;
 
+    SpecializationContext(IRModule* inModule)
+        : module(inModule)
+    {
+        genericSpecializations.reserve(16384);
+        existentialSpecializedFuncs.reserve(16384);
+        existentialSpecializedStructs.reserve(16384);
+    }
+
     // We know that we can only perform generic specialization when all
     // of the arguments to a generic are also fully specialized.
     // The "is fully specialized" condition is something we
@@ -2360,8 +2368,7 @@ bool specializeModule(
     DiagnosticSink* sink)
 {
     SLANG_PROFILE;
-    SpecializationContext context;
-    context.module = module;
+    SpecializationContext context(module);
     context.sink = sink;
     context.processModule();
     return context.changed;

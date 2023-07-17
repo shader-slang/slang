@@ -50,6 +50,18 @@ namespace Slang
     }
 
     SubtypeWitness* SemanticsVisitor::isSubtype(
+        Type* subType,
+        Type* superType)
+    {
+        SubtypeWitness* result = nullptr;
+        if (getShared()->tryGetSubtypeWitness(subType, superType, result))
+            return result;
+        result = checkAndConstructSubtypeWitness(subType, superType);
+        getShared()->cacheSubtypeWitness(subType, superType, result);
+        return result;
+    }
+
+    SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         Type*                   subType,
         Type*                   superType)
     {
@@ -92,8 +104,9 @@ namespace Slang
         // For now we are continuing to conflate all the subtype-ish relationships but not
         // tangling convertibility into it.
 
-        // TODO: Evaluate whether it is beneficial to memo-cache
-        // the results of subtype tests on the `SharedSemanticsContext`.
+        SubtypeWitness* result = nullptr;
+        if (getShared()->tryGetSubtypeWitness(subType, superType, result))
+            return result;
 
         // In the common case, we can use the pre-computed inheritance information for `subType`
         // to enumerate all the types it transitively inherits from.

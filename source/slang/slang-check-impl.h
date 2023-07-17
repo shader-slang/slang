@@ -613,6 +613,18 @@ namespace Slang
             /// Get the processed inheritance information for `extension`, including all its facets
         InheritanceInfo getInheritanceInfo(DeclRef<ExtensionDecl> const& extension);
 
+            /// Try get subtype witness from cache, returns true if cache contains a result for the query.
+        bool tryGetSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness)
+        {
+            auto pair = TypePair{ sub, sup };
+            return m_mapTypePairToSubtypeWitness.tryGetValue(pair, outWitness);
+        }
+        void cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness)
+        {
+            auto pair = TypePair{ sub, sup };
+            m_mapTypePairToSubtypeWitness[pair] = outWitness;
+        }
+
     private:
             /// Mapping from type declarations to the known extensiosn that apply to them
         Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -721,8 +733,16 @@ namespace Slang
 
         void _mergeFacetLists(DirectBaseList bases, FacetList baseFacets, FacetList::Builder& ioMergedFacets);
 
+        struct TypePair
+        {
+            Type* type0;
+            Type* type1;
+            HashCode getHashCode() const { return combineHash(Slang::getHashCode(type0), Slang::getHashCode(type1)); }
+            bool operator == (const TypePair& other) const { return type0 == other.type0 && type1 == other.type1; }
+        };
         Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
         Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
+        Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
     };
 
         /// Local/scoped state of the semantic-checking system
@@ -1794,6 +1814,8 @@ namespace Slang
         SubtypeWitness* isSubtype(
             Type*                   subType,
             Type*                   superType);
+
+        SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
 
         bool isInterfaceType(Type* type);
 

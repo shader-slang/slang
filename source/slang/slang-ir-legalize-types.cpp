@@ -3593,8 +3593,7 @@ struct IRTypeLegalizationPass
                 // at each step, and swap in an empty work list to be added
                 // to with any new instructions.
                 //
-                List<IRInst*> workListCopy;
-                Swap(workListCopy, workList);
+                List<IRInst*> workListCopy = _Move(workList);
 
                 resetScratchDataBit(module->getModuleInst(), kHasBeenAddedScratchBitIndex);
 
