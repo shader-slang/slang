@@ -355,9 +355,15 @@ Force using scalar block layout for uniform and shader storage buffers in GLSL o
 <a id="fvk-b-shift"></a>
 ## -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
 
-**-vk-&lt;[vulkan-shift](#vulkan-shift)&gt;-shift &lt;N&gt; &lt;space&gt;**
+**-fvk-&lt;[vulkan-shift](#vulkan-shift)&gt;-shift &lt;N&gt; &lt;space&gt;**
 
-For example '-vk-b-shift &lt;N&gt; &lt;space&gt;' shifts by N the inferred binding numbers for all resources in 'b' registers of space &lt;space&gt;. For a resource attached with :register(bX, &lt;space&gt;) but not \[vk::binding(...)\], sets its Vulkan descriptor set to &lt;space&gt; and binding number to X + N. If you need to shift the inferred binding numbers for more than one space, provide more than one such option. If more than one such option is provided for the same space, the last one takes effect. If you need to shift the inferred binding numbers for all sets, use 'all' as &lt;space&gt;. 
+For example '-fvk-b-shift &lt;N&gt; &lt;space&gt;' shifts by N the inferred binding numbers for all resources in 'b' registers of space &lt;space&gt;. For a resource attached with :register(bX, &lt;space&gt;) but not \[vk::binding(...)\], sets its Vulkan descriptor set to &lt;space&gt; and binding number to X + N. If you need to shift the inferred binding numbers for more than one space, provide more than one such option. If more than one such option is provided for the same space, the last one takes effect. If you need to shift the inferred binding numbers for all sets, use 'all' as &lt;space&gt;. 
+
+* \[DXC description\](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment) 
+
+* \[GLSL wiki\](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers) 
+
+
 
 
 <a id="fvk-bind-globals"></a>
@@ -824,10 +830,10 @@ Stage
 
 Vulkan Shift 
 
-* `b` : Vulkan Buffer resource 
-* `s` : Vulkan Sampler resource 
-* `t` : Vulkan Texture resource 
-* `u` : Vulkan Uniform resource 
+* `b` : Constant buffer view 
+* `s` : Sampler 
+* `t` : Shader resource view 
+* `u` : Unorderd access view 
 
 <a id="capability"></a>
 # capability

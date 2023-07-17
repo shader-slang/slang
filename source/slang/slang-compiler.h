@@ -2769,6 +2769,9 @@ namespace Slang
         DiagnosticSink* getSink() { return &m_sink; }
         NamePool* getNamePool() { return getLinkage()->getNamePool(); }
 
+        void setHLSLToVulkanLayoutOptions(HLSLToVulkanLayoutOptions* hlslToVulkanLayoutOptions) { m_hlslToVulkanLayoutOptions = hlslToVulkanLayoutOptions; }
+        HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions() const { return m_hlslToVulkanLayoutOptions; }
+
         FrontEndCompileRequest* getFrontEndReq() { return m_frontEndReq; }
 
         ComponentType* getUnspecializedGlobalComponentType() { return getFrontEndReq()->getGlobalComponentType(); }
@@ -2828,6 +2831,9 @@ namespace Slang
         SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
         SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
+            /// Adds any extra settings to complete a targetRequest
+        void _completeTargetRequest(UInt targetIndex);
+        
         ISlangUnknown* getInterface(const Guid& guid);
 
         void generateOutput(ComponentType* program);
@@ -2843,6 +2849,8 @@ namespace Slang
         RefPtr<ComponentType>           m_specializedGlobalAndEntryPointsComponentType;
         List<RefPtr<ComponentType>>     m_specializedEntryPoints;
 
+        RefPtr<HLSLToVulkanLayoutOptions> m_hlslToVulkanLayoutOptions;
+        
         // For output
 
         RefPtr<StdWriters> m_writers;

@@ -484,13 +484,16 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::GLSLForceScalarLayout,
          "-force-glsl-scalar-layout", nullptr,
          "Force using scalar block layout for uniform and shader storage buffers in GLSL output."},
-        { OptionKind::VulkanBindShift, vkShiftNames.getBuffer(), "-vk-<vulkan-shift>-shift <N> <space>", 
-        "For example '-vk-b-shift <N> <space>' shifts by N the inferred binding numbers for all resources in 'b' registers of space <space>. "
+        { OptionKind::VulkanBindShift, vkShiftNames.getBuffer(), "-fvk-<vulkan-shift>-shift <N> <space>", 
+        "For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding numbers for all resources in 'b' registers of space <space>. "
         "For a resource attached with :register(bX, <space>) but not [vk::binding(...)], "
         "sets its Vulkan descriptor set to <space> and binding number to X + N. If you need to shift the "
         "inferred binding numbers for more than one space, provide more than one such option. "
         "If more than one such option is provided for the same space, the last one takes effect. "
-        "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>." },
+        "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>. " 
+        "\n"
+        "* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)\n" 
+        "* [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)\n" },
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
         "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
         { OptionKind::EnableEffectAnnotations,
@@ -2351,12 +2354,16 @@ SlangResult OptionsParser::_parse(
         }
     }
 
-    // If there are no layout settings, we don't need to carry this state
-    if (m_hlslToVulkanLayoutOptions->isReset())
+    // If there is state set on HLSL to Vulkan layout settings, set on the end to end request
+    // such can be added when target requests are setup
+    if (!m_hlslToVulkanLayoutOptions->isReset())
     {
-        m_hlslToVulkanLayoutOptions.setNull();
+        m_requestImpl->setHLSLToVulkanLayoutOptions(m_hlslToVulkanLayoutOptions);
     }
 
+    // No longer need to track
+    m_hlslToVulkanLayoutOptions.setNull();
+    
     if (m_compileStdLib)
     {
         SLANG_RETURN_ON_FAIL(m_session->compileStdLib(m_compileStdLibFlags));
@@ -2761,8 +2768,6 @@ SlangResult OptionsParser::_parse(
     {
         int targetID = m_compileRequest->addCodeGenTarget(SlangCompileTarget(rawTarget.format));
         rawTarget.targetID = targetID;
-
-        m_requestImpl->setHLSLToVulkanLayoutOptions(targetID, m_hlslToVulkanLayoutOptions);
 
         if (rawTarget.profileVersion != ProfileVersion::Unknown)
         {

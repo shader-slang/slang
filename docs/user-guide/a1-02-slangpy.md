@@ -12,7 +12,7 @@ In addition, using a per-thread programming model also results in more optimized
 
 ## Getting Started with slangpy
 
-In this tutorial, we will use a simple example to walkthrough the steps to use Slang in your PyTorch project.
+In this tutorial, we will use a simple example to walk through the steps to use Slang in your PyTorch project.
 
 ### Writing a simple kernel function as a Slang module
 
@@ -27,7 +27,7 @@ float square(float x)
 }
 ```
 
-This function is self explanatory. To use it in PyTorch, we need to write a GPU kernel function (that maps to a 
+This function is self-explanatory. To use it in PyTorch, we need to write a GPU kernel function (that maps to a 
 `__global__` CUDA function) that defines how to compute each element of the input tensor. So we continue to write
 the following Slang function:
 
@@ -62,7 +62,7 @@ TorchTensor<float> square_fwd(TorchTensor<float> input)
     return result;
 }
 ```
-Here, we mark the function with the `[TorchEntryPoint]` attribute so it will be exported to Python. In the function body, we call `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
+Here, we mark the function with the `[TorchEntryPoint]` attribute, so it will be exported to Python. In the function body, we call `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
 `zerosLike` returns a `TorchTensor<float>` object that represents a CPU handle of a PyTorch tensor.
 Then we launch `square_fwd_kernel` with the `__dispatch_kernel` syntax. Note that we can directly pass
 `TorchTensor<float>` arguments to a `TensorView<float>` parameter and the compiler will automatically convert
@@ -113,10 +113,10 @@ The above example demonstrates how to write a simple kernel function in Slang an
 Another major benefit of using Slang is that the Slang compiler support generating backward derivative
 propagation functions automatically.
 
-In the following section, we walkthrough how to use Slang to generate a backward propagation function
+In the following section, we walk through how to use Slang to generate a backward propagation function
 for `square`, and expose it to PyTorch as an autograd function.
 
-First we need to tell Slang compiler that we need the `square` function to be considered a differentiable function so Slang compiler can generate a backward derivative propagation function for it:
+First we need to tell Slang compiler that we need the `square` function to be considered a differentiable function, so Slang compiler can generate a backward derivative propagation function for it:
 ```csharp
 [Differentiable]
 float square(float x)
@@ -153,7 +153,7 @@ void bwd_diff_square(inout DifferentialPair<float> dpInput, float dOut);
 ```
 
 Where the first parameter, `dpInput` represents a pair of original and derivative value for `input`, and the second parameter,
-`dOut`, represents the initial derivative with regard to some latent variable that we wish to backprop through. The resulting
+`dOut`, represents the initial derivative with regard to some latent variable that we wish to back-prop through. The resulting
 derivative will be stored in `dpInput.d`. For example:
 
 ```csharp
@@ -216,6 +216,54 @@ X = tensor([[3., 4.],
 dX = tensor([[6., 8.],
         [0., 2.]])
 ```
+## Specializing shaders using slangpy
+
+`slangpy.loadModule` allows specialization parameters to be specified since it might be easier to write shaders with placeholder definitions that can be substituted at load-time.
+For instance, here's a sphere tracer that uses a _compile-time_ specialization parameter for its maximum number of steps (`N`):
+
+```csharp
+float sphereTrace<let N:int>(Ray ray, SDF sdf)
+{
+    var pt = ray.o;
+    for (int i = 0; i < N; i++)
+    {
+        pt += sdf.eval(pt) * ray.d;
+    }
+
+    return pt;
+}
+
+float render(Ray ray)
+{
+    // Use N=20 for sphere tracing.
+    float3 pt = sphereTrace<20>(ray, sdf);
+    return shade(pt, sdf.normal());
+}
+```
+
+However, instead of using a fixed `20` steps, the renderer can be configured to use an arbitrary compile-time constant.
+
+```csharp
+// Compile-time constant. Expect "MAX_STEPS" to be set by the loadModule call.
+static const uint kMaxSteps = MAX_STEPS;
+
+float render(Ray ray)
+{
+    float3 pt = sphereTrace<kMaxSteps>(ray, sdf);
+    return shade(pt, sdf.normal());
+}
+```
+
+Then multiple versions of this shader can be compiled from Python using the `defines` argument:
+```python
+import slangpy
+
+sdfRenderer20Steps = slangpy.loadModule('sdf.slang', defines={"MAX_STEPS": 20})
+sdfRenderer50Steps = slangpy.loadModule('sdf.slang', defines={"MAX_STEPS": 50})
+...
+```
+
+This is often helpful for code re-use, parameter sweeping, comparison/ablation studies, and more, from the convenience of Python.
 
 ## Back-propagating Derivatives through Complex Access Patterns
 
@@ -229,8 +277,8 @@ surrounding 3x3 pixel block. We can write a Slang function that computes the val
 ```csharp
 float computeOutputPixel(TensorView<float> input, uint2 pixelLoc)
 {
-    int width = input.dim(0);
-    int height = input.dim(1);
+    int width = input.size(0);
+    int height = input.size(1);
 
     // Track the sum of neighboring pixels and the number
     // of pixels currently accumulated.
@@ -367,7 +415,7 @@ void boxFilter_bwd(
 ```
 
 The kernel function simply calls `bwd_diff(computeOutputPixel)` without taking any return values from the call
-and without writing to any elements in the final `inputGradToPropagateTo` tensor. But when exactly does the proapgated
+and without writing to any elements in the final `inputGradToPropagateTo` tensor. But when exactly does the propagated
 output get written to the output gradient tensor (`inputGradToPropagateTo`)?
 
 And that logic is defined in our final piece of code:
@@ -392,7 +440,7 @@ differentiate all operations and function calls in `computeOutputPixel`. By wrap
 with `getInputElement` and by providing a custom backward propagation function of `getInputElement`, we are effectively
 telling the compiler what to do when a derivative propagates to an input tensor element. Inside the body
 of `getInputElement_bwd`, we define what to do then: atomically adds the derivative propagated to the input element
-in the `inputGradToPropagateTo` tensor. Therefore after running `boxFilter_bwd`, the `inputGradToPropagateTo` tensor will contain all the
+in the `inputGradToPropagateTo` tensor. Therefore, after running `boxFilter_bwd`, the `inputGradToPropagateTo` tensor will contain all the
 back propagated derivative values.
 
 Again, to understand all the details of the automatic differentiation system, please refer to the 
@@ -402,9 +450,9 @@ Again, to understand all the details of the automatic differentiation system, pl
 
 As shown in previous tutorial, Slang has defined the `TorchTensor<T>` and `TensorView<T>` type for interop with PyTorch
 tensors. The `TorchTensor<T>` represents the CPU view of a tensor and provides methods to allocate a new tensor object.
-The `TensorView<T>` represents the GPU view of a tensor and provides accesors to read write tensor data.
+The `TensorView<T>` represents the GPU view of a tensor and provides accessors to read write tensor data.
 
-Following is a list of builtin methods and attributes for PyTorch interop.
+Following is a list of built-in methods and attributes for PyTorch interop.
 
 ### `TorchTensor` methods
 
@@ -501,7 +549,7 @@ Marks a function as a CUDA kernel (maps to a `__global__` function)
 Marks a function for export to Python. Functions marked with `[TorchEntryPoint]` will be accessible from a loaded module returned by `slangpy.loadModule`.
 
 #### `[CudaDeviceExport]` attribute
-Marks a function as a cuda device function, and ensures the compiler to include it in the generated cuda source.
+Marks a function as a CUDA device function, and ensures the compiler to include it in the generated CUDA source.
 
 ## Type Marshalling Between Slang and Python
 
@@ -528,4 +576,4 @@ Calling `myFunc` from python will result in a python tuple in the form of
 [[tensor, tensor, tensor], float]
 ```
 
-The same transform rules applies to parameter types.
+The same transform rules apply to parameter types.

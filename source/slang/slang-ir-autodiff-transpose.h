@@ -1560,6 +1560,14 @@ struct DiffTransposePass
     TranspositionResult transposeStore(IRBuilder* builder, IRStore* fwdStore, IRInst*)
     {
         IRInst* revVal = builder->emitLoad(fwdStore->getPtr());
+
+        auto primalType = tryGetPrimalTypeFromDiffInst(fwdStore->getVal());
+        SLANG_ASSERT(primalType);
+
+        // Clear the value at the differential address, by setting to 0.
+        IRInst* emptyVal = emitDZeroOfDiffInstType(builder, primalType);
+        builder->emitStore(fwdStore->getPtr(), emptyVal);
+
         if (auto diffPairType = as<IRDifferentialPairType>(revVal->getDataType()))
         {
             revVal = builder->emitDifferentialPairGetDifferential(
