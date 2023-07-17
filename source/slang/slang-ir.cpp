@@ -6861,8 +6861,13 @@ namespace Slang
                     dedupContext = thisInst->getModule()->getDeduplicationContext();
                 }
                 dedupContext->getInstReplacementMap()[thisInst] = other;
+                
+                // If thisInst is hoistable, remove it from global dedup map now since
+                // we don't want to other insts to be replaced with thisInst.
+                dedupContext->getGlobalValueNumberingMap().remove(thisInst);
             }
 
+     
             // We will walk through the list of uses for the current
             // instruction, and make them point to the other inst.
             IRUse* ff = thisInst->firstUse;
