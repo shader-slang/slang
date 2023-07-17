@@ -270,8 +270,6 @@ class Substitutions: public NodeBase
 {
     SLANG_ABSTRACT_AST_CLASS(Substitutions)
 
-    // The next outer that this one refines.
-    Substitutions* outer = nullptr;
 
     // Apply a set of substitutions to the bindings in this substitution
     Substitutions* applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
@@ -284,20 +282,26 @@ class Substitutions: public NodeBase
     Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
+
+    Substitutions* getOuter() const { return outer; }
+protected:
+    // The next outer that this one refines.
+    Substitutions* outer = nullptr;
 };
 
 class GenericSubstitution : public Substitutions
 {
     SLANG_AST_CLASS(GenericSubstitution)
 
+private:
     // The generic declaration that defines the
     // parameters we are binding to arguments
     GenericDecl* genericDecl = nullptr;
 
-private:
     // The actual values of the arguments
     List<Val* > args;
 public:
+    GenericDecl* getGenericDecl() const { return genericDecl; }
     List<Val*>& getArgs() { return args; }
     const List<Val*>& getArgs() const { return args; }
 
@@ -306,24 +310,12 @@ public:
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 
-    GenericSubstitution(GenericDecl* decl)
+    GenericSubstitution(Substitutions* outerSubst, GenericDecl* decl, ArrayView<Val*> argVals)
     {
-        genericDecl = decl;
-    }
-
-    GenericSubstitution(GenericDecl* decl, ArrayView<Val*> argVals)
-    {
+        outer = outerSubst;
         genericDecl = decl;
         args.addRange(argVals);
     }
-
-    template<typename... TArgs>
-    GenericSubstitution(GenericDecl* decl, TArgs... inArgs)
-    {
-        genericDecl = decl;
-        addToList(args, inArgs...);
-    }
-
 };
 
 class ThisTypeSubstitution : public Substitutions
@@ -343,9 +335,11 @@ class ThisTypeSubstitution : public Substitutions
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 
-    ThisTypeSubstitution(InterfaceDecl* inInterfaceDecl, SubtypeWitness* inWitness)
+    ThisTypeSubstitution(Substitutions* outerSubst, InterfaceDecl* inInterfaceDecl, SubtypeWitness* inWitness)
         : interfaceDecl(inInterfaceDecl), witness(inWitness)
-    {}
+    {
+        outer = outerSubst;
+    }
 };
 
 class Decl;

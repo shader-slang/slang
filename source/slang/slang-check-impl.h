@@ -1613,7 +1613,7 @@ namespace Slang
             DeclRef<FuncDecl> fst,
             DeclRef<FuncDecl> snd);
 
-        GenericSubstitution* createDummySubstitutions(
+        List<Val*> getDefaultSubstitutionArgs(
             GenericDecl* genericDecl);
 
         Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);

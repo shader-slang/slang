@@ -1061,7 +1061,7 @@ namespace Slang
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, fieldType);
                     });
             }
-            for (auto subst = declRefType->declRef.getSubst(); subst; subst = subst->outer)
+            for (auto subst = declRefType->declRef.getSubst(); subst; subst = subst->getOuter())
             {
                 if (auto genSubst = as<GenericSubstitution>(subst))
                 {
@@ -1507,7 +1507,7 @@ namespace Slang
 
         if (isInterfaceRequirement(decl))
         {
-            for (auto subst = declRef.getSubst(); subst; subst = subst->outer)
+            for (auto subst = declRef.getSubst(); subst; subst = subst->getOuter())
             {
                 if (auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
                 {

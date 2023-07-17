@@ -4004,7 +4004,7 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
 
     void collectReferencedModules(SubstitutionSet const& substitutions)
     {
-        for(auto subst = substitutions.substitutions; subst; subst = subst->outer)
+        for(auto subst = substitutions.substitutions; subst; subst = subst->getOuter())
         {
             collectReferencedModules(subst);
         }

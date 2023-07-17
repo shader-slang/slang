@@ -772,10 +772,8 @@ DeclRef<InterfaceDecl> ExtractExistentialType::getSpecializedInterfaceDeclRef()
 
     SubtypeWitness* openedWitness = getSubtypeWitness();
 
-    ThisTypeSubstitution* openedThisType = m_astBuilder->create<ThisTypeSubstitution>();
-    openedThisType->outer = originalInterfaceDeclRef.getSubst();
-    openedThisType->interfaceDecl = interfaceDecl;
-    openedThisType->witness = openedWitness;
+    ThisTypeSubstitution* openedThisType = m_astBuilder->getOrCreateThisTypeSubstitution(
+        interfaceDecl, openedWitness, originalInterfaceDeclRef.getSubst());
 
     DeclRef<InterfaceDecl> specialiedInterfaceDeclRef = m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
 

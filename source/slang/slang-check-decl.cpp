@@ -596,7 +596,7 @@ namespace Slang
         GenericSubstitution* cachedResult = nullptr;
         if (astBuilder->m_genericDefaultSubst.tryGetValue(genericDecl, cachedResult))
         {
-            if (cachedResult->outer == outerSubst)
+            if (cachedResult->getOuter() == outerSubst)
                 return cachedResult;
         }
 
@@ -648,7 +648,7 @@ namespace Slang
             }
         }
 
-        GenericSubstitution* genericSubst = astBuilder->getOrCreateGenericSubstitution(genericDecl, args, outerSubst);
+        GenericSubstitution* genericSubst = astBuilder->getOrCreateGenericSubstitution(outerSubst, genericDecl, args);
         if (shouldCache)
             astBuilder->m_genericDefaultSubst[genericDecl] = genericSubst;
         return genericSubst;
@@ -2292,9 +2292,9 @@ namespace Slang
         }
 
         GenericSubstitution* requiredSubst = m_astBuilder->getOrCreateGenericSubstitution(
+            requiredGenericDeclRef.getSubst(),
             requiredGenericDeclRef.getDecl(),
-            requiredSubstArgs,
-            requiredGenericDeclRef.getSubst());
+            requiredSubstArgs);
 
         // Now that we have computed a set of specialization arguments that will
         // specialize the generic requirement at the type parameters of the satisfying
@@ -3729,10 +3729,10 @@ namespace Slang
         // of `This` in the interface as equivalent to the concrete type for the
         // purpose of signature matching (and similarly for associated types).
         //
-        ThisTypeSubstitution* thisTypeSubst = m_astBuilder->create<ThisTypeSubstitution>();
-        thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
-        thisTypeSubst->witness = subTypeConformsToSuperInterfaceWitness;
-        thisTypeSubst->outer = superInterfaceDeclRef.getSubst();
+        ThisTypeSubstitution* thisTypeSubst = m_astBuilder->getOrCreateThisTypeSubstitution(
+            superInterfaceDeclRef.getDecl(),
+            subTypeConformsToSuperInterfaceWitness,
+            superInterfaceDeclRef.getSubst());
 
         auto specializedSuperInterfaceDeclRef = m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
 
@@ -4871,8 +4871,8 @@ namespace Slang
         // looks like `T : IFoo`.
         //
         auto& substRightToLeft = *outSubstRightToLeft;
-        substRightToLeft = createDummySubstitutions(left);
-        substRightToLeft->genericDecl = right;
+        List<Val*> leftArgs = getDefaultSubstitutionArgs(left);
+        substRightToLeft = getASTBuilder()->getOrCreateGenericSubstitution(nullptr, right, leftArgs);
 
         // We should now be able to enumerate the constraints
         // on `right` in a way that uses the same type parameters
@@ -5014,8 +5014,7 @@ namespace Slang
         return true;
     }
 
-    GenericSubstitution* SemanticsVisitor::createDummySubstitutions(
-        GenericDecl* genericDecl)
+    List<Val*> SemanticsVisitor::getDefaultSubstitutionArgs(GenericDecl* genericDecl)
     {
         List<Val*> args;
         for (auto dd : genericDecl->members)
@@ -5053,8 +5052,7 @@ namespace Slang
                 args.add(witness);
             }
         }
-        GenericSubstitution* subst = m_astBuilder->getOrCreateGenericSubstitution(genericDecl, args, nullptr);
-        return subst;
+        return args;
     }
 
     typedef Dictionary<Name*, CallableDecl*> TargetDeclDictionary;
@@ -6220,10 +6218,10 @@ namespace Slang
                                     SLANG_ASSERT(!as<ThisTypeSubstitution>(targetInterfaceDeclRef.getSubst()));
 
                                     // We will create a new substitution to apply to the target type.
-                                    ThisTypeSubstitution* newTargetSubst = m_astBuilder->create<ThisTypeSubstitution>();
-                                    newTargetSubst->interfaceDecl = appThisTypeSubst->interfaceDecl;
-                                    newTargetSubst->witness = appThisTypeSubst->witness;
-                                    newTargetSubst->outer = targetInterfaceDeclRef.getSubst();
+                                    ThisTypeSubstitution* newTargetSubst = m_astBuilder->getOrCreateThisTypeSubstitution(
+                                        appThisTypeSubst->interfaceDecl,
+                                        appThisTypeSubst->witness,
+                                        targetInterfaceDeclRef.getSubst());
 
                                     targetType = DeclRefType::create(m_astBuilder,
                                         m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(targetInterfaceDeclRef.getDecl(), newTargetSubst));
@@ -6235,10 +6233,10 @@ namespace Slang
                                     // references to the target type of the extension
                                     // declaration have a chance to resolve the way we want them to.
 
-                                    ThisTypeSubstitution* newExtSubst = m_astBuilder->create<ThisTypeSubstitution>();
-                                    newExtSubst->interfaceDecl = appThisTypeSubst->interfaceDecl;
-                                    newExtSubst->witness = appThisTypeSubst->witness;
-                                    newExtSubst->outer = extDeclRef.getSubst();
+                                    ThisTypeSubstitution* newExtSubst = m_astBuilder->getOrCreateThisTypeSubstitution(
+                                        appThisTypeSubst->interfaceDecl,
+                                        appThisTypeSubst->witness,
+                                        extDeclRef.getSubst());
 
                                     extDeclRef = m_astBuilder->getSpecializedDeclRef<ExtensionDecl>(
                                         extDeclRef.getDecl(),
@@ -6851,7 +6849,7 @@ namespace Slang
         {
             if (auto concreteType = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(m_astBuilder, declRefType->declRef))
                 return as<Type>(concreteType);
-            for (auto subst = declRefType->declRef.getSubst(); subst; subst=subst->outer)
+            for (auto subst = declRefType->declRef.getSubst(); subst; subst=subst->getOuter())
             {
                 if (auto genericSubst = as<GenericSubstitution>(subst))
                 {

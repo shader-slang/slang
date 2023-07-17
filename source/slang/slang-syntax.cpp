@@ -425,20 +425,33 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // nested generics.
         //
 
-        // We are going to build up a list of substitutions that need
-        // to be applied to the decl-ref to make it specialized.
-        Substitutions* substsToApply = nullptr;
-        Substitutions** link = &substsToApply;
-
+        // First, we collect all the generic parents.
+        ShortList<GenericDecl*> genericParents;
         Decl* dd = declRef.getDecl();
-        for(;;)
+        for (;;)
         {
             Decl* childDecl = dd;
             Decl* parentDecl = dd->parentDecl;
-            if(!parentDecl)
+            if (!parentDecl)
                 break;
 
             dd = parentDecl;
+
+            if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+            {
+                // Don't specialize any parameters of a generic.
+                if (childDecl != genericParentDecl->inner)
+                    break;
+                genericParents.add(genericParentDecl);
+            }
+        }
+
+
+        Substitutions* outerSubst = nullptr;
+        for (Index i = genericParents.getCount()-1; i>=0; i--)
+        {
+            Decl* childDecl = genericParents[i]->inner;
+            Decl* parentDecl = genericParents[i];
 
             if(auto genericParentDecl = as<GenericDecl>(parentDecl))
             {
@@ -448,18 +461,24 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                 // We have a generic ancestor, but do we have an substitutions for it?
                 GenericSubstitution* foundSubst = nullptr;
-                for(auto s = declRef.getSubst(); s; s = s->outer)
+                for(auto s = declRef.getSubst(); s; s = s->getOuter())
                 {
                     auto genSubst = as<GenericSubstitution>(s);
                     if(!genSubst)
                         continue;
 
-                    if(genSubst->genericDecl != genericParentDecl)
+                    if(genSubst->getGenericDecl() != genericParentDecl)
                         continue;
 
                     // Okay, we found a matching substitution,
-                    // so there is nothing to be done.
+                    // so we just grab the args from the matching subst instead.
                     foundSubst = genSubst;
+                    if (foundSubst->getOuter() != outerSubst)
+                    {
+                        foundSubst = astBuilder->getOrCreateGenericSubstitution(
+                            outerSubst, foundSubst->getGenericDecl(), foundSubst->getArgs());
+                    }
+
                     break;
                 }
 
@@ -469,19 +488,21 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         astBuilder,
                         semantics,
                         genericParentDecl,
-                        nullptr);
-
-                    *link = newSubst;
-                    link = &newSubst->outer;
+                        outerSubst);
+                    outerSubst = newSubst;
+                }
+                else
+                {
+                    outerSubst = foundSubst;
                 }
             }
         }
 
-        if(!substsToApply)
+        if(!outerSubst)
             return declRef;
 
         int diff = 0;
-        return declRef.substituteImpl(astBuilder, substsToApply, &diff);
+        return declRef.substituteImpl(astBuilder, outerSubst, &diff);
     }
 
     // TODO: need to figure out how to unify this with the logic
@@ -494,14 +515,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         if (auto builtinMod = declRef.getDecl()->findModifier<BuiltinTypeModifier>())
         {
-            auto type = astBuilder->create<BasicExpressionType>(builtinMod->tag);
+            auto type = astBuilder->getOrCreate<BasicExpressionType>(builtinMod->tag);
             type->declRef = declRef;
             return type;
         }
         else if (auto magicMod = declRef.getDecl()->findModifier<MagicTypeModifier>())
         {
             GenericSubstitution* subst = nullptr;
-            for(auto s = declRef.getSubst(); s; s = s->outer)
+            for(auto s = declRef.getSubst(); s; s = s->getOuter())
             {
                 if(auto genericSubst = as<GenericSubstitution>(s))
                 {
@@ -561,7 +582,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             else if (magicMod->magicName == "TextureSampler")
             {
                 SLANG_ASSERT(subst && subst->getArgs().getCount() >= 1);
-                auto textureType = astBuilder->create<TextureSamplerType>(
+                auto textureType = astBuilder->getOrCreate<TextureSamplerType>(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->getArgs()[0]));
                 textureType->declRef = declRef;
@@ -683,7 +704,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     GenericSubstitution* findInnerMostGenericSubstitution(Substitutions* subst)
     {
-        for(Substitutions* s = subst; s; s = s->outer)
+        for(Substitutions* s = subst; s; s = s->getOuter())
         {
             if(auto genericSubst = as<GenericSubstitution>(s))
                 return genericSubst;
@@ -803,7 +824,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // Does it already have a specialization for that generic?
                 if(auto specGenericSubst = as<GenericSubstitution>(substsToSpecialize))
                 {
-                    if(specGenericSubst->genericDecl == ancestorGenericDecl)
+                    if(specGenericSubst->getGenericDecl() == ancestorGenericDecl)
                     {
                         // Yes. We have an existing specialization, so we will
                         // keep one matching it in place.
@@ -811,7 +832,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         auto restSubst = specializeSubstitutions(
                             astBuilder,
                             ancestorGenericDecl->parentDecl,
-                            specGenericSubst->outer,
+                            specGenericSubst->getOuter(),
                             substsToApply,
                             &diff);
 
@@ -835,13 +856,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // "default" specializations, this case shouldn't
                 // actually come up.
                 //
-                for(auto s = substsToApply; s; s = s->outer)
+                for(auto s = substsToApply; s; s = s->getOuter())
                 {
                     auto appGenericSubst = as<GenericSubstitution>(s);
                     if(!appGenericSubst)
                         continue;
 
-                    if(appGenericSubst->genericDecl != ancestorGenericDecl)
+                    if(appGenericSubst->getGenericDecl() != ancestorGenericDecl)
                         continue;
 
                     // The substitutions we are applying are trying
@@ -858,7 +879,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         &diff);
 
                     GenericSubstitution* firstSubst = astBuilder->getOrCreateGenericSubstitution(
-                        ancestorGenericDecl, appGenericSubst->getArgs(), restSubst);
+                        restSubst, ancestorGenericDecl, appGenericSubst->getArgs());
 
                     (*ioDiff)++;
                     return firstSubst;
@@ -882,7 +903,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         auto restSubst = specializeSubstitutions(
                             astBuilder,
                             ancestorInterfaceDecl->parentDecl,
-                            specThisTypeSubst->outer,
+                            specThisTypeSubst->getOuter(),
                             substsToApply,
                             &diff);
 
@@ -912,7 +933,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // reference.
                 if (declToSpecialize != ancestorInterfaceDecl)
                 {
-                    for (auto s = substsToApply; s; s = s->outer)
+                    for (auto s = substsToApply; s; s = s->getOuter())
                     {
                         auto appThisTypeSubst = as<ThisTypeSubstitution>(s);
                         if (!appThisTypeSubst)
@@ -1049,7 +1070,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 if(thisTypeSubst->interfaceDecl == interfaceDecl)
                 {
                     // Strip away that specializations that apply to the interface.
-                    substToApply = thisTypeSubst->outer;
+                    substToApply = thisTypeSubst->getOuter();
                 }
             }
         }
@@ -1064,10 +1085,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             //
             if(auto genericSubst = as<GenericSubstitution>(substToApply))
             {
-                if(genericSubst->genericDecl == parentGenericDecl)
+                if(genericSubst->getGenericDecl() == parentGenericDecl)
                 {
                     // Strip away the specializations that were applied to the parent.
-                    substToApply = genericSubst->outer;
+                    substToApply = genericSubst->getOuter();
                 }
             }
         }
@@ -1207,7 +1228,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         const Substitutions*  substs,
         InterfaceDecl*  interfaceDecl)
     {
-        for(const Substitutions* s = substs; s; s = s->outer)
+        for(const Substitutions* s = substs; s; s = s->getOuter())
         {
             auto thisTypeSubst = as<ThisTypeSubstitution>(s);
             if(!thisTypeSubst)
@@ -1230,7 +1251,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         auto substAssocTypeDecl = substDeclRef.getDecl();
 
-        for (auto s = substDeclRef.getSubst(); s; s = s->outer)
+        for (auto s = substDeclRef.getSubst(); s; s = s->getOuter())
         {
             auto thisSubst = as<ThisTypeSubstitution>(s);
             if (!thisSubst)
@@ -1346,14 +1367,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
 
         // Look for generic substitutions on this type.
-        for (const Substitutions* subst = substitutions; subst; subst = subst->outer)
+        for (const Substitutions* subst = substitutions; subst; subst = subst->getOuter())
         {
             auto genericSubstitution = Slang::as<GenericSubstitution>(subst);
             if (!genericSubstitution)
                 continue;
 
             // If the substitution is for this type, print it.
-            if (genericSubstitution->genericDecl == decl)
+            if (genericSubstitution->getGenericDecl() == decl)
             {
                 out << "<";
                 bool isFirst = true;

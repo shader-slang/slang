@@ -311,10 +311,10 @@ DeclRef<Decl> _maybeSpecializeSuperTypeDeclRef(
     {
         if (auto superInterfaceDeclRef = superDeclRefType->declRef.as<InterfaceDecl>())
         {
-            ThisTypeSubstitution* thisTypeSubst = astBuilder->create<ThisTypeSubstitution>();
-            thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
-            thisTypeSubst->witness = subIsSuperWitness;
-            thisTypeSubst->outer = declRefToSpecialize.getSubst();
+            ThisTypeSubstitution* thisTypeSubst = astBuilder->getOrCreateThisTypeSubstitution(
+                superInterfaceDeclRef.getDecl(),
+                subIsSuperWitness,
+                declRefToSpecialize.getSubst());
 
             auto specializedDeclRef = astBuilder->getSpecializedDeclRef<Decl>(declRefToSpecialize.getDecl(), thisTypeSubst);
 
@@ -563,9 +563,7 @@ static void _lookUpMembersInSuperTypeImpl(
         //
         auto interfaceType = DeclRefType::create(astBuilder, thisType->interfaceDeclRef);
 
-        auto superIsInterfaceWitness = astBuilder->create<ThisTypeSubtypeWitness>();
-        superIsInterfaceWitness->sub = superType;
-        superIsInterfaceWitness->sup = interfaceType;
+        auto superIsInterfaceWitness = astBuilder->getThisTypeSubtypeWitness(superType, interfaceType);
 
         auto leafIsInterfaceWitness = _makeSubtypeWitness(
             astBuilder,
