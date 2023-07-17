@@ -421,6 +421,13 @@ static DiagnosticSink* getSink(ParameterBindingContext* context)
 
 struct LayoutSemanticInfo
 {
+    void init()
+    {
+        space = 0;
+        index = 0;
+        kind = LayoutResourceKind::None;
+    }
+
     LayoutResourceKind  kind; // the register kind
     UInt                space;
     UInt                index;
@@ -493,9 +500,7 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     )
 {
     LayoutSemanticInfo info;
-    info.space = 0;
-    info.index = 0;
-    info.kind = LayoutResourceKind::None;
+    info.init();
 
     if (registerName.getLength() == 0)
         return info;
@@ -972,6 +977,26 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     }
 }
 
+static VarLayout* _findLayoutForDeclaration(ProgramLayout* programLayout, VarLayout* varLayout)
+{
+    auto varDecl = varLayout->varDecl;
+
+    auto paramsLayout = programLayout->parametersLayout;
+    auto typeLayout = paramsLayout->getTypeLayout();
+
+    StructTypeLayout* existingStructLayout = as<StructTypeLayout>(typeLayout);
+
+    for (auto field : existingStructLayout->fields)
+    {
+        if (field->getVariable() == varDecl.getDecl())
+        {
+            return field;
+        }
+    }
+
+    return nullptr;
+}
+
 static void addExplicitParameterBindings_GLSL(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo,
@@ -1058,25 +1083,46 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
+    LayoutSemanticInfo hlslInfo; 
+    hlslInfo.init();
+
     // We need an HLSL register semantic to to infer from
     auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
-    if (hlslRegSemantic == nullptr)
+    if (hlslRegSemantic)
+    {
+        // Get the HLSL binding info
+        hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
+    }
+    else
     {
         if (ProgramLayout* existingProgramLayout = context->shared->existingProgramLayout)
         {
+            if (VarLayout* existingVarLayout = _findLayoutForDeclaration(context->shared->existingProgramLayout, varLayout))
+            {
+                // This is only going to work if there is *one* resource type associated
+                if (existingVarLayout->resourceInfos.getCount() == 1)
+                {
+                    const auto& resourceInfo = existingVarLayout->resourceInfos[0];
 
+                    // Copy the info over
+                    hlslInfo.kind = resourceInfo.kind;
+                    hlslInfo.index = resourceInfo.index;
+                    hlslInfo.space = resourceInfo.space;
+                }
+            }
         }
 
-        // We don't have a HLSL binding, so no inferance can occur, issue a warning
-        // 
-        // TODO(JS): I suppose there is some ambiguity here, because if we did a semantic lookup, and it didn't have a vulkanKind
-        // or didn't parse correctly we wouldn't issue this message.
-        getSink(context)->diagnose(varDecl.getDecl(), Diagnostics::cannotInferVulkanBindingWithoutRegisterModifier, varDecl);
-        return;
+        if (hlslInfo.kind == LayoutResourceKind::None)
+        {
+            // We don't have a HLSL binding, so no inferance can occur, issue a warning
+            // 
+            // TODO(JS): I suppose there is some ambiguity here, because if we did a semantic lookup, and it didn't have a vulkanKind
+            // or didn't parse correctly we wouldn't issue this message.
+            getSink(context)->diagnose(varDecl.getDecl(), Diagnostics::cannotInferVulkanBindingWithoutRegisterModifier, varDecl);
+            return;
+        }
     }
             
-    // Get the HLSL binding info
-    const auto hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     if (hlslInfo.kind == LayoutResourceKind::None)
     {
         // Is no hlsl resource binding
@@ -3899,7 +3945,11 @@ RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram* targetProgram,
     DiagnosticSink* sink)
 {
-    RefPtr<ProgramLayout> existingProgramLayout;
+    // Define here so they in scope throughout the final _generateParameterBindingsImpl run
+    // These are only needed if we are going to infer vk bindings from HLSL bindings
+    // using the vk-shift-* mechanism/s
+    RefPtr<ProgramLayout> hlslProgramLayout;
+    RefPtr<TargetProgram> hlslTargetProgram;
 
     auto targetReq = targetProgram->getTargetReq();
     if (auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions())
@@ -3912,13 +3962,13 @@ RefPtr<ProgramLayout> generateParameterBindings(
         hlslTargetReq->copy(*targetReq);
         
         // Create a target program
-        RefPtr<TargetProgram> hlslTargetProgram(new TargetProgram(targetProgram->getProgram(), hlslTargetReq));
+        hlslTargetProgram = new TargetProgram(targetProgram->getProgram(), hlslTargetReq);
 
         // Do the layout
-        existingProgramLayout = _generateParameterBindingsImpl(hlslTargetProgram, sink, nullptr);
+        hlslProgramLayout = _generateParameterBindingsImpl(hlslTargetProgram, sink, nullptr);
     }
  
-    return _generateParameterBindingsImpl(targetProgram, sink, existingProgramLayout);
+    return _generateParameterBindingsImpl(targetProgram, sink, hlslProgramLayout);
 }
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
