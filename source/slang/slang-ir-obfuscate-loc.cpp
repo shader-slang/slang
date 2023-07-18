@@ -362,8 +362,8 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
         sourceMap->addEntry(entries[i]);
     }
 
-    // Associate the sourceMap with the obfuscated file
-    obfuscatedFile->setSourceMap(boxedSourceMap);
+    // Associate the sourceMap with the obfuscated file. 
+    obfuscatedFile->setSourceMap(boxedSourceMap, SourceMapKind::Obfuscated);
 
     // Set the obfuscated map onto the module
     module->setObfuscatedSourceMap(boxedSourceMap);

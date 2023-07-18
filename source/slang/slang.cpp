@@ -3464,6 +3464,106 @@ SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL ComponentType::getLayout(
     return asExternal(programLayout);
 }
 
+static ICastable* _findDiagnosticRepresentation(IArtifact* artifact)
+{
+    if (auto rep = findAssociatedRepresentation<IArtifactDiagnostics>(artifact))
+    {
+        return rep;
+    }
+
+    for (auto associated : artifact->getAssociated())
+    {
+        if (isDerivedFrom(associated->getDesc().payload, ArtifactPayload::Diagnostics))
+        {
+            return associated;
+        }
+    }
+    return nullptr;
+}
+
+static IArtifact* _findObfuscatedSourceMap(IArtifact* artifact)
+{
+    // If we find any obfuscated source maps, we are done
+    for (auto associated : artifact->getAssociated())
+    {
+        const auto desc = associated->getDesc();
+
+        if (isDerivedFrom(desc.payload, ArtifactPayload::SourceMap) &&
+            isDerivedFrom(desc.style, ArtifactStyle::Obfuscated))
+        {
+            return associated;        
+        }
+    }
+    return nullptr;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getResultAsFileSystem(
+    SlangInt        entryPointIndex,
+    Int             targetIndex,
+    ISlangMutableFileSystem** outFileSystem)
+{
+    ComPtr<ISlangBlob> diagnostics;
+    ComPtr<ISlangBlob> code;
+
+    SLANG_RETURN_ON_FAIL(getEntryPointCode(entryPointIndex, targetIndex, diagnostics.writeRef(), code.writeRef()));
+
+    auto linkage = getLinkage();
+
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    IArtifact* artifact = targetProgram->getExistingEntryPointResult(entryPointIndex);
+    
+    // Add diagnostics id needs be...
+    if (diagnostics && !_findDiagnosticRepresentation(artifact))
+    {
+        // Add as an associated 
+
+        auto diagnosticsArtifact = Artifact::create(ArtifactDesc::make(Artifact::Kind::HumanText, ArtifactPayload::Diagnostics));
+        diagnosticsArtifact->addRepresentationUnknown(diagnostics);
+
+        artifact->addAssociated(diagnosticsArtifact);
+
+        SLANG_ASSERT(diagnosticsArtifact == _findDiagnosticRepresentation(artifact));
+    }
+
+    // Add obfuscated source maps
+    if (!_findObfuscatedSourceMap(artifact))
+    {
+        List<IRModule*> irModules;
+        enumerateIRModules([&](IRModule* irModule) -> void { irModules.add(irModule); });
+
+        for (auto irModule : irModules)
+        {
+            if (auto obfuscatedSourceMap = irModule->getObfuscatedSourceMap())
+            {
+                auto artifactDesc = ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::Obfuscated);
+
+                // Create the source map artifact
+                auto sourceMapArtifact = Artifact::create(artifactDesc, obfuscatedSourceMap->get().m_file.getUnownedSlice());
+
+                sourceMapArtifact->addRepresentation(obfuscatedSourceMap);
+
+                // associate with the artifact
+                artifact->addAssociated(sourceMapArtifact);
+            }
+        }
+    }
+    
+    // Turn into a file system and return
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+
+    // Filter the containerArtifact into things that can be written
+    ComPtr<IArtifact> writeArtifact;
+    SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::filter(artifact, writeArtifact));
+    SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, "", fileSystem));
+
+    *outFileSystem = fileSystem.detach();
+
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     SlangInt        entryPointIndex,
     Int             targetIndex,
@@ -4983,7 +5083,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
                 if (name.getLength())
                 {
                     auto sourceFile = sourceManager->findSourceFileByPathRecursively(name);
-                    sourceFile->setSourceMap(sourceMap);
+                    sourceFile->setSourceMap(sourceMap, SourceMapKind::Obfuscated);
                 }
             }
         }

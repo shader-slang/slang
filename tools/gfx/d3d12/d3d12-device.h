@@ -56,6 +56,8 @@ public:
 
     ComPtr<ID3D12Debug> m_dxDebug;
 
+    static const bool g_isAftermathEnabled;
+
     D3D12DeviceInfo m_deviceInfo;
     ID3D12Device* m_device = nullptr;
     ID3D12Device5* m_device5 = nullptr;

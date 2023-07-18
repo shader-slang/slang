@@ -121,6 +121,10 @@ class D3DUtil
     static D3D12_RESOURCE_STATES getResourceState(ResourceState state);
 
     static SlangResult reportLiveObjects();
+
+        /// Call after a DXGI_ERROR_DEVICE_REMOVED/DXGI_ERROR_DEVICE_RESET on present, to wait for 
+        /// dumping to complete. Will return SLANG_OK if wait happened successfully
+    static SlangResult waitForCrashDumpCompletion(HRESULT res);
 };
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
