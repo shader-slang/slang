@@ -407,6 +407,12 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
 class ThisTypeSubtypeWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(ThisTypeSubtypeWitness)
+
+    ThisTypeSubtypeWitness(Type* subType, Type* supType)
+    {
+        sub = subType;
+        sup = supType;
+    }
 };
 
     /// A witness of the fact that a user provided "__Dynamic" type argument is a

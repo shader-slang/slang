@@ -3574,43 +3574,32 @@ struct IRTypeLegalizationPass
         // In order to process an entire module, we start by adding the
         // root module insturction to our work list, and then we will
         // proceed to process instructions until the work list goes dry.
-        // The entire process is repeated until no more changes can be
-        // made to the module.
-        //
-        for (;;)
+
+        addToWorkList(module->getModuleInst());
+        while( workList.getCount() != 0 )
         {
-            auto lastReplacedInstCount = context->replacedInstructions.getCount();
-            addToWorkList(module->getModuleInst());
-            while( workList.getCount() != 0 )
+            // The order of items in the work list is signficiant;
+            // later entries could depend on earlier ones. As such, we
+            // cannot just do something like the `fastRemoveAt(...)`
+            // operation that could potentially lead to instructions
+            // being processed in a different order than they were added.
+            //
+            // Instead, we will make a copy of the current work list
+            // at each step, and swap in an empty work list to be added
+            // to with any new instructions.
+            //
+            List<IRInst*> workListCopy = _Move(workList);
+
+            resetScratchDataBit(module->getModuleInst(), kHasBeenAddedScratchBitIndex);
+
+            // Now we simply process each instruction on the copy of
+            // the work list, knowing that `processInst` may add additional
+            // instructions to the original work list.
+            //
+            for( auto inst : workListCopy )
             {
-                // The order of items in the work list is signficiant;
-                // later entries could depend on earlier ones. As such, we
-                // cannot just do something like the `fastRemoveAt(...)`
-                // operation that could potentially lead to instructions
-                // being processed in a different order than they were added.
-                //
-                // Instead, we will make a copy of the current work list
-                // at each step, and swap in an empty work list to be added
-                // to with any new instructions.
-                //
-                List<IRInst*> workListCopy;
-                Swap(workListCopy, workList);
-
-                resetScratchDataBit(module->getModuleInst(), kHasBeenAddedScratchBitIndex);
-
-                // Now we simply process each instruction on the copy of
-                // the work list, knowing that `processInst` may add additional
-                // instructions to the original work list.
-                //
-                for( auto inst : workListCopy )
-                {
-                    processInst(inst);
-                }
+                processInst(inst);
             }
-            
-            // Any changes made? Run the process again.
-            if (lastReplacedInstCount == context->replacedInstructions.getCount())
-                break;
         }
 
         // After we are done, there might be various instructions that

@@ -2034,7 +2034,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     void _collectSubstitutionArgs(List<IRInst*>& operands, Substitutions* subst)
     {
         if (!subst) return;
-        _collectSubstitutionArgs(operands, subst->outer);
+        _collectSubstitutionArgs(operands, subst->getOuter());
         if (auto genSubst = as<GenericSubstitution>(subst))
         {
             for (auto arg : genSubst->getArgs())
@@ -3931,11 +3931,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     void _lowerSubstitutionEnv(IRGenContext* subContext, Substitutions* subst)
     {
         if(!subst) return;
-        _lowerSubstitutionEnv(subContext, subst->outer);
+        _lowerSubstitutionEnv(subContext, subst->getOuter());
 
         if (auto genSubst = as<GenericSubstitution>(subst))
         {
-            auto genDecl = genSubst->genericDecl;
+            auto genDecl = genSubst->getGenericDecl();
 
             Index argCounter = 0;
             for( auto memberDecl: genDecl->members )
@@ -9415,7 +9415,7 @@ LoweredValInfo emitDeclRef(
     if(!canDeclLowerToAGeneric(decl))
     {
         while(auto genericSubst = as<GenericSubstitution>(subst))
-            subst = genericSubst->outer;
+            subst = genericSubst->getOuter();
     }
 
     // In the simplest case, there is no specialization going
@@ -9444,7 +9444,7 @@ LoweredValInfo emitDeclRef(
         LoweredValInfo genericVal = emitDeclRef(
             context,
             decl,
-            genericSubst->outer,
+            genericSubst->getOuter(),
             context->irBuilder->getGenericKind());
 
         // There's no reason to specialize something that maps to a NULL pointer.
@@ -9542,7 +9542,7 @@ LoweredValInfo emitDeclRef(
             // are lowered as generics, where the generic parameter represents
             // the `ThisType`.
             //
-            auto genericVal = emitDeclRef(context, decl, thisTypeSubst->outer, context->irBuilder->getGenericKind());
+            auto genericVal = emitDeclRef(context, decl, thisTypeSubst->getOuter(), context->irBuilder->getGenericKind());
             auto irGenericVal = getSimpleVal(context, genericVal);
 
             // In order to reference the member for a particular type, we

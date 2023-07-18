@@ -3092,6 +3092,7 @@ namespace Slang
             /// For parsing command line options
         CommandOptions m_commandOptions;
 
+        int m_typeDictionarySize = 0;
     private:
 
         void _initCodeGenTransitionMap();

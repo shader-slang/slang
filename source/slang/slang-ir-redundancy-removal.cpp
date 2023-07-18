@@ -10,6 +10,10 @@ struct RedundancyRemovalContext
     RefPtr<IRDominatorTree> dom;
     bool isMovableInst(IRInst* inst)
     {
+        // Don't try to modify hoistable insts, they are already globally deduplicated.
+        if (getIROpInfo(inst->getOp()).isHoistable())
+            return false;
+
         switch (inst->getOp())
         {
         case kIROp_Add:
@@ -73,11 +77,6 @@ struct RedundancyRemovalContext
         case kIROp_ExtractExistentialType:
         case kIROp_ExtractExistentialValue:
         case kIROp_ExtractExistentialWitnessTable:
-        case kIROp_PtrType:
-        case kIROp_ArrayType:
-        case kIROp_FuncType:
-        case kIROp_InOutType:
-        case kIROp_OutType:
             return true;
         case kIROp_Call:
             return isPureFunctionalCall(as<IRCall>(inst));

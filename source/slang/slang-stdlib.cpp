@@ -135,6 +135,10 @@ namespace Slang
             else
                 return kConversionCost_GeneralConversion;
         }
+        else if (fromInfo.tag == BaseType::Bool && toInfo.tag == BaseType::Int)
+        {
+            return kConversionCost_BoolToInt;
+        }
 
         // If we are converting from an unsigned integer type to
         // a signed integer type that is guaranteed to be larger,

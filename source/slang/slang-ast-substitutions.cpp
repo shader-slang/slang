@@ -64,7 +64,7 @@ Substitutions* GenericSubstitution::_applySubstitutionsShallowOverride(ASTBuilde
 
     (*ioDiff)++;
 
-    auto substSubst = astBuilder->getOrCreateGenericSubstitution(genericDecl, substArgs, substOuter);
+    auto substSubst = astBuilder->getOrCreateGenericSubstitution(substOuter, genericDecl, substArgs);
     return substSubst;
 }
 

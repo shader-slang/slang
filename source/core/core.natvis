@@ -55,33 +55,33 @@
 </Type>
   
 <Type Name="Slang::Dictionary&lt;*,*&gt;">
-    <DisplayString>{{ size={_count} }}</DisplayString>
+    <DisplayString>{{ size={m_count} }}</DisplayString>
     <Expand>
-        <Item Name="[size]">_count</Item>
-        <Item Name="[capacity]">bucketSizeMinusOne + 1</Item>
+        <Item Name="[size]">m_count</Item>
+        <Item Name="[capacity]">m_bucketCountMinusOne + 1</Item>
         <CustomListItems MaxItemsPerView="5000" ExcludeView="Test">
             <Variable Name="iBucket" InitialValue="0" />
-            <Variable Name="pBucket" InitialValue="hashMap" />
+            <Variable Name="pBucket" InitialValue="m_hashMap" />
             <Variable Name="isDeleted" InitialValue="0" />
             <Variable Name="isEmpty" InitialValue="0" />
-            <Size>_count</Size>
-            <Exec>pBucket = hashMap</Exec>
+            <Size>m_count</Size>
+            <Exec>pBucket = m_hashMap</Exec>
             <Loop>
-                <If Condition="iBucket &gt;= bucketSizeMinusOne + 1">
+                <If Condition="iBucket &gt;= m_bucketCountMinusOne">
                     <Break/>
                 </If>
                 <Exec>
-                    isDeleted = marks.m_buffer.m_count &gt; (iBucket*2+1)/32
-                      ? ((marks.m_buffer.m_buffer[(iBucket*2+1)/32]&amp;(1&lt;&lt;(iBucket*2+1)%32)) != 0)
+                    isDeleted = m_marks.m_buffer.m_count &gt; (iBucket*2+1)/32
+                    ? ((m_marks.m_buffer.m_buffer[(iBucket*2+1)/32]&amp;(1&lt;&lt;(iBucket*2+1)%32)) != 0)
                       : 0
                  </Exec>
                 <Exec>
-                    isEmpty = marks.m_buffer.m_count &gt; (iBucket*2)/32
-                    ? ((marks.m_buffer.m_buffer[(iBucket*2)/32]&amp;(1&lt;&lt;(iBucket*2)%32)) == 0)
+                    isEmpty = m_marks.m_buffer.m_count &gt; (iBucket*2)/32
+                    ? ((m_marks.m_buffer.m_buffer[(iBucket*2)/32]&amp;(1&lt;&lt;(iBucket*2)%32)) == 0)
                     : 1
                 </Exec>
                 <If Condition="isDeleted+isEmpty==0">
-                    <Item>*(hashMap + iBucket)</Item>
+                    <Item>*(m_hashMap + iBucket)</Item>
                 </If>
                 <Exec>iBucket++</Exec>
             </Loop>
@@ -93,21 +93,21 @@
         <DisplayString>{{ size={dict._count} }}</DisplayString>
         <Expand>
             <LinkedListItems>
-                <Size>dict._count</Size>
-                <HeadPointer>dict.kvPairs.head</HeadPointer>
+                <Size>m_dict._count</Size>
+                <HeadPointer>m_dict.kvPairs.head</HeadPointer>
                 <NextPointer>next</NextPointer>
-                <ValueNode>Value</ValueNode>
+                <ValueNode>value</ValueNode>
             </LinkedListItems>
         </Expand>
     </Type>
     <Type Name="Slang::OrderedDictionary&lt;*,*&gt;">
-        <DisplayString>{{ size={_count} }}</DisplayString>
+        <DisplayString>{{ size={m_count} }}</DisplayString>
         <Expand>
             <LinkedListItems>
-                <Size>_count</Size>
-                <HeadPointer>kvPairs.head</HeadPointer>
+                <Size>m_count</Size>
+                <HeadPointer>m_kvPairs.head</HeadPointer>
                 <NextPointer>next</NextPointer>
-                <ValueNode>Value</ValueNode>
+                <ValueNode>value</ValueNode>
             </LinkedListItems>
         </Expand>
     </Type>

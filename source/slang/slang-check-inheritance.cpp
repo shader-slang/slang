@@ -32,6 +32,9 @@ namespace Slang
         auto info = _calcInheritanceInfo(type);
         m_mapTypeToInheritanceInfo[type] = info;
 
+        getSession()->m_typeDictionarySize = Math::Max(
+            getSession()->m_typeDictionarySize, (int)m_mapTypeToInheritanceInfo.getCount());
+
         return info;
     }
 

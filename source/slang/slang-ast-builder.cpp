@@ -298,7 +298,7 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
     {
         auto arrayGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("ArrayType"));
         auto arrayTypeDecl = arrayGenericDecl->inner;
-        auto substitutions = getOrCreate<GenericSubstitution>(arrayGenericDecl, elementType, elementCount);
+        auto substitutions = getOrCreateGenericSubstitution(nullptr, arrayGenericDecl, elementType, elementCount);
         result->declRef = getSpecializedDeclRef<Decl>(arrayTypeDecl, substitutions);
     }
     return result;
@@ -313,7 +313,7 @@ VectorExpressionType* ASTBuilder::getVectorType(
     {
         auto vectorGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("Vector"));
         auto vectorTypeDecl = vectorGenericDecl->inner;
-        auto substitutions = getOrCreate<GenericSubstitution>(vectorGenericDecl, elementType, elementCount);
+        auto substitutions = getOrCreateGenericSubstitution(nullptr, vectorGenericDecl, elementType, elementCount);
         result->declRef = getSpecializedDeclRef<Decl>(vectorTypeDecl, substitutions);
     }
     return result;
@@ -327,7 +327,8 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(
 
     auto typeDecl = genericDecl->inner;
 
-    auto substitutions = getOrCreate<GenericSubstitution>(
+    auto substitutions = getOrCreateGenericSubstitution(
+        nullptr,
         genericDecl,
         valueType,
         primalIsDifferentialWitness);
@@ -367,7 +368,8 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
 
     auto typeDecl = genericDecl->inner;
 
-    auto substitutions = getOrCreate<GenericSubstitution>(
+    auto substitutions = getOrCreateGenericSubstitution(
+        nullptr,
         genericDecl,
         elementType,
         maxElementCount);
@@ -392,7 +394,7 @@ DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, Va
         Substitutions* subst = nullptr;
         if (genericArg)
         {
-            subst = getOrCreate<GenericSubstitution>(genericDecl, genericArg);
+            subst = getOrCreateGenericSubstitution(nullptr, genericDecl, genericArg);
         }
         return getSpecializedDeclRef(decl, subst);
     }
@@ -587,6 +589,11 @@ top:
     transitiveWitness->midToSup = bIsSubtypeOfCWitness;
 
     return transitiveWitness;
+}
+
+ThisTypeSubtypeWitness* ASTBuilder::getThisTypeSubtypeWitness(Type* subType, Type* superType)
+{
+    return getOrCreate<ThisTypeSubtypeWitness>(subType, superType);
 }
 
 SubtypeWitness* ASTBuilder::getExtractFromConjunctionSubtypeWitness(

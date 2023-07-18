@@ -4104,7 +4104,7 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
 
     void collectReferencedModules(SubstitutionSet const& substitutions)
     {
-        for(auto subst = substitutions.substitutions; subst; subst = subst->outer)
+        for(auto subst = substitutions.substitutions; subst; subst = subst->getOuter())
         {
             collectReferencedModules(subst);
         }
@@ -5310,6 +5310,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
     {
         StringBuilder perfResult;
         PerformanceProfiler::getProfiler()->getResult(perfResult);
+        perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
         getSink()->diagnose(SourceLoc(), Diagnostics::performanceBenchmarkResult, perfResult.produceString());
     }
 

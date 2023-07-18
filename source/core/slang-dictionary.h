@@ -191,20 +191,9 @@ namespace Slang
                 int newSize = (m_bucketCountMinusOne + 1) * 2;
                 if (newSize == 0)
                 {
-                    newSize = 16;
+                    newSize = 64;
                 }
-                Dictionary<TKey, TValue> newDict;
-                newDict.m_bucketCountMinusOne = newSize - 1;
-                newDict.m_hashMap = new KeyValuePair<TKey, TValue>[newSize];
-                newDict.m_marks.resizeAndClear(newSize * 2);
-                if (m_hashMap)
-                {
-                    for (auto& kvPair : *this)
-                    {
-                        newDict.add(_Move(kvPair));
-                    }
-                }
-                *this = _Move(newDict);
+                reserve(newSize);
             }
         }
 
@@ -342,6 +331,25 @@ namespace Slang
         {
             m_count = 0;
             m_marks.clear();
+        }
+
+        void reserve(int newSize)
+        {
+            if (newSize <= m_bucketCountMinusOne + 1)
+                return;
+
+            Dictionary<TKey, TValue> newDict;
+            newDict.m_bucketCountMinusOne = newSize - 1;
+            newDict.m_hashMap = new KeyValuePair<TKey, TValue>[newSize];
+            newDict.m_marks.resizeAndClear(newSize * 2);
+            if (m_hashMap)
+            {
+                for (auto& kvPair : *this)
+                {
+                    newDict.add(_Move(kvPair));
+                }
+            }
+            *this = _Move(newDict);
         }
 
         TValue* tryGetValueOrAdd(const TKey& key, const TValue& value)
@@ -785,7 +793,7 @@ namespace Slang
                 int newSize = (m_bucketCountMinusOne + 1) * 2;
                 if (newSize == 0)
                 {
-                    newSize = 16;
+                    newSize = 128;
                 }
                 OrderedDictionary<TKey, TValue> newDict;
                 newDict.m_bucketCountMinusOne = newSize - 1;
