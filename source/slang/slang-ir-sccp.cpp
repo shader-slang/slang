@@ -1248,11 +1248,29 @@ struct SCCPContext
         }
     }
 
-    // Run the constant folding on global scope only.
+    // Run the constant folding on global scope and specialized types only.
     bool applyOnGlobalScope(IRModule* module)
     {
-        builderStorage = IRBuilder(shared->module);
+        bool changed = applyOnScope(module->getModuleInst());
         for (auto child : module->getModuleInst()->getChildren())
+        {
+            switch (child->getOp())
+            {
+            case kIROp_StructType:
+            case kIROp_ClassType:
+            case kIROp_InterfaceType:
+            case kIROp_WitnessTable:
+                changed |= applyOnScope(child);
+                break;
+            }
+        }
+        return changed;
+    }
+
+    bool applyOnScope(IRInst* scopeInst)
+    {
+        builderStorage = IRBuilder(scopeInst);
+        for (auto child : scopeInst->getChildren())
         {
             // Only consider evaluable opcodes.
             if (!isEvaluableOpCode(child->getOp()))
@@ -1265,7 +1283,7 @@ struct SCCPContext
             auto inst = ssaWorkList[0];
             ssaWorkList.fastRemoveAt(0);
             // Only consider evaluable opcodes and insts at global scope.
-            if (!isEvaluableOpCode(inst->getOp()) || inst->getParent() != module->getModuleInst())
+            if (!isEvaluableOpCode(inst->getOp()) || inst->getParent() != scopeInst)
                 continue;
             updateValueForInst(inst);
         }
@@ -1273,7 +1291,7 @@ struct SCCPContext
         bool changed = false;
         // Replace the insts with their values.
         List<IRInst*> instsToRemove;
-        for (auto child : module->getModuleInst()->getChildren())
+        for (auto child : scopeInst->getChildren())
         {
             if (!isEvaluableOpCode(child->getOp()))
                 continue;
