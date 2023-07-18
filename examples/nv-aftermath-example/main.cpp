@@ -277,6 +277,9 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
         const char* args[] = { "-obfuscate", "-line-directive-mode", "source-map" };
      
         request->processCommandLineArguments(args, SLANG_COUNT_OF(args));
+
+        // Enable debug info
+        request->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
     }
 
     ComPtr<slang::IBlob> diagnosticsBlob;
