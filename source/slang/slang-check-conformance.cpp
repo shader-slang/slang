@@ -104,10 +104,6 @@ namespace Slang
         // For now we are continuing to conflate all the subtype-ish relationships but not
         // tangling convertibility into it.
 
-        SubtypeWitness* result = nullptr;
-        if (getShared()->tryGetSubtypeWitness(subType, superType, result))
-            return result;
-
         // In the common case, we can use the pre-computed inheritance information for `subType`
         // to enumerate all the types it transitively inherits from.
         //

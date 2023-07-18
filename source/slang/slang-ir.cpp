@@ -6849,16 +6849,6 @@ namespace Slang
             thisInst = workItem.thisInst;
             other = workItem.otherInst;
 
-            // If `other` has been replaced by something else, use that.
-            if (getIROpInfo(thisInst->getOp()).isHoistable())
-            {
-                if (!dedupContext)
-                {
-                    SLANG_ASSERT(thisInst->getModule());
-                    dedupContext = thisInst->getModule()->getDeduplicationContext();
-                }
-                dedupContext->getInstReplacementMap().tryGetValue(other, other);
-            }
             SLANG_ASSERT(other);
 
             // Safety check: don't try to replace something with itself.
@@ -6875,7 +6865,6 @@ namespace Slang
                 dedupContext->getInstReplacementMap()[thisInst] = other;
             }
 
-     
             // We will walk through the list of uses for the current
             // instruction, and make them point to the other inst.
             IRUse* ff = thisInst->firstUse;
@@ -6915,6 +6904,8 @@ namespace Slang
                     IRInst* existingVal = nullptr;
                     if (dedupContext->getGlobalValueNumberingMap().tryGetValue(IRInstKey{ user }, existingVal))
                     {
+                        // If existingVal has been replaced by something else, use that.
+                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
                         addToWorkList(user, existingVal);
                     }
                     else
