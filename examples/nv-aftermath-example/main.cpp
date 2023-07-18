@@ -412,19 +412,22 @@ static void GFSDK_AFTERMATH_CALL _markerCallback(const void* marker, void* pUser
 
 Slang::Result AftermathCrashExample::initialize()
 {
+    // Defer shader debug information callbacks until an actual GPU crash dump
+    // is generated. Increases memory footprint.
+    const uint32_t aftermathFeatureFlags = GFSDK_Aftermath_GpuCrashDumpFeatureFlags_DeferDebugInfoCallbacks;
+
     // As per docs must be called before any device is created
     GFSDK_Aftermath_EnableGpuCrashDumps(
         GFSDK_Aftermath_Version_API,
         GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX | GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_Vulkan,
-        GFSDK_Aftermath_GpuCrashDumpFeatureFlags_Default,
+        aftermathFeatureFlags,
         _crashCallback,
         _debugInfoCallback,
         _crashDescriptionCallback,
         _markerCallback,
         this);
 
-
-    // Set to a specific render API if needed
+    // Set to a specific render API as needed. Valid values are...
     // 
     // * gfx::DeviceType::Default
     // * gfx::DeviceType::Vulkan

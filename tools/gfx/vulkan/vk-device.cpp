@@ -32,12 +32,6 @@ using namespace Slang;
 namespace vk
 {
 
-#if GFX_NV_AFTERMATH
-/* static */const bool DeviceImpl::g_isAftermathEnabled = true;
-#else
-/* static */const bool DeviceImpl::g_isAftermathEnabled = false;
-#endif
-
 DeviceImpl::~DeviceImpl()
 {
     // Check the device queue is valid else, we can't wait on it..
@@ -673,7 +667,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 #if defined(GFX_NV_AFTERMATH)
     VkDeviceDiagnosticsConfigCreateInfoNV aftermathInfo = {};
 
-    if (g_isAftermathEnabled)
     {
         // Enable NV_device_diagnostic_checkpoints extension to be able to
         // use Aftermath event markers.

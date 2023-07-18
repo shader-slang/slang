@@ -394,12 +394,12 @@ Result DeviceImpl::_createDevice(
             // Initialize Nsight Aftermath for this device.
             // This combination of flags is not necessarily appropraite for real world usage 
             const uint32_t aftermathFlags =  
-                GFSDK_Aftermath_FeatureFlags_EnableMarkers |             // Enable event marker tracking.
-                GFSDK_Aftermath_FeatureFlags_CallStackCapturing |        // Enable automatic call stack event markers.
-                GFSDK_Aftermath_FeatureFlags_EnableResourceTracking |    // Enable tracking of resources.
-                GFSDK_Aftermath_FeatureFlags_GenerateShaderDebugInfo |   // Generate debug information for shaders.
-                GFSDK_Aftermath_FeatureFlags_EnableShaderErrorReporting; // Enable additional runtime shader error reporting.
-
+                GFSDK_Aftermath_FeatureFlags_EnableMarkers |                // Enable event marker tracking.
+                GFSDK_Aftermath_FeatureFlags_CallStackCapturing |           // Enable automatic call stack event markers.
+                GFSDK_Aftermath_FeatureFlags_EnableResourceTracking |       // Enable tracking of resources.
+                GFSDK_Aftermath_FeatureFlags_GenerateShaderDebugInfo |      // Generate debug information for shaders.
+                GFSDK_Aftermath_FeatureFlags_EnableShaderErrorReporting;    // Enable additional runtime shader error reporting.
+            
             auto initResult = GFSDK_Aftermath_DX12_Initialize(
                 GFSDK_Aftermath_Version_API,
                 aftermathFlags,

@@ -30,12 +30,6 @@ using namespace Slang;
 namespace d3d11
 {
 
-#if GFX_NV_AFTERMATH
-/* static */const bool DeviceImpl::g_isAftermathEnabled = true;
-#else
-/* static */const bool DeviceImpl::g_isAftermathEnabled = false;
-#endif
-
 SlangResult DeviceImpl::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
@@ -165,7 +159,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 #ifdef GFX_NV_AFTERMATH
             if (SLANG_SUCCEEDED(res))
             {
-                if ((deviceCheckFlags & DeviceCheckFlag::UseDebug) && g_isAftermathEnabled)
+                if (deviceCheckFlags & DeviceCheckFlag::UseDebug) 
                 {
                     // Initialize Nsight Aftermath for this device.
                     // This combination of flags is not necessarily appropriate for real world usage 
