@@ -225,8 +225,6 @@ namespace Slang
         // real RTTI objects and witness tables.
         specializeRTTIObjects(&sharedContext, sink);
 
-        simplifyIR(module);
-
         lowerTuples(module, sink);
         if (sink->getErrorCount() != 0)
             return;
@@ -234,9 +232,5 @@ namespace Slang
         generateAnyValueMarshallingFunctions(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
-
-        // We might have generated new temporary variables during lowering.
-        // An SSA pass can clean up unnecessary load/stores.
-        simplifyIR(module);
     }
 } // namespace Slang

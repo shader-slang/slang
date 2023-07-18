@@ -50,20 +50,10 @@ struct SpecializationContext
 
     bool changed = false;
 
-    // We know that we can only perform generic specialization when all
-    // of the arguments to a generic are also fully specialized.
-    // The "is fully specialized" condition is something we
-    // need to solve for over the program, because the fully-
-    // specialized-ness of an instruction depends on the
-    // fully-specialized-ness of its operands.
-    //
-    // We will build an explicit hash set to encode those
-    // instructions that are fully specialized.
-    //
-    HashSet<IRInst*>& fullySpecializedInsts;
 
     SpecializationContext(IRModule* inModule)
-        : fullySpecializedInsts(*module->getContainerPool().getHashSet<IRInst>())
+        : workList(*inModule->getContainerPool().getList<IRInst>())
+        , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*module->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
     {
@@ -83,42 +73,54 @@ struct SpecializationContext
         //
         if (!inst) return true;
 
-        // An interface requirement entry should always be considered
-        // to be fully specialized, even if it hasn't been visited.
-        //
-        // Note: This logic is here to stop a circularity, where we
-        // can't mark an interface as used until its requirements are
-        // used, etc.
-        //
-        if (inst->getOp() == kIROp_InterfaceRequirementEntry)
-            return true;
-
-        // A generic parameter is never specialized.
         switch (inst->getOp())
         {
         case kIROp_GlobalGenericParam:
+        case kIROp_LookupWitness:
             return false;
-        case kIROp_Param:
-            if (inst->getParent() && inst->getParent()->getOp() == kIROp_Block &&
-                inst->getParent()->getParent() &&
-                inst->getParent()->getParent()->getOp() == kIROp_Generic)
-                return false;
-        }
-
-        // A global value is always specialized.
-        if (inst->getParent() == module->getModuleInst())
-        {
-            switch (inst->getOp())
+        case kIROp_Specialize:
+            // The `specialize` instruction is a bit sepcial,
+            // because it is possible to have a `specialize`
+            // of a built-in type so that it never gets
+            // substituted for another type. (e.g., the specific
+            // case where this code path first showed up
+            // as necessary was `RayQuery<>`)
+            //
             {
-            case kIROp_LookupWitness:
-            case kIROp_Specialize:
+                auto specialize = cast<IRSpecialize>(inst);
+                auto base = specialize->getBase();
+                if (auto generic = as<IRGeneric>(base))
+                {
+                    // If the thing being specialized can be resolved,
+                    // *and* it is a target intrinsic, ...
+                    //
+                    if (auto result = findGenericReturnVal(generic))
+                    {
+                        if (result->findDecoration<IRTargetIntrinsicDecoration>())
+                        {
+                            // ... then we should consider the instruction as
+                            // "fully specialized" in the same cases as for
+                            // any ordinary instruciton.
+                            //
+
+                            if (areAllOperandsFullySpecialized(inst))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
                 return false;
-            default:
-                return true;
             }
         }
 
-        return fullySpecializedInsts.contains(inst);
+        // The default case is that a global value is always specialized.
+        if (inst->getParent() == module->getModuleInst())
+        {
+            return true;
+        }
+
+        return false;
     }
 
     // When an instruction isn't fully specialized, but its operands *are*
@@ -146,34 +148,17 @@ struct SpecializationContext
     // to be considered for specialization or simplification,
     // whether generic, existential, etc.
     //
-    OrderedHashSet<IRInst*> workList;
+    List<IRInst*>& workList;
+    HashSet<IRInst*>& workListSet;
     HashSet<IRInst*>& cleanInsts;
 
     void addToWorkList(
         IRInst* inst)
     {
-#if 0
-        // Note(Yong): we should no longer ignore generic functions
-        // because they maybe called via dynamic dispatch.
-        // We still want to specialize calls inside a generic function
-        // if we can derive its type at compile time. The following
-        // skipping logic is disabled and we should consider remove it.
-        //
-        // 
-        // We will ignore any code that is nested under a generic,
-        // because it doesn't make sense to perform specialization
-        // on such code.
-        //
-        for (auto ii = inst->getParent(); ii; ii = ii->getParent())
+        if (workListSet.add(inst))
         {
-            if (as<IRGeneric>(ii))
-                return;
-        }
-#endif
+            workList.add(inst);
 
-        if (workList.add(inst))
-        {
-            cleanInsts.remove(inst);
 
             addUsersToWorkList(inst);
         }
@@ -194,24 +179,6 @@ struct SpecializationContext
             addToWorkList(user);
         }
     }
-
-    // One of the main transformations we will apply is to
-    // consider an instruction as being fully specialized.
-    //
-    void markInstAsFullySpecialized(
-        IRInst* inst)
-    {
-        if (fullySpecializedInsts.contains(inst))
-            return;
-        fullySpecializedInsts.add(inst);
-
-        // If we know that an instruction is fully specialized,
-        // then we should start to consider its uses and children
-        // as candidates for being fully specialized too...
-        //
-        addUsersToWorkList(inst);
-    }
-
 
     // Of course, somewhere along the way we expect
     // to run into uses of `specialize(...)` instructions
@@ -499,99 +466,6 @@ struct SpecializationContext
         return true;
     }
 
-    // Generic specialization depends on identifying when
-    // instructions are fully specialized.
-    //
-    void maybeMarkAsFullySpecialized(
-        IRInst* inst)
-    {
-        // TODO: The logic here is completely bogus and
-        // we need to revisit the notion of fully-specialized-ness
-        // to only involve things that are semantically *values*
-        // rather than computations/expressions.
-        //
-        // The rules should be something like:
-        //
-        // * Literals are values
-        // * Composite type constructors where all the operands are value are values
-        // * References to nominal types are values
-        // * Built-in types where all the operands are values are values
-        //
-        // The system for defining value-ness probably needs
-        // to combine with the system for deduplicating instructions,
-        // since values are an important class of instruction we want
-        // to deduplicate.
-
-        switch (inst->getOp())
-        {
-        default:
-            // The default case is that an instruction can
-            // be considered as fully specialized as soon
-            // as all of its operands are.
-            //
-            // Anything defined in global scope can be viewed as fully specialized.
-            if (inst->getParent() == module->getModuleInst() ||
-                areAllOperandsFullySpecialized(inst))
-            {
-                markInstAsFullySpecialized(inst);
-            }
-            break;
-
-            // Certain instructions cannot ever be considered
-            // fully specialized because they should never
-            // be substituted into a generic as its arguments.
-        case kIROp_LookupWitness:
-        case kIROp_ExtractExistentialType:
-        case kIROp_BindExistentialsType:
-            break;
-
-            // An interface type is always fully specialized.
-        case kIROp_InterfaceType:
-            markInstAsFullySpecialized(inst);
-            break;
-
-        case kIROp_Specialize:
-            // The `specialize` instruction is a bit sepcial,
-            // because it is possible to have a `specialize`
-            // of a built-in type so that it never gets
-            // substituted for another type. (e.g., the specific
-            // case where this code path first showed up
-            // as necessary was `RayQuery<>`)
-            //
-        {
-            auto specialize = cast<IRSpecialize>(inst);
-            auto base = specialize->getBase();
-            if (auto generic = as<IRGeneric>(base))
-            {
-                // If the thing being specialized can be resolved,
-                // *and* it is a target intrinsic, ...
-                //
-                if (auto result = findGenericReturnVal(generic))
-                {
-                    if (result->findDecoration<IRTargetIntrinsicDecoration>())
-                    {
-                        // ... then we should consider the instruction as
-                        // "fully specialized" in the same cases as for
-                        // any ordinary instruciton.
-                        //
-
-                        if (areAllOperandsFullySpecialized(inst))
-                        {
-                            markInstAsFullySpecialized(inst);
-                        }
-                        return;
-                    }
-                }
-            }
-
-            // Otherwise, a `specialize` instruction falls into
-            // the case of instructions that should never be
-            // considered to be fully specialized.
-        }
-        break;
-        }
-    }
-
     // The core of this pass is to look at one instruction
     // at a time, and try to perform whatever specialization
     // is appropriate based on its opcode.
@@ -739,6 +613,10 @@ struct SpecializationContext
     template<typename TDict>
     void _readSpecializationDictionaryImpl(TDict& dict, IRInst* dictInst)
     {
+        int childrenCount = 0;
+        for (auto child = dictInst->getFirstChild(); child; child = child->next)
+            childrenCount++;
+        dict.reserve(1 << Math::Log2Ceil(childrenCount * 2));
         for (auto child : dictInst->getChildren())
         {
             auto item = as<IRSpecializationDictionaryItem>(child);
@@ -881,10 +759,11 @@ struct SpecializationContext
         for (;;)
         {
             bool iterChanged = false;
-            addToWorkList(module->getModuleInst());
-
-            while (workList.getCount() != 0)
+            for (;;)
             {
+                bool hasSpecialization = false;
+                addToWorkList(module->getModuleInst());
+
                 // We will then iterate until our work list goes dry.
                 //
                 while (workList.getCount() != 0)
@@ -892,23 +771,17 @@ struct SpecializationContext
                     IRInst* inst = workList.getLast();
 
                     workList.removeLast();
-
-                    cleanInsts.add(inst);
+                    workListSet.remove(inst);
 
                     // For each instruction we process, we want to perform
                     // a few steps.
                     //
-                    // First we will do any checking required to tag an
-                    // instruction as being fully specialized.
-                    //
-                    maybeMarkAsFullySpecialized(inst);
-
-                    // Next we will look for all the general-purpose
+                    // First we will look for all the general-purpose
                     // specialization opportunities (generic specialization,
                     // existential specialization, simplifications, etc.)
                     //
                     if (inst->hasUses() || inst->mightHaveSideEffects())
-                        iterChanged |= maybeSpecializeInst(inst);
+                        hasSpecialization |= maybeSpecializeInst(inst);
 
                     // Finally, we need to make our logic recurse through
                     // the whole IR module, so we want to add the children
@@ -932,8 +805,10 @@ struct SpecializationContext
                         addToWorkList(child);
                     }
                 }
-
-                addDirtyInstsToWorkListRec(module->getModuleInst());
+                if (hasSpecialization)
+                    iterChanged = true;
+                else
+                    break;
             }
 
             if (iterChanged)
@@ -941,22 +816,22 @@ struct SpecializationContext
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst(), IRDeadCodeEliminationOptions());
             }
-            else
-            {
-                // If we run out of specialization opportunities, consider
-                // lower lookupWitnessMethod insts into dynamic dispatch calls.
-                iterChanged = lowerWitnessLookup(module, sink);
-                if (!iterChanged || sink->getErrorCount())
-                    break;
-            }
+
+            // Once the work list has gone dry, we should have the invariant
+            // that there are no `specialize` instructions inside of non-generic
+            // functions that in turn reference a generic type/function unless the generic is for a
+            // builtin type/function, or some of the type arguments are unknown at compile time, in
+            // which case we will rely on a follow up pass the translate it into a dynamic dispatch
+            // function.
+            // 
+            // Now we consider lower lookupWitnessMethod insts into dynamic dispatch calls,
+            // which may open up more specialization opportunities.
+            //
+            iterChanged = lowerWitnessLookup(module, sink);
+            if (!iterChanged || sink->getErrorCount())
+                break;
         }
 
-        // Once the work list has gone dry, we should have the invariant
-        // that there are no `specialize` instructions inside of non-generic
-        // functions that in turn reference a generic type/function unless the generic is for a
-        // builtin type/function, or some of the type arguments are unknown at compile time, in
-        // which case we will rely on a follow up pass the translate it into a dynamic dispatch
-        // function.
 
         // For functions that still have `specialize` uses left, we need to preserve the
         // its specializations in resulting IR so they can be reconstructed when this
@@ -964,16 +839,13 @@ struct SpecializationContext
         writeSpecializationDictionaries();
     }
 
-    void addDirtyInstsToWorkListRec(IRInst* inst)
+    void addInstsToWorkListRec(IRInst* inst)
     {
-        if (!cleanInsts.contains(inst))
-        {
-            addToWorkList(inst);
-        }
+        addToWorkList(inst);
 
         for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
         {
-            addDirtyInstsToWorkListRec(child);
+            addInstsToWorkListRec(child);
         }
     }
 
@@ -1323,11 +1195,14 @@ struct SpecializationContext
     }
 
     // Test if a type is compile time constant.
-    static bool isCompileTimeConstantType(IRInst* inst)
+    bool isCompileTimeConstantType(IRInst* inst)
     {
         // TODO: We probably need/want a more robust test here.
         // For now we are just look into the dependency graph of the inst and
         // see if there are any opcodes that are causing problems.
+        if (!isInstFullySpecialized(inst))
+            return false;
+
         List<IRInst*> localWorkList;
         HashSet<IRInst*> processedInsts;
         localWorkList.add(inst);
@@ -1557,12 +1432,6 @@ struct SpecializationContext
             oldFunc->getResultType());
         IRFunc* newFunc = builder->createFunc();
         newFunc->setFullType(newFuncType);
-
-        // By construction, our new function type will be
-        // "fully specialized" by the rules used for doing
-        // generic specialization elsewhere in this pass.
-        //
-        fullySpecializedInsts.add(newFuncType);
 
         // The above steps have accomplished the "first phase"
         // of cloning the function (since `IRFunc`s have no

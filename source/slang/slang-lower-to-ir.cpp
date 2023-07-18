@@ -9854,7 +9854,11 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     constructSSA(module);
     simplifyCFG(module);
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRGlobalValueWithCode>(inst))
+            eliminateDeadCode(func);
+    }
     // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
     //

@@ -2482,7 +2482,6 @@ namespace Slang
         {
             IRInstKey key = { inst };
 
-            // Ideally we would add if not found, else return if was found instead of testing & then adding.
             IRInst** found = m_dedupContext->getGlobalValueNumberingMap().tryGetValueOrAdd(key, inst);
             SLANG_ASSERT(endCursor == memoryArena.getCursor());
             // If it's found, just return, and throw away the instruction
