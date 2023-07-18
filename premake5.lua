@@ -254,8 +254,6 @@ if enableEmbedStdLib and _OPTIONS["disable-stdlib-source"] ~= nil then
     disableStdlibSource = (_OPTIONS["disable-stdlib-source"] == "true")   
 end
 
-
-
 if enableAftermath then
     aftermathPath = "external/nv-aftermath"
     
@@ -263,7 +261,7 @@ if enableAftermath then
         print("external/nv-aftermath directory must hold aftermath SDK")
         os.exit(0)
     end
-    
+
     printf("Enabled aftermath")
 end
 
@@ -833,37 +831,36 @@ example "cpu-hello-world"
 
 if enableAftermath then
     example "nv-aftermath-example"
-    
-    filter {}
-    
-    local aftermathIncludePath = path.join(aftermathPath, "include") 
-    local aftermathLibPath = path.join(aftermathPath, "lib") 
-    
-    -- Add the aftermath includes 
-    
-    includedirs { aftermathIncludePath }
-    
-    -- Add the libs directory.
-    -- Additionally we need to copy dlls that are needed for aftermath usage such that they 
-    -- are available from the executable.
-    
-    filter { "platforms:x86" }
-        local libPath = path.join(aftermathLibPath, "x86")
-        libdirs { libPath }
-        links { "GFSDK_Aftermath_Lib.x86" }
-
-        postbuildcommands {
-                '{COPY} "$(SolutionDir)"' .. libPath .. '/*.* "%{cfg.targetdir}"'
-            }
-
-    filter { "platforms:x64" }
-        local libPath = path.join(aftermathLibPath, "x64")
-        libdirs { libPath }
-        links { "GFSDK_Aftermath_Lib.x64" }
+        filter {}
         
-        postbuildcommands {
-                '{COPY} "$(SolutionDir)"' .. libPath .. '/*.* "%{cfg.targetdir}"'
-            }
+        local aftermathIncludePath = path.join(aftermathPath, "include") 
+        local aftermathLibPath = path.join(aftermathPath, "lib") 
+        
+        -- Add the aftermath includes 
+        
+        includedirs { aftermathIncludePath }
+        
+        -- Add the libs directory.
+        -- Additionally we need to copy dlls that are needed for aftermath usage such that they 
+        -- are available from the executable.
+        
+        filter { "platforms:x86" }
+            local libPath = path.join(aftermathLibPath, "x86")
+            libdirs { libPath }
+            links { "GFSDK_Aftermath_Lib.x86" }
+
+            postbuildcommands {
+                    '{COPY} "$(SolutionDir)"' .. libPath .. '/*.* "%{cfg.targetdir}"'
+                }
+
+        filter { "platforms:x64" }
+            local libPath = path.join(aftermathLibPath, "x64")
+            libdirs { libPath }
+            links { "GFSDK_Aftermath_Lib.x64" }
+            
+            postbuildcommands {
+                    '{COPY} "$(SolutionDir)"' .. libPath .. '/*.* "%{cfg.targetdir}"'
+                }
 end
 
 -- Most of the other projects have more interesting configuration going
@@ -1081,6 +1078,34 @@ tool "gfx"
             '{COPY} "' .. path.getabsolute("tools/gfx/slang.slang") .. '" "%{cfg.targetdir}"',
         }
     end
+    
+    -- If aftermath is enabled we need a define to turn on debugging features withing GFX
+    
+    if enableAftermath then
+        defines { "GFX_NV_AFTERMATH" }
+        
+        local aftermathIncludePath = path.join(aftermathPath, "include") 
+        local aftermathLibPath = path.join(aftermathPath, "lib") 
+        
+        -- Add the aftermath includes         
+        includedirs { aftermathIncludePath }
+        
+        -- Add the libs
+        -- 
+        -- We don't copy the dlls as that is something the application should do.
+        
+        filter { "platforms:x86" }
+            local libPath = path.join(aftermathLibPath, "x86")
+            libdirs { libPath }
+            links { "GFSDK_Aftermath_Lib.x86" }
+
+        filter { "platforms:x64" }
+            local libPath = path.join(aftermathLibPath, "x64")
+            libdirs { libPath }
+            links { "GFSDK_Aftermath_Lib.x64" }
+        
+    end
+    
     -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
     -- If not we assume it's a cygwin/mingw type situation and remove files that aren't appropriate
     if targetInfo.isWindows then

@@ -18,6 +18,12 @@
 
 #include "vk-helper-functions.h"
 
+#ifdef GFX_NV_AFTERMATH
+#   include "GFSDK_Aftermath.h"
+#   include "GFSDK_Aftermath_Defines.h"
+#   include "GFSDK_Aftermath_GpuCrashDump.h"
+#endif
+
 namespace gfx
 {
 
@@ -25,6 +31,12 @@ using namespace Slang;
 
 namespace vk
 {
+
+#if GFX_NV_AFTERMATH
+/* static */const bool DeviceImpl::g_isAftermathEnabled = true;
+#else
+/* static */const bool DeviceImpl::g_isAftermathEnabled = false;
+#endif
 
 DeviceImpl::~DeviceImpl()
 {
@@ -657,6 +669,35 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
     m_queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
     assert(m_queueFamilyIndex >= 0);
+
+#if defined(GFX_NV_AFTERMATH)
+    VkDeviceDiagnosticsConfigCreateInfoNV aftermathInfo = {};
+
+    if (g_isAftermathEnabled)
+    {
+        // Enable NV_device_diagnostic_checkpoints extension to be able to
+        // use Aftermath event markers.
+        deviceExtensions.add(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+
+        // Enable NV_device_diagnostics_config extension to configure Aftermath
+        // features.
+        deviceExtensions.add(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME);
+
+        // Set up device creation info for Aftermath feature flag configuration.
+        VkDeviceDiagnosticsConfigFlagsNV aftermathFlags =
+            VK_DEVICE_DIAGNOSTICS_CONFIG_ENABLE_AUTOMATIC_CHECKPOINTS_BIT_NV |  // Enable automatic call stack checkpoints.
+            VK_DEVICE_DIAGNOSTICS_CONFIG_ENABLE_RESOURCE_TRACKING_BIT_NV |      // Enable tracking of resources.
+            VK_DEVICE_DIAGNOSTICS_CONFIG_ENABLE_SHADER_DEBUG_INFO_BIT_NV;       // Generate debug information for shaders.
+            // Not available on the version of Vulkan currently building with.
+            //VK_DEVICE_DIAGNOSTICS_CONFIG_ENABLE_SHADER_ERROR_REPORTING_BIT_NV;  // Enable additional runtime shader error reporting.
+
+        aftermathInfo.sType = VK_STRUCTURE_TYPE_DEVICE_DIAGNOSTICS_CONFIG_CREATE_INFO_NV;
+        aftermathInfo.flags = aftermathFlags;
+
+        aftermathInfo.pNext = deviceCreateInfo.pNext;
+        deviceCreateInfo.pNext = &aftermathInfo;
+    }
+#endif
 
     if (handles[2].handleValue == 0)
     {

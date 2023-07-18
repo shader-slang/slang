@@ -203,6 +203,8 @@ public:
     VkSampler m_defaultSampler;
 
     RefPtr<FramebufferImpl> m_emptyFramebuffer;
+
+    static const bool g_isAftermathEnabled;
 };
 
 } // namespace vk

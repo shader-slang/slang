@@ -52,7 +52,13 @@ struct AftermathCrashExample : public WindowedAppBase
 
     virtual void renderFrame(int frameBufferIndex) override;
     
-    void aftermathCrashDump(const void* data, const uint32_t dataSizeInBytes);
+    void onAftermathCrash(const void* data, const uint32_t dataSizeInBytes);
+
+    void onAftermathDebugInfo(const void* pGpuCrashDump, const uint32_t gpuCrashDumpSize);
+
+    void onAftermathCrashDescription(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription description);
+    
+    void onAftermathMarker(const void* pMarker, void** resolvedMarkerData, uint32_t* markerSize);
 
     // Create accessors so we don't have to use g prefixed variables.
     gfx::IDevice* getDevice() { return gDevice; }
@@ -78,7 +84,7 @@ void AftermathCrashExample::diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
     }
 }
 
-void AftermathCrashExample::aftermathCrashDump(const void* data, const uint32_t dataSizeInBytes)
+void AftermathCrashExample::onAftermathCrash(const void* data, const uint32_t dataSizeInBytes)
 {
     // NOTE! This method can be called from *any* thread.
     const auto id = m_uniqueId++;
@@ -90,6 +96,27 @@ void AftermathCrashExample::aftermathCrashDump(const void* data, const uint32_t 
     File::writeAllBytes(filename, data, dataSizeInBytes);
     
     //SLANG_BREAKPOINT(0);
+}
+
+void AftermathCrashExample::onAftermathDebugInfo(const void* gpuCrashDump, const uint32_t gpuCrashDumpSize)
+{
+    const auto id = m_uniqueId++;
+
+    // Dump out as a file
+    Slang::StringBuilder filename;
+    filename << "aftermath-debug-info-" << id << ".bin";
+
+    File::writeAllBytes(filename, gpuCrashDump, gpuCrashDumpSize);
+}
+
+void AftermathCrashExample::onAftermathCrashDescription(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription description)
+{
+    // Ignore for now
+}
+
+void AftermathCrashExample::onAftermathMarker(const void* marker, void** resolvedMarkerData, uint32_t* markerSize)
+{
+    // Ignore for now
 }
 
 struct FileSystemEntry
@@ -360,9 +387,24 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     return SLANG_OK;
 }
 
-static void GFSDK_AFTERMATH_CALL _dumpCallback(const void* pGpuCrashDump, const uint32_t gpuCrashDumpSize, void* pUserData)
+static void GFSDK_AFTERMATH_CALL _crashCallback(const void* gpuCrashDump, const uint32_t gpuCrashDumpSize, void* userData)
 {
-    reinterpret_cast<AftermathCrashExample*>(pUserData)->aftermathCrashDump(pGpuCrashDump, gpuCrashDumpSize);
+    reinterpret_cast<AftermathCrashExample*>(userData)->onAftermathCrash(gpuCrashDump, gpuCrashDumpSize);
+}
+
+static void GFSDK_AFTERMATH_CALL _debugInfoCallback(const void* gpuCrashDump, const uint32_t gpuCrashDumpSize, void* userData)
+{
+    reinterpret_cast<AftermathCrashExample*>(userData)->onAftermathDebugInfo(gpuCrashDump, gpuCrashDumpSize);
+}
+
+static void GFSDK_AFTERMATH_CALL _crashDescriptionCallback(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription addDescription, void* userData)
+{
+    reinterpret_cast<AftermathCrashExample*>(userData)->onAftermathCrashDescription(addDescription);
+}
+
+static void GFSDK_AFTERMATH_CALL _markerCallback(const void* marker, void* pUserData, void** resolvedMarkerData, uint32_t* markerSize)
+{
+    reinterpret_cast<AftermathCrashExample*>(pUserData)->onAftermathMarker(marker, resolvedMarkerData, markerSize);
 }
 
 Slang::Result AftermathCrashExample::initialize()
@@ -372,17 +414,19 @@ Slang::Result AftermathCrashExample::initialize()
         GFSDK_Aftermath_Version_API,
         GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX | GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_Vulkan,
         GFSDK_Aftermath_GpuCrashDumpFeatureFlags_Default,
-        _dumpCallback, 
-        nullptr,
-        nullptr,
-        nullptr,
+        _crashCallback,
+        _debugInfoCallback,
+        _crashDescriptionCallback,
+        _markerCallback,
         this);
+
 
     // Set to a specific render API if needed
     // 
     // * gfx::DeviceType::Default
     // * gfx::DeviceType::Vulkan
     // * gfx::DeviceType::DirectX12
+    // * gfx::DeviceType::DirectX11
 
     const gfx::DeviceType deviceType = gfx::DeviceType::Default;
     
@@ -480,9 +524,12 @@ void AftermathCrashExample::renderFrame(int frameBufferIndex)
     //
     getSwapChain()->present();
 
-    // We only want to present one frame...
-
-    platform::Application::quit();
+    // If the id changes means we have a capture and so can quit.
+    // On D3D11, the first present *doesn't* appear to crash.
+    if (m_uniqueId != 0)
+    {
+        platform::Application::quit();
+    }
 }
 
 // This macro instantiates an appropriate main function to

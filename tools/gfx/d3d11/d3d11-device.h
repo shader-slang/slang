@@ -155,6 +155,8 @@ public:
     float m_clearColor[4] = { 0, 0, 0, 0 };
 
     bool m_nvapi = false;
+
+    static const bool g_isAftermathEnabled;
 };
 
 } // namespace d3d11

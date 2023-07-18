@@ -14,6 +14,14 @@
 #include "core/slang-basic.h"
 #include "core/slang-platform.h"
 
+#ifdef GFX_NV_AFTERMATH
+#   include "GFSDK_Aftermath.h"
+#   include "GFSDK_Aftermath_Defines.h"
+#   include "GFSDK_Aftermath_GpuCrashDump.h"
+
+#   include "core/slang-process.h"
+#endif
+
 namespace gfx {
 using namespace Slang;
 
@@ -868,6 +876,58 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
 Result SLANG_MCALL reportD3DLiveObjects()
 {
     return D3DUtil::reportLiveObjects();
+}
+
+
+/* static */SlangResult D3DUtil::waitForCrashDumpCompletion(HRESULT res)
+{
+    // If it's not a device remove/reset then theres nothing to wait for
+    if (!(res == DXGI_ERROR_DEVICE_REMOVED || res == DXGI_ERROR_DEVICE_RESET))
+    {
+        return SLANG_OK;
+    }
+
+#if GFX_NV_AFTERMATH
+    {
+        GFSDK_Aftermath_CrashDump_Status status = GFSDK_Aftermath_CrashDump_Status_Unknown;
+        if (GFSDK_Aftermath_GetCrashDumpStatus(&status) != GFSDK_Aftermath_Result_Success)
+        {
+            return SLANG_FAIL;
+        }
+
+        const auto startTick = Process::getClockTick();
+        const auto frequency = Process::getClockFrequency();
+
+        float timeOutInSecs = 1.0f;
+
+        uint64_t timeOutTicks = uint64_t(frequency * timeOutInSecs) + 1;
+
+        // Loop while Aftermath crash dump data collection has not finished or
+        // the application is still processing the crash dump data.
+        while (status != GFSDK_Aftermath_CrashDump_Status_CollectingDataFailed &&
+            status != GFSDK_Aftermath_CrashDump_Status_Finished &&
+            Process::getClockTick() - startTick < timeOutTicks)
+        {
+            // Sleep a couple of milliseconds and poll the status again.
+            Process::sleepCurrentThread(50);
+            if (GFSDK_Aftermath_GetCrashDumpStatus(&status) != GFSDK_Aftermath_Result_Success)
+            {
+                return SLANG_FAIL;
+            }
+        }
+
+        if (status == GFSDK_Aftermath_CrashDump_Status_Finished)
+        {
+            return SLANG_OK;
+        }
+        else
+        {
+            return SLANG_E_TIME_OUT;
+        }
+    }
+#endif
+
+    return SLANG_OK;
 }
 
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)

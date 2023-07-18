@@ -28,6 +28,12 @@
 #    include "../nvapi/nvapi-include.h"
 #endif
 
+#ifdef GFX_NV_AFTERMATH
+#   include "GFSDK_Aftermath.h"
+#   include "GFSDK_Aftermath_Defines.h"
+#   include "GFSDK_Aftermath_GpuCrashDump.h"
+#endif
+
 namespace gfx
 {
 namespace d3d12
@@ -36,6 +42,13 @@ namespace d3d12
 using namespace Slang;
 
 static const uint32_t D3D_FEATURE_LEVEL_12_2 = 0xc200;
+
+
+#if GFX_NV_AFTERMATH
+/* static */const bool DeviceImpl::g_isAftermathEnabled = true;
+#else
+/* static */const bool DeviceImpl::g_isAftermathEnabled = false;
+#endif
 
 struct ShaderModelInfo
 {
@@ -286,7 +299,7 @@ Result DeviceImpl::_createDevice(
     D3D_FEATURE_LEVEL featureLevel,
     D3D12DeviceInfo& outDeviceInfo)
 {
-    if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
+    if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug) && !g_isAftermathEnabled)
     {
         m_dxDebug->EnableDebugLayer();
     }
@@ -319,7 +332,7 @@ Result DeviceImpl::_createDevice(
         return SLANG_FAIL;
     }
 
-    if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
+    if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug) && !g_isAftermathEnabled)
     {
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SLANG_SUCCEEDED(device->QueryInterface(infoQueue.writeRef())))
@@ -372,6 +385,35 @@ Result DeviceImpl::_createDevice(
             }
         }
     }
+
+
+#ifdef GFX_NV_AFTERMATH
+    {
+        if ((deviceCheckFlags & DeviceCheckFlag::UseDebug) && g_isAftermathEnabled)
+        {
+            // Initialize Nsight Aftermath for this device.
+            // This combination of flags is not necessarily appropraite for real world usage 
+            const uint32_t aftermathFlags =  
+                GFSDK_Aftermath_FeatureFlags_EnableMarkers |             // Enable event marker tracking.
+                GFSDK_Aftermath_FeatureFlags_CallStackCapturing |        // Enable automatic call stack event markers.
+                GFSDK_Aftermath_FeatureFlags_EnableResourceTracking |    // Enable tracking of resources.
+                GFSDK_Aftermath_FeatureFlags_GenerateShaderDebugInfo |   // Generate debug information for shaders.
+                GFSDK_Aftermath_FeatureFlags_EnableShaderErrorReporting; // Enable additional runtime shader error reporting.
+
+            auto initResult = GFSDK_Aftermath_DX12_Initialize(
+                GFSDK_Aftermath_Version_API,
+                aftermathFlags,
+                device);
+            
+            if ( initResult != GFSDK_Aftermath_Result_Success)
+            {
+                SLANG_ASSERT_FAILURE("Unable to initialize aftermath");
+                // Unable to initialize 
+                return SLANG_FAIL;
+            }
+        }
+    }
+#endif
 
     // Get the descs
     {
@@ -474,7 +516,9 @@ Result DeviceImpl::initialize(const Desc& desc)
     }
 #endif
 
-    if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled())
+
+    // If Aftermath is enabled, we can't enable the D3D12 debug layer as well
+    if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled() && !g_isAftermathEnabled)
     {
         m_D3D12GetDebugInterface =
             (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");

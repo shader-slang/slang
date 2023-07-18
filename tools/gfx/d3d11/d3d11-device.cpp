@@ -16,6 +16,12 @@
 
 #include "d3d11-helper-functions.h"
 
+#ifdef GFX_NV_AFTERMATH
+#   include "GFSDK_Aftermath.h"
+#   include "GFSDK_Aftermath_Defines.h"
+#   include "GFSDK_Aftermath_GpuCrashDump.h"
+#endif
+
 namespace gfx
 {
 
@@ -23,6 +29,13 @@ using namespace Slang;
 
 namespace d3d11
 {
+
+#if GFX_NV_AFTERMATH
+/* static */const bool DeviceImpl::g_isAftermathEnabled = true;
+#else
+/* static */const bool DeviceImpl::g_isAftermathEnabled = false;
+#endif
+
 SlangResult DeviceImpl::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
@@ -148,11 +161,42 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
                 m_device.writeRef(),
                 &featureLevel,
                 m_immediateContext.writeRef());
+
+#ifdef GFX_NV_AFTERMATH
+            if (SLANG_SUCCEEDED(res))
+            {
+                if ((deviceCheckFlags & DeviceCheckFlag::UseDebug) && g_isAftermathEnabled)
+                {
+                    // Initialize Nsight Aftermath for this device.
+                    // This combination of flags is not necessarily appropriate for real world usage 
+                    const uint32_t aftermathFlags =
+                        GFSDK_Aftermath_FeatureFlags_EnableMarkers |             // Enable event marker tracking.
+                        GFSDK_Aftermath_FeatureFlags_CallStackCapturing |        // Enable automatic call stack event markers.
+                        GFSDK_Aftermath_FeatureFlags_EnableResourceTracking |    // Enable tracking of resources.
+                        GFSDK_Aftermath_FeatureFlags_GenerateShaderDebugInfo |   // Generate debug information for shaders.
+                        GFSDK_Aftermath_FeatureFlags_EnableShaderErrorReporting; // Enable additional runtime shader error reporting.
+
+                    auto initResult = GFSDK_Aftermath_DX11_Initialize(
+                        GFSDK_Aftermath_Version_API,
+                        aftermathFlags,
+                        m_device);
+
+                    if (initResult != GFSDK_Aftermath_Result_Success)
+                    {
+                        SLANG_ASSERT_FAILURE("Unable to initialize aftermath");
+                        // Unable to initialize aftermath
+                        return SLANG_FAIL;
+                    }
+                }
+            }
+#endif
+
             // Check if successfully constructed - if so we are done.
             if (SLANG_SUCCEEDED(res))
             {
                 break;
             }
+
         }
         // If res is failure, means all styles have have failed, and so initialization fails.
         if (SLANG_FAILED(res))

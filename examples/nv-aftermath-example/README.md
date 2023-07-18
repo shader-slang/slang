@@ -7,6 +7,10 @@ Nsight Aftermath Crash Example
 * Demonstrates use of file system compile products
 * Forces a crash via time out, executing a shader that is purposefully slow
 * Can be used to capture D3D and Vulkan (change the device type in the sample)
+* When enabled GFX is built to use Aftermath it's debug layer 
+  * This disables D3D debug layer, as not possible to have both enabled
+* NOTE! Will only capture Aftermath DebugInfo with a *debug* build
+  * Gfx enables debugging info on debug builds
 
 The example requires aftermath SDK to be in the directory "external/nv-aftermath".
 
@@ -23,14 +27,15 @@ On windows the following would be reasonable..
 premake vs2019 --deps=true --enable-aftermath=true
 ```
 
-Typically D3D run produces the following files...
+Typically D3D debug run produces the following files...
 
-* fragment-0.dxil       - Fragment DXIL
-* fragment-0.map        - The emit source map, maps locations in the the fragment kernel to the obfuscated source file
-* vertex-0.dxil         - Vertex DXIL
-* vertex-0.map          - The emit source map, maps locations in the vertex kernel to the obfuscated source file
-* XXXX-obfuscated.map   - The obfuscated source map. Will be referenced by the other source maps. Maps obfuscated locations to the original source
-* aftermath-dump-0.bin  - The Aftermath crash capture
+* fragment-0.dxil               - Fragment DXIL
+* fragment-0.map                - The emit source map, maps locations in the the fragment kernel to the obfuscated source file
+* vertex-0.dxil                 - Vertex DXIL
+* vertex-0.map                  - The emit source map, maps locations in the vertex kernel to the obfuscated source file
+* XXXX-obfuscated.map           - The obfuscated source map. Will be referenced by the other source maps. Maps obfuscated locations to the original source
+* aftermath-dump-X.bin          - The Aftermath crash captures
+* aftermath-debug-info-X.bin    - The Aftermath debug infos
 
 Having emit source maps, can be useful as discussed in [the documentation](https://github.com/shader-slang/slang/blob/master/docs/user-guide/a1-03-obfuscation.md).
 
