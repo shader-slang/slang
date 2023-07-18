@@ -175,6 +175,7 @@ namespace Slang
             {
                 auto paramType = funcType->getOperand(i);
                 auto loweredParamType = sharedContext->lowerType(builder, paramType, typeMapping, nullptr);
+                SLANG_ASSERT(loweredParamType);
                 translated = translated || (loweredParamType != paramType);
                 newOperands.add(loweredParamType);
             }

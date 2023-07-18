@@ -215,10 +215,7 @@ namespace Slang
         // to represent the arguments that have been coerced to
         // appropriate forms.
         //
-        auto genSubst = m_astBuilder->create<GenericSubstitution>();
-        genSubst->genericDecl = genericDeclRef.getDecl();
-        candidate.subst = genSubst;
-        auto& checkedArgs = (List<Val*>&)genSubst->getArgs();
+        List<Val*> checkedArgs;
 
         // Rather than bail out as soon as we hit a problem,
         // we are going to process *all* of the parameters of the
@@ -347,6 +344,9 @@ namespace Slang
                 continue;
             }
         }
+
+        auto genSubst = m_astBuilder->getOrCreateGenericSubstitution(nullptr, genericDeclRef.getDecl(), checkedArgs.getArrayView());
+        candidate.subst = genSubst;
 
         // Once we are done processing the parameters of the generic,
         // we will have build up a usable `checkedArgs` array and
@@ -515,8 +515,8 @@ namespace Slang
         auto subst = as<GenericSubstitution>(candidate.subst);
         SLANG_ASSERT(subst);
 
-        subst->genericDecl = genericDeclRef.getDecl();
-        subst->outer = genericDeclRef.getSubst();
+        subst = getASTBuilder()->getOrCreateGenericSubstitution(
+            genericDeclRef.getSubst(), genericDeclRef.getDecl(), subst->getArgs());
 
         List<Val*> newArgs = subst->getArgs();
 
@@ -544,7 +544,7 @@ namespace Slang
             }
         }
 
-        candidate.subst = m_astBuilder->getOrCreateGenericSubstitution(genericDeclRef.getDecl(), newArgs, genericDeclRef.getSubst());
+        candidate.subst = m_astBuilder->getOrCreateGenericSubstitution(nullptr, genericDeclRef.getDecl(), newArgs);
 
         // Done checking all the constraints, hooray.
         return true;
@@ -594,8 +594,7 @@ namespace Slang
             return CreateErrorExpr(originalExpr);
         }
 
-        subst->genericDecl = baseGenericRef.getDecl();
-        subst->outer = baseGenericRef.getSubst();
+        subst = m_astBuilder->getOrCreateGenericSubstitution(baseGenericRef.getSubst(), baseGenericRef.getDecl(), subst->getArgs());
 
         DeclRef<Decl> innerDeclRef = m_astBuilder->getSpecializedDeclRef<Decl>(getInner(baseGenericRef), subst);
 

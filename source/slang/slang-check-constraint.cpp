@@ -457,7 +457,7 @@ namespace Slang
         // apply the substitutions we already know...
 
         GenericSubstitution* solvedSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getDecl(), args, genericDeclRef.getSubst());
+            genericDeclRef.getSubst(), genericDeclRef.getDecl(), args.getArrayView());
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
@@ -510,7 +510,7 @@ namespace Slang
         }
 
         resultSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getDecl(), args, genericDeclRef.getSubst());
+            genericDeclRef.getSubst(), genericDeclRef.getDecl(), args);
         return resultSubst;
     }
 
@@ -633,7 +633,7 @@ namespace Slang
         auto fstGen = fst;
         auto sndGen = snd;
         // They must be specializing the same generic
-        if (fstGen->genericDecl != sndGen->genericDecl)
+        if (fstGen->getGenericDecl() != sndGen->getGenericDecl())
             return false;
 
         // Their arguments must unify
@@ -649,7 +649,7 @@ namespace Slang
         }
 
         // Their "base" specializations must unify
-        if (!tryUnifySubstitutions(constraints, fstGen->outer, sndGen->outer))
+        if (!tryUnifySubstitutions(constraints, fstGen->getOuter(), sndGen->getOuter()))
         {
             okay = false;
         }

@@ -176,7 +176,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
         if (genSubst)
         {
             SLANG_RELEASE_ASSERT(genSubst);
-            SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
+            SLANG_RELEASE_ASSERT(genSubst->getGenericDecl() == parentGenericDeclRef.getDecl());
 
             // If the name we printed previously was an operator
             // that ends with `<`, then immediately printing the

@@ -118,7 +118,7 @@ HashCode GenericParamIntVal::_getHashCodeOverride()
 Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff)
 {
     // search for a substitution that might apply to us
-    for (auto s = subst.substitutions; s; s = s->outer)
+    for (auto s = subst.substitutions; s; s = s->getOuter())
     {
         auto genSubst = as<GenericSubstitution>(s);
         if (!genSubst)
@@ -126,7 +126,7 @@ Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet
 
         // the generic decl associated with the substitution list must be
         // the generic decl that declared this parameter
-        auto genericDecl = genSubst->genericDecl;
+        auto genericDecl = genSubst->getGenericDecl();
         if (genericDecl != paramDecl->parentDecl)
             continue;
 
@@ -261,13 +261,13 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
         auto genConstraintDecl = genConstraintDeclRef.getDecl();
 
         // search for a substitution that might apply to us
-        for (auto s = subst.substitutions; s; s = s->outer)
+        for (auto s = subst.substitutions; s; s = s->getOuter())
         {
             if (auto genericSubst = as<GenericSubstitution>(s))
             {
                 // the generic decl associated with the substitution list must be
                 // the generic decl that declared this parameter
-                auto genericDecl = genericSubst->genericDecl;
+                auto genericDecl = genericSubst->getGenericDecl();
                 if (genericDecl != genConstraintDecl->parentDecl)
                     continue;
 

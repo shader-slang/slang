@@ -1205,9 +1205,9 @@ namespace Slang
             }
             GenericSubstitution* genericSubst =
                 getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
+                    genericDeclRef.getSubst(),
                     genericDeclRef.getDecl(),
-                    genericArgs,
-                    genericDeclRef.getSubst());
+                    genericArgs.getArrayView());
             ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
             for (auto constraintDecl : getMembersOfType<GenericTypeConstraintDecl>(
@@ -1235,9 +1235,9 @@ namespace Slang
 
             genericSubst =
                 getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
+                    genericDeclRef.getSubst(),
                     genericDeclRef.getDecl(),
-                    genericArgs,
-                    genericDeclRef.getSubst());
+                    genericArgs);
             specializedFuncDeclRef = astBuilder->getSpecializedDeclRef(specializedFuncDeclRef.getDecl(), genericSubst);
         }
 

@@ -424,7 +424,7 @@ namespace Slang
             // in place for the parent generic declaration, or we don't.
 
             auto subst = findInnerMostGenericSubstitution(declRef.getSubst());
-            if( subst && subst->genericDecl == parentGenericDeclRef.getDecl() )
+            if( subst && subst->getGenericDecl() == parentGenericDeclRef.getDecl())
             {
                 // This is the case where we *do* have substitutions.
                 emitRaw(context, "G");

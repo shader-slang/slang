@@ -6849,6 +6849,8 @@ namespace Slang
             thisInst = workItem.thisInst;
             other = workItem.otherInst;
 
+            SLANG_ASSERT(other);
+
             // Safety check: don't try to replace something with itself.
             if (other == thisInst)
                 continue;
@@ -6902,6 +6904,8 @@ namespace Slang
                     IRInst* existingVal = nullptr;
                     if (dedupContext->getGlobalValueNumberingMap().tryGetValue(IRInstKey{ user }, existingVal))
                     {
+                        // If existingVal has been replaced by something else, use that.
+                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
                         addToWorkList(user, existingVal);
                     }
                     else

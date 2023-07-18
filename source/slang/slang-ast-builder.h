@@ -297,12 +297,7 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    DeclRefType* getOrCreateDeclRefType(DeclRefBase* declRef)
-    {
-        return getOrCreate<DeclRefType>(declRef);
-    }
-
-    GenericSubstitution* getOrCreateGenericSubstitution(GenericDecl* decl, const List<Val*>& args, Substitutions* outer)
+    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, ArrayView<Val*> args)
     {
         NodeDesc desc;
         desc.type = GenericSubstitution::kType;
@@ -324,6 +319,20 @@ public:
         }
         return result;
     }
+
+    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, const List<Val*>& args)
+    {
+        return getOrCreateGenericSubstitution(outer, decl, args.getArrayView());
+    }
+
+    template<typename... Args>
+    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, Args... args)
+    {
+        List<Val*> vals;
+        addToList(vals, args...);
+        return getOrCreateGenericSubstitution(outer, decl, vals.getArrayView());
+    }
+
 
     ThisTypeSubstitution* getOrCreateThisTypeSubstitution(InterfaceDecl* interfaceDecl, SubtypeWitness* subtypeWitness, Substitutions* outer)
     {
@@ -443,6 +452,9 @@ public:
     SubtypeWitness* getTransitiveSubtypeWitness(
         SubtypeWitness*    aIsSubtypeOfBWitness,
         SubtypeWitness*    bIsSubtypeOfCWitness);
+
+        /// Produce a witness that `ThisType(IFoo) <: IFoo`.
+    ThisTypeSubtypeWitness* getThisTypeSubtypeWitness(Type* subType, Type* superType);
 
         /// Produce a witness that `T <: L` or `T <: R` given `T <: L&R`
     SubtypeWitness* getExtractFromConjunctionSubtypeWitness(

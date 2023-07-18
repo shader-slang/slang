@@ -188,7 +188,7 @@ namespace Slang
         }
 
         GenericSubstitution* subst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getDecl(), evaledArgs, genericDeclRef.getSubst());
+            genericDeclRef.getSubst(), genericDeclRef.getDecl(), evaledArgs);
 
         DeclRef<Decl> innerDeclRef = m_astBuilder->getSpecializedDeclRef(getInner(genericDeclRef), subst);
         return DeclRefType::create(m_astBuilder, innerDeclRef);

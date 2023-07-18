@@ -509,7 +509,11 @@ static bool simplifyBoolPhiParams(IRBlock* block)
 
     Array<IRBlock*, 2> preds;
     for (auto pred : block->getPredecessors())
+    {
+        if (pred->getTerminator()->getOp() != kIROp_unconditionalBranch)
+            return false;
         preds.add(pred);
+    }
 
     IRBlock* ifElseBlock = nullptr;
     if (preds[0]->getPredecessors().getCount() != 1)
