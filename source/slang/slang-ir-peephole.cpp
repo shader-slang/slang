@@ -235,9 +235,6 @@ struct PeepholeContext : InstPassBase
         return false;
     }
 
-    RefPtr<IRDominatorTree> domTree;
-    IRGlobalValueWithCode* domTreeFunc = nullptr;
-
     void processInst(IRInst* inst)
     {
         if (as<IRGlobalValueWithCode>(inst))
@@ -746,13 +743,8 @@ struct PeepholeContext : InstPassBase
                             auto parentFunc = getParentFunc(inst);
                             if (!parentFunc)
                                 break;
-                            if (domTreeFunc != parentFunc)
-                            {
-                                domTree = computeDominatorTree(parentFunc);
-                                domTreeFunc = parentFunc;
-                            }
-                            if (!domTree)
-                                break;
+
+                            auto domTree = parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
 
                             if (domTree->dominates(argValue, inst))
                             {
@@ -816,6 +808,8 @@ struct PeepholeContext : InstPassBase
 
     bool processFunc(IRInst* func)
     {
+        func->getModule()->invalidateAllAnalysis();
+
         bool result = false;
         for (;;)
         {

@@ -1688,6 +1688,16 @@ static bool applySparseConditionalConstantPropagationRec(
 
     for( auto childInst : inst->getDecorationsAndChildren() )
     {
+        switch (childInst->getOp())
+        {
+        case kIROp_Func:
+        case kIROp_Block:
+        case kIROp_Generic:
+            break;
+        default:
+            // Skip other op codes.
+            break;
+        }
         changed |= applySparseConditionalConstantPropagationRec(globalContext, childInst);
     }
     return changed;
