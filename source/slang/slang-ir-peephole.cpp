@@ -847,6 +847,22 @@ bool peepholeOptimize(IRInst* func)
     return context.processFunc(func);
 }
 
+bool peepholeOptimizeGlobalScope(IRModule* module)
+{
+    PeepholeContext context = PeepholeContext(module);
+    bool result = false;
+    for (;;)
+    {
+        context.changed = false;
+        for (auto globalInst : module->getGlobalInsts())
+            context.processInst(globalInst);
+        result |= context.changed;
+        if (!context.changed)
+            break;
+    }
+    return result;
+}
+
 bool tryReplaceInstUsesWithSimplifiedValue(IRModule* module, IRInst* inst)
 {
     if (inst != tryConstantFoldInst(module, inst))

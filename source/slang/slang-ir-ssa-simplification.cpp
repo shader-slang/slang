@@ -6,7 +6,6 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-peephole.h"
-#include "slang-ir-hoist-constants.h"
 #include "slang-ir-deduplicate-generic-children.h"
 #include "slang-ir-remove-unused-generic-param.h"
 #include "slang-ir-redundancy-removal.h"
@@ -32,12 +31,11 @@ namespace Slang
 
             changed = false;
 
-            changed |= hoistConstants(module);
             changed |= deduplicateGenericChildren(module);
             changed |= propagateFuncProperties(module);
             changed |= removeUnusedGenericParam(module);
             changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
-            changed |= peepholeOptimize(module);
+            changed |= peepholeOptimizeGlobalScope(module);
 
             for (auto inst : module->getGlobalInsts())
             {
