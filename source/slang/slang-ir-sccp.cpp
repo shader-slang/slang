@@ -1696,7 +1696,7 @@ static bool applySparseConditionalConstantPropagationRec(
             break;
         default:
             // Skip other op codes.
-            break;
+            continue;
         }
         changed |= applySparseConditionalConstantPropagationRec(globalContext, childInst);
     }

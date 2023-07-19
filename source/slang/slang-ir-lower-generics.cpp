@@ -225,7 +225,7 @@ namespace Slang
         // real RTTI objects and witness tables.
         specializeRTTIObjects(&sharedContext, sink);
 
-        eliminateDeadCode(module);
+        simplifyIR(module);
 
         lowerTuples(module, sink);
         if (sink->getErrorCount() != 0)
