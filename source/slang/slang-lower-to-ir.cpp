@@ -3674,7 +3674,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->declRef;
-            if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
+            if (auto enumType = declRef.as<EnumDecl>())
+            {
+                return LoweredValInfo::simple(getBuilder()->getIntValue(irType, 0));
+            }
+            else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 List<IRInst*> args;
 
