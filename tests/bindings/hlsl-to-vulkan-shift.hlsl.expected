@@ -157,7 +157,7 @@ standard output = {
                 },
                 {
                     "name": "c",
-                    "binding": {"kind": "constantBuffer", "index": 3, "used": 0}
+                    "binding": {"kind": "constantBuffer", "index": 3, "used": 1}
                 },
                 {
                     "name": "t2",
