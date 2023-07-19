@@ -234,9 +234,5 @@ namespace Slang
         generateAnyValueMarshallingFunctions(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
-
-        // We might have generated new temporary variables during lowering.
-        // An SSA pass can clean up unnecessary load/stores.
-        simplifyIR(module);
     }
 } // namespace Slang

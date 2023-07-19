@@ -492,7 +492,7 @@ namespace Slang
             auto varExpr = as<VarExpr>(opSideEffectExpr->arguments[0]);
             if (!varExpr)
                 return;
-            if (varExpr->declRef != initialVar)
+            if (varExpr->declRef.getDecl() != initialVar.getDecl())
             {
                 // If the user writes something like `for (int i = 0; i < 5; j++)`,
                 // it is most likely a bug, so we issue a warning.
@@ -518,7 +518,7 @@ namespace Slang
             stepSize = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
         }
 
-        if (predicateVar != initialVar)
+        if (predicateVar.getDecl() != initialVar.getDecl())
         {
             if (predicateVar)
                 getSink()->diagnose(stmt->predicateExpression, Diagnostics::forLoopPredicateCheckingDifferentVar, initialVar, predicateVar);

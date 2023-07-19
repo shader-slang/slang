@@ -235,9 +235,6 @@ struct PeepholeContext : InstPassBase
         return false;
     }
 
-    RefPtr<IRDominatorTree> domTree;
-    IRGlobalValueWithCode* domTreeFunc = nullptr;
-
     void processInst(IRInst* inst)
     {
         if (as<IRGlobalValueWithCode>(inst))
@@ -746,13 +743,8 @@ struct PeepholeContext : InstPassBase
                             auto parentFunc = getParentFunc(inst);
                             if (!parentFunc)
                                 break;
-                            if (domTreeFunc != parentFunc)
-                            {
-                                domTree = computeDominatorTree(parentFunc);
-                                domTreeFunc = parentFunc;
-                            }
-                            if (!domTree)
-                                break;
+
+                            auto domTree = parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
 
                             if (domTree->dominates(argValue, inst))
                             {
@@ -816,6 +808,8 @@ struct PeepholeContext : InstPassBase
 
     bool processFunc(IRInst* func)
     {
+        func->getModule()->invalidateAllAnalysis();
+
         bool result = false;
         for (;;)
         {
@@ -845,6 +839,22 @@ bool peepholeOptimize(IRInst* func)
 {
     PeepholeContext context = PeepholeContext(func->getModule());
     return context.processFunc(func);
+}
+
+bool peepholeOptimizeGlobalScope(IRModule* module)
+{
+    PeepholeContext context = PeepholeContext(module);
+    bool result = false;
+    for (;;)
+    {
+        context.changed = false;
+        for (auto globalInst : module->getGlobalInsts())
+            context.processInst(globalInst);
+        result |= context.changed;
+        if (!context.changed)
+            break;
+    }
+    return result;
 }
 
 bool tryReplaceInstUsesWithSimplifiedValue(IRModule* module, IRInst* inst)
