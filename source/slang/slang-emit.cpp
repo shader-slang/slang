@@ -329,7 +329,6 @@ Result linkAndOptimizeIR(
     }
 
     lowerOptionalType(irModule, sink);
-    simplifyIR(irModule, sink);
 
     switch (target)
     {
@@ -355,6 +354,8 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "UNIONS DESUGARED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    simplifyIR(irModule, sink);
 
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
@@ -475,10 +476,6 @@ Result linkAndOptimizeIR(
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
-
-    // TODO(DG): There are multiple DCE steps here, which need to be changed
-    //   so that they don't just throw out any non-entry point code
-    // Debugging code for IR transformations...
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "SPECIALIZED");
 #endif
@@ -493,9 +490,6 @@ Result linkAndOptimizeIR(
     //
     simplifyIR(irModule, sink);
 
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
-#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // We don't need the legalize pass for C/C++ based types
@@ -529,7 +523,6 @@ Result linkAndOptimizeIR(
         legalizeExistentialTypeLayout(
             irModule,
             sink);
-        eliminateDeadCode(irModule);
 
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "EXISTENTIALS LEGALIZED");
@@ -550,7 +543,6 @@ Result linkAndOptimizeIR(
         legalizeResourceTypes(
             irModule,
             sink);
-        eliminateDeadCode(irModule);
 
         //  Debugging output of legalization
     #if 0
@@ -565,7 +557,6 @@ Result linkAndOptimizeIR(
         legalizeEmptyTypes(
             irModule,
             sink);
-        eliminateDeadCode(irModule);
     }
 
     // Once specialization and type legalization have been performed,
@@ -599,7 +590,7 @@ Result linkAndOptimizeIR(
     {
         specializeArrayParameters(codeGenContext, irModule);
     }
-    simplifyIR(irModule, sink);
+    eliminateDeadCode(irModule);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
@@ -842,9 +833,9 @@ Result linkAndOptimizeIR(
     // functions, so there might still be invalid code in
     // our IR module.
     //
-    // We run IR simplification passes again to clean things up.
+    // We run DCE pass again to clean things up.
     //
-    simplifyIR(irModule, sink);
+    eliminateDeadCode(irModule);
 
     if (isKhronosTarget(targetRequest))
     {
@@ -885,9 +876,10 @@ Result linkAndOptimizeIR(
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
     lowerBitCast(targetRequest, irModule);
-    simplifyIR(irModule, sink);
 
     eliminateMultiLevelBreak(irModule);
+
+    simplifyIR(irModule, sink);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and

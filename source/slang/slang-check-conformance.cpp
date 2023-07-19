@@ -104,6 +104,16 @@ namespace Slang
         // For now we are continuing to conflate all the subtype-ish relationships but not
         // tangling convertibility into it.
 
+        // First, make sure both sub type and super type decl are ready for lookup.
+        if (auto subDeclRefType = as<DeclRefType>(subType))
+        {
+            ensureDecl(subDeclRefType->declRef.getDecl(), DeclCheckState::ReadyForLookup);
+        }
+        if (auto superDeclRefType = as<DeclRefType>(subType))
+        {
+            ensureDecl(superDeclRefType->declRef.getDecl(), DeclCheckState::ReadyForLookup);
+        }
+
         // In the common case, we can use the pre-computed inheritance information for `subType`
         // to enumerate all the types it transitively inherits from.
         //

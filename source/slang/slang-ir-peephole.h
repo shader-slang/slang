@@ -10,5 +10,6 @@ namespace Slang
         /// Apply peephole optimizations.
     bool peepholeOptimize(IRModule* module);
     bool peepholeOptimize(IRInst* func);
+    bool peepholeOptimizeGlobalScope(IRModule* module);
     bool tryReplaceInstUsesWithSimplifiedValue(IRModule* module, IRInst* inst);
 }

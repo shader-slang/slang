@@ -232,7 +232,7 @@ class Type: public Val
 
         /// Type derived types store the AST builder they were constructed on. The builder calls this function
         /// after constructing.
-    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder) { m_astBuilder = inAstBuilder; astNodeType = inAstNodeType; }
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder) { Val::init(inAstNodeType, inAstBuilder); m_astBuilder = inAstBuilder; }
 
         /// Get the ASTBuilder that was used to construct this Type
     SLANG_FORCE_INLINE ASTBuilder* getASTBuilder() const { return m_astBuilder; }
