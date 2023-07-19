@@ -696,12 +696,60 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
 
 GLSLSpecializationConstantLayoutRulesImpl kGLSLSpecializationConstantLayoutRulesImpl;
 
-//
+// Given a ShaderParamKind returns the equivalent LayoutResourceKind/ParameterCategory/SlangParameterCategory
+static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
+{
+    switch (kind)
+    {
+        case ShaderParameterKind::ConstantBuffer:
+            return LayoutResourceKind::ConstantBuffer;
+
+        case ShaderParameterKind::TextureUniformBuffer:
+        case ShaderParameterKind::StructuredBuffer:
+        case ShaderParameterKind::RawBuffer:
+        case ShaderParameterKind::Buffer:
+        case ShaderParameterKind::Texture:
+            return LayoutResourceKind::ShaderResource;
+
+        case ShaderParameterKind::MutableStructuredBuffer:
+        case ShaderParameterKind::MutableRawBuffer:
+        case ShaderParameterKind::MutableBuffer:
+        case ShaderParameterKind::MutableTexture:
+            return LayoutResourceKind::UnorderedAccess;
+
+        case ShaderParameterKind::SamplerState:
+            return LayoutResourceKind::SamplerState;
+        default: 
+            return LayoutResourceKind::None;
+    }
+}
 
 struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind) override
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) override
     {
+        if (options.hlslToVulkanKindFlags)
+        {
+            // Is this an HLSL kind that might be shifted
+
+            // Get as hlslLayoutKind
+            const auto hlslLayoutKind = _getHLSLLayoutResourceKind(kind);
+
+            // Get as hlslToVulkanKind
+            const auto hlslToVulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslLayoutKind);
+
+            if (hlslToVulkanKind != HLSLToVulkanLayoutOptions::Kind::Invalid)
+            {
+                // Is this kind enabled for shift?
+                if (options.hlslToVulkanKindFlags & HLSLToVulkanLayoutOptions::getKindFlag(hlslToVulkanKind))
+                {
+                    // We are going to consume a HLSL layout kind
+                    // Later we will do shifting as necessary
+                    return SimpleLayoutInfo(hlslLayoutKind, 1);
+                }
+            }
+        }
+
         // In Vulkan GLSL, pretty much every object is just a descriptor-table slot.
         // We can refine this method once we support a case where this isn't true.
         return SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1);
@@ -711,7 +759,7 @@ GLSLObjectLayoutRulesImpl kGLSLObjectLayoutRulesImpl;
 
 struct GLSLPushConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/) override
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/, const Options& /* options */) override
     {
         // Special-case the layout for a constant-buffer, because we don't
         // want it to allocate a descriptor-table slot
@@ -722,7 +770,7 @@ GLSLPushConstantBufferObjectLayoutRulesImpl kGLSLPushConstantBufferObjectLayoutR
 
 struct GLSLShaderRecordConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/) override
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/, const Options& /* options */) override
     {
         // Special-case the layout for a constant-buffer, because we don't
         // want it to allocate a descriptor-table slot
@@ -733,7 +781,7 @@ GLSLShaderRecordConstantBufferObjectLayoutRulesImpl kGLSLShaderRecordConstantBuf
 
 struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */) override
     {
         switch( kind )
         {
@@ -910,7 +958,7 @@ CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 
 struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */) override
     {
         switch (kind)
         {
@@ -962,7 +1010,7 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
     // of opaque handle (as opposed to a pointer) such as CUsurfObject, CUtexObject
     typedef unsigned long long ObjectHandle;
 
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options & /* options */) override
     {
         switch (kind)
         {
@@ -1501,6 +1549,11 @@ TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, Pro
     context.rules = nullptr;
     context.matrixLayoutMode = targetReq->getDefaultMatrixLayoutMode();
 
+    if (auto hlslToVulkanLayoutOptions = targetReq->getHLSLToVulkanLayoutOptions())
+    {
+        context.objectLayoutOptions.hlslToVulkanKindFlags = hlslToVulkanLayoutOptions->getKindShiftEnabledFlags();
+    }
+
     if( rulesFamily )
     {
         context.rules = rulesFamily->getConstantBufferRules(targetReq);
@@ -1586,21 +1639,22 @@ static TypeLayoutResult createSimpleTypeLayout(
     return TypeLayoutResult(typeLayout, info);
 }
 
-static SimpleLayoutInfo getParameterGroupLayoutInfo(
-    ParameterGroupType*  type,
-    LayoutRulesImpl*            rules)
+static SimpleLayoutInfo _getParameterGroupLayoutInfo(
+    TypeLayoutContext const& context,
+    ParameterGroupType* type,
+    LayoutRulesImpl* rules)
 {
     if( as<ConstantBufferType>(type) )
     {
-        return rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+        return rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context.objectLayoutOptions);
     }
     else if( as<TextureBufferType>(type) )
     {
-        return rules->GetObjectLayout(ShaderParameterKind::TextureUniformBuffer);
+        return rules->GetObjectLayout(ShaderParameterKind::TextureUniformBuffer, context.objectLayoutOptions);
     }
     else if( as<GLSLShaderStorageBufferType>(type) )
     {
-        return rules->GetObjectLayout(ShaderParameterKind::ShaderStorageBuffer);
+        return rules->GetObjectLayout(ShaderParameterKind::ShaderStorageBuffer, context.objectLayoutOptions);
     }
     else if (as<ParameterBlockType>(type))
     {
@@ -2270,7 +2324,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         // allocate a constant buffer regiser/binding into
         // the overall layout, to account for it.
         //
-        auto cbUsage = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+        auto cbUsage = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context.objectLayoutOptions);
         containerTypeLayout->addResourceUsage(cbUsage.kind, cbUsage.size);
     }
 
@@ -2730,7 +2784,7 @@ createStructuredBufferTypeLayout(
     RefPtr<TypeLayout>          elementTypeLayout)
 {
     auto rules = context.rules;
-    auto info = rules->GetObjectLayout(kind);
+    auto info = rules->GetObjectLayout(kind, context.objectLayoutOptions);
 
     auto typeLayout = new StructuredBufferTypeLayout();
 
@@ -3611,7 +3665,7 @@ static TypeLayoutResult _createTypeLayout(
         // different from a `Texture2D<U>` in terms of how it
         // should be handled as a member of a container.
         //
-        auto info = getParameterGroupLayoutInfo(parameterGroupType, rules);
+        auto info = _getParameterGroupLayoutInfo(context, parameterGroupType, rules);
 
         // The more interesting case, though, is when the user
         // is requesting us to actually create a `TypeLayout`,
@@ -3633,7 +3687,7 @@ static TypeLayoutResult _createTypeLayout(
     else if (const auto samplerStateType = as<SamplerStateType>(type))
     {
         return createSimpleTypeLayout(
-            rules->GetObjectLayout(ShaderParameterKind::SamplerState),
+            rules->GetObjectLayout(ShaderParameterKind::SamplerState, context.objectLayoutOptions),
             type,
             rules);
     }
@@ -3654,7 +3708,7 @@ static TypeLayoutResult _createTypeLayout(
         }
 
         return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind),
+            rules->GetObjectLayout(kind, context.objectLayoutOptions),
             type,
             rules);
     }
@@ -3675,7 +3729,7 @@ static TypeLayoutResult _createTypeLayout(
         }
 
         return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind),
+            rules->GetObjectLayout(kind, context.objectLayoutOptions),
             type,
             rules);
     }
@@ -3696,7 +3750,7 @@ static TypeLayoutResult _createTypeLayout(
         }
 
         return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind),
+            rules->GetObjectLayout(kind, context.objectLayoutOptions),
             type,
             rules);
     }
@@ -3704,7 +3758,7 @@ static TypeLayoutResult _createTypeLayout(
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, KIND)                                                \
     else if(auto type_##TYPE = as<TYPE>(type)) do {                     \
-        auto info = rules->GetObjectLayout(ShaderParameterKind::KIND);  \
+        auto info = rules->GetObjectLayout(ShaderParameterKind::KIND, context.objectLayoutOptions);  \
         auto typeLayout = createStructuredBufferTypeLayout(             \
                 context,                                                \
                 ShaderParameterKind::KIND,                              \
@@ -3726,7 +3780,7 @@ static TypeLayoutResult _createTypeLayout(
 #define CASE(TYPE, KIND)                                        \
     else if(as<TYPE>(type)) do {                              \
         return createSimpleTypeLayout(                             \
-            rules->GetObjectLayout(ShaderParameterKind::KIND),  \
+            rules->GetObjectLayout(ShaderParameterKind::KIND, context.objectLayoutOptions),  \
             type, rules);                        \
     } while(0)
 
