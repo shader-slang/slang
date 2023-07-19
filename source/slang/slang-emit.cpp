@@ -329,7 +329,6 @@ Result linkAndOptimizeIR(
     }
 
     lowerOptionalType(irModule, sink);
-    simplifyIR(irModule, sink);
 
     switch (target)
     {
@@ -355,6 +354,8 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "UNIONS DESUGARED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    simplifyIR(irModule, sink);
 
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
