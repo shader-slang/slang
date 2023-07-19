@@ -311,7 +311,7 @@ void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
     }
 
     // Workout the humane source location.
-    const HumaneSourceLoc humaneSourceLoc = getSourceManager()->getHumaneLoc(sourceLocation);
+    const HumaneSourceLoc humaneSourceLoc = getSourceManager()->getHumaneLoc(sourceLocation, SourceLocType::Emit);
 
     // If the location is valid, mark need to update, and the new location
     if (humaneSourceLoc.line > 0)

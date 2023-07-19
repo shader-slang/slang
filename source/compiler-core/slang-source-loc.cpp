@@ -190,12 +190,41 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
     m_entries.add(entry);
 }
 
-SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView* sourceView, SourceLoc loc, HandleSourceLoc& outLoc)
+// Nominal-like types take into account line directives, and potentially source maps
+static bool _isNominalLike(SourceLocType type)
+{
+    return type == SourceLocType::Nominal || type == SourceLocType::Emit;
+}
+
+static bool _canFollowSourceMap(SourceFile* sourceFile, SourceLocType type)
+{
+    // If we don't have a source map we have nothing to follow
+    if (!sourceFile->getSourceMap())
+    {
+        return false;
+    }
+
+    // If it's obfuscated we can't follow if we are emitting
+    if (sourceFile->getSourceMapKind() == SourceMapKind::Obfuscated &&
+        type == SourceLocType::Emit)
+    {
+        return false;
+    }
+
+    return _isNominalLike(type); 
+}
+
+static SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView* sourceView, SourceLoc loc, SourceLocType type, HandleSourceLoc& outLoc)
 {
     auto sourceFile = sourceView->getSourceFile();
 
+    if (!_canFollowSourceMap(sourceFile, type))
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+
     // Hold a list of sourceFiles visited so we can't end up in a loop of lookups
-    List<SourceFile*> sourceFiles;
+    ShortList<SourceFile*, 8> sourceFiles;
     sourceFiles.add(sourceFile);
 
     Index entryIndex = -1;
@@ -240,8 +269,10 @@ SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView
                     sourceFiles.add(foundSourceFile);
 
                     // If it has a source map, we try and look up the current location in it's source map
-                    if (auto foundSourceMap = foundSourceFile->getSourceMap())
+                    if (_canFollowSourceMap(foundSourceFile, type))
                     {
+                        auto foundSourceMap = foundSourceFile->getSourceMap();
+
                         const auto foundEntryIndex = foundSourceMap->get().findEntry(entry.sourceLine, entry.sourceColumn);
 
                         // If we found the entry repeat the lookup
@@ -273,18 +304,30 @@ SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView
     return SLANG_OK;
 }
 
+
+SlangResult SourceView::_findSourceMapLoc(SourceLoc loc, SourceLocType type, HandleSourceLoc& outLoc)
+{
+    // We only do source map lookups with nominal
+    if (!_isNominalLike(type))
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+
+    // TODO(JS): 
+    // Ideally we'd do the lookup on the "current" source manager rather than the source manager on this 
+    // view, which may be a parent to the current one. 
+    auto lookupSourceManager = m_sourceFile->getSourceManager();
+
+    HandleSourceLoc handleLoc;
+    SLANG_RETURN_ON_FAIL(_findLocWithSourceMap(lookupSourceManager, this, loc, type, outLoc));
+
+    return SLANG_OK;
+}
+
 HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
 {
-    // If it's nominal
-    if (type == SourceLocType::Nominal && m_sourceFile->getSourceMap())
-    {
-        // TODO(JS): 
-        // Ideally we'd do the lookup on the "current" source manager rather than the source manager on this 
-        // view, which may be a parent to the current one. 
-        auto lookupSourceManager = m_sourceFile->getSourceManager();
-
-        HandleSourceLoc handleLoc;
-        if (SLANG_SUCCEEDED(_findLocWithSourceMap(lookupSourceManager, this, loc, handleLoc)))
+    {   HandleSourceLoc handleLoc;
+        if (SLANG_SUCCEEDED(_findSourceMapLoc(loc, type, handleLoc)))
         {
             return handleLoc;
         }
@@ -307,22 +350,21 @@ HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
     HandleSourceLoc handleLoc;
     handleLoc.column = columnIndex + 1;
     handleLoc.line = lineIndex + 1;
-
-    // Make up a default entry
-    StringSlicePool::Handle pathHandle = StringSlicePool::Handle(0);
-
-    // Only bother looking up the entry information if we want a 'Normal' lookup
-    const int entryIndex = (type == SourceLocType::Nominal) ? findEntryIndex(loc) : -1;
-    if (entryIndex >= 0)
+    
+    // Only bother looking up the entry information if we want a 'Norminal'-like lookup
+    if (_isNominalLike(type))
     {
-        const Entry& entry = m_entries[entryIndex];
-        // Adjust the line
-        handleLoc.line += entry.m_lineAdjust;
-        // Get the pathHandle..
-        pathHandle = entry.m_pathHandle;
+        const int entryIndex = findEntryIndex(loc);
+        if (entryIndex >= 0)
+        {
+            const Entry& entry = m_entries[entryIndex];
+            // Adjust the line
+            handleLoc.line += entry.m_lineAdjust;
+            // Get the pathHandle..
+            handleLoc.pathHandle = entry.m_pathHandle;
+        }
     }
 
-    handleLoc.pathHandle = pathHandle;
     return handleLoc;
 }
 
@@ -369,6 +411,14 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
     if (type == SourceLocType::Actual)
     {
         return getViewPathInfo();
+    }
+
+    {   
+        HandleSourceLoc handleLoc;
+        if (SLANG_SUCCEEDED(_findSourceMapLoc(loc, type, handleLoc)))
+        {
+            return _getPathInfoFromHandle(handleLoc.pathHandle);
+        }
     }
 
     const int entryIndex = findEntryIndex(loc);

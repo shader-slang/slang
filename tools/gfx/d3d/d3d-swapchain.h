@@ -99,7 +99,15 @@ public:
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL present() override
     {
-        if (SLANG_FAILED(m_swapChain->Present(m_desc.enableVSync ? 1 : 0, 0)))
+        const auto res = m_swapChain->Present(m_desc.enableVSync ? 1 : 0, 0);
+
+        // We may want to wait for crash dump completion for some kinds of debugging scenarios
+        if (res == DXGI_ERROR_DEVICE_REMOVED || res == DXGI_ERROR_DEVICE_RESET)
+        {
+            D3DUtil::waitForCrashDumpCompletion(res);
+        }
+
+        if (SLANG_FAILED(res))
         {
             return SLANG_FAIL;
         }

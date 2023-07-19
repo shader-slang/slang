@@ -297,6 +297,12 @@ namespace Slang
             SlangInt        targetIndex,
             slang::IBlob**  outCode,
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
+            SlangInt    entryPointIndex,
+            SlangInt    targetIndex,
+            ISlangMutableFileSystem** outFileSystem) SLANG_OVERRIDE;
+
         SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
             SlangInt                        specializationArgCount,
@@ -851,6 +857,14 @@ namespace Slang
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            ISlangMutableFileSystem** outFileSystem)  SLANG_OVERRIDE
+        {
+            return Super::getResultAsFileSystem(entryPointIndex, targetIndex, outFileSystem);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
             SlangInt                        specializationArgCount,
@@ -1067,6 +1081,14 @@ namespace Slang
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            ISlangMutableFileSystem** outFileSystem)  SLANG_OVERRIDE
+        {
+            return Super::getResultAsFileSystem(entryPointIndex, targetIndex, outFileSystem);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
             SlangInt specializationArgCount,
@@ -1219,6 +1241,14 @@ namespace Slang
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE
         {
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            ISlangMutableFileSystem** outFileSystem)  SLANG_OVERRIDE
+        {
+            return Super::getResultAsFileSystem(entryPointIndex, targetIndex, outFileSystem);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL specialize(

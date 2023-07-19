@@ -164,6 +164,16 @@ struct SourceRange
     SourceLoc end;
 };
 
+/// Source maps associated with files are could be of different uses. We use the SourceMapKind
+/// to indicate the usage. 
+/// 
+/// If the source map is obfuscated reasonable/desirable to ignore them on emit (if we didn't we leak information, 
+/// and we don't emit into the locations in the obfuscated intermediate "file").
+enum class SourceMapKind
+{
+    Normal,                     ///< A regular source map
+    Obfuscated,                 ///< Obfuscated source map
+};
 
 // Pre-declare
 struct SourceManager;
@@ -256,8 +266,11 @@ public:
         /// Get the source map associated with this file. If it's set when doing 
         /// lookup for source locations, the source map will be used
     IBoxValue<SourceMap>* getSourceMap() const { return m_sourceMap; }
+        /// Get the source map kind
+    SourceMapKind getSourceMapKind() const { return m_sourceMapKind; }
+
         /// Set a source map
-    void setSourceMap(IBoxValue<SourceMap>* sourceMap) { m_sourceMap = sourceMap; }
+    void setSourceMap(IBoxValue<SourceMap>* sourceMap, SourceMapKind sourceMapKind) { m_sourceMap = sourceMap; m_sourceMapKind = sourceMapKind; }
 
         /// Ctor
     SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize);
@@ -281,12 +294,15 @@ public:
     // If set then the locations in this file are really from locations from elsewhere, 
     // where the SourceMap specifies that mapping
     ComPtr<IBoxValue<SourceMap>> m_sourceMap;
+    // What kind of source map it is (if  there is one)
+    SourceMapKind m_sourceMapKind = SourceMapKind::Normal;
 };
 
 enum class SourceLocType
 {
     Nominal,                ///< The normal interpretation which takes into account #line directives and source maps
     Actual,                 ///< Ignores #line directives/source maps - and is the location as seen in the actual file
+    Emit,                   ///< Behaves the same as `Nominal` but ignores source maps. Used for Emit source locations.
 };
 
 // A source location in a format a human might like to see
@@ -395,6 +411,8 @@ class SourceView
         /// Get the pathInfo from a string handle. If it's 0, it will return the _getPathInfo
     PathInfo _getPathInfoFromHandle(StringSlicePool::Handle pathHandle) const;
     
+    SlangResult _findSourceMapLoc(SourceLoc loc, SourceLocType type, HandleSourceLoc& outLoc);
+
     String m_viewPath;                  ///< Path to this view. If empty the path is the path to the SourceView
 
     SourceLoc m_initiatingSourceLoc;    ///< An optional source loc that defines where this view was initiated from. SourceLoc(0) if not defined.
