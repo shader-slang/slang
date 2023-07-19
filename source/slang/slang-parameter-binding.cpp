@@ -1132,12 +1132,19 @@ static void addExplicitParameterBindings_GLSL(
     const HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
     if (vulkanKind == HLSLToVulkanLayoutOptions::Kind::Invalid)
     {
-        // If we can't use inferance, for the kind we'll use other mechanisms
+        // If we can't use inference, for the kind we'll use other mechanisms so we are done
         return;
     }
 
-    // We use the HLSL binding directly.
-    // We'll do the shifing at later 
+    // If inference is not enabled for this kind, we can issue a warning
+    if (!hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
+    {
+        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
+        return;
+    }
+
+    // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
+    // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
     resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
     
     semanticInfo.kind = resInfo->kind;
@@ -3677,10 +3684,16 @@ static void _maybeApplyHLSLToVulkanShifts(
                     const auto rangeIndex = usedRange.findRangeContaining(bindingInfo.index, resInfo->count);
                     if (rangeIndex >= 0)
                     {
-                        // We found a clash
+                        // We found a clash.
+
+                        // Get the var we are clashing with
                         auto clashingVarLayout = usedRange.ranges[rangeIndex].parameter;
 
-                        sink->diagnose(parameterInfo, Diagnostics::conflictingVulkanInferredBindingForParameter, getReflectionName(clashingVarLayout->getVariable()));
+                        // Get the var that we are currently looking at
+                        auto curVar = parameterInfo->varLayout->getVariable();
+
+                        // Report the clash.
+                        sink->diagnose(curVar, Diagnostics::conflictingVulkanInferredBindingForParameter, getReflectionName(clashingVarLayout->getVariable()));
                     }
                 }
             }

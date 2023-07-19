@@ -109,6 +109,9 @@ public:
 
         /// True if holds state such that vulkan bindings can be inferred from HLSL bindings
     bool canInferBindings() const { return m_kindShiftEnabledFlags != 0; }
+        
+        /// True if the kind/set can be inferred
+    bool canInfer(Kind kind, Index set) const { return getShift(kind, set) != kInvalidShift; }
 
         /// True if can infer a binding for a kind
     bool canInferBindingForKind(Kind kind) const { return (m_kindShiftEnabledFlags & getKindFlag(kind)) != 0; }

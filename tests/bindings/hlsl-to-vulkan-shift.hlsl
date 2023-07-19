@@ -17,5 +17,5 @@ RWStructuredBuffer<int> u2 : register(u3, space2);
 
 float4 main() : SV_TARGET
 {
-	return float4(1, 1, 1, 0);
+	return float4(1, 1, 1, 0) * c.a;
 }
