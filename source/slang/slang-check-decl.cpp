@@ -270,6 +270,11 @@ namespace Slang
             checkVarDeclCommon(varDecl);
         }
 
+        void visitGenericValueParamDecl(GenericValueParamDecl* genValDecl)
+        {
+            checkVarDeclCommon(genValDecl);
+        }
+
         void visitGlobalGenericValueParamDecl(GlobalGenericValueParamDecl* decl)
         {
             checkVarDeclCommon(decl);

@@ -573,9 +573,17 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             else if (magicMod->magicName == "Texture")
             {
                 SLANG_ASSERT(subst && subst->getArgs().getCount() >= 1);
+                auto textureTag = TextureFlavor(magicMod->tag);
+                Val* sampleCount = nullptr;
+                if (textureTag.isMultisample() && textureTag.getAccess() == SLANG_RESOURCE_ACCESS_READ_WRITE)
+                {
+                    if (subst->getArgs().getCount() >= 2)
+                        sampleCount = ExtractGenericArgInteger(subst->getArgs().getLast());
+                }
                 auto textureType = astBuilder->getOrCreate<TextureType>(
-                    TextureFlavor(magicMod->tag),
-                    ExtractGenericArgType(subst->getArgs()[0]));
+                    textureTag,
+                    ExtractGenericArgType(subst->getArgs()[0]),
+                    sampleCount);
                 textureType->declRef = declRef;
                 return textureType;
             }

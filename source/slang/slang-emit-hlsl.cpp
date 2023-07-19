@@ -287,6 +287,15 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     }
     m_writer->emit("<");
     emitType(texType->getElementType());
+    if (texType->getOperandCount() == 2)
+    {
+        auto sampleCount = as<IRIntLit>(texType->getSampleCount());
+        if (sampleCount->getValue() != 0)
+        {
+            m_writer->emit(", ");
+            m_writer->emit(sampleCount->getValue());
+        }
+    }
     m_writer->emit(" >");
 }
 
