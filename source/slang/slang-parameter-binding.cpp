@@ -3612,6 +3612,27 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     return false;
 }
 
+static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
+{
+    if (size == 1)
+    {
+        // If it's in effect a single index, just append like that.
+        ioBuf << start;
+    }
+    else
+    {
+        ioBuf << "[ " << start << " ... ";
+        if (size.isFinite())
+        {
+            ioBuf << start + size.getFiniteValue() << ")";
+        }
+        else
+        {
+            ioBuf << "inf )";
+        }
+    }
+}
+
 static void _maybeApplyHLSLToVulkanShifts(
     ParameterBindingContext* paramContext, 
     TargetRequest* targetReq,
@@ -3695,14 +3716,22 @@ static void _maybeApplyHLSLToVulkanShifts(
                     {
                         // We found a clash.
 
+                        const auto& clashRange = usedRange.ranges[rangeIndex];
+
                         // Get the var we are clashing with
-                        auto clashingVarLayout = usedRange.ranges[rangeIndex].parameter;
+                        auto clashingVarLayout = clashRange.parameter;
 
                         // Get the var that we are currently looking at
                         auto curVar = parameterInfo->varLayout->getVariable();
 
+                        StringBuilder curRangeBuf;
+                        _appendRange(bindingInfo.index, resInfo->count, curRangeBuf);
+
+                        StringBuilder clashRangeBuf;
+                        _appendRange(clashRange.begin, LayoutSize(clashRange.end), clashRangeBuf);
+
                         // Report the clash.
-                        sink->diagnose(curVar, Diagnostics::conflictingVulkanInferredBindingForParameter, getReflectionName(clashingVarLayout->getVariable()));
+                        sink->diagnose(curVar, Diagnostics::conflictingVulkanInferredBindingForParameter, getReflectionName(clashingVarLayout->getVariable()), curRangeBuf, clashRangeBuf);
                     }
                 }
             }
