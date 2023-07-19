@@ -4,7 +4,7 @@
 // and the argument correctly appears in the output hlsl.
 
 // CHECK: RWTexture2DMS<uint > t_0 : register(u0);
-// CHECK: RWTexture2DMS<uint, 4> tExplicit_0 : register(u1);
+// CHECK: RWTexture2DMS<uint, 4 > tExplicit_0 : register(u1);
 
 RWTexture2DMS<uint> t;
 RWTexture2DMS<uint, 4> tExplicit;
