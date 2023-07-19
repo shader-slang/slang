@@ -476,10 +476,6 @@ Result linkAndOptimizeIR(
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
-
-    // TODO(DG): There are multiple DCE steps here, which need to be changed
-    //   so that they don't just throw out any non-entry point code
-    // Debugging code for IR transformations...
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "SPECIALIZED");
 #endif
@@ -494,9 +490,6 @@ Result linkAndOptimizeIR(
     //
     simplifyIR(irModule, sink);
 
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
-#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // We don't need the legalize pass for C/C++ based types
