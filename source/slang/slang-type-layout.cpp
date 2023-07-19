@@ -3604,7 +3604,7 @@ static TypeLayoutResult createArrayLikeTypeLayout(
         // add in that resource usage.
         //
         typeLayout->addResourceUsage(
-            elementResourceKind,
+            elementResourceInfo.kind,
             arrayResourceCount);
     }
 
