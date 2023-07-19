@@ -1,0 +1,178 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "t",
+            "binding": {"kind": "shaderResource", "index": 10},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "s",
+            "binding": {"kind": "samplerState", "index": 100},
+            "type": {
+                "kind": "samplerState"
+            }
+        },
+        {
+            "name": "c",
+            "binding": {"kind": "constantBuffer", "index": 0},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "Data",
+                    "fields": [
+                        {
+                            "name": "a",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        },
+                        {
+                            "name": "b",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "Data",
+                        "fields": [
+                            {
+                                "name": "a",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            },
+                            {
+                                "name": "b",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "int32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                }
+            }
+        },
+        {
+            "name": "t2",
+            "binding": {"kind": "shaderResource", "index": 11},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "u",
+            "binding": {"kind": "unorderedAccess", "index": 1000},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "struct",
+                    "name": "Data",
+                    "fields": [
+                        {
+                            "name": "a",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        },
+                        {
+                            "name": "b",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "u2",
+            "binding": {"kind": "unorderedAccess", "index": 1001},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "int32"
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment",
+            "result:": {
+                "stage": "fragment",
+                "binding": {"kind": "varyingOutput", "index": 0},
+                "semanticName": "SV_TARGET",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            },
+            "bindings": [
+                {
+                    "name": "t",
+                    "binding": {"kind": "shaderResource", "index": 10, "used": 0}
+                },
+                {
+                    "name": "s",
+                    "binding": {"kind": "samplerState", "index": 100, "used": 0}
+                },
+                {
+                    "name": "c",
+                    "binding": {"kind": "constantBuffer", "index": 0, "used": 0}
+                },
+                {
+                    "name": "t2",
+                    "binding": {"kind": "shaderResource", "index": 11, "used": 0}
+                },
+                {
+                    "name": "u",
+                    "binding": {"kind": "unorderedAccess", "index": 1000, "used": 0}
+                },
+                {
+                    "name": "u2",
+                    "binding": {"kind": "unorderedAccess", "index": 1001, "used": 0}
+                }
+            ]
+        }
+    ]
+}
+}
