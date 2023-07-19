@@ -44,7 +44,7 @@ public:
             /// Append/ConsumeStructuredBuffer
             /// RWBuffer
             /// RWTextureXD/Array
-        UnorderedAccess,    
+        UnorderedAccess = 0,    
 
             /// Sampler (s)
             ///
@@ -66,6 +66,22 @@ public:
         CountOf,
     };
 
+    // A flag for each kind
+    typedef uint32_t KindFlags;
+    struct KindFlag
+    {
+        enum Enum : KindFlags
+        {
+            UnorderedAccess = KindFlags(1) << Index(Kind::UnorderedAccess),
+            Sampler         = KindFlags(1) << Index(Kind::Sampler), 
+            ShaderResource  = KindFlags(1) << Index(Kind::ShaderResource),
+            ConstantBuffer  = KindFlags(1) << Index(Kind::ConstantBuffer),
+        };
+    };
+       
+        /// Get a kind flag from a kind
+    SLANG_FORCE_INLINE static KindFlag::Enum getKindFlag(Kind kind) { SLANG_ASSERT(kind != Kind::Invalid); return KindFlag::Enum(KindFlags(1) << Index(kind)); }
+
     struct Key
     {
         typedef Key ThisType;
@@ -79,7 +95,7 @@ public:
         Index set;          ///< The set this shift is associated with 
     };
 
-        /// Set the the all option for the kind
+        /// Set the the all option for the kind.
     void setAllShift(Kind kind, Index shift);
 
         /// Set the shift for kind/set
@@ -92,11 +108,20 @@ public:
     bool hasGlobalsBinding() const { return m_globalsBinding.isSet(); }
 
         /// True if holds state such that vulkan bindings can be inferred from HLSL bindings
-    bool canInferBindings() const;
+    bool canInferBindings() const { return m_kindShiftEnabledFlags != 0; }
+        
+        /// True if the kind/set can be inferred
+    bool canInfer(Kind kind, Index set) const { return getShift(kind, set) != kInvalidShift; }
+
+        /// True if can infer a binding for a kind
+    bool canInferBindingForKind(Kind kind) const { return (m_kindShiftEnabledFlags & getKindFlag(kind)) != 0; }
 
         /// Given an kind and a binding infer the vulkan binding.
         /// Will return an invalid binding if one is not found
     Binding inferBinding(Kind kind, const Binding& inBinding) const;
+
+        /// Returns flags indicating for each kind if there is shift inference
+    KindFlags getKindShiftEnabledFlags() const { return m_kindShiftEnabledFlags; }
 
         /// Reset state such that all options are set to their default. The same state as when 
         /// originally constructed
@@ -125,9 +150,16 @@ public:
     static Kind getKind(slang::ParameterCategory param);
 
 protected:
+        /// Marks that a shift is enabled for the kind
+    void _enableShiftForKind(Kind kind) { m_kindShiftEnabledFlags |= getKindFlag(kind); }
+    
     Binding m_globalsBinding;
 
+        /// The `all` shifts
     Index m_allShifts[Count(Kind::CountOf)];
+
+        /// Holds a bit for each kind that has a shift enabled
+    KindFlags m_kindShiftEnabledFlags = 0;
 
         /// Maps a key to the amount of shift
     Dictionary<Key, Index> m_shifts;

@@ -582,6 +582,8 @@ DIAGNOSTIC(39023, Error, mixingImplicitAndExplicitBindingForVaryingParams, "mixi
 
 DIAGNOSTIC(39024, Warning, cannotInferVulkanBindingWithoutRegisterModifier, "shader parameter '$0' doesn't have a 'register' specified, automatic layout will be used")
 
+DIAGNOSTIC(39025, Error, conflictingVulkanInferredBindingForParameter, "conflicting vulkan inferred binding for parameter '$0' overlap is $1 and $2")
+
 //
 
 // 4xxxx - IL code generation.

@@ -6,7 +6,7 @@ standard output = {
     "parameters": [
         {
             "name": "t",
-            "binding": {"kind": "shaderResource", "index": 5},
+            "binding": {"kind": "shaderResource", "index": 10},
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D"
@@ -14,14 +14,14 @@ standard output = {
         },
         {
             "name": "s",
-            "binding": {"kind": "samplerState", "index": 1},
+            "binding": {"kind": "samplerState", "index": 100},
             "type": {
                 "kind": "samplerState"
             }
         },
         {
             "name": "c",
-            "binding": {"kind": "constantBuffer", "index": 3},
+            "binding": {"kind": "constantBuffer", "index": 0},
             "type": {
                 "kind": "constantBuffer",
                 "elementType": {
@@ -78,7 +78,7 @@ standard output = {
         },
         {
             "name": "t2",
-            "binding": {"kind": "shaderResource", "space": 2, "index": 7},
+            "binding": {"kind": "shaderResource", "index": 11},
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D"
@@ -86,7 +86,7 @@ standard output = {
         },
         {
             "name": "u",
-            "binding": {"kind": "unorderedAccess", "index": 11},
+            "binding": {"kind": "unorderedAccess", "index": 1000},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
@@ -117,7 +117,7 @@ standard output = {
         },
         {
             "name": "u2",
-            "binding": {"kind": "unorderedAccess", "space": 2, "index": 4},
+            "binding": {"kind": "unorderedAccess", "index": 1001},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
@@ -149,27 +149,27 @@ standard output = {
             "bindings": [
                 {
                     "name": "t",
-                    "binding": {"kind": "shaderResource", "index": 5, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 10, "used": 0}
                 },
                 {
                     "name": "s",
-                    "binding": {"kind": "samplerState", "index": 1, "used": 0}
+                    "binding": {"kind": "samplerState", "index": 100, "used": 0}
                 },
                 {
                     "name": "c",
-                    "binding": {"kind": "constantBuffer", "index": 3, "used": 1}
+                    "binding": {"kind": "constantBuffer", "index": 0, "used": 0}
                 },
                 {
                     "name": "t2",
-                    "binding": {"kind": "shaderResource", "space": 2, "index": 7, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 11, "used": 0}
                 },
                 {
                     "name": "u",
-                    "binding": {"kind": "unorderedAccess", "index": 11, "used": 0}
+                    "binding": {"kind": "unorderedAccess", "index": 1000, "used": 0}
                 },
                 {
                     "name": "u2",
-                    "binding": {"kind": "unorderedAccess", "space": 2, "index": 4, "used": 0}
+                    "binding": {"kind": "unorderedAccess", "index": 1001, "used": 0}
                 }
             ]
         }
