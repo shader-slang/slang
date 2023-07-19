@@ -1121,6 +1121,7 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
+    
     const auto hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     if (hlslInfo.kind == LayoutResourceKind::None)
     {
@@ -1128,6 +1129,14 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
+    // We can't infer TextureSampler from HLSL (it's not an HLSL concept)
+    // So use default layout
+    auto varType = varDecl.getDecl()->getType();
+    if (as<TextureSamplerType>(varType))
+    {
+        return;
+    }
+    
     // Can we map to a Vulkan kind in principal?
     const HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
     if (vulkanKind == HLSLToVulkanLayoutOptions::Kind::Invalid)
