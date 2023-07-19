@@ -196,6 +196,14 @@ namespace Slang
     {
         auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
 
+        // Only allow constructing a PartialGenericAppExpr when referencing a callable decl.
+        // Other types of generic decls must be fully specified.
+        bool allowPartialGenericApp = false;
+        if (as<CallableDecl>(genericDeclRef.getDecl()->inner))
+        {
+            allowPartialGenericApp = true;
+        }
+
         // The basic idea here is that we need to check that the
         // arguments to a generic application (e.g., `F<A1, A2, ...>`)
         // have the right "type," which in this context means
@@ -235,13 +243,27 @@ namespace Slang
             {
                 if (aa >= context.argCount)
                 {
-                    // If we have run out of arguments, then we don't
-                    // apply any more checks at this step. We will instead
-                    // attempt to *infer* an argument at this position
-                    // at a later stage.
-                    //
-                    candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
-                    break;
+                    if (allowPartialGenericApp)
+                    {
+                        // If we have run out of arguments, and the referenced decl
+                        // allows partially applied specialization (i.e. a callable
+                        // decl) then we don't apply any more checks at this step.
+                        // We will instead attempt to *infer* an argument at this
+                        // position at a later stage.
+                        //
+                        candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
+                        break;
+                    }
+                    else
+                    {
+                        // Otherwise, the generic decl had better provide a default value
+                        // or this reference is ill-formed.
+                        auto substType = typeParamRef.substitute(m_astBuilder, typeParamRef.getDecl()->initType.type);
+                        if (!substType)
+                            return false;
+                        checkedArgs.add(substType);
+                        continue;
+                    }
                 }
 
                 // We have a type parameter, and we expect to find
@@ -287,13 +309,29 @@ namespace Slang
             {
                 if (aa >= context.argCount)
                 {
-                    // If we have run out of arguments, then we don't
-                    // apply any more checks at this step. We will instead
-                    // attempt to *infer* an argument at this position
-                    // at a later stage.
-                    //
-                    candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
-                    break;
+                    if (allowPartialGenericApp)
+                    {
+                        // If we have run out of arguments and the decl allows
+                        // partial specialization, then we don't apply any more
+                        // checks at this step. We will instead attempt to
+                        // *infer* an argument at this position at a later
+                        // stage.
+                        //
+                        candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
+                        break;
+                    }
+                    else
+                    {
+                        // Otherwise, the generic decl had better provide a default value
+                        // or this reference is ill-formed.
+                        ensureDecl(valParamRef, DeclCheckState::Checked);
+                        ConstantFoldingCircularityInfo newCircularityInfo(valParamRef.getDecl(), nullptr);
+                        auto defaultVal = tryConstantFoldExpr(valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr), &newCircularityInfo);
+                        if (!defaultVal)
+                            return false;
+                        checkedArgs.add(defaultVal);
+                        continue;
+                    }
                 }
 
                 // The case for a generic value parameter is similar to that
