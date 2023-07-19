@@ -947,8 +947,13 @@ struct SimpleLayoutRulesImpl
 
 struct ObjectLayoutRulesImpl
 {
+    struct Options
+    {
+        HLSLToVulkanLayoutOptions::KindFlags hlslToVulkanKindFlags = 0;
+    };
+
     // Compute layout info for an object type
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) = 0;
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) = 0;
 };
 
 struct LayoutRulesImpl
@@ -999,9 +1004,9 @@ struct LayoutRulesImpl
 
     // Forward `ObjectLayoutRulesImpl` interface
 
-    SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind)
+    SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const ObjectLayoutRulesImpl::Options& options)
     {
-        return objectRules->GetObjectLayout(kind);
+        return objectRules->GetObjectLayout(kind, options);
     }
 
     //
@@ -1083,6 +1088,9 @@ struct TypeLayoutContext
 
     // Map types to their type layout
     Dictionary<Type*, TypeLayoutResult>      layoutMap;
+
+    // Options passed to object layout
+    ObjectLayoutRulesImpl::Options objectLayoutOptions;
 
     LayoutRulesImpl* getRules() { return rules; }
     LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }

@@ -1,0 +1,94 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "g_data",
+            "bindings": [
+                {"kind": "uniform", "offset": 0, "size": 32},
+                {"kind": "shaderResource", "index": 10},
+                {"kind": "unorderedAccess", "index": 100}
+            ],
+            "type": {
+                "kind": "array",
+                "elementCount": 2,
+                "elementType": {
+                    "kind": "struct",
+                    "name": "Data",
+                    "fields": [
+                        {
+                            "name": "tex",
+                            "type": {
+                                "kind": "resource",
+                                "baseShape": "texture2D"
+                            },
+                            "binding": {"kind": "shaderResource", "index": 0}
+                        },
+                        {
+                            "name": "structuredBuffer",
+                            "type": {
+                                "kind": "resource",
+                                "baseShape": "structuredBuffer",
+                                "access": "readWrite",
+                                "resultType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "unorderedAccess", "index": 0}
+                        },
+                        {
+                            "name": "a",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        },
+                        {
+                            "name": "b",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                        }
+                    ]
+                },
+                "uniformStride": 16
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment",
+            "result:": {
+                "stage": "fragment",
+                "binding": {"kind": "varyingOutput", "index": 0},
+                "semanticName": "SV_TARGET",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            },
+            "bindings": [
+                {
+                    "name": "g_data",
+                    "bindings": [
+                        {"kind": "uniform", "offset": 0, "size": 32},
+                        {"kind": "shaderResource", "index": 10, "used": 0},
+                        {"kind": "unorderedAccess", "index": 100, "used": 0}
+                    ]
+                }
+            ]
+        }
+    ]
+}
+}

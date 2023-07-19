@@ -29,7 +29,12 @@ static NamesDescriptionValue s_vulkanShiftKinds[] =
 
 HLSLToVulkanLayoutOptions::HLSLToVulkanLayoutOptions()
 {
-    reset();
+    // Clear the all shifts
+    for (auto& shift : m_allShifts)
+    {
+        shift = kInvalidShift;
+    }
+
     SLANG_ASSERT(isReset());
 }
 
@@ -40,6 +45,8 @@ void HLSLToVulkanLayoutOptions::setGlobalsBinding(const Binding& binding)
 
 void HLSLToVulkanLayoutOptions::reset()
 {
+    m_kindShiftEnabledFlags = 0;
+
     for (auto& shift : m_allShifts)
     {
         shift = kInvalidShift;
@@ -50,25 +57,10 @@ void HLSLToVulkanLayoutOptions::reset()
 
 void HLSLToVulkanLayoutOptions::setAllShift(Kind kind, Index shift)
 {
-    // We try to follow the convention, of the *last* entry set is the one used.
-    // If there a "all" set, we remove everything for the kind.
-
-    // Find all the entries for the kind
-    List<Key> keys;
-    for (auto& pair : m_shifts)
-    {
-        if (pair.key.kind == kind)
-        {
-            keys.add(pair.key);
-        }
-    }
-    // Remove them all
-    for (auto& key : keys)
-    {
-        m_shifts.remove(key);
-    }
+    SLANG_ASSERT(shift != kInvalidShift);
 
     m_allShifts[Index(kind)] = shift;
+    _enableShiftForKind(kind);
 }
 
 void HLSLToVulkanLayoutOptions::setShift(Kind kind, Index set, Index shift)
@@ -76,31 +68,25 @@ void HLSLToVulkanLayoutOptions::setShift(Kind kind, Index set, Index shift)
     SLANG_ASSERT(shift != kInvalidShift);
 
     Key key{ kind, set };
-    m_shifts.add(key, shift);
+    m_shifts.set(key, shift);
+    _enableShiftForKind(kind);
 }
 
 Index HLSLToVulkanLayoutOptions::getShift(Kind kind, Index set) const
 {
-    if (auto ptr = m_shifts.tryGetValue(Key{ kind, set }))
+    if (canInferBindingForKind(kind))
     {
-        return *ptr;
-    }
-
-    return m_allShifts[Index(kind)];
-}
-
-bool HLSLToVulkanLayoutOptions::canInferBindings() const
-{
-    // If any all shift is set it's not default
-    for (auto shift : m_allShifts)
-    {
-        if (shift != kInvalidShift)
+        // We lookup a shift for a set first as this shift is "more specific" and 
+        // is seen as taken precedent over the "all" scenario
+        if (auto ptr = m_shifts.tryGetValue(Key{ kind, set }))
         {
-            return true;
+            return *ptr;
         }
-    }
 
-    return m_shifts.getCount() > 0;
+        // Must have an `all` shift
+        return m_allShifts[Index(kind)];
+    }
+    return kInvalidShift;
 }
 
 bool HLSLToVulkanLayoutOptions::hasState() const

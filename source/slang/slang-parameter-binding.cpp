@@ -232,22 +232,70 @@ struct UsedRanges
         return Add(range);
     }
 
-    bool contains(UInt index)
+        /// Finds the range that contains the index
+        /// Returns -1 if not found
+    Index findRangeContaining(UInt index) const
     {
-        for (auto rr : ranges)
+        const auto rangeCount = ranges.getCount();
+        for (Index i = 0; i < rangeCount; ++i)
         {
-            if (index < rr.begin)
-                return false;
-
-            if (index >= rr.end)
-                continue;
-
-            return true;
+            const auto& rr = ranges[i];
+            if (index >= rr.begin && index < rr.end)
+            {
+                return index;
+            }
         }
+        return -1;
+    }
+        /// Finds the range index that contains the range passed in.
+        /// Returns -1 if not found
+    Index findRangeContaining(UInt index, UInt count) const
+    {
+        const auto start = index;
+        const auto end = index + count;
 
-        return false;
+        const auto rangeCount = ranges.getCount();
+        for (Index i = 0; i < rangeCount; ++i)
+        {
+            const auto& rr = ranges[i];
+
+            if (!(end <= rr.begin || start >= rr.end))
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
+    Index findRangeContaining(UInt index, LayoutSize size) const
+    {
+        if (size.isFinite())
+        {
+            const auto count = size.getFiniteValue();
+            if (count > 0)
+            {
+                return (count == 1) ?
+                    findRangeContaining(index) :
+                    findRangeContaining(index, count);
+            }
+        }
+        else
+        {
+            // The size is infinite...
+            const auto rangeCount = ranges.getCount();
+            for (Index i = 0; i < rangeCount; ++i)
+            {
+                // If the range end is part start index it's a hit
+                if (ranges[i].end > index)
+                {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    bool contains(UInt index) const { return findRangeContaining(index) >= 0; }
 
     // Try to find space for `count` entries
     UInt Allocate(VarLayout* param, UInt count)
@@ -285,7 +333,7 @@ struct ParameterBindingInfo
 {
     size_t              space = 0;
     size_t              index = 0;
-    LayoutSize          count;
+    LayoutSize          count = 0;
 };
 
 struct ParameterBindingAndKindInfo : ParameterBindingInfo
@@ -312,18 +360,6 @@ struct ParameterInfo : RefObject
     RefPtr<VarLayout> varLayout;
 
     ParameterBindingInfo    bindingInfo[kLayoutResourceKindCount];
-
-    // The translation unit this parameter is specific to, if any
-//    TranslationUnitRequest* translationUnit = nullptr;
-
-    ParameterInfo()
-    {
-        // Make sure we aren't claiming any resources yet
-        for( int ii = 0; ii < kLayoutResourceKindCount; ++ii )
-        {
-            bindingInfo[ii].count = 0;
-        }
-    }
 };
 
 struct EntryPointParameterBindingContext
@@ -766,17 +802,31 @@ static void collectGlobalScopeParameter(
     parameterInfo->varLayout = varLayout;
 }
 
-static RefPtr<UsedRangeSet> findUsedRangeSetForSpace(
+static UsedRangeSet* _getOrCreateUsedRangeSetForSpace(
     ParameterBindingContext*    context,
     UInt                        space)
 {
-    RefPtr<UsedRangeSet> usedRangeSet;
-    if (context->shared->globalSpaceUsedRangeSets.tryGetValue(space, usedRangeSet))
-        return usedRangeSet;
+    auto& globalSpaceUsedRangeSets = context->shared->globalSpaceUsedRangeSets;
 
-    usedRangeSet = new UsedRangeSet();
-    context->shared->globalSpaceUsedRangeSets.add(space, usedRangeSet);
-    return usedRangeSet;
+    auto& value = globalSpaceUsedRangeSets.getOrAddValue(space, RefPtr<UsedRangeSet>());
+    if (!value)
+    {
+        value = new UsedRangeSet();
+    }
+    return value;
+}
+
+static UsedRangeSet* _getUsedRangeSetForSpace(
+    ParameterBindingContext* context,
+    UInt                        space)
+{
+    auto& globalSpaceUsedRangeSets = context->shared->globalSpaceUsedRangeSets;
+
+    if (auto usedRangeSetPtr = globalSpaceUsedRangeSets.tryGetValue(space))
+    {
+        return *usedRangeSetPtr;
+    }
+    return nullptr;
 }
 
 // Record that a particular register space (or set, in the GLSL case)
@@ -860,7 +910,7 @@ static void addExplicitParameterBinding(
         }
         else
         {
-            auto usedRangeSet = findUsedRangeSetForSpace(context, semanticInfo.space);
+            auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, semanticInfo.space);
 
             // Record that the particular binding space was
             // used by an explicit binding, so that we don't
@@ -1065,50 +1115,51 @@ static void addExplicitParameterBindings_GLSL(
 
     // We need an HLSL register semantic to to infer from
     auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
-    if (hlslRegSemantic == nullptr)
+    if (!hlslRegSemantic)
     {
-        // We don't have a HLSL binding, so no inferance can occur, issue a warning
-        // 
-        // TODO(JS): I suppose there is some ambiguity here, because if we did a semantic lookup, and it didn't have a vulkanKind
-        // or didn't parse correctly we wouldn't issue this message.
-        getSink(context)->diagnose(varDecl.getDecl(), Diagnostics::cannotInferVulkanBindingWithoutRegisterModifier, varDecl);
+        // We'll use inference from the HLSL like layout that will happen elsewhere
         return;
     }
-            
-    // Get the HLSL binding info
+
+    
     const auto hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     if (hlslInfo.kind == LayoutResourceKind::None)
     {
-        // Is no hlsl resource binding
+        // Doesn't have an HLSL resource consumption, so we are done
         return;
     }
 
-    // We need to map to the GLSL binding types
-    HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
+    // We can't infer TextureSampler from HLSL (it's not an HLSL concept)
+    // So use default layout
+    auto varType = varDecl.getDecl()->getType();
+    if (as<TextureSamplerType>(varType))
+    {
+        return;
+    }
+    
+    // Can we map to a Vulkan kind in principal?
+    const HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
     if (vulkanKind == HLSLToVulkanLayoutOptions::Kind::Invalid)
     {
-        // The binding is not "inferable" so we are done
+        // If we can't use inference, for the kind we'll use other mechanisms so we are done
         return;
     }
 
-    const auto hlslBinding = HLSLToVulkanLayoutOptions::Binding{ Index(hlslInfo.space), Index(hlslInfo.index) };
-    const auto vulkanBinding = hlslToVulkanLayoutOptions->inferBinding(vulkanKind, hlslBinding);
-    
-    if (vulkanBinding.isInvalid())
+    // If inference is not enabled for this kind, we can issue a warning
+    if (!hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
-        // If we made it here, there are shift options, but there isn't one for the space/kind specified
-        // That could be a problem and unexpected, so issue a warning
-        getSink(context)->diagnose(varDecl.getDecl(), Diagnostics::hlslToVulkanMappingNotFound, varDecl);
+        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
         return;
     }
 
-    // Add for descriptor slot 
-    resInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
-
+    // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
+    // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
+    resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
+    
     semanticInfo.kind = resInfo->kind;
-    semanticInfo.index = UInt(vulkanBinding.index);
-    semanticInfo.space = UInt(vulkanBinding.set);
-                    
+    semanticInfo.index = UInt(hlslInfo.index);
+    semanticInfo.space = UInt(hlslInfo.space);
+
     const LayoutSize count = resInfo->count;
 
     addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
@@ -1116,7 +1167,7 @@ static void addExplicitParameterBindings_GLSL(
 
 // Given a single parameter, collect whatever information we have on
 // how it has been explicitly bound, which may come from multiple declarations
-void generateParameterBindings(
+void _generateParameterBindings(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo)
 {
@@ -1330,7 +1381,7 @@ static void completeBindingsForParameterImpl(
             // space.
 
             UInt space = context->shared->defaultSpace;
-            RefPtr<UsedRangeSet> usedRangeSet = findUsedRangeSetForSpace(context, space);
+            RefPtr<UsedRangeSet> usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
             bindingInfo.count = count;
             bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(firstVarLayout, count.getFiniteValue());
@@ -1518,7 +1569,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
                     // TODO: construct a `ParameterInfo` we can use here so that
                     // overlapped layout errors get reported nicely.
                     //
-                    auto usedResourceSet = findUsedRangeSetForSpace(context, 0);
+                    auto usedResourceSet = _getOrCreateUsedRangeSetForSpace(context, 0);
                     usedResourceSet->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)].Add(nullptr, semanticIndex, semanticIndex + semanticSlotCount);
                 }
             }
@@ -2528,11 +2579,11 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
     ParameterBindingContext*    context)
 {
     UInt space = context->shared->defaultSpace;
-    auto usedRangeSet = findUsedRangeSetForSpace(context, space);
+    auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
                           ->getConstantBufferRules(context->getTargetRequest())
-                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions);
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
@@ -2548,11 +2599,11 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     UInt space, 
     UInt index)
 {
-    auto usedRangeSet = findUsedRangeSetForSpace(context, space);
+    auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
         ->getConstantBufferRules(context->getTargetRequest())
-        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions);
 
     const Index count = Index(layoutInfo.size.getFiniteValue());
 
@@ -3561,6 +3612,133 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     return false;
 }
 
+static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
+{
+    if (size == 1)
+    {
+        // If it's in effect a single index, just append like that.
+        ioBuf << start;
+    }
+    else
+    {
+        ioBuf << "[ " << start << " ... ";
+        if (size.isFinite())
+        {
+            ioBuf << start + size.getFiniteValue() << ")";
+        }
+        else
+        {
+            ioBuf << "inf )";
+        }
+    }
+}
+
+static void _maybeApplyHLSLToVulkanShifts(
+    ParameterBindingContext* paramContext, 
+    TargetRequest* targetReq,
+    DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+    
+    SharedParameterBindingContext& sharedContext = *paramContext->shared;
+
+    // We may need to finally do any shifting if we have HLSLToVulkanLayoutOptions
+    auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions();
+    if (!vulkanOptions)
+    {
+        return;
+    }
+
+    // We only need to do this if there is some inferance
+    if (!vulkanOptions->canInferBindings())
+    {
+        return;
+    }
+
+    for (ParameterInfo* parameterInfo : sharedContext.parameters)
+    {
+        auto varLayout = parameterInfo->varLayout;
+        SLANG_RELEASE_ASSERT(varLayout);
+
+        // Iterate over all of the resourceInfos
+        for (auto& resourceInfo : varLayout->resourceInfos)
+        {
+            // Get the hlslToVulkanKind, and apply if valid
+            auto hlslToVulkanKind = HLSLToVulkanLayoutOptions::getKind(resourceInfo.kind);
+            if (hlslToVulkanKind != HLSLToVulkanLayoutOptions::Kind::Invalid)
+            {
+                auto& bindingInfo = parameterInfo->bindingInfo[Index(resourceInfo.kind)];
+
+                // Lookup the shift for the kind/space
+                const auto shift = vulkanOptions->getShift(hlslToVulkanKind, resourceInfo.space);
+                // If the shift is valid..
+                if (shift != HLSLToVulkanLayoutOptions::kInvalidShift)
+                {
+                    // Apply the shift
+                    resourceInfo.index += shift;
+
+                    // Fix the parameter binding info
+                    bindingInfo.index += shift;
+
+                    // Presumably they should both match
+                    SLANG_ASSERT(bindingInfo.index == resourceInfo.index);
+                    SLANG_ASSERT(bindingInfo.space == resourceInfo.space);
+                }
+
+                // We should go looking for overlaps. 
+                // In essence we need to look for HLSL kinds which have inferance.
+                // We assume all map to Descriptor, and look for descriptor overlaps
+
+                // We know there can't be a clash of HLSL layout kinds previously, otherwise that would have already produced an a warning.
+                // We also know the only change is either *all* of a set is shifted or none. 
+                // That means post a shift there still can't be clash between HLSL types.
+
+                // So clashes can only be between HLSL types and other bindings (regardless)
+
+
+                auto usedSpace = _getUsedRangeSetForSpace(paramContext, bindingInfo.space);
+
+                // The space must exist, because we are already consuming resources on it
+                SLANG_ASSERT(usedSpace);
+
+                const auto& usedRanges = usedSpace->usedResourceRanges;
+
+                // All the HLSL like bindings, we in actuality be DescriptorSlots on Vulkan
+                const auto& usedRange = usedRanges[Index(LayoutResourceKind::DescriptorTableSlot)];
+
+                // We need to get the count for the amount of slots consumed for this type
+                auto typeLayout = varLayout->getTypeLayout();
+
+                if (auto resInfo = typeLayout->FindResourceInfo(resourceInfo.kind))
+                {
+                    const auto rangeIndex = usedRange.findRangeContaining(bindingInfo.index, resInfo->count);
+                    if (rangeIndex >= 0)
+                    {
+                        // We found a clash.
+
+                        const auto& clashRange = usedRange.ranges[rangeIndex];
+
+                        // Get the var we are clashing with
+                        auto clashingVarLayout = clashRange.parameter;
+
+                        // Get the var that we are currently looking at
+                        auto curVar = parameterInfo->varLayout->getVariable();
+
+                        StringBuilder curRangeBuf;
+                        _appendRange(bindingInfo.index, resInfo->count, curRangeBuf);
+
+                        StringBuilder clashRangeBuf;
+                        _appendRange(clashRange.begin, LayoutSize(clashRange.end), clashRangeBuf);
+
+                        // Report the clash.
+                        sink->diagnose(curVar, Diagnostics::conflictingVulkanInferredBindingForParameter, getReflectionName(clashingVarLayout->getVariable()), curRangeBuf, clashRangeBuf);
+                    }
+                }
+            }
+        }
+    }
+}
+
 RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram*  targetProgram,
     DiagnosticSink* sink)
@@ -3644,7 +3822,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     //
     for( auto& parameter : sharedContext.parameters )
     {
-        generateParameterBindings(&context, parameter);
+        _generateParameterBindings(&context, parameter);
     }
 
     // It is possible that code has specified an explicit location
@@ -3714,7 +3892,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
             // kind of a mess, but also seems to be the best possible
             // answer given the constraints.
             //
-            auto usedRangeSet = findUsedRangeSetForSpace(&context, info.space);
+            auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(&context, info.space);
             markSpaceUsed(&context, nullptr, info.space);
             usedRangeSet->usedResourceRanges[(int)kind].Add(
                 nullptr,
@@ -3855,6 +4033,9 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // parameters and entry points that need them.
     //
     _completeBindings(&context, program);
+
+    // We may need to finally do any shifting if we have HLSLToVulkanLayoutOptions
+    _maybeApplyHLSLToVulkanShifts(&context, targetReq, sink);
 
     // Next we need to create a type layout to reflect the information
     // we have collected, and we will use the `ScopeLayoutBuilder`
