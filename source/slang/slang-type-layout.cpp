@@ -3432,6 +3432,26 @@ RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(
     return _createTypeLayoutForGlobalGenericTypeParam(context, type, globalGenericParamDecl).layout;
 }
 
+static bool _isDescriptorSlotLike(
+    TypeLayoutContext const& context,
+    LayoutResourceKind kind)
+{
+    if (kind == LayoutResourceKind::DescriptorTableSlot)
+    {
+        return true;
+    }
+
+    if (context.objectLayoutOptions.hlslToVulkanKindFlags)
+    {
+        const auto hlslToVulkanKind = HLSLToVulkanLayoutOptions::getKind(kind);
+        // If it maps to a kind and it is enabled it is 'in effect' a Descriptor slot
+        return hlslToVulkanKind != HLSLToVulkanLayoutOptions::Kind::Invalid && 
+            (context.objectLayoutOptions.hlslToVulkanKindFlags & HLSLToVulkanLayoutOptions::getKindFlag(hlslToVulkanKind));
+    }
+
+    return false;
+}
+
 static TypeLayoutResult createArrayLikeTypeLayout(
     TypeLayoutContext const&    context,
     Type* type,
@@ -3526,6 +3546,13 @@ static TypeLayoutResult createArrayLikeTypeLayout(
 
         LayoutSize arrayResourceCount = 0;
 
+        // We copy because if the element is *actually* DescriptorSlot like,
+        // we'll change the type. 
+        // NOTE! That as it stands this will change the resource type from an HLSL type
+        // to Descriptor slot. This scenario happens when we have HLSLToVulkanLayoutOptions
+        // enabled, we layout with some HLSL types.
+        auto elementResourceKind = elementResourceInfo.kind;
+
         // In almost all cases, the resources consumed by an array
         // will be its element count times the resources consumed
         // by its element type.
@@ -3534,14 +3561,15 @@ static TypeLayoutResult createArrayLikeTypeLayout(
         // compiling to GLSL for Vulkan, where an entire array
         // only consumes a single descriptor-table slot.
         //
-        if (elementResourceInfo.kind == LayoutResourceKind::DescriptorTableSlot)
+        if (_isDescriptorSlotLike(context, elementResourceKind))
         {
             arrayResourceCount = elementResourceInfo.count;
+            elementResourceKind = LayoutResourceKind::DescriptorTableSlot;
         }
         // The second exception to this is arrays of an existential type
         // where the entire array should be specialized to a single concrete type.
         //
-        else if (elementResourceInfo.kind == LayoutResourceKind::ExistentialTypeParam)
+        else if (elementResourceKind == LayoutResourceKind::ExistentialTypeParam)
         {
             arrayResourceCount = elementResourceInfo.count;
         }
@@ -3559,7 +3587,7 @@ static TypeLayoutResult createArrayLikeTypeLayout(
         else if(
             elementCount.isInfinite()
             && adjustedElementTypeLayout != elementTypeLayout
-            && doesResourceRequireAdjustmentForArrayOfStructs(elementResourceInfo.kind) )
+            && doesResourceRequireAdjustmentForArrayOfStructs(elementResourceKind) )
         {
             // We want to ignore resource types consumed by the element type
             // that need adjustement if the array size is infinite, since
@@ -3576,7 +3604,7 @@ static TypeLayoutResult createArrayLikeTypeLayout(
         // add in that resource usage.
         //
         typeLayout->addResourceUsage(
-            elementResourceInfo.kind,
+            elementResourceKind,
             arrayResourceCount);
     }
 

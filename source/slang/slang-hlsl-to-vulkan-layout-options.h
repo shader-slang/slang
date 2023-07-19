@@ -80,7 +80,7 @@ public:
     };
        
         /// Get a kind flag from a kind
-    SLANG_FORCE_INLINE static KindFlag::Enum getKindFlag(Kind kind) { return KindFlag::Enum(KindFlags(1) << Index(kind)); }
+    SLANG_FORCE_INLINE static KindFlag::Enum getKindFlag(Kind kind) { SLANG_ASSERT(kind != Kind::Invalid); return KindFlag::Enum(KindFlags(1) << Index(kind)); }
 
     struct Key
     {
