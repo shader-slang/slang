@@ -155,12 +155,17 @@ class TextureTypeBase : public ResourceType
 {
     SLANG_ABSTRACT_AST_CLASS(TextureTypeBase)
 
+    // The sampleCount parameter of a RWTexture*MS resource.
+    Val* sampleCount = nullptr;
 protected:
-    TextureTypeBase(TextureFlavor inFlavor, Type* inElementType)
+    TextureTypeBase(TextureFlavor inFlavor, Type* inElementType, Val* inSampleCount = nullptr)
     {
         elementType = inElementType;
         flavor = inFlavor;
+        sampleCount = inSampleCount;
     }
+
+    Val* getSampleCount() const { return sampleCount; }
 };
 
 
@@ -170,8 +175,8 @@ class TextureType : public TextureTypeBase
     SLANG_AST_CLASS(TextureType)
 
 protected:
-    TextureType(TextureFlavor flavor, Type* elementType)
-        : TextureTypeBase(flavor, elementType)
+    TextureType(TextureFlavor flavor, Type* elementType, Val* inSampleCount = nullptr)
+        : TextureTypeBase(flavor, elementType, inSampleCount)
     {}
 };
 

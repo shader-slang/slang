@@ -1336,6 +1336,7 @@ struct IRResourceTypeBase : IRType
 struct IRResourceType : IRResourceTypeBase
 {
     IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRType* getSampleCount() { return (IRType*)getOperand(1); }
 
     IR_PARENT_ISA(ResourceType)
 };

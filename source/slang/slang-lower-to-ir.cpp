@@ -2063,45 +2063,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             operands.getBuffer());
     }
 
-    // Lower a type where the type declaration being referenced is assumed
-    // to be an intrinsic type with a single generic type parameter, and
-    // which can thus be lowered to a simple IR type with the appropriate opcode.
-    IRType* lowerGenericIntrinsicType(DeclRefType* type, Type* elementType)
-    {
-        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
-        SLANG_ASSERT(intrinsicTypeModifier);
-        IROp op = IROp(intrinsicTypeModifier->irOp);
-        IRInst* irElementType = lowerType(context, elementType);
-        return getBuilder()->getType(
-            op,
-            1,
-            &irElementType);
-    }
-
-    IRType* lowerGenericIntrinsicType(DeclRefType* type, Type* elementType, IntVal* count)
-    {
-        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
-        SLANG_ASSERT(intrinsicTypeModifier);
-        IROp op = IROp(intrinsicTypeModifier->irOp);
-        IRInst* irElementType = lowerType(context, elementType);
-
-        IRInst* irCount = lowerSimpleVal(context, count);
-
-        IRInst* const operands[2] =
-        {
-            irElementType,
-            irCount,
-        };
-
-        return getBuilder()->getType(
-            op,
-            SLANG_COUNT_OF(operands),
-            operands);
-    }
-
     IRType* visitResourceType(ResourceType* type)
     {
-        return lowerGenericIntrinsicType(type, type->elementType);
+        return lowerSimpleIntrinsicType(type);
     }
 
     IRType* visitSamplerStateType(SamplerStateType* type)
@@ -2111,7 +2075,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitBuiltinGenericType(BuiltinGenericType* type)
     {
-        return lowerGenericIntrinsicType(type, type->elementType);
+        return lowerSimpleIntrinsicType(type);
     }
 
     IRType* visitUntypedBufferResourceType(UntypedBufferResourceType* type)
@@ -2121,18 +2085,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitHLSLPatchType(HLSLPatchType* type)
     {
-        Type* elementType = type->getElementType();
-        IntVal* count = type->getElementCount();
-
-        return lowerGenericIntrinsicType(type, elementType, count);
+        return lowerSimpleIntrinsicType(type);
     }
 
     IRType* visitMeshOutputType(MeshOutputType* type)
     {
-        Type* elementType = type->getElementType();
-        IntVal* count = type->getMaxElementCount();
-
-        return lowerGenericIntrinsicType(type, elementType, count);
+        return lowerSimpleIntrinsicType(type);
     }
 
     IRType* visitExtractExistentialType(ExtractExistentialType* type)

@@ -1329,9 +1329,12 @@ struct TextureTypeInfo
         flavor |= (access << 8);
 
         // emit a generic signature
-        // TODO: allow for multisample count to come in as well...
-        sb << "__generic<T = float4> ";
-
+        sb << "__generic<T = float4";
+        // Multi-sample rw texture types have an optional sampleCount parameter.
+        if (isMultisample && access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+            sb << ", let sampleCount : int = 0";
+        sb << ">";
+            
         if(prefixInfo.combined)
         {
             sb << "__magic_type(TextureSampler," << int(flavor) << ")\n";
