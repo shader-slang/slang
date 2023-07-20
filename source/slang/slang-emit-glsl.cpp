@@ -145,6 +145,23 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     }
 }
 
+
+static LayoutResourceKind _getResourceKind(IRVarLayout* layout, LayoutResourceKind primary, LayoutResourceKind secondary)
+{
+    // Primary is the most likely
+    if (layout->usesResourceKind(primary))
+    {
+        return primary;
+    }
+    else if (layout->usesResourceKind(secondary))
+    {
+        // If we find secondary use that
+        return secondary;
+    }
+    // We'll just assume primary then...
+    return primary;
+}
+
 void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
 {
     // Shader storage buffer is an OpenGL 430 feature
@@ -158,7 +175,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        LayoutResourceKind kind = LayoutResourceKind::DescriptorTableSlot;
+        const LayoutResourceKind kind = _getResourceKind(layout, LayoutResourceKind::DescriptorTableSlot, LayoutResourceKind::ShaderResource);
         EmitVarChain chain(layout);
 
         const UInt index = getBindingOffset(&chain, kind);
@@ -216,6 +233,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     m_writer->emit(";\n");
 }
 
+
 void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
 {
     // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
@@ -233,7 +251,8 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        LayoutResourceKind kind = LayoutResourceKind::DescriptorTableSlot;
+        const LayoutResourceKind kind = _getResourceKind(layout, LayoutResourceKind::DescriptorTableSlot, LayoutResourceKind::ShaderResource);
+
         EmitVarChain chain(layout);
 
         const UInt index = getBindingOffset(&chain, kind);
@@ -310,7 +329,9 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     or IRGLSLShaderStorageBufferType which is read write.
     */
 
-    _emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
+    const auto mainKind = _getResourceKind(containerChain.varLayout, LayoutResourceKind::DescriptorTableSlot, LayoutResourceKind::ConstantBuffer);
+
+    _emitGLSLLayoutQualifier(mainKind, &containerChain);
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
     bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
@@ -598,6 +619,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
         case LayoutResourceKind::ShaderResource:
         case LayoutResourceKind::UnorderedAccess:
         case LayoutResourceKind::SamplerState:
+
         case LayoutResourceKind::DescriptorTableSlot:
             m_writer->emit("layout(binding = ");
             m_writer->emit(index);
@@ -1372,8 +1394,16 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     {
         switch (rr->getResourceKind())
         {
-            case LayoutResourceKind::Uniform:
+            // These can occur for vk-shift-* scenarios, and are in effect equivalent to DescriptorTableSlot
             case LayoutResourceKind::ShaderResource:
+            case LayoutResourceKind::ConstantBuffer:
+            case LayoutResourceKind::SamplerState:
+            case LayoutResourceKind::UnorderedAccess:
+
+            // 
+            case LayoutResourceKind::Uniform:
+
+            //
             case LayoutResourceKind::DescriptorTableSlot:
                 m_writer->emit("uniform ");
                 break;
