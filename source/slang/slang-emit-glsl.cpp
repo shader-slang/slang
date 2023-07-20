@@ -145,21 +145,26 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     }
 }
 
-
-static LayoutResourceKind _getResourceKind(IRVarLayout* layout, LayoutResourceKind primary, LayoutResourceKind secondary)
+// In the description in `usesResourceKind`, it appears it does correctly handle cases where there are 0 offsets. Ie we don't have to traverse through 
+// to know it is used.
+//
+// This function was needed because the vk-shift-* change allows kinds which are "in effect" DescriptorSlots but appear as HLSL
+// kinds. 
+// This function should be used passing the "primary"
+static LayoutResourceKind _findUsedResourceKind(IRVarLayout* layout, LayoutResourceKind kind)
 {
-    // Primary is the most likely
-    if (layout->usesResourceKind(primary))
+    // DescriptorTableSlot is the most likely, so look for that first
+    if (layout->usesResourceKind(LayoutResourceKind::DescriptorTableSlot))
     {
-        return primary;
+        return LayoutResourceKind::DescriptorTableSlot;
     }
-    else if (layout->usesResourceKind(secondary))
+    else if (layout->usesResourceKind(kind))
     {
-        // If we find secondary use that
-        return secondary;
+        // If we find the optional kind use that
+        return kind;
     }
-    // We'll just assume primary then...
-    return primary;
+    // We'll just assume descriptor slot then
+    return LayoutResourceKind::DescriptorTableSlot;
 }
 
 void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
@@ -175,11 +180,11 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        const LayoutResourceKind kind = _getResourceKind(layout, LayoutResourceKind::DescriptorTableSlot, LayoutResourceKind::ShaderResource);
+        const LayoutResourceKind usedKind = _findUsedResourceKind(layout, LayoutResourceKind::ShaderResource);
         EmitVarChain chain(layout);
 
-        const UInt index = getBindingOffset(&chain, kind);
-        const UInt space = getBindingSpace(&chain, kind);
+        const UInt index = getBindingOffset(&chain, usedKind);
+        const UInt space = getBindingSpace(&chain, usedKind);
 
         m_writer->emit(", binding = ");
         m_writer->emit(index);
@@ -251,12 +256,12 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        const LayoutResourceKind kind = _getResourceKind(layout, LayoutResourceKind::DescriptorTableSlot, LayoutResourceKind::ShaderResource);
+        const LayoutResourceKind usedKind = _findUsedResourceKind(layout, LayoutResourceKind::ShaderResource);
 
         EmitVarChain chain(layout);
 
-        const UInt index = getBindingOffset(&chain, kind);
-        const UInt space = getBindingSpace(&chain, kind);
+        const UInt index = getBindingOffset(&chain, usedKind);
+        const UInt space = getBindingSpace(&chain, usedKind);
 
         m_writer->emit(", binding = ");
         m_writer->emit(index);
@@ -329,9 +334,10 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     or IRGLSLShaderStorageBufferType which is read write.
     */
 
-    const auto mainKind = _getResourceKind(containerChain.varLayout, LayoutResourceKind::DescriptorTableSlot, LayoutResourceKind::ConstantBuffer);
-
-    _emitGLSLLayoutQualifier(mainKind, &containerChain);
+    {
+        const auto usedKind = _findUsedResourceKind(containerChain.varLayout, LayoutResourceKind::ConstantBuffer);
+        _emitGLSLLayoutQualifier(usedKind, &containerChain);
+    }
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
     bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
