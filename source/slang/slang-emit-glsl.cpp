@@ -145,6 +145,28 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     }
 }
 
+
+// This function was needed because the vk-shift-* change allows kinds which are "in effect" DescriptorSlots but appear as HLSL
+// kinds. 
+// 
+// This seems safe as a test, because in the description of `usesResourceKind`, it appears that VarLayout require offsets even if
+// it's zero. 
+static LayoutResourceKind _findUsedDescriptorSlotLikeKind(IRVarLayout* layout, LayoutResourceKind kind)
+{
+    // DescriptorTableSlot is the most likely, so look for that first
+    if (layout->usesResourceKind(LayoutResourceKind::DescriptorTableSlot))
+    {
+        return LayoutResourceKind::DescriptorTableSlot;
+    }
+    else if (layout->usesResourceKind(kind))
+    {
+        // If we find the optional kind use that
+        return kind;
+    }
+    // We'll just assume descriptor slot then
+    return LayoutResourceKind::DescriptorTableSlot;
+}
+
 void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
 {
     // Shader storage buffer is an OpenGL 430 feature
@@ -158,11 +180,11 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        LayoutResourceKind kind = LayoutResourceKind::DescriptorTableSlot;
+        const LayoutResourceKind usedKind = _findUsedDescriptorSlotLikeKind(layout, LayoutResourceKind::ShaderResource);
         EmitVarChain chain(layout);
 
-        const UInt index = getBindingOffset(&chain, kind);
-        const UInt space = getBindingSpace(&chain, kind);
+        const UInt index = getBindingOffset(&chain, usedKind);
+        const UInt space = getBindingSpace(&chain, usedKind);
 
         m_writer->emit(", binding = ");
         m_writer->emit(index);
@@ -216,6 +238,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     m_writer->emit(";\n");
 }
 
+
 void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
 {
     // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
@@ -233,11 +256,12 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        LayoutResourceKind kind = LayoutResourceKind::DescriptorTableSlot;
+        const LayoutResourceKind usedKind = _findUsedDescriptorSlotLikeKind(layout, LayoutResourceKind::ShaderResource);
+
         EmitVarChain chain(layout);
 
-        const UInt index = getBindingOffset(&chain, kind);
-        const UInt space = getBindingSpace(&chain, kind);
+        const UInt index = getBindingOffset(&chain, usedKind);
+        const UInt space = getBindingSpace(&chain, usedKind);
 
         m_writer->emit(", binding = ");
         m_writer->emit(index);
@@ -310,7 +334,16 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     or IRGLSLShaderStorageBufferType which is read write.
     */
 
-    _emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
+    {
+        // TODO(JS):
+        // The *assumption* here is that we only need to detect the LayoutResourceKind as used on the initial containerChain.varLayout
+        // rather than search up the chain. 
+        //
+        // Perhaps there is still an issue here, because perhaps it's possible (?) to have a mixture of ConstantBuffer/DescriptorSlot
+        // and in that case the usedKind would just restrict to one and so produce the wrong answer.
+        const auto usedKind = _findUsedDescriptorSlotLikeKind(containerChain.varLayout, LayoutResourceKind::ConstantBuffer);
+        _emitGLSLLayoutQualifier(usedKind, &containerChain);
+    }
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
     bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
@@ -598,6 +631,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
         case LayoutResourceKind::ShaderResource:
         case LayoutResourceKind::UnorderedAccess:
         case LayoutResourceKind::SamplerState:
+
         case LayoutResourceKind::DescriptorTableSlot:
             m_writer->emit("layout(binding = ");
             m_writer->emit(index);
@@ -1372,8 +1406,16 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     {
         switch (rr->getResourceKind())
         {
-            case LayoutResourceKind::Uniform:
+            // These can occur for vk-shift-* scenarios, and are in effect equivalent to DescriptorTableSlot
             case LayoutResourceKind::ShaderResource:
+            case LayoutResourceKind::ConstantBuffer:
+            case LayoutResourceKind::SamplerState:
+            case LayoutResourceKind::UnorderedAccess:
+
+            // 
+            case LayoutResourceKind::Uniform:
+
+            //
             case LayoutResourceKind::DescriptorTableSlot:
                 m_writer->emit("uniform ");
                 break;
