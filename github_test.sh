@@ -1,12 +1,5 @@
 #!/usr/bin/env bash
 
-# CONFIGURATION=release or debug
-if [ "${CC}" == "gcc" ] && [ "${CONFIGURATION}" == "release" ]
-then
-    SLANG_TEST_CATEGORY=full
-else
-    SLANG_TEST_CATEGORY=smoke
-fi
 
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCHITECTURE=$(uname -m)
@@ -23,6 +16,14 @@ fi
 
 if [ "${ARCHITECTURE}" == "x86_64" ]; then
     ARCHITECTURE="x64"
+fi
+
+# CONFIGURATION=release or debug
+if [ "${CC}" == "gcc" ] && [ "${CONFIGURATION}" == "release" ] && [ "${ARCHITECTURE}" == "x64" ]
+then
+    SLANG_TEST_CATEGORY=full
+else
+    SLANG_TEST_CATEGORY=smoke
 fi
 
 TARGET=${PLATFORM}-${ARCHITECTURE}

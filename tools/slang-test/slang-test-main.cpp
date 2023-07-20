@@ -635,10 +635,10 @@ static TestResult _fileCheckTest(
     IFileCheck* fc = context.getFileCheck();
     if(!fc)
     {
-        // TODO(JS):
-        // Do we want to fail or ignore if we don't find file check?
-        testReporter.message(TestMessageType::RunError, "FileCheck is not available");
-        return TestResult::Fail;
+        // Ignore if FileCheck is not available.
+        // We could report an error, but our ARM64 CI doesn't have FileCheck yet.
+        testReporter.message(TestMessageType::Info, "FileCheck is not available");
+        return TestResult::Ignored;
     }
 
     const bool coloredOutput = true;
