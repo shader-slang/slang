@@ -176,7 +176,9 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
             if (auto call = as<IRCall>(inst))
             {
                 auto callee = getResolvedInstForDecorations(call->getCallee());
-                if (!callee || !callee->findDecoration<IRReadNoneDecoration>())
+                if (!callee || 
+                    !(callee->findDecoration<IRNoSideEffectDecoration>() || 
+                      callee->findDecoration<IRReadNoneDecoration>()))
                     return true;
                 // We are calling a pure function, check if any of the return
                 // variables are used outside the loop.
