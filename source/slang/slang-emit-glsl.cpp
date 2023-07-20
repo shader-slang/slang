@@ -145,13 +145,13 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     }
 }
 
-// In the description in `usesResourceKind`, it appears it does correctly handle cases where there are 0 offsets. Ie we don't have to traverse through 
-// to know it is used.
-//
+
 // This function was needed because the vk-shift-* change allows kinds which are "in effect" DescriptorSlots but appear as HLSL
 // kinds. 
-// This function should be used passing the "primary"
-static LayoutResourceKind _findUsedResourceKind(IRVarLayout* layout, LayoutResourceKind kind)
+// 
+// This seems safe as a test, because in the description of `usesResourceKind`, it appears that VarLayout require offsets even if
+// it's zero. 
+static LayoutResourceKind _findUsedDescriptorSlotLikeKind(IRVarLayout* layout, LayoutResourceKind kind)
 {
     // DescriptorTableSlot is the most likely, so look for that first
     if (layout->usesResourceKind(LayoutResourceKind::DescriptorTableSlot))
@@ -180,7 +180,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        const LayoutResourceKind usedKind = _findUsedResourceKind(layout, LayoutResourceKind::ShaderResource);
+        const LayoutResourceKind usedKind = _findUsedDescriptorSlotLikeKind(layout, LayoutResourceKind::ShaderResource);
         EmitVarChain chain(layout);
 
         const UInt index = getBindingOffset(&chain, usedKind);
@@ -256,7 +256,7 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        const LayoutResourceKind usedKind = _findUsedResourceKind(layout, LayoutResourceKind::ShaderResource);
+        const LayoutResourceKind usedKind = _findUsedDescriptorSlotLikeKind(layout, LayoutResourceKind::ShaderResource);
 
         EmitVarChain chain(layout);
 
@@ -335,7 +335,13 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     */
 
     {
-        const auto usedKind = _findUsedResourceKind(containerChain.varLayout, LayoutResourceKind::ConstantBuffer);
+        // TODO(JS):
+        // The *assumption* here is that we only need to detect the LayoutResourceKind as used on the initial containerChain.varLayout
+        // rather than search up the chain. 
+        //
+        // Perhaps there is still an issue here, because perhaps it's possible (?) to have a mixture of ConstantBuffer/DescriptorSlot
+        // and in that case the usedKind would just restrict to one and so produce the wrong answer.
+        const auto usedKind = _findUsedDescriptorSlotLikeKind(containerChain.varLayout, LayoutResourceKind::ConstantBuffer);
         _emitGLSLLayoutQualifier(usedKind, &containerChain);
     }
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
