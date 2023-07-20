@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Get premake
+if [[ "aarch64" == "${ARCH}"  ]]
+wget https://github.com/shader-slang/slang-binaries/blob/master/premake/premake-5.0.0-alpha16/bin/linux-arm64/premake5?raw=true -O premake5
+else
 wget https://github.com/shader-slang/slang-binaries/blob/master/premake/premake-5.0.0-alpha16/bin/linux-64/premake5?raw=true -O premake5
+fi
 chmod u+x premake5
 
 # generate slang-tag-version.h 
