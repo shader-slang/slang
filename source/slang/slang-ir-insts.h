@@ -899,6 +899,26 @@ struct IRTreatAsDifferentiableDecoration : IRDecoration
     IR_LEAF_ISA(TreatAsDifferentiableDecoration)
 };
 
+// Mark a call as explicitly calling a differentiable function.
+struct IRDifferentiableCallDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DifferentiableCallDecoration
+    };
+    IR_LEAF_ISA(DifferentiableCallDecoration)
+};
+
+// Treat a call to a non-differentiable function as a differentiable call.
+struct IRTreatCallAsDifferentiableDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_TreatCallAsDifferentiableDecoration
+    };
+    IR_LEAF_ISA(TreatCallAsDifferentiableDecoration)
+};
+
 struct IRDerivativeMemberDecoration : IRDecoration
 {
     enum

@@ -541,6 +541,14 @@ class TreatAsDifferentiableExpr : public Expr
 
     Expr* innerExpr;
     Scope* scope;
+    
+    enum Flavor 
+    {
+        NoDiff,
+        Differentiable
+    };
+
+    Flavor flavor;
 };
 
     /// A type expression of the form `__TaggedUnion(A, ...)`.
