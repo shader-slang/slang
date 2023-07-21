@@ -316,6 +316,9 @@ public:
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
 
+    UInt getBindingOffsetForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags);   
+    UInt getBindingSpaceForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags);
+    
         // Utility code for generating unique IDs as needed
         // during the emit process (e.g., for declarations
         // that didn't originally have names, but now need to).

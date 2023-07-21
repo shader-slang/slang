@@ -145,28 +145,6 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     }
 }
 
-
-// This function was needed because the vk-shift-* change allows kinds which are "in effect" DescriptorSlots but appear as HLSL
-// kinds. 
-// 
-// This seems safe as a test, because in the description of `usesResourceKind`, it appears that VarLayout require offsets even if
-// it's zero. 
-static LayoutResourceKind _findUsedDescriptorSlotLikeKind(IRVarLayout* layout, LayoutResourceKind kind)
-{
-    // DescriptorTableSlot is the most likely, so look for that first
-    if (layout->usesResourceKind(LayoutResourceKind::DescriptorTableSlot))
-    {
-        return LayoutResourceKind::DescriptorTableSlot;
-    }
-    else if (layout->usesResourceKind(kind))
-    {
-        // If we find the optional kind use that
-        return kind;
-    }
-    // We'll just assume descriptor slot then
-    return LayoutResourceKind::DescriptorTableSlot;
-}
-
 void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
 {
     // Shader storage buffer is an OpenGL 430 feature
@@ -177,14 +155,18 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     m_writer->emit("layout(");
     m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
 
+    
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        const LayoutResourceKind usedKind = _findUsedDescriptorSlotLikeKind(layout, LayoutResourceKind::ShaderResource);
+        // We can use ShaderResource/DescriptorSlot interchangably here. 
+       // This is possible because vk-shift-*
+        const LayoutResourceKindFlags kinds = LayoutResourceKindFlag::ShaderResource | LayoutResourceKindFlag::DescriptorTableSlot;
+
         EmitVarChain chain(layout);
 
-        const UInt index = getBindingOffset(&chain, usedKind);
-        const UInt space = getBindingSpace(&chain, usedKind);
+        const UInt index = getBindingOffsetForKinds(&chain, kinds);
+        const UInt space = getBindingSpaceForKinds(&chain, kinds);
 
         m_writer->emit(", binding = ");
         m_writer->emit(index);
@@ -256,12 +238,14 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        const LayoutResourceKind usedKind = _findUsedDescriptorSlotLikeKind(layout, LayoutResourceKind::ShaderResource);
+        // We can use ShaderResource/DescriptorSlot interchangably here. 
+        // This is possible because vk-shift-*
+        const LayoutResourceKindFlags kinds = LayoutResourceKindFlag::ShaderResource | LayoutResourceKindFlag::DescriptorTableSlot;
 
         EmitVarChain chain(layout);
 
-        const UInt index = getBindingOffset(&chain, usedKind);
-        const UInt space = getBindingSpace(&chain, usedKind);
+        const UInt index = getBindingOffsetForKinds(&chain, kinds);
+        const UInt space = getBindingSpaceForKinds(&chain, kinds);
 
         m_writer->emit(", binding = ");
         m_writer->emit(index);
@@ -335,15 +319,10 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     */
 
     {
-        // TODO(JS):
-        // The *assumption* here is that we only need to detect the LayoutResourceKind as used on the initial containerChain.varLayout
-        // rather than search up the chain. 
-        //
-        // Perhaps there is still an issue here, because perhaps it's possible (?) to have a mixture of ConstantBuffer/DescriptorSlot
-        // and in that case the usedKind would just restrict to one and so produce the wrong answer.
-        const auto usedKind = _findUsedDescriptorSlotLikeKind(containerChain.varLayout, LayoutResourceKind::ConstantBuffer);
-        _emitGLSLLayoutQualifier(usedKind, &containerChain);
+        const LayoutResourceKindFlags kinds = LayoutResourceKindFlag::ConstantBuffer | LayoutResourceKindFlag::DescriptorTableSlot;
+        _emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, kinds, &containerChain);
     }
+
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
     bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
@@ -567,15 +546,35 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
     }
 }
 
-bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain)
+bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, LayoutResourceKindFlags kindFlags, EmitVarChain* chain)
 {
     if (!chain)
         return false;
-    if (!chain->varLayout->findOffsetAttr(kind))
-        return false;
 
-    UInt index = getBindingOffset(chain, kind);
-    UInt space = getBindingSpace(chain, kind);
+    UInt index, space; 
+    auto varLayout = chain->varLayout;
+
+    // If kindFlags are set, we use that for binding lookup
+    if (kindFlags != 0)
+    {
+        if (!varLayout->usesResourceFromKinds(kindFlags))
+        {
+            return false;
+        }
+
+        index = getBindingOffsetForKinds(chain, kindFlags);
+        space = getBindingSpaceForKinds(chain, kindFlags);
+    }
+    else
+    {
+        // Otherwise we just use kind
+        if (!varLayout->findOffsetAttr(kind))
+            return false;
+
+        index = getBindingOffset(chain, kind);
+        space = getBindingSpace(chain, kind);
+    }
+
     switch (kind)
     {
         case LayoutResourceKind::Uniform:
@@ -613,7 +612,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
         case LayoutResourceKind::VaryingOutput:
             m_writer->emit("layout(location = ");
             m_writer->emit(index);
-            if( space )
+            if (space)
             {
                 m_writer->emit(", index = ");
                 m_writer->emit(space);
@@ -647,7 +646,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
             m_writer->emit("layout(push_constant)\n");
             break;
         case LayoutResourceKind::ShaderRecord:
-            if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+            if (getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing))
             {
                 m_writer->emit("layout(shaderRecordNV)\n");
             }

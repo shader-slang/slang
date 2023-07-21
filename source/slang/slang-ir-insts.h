@@ -1851,6 +1851,8 @@ struct IRVarLayout : IRLayout
 
         /// Does this variable use any resources of the given `kind`?
     bool usesResourceKind(LayoutResourceKind kind);
+        /// Returns true if there is use of one or more of the kinds
+    bool usesResourceFromKinds(LayoutResourceKindFlags kindFlags);
 
         /// Get the fixed/known stage that this variable is associated with.
         ///
