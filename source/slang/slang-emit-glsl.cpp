@@ -568,9 +568,11 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceK
     else
     {
         // Otherwise we just use kind
-        if (!varLayout->findOffsetAttr(kind))
+        if (!varLayout->usesResourceKind(kind))
+        {
             return false;
-
+        }
+        
         index = getBindingOffset(chain, kind);
         space = getBindingSpace(chain, kind);
     }
