@@ -592,7 +592,7 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
             effectiveSeverity = *pSeverityOverride;
     }
     
-    if (isFlagSet(Flag::TreatWarningsAsErrors) && info.severity == Severity::Warning)
+    if (isFlagSet(Flag::TreatWarningsAsErrors) && effectiveSeverity == Severity::Warning)
         effectiveSeverity = Severity::Error;
 
     return effectiveSeverity;
