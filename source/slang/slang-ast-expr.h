@@ -544,7 +544,16 @@ class TreatAsDifferentiableExpr : public Expr
     
     enum Flavor 
     {
+        /// Represents a no_diff wrapper over
+        /// a non-differentiable method.
+        /// i.e. no_diff(fn(...))
+        /// 
         NoDiff,
+
+        /// Represents a call to a method that
+        /// is either marked differentiable, or has
+        /// a user-defined derivative in scope.
+        /// 
         Differentiable
     };
 
