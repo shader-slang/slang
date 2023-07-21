@@ -5298,6 +5298,7 @@ namespace Slang
         auto noDiffExpr = parser->astBuilder->create<TreatAsDifferentiableExpr>();
         noDiffExpr->innerExpr = parser->ParseLeafExpression();
         noDiffExpr->scope = parser->currentScope;
+        noDiffExpr->flavor = TreatAsDifferentiableExpr::Flavor::NoDiff;
         return noDiffExpr;
     }
 

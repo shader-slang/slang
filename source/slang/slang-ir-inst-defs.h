@@ -867,9 +867,14 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// differential member of a type in its associated differential type.
     INST(DerivativeMemberDecoration, derivativeMemberDecoration, 1, 0)
 
-        /// Treat a function as differentiable function, or an IRCall as a call to a differentiable function.
+        /// Treat a function as differentiable function
     INST(TreatAsDifferentiableDecoration, treatAsDifferentiableDecoration, 0, 0)
 
+        /// Treat a call to arbitrary function as a differentiable call.
+    INST(TreatCallAsDifferentiableDecoration, treatCallAsDifferentiableDecoration, 0, 0)
+
+        /// Mark a call as explicitly calling a differentiable function.
+    INST(DifferentiableCallDecoration, differentiableCallDecoration, 0, 0)
 
         /// Hint that the result from a call to the decorated function should be stored in backward prop function.
     INST(PreferCheckpointDecoration, PreferCheckpointDecoration, 0, 0)

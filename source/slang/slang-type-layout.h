@@ -243,6 +243,52 @@ struct UniformArrayLayoutInfo : UniformLayoutInfo
 
 typedef slang::ParameterCategory LayoutResourceKind;
 
+// Any change to slang::ParameterCategory, requires a change to this macro.
+#define SLANG_PARAMETER_CATEGORIES(x) \
+    x(None) \
+    x(Mixed) \
+    x(ConstantBuffer) \
+    x(ShaderResource) \
+    x(UnorderedAccess) \
+    x(VaryingInput) \
+    x(VaryingOutput) \
+    x(SamplerState) \
+    x(Uniform) \
+    x(DescriptorTableSlot) \
+    x(SpecializationConstant) \
+    x(PushConstantBuffer) \
+    x(RegisterSpace) \
+    x(GenericResource) \
+    \
+    x(RayPayload) \
+    x(HitAttributes) \
+    x(CallablePayload) \
+    \
+    x(ShaderRecord) \
+    \
+    x(ExistentialTypeParam) \
+    x(ExistentialObjectParam) \
+    \
+    x(VertexInput) \
+    x(FragmentOutput)
+
+#define SLANG_PARAMETER_CATEGORY_FLAG(x) x = ParameterCategoryFlags(1) << int(slang::x), 
+
+typedef uint32_t ParameterCategoryFlags;
+struct ParameterCategoryFlag
+{
+    enum Enum : ParameterCategoryFlags
+    {
+        SLANG_PARAMETER_CATEGORIES(SLANG_PARAMETER_CATEGORY_FLAG)
+    };
+
+        /// Make a flag from a category
+    SLANG_FORCE_INLINE static Enum make(slang::ParameterCategory cat) { return Enum(ParameterCategoryFlags(1) << int(cat)); }
+};
+
+typedef ParameterCategoryFlags LayoutResourceKindFlags;
+typedef ParameterCategoryFlag LayoutResourceKindFlag;
+
 // Layout information for a value that only consumes
 // a single resource kind.
 struct SimpleLayoutInfo
