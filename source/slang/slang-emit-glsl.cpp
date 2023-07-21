@@ -320,7 +320,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
 
     {
         const LayoutResourceKindFlags kinds = LayoutResourceKindFlag::ConstantBuffer | LayoutResourceKindFlag::DescriptorTableSlot;
-        _emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, kinds, &containerChain);
+        _emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceKind::DescriptorTableSlot, &containerChain, kinds);
     }
 
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
@@ -546,7 +546,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
     }
 }
 
-bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, LayoutResourceKindFlags kindFlags, EmitVarChain* chain)
+bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceKind kind, EmitVarChain* chain, LayoutResourceKindFlags bindingKinds)
 {
     if (!chain)
         return false;
@@ -554,16 +554,16 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, Layout
     UInt index, space; 
     auto varLayout = chain->varLayout;
 
-    // If kindFlags are set, we use that for binding lookup
-    if (kindFlags != 0)
+    // If bindingKinds are set, we use that for binding lookup
+    if (bindingKinds != 0)
     {
-        if (!varLayout->usesResourceFromKinds(kindFlags))
+        if (!varLayout->usesResourceFromKinds(bindingKinds))
         {
             return false;
         }
 
-        index = getBindingOffsetForKinds(chain, kindFlags);
-        space = getBindingSpaceForKinds(chain, kindFlags);
+        index = getBindingOffsetForKinds(chain, bindingKinds);
+        space = getBindingSpaceForKinds(chain, bindingKinds);
     }
     else
     {

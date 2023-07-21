@@ -67,9 +67,9 @@ protected:
 
     void _emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarChain* inChain, LayoutResourceKind filter = LayoutResourceKind::None);
 
-        /// If kindFlags is set, it is used for binding lookup
-    bool _emitGLSLLayoutQualifier(LayoutResourceKind kind, LayoutResourceKindFlags kindFlags, EmitVarChain* chain);
-    bool _emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain) { return _emitGLSLLayoutQualifier(kind, 0, chain); }
+        /// If bindingKinds is set, it is used for binding index/set lookup. Passing in 0 is equivalent to using the kind only.
+    bool _emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceKind kind, EmitVarChain* chain, LayoutResourceKindFlags bindingKinds);
+    bool _emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain) { return _emitGLSLLayoutQualifierWithBindingKinds(kind, chain, 0); }
 
     void _emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
 
