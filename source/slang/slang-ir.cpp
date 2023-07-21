@@ -1047,6 +1047,20 @@ namespace Slang
         return findOffsetAttr(kind) != nullptr;
     }
 
+    bool IRVarLayout::usesResourceFromKinds(LayoutResourceKindFlags kindFlags)
+    {
+        // Like usesResourceKind this works because there is an offset stored even if it's 0.
+        if (kindFlags)
+        {
+            for (auto offsetAttr : getOffsetAttrs())
+            {
+                if (LayoutResourceKindFlag::make(offsetAttr->getResourceKind()) & kindFlags )
+                    return true;
+            }
+        }
+        return false;
+    }
+
     IRSystemValueSemanticAttr* IRVarLayout::findSystemValueSemanticAttr()
     {
         return findAttr<IRSystemValueSemanticAttr>();
