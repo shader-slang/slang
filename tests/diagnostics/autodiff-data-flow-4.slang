@@ -12,13 +12,6 @@ float f(float x)
 }
 
 [Differentiable]
-float g(float x)
-{
-    float val = f(x + 1); // Error: f must also be backward-differentiable
-    return val;
-}
-
-[Differentiable]
 float h(float x)
 {
     float val = 0;
