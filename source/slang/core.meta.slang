@@ -1331,7 +1331,7 @@ struct TextureTypeInfo
         // emit a generic signature
         sb << "__generic<T = float4";
         // Multi-sample rw texture types have an optional sampleCount parameter.
-        if (isMultisample && access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+        if (isMultisample)
             sb << ", let sampleCount : int = 0";
         sb << ">";
             
