@@ -1213,6 +1213,11 @@ struct IRGLSLPrimitivesRateDecoration : public IRDecoration
     IR_LEAF_ISA(GLSLPrimitivesRateDecoration)
 };
 
+struct IRGLPositionOutputDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(GLPositionOutputDecoration)
+};
+
 struct IRMeshOutputRef : public IRInst
 {
     enum { kOp = kIROp_MeshOutputRef };
@@ -3813,6 +3818,11 @@ public:
     void addGLSLOuterArrayDecoration(IRInst* value, UnownedStringSlice const& text)
     {
         addDecoration(value, kIROp_GLSLOuterArrayDecoration, getStringValue(text));
+    }
+
+    void addGLPositionOutputDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_GLPositionOutputDecoration);
     }
 
     void addInterpolationModeDecoration(IRInst* value, IRInterpolationMode mode)
