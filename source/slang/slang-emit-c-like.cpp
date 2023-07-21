@@ -605,6 +605,48 @@ void CLikeSourceEmitter::emitVal(IRInst* val, EmitOpInfo const& outerPrec)
     }
 }
 
+UInt CLikeSourceEmitter::getBindingOffsetForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags)
+{
+    UInt offset = 0;
+    for (auto cc = chain; cc; cc = cc->next)
+    {
+        for (auto offsetAttr : cc->varLayout->getOffsetAttrs())
+        {
+            // Accumulate offset for all matching kind
+            if (LayoutResourceKindFlag::make(offsetAttr->getResourceKind()) & kindFlags)
+            {
+                offset += offsetAttr->getOffset();
+            }
+        }
+    }
+
+    return offset;
+}
+
+UInt CLikeSourceEmitter::getBindingSpaceForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags)
+{
+    UInt space = 0;
+    for (auto cc = chain; cc; cc = cc->next)
+    {
+        auto varLayout = cc->varLayout;
+
+        for (auto offsetAttr : cc->varLayout->getOffsetAttrs())
+        {
+            // Accumulate offset for all matching kinds
+            if (LayoutResourceKindFlag::make(offsetAttr->getResourceKind()) & kindFlags)
+            {
+                space += offsetAttr->getSpace();
+            }
+        }
+
+        if (auto resInfo = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        {
+            space += resInfo->getOffset();
+        }
+    }
+    return space;
+}
+
 UInt CLikeSourceEmitter::getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind)
 {
     UInt offset = 0;

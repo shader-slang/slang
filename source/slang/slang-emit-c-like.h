@@ -316,6 +316,13 @@ public:
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
 
+        /// Finds the binding offset for *all* the kinds that match the kindFlags
+        /// Thus only meaningful if multiple kinds can be treated as the same as far as binding is concerned.
+        /// In particular is useful for GLSL binding emit, where some HLSL resource kinds can appear but are in effect the 
+        /// same as DescriptorSlot
+    UInt getBindingOffsetForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags);   
+    UInt getBindingSpaceForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags);
+    
         // Utility code for generating unique IDs as needed
         // during the emit process (e.g., for declarations
         // that didn't originally have names, but now need to).
