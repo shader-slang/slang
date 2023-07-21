@@ -502,8 +502,6 @@ public:
                 auto callInst = as<IRCall>(inst);
                 if (callInst->findDecoration<IRTreatCallAsDifferentiableDecoration>())
                     continue;
-                //if (!isDifferentiableFunc(callInst->getCallee(), DifferentiableLevel::Forward))
-                //    continue;
                 auto calleeFuncType = as<IRFuncType>(callInst->getCallee()->getFullType());
                 if (!calleeFuncType) continue;
                 if (calleeFuncType->getParamCount() != callInst->getArgCount())
