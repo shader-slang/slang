@@ -116,6 +116,9 @@ public:
         /// True if can infer a binding for a kind
     bool canInferBindingForKind(Kind kind) const { return (m_kindShiftEnabledFlags & getKindFlag(kind)) != 0; }
 
+        /// True if the compiler should invert the Y coordinate of any SV_Position output.
+    bool shouldInvertY() const { return m_invertY; }
+
         /// Given an kind and a binding infer the vulkan binding.
         /// Will return an invalid binding if one is not found
     Binding inferBinding(Kind kind, const Binding& inBinding) const;
@@ -140,6 +143,8 @@ public:
         /// Get the globals binding
     const Binding& getGlobalsBinding() const { return m_globalsBinding; }
 
+    void setInvertY(bool value) { m_invertY = value; }
+
         /// Ctor
     HLSLToVulkanLayoutOptions();
     
@@ -163,6 +168,9 @@ protected:
 
         /// Maps a key to the amount of shift
     Dictionary<Key, Index> m_shifts;
+
+        /// Whether to invert the Y coordinate of SV_Position output.
+    bool m_invertY = false;
 };
 
 } // namespace Slang

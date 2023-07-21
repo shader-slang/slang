@@ -374,6 +374,11 @@ For example '-fvk-b-shift &lt;N&gt; &lt;space&gt;' shifts by N the inferred bind
 Places the $Globals cbuffer at descriptor set &lt;descriptor-set&gt; and binding &lt;N&gt;. 
 
 
+<a id="fvk-invert-y"></a>
+## -fvk-invert-y
+Negates (additively inverts) SV_Position.y before writing to stage output. 
+
+
 <a id="enable-effect-annotations"></a>
 ## -enable-effect-annotations
 Enables support for legacy effect annotation syntax. 

@@ -795,6 +795,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST_RANGE(MeshOutputDecoration, VerticesDecoration, PrimitivesDecoration)
     INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)
 
+        // Marks an inst that represents the gl_Position output.
+    INST(GLPositionOutputDecoration, PositionOutput, 0, 0)
+
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)
         INST(StageWriteAccessDecoration, stageWriteAccess, 0, 0)
