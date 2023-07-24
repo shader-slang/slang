@@ -1450,7 +1450,6 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 // Clip (discard) fragment conditionally
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-[__readNone]
 void clip(T x)
 {
     if(x < T(0)) discard;
@@ -1458,7 +1457,6 @@ void clip(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-[__readNone]
 void clip(vector<T,N> x)
 {
     if(any(x < T(0))) discard;
@@ -1466,7 +1464,6 @@ void clip(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
-[__readNone]
 void clip(matrix<T,N,M> x)
 {
     if(any(x < T(0))) discard;
