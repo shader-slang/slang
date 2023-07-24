@@ -223,15 +223,34 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
     SLANG_RELEASE_ASSERT(cursor < end);
 
-    const char d = *cursor++;
+    char d = *cursor++;
+
+    // Takes the first character of the number, parses the rest and returns the
+    // total value.
+    auto isDigit = [](char c){ return c >= '0' && c <= '9'; };
+    auto parseNat = [&](){
+        char d = *cursor;
+        SLANG_RELEASE_ASSERT(isDigit(d));
+        Index n = 0;
+        while(isDigit(d))
+        {
+            n = n * 10 + (d - '0');
+            cursor++;
+            if(cursor == end)
+                break;
+            d = *cursor;
+        }
+        return n;
+    };
 
     switch (d)
     {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
         {
+            --cursor;
+            Index argIndex = parseNat() + m_argIndexOffset;
             // Simple case: emit one of the direct arguments to the call
-            Index argIndex = d - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
             m_writer->emit("(");
             m_emitter->emitOperand(m_args[argIndex].get(), getInfo(EmitOp::General));
@@ -243,8 +262,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         {
             // Get the type/value at the index of the specialization of this generic
 
-            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
+            Index argIndex = parseNat() + m_argIndexOffset;
             
             IRSpecialize* specialize = as<IRSpecialize>(m_callInst->getCallee());
             SLANG_ASSERT(specialize);
@@ -280,8 +298,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
             else
             {
-                SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-                Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
+                Index argIndex = parseNat() + m_argIndexOffset;
                 SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
                 type = m_args[argIndex].get()->getDataType();
@@ -298,8 +315,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         case 'S':
             // Get the scalar type of a generic at specified index
         {
-            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
+            Index argIndex = parseNat() + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             IRType* type = m_args[argIndex].get()->getDataType();
@@ -551,8 +567,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // Extract the element count from a vector argument so that
             // we can use it in the constructed expression.
 
-            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
+            Index argIndex = parseNat() + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             auto vectorArg = m_args[argIndex].get();
@@ -574,8 +589,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // it out to a 4-vector with the same element type
             // (this is the inverse of `$z`).
             //
-            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
+            Index argIndex = parseNat() + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             auto arg = m_args[argIndex].get();
@@ -821,8 +835,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             //
             // We therefore expect the next byte to be a digit:
             //
-            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index firstArgIndex = (*cursor++) - '0' + m_argIndexOffset;
+            Index firstArgIndex = parseNat() + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > firstArgIndex);
 
             for (Index argIndex = firstArgIndex; argIndex < m_argCount; ++argIndex)
