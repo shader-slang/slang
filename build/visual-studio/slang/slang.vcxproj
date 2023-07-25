@@ -711,6 +711,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <None Include="..\..\..\source\slang\core.meta.slang" />
     <None Include="..\..\..\source\slang\diff.meta.slang" />
     <None Include="..\..\..\source\slang\hlsl.meta.slang" />
+    <None Include="..\..\..\source\slang\slang.natjmc" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\..\source\core\core.natvis" />
