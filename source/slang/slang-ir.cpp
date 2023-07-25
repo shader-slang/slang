@@ -5119,7 +5119,7 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitIfElse(
+    IRIfElse* IRBuilder::emitIfElse(
         IRInst*     val,
         IRBlock*    trueBlock,
         IRBlock*    falseBlock,
