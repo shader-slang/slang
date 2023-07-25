@@ -639,7 +639,7 @@ public:
     DeclRef<GenericDecl> baseGenericDeclRef;
 
         /// A substitution that includes the generic arguments known so far
-    GenericSubstitution* substWithKnownGenericArgs = nullptr;
+    List<Val*> knownGenericArgs = nullptr;
 };
 
 } // namespace Slang

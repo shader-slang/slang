@@ -16,15 +16,18 @@
 namespace Slang
 {  
 
+class ASTBuilder;
+
 class NodeBase 
 {
     SLANG_ABSTRACT_AST_CLASS(NodeBase)
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.
-    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /*astBuilder*/)
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder)
     {
         astNodeType = inAstNodeType;
+        m_astBuilder = inAstBuilder;
 #ifdef _DEBUG
         static uint32_t uidCounter = 0;
         static uint32_t breakValue = 0;
@@ -40,10 +43,13 @@ class NodeBase
 
     SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
 
+    SLANG_FORCE_INLINE ASTBuilder* getASTBuilder() const { return m_astBuilder; }
+
         /// The type of the node. ASTNodeType(-1) is an invalid node type, and shouldn't appear on any
         /// correctly constructed (through ASTBuilder) NodeBase derived class. 
         /// The actual type is set when constructed on the ASTBuilder. 
     ASTNodeType astNodeType = ASTNodeType(-1);
+    SLANG_UNREFLECTED ASTBuilder* m_astBuilder = nullptr;
 
     // Handy when debugging, shouldn't be checked in though!
     // virtual ~NodeBase() {}
@@ -232,10 +238,7 @@ class Type: public Val
 
         /// Type derived types store the AST builder they were constructed on. The builder calls this function
         /// after constructing.
-    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder) { Val::init(inAstNodeType, inAstBuilder); m_astBuilder = inAstBuilder; }
-
-        /// Get the ASTBuilder that was used to construct this Type
-    SLANG_FORCE_INLINE ASTBuilder* getASTBuilder() const { return m_astBuilder; }
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder) { Val::init(inAstNodeType, inAstBuilder); }
 
     bool equals(Type* type);
     
@@ -247,16 +250,16 @@ class Type: public Val
     bool _equalsImplOverride(Type* type);
     Type* _createCanonicalTypeOverride();
 
-    void _setASTBuilder(ASTBuilder* astBuilder) { m_astBuilder = astBuilder; }
-
 protected:
     bool equalsImpl(Type* type);
     Type* createCanonicalType();
 
     Type* canonicalType = nullptr;
-
-    SLANG_UNREFLECTED
-    ASTBuilder* m_astBuilder = nullptr;
+    // The epoch number of the ASTBuilder at which the cached `canonicalType` is created.
+    // This mechanism allows us to easily invalidate the cache when type checking enters a new phase
+    // that allows more types to be folded, such as when a new associated type requirement is synthesized
+    // for a concrete type.
+    Index canonicalTypeEpoch = 0;
 };
 
 template <typename T>
@@ -272,14 +275,14 @@ class Substitutions: public NodeBase
 
 
     // Apply a set of substitutions to the bindings in this substitution
-    Substitutions* applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
+    Substitutions* applySubstitutionsShallow(ASTBuilder* astBuilder, Substitutions* substSet, Substitutions* substOuter, int* ioDiff);
 
     // Check if these are equivalent substitutions to another set
     bool equals(Substitutions* subst);
     HashCode getHashCode() const;
 
     // Overrides should be public so base classes can access
-    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
+    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, Substitutions* substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 
@@ -289,9 +292,9 @@ protected:
     Substitutions* outer = nullptr;
 };
 
-class GenericSubstitution : public Substitutions
+class GenericSubstitutionDeprecated : public Substitutions
 {
-    SLANG_AST_CLASS(GenericSubstitution)
+    SLANG_AST_CLASS(GenericSubstitutionDeprecated)
 
 private:
     // The generic declaration that defines the
@@ -306,11 +309,11 @@ public:
     const List<Val*>& getArgs() const { return args; }
 
     // Overrides should be public so base classes can access
-    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
+    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, Substitutions* substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 
-    GenericSubstitution(Substitutions* outerSubst, GenericDecl* decl, ArrayView<Val*> argVals)
+    GenericSubstitutionDeprecated(Substitutions* outerSubst, GenericDecl* decl, ArrayView<Val*> argVals)
     {
         outer = outerSubst;
         genericDecl = decl;
@@ -331,7 +334,7 @@ class ThisTypeSubstitution : public Substitutions
 
     // Overrides should be public so base classes can access
     // The actual type that provides the lookup scope for an associated type
-    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
+    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, Substitutions* substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 
@@ -642,5 +645,6 @@ bool DeclRef<T>::equals(DeclRef<U> other) const
 {
     return declRefBase == other.declRefBase || (declRefBase && declRefBase->equals(other.declRefBase));
 }
+
 
 } // namespace Slang

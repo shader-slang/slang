@@ -4091,29 +4091,21 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
         maybeAddModule(module);
     }
 
-    void collectReferencedModules(Substitutions* substitution)
+    void collectReferencedModules(SubstitutionSet substitutions)
     {
-        if(auto genericSubst = as<GenericSubstitution>(substitution))
+        substitutions.forEachGenericSubstitution([this](GenericDecl*, const List<Val*>& args)
         {
-            for(auto arg : genericSubst->getArgs())
+            for (auto arg : args)
             {
                 collectReferencedModules(arg);
             }
-        }
+        });
     }
 
-    void collectReferencedModules(SubstitutionSet const& substitutions)
+    void collectReferencedModules(DeclRefBase* declRef)
     {
-        for(auto subst = substitutions.substitutions; subst; subst = subst->getOuter())
-        {
-            collectReferencedModules(subst);
-        }
-    }
-
-    void collectReferencedModules(DeclRefBase const& declRef)
-    {
-        collectReferencedModules(declRef.getDecl());
-        collectReferencedModules(declRef.getSubst());
+        collectReferencedModules(declRef->getDecl());
+        collectReferencedModules(SubstitutionSet(declRef));
     }
 
     void collectReferencedModules(Type* type)

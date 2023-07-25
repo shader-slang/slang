@@ -935,6 +935,7 @@ namespace Slang
                     return type;
                 }
             }
+            type = resolveType(type);
             if (const auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterfaceType())))
             {
                 auto diffTypeLookupResult = lookUpMember(
@@ -967,7 +968,7 @@ namespace Slang
                         declRefType->declRef.getLoc(),
                         baseTypeExpr);
 
-                    return ExtractTypeFromTypeRepr(diffTypeExpr);
+                    return resolveType(ExtractTypeFromTypeRepr(diffTypeExpr));
                 }
             }
         }
@@ -1061,23 +1062,13 @@ namespace Slang
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, fieldType);
                     });
             }
-            for (auto subst = declRefType->declRef.getSubst(); subst; subst = subst->getOuter())
-            {
-                if (auto genSubst = as<GenericSubstitution>(subst))
+            SubstitutionSet(declRefType->declRef).forEachSubstitutionArg([&](Val* arg)
                 {
-                    for (auto arg : genSubst->getArgs())
+                    if (auto typeArg = as<Type>(arg))
                     {
-                        if (auto typeArg = as<Type>(arg))
-                        {
-                            maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, typeArg);
-                        }
+                        maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, typeArg);
                     }
-                }
-                else if (auto thisSubst = as<ThisTypeSubstitution>(subst))
-                {
-                    maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, thisSubst->witness->sub);
-                }
-            }
+                });
             return;
         }
     }
@@ -2230,7 +2221,7 @@ namespace Slang
         return result;
     }
 
-    Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr *expr)
+    Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     {
         // check the base expression first
         expr->functionExpr = CheckTerm(expr->functionExpr);

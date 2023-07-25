@@ -172,12 +172,9 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
         !declRef.as<GenericValueParamDecl>() &&
         !declRef.as<GenericTypeParamDecl>())
     {
-        auto genSubst = as<GenericSubstitution>(declRef.getSubst());
-        if (genSubst)
+        auto substArgs = SubstitutionSet(declRef).tryGetGenericArguments(parentGenericDeclRef.getDecl());
+        if (substArgs)
         {
-            SLANG_RELEASE_ASSERT(genSubst);
-            SLANG_RELEASE_ASSERT(genSubst->getGenericDecl() == parentGenericDeclRef.getDecl());
-
             // If the name we printed previously was an operator
             // that ends with `<`, then immediately printing the
             // generic arguments inside `<...>` may cause it to
@@ -193,7 +190,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
             sb << "<";
             bool first = true;
-            for (auto arg : genSubst->getArgs())
+            for (auto arg : *substArgs)
             {
                 // When printing the representation of a specialized
                 // generic declaration we don't want to include the

@@ -8,7 +8,7 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Substitutions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Substitutions* Substitutions::applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
+Substitutions* Substitutions::applySubstitutionsShallow(ASTBuilder* astBuilder, Substitutions* substSet, Substitutions* substOuter, int* ioDiff)
 {
     SLANG_AST_NODE_VIRTUAL_CALL(Substitutions, applySubstitutionsShallow, (astBuilder, substSet, substOuter, ioDiff))
 }
@@ -23,7 +23,7 @@ HashCode Substitutions::getHashCode() const
     SLANG_AST_NODE_CONST_VIRTUAL_CALL(Substitutions, getHashCode, ())
 }
 
-Substitutions* Substitutions::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
+Substitutions* Substitutions::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, Substitutions* substSet, Substitutions* substOuter, int* ioDiff)
 {
     SLANG_UNUSED(astBuilder);
     SLANG_UNUSED(substSet);
@@ -48,7 +48,7 @@ HashCode Substitutions::_getHashCodeOverride() const
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericSubstitution !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Substitutions* GenericSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
+Substitutions* GenericSubstitutionDeprecated::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, Substitutions* substSet, Substitutions* substOuter, int* ioDiff)
 {
     int diff = 0;
 
@@ -57,7 +57,10 @@ Substitutions* GenericSubstitution::_applySubstitutionsShallowOverride(ASTBuilde
     List<Val*> substArgs;
     for (auto a : args)
     {
-        substArgs.add(a->substituteImpl(astBuilder, substSet, &diff));
+        // Temporary workaround: since `substituteImpl` now takes a SubstitutionSet, and just use genericDecl to construct a
+        // SubstitutionSet whose substitution is substSet.
+        auto declRefSubstSet = astBuilder->getSpecializedDeclRef(genericDecl, substSet);
+        substArgs.add(a->substituteImpl(astBuilder, SubstitutionSet(declRefSubstSet), &diff));
     }
 
     if (!diff) return this;
@@ -68,7 +71,7 @@ Substitutions* GenericSubstitution::_applySubstitutionsShallowOverride(ASTBuilde
     return substSubst;
 }
 
-bool GenericSubstitution::_equalsOverride(Substitutions* subst)
+bool GenericSubstitutionDeprecated::_equalsOverride(Substitutions* subst)
 {
     // both must be NULL, or non-NULL
     if (subst == nullptr)
@@ -76,7 +79,7 @@ bool GenericSubstitution::_equalsOverride(Substitutions* subst)
     if (this == subst)
         return true;
 
-    auto genericSubst = as<GenericSubstitution>(subst);
+    auto genericSubst = as<GenericSubstitutionDeprecated>(subst);
     if (!genericSubst)
         return false;
     if (genericDecl != genericSubst->genericDecl)
@@ -99,7 +102,7 @@ bool GenericSubstitution::_equalsOverride(Substitutions* subst)
     return true;
 }
 
-HashCode GenericSubstitution::_getHashCodeOverride() const 
+HashCode GenericSubstitutionDeprecated::_getHashCodeOverride() const
 {
     HashCode rs = 0;
     for (auto && v : args)
@@ -112,14 +115,18 @@ HashCode GenericSubstitution::_getHashCodeOverride() const
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ThisTypeSubstitution !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Substitutions* ThisTypeSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
+Substitutions* ThisTypeSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, Substitutions* substSet, Substitutions* substOuter, int* ioDiff)
 {
     int diff = 0;
 
     if (substOuter != outer) diff++;
 
     // NOTE: Must use .as because we must have a smart pointer here to keep in scope.
-    auto substWitness = as<SubtypeWitness>(witness->substituteImpl(astBuilder, substSet, &diff));
+    // Temporary workaround: since `substituteImpl` now takes a SubstitutionSet, and just use interfaceDecl to construct a
+        // SubstitutionSet whose substitution is substSet.
+    auto declRefSubstSet = astBuilder->getSpecializedDeclRef(interfaceDecl, substSet);
+
+    auto substWitness = as<SubtypeWitness>(witness->substituteImpl(astBuilder, SubstitutionSet(declRefSubstSet), &diff));
 
     if (!diff) return this;
 

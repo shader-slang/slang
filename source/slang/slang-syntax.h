@@ -54,13 +54,13 @@ namespace Slang
 
     inline FilteredMemberRefList<Decl> getMembers(ASTBuilder* astBuilder, DeclRef<ContainerDecl> declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<Decl>(astBuilder, declRef.getDecl()->members, declRef.getSubst(), filterStyle);
+        return FilteredMemberRefList<Decl>(astBuilder, declRef.getDecl()->members, SubstitutionSet(declRef), filterStyle);
     }
 
     template<typename T>
     inline FilteredMemberRefList<T> getMembersOfType(ASTBuilder* astBuilder, DeclRef<ContainerDecl> declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<T>(astBuilder, declRef.getDecl()->members, declRef.getSubst(), filterStyle);
+        return FilteredMemberRefList<T>(astBuilder, declRef.getDecl()->members, SubstitutionSet(declRef), filterStyle);
     }
 
     void _foreachDirectOrExtensionMemberOfType(
@@ -70,7 +70,7 @@ namespace Slang
         void                            (*callback)(DeclRefBase*, void*),
         void const*                     userData);
 
-    DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst);
+    DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, SubstitutionSet subst);
 
     template<typename T, typename F>
     inline void foreachDirectOrExtensionMemberOfType(
@@ -153,6 +153,28 @@ namespace Slang
         /// If the given `structTypeDeclRef` inherits from another struct type, return that base struct decl
     DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef);
 
+    SubtypeWitness* findThisTypeWitness(
+        SubstitutionSet substs,
+        InterfaceDecl* interfaceDecl);
+
+    RequirementWitness tryLookUpRequirementWitness(
+        ASTBuilder* astBuilder,
+        SubtypeWitness* subtypeWitness,
+        Decl* requirementKey);
+
+    DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
+        ASTBuilder* astBuilder,
+        SemanticsVisitor* semantics,
+        DeclRef<Decl>   declRef);
+
+    List<Val*>* findInnerMostGenericArgs(SubstitutionSet subst);
+
+    SubtypeWitness* findThisTypeWitness(
+        SubstitutionSet substs,
+        InterfaceDecl* interfaceDecl);
+
+    ParameterDirection getParameterDirection(VarDeclBase* varDecl);
+
     inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->tagType);
@@ -192,9 +214,13 @@ namespace Slang
 
     inline Decl* getInner(DeclRef<GenericDecl> declRef)
     {
-        // TODO: Should really return a `DeclRef<Decl>` for the inner
-        // declaration, and not just a raw pointer
         return declRef.getDecl()->inner;
+    }
+
+    inline DeclRef<Decl> getInnerDeclRef(ASTBuilder* builder, SemanticsVisitor* semantics, DeclRef<GenericDecl> declRef)
+    {
+        SLANG_UNUSED(semantics);
+        return builder->getSpecializedDeclRef(declRef.getDecl()->inner, declRef.getSubst());
     }
 
     //
@@ -287,46 +313,6 @@ namespace Slang
     }
 
     //
-
-    ThisTypeSubstitution* findThisTypeSubstitution(
-        const Substitutions*  substs,
-        InterfaceDecl*  interfaceDecl);
-
-    RequirementWitness tryLookUpRequirementWitness(
-        ASTBuilder*     astBuilder,
-        SubtypeWitness* subtypeWitness,
-        Decl*           requirementKey);
-
-    // TODO: where should this live?
-    SubstitutionSet createDefaultSubstitutions(
-        ASTBuilder*     astBuilder,
-        SemanticsVisitor* semantics,
-        Decl*           decl,
-        SubstitutionSet  parentSubst);
-
-    SubstitutionSet createDefaultSubstitutions(
-        ASTBuilder*     astBuilder,
-        SemanticsVisitor* semantics,
-        Decl*   decl);
-
-    DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
-        ASTBuilder*     astBuilder,
-        SemanticsVisitor* semantics,
-        DeclRef<Decl>   declRef);
-
-    GenericSubstitution* createDefaultSubstitutionsForGeneric(
-        ASTBuilder*             astBuilder,
-        SemanticsVisitor* semantics,
-        GenericDecl*            genericDecl,
-        Substitutions*   outerSubst);
-
-    GenericSubstitution* findInnerMostGenericSubstitution(Substitutions* subst);
-
-    ThisTypeSubstitution* findThisTypeSubstitution(
-        const Substitutions* substs,
-        InterfaceDecl* interfaceDecl);
-
-    ParameterDirection getParameterDirection(VarDeclBase* varDecl);
 
     enum class UserDefinedAttributeTargets
     {

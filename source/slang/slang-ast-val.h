@@ -558,4 +558,35 @@ class BackwardDifferentiatePropagateVal : public DifferentiateVal
     SLANG_AST_CLASS(BackwardDifferentiatePropagateVal)
 };
 
+
+template<typename F>
+void SubstitutionSet::forEachGenericSubstitution(F func) const
+{
+    if (!declRef)
+        return;
+    for (auto subst = declRef->getSubst(); subst; subst = subst->getOuter())
+    {
+        if (auto genSubst = as<GenericSubstitutionDeprecated>(subst))
+            func(genSubst->getGenericDecl(), genSubst->getArgs());
+    }
+}
+
+template<typename F>
+void SubstitutionSet::forEachSubstitutionArg(F func) const
+{
+    if (!declRef)
+        return;
+    for (auto subst = declRef->getSubst(); subst; subst = subst->getOuter())
+    {
+        if (auto genSubst = as<GenericSubstitutionDeprecated>(subst))
+        {
+            for (auto arg : genSubst->getArgs())
+                func(arg);
+        }
+        else if (auto thisSubst = as<ThisTypeSubstitution>(subst))
+        {
+            func(thisSubst->witness->sub);
+        }
+    }
+}
 } // namespace Slang

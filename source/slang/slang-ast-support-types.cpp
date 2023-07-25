@@ -68,4 +68,33 @@ UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
         return UnownedStringSlice("bwd_diff");
     return UnownedStringSlice();
 }
+
+SubstitutionSet::operator bool() const
+{
+    return declRef != nullptr && declRef->getSubst() != nullptr;
+}
+
+
+List<Val*>* SubstitutionSet::tryGetGenericArguments(Decl* genericDecl)
+{
+    if (!declRef)
+        return nullptr;
+
+    // search for a substitution that might apply to us
+    for (auto s = declRef->getSubst(); s; s = s->getOuter())
+    {
+        auto genSubst = as<GenericSubstitutionDeprecated>(s);
+        if (!genSubst)
+            continue;
+
+        // the generic decl associated with the substitution list must be
+        // the generic decl that declared this parameter
+        auto parentGeneric = genSubst->getGenericDecl();
+        if (parentGeneric != genericDecl)
+            continue;
+
+        return &(genSubst->getArgs());
+    }
+    return nullptr;
+}
 }

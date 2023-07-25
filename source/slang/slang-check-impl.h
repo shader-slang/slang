@@ -246,7 +246,7 @@ namespace Slang
         // When required, a candidate can store a pre-checked list of
         // arguments so that we don't have to repeat work across checking
         // phases. Currently this is only needed for generics.
-        Substitutions*   subst = nullptr;
+        SubstitutionSet   subst;
     };
 
     struct TypeCheckingCache
@@ -997,6 +997,21 @@ namespace Slang
 
         void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 
+        DeclRef<Decl> getDefaultDeclRef(Decl* decl)
+        {
+            return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl));
+        }
+
+        DeclRef<Decl> getSpecializedDeclRef(DeclRef<Decl> declToSpecialize, DeclRef<Decl> declRefWithSpecializationArgs)
+        {
+            return declRefWithSpecializationArgs.substitute(m_astBuilder, declToSpecialize);
+        }
+
+        DeclRef<Decl> getSpecializedDeclRef(Decl* declToSpecialize, DeclRef<Decl> declRefWithSpecializationArgs)
+        {
+            return declRefWithSpecializationArgs.substitute(m_astBuilder, getDefaultDeclRef(declToSpecialize));
+        }
+
         DeclRefExpr* ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             Expr*    baseExpr,
@@ -1025,6 +1040,15 @@ namespace Slang
             Expr*            baseExpr,
             SourceLoc loc,
             Expr*    originalExpr);
+
+
+        Val* resolveVal(Val* val);
+        Type* resolveType(Type* type)
+        {
+            return (Type*)resolveVal(type);
+        }
+        DeclRef<Decl> resolveDeclRef(DeclRef<Decl> declRef);
+        Substitutions* resolveSubstDeprecated(Substitutions* subst);
 
             /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
         LookupResult resolveOverloadedLookup(LookupResult const& lookupResult);
@@ -1620,12 +1644,12 @@ namespace Slang
             List<GenericTypeConstraintDecl*>&   outConstraints);
 
             /// Determine if `left` and `right` have matching generic signatures.
-            /// If they do, then outputs a substitution to `ioSubstRightToLeft` that
-            /// can be used to specialize `right` to the parameters of `left`.
+            /// If they do, then outputs a specialized declRef to `ioSubstRightToLeft` that
+            /// represents a reference to `right` with the parameters of `left`.
         bool doGenericSignaturesMatch(
             GenericDecl*                    left,
             GenericDecl*                    right,
-            GenericSubstitution**    outSubstRightToLeft);
+            DeclRef<GenericDecl>*    outSpecializedRight);
 
         // Check if two functions have the same signature for the purposes
         // of overload resolution.
@@ -1875,7 +1899,7 @@ namespace Slang
         SubstitutionSet trySolveConstraintSystem(
             ConstraintSystem*       system,
             DeclRef<GenericDecl>    genericDeclRef,
-            GenericSubstitution*    substWithKnownGenericArgs = nullptr);
+            ArrayView<Val*> knownGenericArgs);
 
 
         // State related to overload resolution for a call
@@ -2002,7 +2026,7 @@ namespace Slang
         Expr* createGenericDeclRef(
             Expr*            baseExpr,
             Expr*            originalExpr,
-            GenericSubstitution*   subst);
+            SubstitutionSet  substSet);
 
         // Take an overload candidate that previously got through
         // `TryCheckOverloadCandidate` above, and try to finish
@@ -2088,8 +2112,8 @@ namespace Slang
 
         bool tryUnifyGenericSubstitutions(
             ConstraintSystem&           constraints,
-            GenericSubstitution* fst,
-            GenericSubstitution* snd);
+            GenericSubstitutionDeprecated* fst,
+            GenericSubstitutionDeprecated* snd);
 
         bool TryUnifyTypeParam(
             ConstraintSystem&				constraints,
@@ -2135,7 +2159,7 @@ namespace Slang
         DeclRef<Decl> inferGenericArguments(
             DeclRef<GenericDecl>    genericDeclRef,
             OverloadResolveContext& context,
-            GenericSubstitution*    substWithKnownGenericArgs,
+            ArrayView<Val*>         knownGenericArgs,
             List<Type*>             *innerParameterTypes = nullptr);
 
         void AddTypeOverloadCandidates(
@@ -2178,7 +2202,7 @@ namespace Slang
         void addOverloadCandidatesForCallToGeneric(
             LookupResultItem        genericItem,
             OverloadResolveContext& context,
-            GenericSubstitution*    substWithKnownGenericArgs = nullptr);
+            ArrayView<Val*>     knownGenericArgs);
 
             /// Check a generic application where the operands have already been checked.
         Expr* checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr);

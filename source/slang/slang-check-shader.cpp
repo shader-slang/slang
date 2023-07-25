@@ -1203,19 +1203,14 @@ namespace Slang
                 auto specializationArg = args[ii];
                 genericArgs.add(specializationArg.val);
             }
-            GenericSubstitution* genericSubst =
-                getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
-                    genericDeclRef.getSubst(),
-                    genericDeclRef.getDecl(),
-                    genericArgs.getArrayView());
+            genericDeclRef = getLinkage()->getASTBuilder()->getSpecializedGenericDeclRef(genericDeclRef, genericArgs.getArrayView()).as<GenericDecl>();
             ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
             for (auto constraintDecl : getMembersOfType<GenericTypeConstraintDecl>(
                      getLinkage()->getASTBuilder(), DeclRef<ContainerDecl>(genericDeclRef)))
             {
-                DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getSpecializedDeclRef(
-                    constraintDecl.getDecl(), genericSubst);
-
+                DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getMemberDeclRef(
+                    genericDeclRef, constraintDecl.getDecl());
 
                 auto sub = getSub(astBuilder, constraintDeclRef);
                 auto sup = getSup(astBuilder, constraintDeclRef);
@@ -1233,12 +1228,8 @@ namespace Slang
                 }
             }
 
-            genericSubst =
-                getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
-                    genericDeclRef.getSubst(),
-                    genericDeclRef.getDecl(),
-                    genericArgs);
-            specializedFuncDeclRef = astBuilder->getSpecializedDeclRef(specializedFuncDeclRef.getDecl(), genericSubst);
+            specializedFuncDeclRef = getLinkage()->getASTBuilder()->getMemberDeclRef(
+                genericDeclRef, m_funcDeclRef.getDecl());
         }
 
         info->specializedFuncDeclRef = specializedFuncDeclRef;

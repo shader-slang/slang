@@ -195,6 +195,16 @@ public:
         };
     };
 
+    Index getEpoch()
+    {
+        return m_epoch;
+    }
+
+    void incrementEpoch()
+    {
+        m_epoch++;
+    }
+
     MemoryArena& getArena() { return m_arena; }
 
         /// Create AST types 
@@ -267,6 +277,14 @@ public:
             });
     }
 
+    template<typename T>
+    DeclRef<T> getMemberDeclRef(DeclRef<Decl> parent, T* memberDecl)
+    {
+        SLANG_ASSERT(memberDecl->parentDecl == parent.getDecl());
+
+        return getSpecializedDeclRef(memberDecl, parent.getSubst());
+    }
+
     // This is the bottlneck through which all DeclRefs are created.
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, Substitutions* subst)
@@ -289,7 +307,7 @@ public:
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, SubstitutionSet subst)
     {
-        return getSpecializedDeclRef(decl, subst.substitutions);
+        return getSpecializedDeclRef(decl, subst ? subst.declRef->substitutions : nullptr);
     }
 
     ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
@@ -297,10 +315,10 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, ArrayView<Val*> args)
+    GenericSubstitutionDeprecated* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, ArrayView<Val*> args)
     {
         NodeDesc desc;
-        desc.type = GenericSubstitution::kType;
+        desc.type = GenericSubstitutionDeprecated::kType;
         desc.operands.add(decl);
         for (auto arg : args)
             desc.operands.add(arg);
@@ -309,7 +327,7 @@ public:
             desc.operands.add(outer);
         }
         desc.init();
-        auto result = (GenericSubstitution*)_getOrCreateImpl(desc, [this]() {return create<GenericSubstitution>(); });
+        auto result = (GenericSubstitutionDeprecated*)_getOrCreateImpl(desc, [this]() {return create<GenericSubstitutionDeprecated>(); });
         if (result->args.getCount() != args.getCount())
         {
             SLANG_RELEASE_ASSERT(result->args.getCount() == 0);
@@ -320,13 +338,13 @@ public:
         return result;
     }
 
-    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, const List<Val*>& args)
+    GenericSubstitutionDeprecated* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, const List<Val*>& args)
     {
         return getOrCreateGenericSubstitution(outer, decl, args.getArrayView());
     }
 
     template<typename... Args>
-    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, Args... args)
+    GenericSubstitutionDeprecated* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, Args... args)
     {
         List<Val*> vals;
         addToList(vals, args...);
@@ -350,6 +368,20 @@ public:
         result->witness = subtypeWitness;
         result->outer = outer;
         return result;
+    }
+
+    DeclRef<GenericDecl> getSpecializedGenericDeclRef(DeclRef<GenericDecl> genericBase, ArrayView<Val*> args)
+    {
+        // Exclude the existing generic arguments for the current generic decl.
+        auto outerSubst = genericBase.getSubst();
+        if (auto genSubst = as<GenericSubstitutionDeprecated>(outerSubst))
+        {
+            if (genSubst->getGenericDecl() == genericBase.getDecl())
+                outerSubst = genSubst->getOuter();
+        }
+
+        auto genSubst = getOrCreateGenericSubstitution(outerSubst, genericBase.getDecl(), args);
+        return getSpecializedDeclRef(genericBase.getDecl(), genSubst).as<GenericDecl>();
     }
 
     NodeBase* createByNodeType(ASTNodeType nodeType);
@@ -491,7 +523,7 @@ public:
         /// Dtor
     ~ASTBuilder();
 
-    Dictionary<Decl*, GenericSubstitution*> m_genericDefaultSubst;
+    Dictionary<Decl*, GenericSubstitutionDeprecated*> m_genericDefaultSubst;
 
 protected:
     // Special default Ctor that can only be used by SharedASTBuilder
@@ -527,6 +559,8 @@ protected:
     SharedASTBuilder* m_sharedASTBuilder;
 
     MemoryArena m_arena;
+
+    Index m_epoch = 0;
 
 };
 

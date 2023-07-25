@@ -625,19 +625,20 @@ namespace Slang
 
     struct SubstitutionSet
     {
-        Substitutions* substitutions = nullptr;
-        operator Substitutions*() const
-        {
-            return substitutions;
-        }
+        DeclRefBase* declRef = nullptr;
+        SubstitutionSet() = default;
+        SubstitutionSet(DeclRefBase* declRefBase)
+            :declRef(declRefBase)
+        {}
+        explicit operator bool() const;
 
-        SubstitutionSet() {}
-        SubstitutionSet(Substitutions* subst)
-            : substitutions(subst)
-        {
-        }
-        bool equals(const SubstitutionSet& substSet) const;
-        HashCode getHashCode() const;
+        List<Val*>* tryGetGenericArguments(Decl* genericDecl);
+        
+        template<typename F>
+        void forEachGenericSubstitution(F func) const;
+
+        template<typename F>
+        void forEachSubstitutionArg(F func) const;
     };
 
         /// An expression together with (optional) substutions to apply to it
@@ -752,7 +753,7 @@ namespace Slang
     // try to find the concrete decl that satisfies the associatedtype requirement from the
     // concrete type supplied by ThisTypeSubstittution.
     Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef);
-    void _printNestedDecl(const Substitutions* substitutions, const Decl* decl, StringBuilder& out);
+    void _printNestedDecl(const SubstitutionSet substitutions, const Decl* decl, StringBuilder& out);
 
     template<typename T = Decl>
     struct DeclRef
@@ -1550,6 +1551,7 @@ namespace Slang
 
     /// Get the operator name from the higher order invoke expr.
     UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr);
+
 
 } // namespace Slang
 

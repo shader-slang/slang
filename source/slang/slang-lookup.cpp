@@ -731,7 +731,7 @@ static void _lookUpInScopes(
             // just a decl.
             //
             DeclRef<ContainerDecl> containerDeclRef =
-                astBuilder->getSpecializedDeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, request.semantics, containerDecl)).as<ContainerDecl>();
+                createDefaultSubstitutionsIfNeeded(astBuilder, request.semantics, makeDeclRef(containerDecl)).as<ContainerDecl>();
 
             // If the container we are looking into represents a type
             // or an `extension` of a type, then we need to treat

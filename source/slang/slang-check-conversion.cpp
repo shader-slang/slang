@@ -923,7 +923,7 @@ namespace Slang
         //
         // TODO(tfoley): Under what circumstances would this check ever be needed?
         //
-        if (auto toParameterGroupType = as<ParameterGroupType>(toType))
+        if (as<ParameterGroupType>(toType))
         {
             return _failedCoercion(toType, outToExpr, fromExpr);
         }

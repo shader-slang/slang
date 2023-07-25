@@ -338,7 +338,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     // So, in order to get the *right* end result, we need to apply
                     // the substitutions from the inheritance decl-ref to the witness.
                     //
-                    requirementWitness = requirementWitness.specialize(astBuilder, inheritanceDeclRef.getSubst());
+                    requirementWitness = requirementWitness.specialize(astBuilder, SubstitutionSet(inheritanceDeclRef));
 
                     return requirementWitness;
                 }
@@ -356,7 +356,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     RequirementWitness result;
                     if (table->requirementDictionary.tryGetValue(requirementKey, result))
                     {
-                        result = result.specialize(astBuilder, midKey.getSubst());
+                        result = result.specialize(astBuilder, SubstitutionSet(midKey));
                     }
                     return result;
                 }
@@ -405,6 +405,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return intVal;
     }
 
+    GenericSubstitutionDeprecated* _createDefaultSubstitutionsForGeneric(
+        ASTBuilder* astBuilder,
+        SemanticsVisitor* semantics,
+        GenericDecl* genericDecl,
+        Substitutions* outerSubst);
+
     DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         ASTBuilder*     astBuilder,
         SemanticsVisitor* semantics,
@@ -441,11 +447,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 // Don't specialize any parameters of a generic.
                 if (childDecl != genericParentDecl->inner)
-                    break;
+                    continue;
                 genericParents.add(genericParentDecl);
             }
         }
-
 
         Substitutions* outerSubst = nullptr;
         for (Index i = genericParents.getCount()-1; i>=0; i--)
@@ -460,10 +465,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     break;
 
                 // We have a generic ancestor, but do we have an substitutions for it?
-                GenericSubstitution* foundSubst = nullptr;
+                GenericSubstitutionDeprecated* foundSubst = nullptr;
                 for(auto s = declRef.getSubst(); s; s = s->getOuter())
                 {
-                    auto genSubst = as<GenericSubstitution>(s);
+                    auto genSubst = as<GenericSubstitutionDeprecated>(s);
                     if(!genSubst)
                         continue;
 
@@ -484,7 +489,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                 if(!foundSubst)
                 {
-                    Substitutions* newSubst = createDefaultSubstitutionsForGeneric(
+                    Substitutions* newSubst = _createDefaultSubstitutionsForGeneric(
                         astBuilder,
                         semantics,
                         genericParentDecl,
@@ -502,7 +507,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             return declRef;
 
         int diff = 0;
-        return declRef.substituteImpl(astBuilder, outerSubst, &diff);
+        auto substDeclRef = astBuilder->getSpecializedDeclRef(declRef.getDecl(), outerSubst);
+        return declRef.substituteImpl(astBuilder, SubstitutionSet(substDeclRef), &diff);
     }
 
     // TODO: need to figure out how to unify this with the logic
@@ -521,10 +527,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
         else if (auto magicMod = declRef.getDecl()->findModifier<MagicTypeModifier>())
         {
-            GenericSubstitution* subst = nullptr;
+            GenericSubstitutionDeprecated* subst = nullptr;
             for(auto s = declRef.getSubst(); s; s = s->getOuter())
             {
-                if(auto genericSubst = as<GenericSubstitution>(s))
+                if(auto genericSubst = as<GenericSubstitutionDeprecated>(s))
                 {
                     subst = genericSubst;
                     break;
@@ -710,12 +716,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     //
 
-    GenericSubstitution* findInnerMostGenericSubstitution(Substitutions* subst)
+    List<Val*>* findInnerMostGenericArgs(SubstitutionSet subst)
     {
-        for(Substitutions* s = subst; s; s = s->getOuter())
+        if (!subst.declRef)
+            return nullptr;
+        for(Substitutions* s = subst.declRef->getSubst(); s; s = s->getOuter())
         {
-            if(auto genericSubst = as<GenericSubstitution>(s))
-                return genericSubst;
+            if(auto genericSubst = as<GenericSubstitutionDeprecated>(s))
+                return &genericSubst->getArgs();
         }
         return nullptr;
     }
@@ -735,7 +743,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Otherwise we need to recurse on the type structure
         // and apply substitutions where it makes sense
-        return Slang::as<Type>(type->substitute(astBuilder, substitutions));
+        return Slang::as<Type>(type->substitute(astBuilder, SubstitutionSet(const_cast<DeclRefBase*>(this))));
     }
 
     DeclRefBase* DeclRefBase::substitute(ASTBuilder* astBuilder, DeclRefBase* declRef) const
@@ -744,12 +752,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             return declRef;
 
         int diff = 0;
-        return declRef->substituteImpl(astBuilder, substitutions, &diff);
+        return declRef->substituteImpl(astBuilder, SubstitutionSet(const_cast<DeclRefBase*>(this)), &diff);
     }
 
     SubstExpr<Expr> DeclRefBase::substitute(ASTBuilder* /* astBuilder*/, Expr* expr) const
     {
-        return SubstExpr<Expr>(expr, substitutions);
+        return SubstExpr<Expr>(expr, SubstitutionSet(const_cast<DeclRefBase*>(this)));
     }
 
     SubstExpr<Expr> substituteExpr(SubstitutionSet const& substs, Expr* expr)
@@ -830,7 +838,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 // The declaration is nested inside a generic.
                 // Does it already have a specialization for that generic?
-                if(auto specGenericSubst = as<GenericSubstitution>(substsToSpecialize))
+                if(auto specGenericSubst = as<GenericSubstitutionDeprecated>(substsToSpecialize))
                 {
                     if(specGenericSubst->getGenericDecl() == ancestorGenericDecl)
                     {
@@ -866,7 +874,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 //
                 for(auto s = substsToApply; s; s = s->getOuter())
                 {
-                    auto appGenericSubst = as<GenericSubstitution>(s);
+                    auto appGenericSubst = as<GenericSubstitutionDeprecated>(s);
                     if(!appGenericSubst)
                         continue;
 
@@ -886,7 +894,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         substsToApply,
                         &diff);
 
-                    GenericSubstitution* firstSubst = astBuilder->getOrCreateGenericSubstitution(
+                    GenericSubstitutionDeprecated* firstSubst = astBuilder->getOrCreateGenericSubstitution(
                         restSubst, ancestorGenericDecl, appGenericSubst->getArgs());
 
                     (*ioDiff)++;
@@ -999,7 +1007,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             astBuilder,
             decl,
             substitutions,
-            substSet.substitutions,
+            substSet ? substSet.declRef->getSubst() : nullptr,
             &diff);
 
         if (!diff)
@@ -1033,8 +1041,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             return false;
         if (decl != declRef->decl)
             return false;
-        if (!SubstitutionSet(substitutions).equals(declRef->substitutions))
-            return false;
+        if (!substitutions)
+            return declRef->substitutions == nullptr;
+        if (substitutions != declRef->substitutions)
+            return substitutions->equals(declRef->substitutions);
 
         return true;
     }
@@ -1091,7 +1101,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             // A decl-ref to the parent generic should *not* include
             // those substitutions.
             //
-            if(auto genericSubst = as<GenericSubstitution>(substToApply))
+            if(auto genericSubst = as<GenericSubstitutionDeprecated>(substToApply))
             {
                 if(genericSubst->getGenericDecl() == parentGenericDecl)
                 {
@@ -1106,7 +1116,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     HashCode DeclRefBase::getHashCode() const
     {
-        return combineHash(PointerHash<1>::getHashCode(decl), SubstitutionSet(substitutions).getHashCode());
+        HashCode substHash = 0;
+        if (substitutions)
+            substHash = substitutions->getHashCode();
+        return combineHash(PointerHash<1>::getHashCode(decl), substHash);
     }
 
     // IntVal
@@ -1125,14 +1138,29 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // HLSLPatchType
 
+    Val* getGenericArg(DeclRef<Decl> declRef, Index index)
+    {
+        auto subst = declRef.getSubst();
+        while (subst)
+        {
+            if (auto genSubst = as<GenericSubstitutionDeprecated>(subst))
+            {
+                if (index < genSubst->getArgs().getCount())
+                    return genSubst->getArgs()[index];
+            }
+            subst = subst->getOuter();
+        }
+        return nullptr;
+    }
+
     Type* HLSLPatchType::getElementType()
     {
-        return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
+        return as<Type>(getGenericArg(declRef, 0));
     }
 
     IntVal* HLSLPatchType::getElementCount()
     {
-        return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[1]);
+        return as<IntVal>(getGenericArg(declRef, 1));
     }
 
     // MeshOutputType
@@ -1143,12 +1171,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     Type* MeshOutputType::getElementType()
     {
-        return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
+        return as<Type>(getGenericArg(declRef, 0));
     }
 
     IntVal* MeshOutputType::getMaxElementCount()
     {
-        return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[1]);
+        return as<IntVal>(getGenericArg(declRef, 1));
     }
 
     // Constructors for types
@@ -1174,7 +1202,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         DeclRef<TypeDefDecl> specializedDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef).as<TypeDefDecl>();
 
-        return astBuilder->create<NamedExpressionType>(specializedDeclRef);
+        return astBuilder->getOrCreate<NamedExpressionType>(specializedDeclRef);
     }
     
     FuncType* getFuncType(
@@ -1232,11 +1260,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return astBuilder->create<SamplerStateType>();
     }
 
-    ThisTypeSubstitution* findThisTypeSubstitution(
-        const Substitutions*  substs,
+    SubtypeWitness* findThisTypeWitness(
+        SubstitutionSet  substs,
         InterfaceDecl*  interfaceDecl)
     {
-        for(const Substitutions* s = substs; s; s = s->getOuter())
+        for(const Substitutions* s = substs.declRef->getSubst(); s; s = s->getOuter())
         {
             auto thisTypeSubst = as<ThisTypeSubstitution>(s);
             if(!thisTypeSubst)
@@ -1245,7 +1273,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(thisTypeSubst->interfaceDecl != interfaceDecl)
                 continue;
 
-            return const_cast<ThisTypeSubstitution*>(thisTypeSubst);
+            return thisTypeSubst->witness;
         }
 
         return nullptr;
@@ -1328,7 +1356,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     // Prints a partially qualified type name with generic substitutions.
-    void _printNestedDecl(const Substitutions* substitutions, const Decl* decl, StringBuilder& out)
+    void _printNestedDecl(SubstitutionSet substitutions, const Decl* decl, StringBuilder& out)
     {
         // If there is a parent scope for the declaration, print it first.
         // Exclude top-level namespaces like `tu0` or `core`.
@@ -1356,9 +1384,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             if (auto interfaceDecl = const_cast<InterfaceDecl*>(as<InterfaceDecl>(decl)))
             {
-                if (auto thisSubst = findThisTypeSubstitution(substitutions, interfaceDecl))
+                if (auto thisWitness = findThisTypeWitness(substitutions, interfaceDecl))
                 {
-                    if (auto subTypeWitness = as<SubtypeWitness>(thisSubst->witness))
+                    if (auto subTypeWitness = as<SubtypeWitness>(thisWitness))
                     {
                         out << subTypeWitness->sub;
                         break;
@@ -1375,31 +1403,23 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
 
         // Look for generic substitutions on this type.
-        for (const Substitutions* subst = substitutions; subst; subst = subst->getOuter())
+        auto genericDecl = const_cast<GenericDecl*>(as<GenericDecl>(decl));
+        auto args = substitutions.tryGetGenericArguments(genericDecl);
+        if (args)
         {
-            auto genericSubstitution = Slang::as<GenericSubstitution>(subst);
-            if (!genericSubstitution)
-                continue;
-
-            // If the substitution is for this type, print it.
-            if (genericSubstitution->getGenericDecl() == decl)
+            out << "<";
+            bool isFirst = true;
+            for (const auto& it : *args)
             {
-                out << "<";
-                bool isFirst = true;
-                for (const auto& it : genericSubstitution->getArgs())
-                {
-                    // Don't print out witnesses.
-                    if (as<Witness>(it))
-                        continue;
-                    if (!isFirst)
-                        out << ", ";
-                    isFirst = false;
-                    it->toText(out);
-                }
-                out << ">";
-
-                break;
+                // Don't print out witnesses.
+                if (as<Witness>(it))
+                    continue;
+                if (!isFirst)
+                    out << ", ";
+                isFirst = false;
+                it->toText(out);
             }
+            out << ">";
         }
     }
 
@@ -1407,29 +1427,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if (decl)
         {
-            _printNestedDecl(substitutions, decl, out);
+            _printNestedDecl(SubstitutionSet(const_cast<DeclRefBase*>(this)), decl, out);
         }
-    }
-
-    bool SubstitutionSet::equals(const SubstitutionSet& substSet) const
-    {
-        if (substitutions == substSet.substitutions)
-        {
-            return true;
-        }
-        if (substitutions == nullptr || substSet.substitutions == nullptr)
-        {
-            return false;
-        }
-        return substitutions->equals(substSet.substitutions);
-    }
-
-    HashCode SubstitutionSet::getHashCode() const
-    {
-        HashCode rs = 0;
-        if (substitutions)
-            rs = combineHash(rs, substitutions->getHashCode());
-        return rs;
     }
 
 

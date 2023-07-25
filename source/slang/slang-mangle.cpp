@@ -423,14 +423,14 @@ namespace Slang
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.
 
-            auto subst = findInnerMostGenericSubstitution(declRef.getSubst());
-            if( subst && subst->getGenericDecl() == parentGenericDeclRef.getDecl())
+            auto substArgs = SubstitutionSet(declRef).tryGetGenericArguments(parentGenericDeclRef.getDecl());
+            if (substArgs)
             {
                 // This is the case where we *do* have substitutions.
                 emitRaw(context, "G");
-                UInt genericArgCount = subst->getArgs().getCount();
+                UInt genericArgCount = substArgs->getCount();
                 emit(context, genericArgCount);
-                for (auto aa : subst->getArgs())
+                for (auto aa : *substArgs)
                 {
                     emitVal(context, aa);
                 }

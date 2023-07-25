@@ -517,11 +517,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 NodeBase* nodeBase = (NodeBase*)obj.m_ptr;
                                 SLANG_ASSERT(nodeBase);
 
-                                if (Type* type = dynamicCast<Type>(nodeBase))
-                                {
-                                    type->_setASTBuilder(astBuilder);
-                                }
-                                else if (ExtensionDecl* extensionDecl = dynamicCast<ExtensionDecl>(nodeBase))
+                                if (ExtensionDecl* extensionDecl = dynamicCast<ExtensionDecl>(nodeBase))
                                 {
                                     if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType))
                                     {

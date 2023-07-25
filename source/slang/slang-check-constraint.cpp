@@ -266,7 +266,7 @@ namespace Slang
     SubstitutionSet SemanticsVisitor::trySolveConstraintSystem(
         ConstraintSystem*       system,
         DeclRef<GenericDecl>    genericDeclRef,
-        GenericSubstitution*    substWithKnownGenericArgs)
+        ArrayView<Val*>         knownGenericArgs)
     {
         // For now the "solver" is going to be ridiculously simplistic.
 
@@ -290,7 +290,7 @@ namespace Slang
             if(!TryUnifyTypes(*system, getSub(m_astBuilder, constraintDeclRef), getSup(m_astBuilder, constraintDeclRef)))
                 return SubstitutionSet();
         }
-        SubstitutionSet resultSubst = genericDeclRef.getSubst();
+        SubstitutionSet resultSubst = SubstitutionSet(genericDeclRef);
 
         // Once have built up the full list of constraints we are trying to satisfy,
         // we will attempt to solve for each parameter in a way that satisfies all
@@ -310,10 +310,10 @@ namespace Slang
         // or not they are compatible with the constraints).
         //
         Count knownGenericArgCount = 0;
-        if (substWithKnownGenericArgs)
+        if (knownGenericArgs.getCount())
         {
-            knownGenericArgCount = substWithKnownGenericArgs->getArgs().getCount();
-            for (auto arg : substWithKnownGenericArgs->getArgs())
+            knownGenericArgCount = knownGenericArgs.getCount();
+            for (auto arg : knownGenericArgs)
             {
                 args.add(arg);
             }
@@ -455,15 +455,11 @@ namespace Slang
         // we've already decided that `T` is `Robin`, then we want to
         // search for a conformance `Robin : ISidekick`, which involved
         // apply the substitutions we already know...
-
-        GenericSubstitution* solvedSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getSubst(), genericDeclRef.getDecl(), args.getArrayView());
+        auto specializedGenericDeclRef = m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, args.getArrayView());
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
-            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getSpecializedDeclRef(
-                constraintDecl,
-                solvedSubst);
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = getSpecializedDeclRef(constraintDecl, specializedGenericDeclRef).as<GenericTypeConstraintDecl>();
 
             // Extract the (substituted) sub- and super-type from the constraint.
             auto sub = getSub(m_astBuilder, constraintDeclRef);
@@ -509,8 +505,7 @@ namespace Slang
             }
         }
 
-        resultSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getSubst(), genericDeclRef.getDecl(), args);
+        resultSubst = SubstitutionSet(m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, args.getArrayView()));
         return resultSubst;
     }
 
@@ -606,9 +601,9 @@ namespace Slang
         if (!fst || !snd)
             return !fst && !snd;
 
-        if(auto fstGeneric = as<GenericSubstitution>(fst))
+        if(auto fstGeneric = as<GenericSubstitutionDeprecated>(fst))
         {
-            if(auto sndGeneric = as<GenericSubstitution>(snd))
+            if(auto sndGeneric = as<GenericSubstitutionDeprecated>(snd))
             {
                 return tryUnifyGenericSubstitutions(
                     constraints,
@@ -624,8 +619,8 @@ namespace Slang
 
     bool SemanticsVisitor::tryUnifyGenericSubstitutions(
         ConstraintSystem&           constraints,
-        GenericSubstitution* fst,
-        GenericSubstitution* snd)
+        GenericSubstitutionDeprecated* fst,
+        GenericSubstitutionDeprecated* snd)
     {
         SLANG_ASSERT(fst);
         SLANG_ASSERT(snd);

@@ -176,7 +176,7 @@ namespace Slang
             superTypeDeclRef = superDeclRefType->declRef;
         }
 
-        if (auto dynamicType = as<DynamicType>(subType))
+        if (as<DynamicType>(subType))
         {
             // A __Dynamic type always conforms to the interface via its witness table.
             auto witness = m_astBuilder->create<DynamicSubtypeWitness>();

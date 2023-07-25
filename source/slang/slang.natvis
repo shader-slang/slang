@@ -42,7 +42,7 @@
           </Synthetic>
       </Expand>
     </Type>
-    <Type Name="Slang::GenericSubstitution">
+    <Type Name="Slang::GenericSubstitutionDeprecated">
         <DisplayString>GenSubst {(*genericDecl).nameAndLoc}</DisplayString>
         <Expand>
             <Item Name="genericDecl">genericDecl</Item>
@@ -451,16 +451,16 @@
         </Expand>
     </Type>
     <Type Name="Slang::Substitutions" Inheritable="false">
-      <DisplayString Condition="astNodeType == Slang::ASTNodeType::GenericSubstitution">{*(Slang::GenericSubstitution*)&amp;astNodeType}</DisplayString>
+      <DisplayString Condition="astNodeType == Slang::ASTNodeType::GenericSubstitutionDeprecated">{*(Slang::GenericSubstitutionDeprecated*)&amp;astNodeType}</DisplayString>
       <DisplayString Condition="astNodeType == Slang::ASTNodeType::ThisTypeSubstitution">{*(Slang::ThisTypeSubstitution*)&amp;astNodeType}</DisplayString>
       <DisplayString>{astNodeType,en}</DisplayString>
       <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericSubstitution">(Slang::GenericSubstitution*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericSubstitutionDeprecated">(Slang::GenericSubstitutionDeprecated*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ThisTypeSubstitution">(Slang::ThisTypeSubstitution*)&amp;astNodeType</ExpandedItem>
         </Expand>
     </Type>
-    <Type Name="Slang::GenericSubstitution" Inheritable="false">
+    <Type Name="Slang::GenericSubstitutionDeprecated" Inheritable="false">
       <DisplayString Condition="outer != 0">&lt;{args}&gt;{*outer}</DisplayString>
       <DisplayString>&lt;{args}&gt;</DisplayString>
     </Type>
@@ -471,8 +471,8 @@
     <Type Name="Slang::SubstitutionSet">
         <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
-            <LinkedListItems>
-                <HeadPointer>substitutions</HeadPointer>
+            <LinkedListItems Condition="declRef!=nullptr">
+                <HeadPointer>declRef->substitutions</HeadPointer>
                 <NextPointer>outer</NextPointer>
                 <ValueNode>(Slang::Substitutions*)this</ValueNode>
             </LinkedListItems>

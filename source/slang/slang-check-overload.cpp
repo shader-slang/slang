@@ -383,8 +383,8 @@ namespace Slang
             }
         }
 
-        auto genSubst = m_astBuilder->getOrCreateGenericSubstitution(nullptr, genericDeclRef.getDecl(), checkedArgs.getArrayView());
-        candidate.subst = genSubst;
+        auto genSubst = m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef.getDecl(), checkedArgs.getArrayView());
+        candidate.subst = SubstitutionSet(genSubst);
 
         // Once we are done processing the parameters of the generic,
         // we will have build up a usable `checkedArgs` array and
@@ -550,19 +550,16 @@ namespace Slang
 
         // We should have the existing arguments to the generic
         // handy, so that we can construct a substitution list.
-        auto subst = as<GenericSubstitution>(candidate.subst);
-        SLANG_ASSERT(subst);
+        auto substArgs = candidate.subst.tryGetGenericArguments(genericDeclRef.getDecl());
+        SLANG_ASSERT(substArgs);
 
-        subst = getASTBuilder()->getOrCreateGenericSubstitution(
-            genericDeclRef.getSubst(), genericDeclRef.getDecl(), subst->getArgs());
-
-        List<Val*> newArgs = subst->getArgs();
+        List<Val*> newArgs;
+        newArgs.addRange(*substArgs);
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
-            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getSpecializedDeclRef(
-                constraintDecl, subst);
-
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getSpecializedDeclRef(constraintDecl, candidate.subst);
+            
             auto sub = getSub(m_astBuilder, constraintDeclRef);
             auto sup = getSup(m_astBuilder, constraintDeclRef);
 
@@ -582,7 +579,7 @@ namespace Slang
             }
         }
 
-        candidate.subst = m_astBuilder->getOrCreateGenericSubstitution(nullptr, genericDeclRef.getDecl(), newArgs);
+        candidate.subst = SubstitutionSet(m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, newArgs.getArrayView()));
 
         // Done checking all the constraints, hooray.
         return true;
@@ -617,7 +614,7 @@ namespace Slang
     Expr* SemanticsVisitor::createGenericDeclRef(
         Expr*                baseExpr,
         Expr*                originalExpr,
-        GenericSubstitution* subst)
+        SubstitutionSet      substArgs)
     {
         auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
         if (!baseDeclRefExpr)
@@ -632,9 +629,7 @@ namespace Slang
             return CreateErrorExpr(originalExpr);
         }
 
-        subst = m_astBuilder->getOrCreateGenericSubstitution(baseGenericRef.getSubst(), baseGenericRef.getDecl(), subst->getArgs());
-
-        DeclRef<Decl> innerDeclRef = m_astBuilder->getSpecializedDeclRef<Decl>(getInner(baseGenericRef), subst);
+        DeclRef<Decl> innerDeclRef = m_astBuilder->getSpecializedDeclRef(getInner(baseGenericRef), substArgs);
 
         Expr* base = nullptr;
         if (auto mbrExpr = as<MemberExpr>(baseExpr))
@@ -768,14 +763,15 @@ namespace Slang
                     expr->loc = context.loc;
                     expr->originalExpr = baseExpr;
                     expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
-                    expr->substWithKnownGenericArgs = (GenericSubstitution*)candidate.subst;
+                    if (auto args = candidate.subst.tryGetGenericArguments(expr->baseGenericDeclRef.getDecl()))
+                        expr->knownGenericArgs = *args;
                     return expr;
                 }
 
                 return createGenericDeclRef(
                     baseExpr,
                     context.originalExpr,
-                    as<GenericSubstitution>(candidate.subst));
+                    candidate.subst);
                 break;
 
             default:
@@ -1227,7 +1223,7 @@ namespace Slang
     DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         DeclRef<GenericDecl>    genericDeclRef,
         OverloadResolveContext& context,
-        GenericSubstitution*    substWithKnownGenericArgs,
+        ArrayView<Val*>         knownGenericArgs,
         List<Type*>             *innerParameterTypes)
     {
         // We have been asked to infer zero or more arguments to
@@ -1269,20 +1265,22 @@ namespace Slang
         // use any substitutions that were in place for referring to the
         // generic itself.
         //
-        Substitutions* substForInnerDecl = genericDeclRef.getSubst();
+        DeclRef<Decl> partiallySpecializedInnerRef;
         //
         // In the case where we have explicit/known arguments,
         // we will use those as our baseline substitutions.
         //
-        if (substWithKnownGenericArgs)
+        if (knownGenericArgs.getCount())
         {
-            substForInnerDecl = substWithKnownGenericArgs;
+            partiallySpecializedInnerRef = getInnerDeclRef(
+                m_astBuilder,
+                this,
+                m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, knownGenericArgs).as<GenericDecl>());
         }
-
-        auto innerDecl = getInner(genericDeclRef);
-        DeclRef<Decl> partiallySpecializedInnerRef = m_astBuilder->getSpecializedDeclRef<Decl>(
-            innerDecl,
-            substForInnerDecl);
+        else
+        {
+            partiallySpecializedInnerRef = getInnerDeclRef(m_astBuilder, this, genericDeclRef);
+        }
 
         // Check what type of declaration we are dealing with, and then try
         // to match it up with the arguments accordingly...
@@ -1361,7 +1359,7 @@ namespace Slang
         // so that the solver knows to accept those arguments as-is.
         //
         auto constraintSubst = trySolveConstraintSystem(
-            &constraints, genericDeclRef, substWithKnownGenericArgs);
+            &constraints, genericDeclRef, knownGenericArgs);
         if (!constraintSubst)
         {
             // In this case, the solver failed to find a solution to the constraint
@@ -1381,7 +1379,9 @@ namespace Slang
         // all the constraints), we can construct a reference to the inner
         // declaration that applies the generic to those arguments.
         //
-        return m_astBuilder->getSpecializedDeclRef<Decl>(innerDecl, constraintSubst);
+        int diff = 0;
+        return getInnerDeclRef(m_astBuilder, this, genericDeclRef).substituteImpl(
+            m_astBuilder, constraintSubst, &diff);
     }
 
     void SemanticsVisitor::AddTypeOverloadCandidates(
@@ -1424,13 +1424,13 @@ namespace Slang
     void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
         LookupResultItem                genericItem,
         OverloadResolveContext&         context,
-        GenericSubstitution*            substWithKnownGenericArgs)
+        ArrayView<Val*>                 knownGenericArgs)
     {
         auto genericDeclRef = genericItem.declRef.as<GenericDecl>();
         SLANG_ASSERT(genericDeclRef);
 
         // Try to infer generic arguments, based on the context
-        DeclRef<Decl> innerRef = inferGenericArguments(genericDeclRef, context, substWithKnownGenericArgs);
+        DeclRef<Decl> innerRef = inferGenericArguments(genericDeclRef, context, knownGenericArgs);
 
         if (innerRef)
         {
@@ -1475,7 +1475,7 @@ namespace Slang
             LookupResultItem innerItem;
             innerItem.breadcrumbs = item.breadcrumbs;
             innerItem.declRef = genericDeclRef;
-            addOverloadCandidatesForCallToGeneric(innerItem, context);
+            addOverloadCandidatesForCallToGeneric(innerItem, context, ArrayView<Val*>());
         }
         else if( auto typeDefDeclRef = item.declRef.as<TypeDefDecl>() )
         {
@@ -1578,7 +1578,7 @@ namespace Slang
             addOverloadCandidatesForCallToGeneric(
                 LookupResultItem(partiallyAppliedGenericExpr->baseGenericDeclRef),
                 context,
-                partiallyAppliedGenericExpr->substWithKnownGenericArgs);
+                partiallyAppliedGenericExpr->knownGenericArgs.getArrayView());
         }
         else if (auto typeType = as<TypeType>(funcExprType))
         {
@@ -1636,7 +1636,7 @@ namespace Slang
                 DeclRef<Decl> innerRef = inferGenericArguments(
                     baseFuncGenericDeclRef,
                     context,
-                    nullptr,
+                    ArrayView<Val*>(),
                     &paramTypes);
 
                 OverloadCandidate candidate;

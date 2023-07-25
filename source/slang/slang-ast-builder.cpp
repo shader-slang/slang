@@ -720,9 +720,9 @@ void ASTBuilder::NodeDesc::init()
     hashCode = hasher.getResult();
 }
 
-DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst)
+DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, SubstitutionSet subst)
 {
-    return builder->getSpecializedDeclRef(decl, subst);
+    return builder->getSpecializedDeclRef(decl, subst.declRef->getSubst());
 }
 
 } // namespace Slang

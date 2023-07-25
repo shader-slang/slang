@@ -2030,19 +2030,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
-    // Lower substitution args and collect them into a list of IR operands.
-    void _collectSubstitutionArgs(List<IRInst*>& operands, Substitutions* subst)
-    {
-        if (!subst) return;
-        _collectSubstitutionArgs(operands, subst->getOuter());
-        if (auto genSubst = as<GenericSubstitution>(subst))
-        {
-            for (auto arg : genSubst->getArgs())
-            {
-                operands.add(lowerVal(context, arg).val);
-            }
-        }
-    }
     // Lower a type where the type declaration being referenced is assumed
     // to be an intrinsic type, which can thus be lowered to a simple IR
     // type with the appropriate opcode.
@@ -2056,7 +2043,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRInst*> operands;
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
-        _collectSubstitutionArgs(operands, type->declRef.getSubst());
+        SubstitutionSet(type->declRef).forEachSubstitutionArg([&](Val* arg)
+            {
+                operands.add(lowerVal(context, arg).val);
+            });
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),
@@ -2786,8 +2776,8 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, SemanticsVisitor* semantics, Decl* decl)
 {
-    DeclRef<Decl> declRef = context->astBuilder->getSpecializedDeclRef(
-        decl, createDefaultSubstitutions(context->astBuilder, semantics, decl));
+    DeclRef<Decl> declRef = createDefaultSubstitutionsIfNeeded(context->astBuilder, semantics,
+        makeDeclRef(decl));
     return declRef;
 }
 //
@@ -3896,7 +3886,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    void _lowerSubstitutionArg(IRGenContext* subContext, GenericSubstitution* subst, Decl* paramDecl, Index argIndex)
+    void _lowerSubstitutionArg(IRGenContext* subContext, GenericSubstitutionDeprecated* subst, Decl* paramDecl, Index argIndex)
     {
         SLANG_ASSERT(argIndex < subst->getArgs().getCount());
         auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
@@ -3908,7 +3898,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         if(!subst) return;
         _lowerSubstitutionEnv(subContext, subst->getOuter());
 
-        if (auto genSubst = as<GenericSubstitution>(subst))
+        if (auto genSubst = as<GenericSubstitutionDeprecated>(subst))
         {
             auto genDecl = genSubst->getGenericDecl();
 
@@ -3985,7 +3975,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             IRGenContext* subContext = &subContextStorage;
             subContext->env = subEnv;
 
-            _lowerSubstitutionEnv(subContext, argExpr.getSubsts());
+            _lowerSubstitutionEnv(subContext, argExpr.getSubsts() ? argExpr.getSubsts().declRef->getSubst() : nullptr);
 
             addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
 
@@ -9389,7 +9379,7 @@ LoweredValInfo emitDeclRef(
     // we should also ignore any generic substitutions.
     if(!canDeclLowerToAGeneric(decl))
     {
-        while(auto genericSubst = as<GenericSubstitution>(subst))
+        while(auto genericSubst = as<GenericSubstitutionDeprecated>(subst))
             subst = genericSubst->getOuter();
     }
 
@@ -9403,7 +9393,7 @@ LoweredValInfo emitDeclRef(
     }
 
     // Otherwise, we look at the kind of substitution, and let it guide us.
-    if(auto genericSubst = as<GenericSubstitution>(subst))
+    if(auto genericSubst = as<GenericSubstitutionDeprecated>(subst))
     {
         // A generic substitution means we will need to output
         // a `specialize` instruction to specialize the generic.

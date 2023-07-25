@@ -118,58 +118,56 @@ HashCode GenericParamIntVal::_getHashCodeOverride()
 Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff)
 {
     // search for a substitution that might apply to us
-    for (auto s = subst.substitutions; s; s = s->getOuter())
+    auto outerGeneric = as<GenericDecl>(paramDecl->parentDecl);
+    if (!outerGeneric)
+        return paramVal;
+
+    List<Val*>* args = subst.tryGetGenericArguments(outerGeneric);
+    if (!args)
     {
-        auto genSubst = as<GenericSubstitution>(s);
-        if (!genSubst)
-            continue;
+        return paramVal;
+    }
 
-        // the generic decl associated with the substitution list must be
-        // the generic decl that declared this parameter
-        auto genericDecl = genSubst->getGenericDecl();
-        if (genericDecl != paramDecl->parentDecl)
-            continue;
 
-        // In some cases, we construct a `DeclRef` to a `GenericDecl`
-        // (or a declaration under one) that only includes argument
-        // values for a prefix of the parameters of the generic.
+    // In some cases, we construct a `DeclRef` to a `GenericDecl`
+    // (or a declaration under one) that only includes argument
+    // values for a prefix of the parameters of the generic.
+    //
+    // If we aren't careful, we could end up indexing into the
+    // argument list past the available range.
+    //
+    Count argCount = args->getCount();
+
+    Count argIndex = 0;
+    for (auto m : outerGeneric->members)
+    {
+        // If we have run out of arguments, then we can stop
+        // iterating over the parameters, because `this`
+        // parameter will not be replaced with anything by
+        // the substituion.
         //
-        // If we aren't careful, we could end up indexing into the
-        // argument list past the available range.
-        //
-        Count argCount = genSubst->getArgs().getCount();
-
-        Count argIndex = 0;
-        for (auto m : genericDecl->members)
+        if (argIndex >= argCount)
         {
-            // If we have run out of arguments, then we can stop
-            // iterating over the parameters, because `this`
-            // parameter will not be replaced with anything by
-            // the substituion.
-            //
-            if (argIndex >= argCount)
-            {
-                return paramVal;
-            }
+            return paramVal;
+        }
 
 
-            if (m == paramDecl)
-            {
-                // We've found it, so return the corresponding specialization argument
-                (*ioDiff)++;
-                return genSubst->getArgs()[argIndex];
-            }
-            else if (const auto typeParam = as<GenericTypeParamDecl>(m))
-            {
-                argIndex++;
-            }
-            else if (const auto valParam = as<GenericValueParamDecl>(m))
-            {
-                argIndex++;
-            }
-            else
-            {
-            }
+        if (m == paramDecl)
+        {
+            // We've found it, so return the corresponding specialization argument
+            (*ioDiff)++;
+            return (*args)[argIndex];
+        }
+        else if (const auto typeParam = as<GenericTypeParamDecl>(m))
+        {
+            argIndex++;
+        }
+        else if (const auto valParam = as<GenericValueParamDecl>(m))
+        {
+            argIndex++;
+        }
+        else
+        {
         }
     }
 
@@ -258,44 +256,49 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
 {
     if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
     {
-        auto genConstraintDecl = genConstraintDeclRef.getDecl();
+        auto genericDecl = as<GenericDecl>(declRef.getDecl()->parentDecl);
+        if (!genericDecl)
+            goto breakLabel;
 
         // search for a substitution that might apply to us
-        for (auto s = subst.substitutions; s; s = s->getOuter())
-        {
-            if (auto genericSubst = as<GenericSubstitution>(s))
-            {
-                // the generic decl associated with the substitution list must be
-                // the generic decl that declared this parameter
-                auto genericDecl = genericSubst->getGenericDecl();
-                if (genericDecl != genConstraintDecl->parentDecl)
-                    continue;
+        auto args = subst.tryGetGenericArguments(genericDecl);
+        if (!args)
+            goto breakLabel;
 
-                bool found = false;
-                Index index = 0;
-                for (auto m : genericDecl->members)
+        bool found = false;
+        Index index = 0;
+        for (auto m : genericDecl->members)
+        {
+            if (auto constraintParam = as<GenericTypeConstraintDecl>(m))
+            {
+                if (constraintParam == declRef.getDecl())
                 {
-                    if (auto constraintParam = as<GenericTypeConstraintDecl>(m))
-                    {
-                        if (constraintParam == declRef.getDecl())
-                        {
-                            found = true; 
-                            break;
-                        }
-                        index++;
-                    }
+                    found = true;
+                    break;
                 }
-                if (found)
-                {
-                    (*ioDiff)++;
-                    auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
-                        genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
-                    SLANG_ASSERT(index + ordinaryParamCount < genericSubst->getArgs().getCount());
-                    return genericSubst->getArgs()[index + ordinaryParamCount];
-                }
+                index++;
+            }
+        }
+        if (found)
+        {
+            auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
+                genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
+            if (index + ordinaryParamCount < args->getCount())
+            {
+                (*ioDiff)++;
+                return (*args)[index + ordinaryParamCount];
+            }
+            else
+            {
+                // When the `subst` represents a partial substitution, we may not have a corresponding argument.
+                // In this case we just return the original witness.
+                //
+                goto breakLabel;
             }
         }
     }
+
+breakLabel:;
 
     // Perform substitution on the constituent elements.
     int diff = 0;
@@ -326,12 +329,12 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
                 // At this point we have a constraint decl for an associated type,
                 // and we nee to see if we are dealing with a concrete substitution
                 // for the interface around that associated type.
-                if (auto thisTypeSubst = findThisTypeSubstitution(substDeclRef.getSubst(), interfaceDecl))
+                if (auto thisTypeWitness = findThisTypeWitness(SubstitutionSet(substDeclRef), interfaceDecl))
                 {
                     // We need to look up the declaration that satisfies
                     // the requirement named by the associated type.
                     Decl* requirementKey = substTypeConstraintDecl;
-                    RequirementWitness requirementWitness = tryLookUpRequirementWitness(astBuilder, thisTypeSubst->witness, requirementKey);
+                    RequirementWitness requirementWitness = tryLookUpRequirementWitness(astBuilder, thisTypeWitness, requirementKey);
                     switch (requirementWitness.getFlavor())
                     {
                         default:
@@ -630,8 +633,8 @@ Val* ConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, 
     auto result = astBuilder->getConjunctionSubtypeWitness(
         substSub,
         substSup,
-        componentWitnesses[0],
-        componentWitnesses[1]);
+        as<SubtypeWitness>(substComponentWitnesses[0]),
+        as<SubtypeWitness>(substComponentWitnesses[1]));
     return result;
 }
 
