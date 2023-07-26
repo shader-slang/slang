@@ -1358,9 +1358,11 @@ struct TextureTypeInfo
 
         if( !isMultisample )
         {
+            sb << "__target_intrinsic(glsl, \"textureQueryLod($p, $2).x\")";
             sb << "float CalculateLevelOfDetail(" << samplerStateParam;
             sb << "float" << base.coordCount << " location);\n";
 
+            sb << "__target_intrinsic(glsl, \"textureQueryLod($p, $2).y\")";
             sb << "float CalculateLevelOfDetailUnclamped(" << samplerStateParam;
             sb << "float" << base.coordCount << " location);\n";
         }
