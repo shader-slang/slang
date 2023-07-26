@@ -5457,12 +5457,12 @@ __target_intrinsic(GL_NV_ray_tracing, "transpose(gl_WorldToObjectNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_WorldToObjectEXT)")
 float3x4 WorldToObject3x4();
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectToWorldNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectToWorld3x4EXT)")
+__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_ObjectToWorldNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_ObjectToWorld3x4EXT)")
 float4x3 ObjectToWorld4x3();
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_WorldToObjectNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldToObject3x4EXT)")
+__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_WorldToObjectNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_WorldToObject3x4EXT)")
 float4x3 WorldToObject4x3();
 
 // NOTE!
