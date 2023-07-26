@@ -801,10 +801,10 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     [BackwardDifferentiable] [PreferRecompute]                                               \
     [ForwardDerivativeOf(NAME)]                                                              \
     DifferentialPair<T> __d_##NAME(DifferentialPair<T> dpx)                                  \
-    {                                                                                                                                    \
-        typealias ReturnType = T;                                                                                                        \
-        return DifferentialPair<T>(NAME(dpx.p), FWD_DIFF_FUNC);                                                                          \
-    }                                                                                                                                    \
+    {                                                                                        \
+        typealias ReturnType = T;                                                            \
+        return DifferentialPair<T>(NAME(dpx.p), FWD_DIFF_FUNC);                              \
+    }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
     [BackwardDifferentiable] [PreferRecompute]                                               \
     [ForwardDerivativeOf(NAME)]                                                              \
