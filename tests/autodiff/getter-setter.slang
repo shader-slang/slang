@@ -32,9 +32,9 @@ struct A : IDifferentiable
     }
 
     [__unsafeForceInlineEarly]
-    static Differential dmul(This a, Differential b)
+    static Differential dmul<T : __BuiltinRealType>(T a, Differential b)
     {
-        B o = {a.x * b.z};
+        B o = {__realCast<float, T>(a) * b.z};
         return o;
     }
 };

@@ -636,7 +636,7 @@ public:
         {
             if (auto genericInst = as<IRGeneric>(inst))
             {
-                if (auto innerFunc = as<IRGlobalValueWithCode>(findGenericReturnVal(genericInst)))
+                if (auto innerFunc = as<IRGlobalValueWithCode>(findInnerMostGenericReturnVal(genericInst)))
                     processFunc(innerFunc);
             }
             else if (auto funcInst = as<IRGlobalValueWithCode>(inst))

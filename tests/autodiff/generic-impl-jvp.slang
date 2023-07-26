@@ -6,7 +6,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 typedef float Real;
 
-typealias IDFloat = IFloat & IDifferentiable;
+typealias IDFloat = __BuiltinRealType & IDifferentiable;
 
 __generic<T : IDifferentiable, let N : int>
 struct dvector : IDifferentiable
@@ -44,13 +44,13 @@ struct myvector : IDifferentiable
     }
 
     
-    static Differential dmul(This a, Differential b)
+    static Differential dmul<U: __BuiltinRealType>(U a, Differential b)
     {
         Differential output;
 
         for (int i = 0; i < N; i++)
         {
-            output.values[i] = T.dmul(a.values[i], b.values[i]);
+            output.values[i] = T.dmul<U>(a, b.values[i]);
         }
 
         return output;
@@ -112,7 +112,7 @@ __generic<T : IDFloat, let N : int>
 [ForwardDerivative(dot_jvp)]
 T dot(myvector<T, N> a, myvector<T, N> b)
 {
-    T curr = (T)0.0;
+    T curr = __realCast<T, float>(0.f);
     [ForceUnroll]
     for (int i = 0; i < N; i++)
     {
@@ -129,7 +129,7 @@ __generic<T : IDFloat, let N : int>
 DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
 {
     T.Differential curr_d = (T.dzero());
-    T curr_p = (T)0.0;
+    T curr_p = __realCast<T, float>(0.f);
     [ForceUnroll]
     for (int i = 0; i < N; i++)
     {
@@ -137,8 +137,8 @@ DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
         curr_d = T.dadd(
                     curr_d, 
                     T.dadd(
-                        T.dmul(a.p.values[i], b.d.values[i]),
-                        T.dmul(b.p.values[i], a.d.values[i])));
+                        T.dmul<T>(a.p.values[i], b.d.values[i]),
+                        T.dmul<T>(b.p.values[i], a.d.values[i])));
     }
 
     return DifferentialPair<T>(curr_p, curr_d);
@@ -203,9 +203,9 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
         return { myvector<Real, N>.dadd(a.val, b.val) };
     }
 
-    static Differential dmul(This a, Differential b)
+    static Differential dmul<T: __BuiltinRealType>(T a, Differential b)
     {
-        return { myvector<Real, N>.dmul(a.val, b.val) };
+        return { myvector<Real, N>.dmul<T>(a, b.val) };
     }
 
     [ForwardDifferentiable]
