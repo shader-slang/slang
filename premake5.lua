@@ -487,6 +487,10 @@ function addSourceDir(path)
         path .. "/*.h",         -- Header files
         path .. "/*.hpp",       -- C++ style headers (for glslang)
         path .. "/*.natvis",    -- Visual Studio debugger visualization files
+        path .. "/*.natstepfilter", -- Visual Studio debugger step filter files
+        path .. "/*.natjmc", -- Visual Studio debugger step filter files
+
+
     }
     removefiles
     {
@@ -613,7 +617,7 @@ function baseSlangProject(name, sourceDir)
     --
     vpaths {
         { ["Header Files"] = { "**.h", "**.hpp"} },
-        { ["Source Files"] = { "**.cpp", "**.slang", "**.natvis" } },
+        { ["Source Files"] = { "**.cpp", "**.slang", "**.natvis", "**.natjmc" } },
     }
 
     -- Override default options for a project if necessary

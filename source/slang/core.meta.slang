@@ -1341,7 +1341,7 @@ struct TextureTypeInfo
         // emit a generic signature
         sb << "__generic<T = float4";
         // Multi-sample rw texture types have an optional sampleCount parameter.
-        if (isMultisample && access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+        if (isMultisample)
             sb << ", let sampleCount : int = 0";
         sb << ">";
             
@@ -1368,9 +1368,11 @@ struct TextureTypeInfo
 
         if( !isMultisample )
         {
+            sb << "__target_intrinsic(glsl, \"textureQueryLod($p, $2).x\")";
             sb << "float CalculateLevelOfDetail(" << samplerStateParam;
             sb << "float" << base.coordCount << " location);\n";
 
+            sb << "__target_intrinsic(glsl, \"textureQueryLod($p, $2).y\")";
             sb << "float CalculateLevelOfDetailUnclamped(" << samplerStateParam;
             sb << "float" << base.coordCount << " location);\n";
         }
@@ -2186,50 +2188,83 @@ struct TextureTypeInfo
                 { 2, "Blue" },
                 { 3, "Alpha" },
             };
+            enum Cmp
+            { NotCmp,
+              Cmp
+            };
 
+            for(auto cmp : {NotCmp, Cmp})
             for(auto kk : kGatherComponets)
             {
+                auto samplerOrComparisonSampler = cmp == Cmp ? "SamplerComparisonState s, " : samplerStateParam;
+
                 auto componentIndex = kk.componentIndex;
                 auto componentName = kk.componentName;
 
                 auto outputType = cc.outputType;
 
+                const auto cmpName          = cmp == Cmp ? "Cmp" : "";
+                const auto cmpValueParam    = cmp == Cmp ? "float compareValue, " : "";
+                const auto cmpValueParamEnd = cmp == Cmp ? ", float compareValue" : "";
+                const auto supportsGLSL     = componentIndex == 0 || cmp == NotCmp;
+
                 EMIT_LINE_DIRECTIVE();
 
-                sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
-                if (base.coordCount == 2)
+                if(supportsGLSL)
                 {
-                    // Gather only works on 2D in CUDA
+                    if(cmp == Cmp)
+                        sb << "__target_intrinsic(glsl, \"textureGather($p, $2, $3)\")\n";
+                    else
+                        sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
+                }
+                if (base.coordCount == 2 && cmp == NotCmp)
+                {
+                    // Gather only works on 2D in CUDA without comparison
                     // "It is based on the base type of DataType except when readMode is equal to cudaReadModeNormalizedFloat (see Texture Reference API), in which case it is always float4."
                     sb << "__target_intrinsic(cuda, \"tex2Dgather<$T0>($0, ($2).x, ($2).y, " << componentIndex << ")\")\n";
                 }
                 if (isReadOnly)
                     sb << "[__readNone]\n";
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
-                sb << "float" << base.coordCount + isArray << " location);\n";
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
+                sb << "float" << base.coordCount + isArray << " location" << cmpValueParamEnd << ");\n";
 
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 EMIT_LINE_DIRECTIVE();
-                sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
+                if(supportsGLSL)
+                {
+                    if(cmp == Cmp)
+                        sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, $4)\")\n";
+                    else
+                        sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
+                }
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
                 sb << "float" << base.coordCount + isArray << " location, ";
+                sb << cmpValueParam;
                 sb << "constexpr int" << base.coordCount << " offset);\n";
 
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 EMIT_LINE_DIRECTIVE();
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
                 sb << "float" << base.coordCount + isArray << " location, ";
+                sb << cmpValueParam;
                 sb << "constexpr int" << base.coordCount << " offset, ";
                 sb << "out uint status);\n";
 
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 EMIT_LINE_DIRECTIVE();
-                sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, int" << base.coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
+                if(supportsGLSL)
+                {
+                    if(cmp == Cmp)
+                        sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, $3, ivec" << base.coordCount << "[]($4, $5, $6, $7))\")\n";
+                    else
+                        sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, ivec" << base.coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
+                }
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
                 sb << "float" << base.coordCount + isArray << " location, ";
+                sb << cmpValueParam;
                 sb << "int" << base.coordCount << " offset1, ";
                 sb << "int" << base.coordCount << " offset2, ";
                 sb << "int" << base.coordCount << " offset3, ";
@@ -2238,8 +2273,9 @@ struct TextureTypeInfo
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 EMIT_LINE_DIRECTIVE();
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
                 sb << "float" << base.coordCount + isArray << " location, ";
+                sb << cmpValueParam;
                 sb << "int" << base.coordCount << " offset1, ";
                 sb << "int" << base.coordCount << " offset2, ";
                 sb << "int" << base.coordCount << " offset3, ";

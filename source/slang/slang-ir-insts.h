@@ -899,6 +899,26 @@ struct IRTreatAsDifferentiableDecoration : IRDecoration
     IR_LEAF_ISA(TreatAsDifferentiableDecoration)
 };
 
+// Mark a call as explicitly calling a differentiable function.
+struct IRDifferentiableCallDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DifferentiableCallDecoration
+    };
+    IR_LEAF_ISA(DifferentiableCallDecoration)
+};
+
+// Treat a call to a non-differentiable function as a differentiable call.
+struct IRTreatCallAsDifferentiableDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_TreatCallAsDifferentiableDecoration
+    };
+    IR_LEAF_ISA(TreatCallAsDifferentiableDecoration)
+};
+
 struct IRDerivativeMemberDecoration : IRDecoration
 {
     enum
@@ -1191,6 +1211,11 @@ struct IRPrimitivesDecoration : public IRMeshOutputDecoration
 struct IRGLSLPrimitivesRateDecoration : public IRDecoration
 {
     IR_LEAF_ISA(GLSLPrimitivesRateDecoration)
+};
+
+struct IRGLPositionOutputDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(GLPositionOutputDecoration)
 };
 
 struct IRMeshOutputRef : public IRInst
@@ -1851,6 +1876,8 @@ struct IRVarLayout : IRLayout
 
         /// Does this variable use any resources of the given `kind`?
     bool usesResourceKind(LayoutResourceKind kind);
+        /// Returns true if there is use of one or more of the kinds
+    bool usesResourceFromKinds(LayoutResourceKindFlags kindFlags);
 
         /// Get the fixed/known stage that this variable is associated with.
         ///
@@ -3791,6 +3818,11 @@ public:
     void addGLSLOuterArrayDecoration(IRInst* value, UnownedStringSlice const& text)
     {
         addDecoration(value, kIROp_GLSLOuterArrayDecoration, getStringValue(text));
+    }
+
+    void addGLPositionOutputDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_GLPositionOutputDecoration);
     }
 
     void addInterpolationModeDecoration(IRInst* value, IRInterpolationMode mode)

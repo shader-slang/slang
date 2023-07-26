@@ -319,6 +319,12 @@ struct GlobalVaryingDeclarator
     GlobalVaryingDeclarator*    next;
 };
 
+enum GLSLSystemValueKind
+{
+    General,
+    PositionOutput,
+};
+
 struct GLSLSystemValueInfo
 {
     // The name of the built-in GLSL variable
@@ -334,6 +340,9 @@ struct GLSLSystemValueInfo
     // If the built in GLSL variable is an array, holds the index into the array.
     // If < 0, then there is no array indexing
     Index arrayIndex;
+
+    // The kind of the system value that requires special treatment.
+    GLSLSystemValueKind kind = GLSLSystemValueKind::General;
 };
 
 static void leafAddressesImpl(List<IRInst*>& ret, const ScalarizedVal& v)
@@ -511,6 +520,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     char const* name = nullptr;
     char const* outerArrayName = nullptr;
     int arrayIndex = -1;
+    GLSLSystemValueKind systemValueKind = GLSLSystemValueKind::General;
 
     auto semanticInst = varLayout->findSystemValueSemanticAttr();
     if(!semanticInst)
@@ -558,6 +568,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         else
         {
             name = "gl_Position";
+            if (kind == LayoutResourceKind::VaryingOutput)
+            {
+                systemValueKind = GLSLSystemValueKind::PositionOutput;
+            }
         }
 
         requiredType = builder->getVectorType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 4));
@@ -918,6 +932,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         inStorage->outerArrayName = outerArrayName;
         inStorage->requiredType = requiredType;
         inStorage->arrayIndex = arrayIndex;
+        inStorage->kind = systemValueKind;
         return inStorage;
     }
 
@@ -1159,6 +1174,15 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         if(auto outerArrayName = systemValueInfo->outerArrayName)
         {
             builder->addGLSLOuterArrayDecoration(globalParam, UnownedTerminatedStringSlice(outerArrayName));
+        }
+
+        switch (systemValueInfo->kind)
+        {
+        case GLSLSystemValueKind::PositionOutput:
+            builder->addGLPositionOutputDecoration(globalParam);
+            break;
+        default:
+            break;
         }
     }
 

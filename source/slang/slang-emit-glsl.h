@@ -66,7 +66,10 @@ protected:
     void _emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType);
 
     void _emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarChain* inChain, LayoutResourceKind filter = LayoutResourceKind::None);
-    bool _emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain);
+
+        /// If bindingKinds is set, it is used for binding index/set lookup. Passing in 0 is equivalent to using the kind only.
+    bool _emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceKind kind, EmitVarChain* chain, LayoutResourceKindFlags bindingKinds);
+    bool _emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain) { return _emitGLSLLayoutQualifierWithBindingKinds(kind, chain, 0); }
 
     void _emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
 
