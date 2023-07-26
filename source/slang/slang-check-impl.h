@@ -1467,6 +1467,13 @@ namespace Slang
             DeclRef<FuncDecl> requiredMemberDeclRef,
             List<Expr*>& synArgs,
             ThisExpr*& synThis);
+        
+        GenericDecl* synthesizeGenericSignatureForRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<GenericDecl> requiredMemberDeclRef,
+            List<Expr*>& synArgs,
+            List<Expr*>& synGenericArgs,
+            ThisExpr*& synThis);
 
         void _addMethodWitness(
             WitnessTable* witnessTable,
@@ -1504,13 +1511,22 @@ namespace Slang
             DeclRef<Decl>               requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 
-            /// Attempt to synthesize `zero`, `dadd` and `dmul` methods for a type that conforms to
+            /// Attempt to synthesize `zero` & `dadd` methods for a type that conforms to
             /// `IDifferentiable`.
             /// On success, installs the syntethesized functions and returns `true`.
             /// Otherwise, returns `false`.
         bool trySynthesizeDifferentialMethodRequirementWitness(
             ConformanceCheckingContext* context,
             DeclRef<Decl> requirementDeclRef,
+            RefPtr<WitnessTable> witnessTable);
+
+            // Attempt to synthesize `dmul` methods for a type that conforms to
+            /// `IDifferentiable`.
+            /// On success, installs the syntethesized function and returns `true`.
+            /// Otherwise, returns `false`.
+        bool trySynthesizeDMulMethodRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<GenericDecl> requirementDeclRef,
             RefPtr<WitnessTable> witnessTable);
 
             /// Attempt to synthesize an associated `Differential` type for a type that conforms to

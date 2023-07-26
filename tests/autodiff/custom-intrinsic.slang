@@ -6,81 +6,81 @@ RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
 
-typealias IDFloat = IFloat & IDifferentiable;
+typealias IDFloat = __BuiltinFloatingPointType & IDifferentiable;
 
 namespace myintrinsiclib
 {
     __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
+    __target_intrinsic(hlsl, "exp($0)")
+    __target_intrinsic(glsl, "exp($0)")
     __target_intrinsic(cuda, "$P_exp($0)")
     __target_intrinsic(cpp, "$P_exp($0)")
     __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 27 _0")
-    [ForwardDerivative(d_exp<T>)]
-    T exp(T x);
+    [ForwardDerivative(d_myexp<T>)]
+    T myexp(T x);
 
     __generic<T : IDFloat>
-    DifferentialPair<T> d_exp(DifferentialPair<T> dpx)
+    DifferentialPair<T> d_myexp(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            exp(dpx.p),
-            T.dmul(exp(dpx.p), dpx.d));
+            myexp(dpx.p),
+            T.dmul(myexp(dpx.p), dpx.d));
     }
 
     
     // Sine
     __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
+    __target_intrinsic(hlsl, "sin($0)")
+    __target_intrinsic(glsl, "sin($0)")
     __target_intrinsic(cuda, "$P_sin($0)")
     __target_intrinsic(cpp, "$P_sin($0)")
     __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 13 _0")
-    [ForwardDerivative(d_sin<T>)]
-    T sin(T x);
+    [ForwardDerivative(d_mysin<T>)]
+    T mysin(T x);
 
     __generic<T : IDFloat>
-    DifferentialPair<T> d_sin(DifferentialPair<T> dpx)
+    DifferentialPair<T> d_mysin(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            sin(dpx.p),
-            T.dmul(cos(dpx.p), dpx.d));
+            mysin(dpx.p),
+            T.dmul(mycos(dpx.p), dpx.d));
     }
 
     // Cosine
     __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
+    __target_intrinsic(hlsl, "cos($0)")
+    __target_intrinsic(glsl, "cos($0)")
     __target_intrinsic(cuda, "$P_cos($0)")
     __target_intrinsic(cpp, "$P_cos($0)")
     __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 14 _0")
-    [ForwardDerivative(d_cos<T>)]
-    T cos(T x);
+    [ForwardDerivative(d_mycos<T>)]
+    T mycos(T x);
 
     __generic<T : IDFloat>
-    DifferentialPair<T> d_cos(DifferentialPair<T> dpx)
+    DifferentialPair<T> d_mycos(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            cos(dpx.p),
+            mycos(dpx.p),
             T.dmul(-sin(dpx.p), dpx.d));
     }
 
     // Sine and cosine
     __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "sincos($0, $1, $2)")
     __target_intrinsic(cuda, "$P_sincos($0, $1, $2)")
-    [ForwardDerivative(d_sincos<T>)]
-    void sincos(T x, out T s, out T c)
+    [ForwardDerivative(d_mysincos<T>)]
+    void mysincos(T x, out T s, out T c)
     {
         s = sin(x);
         c = cos(x);
     }
 
     __generic<T : IDFloat>
-    void d_sincos(DifferentialPair<T> x, out DifferentialPair<T> s, out DifferentialPair<T> c)
+    void d_mysincos(DifferentialPair<T> x, out DifferentialPair<T> s, out DifferentialPair<T> c)
     {
         T _s;
         T _c;
-        sincos(x.p, _s, _c);
+        mysincos(x.p, _s, _c);
 
         s = DifferentialPair<T>(_s, T.dmul(_c, x.d));
         c = DifferentialPair<T>(_c, T.dmul(-_s, x.d));
@@ -90,7 +90,7 @@ namespace myintrinsiclib
 [ForwardDifferentiable]
 float f(float x)
 {
-    return myintrinsiclib.exp(x);
+    return myintrinsiclib.myexp(x);
 }
 
 [ForwardDifferentiable]
@@ -98,7 +98,7 @@ float g(float x)
 {
     float s;
     float t;
-    myintrinsiclib.sincos(x, s, t);
+    myintrinsiclib.mysincos(x, s, t);
 
     return s + t;
 }

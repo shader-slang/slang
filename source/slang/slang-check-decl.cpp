@@ -2574,6 +2574,135 @@ namespace Slang
         return false;
     }
 
+    GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<GenericDecl> requiredMemberDeclRef,
+        List<Expr*>& synArgs,
+        List<Expr*>& synGenericArgs,
+        ThisExpr*& synThis)
+    {
+        auto synGenericDecl = m_astBuilder->create<GenericDecl>();
+
+        // For now our synthesized method will use the name and source
+        // location of the requirement we are trying to satisfy.
+        //
+        // TODO: as it stands right now our syntesized method will
+        // get a mangled name, which we don't actually want. Leaving
+        // out the name here doesn't help matters, because then *all*
+        // snthesized methods on a given type would share the same
+        // mangled name!
+        //
+        synGenericDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
+        if (synGenericDecl->nameAndLoc.name)
+        {
+            synGenericDecl->nameAndLoc.name = getSession()->getNameObj("$__syn_" + synGenericDecl->nameAndLoc.name->text);
+        }
+
+        // Dictionary to map from the original type parameters to the synthesized ones.
+        Dictionary<GenericTypeParamDecl*, GenericTypeParamDecl*> mapOrigToSynTypeParams;
+
+        // Our synthesized method will have parameters matching the names
+        // and types of those on the requirement, and it will use expressions
+        // that reference those parametesr as arguments for the call expresison
+        // that makes up the body.
+        // 
+        for (auto member : requiredMemberDeclRef.getDecl()->members)
+        {
+            if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
+            {
+                auto synTypeParamDecl = m_astBuilder->create<GenericTypeParamDecl>();
+                synTypeParamDecl->nameAndLoc = typeParamDecl->getNameAndLoc();
+                synTypeParamDecl->initType = typeParamDecl->initType;
+                synTypeParamDecl->parentDecl = synGenericDecl;
+                synGenericDecl->members.add(synTypeParamDecl);
+
+                mapOrigToSynTypeParams.add(typeParamDecl, synTypeParamDecl);
+                
+                // Construct a DeclRefExpr from the type parameter.
+                auto synTypeParamDeclRef = makeDeclRef(synTypeParamDecl);
+
+                auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
+                synTypeParamDeclRefExpr->type = getTypeForDeclRef(m_astBuilder, synTypeParamDeclRef, SourceLoc());
+                
+                synGenericArgs.add(synTypeParamDeclRefExpr);
+            } 
+        }
+
+        for (auto member : requiredMemberDeclRef.getDecl()->members)
+        {
+            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
+            {
+                getASTBuilder()->getSpecializedDeclRef(
+                    constraintDecl, requiredMemberDeclRef.getSubst());
+
+                auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
+                synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
+                synConstraintDecl->parentDecl = synGenericDecl;
+                
+                // For constraints of type T : Interface, where T is a simple type parameter, 
+                // find the declaration of T
+                // 
+                if (auto typeParamDecl = as<DeclRefType>(constraintDecl->sub.type)->declRef.as<GenericTypeParamDecl>().getDecl())
+                {  
+                    auto synTypeParamDecl = mapOrigToSynTypeParams[typeParamDecl];
+
+                    // Construct a DeclRefExpr from the type parameter.
+                    auto synTypeParamDeclRef = makeDeclRef(synTypeParamDecl.getValue());
+
+                    auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                    synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
+                    synTypeParamDeclRefExpr->type = getTypeForDeclRef(m_astBuilder, synTypeParamDeclRef, SourceLoc());
+
+                    synConstraintDecl->sub = TypeExp(synTypeParamDeclRefExpr);
+                    synConstraintDecl->sup = constraintDecl->sup;
+                    synGenericDecl->members.add(synConstraintDecl);
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("Cannot perform synthesis for requirements with complex type constraints.");
+                }
+            }
+        }
+
+        // Get outer substitutions. (This inner-most substition 
+        // must be a ThisTypeSubstition)
+        // 
+        Substitutions* outer = nullptr;
+        if (auto thisTypeSubst = findThisTypeSubstitution(
+            requiredMemberDeclRef.getSubst(),
+            as<InterfaceDecl>(requiredMemberDeclRef.getParent(m_astBuilder)).getDecl()))
+        {
+            outer = thisTypeSubst;
+        }
+
+        // Override generic pointer to point to the original generic container.
+        // This will create a substitution of the synthesized parameters for the
+        // original parameters.
+        // 
+        GenericSubstitution* requiredFuncSubsts = createDefaultSubstitutionsForGeneric(m_astBuilder, this, requiredMemberDeclRef.getDecl(), outer);
+        DeclRef<Decl> requiredFuncDeclRef = m_astBuilder->getSpecializedDeclRef(requiredMemberDeclRef.getDecl()->inner, requiredFuncSubsts);
+
+        GenericSubstitution* substSynParamsForOrigGeneric = m_astBuilder->getOrCreateGenericSubstitution(
+            outer,
+            requiredMemberDeclRef.getDecl(),
+            createDefaultSubstitutionsForGeneric(m_astBuilder, this, synGenericDecl, nullptr)->getArgs());
+
+        // Substitute parameters of the synthesized generic for the parameters of the original generic.
+        requiredFuncDeclRef = substituteDeclRef(substSynParamsForOrigGeneric, m_astBuilder, requiredFuncDeclRef);
+
+        SLANG_ASSERT(requiredFuncDeclRef.as<FuncDecl>());
+
+        synGenericDecl->inner = synthesizeMethodSignatureForRequirementWitness(
+            context,
+            requiredFuncDeclRef.as<FuncDecl>(),
+            synArgs,
+            synThis);
+        synGenericDecl->inner->parentDecl = synGenericDecl;
+
+        return synGenericDecl;
+    }
+
     FuncDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<FuncDecl> requiredMemberDeclRef,
@@ -3274,11 +3403,27 @@ namespace Slang
                 switch (builtinAttr->kind)
                 {
                 case BuiltinRequirementKind::DAddFunc:
-                case BuiltinRequirementKind::DMulFunc:
                 case BuiltinRequirementKind::DZeroFunc:
                     return trySynthesizeDifferentialMethodRequirementWitness(
                         context,
                         requiredFuncDeclRef,
+                        witnessTable);
+                }
+            }
+            return false;
+        }
+
+        // For generic decl, check if we match DMulFunc, and synthesize the method.
+        if (auto requiredGenericDeclRef = requiredMemberDeclRef.as<GenericDecl>())
+        {
+            if (auto builtinAttr = getInner(requiredGenericDeclRef)->findModifier<BuiltinRequirementModifier>())
+            {
+                switch (builtinAttr->kind)
+                {
+                case BuiltinRequirementKind::DMulFunc:
+                    return trySynthesizeDMulMethodRequirementWitness(
+                        context,
+                        requiredGenericDeclRef,
                         witnessTable);
                 }
             }
@@ -3330,7 +3475,15 @@ namespace Slang
         return false;
     }
 
-    Stmt* _synthesizeMemberAssignMemberHelper(ASTSynthesizer& synth, Name* funcName, Type* leftType, Expr* leftValue, List<Expr*>&& args, int nestingLevel = 0)
+    Stmt* _synthesizeMemberAssignMemberHelper(
+        ASTSynthesizer& synth,
+        Name* funcName,
+        Type* leftType,
+        Expr* leftValue,
+        List<Expr*>&& args,
+        List<Expr*>&& genericArgs,
+        List<bool>&& inductiveArgMask,
+        int nestingLevel = 0)
     {
         if (nestingLevel > 16)
             return nullptr;
@@ -3342,11 +3495,24 @@ namespace Slang
             auto forStmt = synth.emitFor(synth.emitIntConst(0), synth.emitGetArrayLengthExpr(leftValue), indexVar);
             addModifier(forStmt, synth.getBuilder()->create<ForceUnrollAttribute>());
             auto innerLeft = synth.emitIndexExpr(leftValue, synth.emitVarExpr(indexVar));
-            for (auto& arg : args)
+
+            for (auto ii = 0; ii < args.getCount(); ++ii)
             {
-                arg = synth.emitIndexExpr(arg, synth.emitVarExpr(indexVar));
+                auto& arg = args[ii];
+                if (inductiveArgMask[ii])
+                    arg = synth.emitIndexExpr(arg, synth.emitVarExpr(indexVar));
             }
-            auto assignStmt = _synthesizeMemberAssignMemberHelper(synth, funcName, arrayType->getElementType(), innerLeft, _Move(args), nestingLevel + 1);
+
+            auto assignStmt = _synthesizeMemberAssignMemberHelper(
+                    synth,
+                    funcName,
+                    arrayType->getElementType(),
+                    innerLeft,
+                    _Move(args),
+                    _Move(genericArgs),
+                    _Move(inductiveArgMask),
+                    nestingLevel + 1);
+
             synth.popScope();
             if (!assignStmt)
                 return nullptr;
@@ -3354,12 +3520,16 @@ namespace Slang
         }
 
         auto callee = synth.emitMemberExpr(leftType, funcName);
+
+        if (genericArgs.getCount() > 0)
+            callee = synth.emitGenericAppExpr(callee, _Move(genericArgs));
+
         return synth.emitAssignStmt(leftValue, synth.emitInvokeExpr(callee, _Move(args)));
     }
 
-    bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
+    bool SemanticsVisitor::trySynthesizeDMulMethodRequirementWitness(
         ConformanceCheckingContext* context,
-        DeclRef<Decl> requirementDeclRef,
+        DeclRef<GenericDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable)
     {
         // We support two cases of synthesis here.
@@ -3381,6 +3551,158 @@ namespace Slang
         //     TResult result;
         //     result.member0 = decltype(result.member0).requiredMethod(p0.member0, p1.member0);
         //     result.member1 = decltype(result.member1).requiredMethod(p0.member1, p1.member1);
+        //     ...
+        //     return result;
+        // }
+        // ```
+
+        // First we need to make sure the associated `Differential` type requirement is satisfied.
+        bool hasDifferentialAssocType = false;
+        for (auto existingEntry : witnessTable->requirementDictionary)
+        {
+            if (auto builtinReqAttr = existingEntry.key->findModifier<BuiltinRequirementModifier>())
+            {
+                if (builtinReqAttr->kind == BuiltinRequirementKind::DifferentialType &&
+                    existingEntry.value.getFlavor() != RequirementWitness::Flavor::none)
+                {
+                    hasDifferentialAssocType = true;
+                }
+            }
+        }
+        if (!hasDifferentialAssocType)
+            return false;
+
+        ASTSynthesizer synth(m_astBuilder, getNamePool());
+        List<Expr*> synArgs;
+        List<Expr*> synGenericArgs;
+        ThisExpr* synThis = nullptr;
+        auto synGeneric = synthesizeGenericSignatureForRequirementWitness(
+            context, requirementDeclRef.as<GenericDecl>(), synArgs, synGenericArgs, synThis);
+
+        // dmul should have exactly 2 arguments.
+        SLANG_ASSERT(synArgs.getCount() == 2);
+
+        // dmul should have exactly one generic argument.
+        SLANG_ASSERT(synGenericArgs.getCount() == 1);
+        
+        //addModifier(synGeneric->inner, m_astBuilder->create<BackwardDifferentiableAttribute>());
+
+        synGeneric->parentDecl = context->parentDecl;
+
+        FuncDecl* synFunc = as<FuncDecl>(synGeneric->inner);
+        synth.pushContainerScope(synFunc);
+        auto blockStmt = m_astBuilder->create<BlockStmt>();
+        synFunc->body = blockStmt;
+        auto seqStmt = synth.pushSeqStmtScope();
+        blockStmt->body = seqStmt;
+
+        // Create a variable for return value.
+        synth.pushVarScope();
+        auto varStmt = synth.emitVarDeclStmt(synFunc->returnType.type, getName("result"));
+        auto resultVarExpr = synth.emitVarExpr(varStmt, synFunc->returnType.type);
+
+        for (auto member : context->parentDecl->members)
+        {
+            auto derivativeAttr = member->findModifier<DerivativeMemberAttribute>();
+            if (!derivativeAttr)
+                continue;
+            auto varMember = as<VarDeclBase>(member);
+            if (!varMember)
+                continue;
+            ensureDecl(varMember, DeclCheckState::ReadyForReference);
+            auto memberType = varMember->getType();
+            auto diffMemberType = tryGetDifferentialType(m_astBuilder, memberType);
+            if (!diffMemberType)
+                continue;
+
+            // Construct reference exprs to the member's corresponding fields in each parameter.
+            List<Expr*> paramFields;
+            List<bool> inductiveArgMask;
+
+            // First arg is always scalar.
+            paramFields.add(synArgs[0]);
+            inductiveArgMask.add(false);
+
+            // Second arg needs a member lookup
+            auto memberExpr = m_astBuilder->create<MemberExpr>();
+            memberExpr->baseExpression = synArgs[1];
+            
+            // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
+            // Differential type.
+            memberExpr->name = varMember->getName();
+            paramFields.add(memberExpr);
+            inductiveArgMask.add(true);
+
+            // Invoke the method for the field and assign the value to resultVar.
+            // TODO: we should probably fetch the name from `[DerivativeMember]` if `resultVarExpr`
+            // is Differential type.
+            auto leftVal = synth.emitMemberExpr(resultVarExpr, varMember->getName());
+            if (!_synthesizeMemberAssignMemberHelper(
+                synth,
+                requirementDeclRef.getName(),
+                memberType,
+                leftVal,
+                _Move(paramFields),
+                _Move(synGenericArgs),
+                _Move(inductiveArgMask)))
+                return false;
+        }
+
+        // TODO: synthesize assignments for inherited members here.
+
+        auto synReturn = m_astBuilder->create<ReturnStmt>();
+        synReturn->expression = resultVarExpr;
+        seqStmt->stmts.add(synReturn);
+        
+        context->parentDecl->members.add(synFunc);
+        context->parentDecl->invalidateMemberDictionary();
+        addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
+
+        // If `This` is nested inside a generic, we need to form a complete declref type to the
+        // newly synthesized method here in order to fill into the witness table.
+        // This can be done by obtaining ThisTypeSubstitution from requirementDeclRef to get the
+        // generic substitution for outer generic parameters, and apply it here.
+        SubstitutionSet substSet;
+        if (auto thisTypeSusbt = findThisTypeSubstitution(
+            requirementDeclRef.getSubst(),
+            as<InterfaceDecl>(requirementDeclRef.getDecl()->parentDecl)))
+        {
+            if (auto declRefType = as<DeclRefType>(thisTypeSusbt->witness->sub))
+            {
+                substSet = declRefType->declRef.getSubst();
+            }
+        }
+        
+        auto funcDeclRef = m_astBuilder->getSpecializedDeclRef<Decl>(synGeneric->inner, substSet);
+
+        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(funcDeclRef));
+        return true;
+    }
+
+    bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<Decl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable)
+    {
+        // We support two cases of synthesis here.
+        // Case 1 is that there the associated Differential type is defined to be `DifferentialBottom`.
+        // In this case we just trivially return `DifferentialBottom` in all synthesized methods.
+        // Case 2 is that the `Differential` type contains members corresponding to each primal member.
+        // We will apply a general code synthesis pattern to reflect that structure.
+        // For requirement of the form:
+        // ```
+        // static TResult requiredMethod<T:Interface>(T p0, TParam2 p1)
+        // ```
+        // Where TResult, TParam1, TParam2 is either `This` or `Differential`,
+        // We synthesize a memberwise dispatch to compute each field of `TResult`,
+        // resulting an implementation of the form:
+        // ```
+        // [BackwardDifferentiable]
+        // static TResult requiredMethod<T:Interface>(T p0, TParam2 p1)
+        // {
+        //     TResult result;
+        //     result.member0 = decltype(result.member0).requiredMethod<T>(p0, p1.member0);
+        //     result.member1 = decltype(result.member1).requiredMethod<T>(p0, p1.member1);
         //     ...
         //     return result;
         // }
@@ -3438,6 +3760,8 @@ namespace Slang
 
             // Construct reference exprs to the member's corresponding fields in each parameter.
             List<Expr*> paramFields;
+            List<bool> inductiveArgMask;
+
             int paramIndex = 0;
             for (auto arg : synArgs)
             {
@@ -3447,6 +3771,8 @@ namespace Slang
                 // Differential type.
                 memberExpr->name = varMember->getName();
                 paramFields.add(memberExpr);
+                inductiveArgMask.add(true);
+
                 paramIndex++;
             }
 
@@ -3454,7 +3780,15 @@ namespace Slang
             // TODO: we should probably fetch the name from `[DerivativeMember]` if `resultVarExpr`
             // is Differential type.
             auto leftVal = synth.emitMemberExpr(resultVarExpr, varMember->getName());
-            if (!_synthesizeMemberAssignMemberHelper(synth, requirementDeclRef.getName(), memberType, leftVal, _Move(paramFields)))
+            List<Expr*> emptyGenericArgs;
+            if (!_synthesizeMemberAssignMemberHelper(
+                synth,
+                requirementDeclRef.getName(),
+                memberType,
+                leftVal,
+                _Move(paramFields),
+                _Move(emptyGenericArgs),
+                _Move(inductiveArgMask)))
                 return false;
         }
 
@@ -3610,7 +3944,9 @@ namespace Slang
             // requirement, it may be possible that we can still synthesis the
             // implementation if this is one of the known builtin requirements.
             // Otherwise, report diagnostic now.
-            if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>())
+            if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() && 
+                !(requiredMemberDeclRef.as<GenericDecl>() && 
+                    getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
             {
                 getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
                 getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
