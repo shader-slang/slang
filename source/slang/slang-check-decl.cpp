@@ -13,6 +13,8 @@
 #include "slang-lookup.h"
 #include "slang-syntax.h"
 #include "slang-ast-synthesis.h"
+#include "slang-ast-reflect.h"
+
 #include <limits>
 
 namespace Slang
@@ -6797,61 +6799,6 @@ namespace Slang
             result[constraints.key] = typeList;
         }
         return result;
-    }
-
-    Substitutions* SemanticsVisitor::resolveSubstDeprecated(Substitutions* subst)
-    {
-        if (!subst)
-            return nullptr;
-        if (auto genericSubst = as<GenericSubstitutionDeprecated>(subst))
-        {
-            List<Val*> newArgs;
-            for (auto arg : genericSubst->getArgs())
-                newArgs.add(resolveVal(arg));
-            auto outerSubst = resolveSubstDeprecated(subst->getOuter());
-            return m_astBuilder->getOrCreateGenericSubstitution(outerSubst, genericSubst->getGenericDecl(), newArgs);
-        }
-        else if (auto thisSubst = as<ThisTypeSubstitution>(subst))
-        {
-            auto witness = as<SubtypeWitness>(resolveVal(thisSubst->witness));
-            auto outerSubst = resolveSubstDeprecated(subst->getOuter());
-            return m_astBuilder->getOrCreateThisTypeSubstitution(thisSubst->interfaceDecl, witness, outerSubst);
-        }
-        SLANG_UNREACHABLE("unhandled case of resolveSubst");
-    }
-
-    DeclRef<Decl> SemanticsVisitor::resolveDeclRef(DeclRef<Decl> declRef)
-    {
-        auto resolvedSubst = resolveSubstDeprecated(declRef.getSubst());
-        return m_astBuilder->getSpecializedDeclRef(declRef.getDecl(), resolvedSubst);
-    }
-
-    Val* SemanticsVisitor::resolveVal(Val* val)
-    {
-        if (auto declRefType = as<DeclRefType>(val))
-        {
-            auto resolvedDeclRef = resolveDeclRef(declRefType->declRef);
-            if (resolvedDeclRef != declRefType->declRef)
-                declRefType = DeclRefType::create(m_astBuilder, resolvedDeclRef);
-            if (auto satisfyingVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(m_astBuilder, resolvedDeclRef))
-                return satisfyingVal;
-            return declRefType;
-        }
-        else if (auto subtypeWitness = as<SubtypeWitness>(val))
-        {
-            auto sub = as<Type>(resolveVal(subtypeWitness->sub));
-            auto sup = as<Type>(resolveVal(subtypeWitness->sup));
-            if (sub && sup)
-            {
-                if (sub != subtypeWitness->sub || sup != subtypeWitness->sup)
-                {
-                    auto newVal = tryGetSubtypeWitness(as<Type>(sub), as<Type>(sup));
-                    if (newVal)
-                        val = newVal;
-                }
-            }
-        }
-        return val;
     }
 
     struct ArgsWithDirectionInfo

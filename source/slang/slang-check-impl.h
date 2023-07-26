@@ -1042,7 +1042,11 @@ namespace Slang
             Expr*    originalExpr);
 
 
-        Val* resolveVal(Val* val);
+        Val* resolveVal(Val* val)
+        {
+            if (!val) return nullptr;
+            return val->resolve(this);
+        }
         Type* resolveType(Type* type)
         {
             return (Type*)resolveVal(type);

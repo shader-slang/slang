@@ -19,6 +19,7 @@ class IntVal : public Val
         : type(inType)
     {}
 
+    Val* _resolveOverride(SemanticsVisitor*) { return this; }
 };
 
 // Trivial case of a value that is just a constant integer
@@ -252,6 +253,7 @@ class ErrorIntVal : public IntVal
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveOverride(SemanticsVisitor*) { return this;  }
 };
 
 // A witness to the fact that some proposition is true, encoded
@@ -303,6 +305,7 @@ class SubtypeWitness : public Witness
 
     Type* sub = nullptr;
     Type* sup = nullptr;
+    Val* _resolveOverride(SemanticsVisitor* visitor);
 };
 
 class TypeEqualityWitness : public SubtypeWitness 

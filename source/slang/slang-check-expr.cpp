@@ -510,7 +510,7 @@ namespace Slang
         if (!subType)
             return nullptr;
 
-        subType = as<DeclRefType>(subType->getCanonicalType());
+        subType = as<DeclRefType>(subType->getCanonicalType(this));
         if (!subType)
             return nullptr;
 

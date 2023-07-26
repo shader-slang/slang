@@ -31,6 +31,17 @@ void Val::toText(StringBuilder& out)
     SLANG_AST_NODE_VIRTUAL_CALL(Val, toText, (out))
 }
 
+Val* Val::_resolveOverride(SemanticsVisitor*) 
+{
+    SLANG_UNEXPECTED("Val::_resolveOverride not overridden");
+}
+
+Val* Val::resolve(SemanticsVisitor* visitor)
+{
+    SLANG_AST_NODE_VIRTUAL_CALL(Val, resolve, (visitor));
+}
+
+
 String Val::toString()
 {
     StringBuilder builder;

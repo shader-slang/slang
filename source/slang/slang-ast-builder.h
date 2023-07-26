@@ -195,15 +195,9 @@ public:
         };
     };
 
-    Index getEpoch()
-    {
-        return m_epoch;
-    }
+    Index getEpoch();
 
-    void incrementEpoch()
-    {
-        m_epoch++;
-    }
+    void incrementEpoch();
 
     MemoryArena& getArena() { return m_arena; }
 
@@ -559,9 +553,6 @@ protected:
     SharedASTBuilder* m_sharedASTBuilder;
 
     MemoryArena m_arena;
-
-    Index m_epoch = 0;
-
 };
 
 } // namespace Slang

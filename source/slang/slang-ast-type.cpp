@@ -11,14 +11,9 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Type* Type::createCanonicalType()
-{
-    SLANG_AST_NODE_VIRTUAL_CALL(Type, createCanonicalType, ())
-}
-
 bool Type::equals(Type* type)
 {
-    return getCanonicalType()->equalsImpl(type->getCanonicalType());
+    return getCanonicalType(nullptr)->equalsImpl(type->getCanonicalType(nullptr));
 }
 
 bool Type::equalsImpl(Type* type)
@@ -33,7 +28,7 @@ bool Type::_equalsImplOverride(Type* type)
     //return false;
 }
 
-Type* Type::_createCanonicalTypeOverride()
+Type* Type::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     SLANG_UNEXPECTED("Type::_createCanonicalTypeOverride not overridden");
     //return Type*();
@@ -49,7 +44,7 @@ bool Type::_equalsValOverride(Val* val)
 Val* Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
-    auto canSubst = getCanonicalType()->substituteImpl(astBuilder, subst, &diff);
+    auto canSubst = getCanonicalType(nullptr)->substituteImpl(astBuilder, subst, &diff);
 
     // If nothing changed, then don't drop any sugar that is applied
     if (!diff)
@@ -59,20 +54,6 @@ Val* Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst
     // rather than try to re-construct any amount of sugar
     (*ioDiff)++;
     return canSubst;
-}
-
-Type* Type::getCanonicalType()
-{
-    Type* et = const_cast<Type*>(this);
-    if (!et->canonicalType || getASTBuilder()->getEpoch() != canonicalTypeEpoch)
-    {
-        auto canType = et->createCanonicalType();
-        et->canonicalType = canType;
-        et->canonicalTypeEpoch = getASTBuilder()->getEpoch();
-        if (!et->canonicalType)
-            return getASTBuilder()->getErrorType();
-    }
-    return et->canonicalType;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OverloadGroupType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -87,7 +68,7 @@ bool OverloadGroupType::_equalsImplOverride(Type * /*type*/)
     return false;
 }
 
-Type* OverloadGroupType::_createCanonicalTypeOverride()
+Type* OverloadGroupType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -109,7 +90,7 @@ bool InitializerListType::_equalsImplOverride(Type * /*type*/)
     return false;
 }
 
-Type* InitializerListType::_createCanonicalTypeOverride()
+Type* InitializerListType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -131,7 +112,7 @@ bool ErrorType::_equalsImplOverride(Type* type)
     return as<ErrorType>(type);
 }
 
-Type* ErrorType::_createCanonicalTypeOverride()
+Type* ErrorType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -155,7 +136,7 @@ bool BottomType::_equalsImplOverride(Type* type)
     return as<BottomType>(type);
 }
 
-Type* BottomType::_createCanonicalTypeOverride() { return this; }
+Type* BottomType::_createCanonicalTypeOverride(SemanticsVisitor*) { return this; }
 
 Val* BottomType::_substituteImplOverride(
     ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
@@ -184,13 +165,6 @@ bool DeclRefType::_equalsImplOverride(Type * type)
         return declRef.equals(declRefType->declRef);
     }
     return false;
-}
-
-Type* DeclRefType::_createCanonicalTypeOverride()
-{
-    // A declaration reference is already canonical
-    declRef.substitute(this->getASTBuilder(), this);
-    return this;
 }
 
 Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff);
@@ -263,7 +237,7 @@ bool BasicExpressionType::_equalsImplOverride(Type * type)
     return basicType && basicType->baseType == this->baseType;
 }
 
-Type* BasicExpressionType::_createCanonicalTypeOverride()
+Type* BasicExpressionType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     // A basic type is already canonical, in our setup
     return this;
@@ -387,9 +361,9 @@ bool TypeType::_equalsImplOverride(Type * t)
     return false;
 }
 
-Type* TypeType::_createCanonicalTypeOverride()
+Type* TypeType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
-    return getASTBuilder()->getTypeType(type->getCanonicalType());
+    return getASTBuilder()->getTypeType(type->getCanonicalType(semantics));
 }
 
 HashCode TypeType::_getHashCodeOverride()
@@ -420,7 +394,7 @@ HashCode GenericDeclRefType::_getHashCodeOverride()
     return declRef.getHashCode();
 }
 
-Type* GenericDeclRefType::_createCanonicalTypeOverride()
+Type* GenericDeclRefType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -446,7 +420,7 @@ HashCode NamespaceType::_getHashCodeOverride()
     return declRef.getHashCode();
 }
 
-Type* NamespaceType::_createCanonicalTypeOverride()
+Type* NamespaceType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -485,12 +459,12 @@ bool NamedExpressionType::_equalsImplOverride(Type * /*type*/)
     //return false;
 }
 
-Type* NamedExpressionType::_createCanonicalTypeOverride()
+Type* NamedExpressionType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     if (!innerType)
         innerType = getType(m_astBuilder, declRef);
     if (innerType)
-        return innerType->getCanonicalType();
+        return innerType->getCanonicalType(semantics);
     return nullptr;
 }
 
@@ -505,7 +479,7 @@ HashCode NamedExpressionType::_getHashCodeOverride()
     // for now (and hopefully equivalent) to just have any
     // named types automaticlaly route hash-code requests
     // to their canonical type.
-    return getCanonicalType()->getHashCode();
+    return getCanonicalType(nullptr)->getHashCode();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -611,17 +585,17 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     return substType;
 }
 
-Type* FuncType::_createCanonicalTypeOverride()
+Type* FuncType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     // result type
-    Type* canResultType = resultType->getCanonicalType();
-    Type* canErrorType = errorType->getCanonicalType();
+    Type* canResultType = resultType->getCanonicalType(semantics);
+    Type* canErrorType = errorType->getCanonicalType(semantics);
 
     // parameter types
     List<Type*> canParamTypes;
     for (auto pp : paramTypes)
     {
-        canParamTypes.add(pp->getCanonicalType());
+        canParamTypes.add(pp->getCanonicalType(semantics));
     }
 
     FuncType* canType = getASTBuilder()->create<FuncType>();
@@ -697,13 +671,13 @@ Val* TupleType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet 
     return astBuilder->create<TupleType>(std::move(substMemberTypes));
 }
 
-Type* TupleType::_createCanonicalTypeOverride()
+Type* TupleType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     // member types
     List<Type*> canMemberTypes;
     for (auto m : memberTypes)
     {
-        canMemberTypes.add(m->getCanonicalType());
+        canMemberTypes.add(m->getCanonicalType(semantics));
     }
 
     return getASTBuilder()->create<TupleType>(std::move(canMemberTypes));
@@ -738,7 +712,7 @@ HashCode ExtractExistentialType::_getHashCodeOverride()
     return combineHash(declRef.getHashCode(), originalInterfaceType->getHashCode(), originalInterfaceDeclRef.getHashCode());
 }
 
-Type* ExtractExistentialType::_createCanonicalTypeOverride()
+Type* ExtractExistentialType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -841,13 +815,13 @@ HashCode TaggedUnionType::_getHashCodeOverride()
     return hashCode;
 }
 
-Type* TaggedUnionType::_createCanonicalTypeOverride()
+Type* TaggedUnionType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     TaggedUnionType* canType = m_astBuilder->create<TaggedUnionType>();
 
     for (auto caseType : caseTypes)
     {
-        auto canCaseType = caseType->getCanonicalType();
+        auto canCaseType = caseType->getCanonicalType(semantics);
         canType->caseTypes.add(canCaseType);
     }
 
@@ -931,18 +905,18 @@ static Val* _getCanonicalValue(Val* val)
         return nullptr;
     if (auto type = as<Type>(val))
     {
-        return type->getCanonicalType();
+        return type->getCanonicalType(nullptr);
     }
     // TODO: We may eventually need/want some sort of canonicalization
     // for non-type values, but for now there is nothing to do.
     return val;
 }
 
-Type* ExistentialSpecializedType::_createCanonicalTypeOverride()
+Type* ExistentialSpecializedType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     ExistentialSpecializedType* canType = m_astBuilder->create<ExistentialSpecializedType>();
 
-    canType->baseType = baseType->getCanonicalType();
+    canType->baseType = baseType->getCanonicalType(semantics);
     for (auto arg : args)
     {
         ExpandedSpecializationArg canArg;
@@ -1011,12 +985,13 @@ HashCode ThisType::_getHashCodeOverride()
         interfaceDeclRef.getHashCode());
 }
 
-Type* ThisType::_createCanonicalTypeOverride()
+Type* ThisType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     ThisType* canType = m_astBuilder->create<ThisType>();
-
+    
     // TODO: need to canonicalize the decl-ref
-    canType->interfaceDeclRef = interfaceDeclRef;
+    if (interfaceDeclRef)
+        canType->interfaceDeclRef = DeclRef<Decl>(as<DeclRefBase>(interfaceDeclRef.declRefBase->resolve(semantics))).as<InterfaceDecl>();
     return canType;
 }
 
@@ -1071,7 +1046,7 @@ HashCode AndType::_getHashCodeOverride()
     return hasher.getResult();
 }
 
-Type* AndType::_createCanonicalTypeOverride()
+Type* AndType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     // TODO: proper canonicalization of an `&` type relies on
     // several different things:
@@ -1106,8 +1081,8 @@ Type* AndType::_createCanonicalTypeOverride()
     // right now, in the name of getting something up and running.
     //
 
-    auto canLeft = left->getCanonicalType();
-    auto canRight = right->getCanonicalType();
+    auto canLeft = left->getCanonicalType(semantics);
+    auto canRight = right->getCanonicalType(semantics);
     auto canType = m_astBuilder->getAndType(canLeft, canRight);
     return canType;
 }
@@ -1190,10 +1165,10 @@ HashCode ModifiedType::_getHashCodeOverride()
     return hasher.getResult();
 }
 
-Type* ModifiedType::_createCanonicalTypeOverride()
+Type* ModifiedType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     ModifiedType* canonical = m_astBuilder->create<ModifiedType>();
-    canonical->base = base->getCanonicalType();
+    canonical->base = base->getCanonicalType(semantics);
     for( auto modifier : modifiers )
     {
         canonical->modifiers.add(modifier);

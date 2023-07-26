@@ -17,6 +17,7 @@ namespace Slang
 {  
 
 class ASTBuilder;
+struct SemanticsVisitor;
 
 class NodeBase 
 {
@@ -163,6 +164,13 @@ class Val : public NodeBase
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
+
+    Val* _resolveOverride(SemanticsVisitor* visitor);
+
+    Val* resolve(SemanticsVisitor* visitor);
+protected:
+    SLANG_UNREFLECTED mutable Val* m_resolvedVal = nullptr;
+    SLANG_UNREFLECTED mutable Index m_resolvedValEpoch = 0;
 };
 
 struct ValSet
@@ -242,30 +250,26 @@ class Type: public Val
 
     bool equals(Type* type);
     
-    Type* getCanonicalType();
-
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsValOverride(Val* val);
     bool _equalsImplOverride(Type* type);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Val* _resolveOverride(SemanticsVisitor* semantics);
+    Type* getCanonicalType(SemanticsVisitor* semantics)
+    {
+        return as<Type>(_resolveOverride(semantics));
+    }
 
 protected:
+    Type* createCanonicalType(SemanticsVisitor* semantics);
     bool equalsImpl(Type* type);
-    Type* createCanonicalType();
-
-    Type* canonicalType = nullptr;
-    // The epoch number of the ASTBuilder at which the cached `canonicalType` is created.
-    // This mechanism allows us to easily invalidate the cache when type checking enters a new phase
-    // that allows more types to be folded, such as when a new associated type requirement is synthesized
-    // for a concrete type.
-    Index canonicalTypeEpoch = 0;
 };
 
 template <typename T>
-SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->getCanonicalType()) : nullptr; }
+SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->getCanonicalType(nullptr)) : nullptr; }
 template <typename T>
-SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->getCanonicalType()) : nullptr; }
+SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->getCanonicalType(nullptr)) : nullptr; }
 
 // A substitution represents a binding of certain
 // type-level variables to concrete argument values
@@ -388,6 +392,8 @@ class DeclRefBase : public Val
 
     void _toTextOverride(StringBuilder& out) { toText(out); }
 
+    Val* _resolveOverride(SemanticsVisitor* semantics);
+
     // Returns true if 'as' will return a valid cast
     template <typename T>
     bool is() const { return Slang::as<T>(decl) != nullptr; }
@@ -416,7 +422,7 @@ private:
 
 };
 
-SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase* declRef) { declRef->toText(io); return io; }
+SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase* declRef) { if (declRef) declRef->toText(io); return io; }
 
 SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const Decl* decl)
 {

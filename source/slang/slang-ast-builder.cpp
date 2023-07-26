@@ -208,6 +208,12 @@ Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+Index& _getGlobalASTEpochId()
+{
+    static Index epochId = 1;
+    return epochId;
+}
+
 ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
     m_sharedASTBuilder(sharedASTBuilder),
     m_name(name),
@@ -233,6 +239,16 @@ ASTBuilder::~ASTBuilder()
         SLANG_ASSERT(info->m_destructorFunc);
         info->m_destructorFunc(node);
     }
+}
+
+Index ASTBuilder::getEpoch()
+{
+    return _getGlobalASTEpochId();
+}
+
+void ASTBuilder::incrementEpoch()
+{
+    _getGlobalASTEpochId()++;
 }
 
 NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)

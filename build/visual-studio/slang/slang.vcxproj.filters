@@ -683,6 +683,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-check-overload.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-check-resolve-val.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-check-shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
