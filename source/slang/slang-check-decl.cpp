@@ -3407,7 +3407,8 @@ namespace Slang
                     return trySynthesizeDifferentialMethodRequirementWitness(
                         context,
                         requiredFuncDeclRef,
-                        witnessTable);
+                        witnessTable,
+                        SynthesisPattern::AllInductive);
                 }
             }
             return false;
@@ -3421,10 +3422,11 @@ namespace Slang
                 switch (builtinAttr->kind)
                 {
                 case BuiltinRequirementKind::DMulFunc:
-                    return trySynthesizeDMulMethodRequirementWitness(
+                    return trySynthesizeDifferentialMethodRequirementWitness(
                         context,
                         requiredGenericDeclRef,
-                        witnessTable);
+                        witnessTable,
+                        SynthesisPattern::FixedFirstArg);
                 }
             }
             return false;
@@ -3527,10 +3529,11 @@ namespace Slang
         return synth.emitAssignStmt(leftValue, synth.emitInvokeExpr(callee, _Move(args)));
     }
 
-    bool SemanticsVisitor::trySynthesizeDMulMethodRequirementWitness(
+    bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
         ConformanceCheckingContext* context,
-        DeclRef<GenericDecl> requirementDeclRef,
-        RefPtr<WitnessTable> witnessTable)
+        DeclRef<Decl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        SynthesisPattern pattern)
     {
         // We support two cases of synthesis here.
         // Case 1 is that there the associated Differential type is defined to be `DifferentialBottom`.
@@ -3541,9 +3544,10 @@ namespace Slang
         // ```
         // static TResult requiredMethod(TParam1 p0, TParam2 p1, ...)
         // ```
-        // Where TResult, TParam1, TParam2 is either `This` or `Differential`,
-        // We synthesize a memberwise dispatch to compute each field of `TResult`,
-        // resulting an implementation of the form:
+        // Where TResult,TParam1, TParam2 is either `This` or `Differential`,
+        // We synthesize a memberwise dispatch to compute each field of `TResult`.
+        // Multiple patterns are supported (see SemanticsVisitor::SynthesisPattern for a full list)
+        // For AllInductive, we synthesize an implementation of the form:
         // ```
         // [BackwardDifferentiable]
         // static TResult requiredMethod(TParam1 p0, TParam2 p1, ...)
@@ -3576,20 +3580,30 @@ namespace Slang
         List<Expr*> synArgs;
         List<Expr*> synGenericArgs;
         ThisExpr* synThis = nullptr;
-        auto synGeneric = synthesizeGenericSignatureForRequirementWitness(
-            context, requirementDeclRef.as<GenericDecl>(), synArgs, synGenericArgs, synThis);
+        FuncDecl* synFunc = nullptr;
+        GenericDecl* synGeneric = nullptr;
 
-        // dmul should have exactly 2 arguments.
-        SLANG_ASSERT(synArgs.getCount() == 2);
-
-        // dmul should have exactly one generic argument.
-        SLANG_ASSERT(synGenericArgs.getCount() == 1);
+        if (auto genericDeclRef = requirementDeclRef.as<GenericDecl>())
+        {
+            synGeneric = synthesizeGenericSignatureForRequirementWitness(
+                context, genericDeclRef, synArgs, synGenericArgs, synThis);
+            synFunc = as<FuncDecl>(synGeneric->inner);
+        }
+        else if (auto funcDeclRef = requirementDeclRef.as<FuncDecl>())
+        {
+            synFunc = synthesizeMethodSignatureForRequirementWitness( 
+               context, funcDeclRef, synArgs, synThis);
+        }
         
-        //addModifier(synGeneric->inner, m_astBuilder->create<BackwardDifferentiableAttribute>());
+        SLANG_ASSERT(synFunc);
+        
+        addModifier(synFunc, m_astBuilder->create<BackwardDifferentiableAttribute>());
 
-        synGeneric->parentDecl = context->parentDecl;
+        if (synGeneric)
+            synGeneric->parentDecl = context->parentDecl;
+        else
+            synFunc->parentDecl = context->parentDecl;
 
-        FuncDecl* synFunc = as<FuncDecl>(synGeneric->inner);
         synth.pushContainerScope(synFunc);
         auto blockStmt = m_astBuilder->create<BlockStmt>();
         synFunc->body = blockStmt;
@@ -3619,19 +3633,56 @@ namespace Slang
             List<Expr*> paramFields;
             List<bool> inductiveArgMask;
 
-            // First arg is always scalar.
-            paramFields.add(synArgs[0]);
-            inductiveArgMask.add(false);
+            switch (pattern)
+            {
+                case SynthesisPattern::AllInductive:
+                {
+                    int paramIndex = 0;
+                    for (auto arg : synArgs)
+                    {
+                        auto memberExpr = m_astBuilder->create<MemberExpr>();
+                        memberExpr->baseExpression = arg;
+                        // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
+                        // Differential type.
+                        memberExpr->name = varMember->getName();
+                        paramFields.add(memberExpr);
+                        inductiveArgMask.add(true);
 
-            // Second arg needs a member lookup
-            auto memberExpr = m_astBuilder->create<MemberExpr>();
-            memberExpr->baseExpression = synArgs[1];
-            
-            // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
-            // Differential type.
-            memberExpr->name = varMember->getName();
-            paramFields.add(memberExpr);
-            inductiveArgMask.add(true);
+                        paramIndex++;
+                    }
+                    break;
+                }
+                case SynthesisPattern::FixedFirstArg:
+                {
+                    int paramIndex = 0;
+                    for (auto arg : synArgs)
+                    {
+                        if (paramIndex == 0)
+                        {
+                            paramFields.add(arg);
+                            inductiveArgMask.add(false);
+
+                            paramIndex++;
+                        }
+                        else
+                        {
+                            auto memberExpr = m_astBuilder->create<MemberExpr>();
+                            memberExpr->baseExpression = arg;
+                            // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
+                            // Differential type.
+                            memberExpr->name = varMember->getName();
+                            paramFields.add(memberExpr);
+                            inductiveArgMask.add(true);
+
+                            paramIndex++;
+                        }
+                    }
+                    break;
+                }
+                default:
+                    SLANG_UNIMPLEMENTED_X("unhandled synthesis pattern");
+                    break;
+            }
 
             // Invoke the method for the field and assign the value to resultVar.
             // TODO: we should probably fetch the name from `[DerivativeMember]` if `resultVarExpr`
@@ -3663,155 +3714,11 @@ namespace Slang
         // This can be done by obtaining ThisTypeSubstitution from requirementDeclRef to get the
         // generic substitution for outer generic parameters, and apply it here.
         SubstitutionSet substSet;
-        if (auto thisTypeSusbt = findThisTypeSubstitution(
+        if (auto thisTypeSubst = findThisTypeSubstitution(
             requirementDeclRef.getSubst(),
             as<InterfaceDecl>(requirementDeclRef.getDecl()->parentDecl)))
         {
-            if (auto declRefType = as<DeclRefType>(thisTypeSusbt->witness->sub))
-            {
-                substSet = declRefType->declRef.getSubst();
-            }
-        }
-        
-        auto funcDeclRef = m_astBuilder->getSpecializedDeclRef<Decl>(synGeneric->inner, substSet);
-
-        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(funcDeclRef));
-        return true;
-    }
-
-    bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<Decl> requirementDeclRef,
-        RefPtr<WitnessTable> witnessTable)
-    {
-        // We support two cases of synthesis here.
-        // Case 1 is that there the associated Differential type is defined to be `DifferentialBottom`.
-        // In this case we just trivially return `DifferentialBottom` in all synthesized methods.
-        // Case 2 is that the `Differential` type contains members corresponding to each primal member.
-        // We will apply a general code synthesis pattern to reflect that structure.
-        // For requirement of the form:
-        // ```
-        // static TResult requiredMethod<T:Interface>(T p0, TParam2 p1)
-        // ```
-        // Where TResult, TParam1, TParam2 is either `This` or `Differential`,
-        // We synthesize a memberwise dispatch to compute each field of `TResult`,
-        // resulting an implementation of the form:
-        // ```
-        // [BackwardDifferentiable]
-        // static TResult requiredMethod<T:Interface>(T p0, TParam2 p1)
-        // {
-        //     TResult result;
-        //     result.member0 = decltype(result.member0).requiredMethod<T>(p0, p1.member0);
-        //     result.member1 = decltype(result.member1).requiredMethod<T>(p0, p1.member1);
-        //     ...
-        //     return result;
-        // }
-        // ```
-
-        // First we need to make sure the associated `Differential` type requirement is satisfied.
-        bool hasDifferentialAssocType = false;
-        for (auto existingEntry : witnessTable->requirementDictionary)
-        {
-            if (auto builtinReqAttr = existingEntry.key->findModifier<BuiltinRequirementModifier>())
-            {
-                if (builtinReqAttr->kind == BuiltinRequirementKind::DifferentialType &&
-                    existingEntry.value.getFlavor() != RequirementWitness::Flavor::none)
-                {
-                    hasDifferentialAssocType = true;
-                }
-            }
-        }
-        if (!hasDifferentialAssocType)
-            return false;
-
-        ASTSynthesizer synth(m_astBuilder, getNamePool());
-        List<Expr*> synArgs;
-        ThisExpr* synThis = nullptr;
-        auto synFunc = synthesizeMethodSignatureForRequirementWitness(
-            context, requirementDeclRef.as<FuncDecl>(), synArgs, synThis);
-        
-        addModifier(synFunc, m_astBuilder->create<BackwardDifferentiableAttribute>());
-
-        synFunc->parentDecl = context->parentDecl;
-        synth.pushContainerScope(synFunc);
-        auto blockStmt = m_astBuilder->create<BlockStmt>();
-        synFunc->body = blockStmt;
-        auto seqStmt = synth.pushSeqStmtScope();
-        blockStmt->body = seqStmt;
-
-        // Create a variable for return value.
-        synth.pushVarScope();
-        auto varStmt = synth.emitVarDeclStmt(synFunc->returnType.type, getName("result"));
-        auto resultVarExpr = synth.emitVarExpr(varStmt, synFunc->returnType.type);
-
-        for (auto member : context->parentDecl->members)
-        {
-            auto derivativeAttr = member->findModifier<DerivativeMemberAttribute>();
-            if (!derivativeAttr)
-                continue;
-            auto varMember = as<VarDeclBase>(member);
-            if (!varMember)
-                continue;
-            ensureDecl(varMember, DeclCheckState::ReadyForReference);
-            auto memberType = varMember->getType();
-            auto diffMemberType = tryGetDifferentialType(m_astBuilder, memberType);
-            if (!diffMemberType)
-                continue;
-
-            // Construct reference exprs to the member's corresponding fields in each parameter.
-            List<Expr*> paramFields;
-            List<bool> inductiveArgMask;
-
-            int paramIndex = 0;
-            for (auto arg : synArgs)
-            {
-                auto memberExpr = m_astBuilder->create<MemberExpr>();
-                memberExpr->baseExpression = arg;
-                // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
-                // Differential type.
-                memberExpr->name = varMember->getName();
-                paramFields.add(memberExpr);
-                inductiveArgMask.add(true);
-
-                paramIndex++;
-            }
-
-            // Invoke the method for the field and assign the value to resultVar.
-            // TODO: we should probably fetch the name from `[DerivativeMember]` if `resultVarExpr`
-            // is Differential type.
-            auto leftVal = synth.emitMemberExpr(resultVarExpr, varMember->getName());
-            List<Expr*> emptyGenericArgs;
-            if (!_synthesizeMemberAssignMemberHelper(
-                synth,
-                requirementDeclRef.getName(),
-                memberType,
-                leftVal,
-                _Move(paramFields),
-                _Move(emptyGenericArgs),
-                _Move(inductiveArgMask)))
-                return false;
-        }
-
-        // TODO: synthesize assignments for inherited members here.
-
-        auto synReturn = m_astBuilder->create<ReturnStmt>();
-        synReturn->expression = resultVarExpr;
-        seqStmt->stmts.add(synReturn);
-        
-        context->parentDecl->members.add(synFunc);
-        context->parentDecl->invalidateMemberDictionary();
-        addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
-
-        // If `This` is nested inside a generic, we need to form a complete declref type to the
-        // newly synthesized method here in order to fill into the witness table.
-        // This can be done by obtaining ThisTypeSubstitution from requirementDeclRef to get the
-        // generic substitution for outer generic parameters, and apply it here.
-        SubstitutionSet substSet;
-        if (auto thisTypeSusbt = findThisTypeSubstitution(
-            requirementDeclRef.getSubst(),
-            as<InterfaceDecl>(requirementDeclRef.getDecl()->parentDecl)))
-        {
-            if (auto declRefType = as<DeclRefType>(thisTypeSusbt->witness->sub))
+            if (auto declRefType = as<DeclRefType>(thisTypeSubst->witness->sub))
             {
                 substSet = declRefType->declRef.getSubst();
             }

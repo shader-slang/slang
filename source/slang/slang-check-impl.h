@@ -1510,24 +1510,39 @@ namespace Slang
             LookupResult const&         lookupResult,
             DeclRef<Decl>               requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
+        
 
-            /// Attempt to synthesize `zero` & `dadd` methods for a type that conforms to
+        enum SynthesisPattern
+        {
+            // Synthesized method inducts over all arguments.
+            // T fn(T x, T y, T z, ...) 
+            // { 
+            //     typeof(T::member0)::fn(x.member0, y.member0, z.member0, ...);
+            //     typeof(T::member1)::fn(x.member1, y.member1, z.member1, ...);
+            //     ...
+            // }
+            // 
+            AllInductive,
+
+            // Synthesized method inducts over all arguments except the first.
+            // T fn(U x, T y, T z)
+            // {
+            //     typeof(T::member0)::fn(x, y.member0, z.member0, ...);
+            //     typeof(T::member1)::fn(x, y.member1, z.member1, ...);
+            //     ...
+            // }
+            FixedFirstArg
+        };
+
+            /// Attempt to synthesize `zero`, `dadd` & `dmul` methods for a type that conforms to
             /// `IDifferentiable`.
             /// On success, installs the syntethesized functions and returns `true`.
             /// Otherwise, returns `false`.
         bool trySynthesizeDifferentialMethodRequirementWitness(
             ConformanceCheckingContext* context,
             DeclRef<Decl> requirementDeclRef,
-            RefPtr<WitnessTable> witnessTable);
-
-            // Attempt to synthesize `dmul` methods for a type that conforms to
-            /// `IDifferentiable`.
-            /// On success, installs the syntethesized function and returns `true`.
-            /// Otherwise, returns `false`.
-        bool trySynthesizeDMulMethodRequirementWitness(
-            ConformanceCheckingContext* context,
-            DeclRef<GenericDecl> requirementDeclRef,
-            RefPtr<WitnessTable> witnessTable);
+            RefPtr<WitnessTable> witnessTable,
+            SynthesisPattern pattern);
 
             /// Attempt to synthesize an associated `Differential` type for a type that conforms to
             /// `IDifferentiable`.
