@@ -1300,6 +1300,21 @@ namespace Slang
                 addModifier(varDecl, m_astBuilder->getOrCreate<NoDiffModifier>());
             }
         }
+
+
+        if (as<NamespaceDeclBase>(varDecl->parentDecl))
+        {
+            // If this is a global variable with [vk::push_constant] attribute,
+            // we need to make sure to wrap it in a `ConstantBuffer`.
+            
+            if (!as<ConstantBufferType>(varDecl->type))
+            {
+                if (varDecl->findModifier<PushConstantAttribute>())
+                {
+                    varDecl->type.type = m_astBuilder->getConstantBufferType(varDecl->type);
+                }
+            }
+        }
     }
 
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
