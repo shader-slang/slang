@@ -112,6 +112,12 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
+/// A type that can represent non-integers
+[sealed]
+[builtin]
+interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
+
+
 __attributeTarget(AggTypeDecl)
 attribute_syntax [__NonCopyableType] : NonCopyableTypeAttribute;
 
@@ -144,7 +150,7 @@ interface IDifferentiable
     // Note: the compiler implementation requires the `Differential` associated type to be defined
     // before anything else.
 
-    __builtin_requirement($( (int) BuiltinRequirementKind::DifferentialType) )
+    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialType) )
     associatedtype Differential : IDifferentiable;
 
     __builtin_requirement($( (int)BuiltinRequirementKind::DZeroFunc) )
@@ -154,7 +160,8 @@ interface IDifferentiable
     static Differential dadd(Differential, Differential);
 
     __builtin_requirement($( (int)BuiltinRequirementKind::DMulFunc) )
-    static Differential dmul(This, Differential);
+    __generic<T : __BuiltinRealType>
+    static Differential dmul(T, Differential);
 };
 
 
@@ -219,19 +226,16 @@ struct DifferentialPair : IDifferentiable
             T.Differential.dadd(a.d, b.d));
     }
 
+    __generic<U : __BuiltinRealType>
     [__unsafeForceInlineEarly]
-    static Differential dmul(This a, Differential b)
+    static Differential dmul(U a, Differential b)
     {
         return Differential(
-            T.dmul(a.p, b.p),
-            T.Differential.dmul(a.d, b.d));
+            T.dmul<U>(a, b.p),
+            T.Differential.dmul<U>(a, b.d));
     }
 };
 
-/// A type that can represent non-integers
-[sealed]
-[builtin]
-interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 
 /// A type that uses a floating-point representation
 [sealed]
@@ -339,6 +343,9 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<b
 __generic<T> __intrinsic_op(select) T select(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
 
+// Allow real-number types to be cast into each other
+__intrinsic_op($(kIROp_FloatCast))
+    T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
 
 ${{{{
 // We are going to use code generation to produce the
@@ -483,12 +490,13 @@ ${{{{
         {
             return a + b;
         }
-
+        
+        __generic<U : __BuiltinRealType>
         [__unsafeForceInlineEarly]
         [BackwardDifferentiable]
-        static Differential dmul(Differential a, Differential b)
+        static Differential dmul(U a, Differential b)
         {
-            return a * b;
+            return __realCast<Differential, U>(a) * b;
         }
 ${{{{
         break;
@@ -1190,11 +1198,12 @@ extension vector<T, N> : IDifferentiable
         return a + b;
     }
 
+    __generic<U : __BuiltinRealType>
     [__unsafeForceInlineEarly]
     [BackwardDifferentiable]
-    static Differential dmul(This a, Differential b)
+    static Differential dmul(U a, Differential b)
     {
-        return a * b;
+        return __realCast<T, U>(a) * b;
     }
 }
 
@@ -1216,12 +1225,13 @@ extension matrix<T, R, C> : IDifferentiable
     {
         return a + b;
     }
-
+    
+    __generic<U : __BuiltinRealType>
     [__unsafeForceInlineEarly]
     [BackwardDifferentiable]
-    static Differential dmul(This a, Differential b)
+    static Differential dmul(U a, Differential b)
     {
-        return a * b;
+        return __realCast<T, U>(a) * b;
     }
 }
 
@@ -1358,9 +1368,11 @@ struct TextureTypeInfo
 
         if( !isMultisample )
         {
+            sb << "__target_intrinsic(glsl, \"textureQueryLod($p, $2).x\")";
             sb << "float CalculateLevelOfDetail(" << samplerStateParam;
             sb << "float" << base.coordCount << " location);\n";
 
+            sb << "__target_intrinsic(glsl, \"textureQueryLod($p, $2).y\")";
             sb << "float CalculateLevelOfDetailUnclamped(" << samplerStateParam;
             sb << "float" << base.coordCount << " location);\n";
         }
@@ -2176,50 +2188,83 @@ struct TextureTypeInfo
                 { 2, "Blue" },
                 { 3, "Alpha" },
             };
+            enum Cmp
+            { NotCmp,
+              Cmp
+            };
 
+            for(auto cmp : {NotCmp, Cmp})
             for(auto kk : kGatherComponets)
             {
+                auto samplerOrComparisonSampler = cmp == Cmp ? "SamplerComparisonState s, " : samplerStateParam;
+
                 auto componentIndex = kk.componentIndex;
                 auto componentName = kk.componentName;
 
                 auto outputType = cc.outputType;
 
+                const auto cmpName          = cmp == Cmp ? "Cmp" : "";
+                const auto cmpValueParam    = cmp == Cmp ? "float compareValue, " : "";
+                const auto cmpValueParamEnd = cmp == Cmp ? ", float compareValue" : "";
+                const auto supportsGLSL     = componentIndex == 0 || cmp == NotCmp;
+
                 EMIT_LINE_DIRECTIVE();
 
-                sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
-                if (base.coordCount == 2)
+                if(supportsGLSL)
                 {
-                    // Gather only works on 2D in CUDA
+                    if(cmp == Cmp)
+                        sb << "__target_intrinsic(glsl, \"textureGather($p, $2, $3)\")\n";
+                    else
+                        sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
+                }
+                if (base.coordCount == 2 && cmp == NotCmp)
+                {
+                    // Gather only works on 2D in CUDA without comparison
                     // "It is based on the base type of DataType except when readMode is equal to cudaReadModeNormalizedFloat (see Texture Reference API), in which case it is always float4."
                     sb << "__target_intrinsic(cuda, \"tex2Dgather<$T0>($0, ($2).x, ($2).y, " << componentIndex << ")\")\n";
                 }
                 if (isReadOnly)
                     sb << "[__readNone]\n";
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
-                sb << "float" << base.coordCount + isArray << " location);\n";
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
+                sb << "float" << base.coordCount + isArray << " location" << cmpValueParamEnd << ");\n";
 
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 EMIT_LINE_DIRECTIVE();
-                sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
+                if(supportsGLSL)
+                {
+                    if(cmp == Cmp)
+                        sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, $4)\")\n";
+                    else
+                        sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
+                }
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
                 sb << "float" << base.coordCount + isArray << " location, ";
+                sb << cmpValueParam;
                 sb << "constexpr int" << base.coordCount << " offset);\n";
 
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 EMIT_LINE_DIRECTIVE();
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
                 sb << "float" << base.coordCount + isArray << " location, ";
+                sb << cmpValueParam;
                 sb << "constexpr int" << base.coordCount << " offset, ";
                 sb << "out uint status);\n";
 
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 EMIT_LINE_DIRECTIVE();
-                sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, int" << base.coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
+                if(supportsGLSL)
+                {
+                    if(cmp == Cmp)
+                        sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, $3, ivec" << base.coordCount << "[]($4, $5, $6, $7))\")\n";
+                    else
+                        sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, ivec" << base.coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
+                }
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
                 sb << "float" << base.coordCount + isArray << " location, ";
+                sb << cmpValueParam;
                 sb << "int" << base.coordCount << " offset1, ";
                 sb << "int" << base.coordCount << " offset2, ";
                 sb << "int" << base.coordCount << " offset3, ";
@@ -2228,8 +2273,9 @@ struct TextureTypeInfo
                 if (isReadOnly)
                     sb << "[__readNone]\n";
                 EMIT_LINE_DIRECTIVE();
-                sb << outputType << " Gather" << componentName << "(" << samplerStateParam;
+                sb << outputType << " Gather" << cmpName << componentName << "(" << samplerOrComparisonSampler;
                 sb << "float" << base.coordCount + isArray << " location, ";
+                sb << cmpValueParam;
                 sb << "int" << base.coordCount << " offset1, ";
                 sb << "int" << base.coordCount << " offset2, ";
                 sb << "int" << base.coordCount << " offset3, ";

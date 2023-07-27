@@ -169,10 +169,6 @@ namespace Slang
 
     List<Val*>* findInnerMostGenericArgs(SubstitutionSet subst);
 
-    SubtypeWitness* findThisTypeWitness(
-        SubstitutionSet substs,
-        InterfaceDecl* interfaceDecl);
-
     ParameterDirection getParameterDirection(VarDeclBase* varDecl);
 
     inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)

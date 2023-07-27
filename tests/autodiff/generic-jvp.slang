@@ -113,9 +113,9 @@ extension myfloat3 : IDifferentiable
     }
 
     [ForwardDifferentiable]
-    static Differential dmul(Differential a, Differential b)
+    static Differential dmul<T : __BuiltinRealType>(T a, Differential b)
     {
-        return a * b;
+        return { __realCast<Real, T>(a) * b.val };
     }
 
 };
@@ -139,9 +139,9 @@ extension myfloat4 : IDifferentiable
     }
 
     [ForwardDifferentiable]
-    static Differential dmul(Differential a, Differential b)
+    static Differential dmul<T: __BuiltinRealType>(T a, Differential b)
     {
-        return a * b;
+        return { __realCast<Real, T>(a) * b.val };
     }
 };
 

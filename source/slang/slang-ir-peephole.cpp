@@ -759,6 +759,31 @@ struct PeepholeContext : InstPassBase
             break;
         case kIROp_swizzle:
             {
+                // If we see a swizzle(scalar), we replace it with makeVectorFromScalar.
+                if (as<IRBasicType>(inst->getOperand(0)->getDataType()))
+                {
+                    auto vectorType = as<IRVectorType>(inst->getDataType());
+                    IRIntegerValue vectorSize = 1;
+                    if (vectorType)
+                    {
+                        auto sizeLit = as<IRIntLit>(vectorType->getElementCount());
+                        if (!sizeLit)
+                            vectorSize = 0;
+                        vectorSize = sizeLit->getValue();
+                    }
+                    if (vectorSize == 1)
+                    {
+                        inst->replaceUsesWith(inst->getOperand(0));
+                        maybeRemoveOldInst(inst);
+                        break;
+                    }
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    auto newInst = builder.emitMakeVectorFromScalar(vectorType, inst->getOperand(0));
+                    inst->replaceUsesWith(newInst);
+                    maybeRemoveOldInst(inst);
+                    break;
+                }
                 // If we see a swizzle(makeVector) then we can replace it with the values from makeVector.
                 auto makeVector = inst->getOperand(0);
                 if (makeVector->getOp() != kIROp_MakeVector)
