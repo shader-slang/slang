@@ -52,6 +52,12 @@ namespace Slang
         DeclRef<AggTypeDecl> const& declRef,
         SemanticsVisitor*           semantics);
 
+    // Returns the members of `genericInnerDecl`'s enclosing generic decl.
+    inline FilteredMemberRefList<Decl> getGenericMembers(ASTBuilder* astBuilder, DeclRef<Decl> genericInnerDecl, MemberFilterStyle filterStyle = MemberFilterStyle::All)
+    {
+        return FilteredMemberRefList<Decl>(astBuilder, genericInnerDecl.getParent(astBuilder).getDecl()->members, SubstitutionSet(genericInnerDecl), filterStyle);
+    }
+
     inline FilteredMemberRefList<Decl> getMembers(ASTBuilder* astBuilder, DeclRef<ContainerDecl> declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
         return FilteredMemberRefList<Decl>(astBuilder, declRef.getDecl()->members, SubstitutionSet(declRef), filterStyle);

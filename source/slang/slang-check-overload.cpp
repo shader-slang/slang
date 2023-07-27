@@ -1272,10 +1272,7 @@ namespace Slang
         //
         if (knownGenericArgs.getCount())
         {
-            partiallySpecializedInnerRef = getInnerDeclRef(
-                m_astBuilder,
-                this,
-                m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, knownGenericArgs).as<GenericDecl>());
+            partiallySpecializedInnerRef = m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, knownGenericArgs);
         }
         else
         {

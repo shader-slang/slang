@@ -2255,9 +2255,9 @@ namespace Slang
         // generic, we can construct a reference to that declaration and re-run some
         // of the earlier checking logic with more type information usable.
         //
-        auto specializedRequiredGenericDeclRef = m_astBuilder->getSpecializedGenericDeclRef(
-            requiredGenericDeclRef, requiredSubstArgs.getArrayView()).as<GenericDecl>();
-        auto specializedRequiredMemberDeclRefs = getMembers(m_astBuilder, specializedRequiredGenericDeclRef);
+        auto specializedRequiredGenericInnerDeclRef = m_astBuilder->getSpecializedGenericDeclRef(
+            requiredGenericDeclRef, requiredSubstArgs.getArrayView());
+        auto specializedRequiredMemberDeclRefs = getGenericMembers(m_astBuilder, specializedRequiredGenericInnerDeclRef);
         for (Index i = 0; i < memberCount; i++)
         {
             auto requiredMemberDeclRef = specializedRequiredMemberDeclRefs[i];
@@ -2336,7 +2336,7 @@ namespace Slang
         //
         return doesMemberSatisfyRequirement(
             getInnerDeclRef(m_astBuilder, this, satisfyingGenericDeclRef),
-            getInnerDeclRef(m_astBuilder, this, specializedRequiredGenericDeclRef),
+            specializedRequiredGenericInnerDeclRef,
             witnessTable);
     }
 
@@ -2620,11 +2620,8 @@ namespace Slang
         // original parameters.
         //
         auto defaultArgs = getDefaultSubstitutionArgs(synGenericDecl);
-        DeclRef<Decl> requiredFuncDeclRef = getInnerDeclRef(
-            m_astBuilder,
-            this,
-            m_astBuilder->getSpecializedGenericDeclRef(
-                requiredMemberDeclRef, defaultArgs.getArrayView()).as<GenericDecl>());
+        DeclRef<Decl> requiredFuncDeclRef = m_astBuilder->getSpecializedGenericDeclRef(
+                requiredMemberDeclRef, defaultArgs.getArrayView());
 
         SLANG_ASSERT(requiredFuncDeclRef.as<FuncDecl>());
 
@@ -4935,7 +4932,7 @@ namespace Slang
     bool SemanticsVisitor::doGenericSignaturesMatch(
         GenericDecl*                    left,
         GenericDecl*                    right,
-        DeclRef<GenericDecl>*           outSpecializedRight)
+        DeclRef<Decl>*                  outSpecializedRightInner)
     {
         // Our first goal here is to determine if `left` and
         // `right` have equivalent lists of explicit
@@ -5053,9 +5050,9 @@ namespace Slang
         // `foo2<T>` so that its constraint, after specialization,
         // looks like `T : IFoo`.
         //
-        auto& substRightToLeft = *outSpecializedRight;
+        auto& substInnerRightToLeft = *outSpecializedRightInner;
         List<Val*> leftArgs = getDefaultSubstitutionArgs(left);
-        substRightToLeft = m_astBuilder->getSpecializedGenericDeclRef(makeDeclRef(right), leftArgs.getArrayView()).as<GenericDecl>();
+        substInnerRightToLeft = m_astBuilder->getSpecializedGenericDeclRef(makeDeclRef(right), leftArgs.getArrayView());
 
         // We should now be able to enumerate the constraints
         // on `right` in a way that uses the same type parameters
@@ -5128,7 +5125,7 @@ namespace Slang
             //
             GenericTypeConstraintDecl* leftConstraint = leftConstraints[cc];
             auto unspecializedRightConstarintDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(rightConstraints[cc]));
-            DeclRef<GenericTypeConstraintDecl> rightConstraint = substRightToLeft.substitute(
+            DeclRef<GenericTypeConstraintDecl> rightConstraint = substInnerRightToLeft.substitute(
                 m_astBuilder, unspecializedRightConstarintDeclRef).as<GenericTypeConstraintDecl>();
 
             // For now, every constraint has the form `sub : sup`
@@ -5331,11 +5328,11 @@ namespace Slang
             // Then we will compare the parameter types of `foo2`
             // against the specialization `foo1<U>`.
             //
-            DeclRef<GenericDecl> specializedOldDecl;
-            if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl, &specializedOldDecl))
+            DeclRef<Decl> specializedOldDeclInner;
+            if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl, &specializedOldDeclInner))
                 return SLANG_OK;
 
-            oldDeclRef = getInnerDeclRef(m_astBuilder, this, specializedOldDecl).as<FuncDecl>();
+            oldDeclRef = specializedOldDeclInner.as<FuncDecl>();
         }
 
         // If the parameter signatures don't match, then don't worry

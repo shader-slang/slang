@@ -455,11 +455,12 @@ namespace Slang
         // we've already decided that `T` is `Robin`, then we want to
         // search for a conformance `Robin : ISidekick`, which involved
         // apply the substitutions we already know...
-        auto specializedGenericDeclRef = m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, args.getArrayView());
+        auto specializedGenericInnerDeclRef = m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, args.getArrayView());
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
-            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = getSpecializedDeclRef(constraintDecl, specializedGenericDeclRef).as<GenericTypeConstraintDecl>();
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getGenericMemberDeclRef(
+                specializedGenericInnerDeclRef, constraintDecl).as<GenericTypeConstraintDecl>();
 
             // Extract the (substituted) sub- and super-type from the constraint.
             auto sub = getSub(m_astBuilder, constraintDeclRef);

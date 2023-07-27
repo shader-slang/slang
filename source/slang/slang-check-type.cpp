@@ -187,7 +187,7 @@ namespace Slang
             evaledArgs.add(ExtractGenericArgVal(argExpr));
         }
 
-        DeclRef<Decl> innerDeclRef = getInnerDeclRef(m_astBuilder, this, m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, evaledArgs.getArrayView()));
+        DeclRef<Decl> innerDeclRef = m_astBuilder->getSpecializedGenericDeclRef(genericDeclRef, evaledArgs.getArrayView());
         return DeclRefType::create(m_astBuilder, innerDeclRef);
     }
 

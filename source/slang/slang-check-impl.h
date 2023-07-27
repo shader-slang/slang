@@ -1684,7 +1684,7 @@ namespace Slang
         bool doGenericSignaturesMatch(
             GenericDecl*                    left,
             GenericDecl*                    right,
-            DeclRef<GenericDecl>*    outSpecializedRight);
+            DeclRef<Decl>*                  outSpecializedRightInner);
 
         // Check if two functions have the same signature for the purposes
         // of overload resolution.

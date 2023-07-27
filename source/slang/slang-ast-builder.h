@@ -279,6 +279,14 @@ public:
         return getSpecializedDeclRef(memberDecl, parent.getSubst());
     }
 
+    template<typename T>
+    DeclRef<T> getGenericMemberDeclRef(DeclRef<Decl> genericInnerDeclRef, T* memberDecl)
+    {
+        SLANG_ASSERT(memberDecl->parentDecl == genericInnerDeclRef.getParent(memberDecl->getASTBuilder()).getDecl());
+
+        return getSpecializedDeclRef(memberDecl, genericInnerDeclRef.getSubst());
+    }
+
     // This is the bottlneck through which all DeclRefs are created.
     template<typename T>
     DeclRef<T> getSpecializedDeclRef(T* decl, Substitutions* subst)
@@ -364,7 +372,8 @@ public:
         return result;
     }
 
-    DeclRef<GenericDecl> getSpecializedGenericDeclRef(DeclRef<GenericDecl> genericBase, ArrayView<Val*> args)
+    // Get a specialized decl ref to the inner decl of `genericBase` with the given `args`.
+    DeclRef<Decl> getSpecializedGenericDeclRef(DeclRef<GenericDecl> genericBase, ArrayView<Val*> args)
     {
         // Exclude the existing generic arguments for the current generic decl.
         auto outerSubst = genericBase.getSubst();
@@ -375,7 +384,7 @@ public:
         }
 
         auto genSubst = getOrCreateGenericSubstitution(outerSubst, genericBase.getDecl(), args);
-        return getSpecializedDeclRef(genericBase.getDecl(), genSubst).as<GenericDecl>();
+        return getSpecializedDeclRef(genericBase.getDecl()->inner, genSubst);
     }
 
     NodeBase* createByNodeType(ASTNodeType nodeType);
