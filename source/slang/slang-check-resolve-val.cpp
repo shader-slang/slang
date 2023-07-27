@@ -35,7 +35,7 @@ Substitutions* SemanticsVisitor::resolveSubstDeprecated(Substitutions* subst)
 
 Val* DeclRefBase::_resolveOverride(SemanticsVisitor* semantics)
 {
-    if (m_astBuilder->getEpoch() == m_resolvedValEpoch)
+    if (m_resolvedVal && m_resolvedValEpoch == m_astBuilder->getEpoch())
         return m_resolvedVal;
 
     auto resolvedSubst = semantics ? semantics->resolveSubstDeprecated(substitutions) : substitutions;
@@ -53,10 +53,10 @@ Type* Type::createCanonicalType(SemanticsVisitor* semantics)
 Val* Type::_resolveOverride(SemanticsVisitor* semantics)
 {
     auto val = const_cast<Type*>(this);
-
-    if (val->m_resolvedValEpoch == m_astBuilder->getEpoch())
+    if (val->m_resolvedVal && val->m_resolvedValEpoch == m_astBuilder->getEpoch())
+    {
         return val->m_resolvedVal;
-
+    }
     Val* resolvedVal = createCanonicalType(semantics);
     val->m_resolvedVal = resolvedVal;
 
@@ -71,12 +71,8 @@ Type* DeclRefType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
     // A declaration reference is already canonical
     declRef.substitute(m_astBuilder, this);
     auto resolvedDeclRef = declRef;
-    static int cc = 0;
-    cc++;
     if (semantics)
         resolvedDeclRef = as<DeclRefBase>(declRef.declRefBase->resolve(semantics));
-    if (resolvedDeclRef.declRefBase->getSubst() && (UInt)(resolvedDeclRef.declRefBase->getSubst()->astNodeType) >= UInt(ASTNodeType::CountOf))
-        printf("break");
     if (auto satisfyingVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(m_astBuilder, resolvedDeclRef))
         return as<Type>(satisfyingVal);
     if (resolvedDeclRef != declRef)
@@ -89,7 +85,7 @@ Val* SubtypeWitness::_resolveOverride(SemanticsVisitor* semantics)
 {
     auto subtypeWitness = this;
 
-    if (subtypeWitness->m_resolvedValEpoch == m_astBuilder->getEpoch())
+    if (m_resolvedVal && m_resolvedValEpoch == m_astBuilder->getEpoch())
         return subtypeWitness->m_resolvedVal;
 
     subtypeWitness->m_resolvedVal = this;

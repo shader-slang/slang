@@ -541,6 +541,12 @@ protected:
             auto decl = (Decl*)(node);
             decl->defaultDeclRef = getSpecializedDeclRef(decl, nullptr);
         }
+        else if (node->getClassInfo().isSubClassOf(*ASTClassInfo::getInfo(Val::kType)))
+        {
+            auto val = (Val*)(node);
+            val->m_resolvedValEpoch = getEpoch();
+        }
+
         return node;
     }
 

@@ -169,7 +169,7 @@ class Val : public NodeBase
 
     Val* resolve(SemanticsVisitor* visitor);
 protected:
-    SLANG_UNREFLECTED mutable Val* m_resolvedVal = nullptr;
+    mutable Val* m_resolvedVal = nullptr;
     SLANG_UNREFLECTED mutable Index m_resolvedValEpoch = 0;
 };
 
