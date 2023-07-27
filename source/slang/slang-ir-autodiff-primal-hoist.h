@@ -240,11 +240,12 @@ namespace Slang
         enum Kind
         {
             AlwaysTrue,
-            OffsetFromCounter,
+            AffineFunctionOfCounter,
         };
         Kind kind;
         IRLoop* loopInst = nullptr;
         IRInst* counterOffset = nullptr;
+        IRConstant* counterFactor = nullptr;
     };
     
     // Information on which insts are to be stored, recomputed
