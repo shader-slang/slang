@@ -122,6 +122,14 @@ Expr* ASTSynthesizer::emitInvokeExpr(Expr* callee, List<Expr*>&& args)
     return rs;
 }
 
+Expr* ASTSynthesizer::emitGenericAppExpr(Expr* genericExpr, List<Expr*>&& args)
+{
+    auto rs = m_builder->create<GenericAppExpr>();
+    rs->functionExpr = genericExpr;
+    rs->arguments = _Move(args);
+    return rs;
+}
+
 Expr* ASTSynthesizer::emitMemberExpr(Type* type, Name* name)
 {
     auto rs = m_builder->create<StaticMemberExpr>();

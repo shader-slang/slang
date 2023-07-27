@@ -138,6 +138,8 @@ public:
 
     Expr* emitInvokeExpr(Expr* callee, List<Expr*>&& args);
 
+    Expr* emitGenericAppExpr(Expr* genericExpr, List<Expr*>&& args);
+
     DeclStmt* emitVarDeclStmt(Type* type, Name* name = nullptr, Expr* initVal = nullptr);
 
     ExpressionStmt* emitExprStmt(Expr* expr);
