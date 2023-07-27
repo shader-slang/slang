@@ -240,7 +240,7 @@ namespace Slang
         enum Kind
         {
             AlwaysTrue,
-            EqualsToCounter,
+            OffsetFromCounter,
         };
         Kind kind;
         IRLoop* loopInst = nullptr;

@@ -1208,6 +1208,18 @@ struct IRBlock : IRInst
             getFirstParam(),
             getLastParam());
     }
+    // Linear in the parameter index, returns -1 if the param doesn't exist
+    Index getParamIndex(IRParam* const needle)
+    {
+        Index ret = 0;
+        for(const auto p : getParams())
+        {
+            if (p == needle)
+                return ret;
+            ret++;
+        }
+        return -1;
+    }
 
     void addParam(IRParam* param);
     void insertParamAtHead(IRParam* param);
