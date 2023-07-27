@@ -633,6 +633,12 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
     if (debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
     {
         spvOptions.generateDebugInfo = true;
+        spvOptions.emitNonSemanticShaderDebugInfo = true;
+    }
+
+    if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
+    {
+        spvOptions.emitNonSemanticShaderDebugSource = true;
     }
 
     for(int stage = 0; stage < EShLangCount; ++stage)
