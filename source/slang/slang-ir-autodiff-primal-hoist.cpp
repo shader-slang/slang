@@ -578,7 +578,7 @@ static bool inductionImplicationHolds(
     // If we've seen these values before then our proof isn't getting any
     // smaller! Return false to avoid a self-referential proof, it's hard to
     // imagine an actual program which would lead to this however...
-    const ImplicationParams i = { conditionVal, inductiveVal, block};
+    const ImplicationParams i = {conditionVal, inductiveVal, block};
     if(!memo.add(i))
         return false;
 
@@ -593,15 +593,19 @@ static bool inductionImplicationHolds(
         return true;
 
     // The last thing to try is to consider the case where the
-    // values we're check is itself a parameter to a block,
-    // in which case the induction implication must hold for all of
-    // that block's predecessors.
+    // inductive value under consideration is a parameter, in that case we can
+    // recurse into the predecessors of this block, replacing the parameter and
+    // condition variables with their arguments where appropriate.
     const auto inductiveParam = as<IRParam>(inductiveVal);
 
-    if(inductiveParam == prevVal)
+    // If it's not a parameter then we don't know how to continue
+    // (in principle we could also hadle instructions such as loads here)
+    if(!inductiveParam)
         return false;
 
-    if(!inductiveParam)
+    // If this is the previous value, then it's definitely not what we're
+    // looking for.
+    if(inductiveParam == prevVal)
         return false;
 
     const auto conditionParam = as<IRParam>(conditionVal);
@@ -615,10 +619,10 @@ static bool inductionImplicationHolds(
         SLANG_ASSERT(inductiveParamIndex == -1 || predTerminator);
         SLANG_ASSERT(conditionParamIndex == -1 || predTerminator);
 
-        const auto nextInductiveParam
-            = inductiveParamIndex == -1 ? inductiveParam : predTerminator->getArg(inductiveParamIndex);
-        const auto nextConditionParam
-            = conditionParamIndex == -1 ? conditionParam : predTerminator->getArg(conditionParamIndex);
+        const auto nextInductiveParam =
+            inductiveParamIndex == -1 ? inductiveParam : predTerminator->getArg(inductiveParamIndex);
+        const auto nextConditionParam =
+            conditionParamIndex == -1 ? conditionParam : predTerminator->getArg(conditionParamIndex);
 
         holdsForAllPredecessors &=
             inductionImplicationHolds(memo, factor, prevVal, nextConditionParam, nextInductiveParam, predecessor);
