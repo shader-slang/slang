@@ -24,7 +24,7 @@
 // CHECK:layout(binding = 1001)
 // CHECK:layout(std140) uniform _S4
 
-// CHECK:layout(binding = 0)
+// CHECK:layout(binding = 1000)
 // CHECK:layout(std140) uniform _S5
 
 Texture2D texture0; 
