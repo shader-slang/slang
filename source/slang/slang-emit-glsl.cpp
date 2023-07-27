@@ -241,7 +241,10 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     {
         // We can use ShaderResource/DescriptorSlot interchangably here. 
         // This is possible because vk-shift-*
-        const LayoutResourceKindFlags kinds = LayoutResourceKindFlag::ShaderResource | LayoutResourceKindFlag::DescriptorTableSlot;
+        bool isReadOnly = (as<IRHLSLByteAddressBufferType>(byteAddressBufferType) != nullptr);
+
+        const LayoutResourceKindFlags kinds = (isReadOnly ? LayoutResourceKindFlag::ShaderResource : LayoutResourceKindFlag::UnorderedAccess)
+            | LayoutResourceKindFlag::DescriptorTableSlot;
 
         EmitVarChain chain(layout);
 

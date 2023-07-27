@@ -3634,7 +3634,8 @@ static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
 }
 
 static void _maybeApplyHLSLToVulkanShifts(
-    ParameterBindingContext* paramContext, 
+    ParameterBindingContext* paramContext,
+    ParameterBindingAndKindInfo& globalConstantBinding,
     TargetRequest* targetReq,
     DiagnosticSink* sink)
 {
@@ -3653,6 +3654,17 @@ static void _maybeApplyHLSLToVulkanShifts(
     if (!vulkanOptions->canInferBindings())
     {
         return;
+    }
+
+    // If the user specified -fvk-b-shift for the default space but not -fvk-bind-global, we want to apply the shift
+    // to the global constant buffer.
+    if (!vulkanOptions->hasGlobalsBinding())
+    {
+        auto globalCBufferShift = vulkanOptions->getShift(HLSLToVulkanLayoutOptions::Kind::ConstantBuffer, globalConstantBinding.space);
+        if (globalCBufferShift != HLSLToVulkanLayoutOptions::kInvalidShift)
+        {
+            globalConstantBinding.index += globalCBufferShift;
+        }
     }
 
     for (ParameterInfo* parameterInfo : sharedContext.parameters)
@@ -4035,7 +4047,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     _completeBindings(&context, program);
 
     // We may need to finally do any shifting if we have HLSLToVulkanLayoutOptions
-    _maybeApplyHLSLToVulkanShifts(&context, targetReq, sink);
+    _maybeApplyHLSLToVulkanShifts(&context, globalConstantBufferBinding, targetReq, sink);
 
     // Next we need to create a type layout to reflect the information
     // we have collected, and we will use the `ScopeLayoutBuilder`
