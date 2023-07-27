@@ -405,6 +405,8 @@ public:
 
     VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 
+    ConstantBufferType* getConstantBufferType(Type* elementType);
+
     DifferentialPairType* getDifferentialPairType(
         Type* valueType,
         Witness* primalIsDifferentialWitness);

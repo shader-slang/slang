@@ -304,6 +304,19 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
     return result;
 }
 
+ConstantBufferType* ASTBuilder::getConstantBufferType(Type* elementType)
+{
+    auto result = getOrCreate<ConstantBufferType>(elementType);
+    if (!result->declRef.getDecl())
+    {
+        auto genericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("ConstantBuffer"));
+        auto typeDecl = genericDecl->inner;
+        auto substitutions = getOrCreateGenericSubstitution(nullptr, genericDecl, elementType);
+        result->declRef = getSpecializedDeclRef<Decl>(typeDecl, substitutions);
+    }
+    return result;
+}
+
 VectorExpressionType* ASTBuilder::getVectorType(
     Type*    elementType,
     IntVal*  elementCount)
