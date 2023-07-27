@@ -2498,7 +2498,7 @@ namespace Slang
             // check if the specified type satisfies the constraints defined by the associated type
             if (auto requiredTypeDeclRef = requiredMemberDeclRef.as<AssocTypeDecl>())
             {
-                ensureDecl(typedefDeclRef, DeclCheckState::CanUseAsType);
+                ensureDecl(typedefDeclRef, DeclCheckState::ReadyForLookup);
 
                 auto satisfyingType = getNamedType(m_astBuilder, typedefDeclRef);
                 return doesTypeSatisfyAssociatedTypeRequirement(satisfyingType, requiredTypeDeclRef, witnessTable);

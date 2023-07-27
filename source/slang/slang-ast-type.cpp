@@ -465,7 +465,7 @@ Type* NamedExpressionType::_createCanonicalTypeOverride(SemanticsVisitor* semant
         innerType = getType(m_astBuilder, declRef);
     if (innerType)
         return innerType->getCanonicalType(semantics);
-    return nullptr;
+    return m_astBuilder->getErrorType();
 }
 
 HashCode NamedExpressionType::_getHashCodeOverride()
