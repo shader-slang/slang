@@ -2629,6 +2629,33 @@ void EndToEndCompileRequest::init()
     m_frontEndReq = new FrontEndCompileRequest(getLinkage(), m_writers, getSink());
 }
 
+SlangResult EndToEndCompileRequest::_writeHash(ComponentType* component)
+{
+    DigestBuilder<SHA1> builder;
+
+    getLinkage()->buildHash(builder, 0);
+
+    // Enumerate all file dependencies and add them to the hash.
+    for (SourceFile* sourceFile : component->getFileDependencies())
+    {
+        SHA1::Digest digest = SHA1::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
+        builder.append(digest);
+    }
+
+    component->buildHash(builder);
+
+    auto hash = builder.finalize().toBlob();
+    
+    // Make artifact from the hash blob.
+    auto hashArtifactDesc = ArtifactDesc::make(ArtifactKind::Text, ArtifactPayload::Miscellaneous);
+    auto hashArtifact = ArtifactUtil::createArtifact(hashArtifactDesc, "hash");
+    hashArtifact->addRepresentationUnknown(hash.get());
+    
+    _maybeWriteArtifact("", hashArtifact);
+
+    return SLANG_OK;
+}
+
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
     // If no code-generation target was specified, then try to infer one from the source language,
@@ -2703,6 +2730,15 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
             m_specializedEntryPoints);
         if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
+        
+        // If we are only generating a hash, then we can emit the hash and
+        // stop here.
+        // 
+        if (m_generateHashOnly)
+        {
+            _writeHash(m_specializedGlobalAndEntryPointsComponentType);
+            return SLANG_OK;
+        }
 
         // For each code generation target, we will generate specialized
         // parameter binding information (taking global generic
@@ -4935,6 +4971,11 @@ void EndToEndCompileRequest::setReportDownstreamTime(bool value)
 void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 {
     m_reportPerfBenchmark = value;
+}
+
+void EndToEndCompileRequest::setReportHashOnly(bool value)
+{
+    m_generateHashOnly = value;
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)

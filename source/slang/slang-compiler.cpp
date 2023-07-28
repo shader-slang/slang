@@ -1693,7 +1693,7 @@ namespace Slang
         }
         else
         {
-            SLANG_RETURN_ON_FAIL(_writeArtifact(path, artifact));
+            SLANG_RETURN_ON_FAIL(_writeArtifact("", artifact));
         }
     
         return SLANG_OK;
