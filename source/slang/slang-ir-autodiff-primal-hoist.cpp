@@ -496,9 +496,9 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     return hoistInfo;
 }
 
-// isSuccessor(res, arg, n) returns true if 'res = arg + n', if n is null
-// then any n is accepted and n is initialized.
-static bool isSuccessor(IRInst* res, IRInst* arg, IRConstant*& factor)
+// isSuccessor(res, arg, n) returns true if 'res = arg + n', returning 'n' in
+// factor
+static bool isAdditionOf(IRInst* res, IRInst* arg, IRIntegerValue& factor)
 {
     if (res->getOp() != kIROp_Add)
         return false;
@@ -512,15 +512,11 @@ static bool isSuccessor(IRInst* res, IRInst* arg, IRConstant*& factor)
 
     // This could be enhanced to any instruction which is constant in the loop
     // body.
-    const auto i = as<IRConstant>(n);
+    const auto i = as<IRIntLit>(n);
     if(!i)
         return false;
 
-    // .. and this could be less strict
-    if(factor)
-        return i->equal(factor);
-
-    factor = i;
+    factor = i->getValue();
     return true;
 }
 
@@ -567,9 +563,37 @@ struct ImplicationParams
         return x.condition == y.condition && x.induction == y.induction && x.block == y.block;
     }
 };
-static bool inductionImplicationHolds(
+struct ImplicationResult
+{
+    enum
+    {
+        // The value was not a constant offset from the induction variable and
+        // the condition variable was true
+        Falsified,
+        // The condition variable is false, so the value's relationship to the
+        // induction variable doesn't matter
+        AntecedentHolds,
+        // The value is a constant offset from the induction variable, stored
+        // in 'factor'
+        ConsequentHolds
+    } e;
+    IRIntegerValue factor;
+};
+static ImplicationResult join(const ImplicationResult& a, const ImplicationResult& b)
+{
+    ImplicationResult res;
+    if(a.e == ImplicationResult::Falsified || b.e == ImplicationResult::Falsified)
+        return {ImplicationResult::Falsified, 0};
+    if(a.e == ImplicationResult::AntecedentHolds)
+        return b;
+    if(b.e == ImplicationResult::AntecedentHolds)
+        return a;
+    if(a.factor != b.factor)
+        return {ImplicationResult::Falsified, 0};
+    return a;
+}
+static ImplicationResult inductionImplicationHolds(
     HashSet<ImplicationParams>& memo,
-    IRConstant*& factor,
     IRInst* const prevVal,
     IRInst* const conditionVal,
     IRInst* const inductiveVal,
@@ -580,17 +604,18 @@ static bool inductionImplicationHolds(
     // imagine an actual program which would lead to this however...
     const ImplicationParams i = {conditionVal, inductiveVal, block};
     if(!memo.add(i))
-        return false;
+        return {ImplicationResult::Falsified, 0};
 
     // The easy solution to this implication case is if the right
     // hand side is true.
-    if(isSuccessor(inductiveVal, prevVal, factor))
-        return true;
+    IRIntegerValue factor;
+    if(isAdditionOf(inductiveVal, prevVal, factor))
+        return {ImplicationResult::ConsequentHolds, factor};
 
     // Otherwise, check if the left hand side is true, i.e. the
     // condition variable is always false here.
     if(isAlwaysFalseInBlock(conditionVal, block))
-        return true;
+        return {ImplicationResult::AntecedentHolds, 0};
 
     // The last thing to try is to consider the case where the
     // inductive value under consideration is a parameter, in that case we can
@@ -601,18 +626,21 @@ static bool inductionImplicationHolds(
     // If it's not a parameter then we don't know how to continue
     // (in principle we could also hadle instructions such as loads here)
     if(!inductiveParam)
-        return false;
+        return {ImplicationResult::Falsified, 0};
 
     // If this is the previous value, then it's definitely not what we're
     // looking for.
     if(inductiveParam == prevVal)
-        return false;
+        return {ImplicationResult::Falsified, 0};
 
     const auto conditionParam = as<IRParam>(conditionVal);
     const auto inductiveParamIndex = block->getParamIndex(inductiveParam);
     const auto conditionParamIndex = block->getParamIndex(conditionParam);
 
-    bool holdsForAllPredecessors = true;
+    // If we have no predecessors, then all the possible values (none) of the
+    // condition variable are false, so our antecedent holds
+    ImplicationResult res = {ImplicationResult::AntecedentHolds, 0};
+
     for(const auto predecessor : block->getPredecessors())
     {
         const auto predTerminator = as<IRUnconditionalBranch>(predecessor->getTerminator());
@@ -624,16 +652,14 @@ static bool inductionImplicationHolds(
         const auto nextConditionParam =
             conditionParamIndex == -1 ? conditionParam : predTerminator->getArg(conditionParamIndex);
 
-        holdsForAllPredecessors &=
-            inductionImplicationHolds(memo, factor, prevVal, nextConditionParam, nextInductiveParam, predecessor);
+        const auto predResult = inductionImplicationHolds(memo, prevVal, nextConditionParam, nextInductiveParam, predecessor);
+        res = join(res, predResult);
 
-        if(!holdsForAllPredecessors)
+        if(res.e == ImplicationResult::Falsified)
             break;
     }
-    if(holdsForAllPredecessors)
-        return true;
 
-    return false;
+    return res;
 }
 
 void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode* func)
@@ -711,7 +737,7 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
             auto predecessors = targetBlock->getPredecessors();
             HashSet<ImplicationParams> memo;
             IRConstant* factor = nullptr;
-            bool isAnInductionVariable = true;
+            ImplicationResult impRes = {ImplicationResult::AntecedentHolds, 0};
             for(const auto predecessor : predecessors)
             {
                 // Since this is branching with a parameter, it can only be an
@@ -727,22 +753,34 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
                 const auto inductiveArg = predTerminator->getArg(paramIndex);
 
                 // Check that the required implication holds for this block
-                isAnInductionVariable &=
-                    inductionImplicationHolds(memo, factor, param, conditionArg, inductiveArg, predecessor);
-                if(!isAnInductionVariable)
+                const auto predRes = inductionImplicationHolds(memo, param, conditionArg, inductiveArg, predecessor);
+                impRes = join(impRes, predRes);
+                if(impRes.e == ImplicationResult::Falsified)
                     break;
             }
 
-            if(isAnInductionVariable)
+            switch(impRes.e)
             {
-                // The use of the add inst matches all of our conditions as an induction value
-                // that is a constant offset from the loop counter.
-                LoopInductionValueInfo info;
-                info.kind = LoopInductionValueInfo::Kind::AffineFunctionOfCounter;
-                info.loopInst = loopInst;
-                info.counterOffset = loopInst->getArg(paramIndex);
-                info.counterFactor = factor;
-                inductionValueInsts[param] = info;
+                // This wasn't an induction variable
+                case ImplicationResult::Falsified:
+                    break;
+
+                // The loop doesn't loop (because in every case the break flag is
+                // true)
+                case ImplicationResult::AntecedentHolds:
+                    break;
+
+                case ImplicationResult::ConsequentHolds:
+                {
+                    // The use of the add inst matches all of our conditions as an induction value
+                    // that is a constant offset from a multiple of the loop counter.
+                    LoopInductionValueInfo info;
+                    info.kind = LoopInductionValueInfo::Kind::AffineFunctionOfCounter;
+                    info.loopInst = loopInst;
+                    info.counterOffset = loopInst->getArg(paramIndex);
+                    info.counterFactor = impRes.factor;
+                    inductionValueInsts[param] = info;
+                }
             }
         }
     }
@@ -789,13 +827,13 @@ void applyToInst(
                     SLANG_ASSERT(indexInfo);
                     SLANG_ASSERT(indexInfo->getCount() != 0);
                     replacement = indexInfo->getFirst().diffCountParam;
-                    if (inductionValueInfo.counterFactor)
+                    if (inductionValueInfo.counterFactor != 1)
                     {
                         setInsertAfterOrdinaryInst(builder, replacement);
                         replacement = builder->emitMul(
                             replacement->getDataType(),
                             replacement,
-                            inductionValueInfo.counterFactor);
+                            builder->getIntValue(replacement->getDataType(), inductionValueInfo.counterFactor));
                     }
                     if (inductionValueInfo.counterOffset)
                     {
