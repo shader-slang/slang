@@ -2720,6 +2720,9 @@ namespace Slang
 
         // If set, will print out compiler performance benchmark results.
         bool m_reportPerfBenchmark = false;
+
+        // If set, will print out the hash and exit.
+        bool m_generateHashOnly = false;
         
         String m_diagnosticOutput;
 
@@ -2853,6 +2856,9 @@ namespace Slang
 
             /// Adds any extra settings to complete a targetRequest
         void _completeTargetRequest(UInt targetIndex);
+
+            /// Writes a hash.
+        SlangResult _writeHash(ComponentType* component);
         
         ISlangUnknown* getInterface(const Guid& guid);
 
