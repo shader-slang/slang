@@ -784,8 +784,9 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& inO
     // Neither of these options are strictly required, for general use of nvrtc,
     // but are enabled to make use withing Slang work more smoothly
     {
-        // Require c++14, as makes initialization construction with {} available and so simplifies code generation
-        cmdLine.addArg("-std=c++14");
+        // Require c++17, the default at the time of writing, since we share
+        // some functionality between slang itself and the compiled code
+        cmdLine.addArg("-std=c++17");
 
         // Disable all warnings
         // This is arguably too much - but nvrtc does not appear to have a mechanism to switch off individual warnings.
