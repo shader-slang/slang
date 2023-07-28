@@ -431,6 +431,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."},
         { OptionKind::ReportDownstreamTime, "-report-downstream-time", nullptr, "Reports the time spent in the downstream compiler." },
         { OptionKind::ReportPerfBenchmark, "-report-perf-benchmark", nullptr, "Reports compiler performance benchmark results." },
+        { OptionKind::ReportHashOnly, "-report-hash-only", nullptr, "Reports the hash of the program on stdout, then exits early." },
         { OptionKind::SourceEmbedStyle, "-source-embed-style", "-source-embed-style <source-embed-style>",
         "If source embedding is enabled, defines the style used. When enabled (with any style other than `none`), "
         "will write compile results into embeddable source for the target language. "
