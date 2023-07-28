@@ -380,6 +380,20 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
 
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
 {
+    // Special-case for differentiable existential types.
+    if (isExistentialType(origType))
+    {
+        if (differentiableTypeConformanceContext.lookUpConformanceForType(origType))
+        {
+            return (IRType*)_lookupWitness(
+                builder,
+                differentiableTypeConformanceContext.sharedContext->differentiableInterfaceType,
+                differentiableTypeConformanceContext.sharedContext->differentialAssocTypeStructKey);
+        }
+        else
+            return nullptr;
+    }
+
     auto primalType = lookupPrimalInst(builder, origType, origType);
     if (primalType->getOp() == kIROp_Param &&
         primalType->getParent() && primalType->getParent()->getParent() &&
@@ -475,10 +489,37 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
         return builder->getTupleType(diffTypeList);
     }
 
+    case kIROp_InterfaceType:
+    {
+        // If interface conforms to IDifferentiable, return the abstract associated type IDifferentiable.Differential
+        if (auto structKey = cast<IRStructKey>(differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)origType)))
+        {   
+            return (IRType*)_lookupWitness(
+                builder,
+                differentiableTypeConformanceContext.sharedContext->differentiableInterfaceType,
+                differentiableTypeConformanceContext.sharedContext->differentialAssocTypeStructKey);
+        }
+        else
+            return false;
+    }
+
     default:
     return (IRType*)maybeCloneForPrimalInst(
         builder,
         differentiableTypeConformanceContext.getDifferentialForType(builder, (IRType*)origType));
+    }
+}
+
+bool AutoDiffTranscriberBase::isExistentialType(IRType *type)
+{
+    switch (type->getOp())
+    {
+        case kIROp_ExtractExistentialType:
+        case kIROp_InterfaceType:
+        case kIROp_AssociatedType:
+            return true;
+        default:
+            return false;
     }
 }
 
@@ -762,12 +803,43 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(IRBuilder* bui
 // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
 // The current implementation requires that types are defined linearly.
 // 
-IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, IRType* originalType)
+IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(
+    IRBuilder* builder, IRType* originalType, IRInst* primalValue /*= nullptr*/)
 {
     originalType = (IRType*)unwrapAttributedType(originalType);
     auto primalType = (IRType*)lookupPrimalInst(builder, originalType);
     if (auto diffType = differentiateType(builder, originalType))
     {
+        if (isExistentialType(diffType))
+        {
+            SLANG_ASSERT(primalValue);
+
+            IRInst* outWitnessTable = nullptr;
+
+            // Search for IDifferentiable conformance.
+            // TODO: Handle the case where primalType is an associated type.
+            // 
+            auto interfaceType = cast<IRInterfaceType>(unwrapAttributedType(primalType));
+
+            List<IRInterfaceRequirementEntry*> lookupKeyPath = findDifferentiableInterfaceLookupPath(
+                autoDiffSharedContext->differentiableInterfaceType, interfaceType);
+
+            if (lookupKeyPath.getCount())
+            {
+                // `interfaceType` does conform to `IDifferentiable`.
+                outWitnessTable = builder->emitExtractExistentialWitnessTable(primalValue);
+                for (auto node : lookupKeyPath)
+                {
+                    outWitnessTable = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), outWitnessTable, node->getRequirementKey());
+                }
+                diffType = (IRType*)builder->emitLookupInterfaceMethodInst(builder->getTypeType(), outWitnessTable, autoDiffSharedContext->differentialAssocTypeStructKey);
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Could not call dzero() on differentiable existential type.");
+            }
+        }
+
         switch (diffType->getOp())
         {
         case kIROp_DifferentialPairType:

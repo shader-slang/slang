@@ -238,13 +238,13 @@ struct DifferentiableTypeConformanceContext
         return false;
     }
 
-    IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
+    IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType, IRInst* primalInst = nullptr)
     {
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);
         return result;
     }
 
-    IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
+    IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType, IRInst* primalInst = nullptr)
     {
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->addMethodStructKey);
         return result;

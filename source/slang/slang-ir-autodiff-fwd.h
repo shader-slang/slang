@@ -86,6 +86,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeWrapExistential(IRBuilder* builder, IRInst* origInst);
 
+    InstPair transcribeCreateExistentialObject(IRBuilder* builder, IRInst* origInst);
+
     InstPair transcribeDefaultConstruct(IRBuilder* builder, IRInst* origInst);
 
     virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;

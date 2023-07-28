@@ -35,6 +35,15 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
                 return entry->getSatisfyingVal();
         }
     }
+    else if (auto interfaceType = as<IRInterfaceType>(witness))
+    {
+        for (auto ii = 0; ii < interfaceType->getOperandCount(); ii++)
+        {
+            auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(ii));
+            if (entry->getRequirementKey() == requirementKey)
+                return entry->getRequirementVal();
+        }
+    }
     else
     {
         return builder->emitLookupInterfaceMethodInst(

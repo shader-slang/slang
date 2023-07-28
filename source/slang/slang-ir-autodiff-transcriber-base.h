@@ -112,7 +112,7 @@ struct AutoDiffTranscriberBase
 
     IRType* tryGetDiffPairType(IRBuilder* builder, IRType* primalType);
 
-    IRInst* getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType);
+    IRInst* getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType, IRInst* primalValue = nullptr);
 
     InstPair transcribeNonDiffInst(IRBuilder* builder, IRInst* origInst);
 
@@ -140,6 +140,8 @@ struct AutoDiffTranscriberBase
     InstPair transcribeInst(IRBuilder* builder, IRInst* origInst);
 
     IRType* _differentiateTypeImpl(IRBuilder* builder, IRType* origType);
+
+    bool isExistentialType(IRType* type);
 
     virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) = 0;
 
