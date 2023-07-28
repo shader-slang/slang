@@ -496,28 +496,105 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     return hoistInfo;
 }
 
-// isSuccessor(res, arg, n) returns true if 'res = arg + n', returning 'n' in
-// factor
-static bool isAdditionOf(IRInst* res, IRInst* arg, IRIntegerValue& factor)
+struct ImplicationParams
 {
-    if (res->getOp() != kIROp_Add)
-        return false;
-    auto n = res->getOperand(0);
-    auto argOperand = res->getOperand(1);
-    if(argOperand != arg)
-        std::swap(n, argOperand);
+    IRInst *condition, *induction, *block;
+    HashCode getHashCode() const { return getHashCodeBytewise(*this); }
+    // C++20: friend auto operator<=>(const ImplicationParams&, const ImplicationParams&) = default;
+    friend bool operator==(const ImplicationParams& x, const ImplicationParams& y)
+    {
+        return x.condition == y.condition && x.induction == y.induction && x.block == y.block;
+    }
+};
 
-    if(argOperand != arg)
-        return false;
+struct ImplicationResult
+{
+    enum
+    {
+        // The value was not a constant offset from the induction variable and
+        // the condition variable was true
+        Falsified,
+        // The condition variable is false, so the value's relationship to the
+        // induction variable doesn't matter
+        AntecedentHolds,
+        // The value is a constant offset from the induction variable, stored
+        // in 'factor'
+        ConsequentHolds
+    } e;
+    IRIntegerValue factor;
+};
 
-    // This could be enhanced to any instruction which is constant in the loop
-    // body.
-    const auto i = as<IRIntLit>(n);
-    if(!i)
-        return false;
+static ImplicationResult join(const ImplicationResult& a, const ImplicationResult& b)
+{
+    if(a.e == ImplicationResult::Falsified || b.e == ImplicationResult::Falsified)
+        return {ImplicationResult::Falsified, 0};
+    if(a.e == ImplicationResult::AntecedentHolds)
+        return b;
+    if(b.e == ImplicationResult::AntecedentHolds)
+        return a;
+    if(a.factor != b.factor)
+        return {ImplicationResult::Falsified, 0};
+    return a;
+}
 
-    factor = i->getValue();
+static ImplicationResult inductionImplicationHolds(
+    Dictionary<ImplicationParams, ImplicationResult>& memo,
+    IRInst* const prevVal,
+    IRInst* const conditionVal,
+    IRInst* const inductiveVal,
+    IRBlock* const block);
+
+static bool unpackConstantAddition(IRInst* addOrSub, IRInst*& operand, IRIntegerValue& constant)
+{
+    if(addOrSub->getOp() != kIROp_Add && addOrSub->getOp() != kIROp_Sub)
+        return false;
+    const bool negate = addOrSub->getOp() == kIROp_Sub;
+
+    auto o = addOrSub->getOperand(0);
+    auto c = addOrSub->getOperand(1);
+    if(!as<IRIntLit>(c))
+        std::swap(o, c);
+    const auto cLit = as<IRIntLit>(c);
+    if(!cLit)
+        return false;
+    operand = o;
+    constant = cLit->getValue();
+    // Check that we can actually represent this!
+    if(negate && constant == std::numeric_limits<IRIntegerValue>::min())
+        return false;
+    constant *= negate ? -1 : 1;
     return true;
+}
+
+// isAdditionOf(m, i, p, c, f) returns true if it can prove `c => i = p + f`
+// for some constant factor f
+static bool isAdditionOf(
+    Dictionary<ImplicationParams, ImplicationResult>& memo,
+    IRInst* inductiveVal,
+    IRInst* prevVal,
+    IRInst* conditionVal,
+    IRIntegerValue& factor)
+{
+    IRInst* operand;
+    IRIntegerValue constant;
+    if(!unpackConstantAddition(inductiveVal, operand, constant))
+        return false;
+
+    const auto impRes = inductionImplicationHolds(
+        memo,
+        prevVal,
+        conditionVal,
+        operand,
+        as<IRBlock>(inductiveVal->getParent()));
+
+    if(impRes.e == ImplicationResult::ConsequentHolds)
+    {
+        // TODO: Check for overflow here (strictly speaking it shouldn't
+        // matter in the end numerically (except that this could be UB)).
+        factor = impRes.factor + constant;
+        return true;
+    }
+    return false;
 }
 
 // Returns true if we can prove that in this block this value is
@@ -553,69 +630,44 @@ static bool isAlwaysFalseInBlock(IRInst* inst, IRBlock* block)
 //
 // It returns true if at the time of the branch: 'isTrue(c) => isInductiveValue(i, p)'
 // It return false if it can't prove this implication holds.
-struct ImplicationParams
-{
-    IRInst *condition, *induction, *block;
-    HashCode getHashCode() const { return getHashCodeBytewise(*this); }
-    // C++20: friend auto operator<=>(const ImplicationParams&, const ImplicationParams&) = default;
-    friend bool operator==(const ImplicationParams& x, const ImplicationParams& y)
-    {
-        return x.condition == y.condition && x.induction == y.induction && x.block == y.block;
-    }
-};
-struct ImplicationResult
-{
-    enum
-    {
-        // The value was not a constant offset from the induction variable and
-        // the condition variable was true
-        Falsified,
-        // The condition variable is false, so the value's relationship to the
-        // induction variable doesn't matter
-        AntecedentHolds,
-        // The value is a constant offset from the induction variable, stored
-        // in 'factor'
-        ConsequentHolds
-    } e;
-    IRIntegerValue factor;
-};
-static ImplicationResult join(const ImplicationResult& a, const ImplicationResult& b)
-{
-    ImplicationResult res;
-    if(a.e == ImplicationResult::Falsified || b.e == ImplicationResult::Falsified)
-        return {ImplicationResult::Falsified, 0};
-    if(a.e == ImplicationResult::AntecedentHolds)
-        return b;
-    if(b.e == ImplicationResult::AntecedentHolds)
-        return a;
-    if(a.factor != b.factor)
-        return {ImplicationResult::Falsified, 0};
-    return a;
-}
 static ImplicationResult inductionImplicationHolds(
-    HashSet<ImplicationParams>& memo,
+    Dictionary<ImplicationParams, ImplicationResult>& memo,
     IRInst* const prevVal,
     IRInst* const conditionVal,
     IRInst* const inductiveVal,
     IRBlock* const block)
 {
-    // If we've seen these values before then our proof isn't getting any
-    // smaller! Return false to avoid a self-referential proof, it's hard to
-    // imagine an actual program which would lead to this however...
+    // If we have a result memoized we can safely return that.
     const ImplicationParams i = {conditionVal, inductiveVal, block};
-    if(!memo.add(i))
-        return {ImplicationResult::Falsified, 0};
+    const auto memoized = memo.tryGetValue(i);
+    if(memoized)
+        return *memoized;
 
-    // The easy solution to this implication case is if the right
-    // hand side is true.
-    IRIntegerValue factor;
-    if(isAdditionOf(inductiveVal, prevVal, factor))
-        return {ImplicationResult::ConsequentHolds, factor};
+    // While we are detemining if the implication holds at this position we set
+    // the result to Falsified so as to fail if we require a self-referential
+    // proof
+    memo.add(i, {ImplicationResult::Falsified, 0});
+    // A helper to record the solution as we're returning
+    const auto andRemember = [&memo, i](ImplicationResult r) {
+        memo.set(i, r);
+        return r;
+    };
 
-    // Otherwise, check if the left hand side is true, i.e. the
-    // condition variable is always false here.
+    // Our most general solution is if the left hand side of the implication is
+    // false, in which case we can return success without specifying a factor
     if(isAlwaysFalseInBlock(conditionVal, block))
-        return {ImplicationResult::AntecedentHolds, 0};
+        return andRemember({ImplicationResult::AntecedentHolds, 0});
+
+    // Otherwise, we handle the additive case
+    // One easy case is that this *is* the previous value, in which case it's a
+    // trivial solution with an addition of 0
+    if(prevVal == inductiveVal)
+        return andRemember({ImplicationResult::ConsequentHolds, 0});
+
+    // Otherwise is it a function over the inductive variable
+    IRIntegerValue factor;
+    if(isAdditionOf(memo, inductiveVal, prevVal, conditionVal, factor))
+        return andRemember({ImplicationResult::ConsequentHolds, factor});
 
     // The last thing to try is to consider the case where the
     // inductive value under consideration is a parameter, in that case we can
@@ -626,11 +678,6 @@ static ImplicationResult inductionImplicationHolds(
     // If it's not a parameter then we don't know how to continue
     // (in principle we could also hadle instructions such as loads here)
     if(!inductiveParam)
-        return {ImplicationResult::Falsified, 0};
-
-    // If this is the previous value, then it's definitely not what we're
-    // looking for.
-    if(inductiveParam == prevVal)
         return {ImplicationResult::Falsified, 0};
 
     const auto conditionParam = as<IRParam>(conditionVal);
@@ -659,7 +706,7 @@ static ImplicationResult inductionImplicationHolds(
             break;
     }
 
-    return res;
+    return andRemember(res);
 }
 
 void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode* func)
@@ -735,8 +782,7 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
                 continue;
 
             auto predecessors = targetBlock->getPredecessors();
-            HashSet<ImplicationParams> memo;
-            IRConstant* factor = nullptr;
+            Dictionary<ImplicationParams, ImplicationResult> memo;
             ImplicationResult impRes = {ImplicationResult::AntecedentHolds, 0};
             for(const auto predecessor : predecessors)
             {
