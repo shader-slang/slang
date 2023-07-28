@@ -1952,6 +1952,8 @@ namespace Slang
 
         void setRequireCacheFileSystem(bool requireCacheFileSystem);
 
+        void setUseShallowChecking(bool useShallowChecking);
+
         void setFileSystem(ISlangFileSystem* fileSystem);
 
         /// The layout to use for matrices by default (row/column major)
@@ -1970,6 +1972,7 @@ namespace Slang
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
         bool m_enableEffectAnnotations = false;
+        bool m_useShallowChecking = false;
 
         // Modules that have been read in with the -r option
         List<ComPtr<IArtifact>> m_libModules;
@@ -2182,6 +2185,11 @@ namespace Slang
 
             /// Does the code we are compiling represent part of the Slang standard library?
         bool m_isStandardLibraryCode = false;
+
+            /// Shallow-mode performs a lightweight version of semantic checking that only
+            /// checks imports and includes. Used for file/module dependency analysis.
+            /// 
+        bool m_shallowMode = false;
 
         Name* m_defaultModuleName = nullptr;
 

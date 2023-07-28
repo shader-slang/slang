@@ -54,6 +54,7 @@
 
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
+#include "slang-compiler.h"
 
 extern Slang::String get_slang_cuda_prelude();
 extern Slang::String get_slang_cpp_prelude();
@@ -2369,6 +2370,10 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
         // this scenario with a recursive style checking.
         loadedModules.add(translationUnit->moduleName, translationUnit->getModule());
     }
+
+    if (getLinkage()->m_useShallowChecking)
+        return;
+
     checkEntryPoints();
 }
 
@@ -2546,6 +2551,9 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         m_unspecializedEntryPoints);
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
+
+    if (getLinkage()->m_useShallowChecking)
+        return SLANG_OK;
 
     // We always generate IR for all the translation units.
     //
@@ -3036,6 +3044,9 @@ RefPtr<Module> Linkage::loadModule(
     CompileTimerRAII recordCompileTime(static_cast<Session*>(getGlobalSession()));
 
     RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
+
+    if (m_useShallowChecking)
+        frontEndReq->m_shallowMode = true;
 
     frontEndReq->additionalLoadedModules = additionalLoadedModules;
 
@@ -4655,6 +4666,11 @@ void Linkage::setRequireCacheFileSystem(bool requireCacheFileSystem)
     setFileSystem(scopeFileSystem);
 }
 
+void Linkage::setUseShallowChecking(bool useShallowChecking)
+{
+    m_useShallowChecking = useShallowChecking;
+}
+
 RefPtr<Module> findOrImportModule(
     Linkage*            linkage,
     Name*               name,
@@ -4974,6 +4990,7 @@ void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 void EndToEndCompileRequest::setReportHashOnly(bool value)
 {
     m_generateHashOnly = value;
+    getLinkage()->setUseShallowChecking(true);
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)

@@ -1842,6 +1842,9 @@ namespace Slang
             ensureDecl(importDecl, DeclCheckState::Checked);
         }
 
+        if (getLinkage()->m_useShallowChecking)
+            return;
+
         // The entire goal of semantic checking is to get all of the
         // declarations in the module up to `DeclCheckState::Checked`.
         //
