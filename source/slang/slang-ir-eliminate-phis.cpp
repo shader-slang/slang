@@ -140,11 +140,10 @@ struct PhiEliminationContext
     {
         IRBuilder builder(m_module);
 
-        for (auto instAlloc : m_registerAllocation.mapInstToRegister)
+        for (const auto& [inst, reg] : m_registerAllocation.mapInstToRegister)
         {
-            auto inst = instAlloc.key;
             IRInst* registerVar = nullptr;
-            m_mapRegToTempVar.tryGetValue(instAlloc.value, registerVar);
+            m_mapRegToTempVar.tryGetValue(reg, registerVar);
             SLANG_RELEASE_ASSERT(registerVar);
 
             switch (inst->getOp())
@@ -159,7 +158,7 @@ struct PhiEliminationContext
                     m_registerAllocation.mapInstToRegister.tryGetValue(updateInst->getOldValue(), oldReg);
                     // If the original value is not assigned to the same register as this inst,
                     // we need to insert a copy.
-                    if (instAlloc.value != oldReg)
+                    if (reg != oldReg)
                     {
                         builder.emitStore(registerVar, updateInst->getOldValue());
                     }
@@ -178,11 +177,10 @@ struct PhiEliminationContext
     {
         IRBuilder builder(m_module);
 
-        for (auto instAlloc : m_registerAllocation.mapInstToRegister)
+        for (const auto& [inst, reg] : m_registerAllocation.mapInstToRegister)
         {
-            auto inst = instAlloc.key;
             IRInst* registerVar = nullptr;
-            m_mapRegToTempVar.tryGetValue(instAlloc.value, registerVar);
+            m_mapRegToTempVar.tryGetValue(reg, registerVar);
             SLANG_RELEASE_ASSERT(registerVar);
             while (auto use = inst->firstUse)
             {

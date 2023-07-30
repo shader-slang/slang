@@ -333,10 +333,8 @@ void specializeDispatchFunctions(SharedGenericsLoweringContext* sharedContext)
     ensureWitnessTableSequentialIDs(sharedContext);
 
     // Generate specialized dispatch functions and fixup call sites.
-    for (auto kv : sharedContext->mapInterfaceRequirementKeyToDispatchMethods)
+    for (const auto& [_, dispatchFunc] : sharedContext->mapInterfaceRequirementKeyToDispatchMethods)
     {
-        auto dispatchFunc = kv.value;
-
         // Generate a specialized `switch` statement based dispatch func,
         // from the witness tables present in the module.
         auto newDispatchFunc = specializeDispatchFunction(sharedContext, dispatchFunc);

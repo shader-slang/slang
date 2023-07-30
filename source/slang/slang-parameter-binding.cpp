@@ -3171,9 +3171,8 @@ void diagnoseGlobalUniform(
 static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingContext* bindingContext, LayoutResourceKind kind)
 {
     int numUsed = 0;
-    for (auto& pair : bindingContext->shared->globalSpaceUsedRangeSets)
+    for (auto& [_, rangeSet] : bindingContext->shared->globalSpaceUsedRangeSets)
     {
-        UsedRangeSet* rangeSet = pair.value;
         const auto& usedRanges = rangeSet->usedResourceRanges[kind];
         for (const auto& usedRange : usedRanges.ranges)
         {

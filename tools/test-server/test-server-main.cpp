@@ -185,10 +185,8 @@ SlangResult TestServer::init(int argc, const char* const* argv)
 
 TestServer::~TestServer()
 {
-    for (auto& pair : m_unitTestModules)
-    {
-        pair.value->destroy();
-    }
+    for (auto& [_, value] : m_unitTestModules)
+        value->destroy();
 }
 
 slang::IGlobalSession* TestServer::getOrCreateGlobalSession()

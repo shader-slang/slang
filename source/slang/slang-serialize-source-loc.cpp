@@ -124,9 +124,8 @@ void SerialSourceLocWriter::write(SerialSourceLocData* outSourceLocData)
 
     // Okay we can now calculate the final source information
 
-    for (auto& pair : m_sourceFileMap)
+    for (const auto& [_, debugSourceFile] : m_sourceFileMap)
     {
-        Source* debugSourceFile = pair.value;
         SourceFile* sourceFile = debugSourceFile->m_sourceFile;
 
         SerialSourceLocData::SourceInfo sourceInfo;

@@ -2006,11 +2006,11 @@ namespace Slang
         // Once things are done, we will install the satisfying values
         // into the witness table for the requirements.
         //
-        for( auto p : mapRequiredToSatisfyingAccessorDeclRef )
+        for( const auto& [key, value] : mapRequiredToSatisfyingAccessorDeclRef )
         {
             witnessTable->add(
-                p.key.getDecl(),
-                RequirementWitness(p.value));
+                key.getDecl(),
+                RequirementWitness(value));
         }
         //
         // Note: the property declaration itself isn't something that
@@ -3262,9 +3262,9 @@ namespace Slang
         // difference between our synthetic property and a hand-written
         // one with the same behavior.
         //
-        for(auto p : mapRequiredAccessorToSynAccessor)
+        for(auto& [key, value] : mapRequiredAccessorToSynAccessor)
         {
-            witnessTable->add(p.key.getDecl(), RequirementWitness(makeDeclRef(p.value)));
+            witnessTable->add(key.getDecl(), RequirementWitness(makeDeclRef(value)));
         }
         witnessTable->add(requiredMemberDeclRef.getDecl(),
             RequirementWitness(makeDeclRef(synPropertyDecl)));
@@ -5457,9 +5457,8 @@ namespace Slang
             _addTargetModifiers(newDecl, newTargets);
 
             bool hasConflict = false;
-            for (auto& pair : newTargets)
+            for (auto& [target, value] : newTargets)
             {
-                Name* target = pair.key;
                 auto found = currentTargets.tryGetValue(target);
                 if (found)
                 {
@@ -6663,10 +6662,10 @@ namespace Slang
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
     {
-        for( auto& entry : moduleDecl->mapTypeToCandidateExtensions )
+        for( auto& [entryKey, entryValue] : moduleDecl->mapTypeToCandidateExtensions )
         {
-            auto& list = _getCandidateExtensionList(entry.key, m_mapTypeDeclToCandidateExtensions);
-            list.addRange(entry.value->candidateExtensions);
+            auto& list = _getCandidateExtensionList(entryKey, m_mapTypeDeclToCandidateExtensions);
+            list.addRange(entryValue->candidateExtensions);
         }
     }
 

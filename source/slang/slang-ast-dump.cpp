@@ -386,11 +386,8 @@ struct ASTDumpContext
         m_writer->emit(" { \n");
         m_writer->indent();
 
-        for (auto iter : dict)
+        for (const auto& [key, value] : dict)
         {
-            const auto& key = iter.key;
-            const auto& value = iter.value;
-
             dump(key);
             m_writer->emit(" : ");
             dump(value);

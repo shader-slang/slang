@@ -120,9 +120,9 @@ namespace Slang
                 if (env->mapOldValToNew.containsKey(inst))
                     newPrimalsInfo->instsToInvert.add(env->mapOldValToNew[inst]);
 
-            for (auto kvpair : this->invertInfoMap)
-                if (env->mapOldValToNew.containsKey(kvpair.key))
-                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[kvpair.key]] = kvpair.value.applyMap(env);
+            for (auto [key, value] : this->invertInfoMap)
+                if (env->mapOldValToNew.containsKey(key))
+                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[key]] = value.applyMap(env);
             
             return newPrimalsInfo;
         }
@@ -141,8 +141,8 @@ namespace Slang
             for (auto inst : info->instsToInvert)
                 instsToInvert.add(inst);
 
-            for (auto kvpair : info->invertInfoMap)
-                invertInfoMap[kvpair.key] = kvpair.value;
+            for (auto [key, value] : info->invertInfoMap)
+                invertInfoMap[key] = value;
         }
     };
 

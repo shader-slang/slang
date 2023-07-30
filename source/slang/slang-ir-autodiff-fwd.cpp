@@ -1608,10 +1608,8 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
             if (inst->getOp() == kIROp_Return)
             {
                 builder.setInsertBefore(inst);
-                for (auto& kv : mapParamToTempVar)
-                {
-                    builder.emitStore(kv.key, builder.emitLoad(kv.value));
-                }
+                for (const auto& [param, var] : mapParamToTempVar)
+                    builder.emitStore(param, builder.emitLoad(var));
             }
         }
     }

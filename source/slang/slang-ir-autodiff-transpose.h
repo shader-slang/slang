@@ -903,16 +903,16 @@ struct DiffTransposePass
         // Also handle any remaining gradients for insts that appear in prior blocks.
         List<IRInst*> externInsts; // Holds insts in a different block, same function.
         List<IRInst*> globalInsts; // Holds insts in the global scope.
-        for (auto pair : gradientsMap)
+        for (const auto& [inst, _] : gradientsMap)
         {
-            auto instParent = pair.key->getParent();
+            auto instParent = inst->getParent();
             if (instParent != fwdBlock)
             {
                 if (instParent->getParent() == fwdBlock->getParent())
-                    externInsts.add(pair.key);
+                    externInsts.add(inst);
                 
                 if (as<IRModuleInst>(instParent))
-                    globalInsts.add(pair.key);
+                    globalInsts.add(inst);
             }
         }
 

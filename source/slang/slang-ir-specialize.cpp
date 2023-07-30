@@ -698,18 +698,18 @@ struct SpecializationContext
         builder.setInsertInto(moduleInst);
         auto dictInst = builder.emitIntrinsicInst(nullptr, dictOp, 0, nullptr);
         builder.setInsertInto(dictInst);
-        for (auto kv : dict)
+        for (const auto& [key, value] : dict)
         {
-            if (!kv.value->parent)
+            if (!value->parent)
                 continue;
-            for (auto keyVal : kv.key.vals)
+            for (auto keyVal : key.vals)
             {
                 if (!keyVal->parent) goto next;
             }
             {
                 List<IRInst*> args;
-                args.add(kv.value);
-                args.addRange(kv.key.vals);
+                args.add(value);
+                args.addRange(key.vals);
                 builder.emitIntrinsicInst(nullptr, kIROp_SpecializationDictionaryItem, args.getCount(), args.getBuffer());
             }
         next:;

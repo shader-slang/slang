@@ -235,12 +235,10 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
         container.addDataChunk(RiffFileSystemBinary::kHeaderFourCC, &header, sizeof(header));
     }
 
-    for (const auto& pair : m_entries)
+    for (const auto& [_, srcEntry] : m_entries)
     {
-        const Entry* srcEntry = &pair.value;
-
         // Ignore the root entry
-        if (srcEntry->m_canonicalPath == toSlice("."))
+        if (srcEntry.m_canonicalPath == toSlice("."))
         {
             continue;
         }
@@ -250,22 +248,22 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
         RiffFileSystemBinary::Entry dstEntry;
         dstEntry.uncompressedSize = 0;
         dstEntry.compressedSize = 0;
-        dstEntry.pathSize = uint32_t(srcEntry->m_canonicalPath.getLength() + 1);
-        dstEntry.pathType = srcEntry->m_type;
+        dstEntry.pathSize = uint32_t(srcEntry.m_canonicalPath.getLength() + 1);
+        dstEntry.pathType = srcEntry.m_type;
 
-        ISlangBlob* blob = srcEntry->m_contents;
+        ISlangBlob* blob = srcEntry.m_contents;
 
-        if (srcEntry->m_type == SLANG_PATH_TYPE_FILE)
+        if (srcEntry.m_type == SLANG_PATH_TYPE_FILE)
         {
             dstEntry.compressedSize = uint32_t(blob->getBufferSize());
-            dstEntry.uncompressedSize = uint32_t(srcEntry->m_uncompressedSizeInBytes);
+            dstEntry.uncompressedSize = uint32_t(srcEntry.m_uncompressedSizeInBytes);
         }
 
         // Entry header
         container.write(&dstEntry, sizeof(dstEntry));
 
         // Path
-        container.write(srcEntry->m_canonicalPath.getBuffer(), srcEntry->m_canonicalPath.getLength() + 1);
+        container.write(srcEntry.m_canonicalPath.getBuffer(), srcEntry.m_canonicalPath.getLength() + 1);
 
         // Add the contained data without copying
         if (blob)
