@@ -27,10 +27,7 @@ namespace Slang
         {
             IRType* originalType;
             IRIntegerValue anyValueSize;
-            bool operator ==(MarshallingFunctionKey other)
-            {
-                return originalType == other.originalType && anyValueSize == other.anyValueSize;
-            }
+            bool operator==(const MarshallingFunctionKey&) const = default;
             HashCode getHashCode() const
             {
                 return combineHash(Slang::getHashCode(originalType), Slang::getHashCode(anyValueSize));

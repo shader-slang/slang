@@ -55,7 +55,7 @@ namespace Slang
             value = that.value;
             return *this;
         }
-        HashCode getHashCode()
+        HashCode getHashCode() const
         {
             return combineHash(
                 Slang::getHashCode(key),

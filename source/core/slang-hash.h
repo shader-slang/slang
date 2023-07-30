@@ -113,7 +113,7 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static HashCode getHashCode(TKey& key)
+		static HashCode getHashCode(const TKey& key)
 		{
 			return (HashCode)key;
 		}
@@ -123,7 +123,7 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static HashCode getHashCode(TKey& key)
+		static HashCode getHashCode(const TKey& key)
 		{
 			return HashCode(key.getHashCode());
 		}
@@ -146,7 +146,7 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static HashCode getHashCode(TKey& key)
+		static HashCode getHashCode(const TKey& key)
 		{
 			return Hash<std::is_integral<TKey>::value || std::is_enum<TKey>::value>::getHashCode(key);
 		}

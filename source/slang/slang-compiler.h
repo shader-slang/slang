@@ -1697,11 +1697,8 @@ namespace Slang
     {
         slang::TypeReflection* elementType;
         slang::ContainerType containerType;
-        bool operator==(ContainerTypeKey other)
-        {
-            return elementType == other.elementType && containerType == other.containerType;
-        }
-        Slang::HashCode getHashCode()
+        bool operator==(const ContainerTypeKey&) const = default;
+        Slang::HashCode getHashCode() const
         {
             return Slang::combineHash(
                 Slang::getHashCode(elementType), Slang::getHashCode(containerType));

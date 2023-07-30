@@ -1074,16 +1074,8 @@ struct ShaderOffset
     {
         return (uint32_t)(((bindingRangeIndex << 20) + bindingArrayIndex) ^ uniformOffset);
     }
-    bool operator==(const ShaderOffset& other) const
-    {
-        return uniformOffset == other.uniformOffset
-            && bindingRangeIndex == other.bindingRangeIndex
-            && bindingArrayIndex == other.bindingArrayIndex;
-    }
-    bool operator!=(const ShaderOffset& other) const
-    {
-        return !this->operator==(other);
-    }
+    bool operator==(const ShaderOffset&) const = default;
+    bool operator!=(const ShaderOffset&) const = default;
     bool operator<(const ShaderOffset& other) const
     {
         if (bindingRangeIndex < other.bindingRangeIndex)
