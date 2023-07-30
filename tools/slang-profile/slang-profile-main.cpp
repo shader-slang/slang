@@ -17,7 +17,7 @@ SlangResult innerMain(int argc, char** argv)
 
     // Time the creation of the session
     {
-        const auto startTick = ProcessUtil::getClockTick();
+        const auto startTick = Process::getClockTick();
 
         for (Int i = 0; i < 32; ++i)
         {
@@ -25,9 +25,9 @@ SlangResult innerMain(int argc, char** argv)
             slangSession.attach(spCreateSession(nullptr));
         }
 
-        const auto endTick = ProcessUtil::getClockTick();
+        const auto endTick = Process::getClockTick();
 
-        printf("Ticks %f\n", double(endTick - startTick) / ProcessUtil::getClockFrequency());
+        printf("Ticks %f\n", double(endTick - startTick) / Process::getClockFrequency());
         return SLANG_OK;
     }
 
