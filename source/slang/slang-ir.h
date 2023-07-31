@@ -2009,6 +2009,7 @@ public:
     {
         hashCode = _getHashCode();
     }
+    IRInstKey& operator=(const IRInstKey&) = default;
     HashCode getHashCode() const { return hashCode; }
     IRInst* getInst() const { return inst; }
 
