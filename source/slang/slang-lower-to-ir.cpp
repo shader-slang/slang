@@ -3311,7 +3311,14 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // to handle that case might be.
                 // 
                 if (as<IRCall>(materializedVal.val))
-                    getBuilder()->addDecoration(materializedVal.val, kIROp_TreatAsDifferentiableDecoration);
+                {
+                    if (expr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
+                        getBuilder()->addDecoration(materializedVal.val, kIROp_TreatCallAsDifferentiableDecoration);
+                    else if (expr->flavor == TreatAsDifferentiableExpr::Flavor::Differentiable)
+                        getBuilder()->addDecoration(materializedVal.val, kIROp_DifferentiableCallDecoration);
+                    else
+                        SLANG_UNEXPECTED("Unknown TreatAsDifferentiableExpr::Flavor");
+                }
 
                 innerInst = getSimpleVal(context, materializedVal);
                 
@@ -3324,13 +3331,19 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
             else
             {
-                SLANG_ASSERT("TreatAsDifferentiableExpr on non-simple l-values not properly defined.");
+                SLANG_UNEXPECTED("TreatAsDifferentiableExpr on non-simple l-values not properly defined.");
             }
         }
         else
         {
-            if (as<IRCall>(baseVal.val))
-                getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableDecoration);
+            if (auto callInst = as<IRCall>(baseVal.val))
+                if (expr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
+                    getBuilder()->addDecoration(callInst, kIROp_TreatCallAsDifferentiableDecoration);
+                else if (expr->flavor == TreatAsDifferentiableExpr::Flavor::Differentiable)
+                    getBuilder()->addDecoration(callInst, kIROp_DifferentiableCallDecoration);
+                else
+                    SLANG_UNEXPECTED("Unknown TreatAsDifferentiableExpr::Flavor");
+
             innerInst = baseVal.val;
         }
 

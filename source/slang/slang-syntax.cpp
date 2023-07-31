@@ -575,7 +575,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 SLANG_ASSERT(subst && subst->getArgs().getCount() >= 1);
                 auto textureTag = TextureFlavor(magicMod->tag);
                 Val* sampleCount = nullptr;
-                if (textureTag.isMultisample() && textureTag.getAccess() == SLANG_RESOURCE_ACCESS_READ_WRITE)
+                if (textureTag.isMultisample())
                 {
                     if (subst->getArgs().getCount() >= 2)
                         sampleCount = ExtractGenericArgInteger(subst->getArgs().getLast());

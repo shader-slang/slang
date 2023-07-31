@@ -396,6 +396,7 @@ class VaryingParameterGroupType : public ParameterGroupType
 class ConstantBufferType : public UniformParameterGroupType 
 {
     SLANG_AST_CLASS(ConstantBufferType)
+    ConstantBufferType(Type* elementType) { SLANG_UNUSED(elementType); }
 };
 
 

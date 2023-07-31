@@ -155,13 +155,14 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     m_writer->emit("layout(");
     m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
 
-    
+    bool isReadOnly = (as<IRHLSLStructuredBufferType>(structuredBufferType) != nullptr);
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
         // We can use ShaderResource/DescriptorSlot interchangably here. 
        // This is possible because vk-shift-*
-        const LayoutResourceKindFlags kinds = LayoutResourceKindFlag::ShaderResource | LayoutResourceKindFlag::DescriptorTableSlot;
+        const LayoutResourceKindFlags kinds = (isReadOnly ? LayoutResourceKindFlag::ShaderResource : LayoutResourceKindFlag::UnorderedAccess)
+            | LayoutResourceKindFlag::DescriptorTableSlot;
 
         EmitVarChain chain(layout);
 
@@ -240,7 +241,10 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     {
         // We can use ShaderResource/DescriptorSlot interchangably here. 
         // This is possible because vk-shift-*
-        const LayoutResourceKindFlags kinds = LayoutResourceKindFlag::ShaderResource | LayoutResourceKindFlag::DescriptorTableSlot;
+        bool isReadOnly = (as<IRHLSLByteAddressBufferType>(byteAddressBufferType) != nullptr);
+
+        const LayoutResourceKindFlags kinds = (isReadOnly ? LayoutResourceKindFlag::ShaderResource : LayoutResourceKindFlag::UnorderedAccess)
+            | LayoutResourceKindFlag::DescriptorTableSlot;
 
         EmitVarChain chain(layout);
 

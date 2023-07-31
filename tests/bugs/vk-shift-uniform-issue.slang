@@ -1,31 +1,39 @@
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -profile ps_4_0 -entry main -fvk-t-shift 10 all  -fvk-s-shift 100 all -fvk-u-shift 100 all -fvk-b-shift 1000 all
 
 // CHECK:layout(binding = 10)
-// CHECK:uniform texture2D texture0_0;
+// CHECK-NEXT:uniform texture2D texture0_0;
 
 // CHECK:layout(binding = 100)
-// CHECK:uniform sampler sampler0_0;
+// CHECK-NEXT:uniform sampler sampler0_0;
 
 // CHECK:layout(binding = 11, set = 2)
-// CHECK:uniform texture2D texture1_0;
+// CHECK-NEXT:uniform texture2D texture1_0;
 
 // CHECK:layout(binding = 101, set = 2)
-// CHECK:uniform sampler sampler1_0;
+// CHECK-NEXT:uniform sampler sampler1_0;
+
+// CHECK: layout(push_constant)
+// CHECK-NEXT: layout(std140) uniform
 
 // CHECK:layout(binding = 1004)
-// CHECK:layout(std140) uniform _S1
+// CHECK-NEXT:layout(std140) uniform
 
 // CHECK:layout(binding = 1003)
-// CHECK:layout(std140) uniform _S2
+// CHECK-NEXT:layout(std140) uniform
 
 // CHECK:layout(binding = 1002)
-// CHECK:layout(std140) uniform _S3
+// CHECK-NEXT:layout(std140) uniform
 
 // CHECK:layout(binding = 1001)
-// CHECK:layout(std140) uniform _S4
+// CHECK-NEXT:layout(std140) uniform
 
-// CHECK:layout(binding = 0)
-// CHECK:layout(std140) uniform _S5
+// CHECK: struct GlobalParams
+// CHECK-NEXT: {
+// CHECK-NEXT: float g_value
+// CHECK-NEXT: }
+
+// CHECK:layout(binding = 1000)
+// CHECK-NEXT:layout(std140) uniform
 
 Texture2D texture0; 
 SamplerState sampler0;
@@ -59,10 +67,10 @@ struct StructA
 { 
     float a;
 };
- 
-[[ vk::push_constant ]] 
+
+[[ vk::push_constant ]]
 StructA pushConstantA;
-  
+
 struct PixelInput
 { 
     float4 t : TEXCOORD0; 

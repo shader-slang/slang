@@ -92,6 +92,7 @@ enum class OptionKind
 
     VulkanBindShift,
     VulkanBindGlobals,
+    VulkanInvertY,
 
     GLSLForceScalarLayout,
     EnableEffectAnnotations,
@@ -496,6 +497,7 @@ void initCommandOptions(CommandOptions& options)
         "* [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)\n" },
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
         "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
+        { OptionKind::VulkanInvertY, "-fvk-invert-y", nullptr, "Negates (additively inverts) SV_Position.y before writing to stage output."},
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
@@ -2006,6 +2008,12 @@ SlangResult OptionsParser::_parse(
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSet));
 
                 m_hlslToVulkanLayoutOptions->setGlobalsBinding(Index(bindingSet), Index(binding));
+                break;
+            }
+            case OptionKind::VulkanInvertY:
+            {
+                // -fvk-invert-y
+                m_hlslToVulkanLayoutOptions->setInvertY(true);
                 break;
             }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;

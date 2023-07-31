@@ -2265,6 +2265,7 @@ namespace Slang
                 {
                     maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
                 }
+
                 if (auto calleeExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
                 {
                     if (auto calleeDecl = as<FunctionDeclBase>(calleeExpr->declRef.getDecl()))
@@ -2279,6 +2280,7 @@ namespace Slang
                                 newFuncExpr->type = checkedInvokeExpr->type;
                                 newFuncExpr->innerExpr = checkedInvokeExpr;
                                 newFuncExpr->loc = checkedInvokeExpr->loc;
+                                newFuncExpr->flavor = TreatAsDifferentiableExpr::Flavor::Differentiable;
                                 checkedExpr = newFuncExpr;
                             }
                             else

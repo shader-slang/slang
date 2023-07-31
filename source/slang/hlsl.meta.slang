@@ -1450,7 +1450,6 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 // Clip (discard) fragment conditionally
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-[__readNone]
 void clip(T x)
 {
     if(x < T(0)) discard;
@@ -1458,7 +1457,6 @@ void clip(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-[__readNone]
 void clip(vector<T,N> x)
 {
     if(any(x < T(0))) discard;
@@ -1466,7 +1464,6 @@ void clip(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
-[__readNone]
 void clip(matrix<T,N,M> x)
 {
     if(any(x < T(0))) discard;
@@ -5460,12 +5457,12 @@ __target_intrinsic(GL_NV_ray_tracing, "transpose(gl_WorldToObjectNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_WorldToObjectEXT)")
 float3x4 WorldToObject3x4();
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectToWorldNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectToWorld3x4EXT)")
+__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_ObjectToWorldNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_ObjectToWorld3x4EXT)")
 float4x3 ObjectToWorld4x3();
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_WorldToObjectNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldToObject3x4EXT)")
+__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_WorldToObjectNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_WorldToObject3x4EXT)")
 float4x3 WorldToObject4x3();
 
 // NOTE!

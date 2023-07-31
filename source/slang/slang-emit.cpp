@@ -63,6 +63,7 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-vk-invert-y.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -864,6 +865,8 @@ Result linkAndOptimizeIR(
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
         legalizeUniformBufferLoad(irModule);
+        if (targetRequest->getHLSLToVulkanLayoutOptions() && targetRequest->getHLSLToVulkanLayoutOptions()->shouldInvertY())
+            invertYOfPositionOutput(irModule);
     }
 
     // Lower sizeof/alignof

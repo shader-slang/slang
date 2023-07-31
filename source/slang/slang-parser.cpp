@@ -3924,7 +3924,7 @@ namespace Slang
             declToModify = genericDecl->inner;
         _addModifiers(declToModify, modifiers);
 
-        if (containerDecl)
+        if (containerDecl && !as<GenericDecl>(containerDecl))
         {
             // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
@@ -5298,6 +5298,7 @@ namespace Slang
         auto noDiffExpr = parser->astBuilder->create<TreatAsDifferentiableExpr>();
         noDiffExpr->innerExpr = parser->ParseLeafExpression();
         noDiffExpr->scope = parser->currentScope;
+        noDiffExpr->flavor = TreatAsDifferentiableExpr::Flavor::NoDiff;
         return noDiffExpr;
     }
 
