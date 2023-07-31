@@ -1,7 +1,10 @@
 #ifndef SLANG_CORE_HASH_H
 #define SLANG_CORE_HASH_H
 
+#include "../../slang.h"
 #include "slang-math.h"
+#include "ankerl/unordered_dense.h"
+#include <concepts>
 #include <string.h>
 #include <type_traits>
 
@@ -103,65 +106,29 @@ namespace Slang
     SLANG_FORCE_INLINE HashCode64 getHashCode64(const char* buffer, size_t numChars) { return getStableHashCode64(buffer, numChars); }
     SLANG_FORCE_INLINE HashCode32 getHashCode32(const char* buffer, size_t numChars) { return toHash32(getHashCode(buffer, numChars)); }
 
-	template<int IsInt>
-	class Hash
-	{
-	public:
-	};
-	template<>
-	class Hash<1>
-	{
-	public:
-		template<typename TKey>
-		static HashCode getHashCode(const TKey& key)
-		{
-			return (HashCode)key;
-		}
-	};
-	template<>
-	class Hash<0>
-	{
-	public:
-		template<typename TKey>
-		static HashCode getHashCode(const TKey& key)
-		{
-			return HashCode(key.getHashCode());
-		}
-	};
-	template<int IsPointer>
-	class PointerHash
-	{};
-	template<>
-	class PointerHash<1>
-	{
-	public:
-		template<typename TKey>
-		static HashCode getHashCode(TKey const& key)
-		{
-			return (HashCode)((PtrInt)key) >> 2; // sizeof(typename std::remove_pointer<TKey>::type);
-		}
-	};
-	template<>
-	class PointerHash<0>
-	{
-	public:
-		template<typename TKey>
-		static HashCode getHashCode(const TKey& key)
-		{
-			return Hash<std::is_integral<TKey>::value || std::is_enum<TKey>::value>::getHashCode(key);
-		}
-	};
+    template <typename T>
+    concept has_slang_hash = requires(const T &t)
+    {
+        { t.getHashCode() } -> std::convertible_to<HashCode64>;
+    };
+
+    // By default, use the hash provided with the hashmap implementation
+    template<typename T>
+    struct Hash : public ankerl::unordered_dense::hash<T> {};
+
+    // If we have defined getHashCode, use that instead
+    template<typename T>
+    requires has_slang_hash<T>
+    struct Hash<T>
+    {
+        auto operator()(const T& t) const { return t.getHashCode(); }
+    };
 
 	template<typename TKey>
-	HashCode getHashCode(const TKey& key)
+	auto getHashCode(const TKey& key)
 	{
-		return PointerHash<std::is_pointer<TKey>::value>::getHashCode(key);
-	}
-
-	template<typename TKey>
-	HashCode getHashCode(TKey& key)
-	{
-		return PointerHash<std::is_pointer<TKey>::value>::getHashCode(key);
+        Hash<TKey> h;
+        return h(key);
 	}
 
     template<typename TKey>
