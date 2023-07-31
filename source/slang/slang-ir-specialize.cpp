@@ -647,7 +647,7 @@ struct SpecializationContext
             }
             if (shouldSkip)
                 continue;
-            auto value = as<typename std::remove_pointer<typename TDict::ValueType>::type>(item->getOperand(0));
+            auto value = as<std::remove_pointer_t<typename TDict::ValueType>>(item->getOperand(0));
             SLANG_ASSERT(value);
             dict[key] = value;
         }

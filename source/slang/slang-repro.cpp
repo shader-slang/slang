@@ -447,7 +447,7 @@ static String _scrubName(const String& in)
             {
                 const auto& srcTargetInfos = request->m_targetInfos;
 
-                if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.tryGetValue(srcTargetRequest))
+                if (const RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.tryGetValue(srcTargetRequest))
                 {
                     EndToEndCompileRequest::TargetInfo* infos = *infosPtr;
 
