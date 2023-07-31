@@ -676,8 +676,9 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     if(varDecl->hasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type))
     {
-        return createTypeLayout(
-            layoutContext.with(rules->getShaderRecordConstantBufferRules()),
+        return createTypeLayoutWith(
+            layoutContext,
+            rules->getShaderRecordConstantBufferRules(),
             type);
     }
 
@@ -686,8 +687,9 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     // qualifier before we move on to anything else.
     if( varDecl->hasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type) )
     {
-        return createTypeLayout(
-            layoutContext.with(rules->getPushConstantBufferRules()),
+        return createTypeLayoutWith(
+            layoutContext,
+            rules->getPushConstantBufferRules(),
             type);
     }
 
@@ -710,8 +712,9 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     // An "ordinary" global variable is implicitly a uniform
     // shader parameter.
-    return createTypeLayout(
-        layoutContext.with(rules->getConstantBufferRules(context->getTargetRequest())),
+    return createTypeLayoutWith(
+        layoutContext,
+        rules->getConstantBufferRules(context->getTargetRequest()),
         type);
 }
 
@@ -1910,15 +1913,19 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::ClosestHit:
         case Stage::Miss:
             // `in out` or `out` parameter is payload
-            return createTypeLayout(context->layoutContext.with(
-                context->getRulesFamily()->getRayPayloadParameterRules()),
-                type);
+            return createTypeLayoutWith(
+                context->layoutContext,
+                context->getRulesFamily()->getRayPayloadParameterRules(),
+                type
+            );
 
         case Stage::Callable:
             // `in out` or `out` parameter is payload
-            return createTypeLayout(context->layoutContext.with(
-                context->getRulesFamily()->getCallablePayloadParameterRules()),
-                type);
+            return createTypeLayoutWith(
+                context->layoutContext,
+                context->getRulesFamily()->getCallablePayloadParameterRules(),
+                type
+            );
 
         }
     }
@@ -1946,9 +1953,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::AnyHit:
         case Stage::ClosestHit:
             // `in` parameter is hit attributes
-            return createTypeLayout(context->layoutContext.with(
-                context->getRulesFamily()->getHitAttributesParameterRules()),
-                type);
+            return createTypeLayoutWith(
+                context->layoutContext,
+                context->getRulesFamily()->getHitAttributesParameterRules(),
+                type
+            );
         }
     }
 
@@ -2226,9 +2235,9 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         // a uniform shader parameter passed via the implicitly-defined
         // constant buffer (e.g., the `$Params` constant buffer seen in fxc/dxc output).
         //
-        return createTypeLayout(
-            context->layoutContext.with(
-                context->getRulesFamily()->getConstantBufferRules(context->getTargetRequest())),
+        return createTypeLayoutWith(
+            context->layoutContext,
+            context->getRulesFamily()->getConstantBufferRules(context->getTargetRequest()),
             paramType);
     }
     else

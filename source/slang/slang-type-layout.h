@@ -1264,7 +1264,14 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 // Create a full type-layout object for a type,
 // according to the layout rules in `context`.
 RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext const&    context,
+    TypeLayoutContext&          context,
+    Type*                       type);
+
+// A wrapper for createTypeLayout which copies the context applying the
+// provided rules with TypeLayoutContext::with
+RefPtr<TypeLayout> createTypeLayoutWith(
+    const TypeLayoutContext&    context,
+    LayoutRulesImpl*            rules,
     Type*                       type);
 
 //
