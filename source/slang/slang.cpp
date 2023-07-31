@@ -4990,7 +4990,7 @@ void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 void EndToEndCompileRequest::setReportHashOnly(bool value)
 {
     m_generateHashOnly = value;
-    getLinkage()->setUseShallowChecking(true);
+    getLinkage()->setUseShallowChecking(value);
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)

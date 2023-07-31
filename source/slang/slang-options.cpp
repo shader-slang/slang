@@ -1884,6 +1884,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::ReportHashOnly:
             {
                 m_compileRequest->setReportHashOnly(true);
+                break;
             }
             case OptionKind::ModuleName:
             {
