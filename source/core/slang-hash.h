@@ -4,12 +4,17 @@
 #include "../../slang.h"
 #include "slang-math.h"
 #include "ankerl/unordered_dense.h"
+#include <bit>
 #include <concepts>
-#include <string.h>
+#include <cstring>
 #include <type_traits>
 
 namespace Slang
 {
+    //
+    // Types
+    //
+
     // Ideally Hash codes should be unsigned types - makes accumulation simpler (as overflow/underflow behavior are defined)
     // Only downside is around multiply, where unsigned multiply can be slightly slower on some targets.
 
@@ -21,53 +26,116 @@ namespace Slang
     // A fixed 32bit wide hash on all targets.
     typedef uint32_t HashCode32;
 
-    SLANG_FORCE_INLINE HashCode32 toHash32(HashCode value) { return (sizeof(HashCode) == sizeof(int64_t)) ? (HashCode32(uint64_t(value) >> 32) ^ HashCode(value)) : HashCode32(value); }
-    SLANG_FORCE_INLINE HashCode64 toHash64(HashCode value) { return (sizeof(HashCode) == sizeof(int64_t)) ? HashCode(value) : ((HashCode64(value) << 32) | value); }
+    //
+    // Some helpers to determine which hash to use for a type
+    //
 
-    SLANG_FORCE_INLINE HashCode getHashCode(int64_t value)
-    {
-        return (sizeof(HashCode) == sizeof(int64_t)) ? HashCode(value) : (HashCode(uint64_t(value) >> 32) ^ HashCode(value));
-    }
-    SLANG_FORCE_INLINE HashCode getHashCode(uint64_t value)
-    {
-        return (sizeof(HashCode) == sizeof(uint64_t)) ? HashCode(value) : (HashCode(value >> 32) ^ HashCode(value));
-    }
+    // Forward declare Hash
+    template<typename T> struct Hash;
 
-	inline HashCode getHashCode(double key)
-	{
-		return getHashCode(DoubleAsInt64(key));
-	}
-	inline HashCode getHashCode(float key)
-	{
-		return FloatAsInt(key);
-	} 
-	inline HashCode getHashCode(const char* buffer)
-	{
-		if (!buffer)
-			return 0;
-		HashCode hash = 0;
-		auto str = buffer;
-		HashCode c = HashCode(*str++);
-		while (c)
-		{
-			hash = c + (hash << 6) + (hash << 16) - hash;
-			c = HashCode(*str++);
-		}
-		return hash;
-	} 
-	inline HashCode getHashCode(char* buffer)
-	{
-		return getHashCode(const_cast<const char *>(buffer));
-	}
-    inline HashCode getHashCode(const char* buffer, size_t numChars)
+    // "Do we have a suitable member function 'getHashCode'?"
+    template <typename T>
+    concept HasSlangHash = requires(const T &t)
     {
-        HashCode hash = 0;
-        for (size_t i = 0; i < numChars; ++i)
-        {      
-            hash = HashCode(buffer[i]) + (hash << 6) + (hash << 16) - hash;
+        { t.getHashCode() } -> std::convertible_to<HashCode64>;
+    };
+
+    // Have we marked 'getHashCode' as having good uniformity properties.
+    template <typename T>
+    concept HasUniformHash = T::kHasUniformHash;
+
+    // Does the hashmap implementation provide a uniform hash for this type.
+    template <typename T>
+    concept HasWyhash = requires { typename ankerl::unordered_dense::hash<T>::is_avalanching; };
+
+    // We want to have an associated type 'is_avalanching = void' iff we have a
+    // hash with good uniformity, the two specializations here add that member
+    // when appropriate (since we can't declare an associated type with
+    // constexpr if or something terse like that)
+    template<typename T>
+    struct DetectAvalanchingHash {};
+    template<HasWyhash T>
+    struct DetectAvalanchingHash<T> { using is_avalanching = void; };
+    template<HasUniformHash T>
+    struct DetectAvalanchingHash<T> { using is_avalanching = void; };
+
+    // A helper for hashing according to the bit representation
+    template<typename T, typename U>
+    struct BitCastHash : DetectAvalanchingHash<U>
+    {
+        auto operator()(const T& t) const
+        {
+            return Hash<U>{}(std::bit_cast<U>(t));
         }
-        return hash;
+    };
+
+    //
+    // Our hashing functor which disptaches to the most appropriate hashing
+    // function for the type
+    //
+
+    template<typename T>
+    struct Hash : DetectAvalanchingHash<T>
+    {
+        auto operator()(const T& t) const
+        {
+            // Our preference is for any hash we've defined ourselves
+            if constexpr (HasSlangHash<T>)
+                return t.getHashCode();
+            // Otherwise fall back to any good hash provided by the hashmap
+            // library
+            else if constexpr (HasWyhash<T>)
+                return ankerl::unordered_dense::hash<T>{}(t);
+            // Otherwise fail
+            else
+            {
+                // !sizeof(T*) is a 'false' which is dependent on T (pending P2593R0)
+                static_assert(!sizeof(T*), "No hash implementation found for this type");
+                // This is to avoid the return type being deduced as 'void' and creating further errors.
+                return HashCode64(0);
+            }
+        }
+    };
+
+    // Specializations for float and double which hash 0 and -0 to distinct values
+    template<>
+    struct Hash<float> : BitCastHash<float, uint32_t> {};
+    template<>
+    struct Hash<double> : BitCastHash<double, uint64_t> {};
+
+    //
+    // Utility functions for using hashes
+    //
+
+    // A wrapper for Hash<TKey>
+	template<typename TKey>
+	auto getHashCode(const TKey& key)
+	{
+        return Hash<TKey>{}(key);
+	}
+
+	inline auto getHashCode(const char* buffer, std::size_t len)
+	{
+        return ankerl::unordered_dense::detail::wyhash::hash(buffer, len);
+	}
+
+    template<typename T>
+    HashCode64 hashObjectBytes(const T& t)
+    {
+        static_assert(std::has_unique_object_representations_v<T>,
+            "This type must have a unique object representation to use hashObjectBytes");
+        return getHashCode(reinterpret_cast<const char*>(&t), sizeof(t));
     }
+
+    // Use in a struct to declare a uniform hash which doens't care about the
+    // structure of the members.
+#   define SLANG_BYTEWISE_HASHABLE \
+        static constexpr bool kHasUniformHash = true; \
+        ::Slang::HashCode64 getHashCode() const \
+        { \
+            return ::Slang::hashObjectBytes(*this); \
+        }
+
 
     /* The 'Stable' hash code functions produce hashes that must be
 
@@ -77,7 +145,7 @@ namespace Slang
     Hash value used from the 'Stable' functions can also be used as part of serialization -
     so it is in effect part of the API.
 
-    In effect this means changing a 'Stable' algorithm will typically require doing a new release. 
+    In effect this means changing a 'Stable' algorithm will typically require doing a new release.
     */
     inline HashCode32 getStableHashCode32(const char* buffer, size_t numChars)
     {
@@ -100,64 +168,15 @@ namespace Slang
         return hash;
     }
 
-    // Hash functions with specific sized results
-    // TODO(JS): We might want to implement HashCode as just an alias a suitable Hash32/Hash32 based on target.
-    // For now just use Stable for 64bit.
-    SLANG_FORCE_INLINE HashCode64 getHashCode64(const char* buffer, size_t numChars) { return getStableHashCode64(buffer, numChars); }
-    SLANG_FORCE_INLINE HashCode32 getHashCode32(const char* buffer, size_t numChars) { return toHash32(getHashCode(buffer, numChars)); }
-
-    template <typename T>
-    concept has_slang_hash = requires(const T &t)
+    inline HashCode combineHash(HashCode h)
     {
-        { t.getHashCode() } -> std::convertible_to<HashCode64>;
-    };
-
-    // By default, use the hash provided with the hashmap implementation
-    template<typename T>
-    struct Hash : public ankerl::unordered_dense::hash<T> {};
-
-    // If we have defined getHashCode, use that instead
-    template<typename T>
-    requires has_slang_hash<T>
-    struct Hash<T>
-    {
-        auto operator()(const T& t) const { return t.getHashCode(); }
-    };
-
-	template<typename TKey>
-	auto getHashCode(const TKey& key)
-	{
-        Hash<TKey> h;
-        return h(key);
-	}
-
-    template<typename TKey>
-    HashCode getHashCodeBytewise(const TKey& t)
-    {
-        static_assert(std::has_unique_object_representations_v<TKey>);
-        return getHashCode(reinterpret_cast<const char*>(&t), sizeof(TKey));
-    }
-
-    inline HashCode combineHash(HashCode left, HashCode right)
-    {
-        return (left * 16777619) ^ right;
-    }
-
-    inline HashCode combineHash(HashCode hash0, HashCode hash1, HashCode hash2)
-    {
-        auto h = hash0;
-        h = combineHash(h, hash1);
-        h = combineHash(h, hash2);
         return h;
     }
 
-    inline HashCode combineHash(HashCode hash0, HashCode hash1, HashCode hash2, HashCode hash3)
+    template<typename... Hs>
+    HashCode combineHash(HashCode n, Hs... args)
     {
-        auto h = hash0;
-        h = combineHash(h, hash1);
-        h = combineHash(h, hash2);
-        h = combineHash(h, hash3);
-        return h;
+        return (n * 16777619) ^ combineHash(args...);
     }
 
     struct Hasher
@@ -174,17 +193,6 @@ namespace Slang
             // and a `Hasher`.
 
             m_hashCode = combineHash(m_hashCode, getHashCode(value));
-        }
-
-            /// Hash the given `object` and combine it into this hash state
-        template<typename T>
-        void hashObject(T const& object)
-        {
-            // TODO: Eventually, we should replace `getHashCode`
-            // with a "hash into" operation that takes the value
-            // and a `Hasher`.
-
-            m_hashCode = combineHash(m_hashCode, object->getHashCode());
         }
 
             /// Combine the given `hash` code into the hash state.
