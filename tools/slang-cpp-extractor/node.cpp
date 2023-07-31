@@ -316,7 +316,7 @@ void ScopeNode::addChild(Node* child)
 
 Node* ScopeNode::findChild(const UnownedStringSlice& name) const
 {
-    Node** nodePtr = m_childMap.tryGetValue(name);
+    Node* const* nodePtr = m_childMap.tryGetValue(name);
     if (nodePtr)
     {
         return *nodePtr;
