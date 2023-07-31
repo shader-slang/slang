@@ -3652,7 +3652,6 @@ namespace Slang
             {
                 case SynthesisPattern::AllInductive:
                 {
-                    int paramIndex = 0;
                     for (auto arg : synArgs)
                     {
                         auto memberExpr = m_astBuilder->create<MemberExpr>();
@@ -3662,8 +3661,6 @@ namespace Slang
                         memberExpr->name = varMember->getName();
                         paramFields.add(memberExpr);
                         inductiveArgMask.add(true);
-
-                        paramIndex++;
                     }
                     break;
                 }
