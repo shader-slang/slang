@@ -331,7 +331,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     for (auto param : func->getParams())
     {
         if (paramInfo.primalFuncParams.contains(param))
-            newPrimalParams.add(subEnv.mapOldValToNew[param].getValue());
+            newPrimalParams.add(subEnv.mapOldValToNew.at(param));
     }
 
     ExtractPrimalFuncContext context;

@@ -2533,8 +2533,7 @@ struct SPIRVEmitContext
                 case SpvSnippet::ASMOperandType::ResultTypeId:
                     if (operand.content != 0xFFFFFFFF)
                     {
-                        emitOperand(context.qualifiedResultTypes[(SpvStorageClass)operand.content]
-                                        .getValue());
+                        emitOperand(context.qualifiedResultTypes.at((SpvStorageClass)operand.content));
                     }
                     else
                     {

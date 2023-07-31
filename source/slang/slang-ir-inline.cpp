@@ -573,7 +573,7 @@ struct InliningPassBase
 
         // Insert a branch into the cloned first block at the end of `callerBlock`.
         builder->setInsertInto(callerBlock);
-        auto mainBlock = as<IRBlock>(env->mapOldValToNew[callee->getFirstBlock()].getValue());
+        auto mainBlock = as<IRBlock>(env->mapOldValToNew.at(callee->getFirstBlock()));
         auto newBranch = builder->emitLoop(mainBlock, afterBlock, mainBlock);
         _setSourceLoc(newBranch, call, callSite);
 
@@ -581,7 +581,7 @@ struct InliningPassBase
         bool isFirstBlock = true;
         for (auto calleeBlock : callee->getBlocks())
         {
-            auto clonedBlock = env->mapOldValToNew[calleeBlock].getValue();
+            auto clonedBlock = env->mapOldValToNew.at(calleeBlock);
             builder->setInsertInto(clonedBlock);
             // We will loop over the instructions of the each block,
             // and clone each of them appropriately.

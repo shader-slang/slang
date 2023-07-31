@@ -571,7 +571,7 @@ struct DiffTransposePass
         // Keep track of first diff block, since this is where 
         // we'll emit temporary vars to hold per-block derivatives.
         // 
-        auto firstRevDiffBlock = revBlockMap[terminalDiffBlocks[0]].getValue();
+        auto firstRevDiffBlock = revBlockMap.at(terminalDiffBlocks[0]);
         firstRevDiffBlockMap[revDiffFunc] = firstRevDiffBlock;
 
         // Move all diff vars to first block, and initialize them with zero.
@@ -2779,7 +2779,7 @@ struct DiffTransposePass
         {
             gradientsMap[fwdInst] = List<RevGradient>();
         }
-        gradientsMap[fwdInst].getValue().add(assignment);
+        gradientsMap.at(fwdInst).add(assignment);
     }
 
     List<RevGradient> getRevGradients(IRInst* fwdInst)
@@ -2789,7 +2789,7 @@ struct DiffTransposePass
 
     List<RevGradient> popRevGradients(IRInst* fwdInst)
     {
-        List<RevGradient> val = gradientsMap[fwdInst].getValue();
+        List<RevGradient> val = gradientsMap.at(fwdInst);
         gradientsMap.remove(fwdInst);
         return val;
     }

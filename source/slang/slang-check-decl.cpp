@@ -2559,10 +2559,10 @@ namespace Slang
                 // 
                 if (auto typeParamDecl = as<DeclRefType>(constraintDecl->sub.type)->getDeclRef().as<GenericTypeParamDecl>().getDecl())
                 {  
-                    auto synTypeParamDecl = mapOrigToSynTypeParams[typeParamDecl];
+                    auto synTypeParamDecl = mapOrigToSynTypeParams.at(typeParamDecl);
 
                     // Construct a DeclRefExpr from the type parameter.
-                    auto synTypeParamDeclRef = makeDeclRef(synTypeParamDecl.getValue());
+                    auto synTypeParamDeclRef = makeDeclRef(synTypeParamDecl);
 
                     auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
                     synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;

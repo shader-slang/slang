@@ -57,7 +57,7 @@ public:
 
     Decl* findBuiltinRequirementDecl(BuiltinRequirementKind kind)
     {
-        return m_builtinRequirementDecls[kind].getValue();
+        return m_builtinRequirementDecls.at(kind);
     }
 
         /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.

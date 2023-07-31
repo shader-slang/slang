@@ -210,19 +210,13 @@ void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier
 
 Decl* SharedASTBuilder::findMagicDecl(const String& name)
 {
-    return m_magicDecls[name].getValue();
+    return m_magicDecls.at(name);
 }
 
 Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 {
-    if (m_magicDecls.containsKey(name))
-    {
-        return m_magicDecls[name].getValue();
-    }
-    else
-    {
-        return nullptr;
-    }
+    auto d = m_magicDecls.tryGetValue(name);
+    return d ? *d : nullptr;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
