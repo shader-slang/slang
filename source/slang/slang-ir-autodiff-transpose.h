@@ -855,11 +855,14 @@ struct DiffTransposePass
         // function scope variable, since control flow can affect what blocks contribute to
         // for a specific inst.
         // 
-        for (auto pair : gradientsMap)
+        List<IRLoad*> loads;
+        for (const auto& [key, _] : gradientsMap)
         {
-            if (auto loadInst = as<IRLoad>(pair.key))
-                accumulateGradientsForLoad(&builder, loadInst);
+            if (auto load = as<IRLoad>(key))
+                loads.add(load);
         }
+        for(const auto& load : loads)
+                accumulateGradientsForLoad(&builder, load);
 
         // Do the same thing with the phi parameters if the block.
         List<IRInst*> phiParamRevGradInsts;
