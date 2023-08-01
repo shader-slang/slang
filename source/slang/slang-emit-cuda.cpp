@@ -10,20 +10,24 @@
 
 namespace Slang {
 
-static uint32_t _findBaseTypesUsed(IRModule* module)
+static CUDAExtensionTracker::BaseTypeFlags _findBaseTypesUsed(IRModule* module)
 {
-    // All basic types are hoistable so must be in global scope.
+    typedef CUDAExtensionTracker::BaseTypeFlags Flags;
 
-    uint32_t baseTypesUsed = 0;
+    // All basic types are hoistable so must be in global scope.
+    Flags baseTypesUsed = 0;
 
     auto moduleInst = module->getModuleInst();
 
+    // Search all the insts in global scope, for BasicTypes
     for (auto inst : moduleInst->getChildren())
     {
         if (auto basicType = as<IRBasicType>(inst))
         {
-            auto baseTypeEnum = basicType->getBaseType();
-            baseTypesUsed |= uint32_t(1) << int(baseTypeEnum);
+            // Get the base type, and set the bit
+            const auto baseTypeEnum = basicType->getBaseType();
+
+            baseTypesUsed |= Flags(1) << int(baseTypeEnum);
         }
     }
 
