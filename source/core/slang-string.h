@@ -189,7 +189,8 @@ namespace Slang
             /// Trims any horizonatl whitespace from start and returns as a substring
         UnownedStringSlice trimStart() const;
 
-        HashCode getHashCode() const
+        static constexpr bool kHasUniformHash = true;
+        HashCode64 getHashCode() const
         {
             return Slang::getHashCode(m_begin, size_t(m_end - m_begin)); 
         }
@@ -869,7 +870,8 @@ namespace Slang
             return contains(str.begin());
         }
 
-        HashCode getHashCode() const
+        static constexpr bool kHasUniformHash = true;
+        HashCode64 getHashCode() const
         {
             return Slang::getHashCode(StringRepresentation::asSlice(m_buffer));
         }

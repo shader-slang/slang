@@ -114,7 +114,7 @@ namespace Slang
         return Hash<TKey>{}(key);
 	}
 
-	inline auto getHashCode(const char* buffer, std::size_t len)
+	inline HashCode64 getHashCode(const char* buffer, std::size_t len)
 	{
         return ankerl::unordered_dense::detail::wyhash::hash(buffer, len);
 	}
