@@ -2671,7 +2671,6 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) SLANG_OVERRIDE;
-
         void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
@@ -2720,9 +2719,6 @@ namespace Slang
 
         // If set, will print out compiler performance benchmark results.
         bool m_reportPerfBenchmark = false;
-
-        // If set, will print out the hash and exit.
-        bool m_generateHashOnly = false;
         
         String m_diagnosticOutput;
 
@@ -2856,9 +2852,6 @@ namespace Slang
 
             /// Adds any extra settings to complete a targetRequest
         void _completeTargetRequest(UInt targetIndex);
-
-            /// Writes a hash.
-        SlangResult _writeHash(ComponentType* component);
         
         ISlangUnknown* getInterface(const Guid& guid);
 

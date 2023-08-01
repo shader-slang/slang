@@ -73,7 +73,6 @@ enum class OptionKind
     EmitIr,
     ReportDownstreamTime,
     ReportPerfBenchmark,
-    ReportHashOnly,
 
     SourceEmbedStyle,
     SourceEmbedName,
@@ -1894,10 +1893,6 @@ SlangResult OptionsParser::_parse(
             {
                 m_compileRequest->setReportPerfBenchmark(true);
                 break;
-            }
-            case OptionKind::ReportHashOnly:
-            {
-                m_compileRequest->setReportHashOnly(true);
             }
             case OptionKind::ModuleName:
             {

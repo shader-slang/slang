@@ -1711,7 +1711,7 @@ namespace Slang
         }
         else
         {
-            SLANG_RETURN_ON_FAIL(_writeArtifact("", artifact));
+            SLANG_RETURN_ON_FAIL(_writeArtifact(path, artifact));
         }
     
         return SLANG_OK;
