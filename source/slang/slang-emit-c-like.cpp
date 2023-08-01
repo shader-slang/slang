@@ -1009,19 +1009,20 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 default:
                 
-                case BaseType::Int:
-                {
-                    m_writer->emit("int(");
-                    m_writer->emit(int32_t(litInst->value.intVal));
-                    m_writer->emit(")");
-                    return;
-                }
                 case BaseType::Int8:
                 {
                     m_writer->emit("int8_t(");
                     m_writer->emit(int8_t(litInst->value.intVal));
                     m_writer->emit(")");
                     return;
+                }
+                case BaseType::UInt8:
+                {
+                    m_writer->emit("uint8_t(");
+                    m_writer->emit(UInt(uint8_t(litInst->value.intVal)));
+                    m_writer->emit("U");
+                    m_writer->emit(")");
+                    break;
                 }
                 case BaseType::Int16:
                 {
@@ -1030,17 +1031,20 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     m_writer->emit(")");
                     return;
                 }
-                case BaseType::UInt8:
-                {
-                    m_writer->emit(UInt(uint8_t(litInst->value.intVal)));
-                    m_writer->emit("U");
-                    break;
-                }
                 case BaseType::UInt16:
                 {
+                    m_writer->emit("uint16_t(");
                     m_writer->emit(UInt(uint16_t(litInst->value.intVal)));
                     m_writer->emit("U");
+                    m_writer->emit(")");
                     break;
+                }
+                case BaseType::Int:
+                {
+                    m_writer->emit("int(");
+                    m_writer->emit(int32_t(litInst->value.intVal));
+                    m_writer->emit(")");
+                    return;
                 }
                 case BaseType::UInt:
                 {

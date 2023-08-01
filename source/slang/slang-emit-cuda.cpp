@@ -10,7 +10,29 @@
 
 namespace Slang {
 
+static CUDAExtensionTracker::BaseTypeFlags _findBaseTypesUsed(IRModule* module)
+{
+    typedef CUDAExtensionTracker::BaseTypeFlags Flags;
 
+    // All basic types are hoistable so must be in global scope.
+    Flags baseTypesUsed = 0;
+
+    auto moduleInst = module->getModuleInst();
+
+    // Search all the insts in global scope, for BasicTypes
+    for (auto inst : moduleInst->getChildren())
+    {
+        if (auto basicType = as<IRBasicType>(inst))
+        {
+            // Get the base type, and set the bit
+            const auto baseTypeEnum = basicType->getBaseType();
+
+            baseTypesUsed |= Flags(1) << int(baseTypeEnum);
+        }
+    }
+
+    return baseTypesUsed;
+}
 
 void CUDAExtensionTracker::finalize()
 {
@@ -48,12 +70,8 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
         case kIROp_IntPtrType:  return UnownedStringSlice("int");
         case kIROp_UIntPtrType: return UnownedStringSlice("uint");
 #endif
-        case kIROp_HalfType:
-        {
-            m_extensionTracker->requireBaseType(BaseType::Half);
-            return UnownedStringSlice("__half");
-        }
-
+        case kIROp_HalfType:    return UnownedStringSlice("__half");
+        
         case kIROp_FloatType:   return UnownedStringSlice("float");
         case kIROp_DoubleType:  return UnownedStringSlice("double");
         default:                return UnownedStringSlice();
@@ -77,11 +95,7 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
         case kIROp_UIntType:    return UnownedStringSlice("uint");
         case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
 
-        case kIROp_HalfType:
-        {
-            m_extensionTracker->requireBaseType(BaseType::Half);
-            return UnownedStringSlice("__half");
-        }
+        case kIROp_HalfType:    return UnownedStringSlice("__half");
 
         case kIROp_FloatType:   return UnownedStringSlice("float");
         case kIROp_DoubleType:  return UnownedStringSlice("double");
@@ -424,8 +438,14 @@ void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operand
 
 void CUDASourceEmitter::emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec)
 {
-    if (targetIntrinsic->getDefinition().startsWith("__half"))
+    // This works around the problem, where some intrinsics that require the "half" type enabled don't use the half/float16_t type.
+    // For example `f16tof32` can operate on float16_t *and* uint. If the input is uint, although we are 
+    // using the half feature (as far as CUDA is concerned), the half/float16_t type is not visible/directly used.
+    if (targetIntrinsic->getDefinition().startsWith(toSlice("__half")))
+    {
         m_extensionTracker->requireBaseType(BaseType::Half);
+    }
+
     Super::emitIntrinsicCallExprImpl(inst, targetIntrinsic, inOuterPrec);
 }
 
@@ -795,6 +815,9 @@ bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
 
 void CUDASourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 {
+    // Set up with all of the base types used in the module
+    m_extensionTracker->requireBaseTypes(_findBaseTypesUsed(module));
+
     CLikeSourceEmitter::emitModuleImpl(module, sink);
 
     // Emit all witness table definitions.

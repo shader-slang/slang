@@ -17,6 +17,7 @@ public:
 
     void requireBaseType(BaseType baseType) { m_baseTypeFlags |= _getFlag(baseType); }
     bool isBaseTypeRequired(BaseType baseType) { return (m_baseTypeFlags & _getFlag(baseType)) != 0; }
+    void requireBaseTypes(BaseTypeFlags flags) { m_baseTypeFlags |= flags; }
 
         /// Ensure that the generated code is compiled for at least CUDA SM `version`
     void requireSMVersion(const SemanticVersion& smVersion) { m_smVersion = (smVersion > m_smVersion) ? smVersion : m_smVersion; }
