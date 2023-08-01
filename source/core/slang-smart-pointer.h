@@ -162,8 +162,6 @@ namespace Slang
             return Slang::getHashCode(pointer);
         }
 
-        // auto operator<=>(const RefPtr<T>&) const = default;
-        //
         auto operator<=>(const T* ptr) const
         {
             return pointer <=> ptr;
