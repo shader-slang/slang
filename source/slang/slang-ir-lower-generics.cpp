@@ -15,6 +15,8 @@
 #include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "slang-ir-layout.h"
+
 #include "../core/slang-performance-profiler.h"
 
 namespace Slang
@@ -176,6 +178,90 @@ namespace Slang
             });
     }
 
+    void inferAnyValueSizeWhereNecessary(
+        SharedGenericsLoweringContext* sharedContext, 
+        IRModule* module)
+    {
+        // Go through the global insts and collect all interface types.
+        // For each interface type, infer its any-value-size, by looking up
+        // all witness tables whose conformance type matches the interface type.
+        // then using _calcNaturalSizeAndAlignment to find the max size.
+        //
+        // Note: we only infer any-value-size for interface types that are used
+        // as a generic type parameter, because we don't want to infer any-value-size
+        // for interface types that are used as a witness table type.
+        //
+
+        // Collect all interface types that require inference.
+        List<IRInterfaceType*> interfaceTypes;
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (inst->getOp() == kIROp_InterfaceType)
+            {
+                auto interfaceType = cast<IRInterfaceType>(inst);
+
+                // Do not infer anything for COM interfaces.
+                if (isComInterfaceType((IRType*)interfaceType))
+                    continue;
+                
+                // If the interface already has an explicit any-value-size, don't infer anything.
+                if (interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+                    continue;
+                
+                interfaceTypes.add(interfaceType);
+            }
+        }
+
+        // Collect all witness tables whose conformance type matches the interface type.
+        for (auto interfaceType : interfaceTypes)
+        {
+            IRIntegerValue maxAnyValueSize = 0;
+            
+            IRWitnessTableType* witnessTableType = nullptr;
+            // Find witness table type corresponding to this interface.
+            for (auto use = interfaceType->firstUse; use; use = use->nextUse)
+            {
+                auto _witnessTableType = as<IRWitnessTableType>(use->getUser());
+                
+                if (_witnessTableType->getConformanceType() == interfaceType)
+                {
+                    witnessTableType = _witnessTableType;
+                    break;
+                }
+            }
+            
+            // If we hit this case, we have an interface without any conforming implementations.
+            // This case should be handled before this point.
+            // 
+            SLANG_ASSERT(witnessTableType);
+
+            // Walk through all the uses of this witness table type to find the witness tables.
+            for (auto use = witnessTableType->firstUse; use; use = use->nextUse)
+            {
+                auto witnessTable = as<IRWitnessTable>(use->getUser());
+                if (!witnessTable || witnessTable->getDataType() != witnessTableType)
+                    continue;
+
+                auto concreteImpl = witnessTable->getConcreteType();
+
+                IRSizeAndAlignment sizeAndAlignment;
+                getNaturalSizeAndAlignment(sharedContext->targetReq, concreteImpl, &sizeAndAlignment);
+                
+                maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
+            }
+
+            // Should not encounter interface types without any conforming implementations.
+            SLANG_ASSERT(maxAnyValueSize > 0);
+
+            // If we found a max size, add an any-value-size decoration to the interface type.
+            if (maxAnyValueSize != 0)
+            {
+                IRBuilder builder(module);
+                builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
+            }
+        }
+    }
+
     void lowerGenerics(
         TargetRequest*          targetReq,
         IRModule*               module,
@@ -188,6 +274,8 @@ namespace Slang
         sharedContext.sink = sink;
 
         checkTypeConformanceExists(&sharedContext);
+
+        inferAnyValueSizeWhereNecessary(&sharedContext, module);
 
         // Replace all `makeExistential` insts with `makeExistentialWithRTTI`
         // before making any other changes. This is necessary because a parameter of

@@ -33,6 +33,10 @@ namespace Slang
         Dictionary<IRInterfaceType*, IRInterfaceType*> loweredInterfaceTypes;
         Dictionary<IRInterfaceType*, IRInterfaceType*> mapLoweredInterfaceToOriginal;
 
+        // Dictionary for inferred any-value-size for each interface type.
+        Dictionary<IRInterfaceType*, IRIntegerValue> mapInterfaceTypeToAnyValueSize;
+        bool allowInferenceForAnyValueSize;
+
 
         // Dictionaries for interface type requirement key-value lookups.
         // Used by `findInterfaceRequirementVal`.
@@ -51,6 +55,7 @@ namespace Slang
             : module(inModule)
             , workList(inModule)
             , workListSet(inModule)
+            , allowInferenceForAnyValueSize(false)
         {}
 
         void addToWorkList(
