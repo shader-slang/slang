@@ -332,6 +332,7 @@
     <ClInclude Include="..\..\..\source\core\slang-short-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-signal.h" />
     <ClInclude Include="..\..\..\source\core\slang-smart-pointer.h" />
+    <ClInclude Include="..\..\..\source\core\slang-stable-hash.h" />
     <ClInclude Include="..\..\..\source\core\slang-std-writers.h" />
     <ClInclude Include="..\..\..\source\core\slang-stream.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-escape-util.h" />
