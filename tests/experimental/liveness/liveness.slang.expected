@@ -92,13 +92,9 @@ layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
-    SomeStruct_0 _S10 = makeSomeStruct_0();
-    const int  _S11[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int _S12 = index_0 & 7;
-    uint _S13 = uint(index_0);
-    int v_1 = someSlowFunc_0(index_0);
-    bool _S14 = (v_1 & 256) != 0;
-    uint _S15 = uint(v_1 & 3);
+    const int  _S10[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int _S11 = index_0 & 7;
+    uint _S12 = uint(index_0);
     int i_2;
     livenessStart_1(i_2, 0);
     i_2 = 0;
@@ -115,20 +111,22 @@ void main()
             livenessEnd_0(i_2, 0);
             break;
         }
+        int v_1 = someSlowFunc_0(index_0);
         SomeStruct_0 s_3;
         livenessStart_2(s_3, 0);
         SomeStruct_0 t_0;
         livenessStart_2(t_0, 0);
-        t_0 = _S10;
+        t_0 = makeSomeStruct_0();
         SomeStruct_0 u_0;
-        if(_S14)
+        if((v_1 & 256) != 0)
         {
-            s_3.x_0 = ((anotherBuffer_0)._data[(_S15)]);
-            t_0.x_0 = ((anotherBuffer_0)._data[(_S15)]);
+            uint _S13 = uint(v_1 & 3);
+            s_3.x_0 = ((anotherBuffer_0)._data[(_S13)]);
+            t_0.x_0 = ((anotherBuffer_0)._data[(_S13)]);
             livenessStart_2(u_0, 0);
             u_0.a_1 = 0;
             u_0.x_0 = 0;
-            u_0.c_0 = _S11;
+            u_0.c_0 = _S10;
         }
         else
         {
@@ -136,34 +134,34 @@ void main()
             livenessStart_2(x_1, 0);
             x_1.a_1 = 0;
             x_1.x_0 = 0;
-            x_1.c_0 = _S11;
-            x_1.x_0 = ((anotherBuffer_0)._data[(_S15)]) + 1;
-            SomeStruct_0 _S16 = x_1;
+            x_1.c_0 = _S10;
+            x_1.x_0 = ((anotherBuffer_0)._data[(uint(v_1 & 3))]) + 1;
+            SomeStruct_0 _S14 = x_1;
             livenessEnd_2(x_1, 0);
             livenessStart_2(u_0, 0);
-            u_0 = _S16;
+            u_0 = _S14;
         }
-        s_3.c_0[_S12] = s_3.c_0[_S12] + 1;
-        int _S17 = s_3.x_0 + t_0.x_0;
-        SomeStruct_0 _S18 = u_0;
+        s_3.c_0[_S11] = s_3.c_0[_S11] + 1;
+        int _S15 = s_3.x_0 + t_0.x_0;
+        SomeStruct_0 _S16 = u_0;
         livenessEnd_2(u_0, 0);
-        int _S19 = _S17 + _S18.x_0 + doThing_0(t_0);
-        int _S20 = somethingElse_0(t_0);
+        int _S17 = _S15 + _S16.x_0 + doThing_0(t_0);
+        int _S18 = somethingElse_0(t_0);
         livenessEnd_2(t_0, 0);
-        int _S21 = _S19 + _S20;
-        int _S22 = s_3.c_0[2];
+        int _S19 = _S17 + _S18;
+        int _S20 = s_3.c_0[2];
         livenessEnd_2(s_3, 0);
-        int _S23 = _S21 + _S22;
-        int _S24 = res_0;
+        int _S21 = _S19 + _S20;
+        int _S22 = res_0;
         livenessEnd_0(res_0, 0);
-        int res_1 = _S24 + _S23;
+        int res_1 = _S22 + _S21;
         i_2 = i_2 + 1;
         livenessStart_1(res_0, 0);
         res_0 = res_1;
     }
-    int _S25 = res_0;
+    int _S23 = res_0;
     livenessEnd_0(res_0, 0);
-    ((outputBuffer_0)._data[(_S13)]) = _S25;
+    ((outputBuffer_0)._data[(_S12)]) = _S23;
     return;
 }
 
