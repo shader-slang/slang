@@ -19,7 +19,6 @@ struct RedundancyRemovalContext
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
-        case kIROp_Div:
         case kIROp_FRem:
         case kIROp_IRem:
         case kIROp_Lsh:
@@ -78,8 +77,6 @@ struct RedundancyRemovalContext
         case kIROp_ExtractExistentialValue:
         case kIROp_ExtractExistentialWitnessTable:
             return true;
-        case kIROp_Call:
-            return isPureFunctionalCall(as<IRCall>(inst));
         case kIROp_Load:
             // Load is generally not movable, an exception is loading a global constant buffer.
             if (auto load = as<IRLoad>(inst))
