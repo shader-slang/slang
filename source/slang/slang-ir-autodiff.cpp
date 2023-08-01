@@ -56,8 +56,20 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
 
 static IRInst* _getDiffTypeFromPairType(AutoDiffSharedContext*sharedContext, IRBuilder* builder, IRDifferentialPairTypeBase* type)
 {
-    auto witnessTable = type->getWitness();
-    return _lookupWitness(builder, witnessTable, sharedContext->differentialAssocTypeStructKey);
+    auto witness = type->getWitness();
+    SLANG_RELEASE_ASSERT(witness);
+
+    // Special case when the primal tpe is an InterfaceType.
+    if (auto primalInterfaceType = as<IRInterfaceType>(type->getValueType()))
+    {
+        // The witness should just be a struct key.
+        SLANG_ASSERT(as<IRStructKey>(type->getWitness()));
+
+        // The differential type is the IDifferentiable interface type.
+        return sharedContext->differentiableInterfaceType;
+    }
+    
+    return _lookupWitness(builder, witness, sharedContext->differentialAssocTypeStructKey);
 }
 
 static IRInst* _getDiffTypeWitnessFromPairType(AutoDiffSharedContext* sharedContext, IRBuilder* builder, IRDifferentialPairTypeBase* type)
@@ -453,9 +465,7 @@ IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* b
 IRInst* DifferentiableTypeConformanceContext::getDifferentialTypeFromDiffPairType(
     IRBuilder* builder, IRDifferentialPairTypeBase* diffPairType)
 {
-    auto witness = diffPairType->getWitness();
-    SLANG_RELEASE_ASSERT(witness);
-    return _lookupWitness(builder, witness, sharedContext->differentialAssocTypeStructKey);
+    SLANG_UNIMPLEMENTED_X("");
 }
 
 IRInst* DifferentiableTypeConformanceContext::getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type)

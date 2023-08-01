@@ -1571,7 +1571,7 @@ struct DiffTransposePass
         if (auto diffPairType = as<IRDifferentialPairType>(revVal->getDataType()))
         {
             revVal = builder->emitDifferentialPairGetDifferential(
-                (IRType*)diffTypeContext.getDifferentialTypeFromDiffPairType(
+                (IRType*)diffTypeContext.getDiffTypeFromPairType(
                     builder, diffPairType),
                 revVal);
         }

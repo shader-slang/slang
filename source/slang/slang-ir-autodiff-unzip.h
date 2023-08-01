@@ -88,7 +88,7 @@ struct DiffUnzipPass
             }
             if (auto pairType = as<IRDifferentialPairType>(type))
             {
-                IRInst* diffType = diffTypeContext.getDifferentialTypeFromDiffPairType(builder, pairType);
+                IRInst* diffType = diffTypeContext.getDiffTypeFromPairType(builder, pairType);
                 if (as<IRPtrTypeBase>(primalParam->getFullType()))
                     diffType = builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
                 auto primalRef = builder->emitPrimalParamRef(primalParam);

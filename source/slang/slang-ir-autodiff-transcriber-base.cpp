@@ -384,12 +384,7 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
     if (isExistentialType(origType))
     {
         if (differentiableTypeConformanceContext.lookUpConformanceForType(origType))
-        {
-            return (IRType*)_lookupWitness(
-                builder,
-                differentiableTypeConformanceContext.sharedContext->differentiableInterfaceType,
-                differentiableTypeConformanceContext.sharedContext->differentialAssocTypeStructKey);
-        }
+            return autoDiffSharedContext->differentiableInterfaceType;
         else
             return nullptr;
     }
@@ -810,8 +805,14 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(
     auto primalType = (IRType*)lookupPrimalInst(builder, originalType);
     if (auto diffType = differentiateType(builder, originalType))
     {
+        IRInst* diffWitnessTable = nullptr;
+        IRType* diffOuterType = nullptr;
         if (isExistentialType(diffType))
         {
+            // The primal value inst is required to generate a zero value 
+            // for an existential type, since the value (and not the type itself)
+            // contains the type information.
+            // 
             SLANG_ASSERT(primalValue);
 
             IRInst* outWitnessTable = nullptr;
@@ -828,11 +829,15 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(
             {
                 // `interfaceType` does conform to `IDifferentiable`.
                 outWitnessTable = builder->emitExtractExistentialWitnessTable(primalValue);
+                diffWitnessTable = outWitnessTable;
+
                 for (auto node : lookupKeyPath)
                 {
                     outWitnessTable = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), outWitnessTable, node->getRequirementKey());
                 }
+                diffOuterType = diffType;
                 diffType = (IRType*)builder->emitLookupInterfaceMethodInst(builder->getTypeType(), outWitnessTable, autoDiffSharedContext->differentialAssocTypeStructKey);
+                builder->markInstAsDifferential(diffType, nullptr);
             }
             else
             {
@@ -897,7 +902,18 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(
         auto callInst = builder->emitCallInst((IRType*)diffType, zeroMethod, emptyArgList);
         builder->markInstAsDifferential(callInst, primalType);
 
-        return callInst;
+        if (diffOuterType && isExistentialType(diffOuterType))
+        {
+            // Need to wrap the result back into an existential.
+            auto existentialZero = builder->emitMakeExistential(
+                diffOuterType,
+                callInst,
+                diffWitnessTable);
+            builder->markInstAsDifferential(existentialZero, primalType);
+            return existentialZero;
+        }
+        else
+            return callInst;
     }
     else
     {
