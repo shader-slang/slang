@@ -287,8 +287,7 @@ convention for interface methods.
 #endif
 
 #ifndef SLANG_COMPILE_TIME_ASSERT
-//  TODO(C++17), can use terse static_assert
-#   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x, #x)
+#   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x)
 #endif
 
 #ifndef SLANG_OFFSET_OF
