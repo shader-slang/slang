@@ -164,6 +164,13 @@ namespace Slang
 		return PointerHash<std::is_pointer<TKey>::value>::getHashCode(key);
 	}
 
+    template<typename TKey>
+    HashCode getHashCodeBytewise(const TKey& t)
+    {
+        static_assert(std::has_unique_object_representations_v<TKey>);
+        return getHashCode(reinterpret_cast<const char*>(&t), sizeof(TKey));
+    }
+
     inline HashCode combineHash(HashCode left, HashCode right)
     {
         return (left * 16777619) ^ right;

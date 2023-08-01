@@ -466,8 +466,8 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     {
         cmdLine.addArg("-fvisibility=hidden");
 
-        // Need C++14 for partial specialization
-        cmdLine.addArg("-std=c++14");
+        // C++17 since we share headers with slang itself (which uses c++17)
+        cmdLine.addArg("-std=c++17");
     }
 
     // TODO(JS): Here we always set -m32 on x86. It could be argued it is only necessary when creating a shared library
@@ -696,19 +696,16 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     ComPtr<IDownstreamCompiler> compiler;
     if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "g++"), compiler)))
     {
-        // A downstream compiler for Slang must currently support C++14 - such that
+        // A downstream compiler for Slang must currently support C++17 - such that
         // the prelude and generated code works.
         // 
-        // The first version of gcc that supports `-std=c++14` is 5.0
+        // The first version of gcc that supports stable `-std=c++17` is 9.0
         // https://gcc.gnu.org/projects/cxx-status.html
-        //
-        // If could be argued to allow C/C++ compilations via older versions through an older version
-        // but that requires some more complex behavior, so we don't allow for now.
         
         auto desc = compiler->getDesc();
-        if (desc.version.m_major < 5)
+        if (desc.version.m_major < 9)
         {
-            // If the version isn't 5 or higher, we don't add this version of the compiler.
+            // If the version isn't 9 or higher, we don't add this version of the compiler.
             return SLANG_OK;
         }
 
