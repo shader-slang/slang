@@ -147,7 +147,7 @@ bool opCanBeConstExpr(IRInst* value)
     // TODO: realistically need to special-case `call`
     // operations here, so that we check whether the
     // callee function is fixed/known, and if it is
-    // whether it has been decoared as constant-foldable
+    // whether it has been declared as constant-foldable
 
     return opCanBeConstExpr(value->getOp());
 }

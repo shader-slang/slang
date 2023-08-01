@@ -628,10 +628,34 @@ SlangResult NVRTCDownstreamCompiler::_findIncludePath(String& outPath)
         String libPath = SharedLibraryUtils::getSharedLibraryFileName((void*)m_nvrtcCreateProgram);
         if (libPath.getLength())
         {
-            const String parentPath = Path::getParentDirectory(libPath);
+            String parentPath = Path::getParentDirectory(libPath);
+
             if (SLANG_SUCCEEDED(_findFileInIncludePath(parentPath, g_fp16HeaderName, outPath)))
             {
                 return SLANG_OK;
+            }
+
+            // See if the shared library is in the SDK, as if so we know how to find the includes
+            // TODO(JS):
+            // This directory structure is correct for windows perhaps could be different elsewhere.
+            {
+                List<UnownedStringSlice> pathSlices;
+                Path::split(parentPath.getUnownedSlice(), pathSlices);
+
+                // This -2 split holds the version number.
+                const auto pathSplitCount = pathSlices.getCount();
+                if (pathSplitCount >= 3 &&
+                    pathSlices[pathSplitCount - 1] == toSlice("bin") &&
+                    pathSlices[pathSplitCount - 3] == toSlice("CUDA"))
+                {
+                    // We want to make sure that one of these paths is CUDA...
+                    const auto sdkPath = Path::getParentDirectory(parentPath);
+
+                    if (SLANG_SUCCEEDED(_findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+                    {
+                        return SLANG_OK;
+                    }
+                }
             }
         }
     }
