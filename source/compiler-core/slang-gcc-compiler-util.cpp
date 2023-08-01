@@ -466,8 +466,8 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     {
         cmdLine.addArg("-fvisibility=hidden");
 
-        // C++17 since we share headers with slang itself (which uses c++17)
-        cmdLine.addArg("-std=c++17");
+        // Need C++20 as we share headers with the slang compiler itself
+        cmdLine.addArg("-std=c++20");
     }
 
     // TODO(JS): Here we always set -m32 on x86. It could be argued it is only necessary when creating a shared library
@@ -696,16 +696,15 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     ComPtr<IDownstreamCompiler> compiler;
     if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "g++"), compiler)))
     {
-        // A downstream compiler for Slang must currently support C++17 - such that
+        // A downstream compiler for Slang must currently support C++20 - such that
         // the prelude and generated code works.
         // 
-        // The first version of gcc that supports stable `-std=c++17` is 9.0
-        // https://gcc.gnu.org/projects/cxx-status.html
+        // The first version of gcc that supports the features we require is gcc 11
         
         auto desc = compiler->getDesc();
-        if (desc.version.m_major < 9)
+        if (desc.version.m_major < 11)
         {
-            // If the version isn't 9 or higher, we don't add this version of the compiler.
+            // If the version isn't 11 or higher, we don't add this version of the compiler.
             return SLANG_OK;
         }
 

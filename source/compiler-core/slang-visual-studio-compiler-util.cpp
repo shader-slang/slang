@@ -90,6 +90,9 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
             // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
             // Assumes c functions cannot throw
             cmdLine.addArg("/EHsc");
+
+            // Need C++20 as we share headers with the slang compiler itself
+            cmdLine.addArg("/std:c++20");
         }
     }
 
