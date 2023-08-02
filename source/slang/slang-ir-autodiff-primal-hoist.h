@@ -136,8 +136,8 @@ namespace Slang
             for (auto inst : info->instsToInvert)
                 instsToInvert.add(inst);
 
-            for (auto info : info->invertInfoMap)
-                invertInfoMap.add(info);
+            for (auto invertInfo : info->invertInfoMap)
+                invertInfoMap.add(invertInfo);
         }
     };
 
