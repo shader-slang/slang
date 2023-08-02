@@ -114,7 +114,7 @@ namespace Slang
         void remove(const TKey& key) { map.erase(key); }
 
         // Reserves enough space for the specified number of values
-        void reserve(std::size_t size) { map.reserve(size); };
+        void reserve(Index size) { map.reserve(std::size_t(size)); };
 
         // Swap with another map
         void swapWith(ThisType& rhs) { std::swap(*this, rhs); }

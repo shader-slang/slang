@@ -629,10 +629,10 @@ struct SpecializationContext
     template<typename TDict>
     void _readSpecializationDictionaryImpl(TDict& dict, IRInst* dictInst)
     {
-        Int childrenCount = 0;
+        int childrenCount = 0;
         for (auto child = dictInst->getFirstChild(); child; child = child->next)
             childrenCount++;
-        dict.reserve(1 << Math::Log2Ceil(childrenCount * 2));
+        dict.reserve(Index{1} << Math::Log2Ceil(childrenCount * 2));
         for (auto child : dictInst->getChildren())
         {
             auto item = as<IRSpecializationDictionaryItem>(child);
