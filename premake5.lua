@@ -408,6 +408,10 @@ workspace "slang"
     filter { "toolset:clang or gcc*", "language:C++" }
         buildoptions { "-Wno-reorder", "-Wno-invalid-offsetof" }
 
+    -- Enable some warnings on clang/gcc which are on by default in MSVC
+    filter { "toolset:clang or gcc*", "language:C++" }
+        buildoptions { "-Wnarrowing" }
+
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
     -- and add the same preprocessor definition that VS
