@@ -178,6 +178,49 @@ namespace Slang
             });
     }
 
+    void _findDependenciesOfTypeInSet(IRType* type, HashSet<IRInterfaceType*>& targetSet, List<IRInterfaceType*>& result)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_InterfaceType:
+            {
+                auto interfaceType = cast<IRInterfaceType>(type);
+                if (targetSet.contains(interfaceType))
+                {
+                    result.add(interfaceType);
+                    return;
+                }
+            }
+            break;
+        case kIROp_StructType:
+            {
+                auto structType = cast<IRStructType>(type);
+                for (auto field : structType->getFields())
+                {
+                    _findDependenciesOfTypeInSet(field->getFieldType(), targetSet, result);
+                }
+            }
+            break;
+        default:
+            {
+                for (UInt i = 0; i < type->getOperandCount(); i++)
+                {
+                    if (auto operandType = as<IRType>(type->getOperand(i)))
+                        _findDependenciesOfTypeInSet(operandType, targetSet, result);
+                }
+            }
+            break;
+        }
+    }
+
+    List<IRInterfaceType*> findDependenciesOfTypeInSet(IRType* type, HashSet<IRInterfaceType*> targetSet)
+    {
+        List<IRInterfaceType*> result;
+        _findDependenciesOfTypeInSet(type, targetSet, result);
+
+        return result;
+    }
+
     void inferAnyValueSizeWhereNecessary(
         SharedGenericsLoweringContext* sharedContext, 
         IRModule* module)
@@ -212,7 +255,9 @@ namespace Slang
             }
         }
 
-        // Collect all witness tables whose conformance type matches the interface type.
+        Dictionary<IRInterfaceType*, List<IRInst*>> mapInterfaceToImplementations;
+
+        // Collect all concrete types that conform to this interface type.
         for (auto interfaceType : interfaceTypes)
         {
             IRIntegerValue maxAnyValueSize = 0;
@@ -235,6 +280,8 @@ namespace Slang
             // 
             SLANG_ASSERT(witnessTableType);
 
+            List<IRInst*> implList;
+
             // Walk through all the uses of this witness table type to find the witness tables.
             for (auto use = witnessTableType->firstUse; use; use = use->nextUse)
             {
@@ -242,24 +289,50 @@ namespace Slang
                 if (!witnessTable || witnessTable->getDataType() != witnessTableType)
                     continue;
 
-                auto concreteImpl = witnessTable->getConcreteType();
-
-                IRSizeAndAlignment sizeAndAlignment;
-                getNaturalSizeAndAlignment(sharedContext->targetReq, concreteImpl, &sizeAndAlignment);
-                
-                maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
+                implList.add(witnessTable->getConcreteType());
             }
-
-            // Should not encounter interface types without any conforming implementations.
-            SLANG_ASSERT(maxAnyValueSize > 0);
-
-            // If we found a max size, add an any-value-size decoration to the interface type.
-            if (maxAnyValueSize != 0)
-            {
-                IRBuilder builder(module);
-                builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
-            }
+            
+            mapInterfaceToImplementations.add(interfaceType, implList);
         }
+
+        HashSet<IRInterfaceType*> interfaceTypesSet;
+        for (auto interfaceType : interfaceTypes)
+            interfaceTypesSet.add(interfaceType);
+        List<IRInterfaceType*> activeStack;
+
+        while (interfaceTypesSet.getCount())
+        {
+            auto type = *interfaceTypesSet.begin();
+
+            auto dependencies = findDependenciesOfTypeInSet(type, interfaceTypesSet);
+            if (dependencies.getCount() > 0)
+            {
+                // Add to active stack.
+                
+            }
+
+            activeStack.add(interfaceTypes.getLast());
+
+            
+        }
+        
+        
+        // Should not encounter interface types without any conforming implementations.
+        SLANG_ASSERT(maxAnyValueSize > 0);
+
+        // If we found a max size, add an any-value-size decoration to the interface type.
+        if (maxAnyValueSize != 0)
+        {
+            IRBuilder builder(module);
+            builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
+        }
+
+        // TODO: What about the case where the concrete type has an existential member?
+        
+        IRSizeAndAlignment sizeAndAlignment;
+        getNaturalSizeAndAlignment(sharedContext->targetReq, concreteImpl, &sizeAndAlignment);
+        
+        maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
     }
 
     void lowerGenerics(
