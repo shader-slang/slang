@@ -123,7 +123,6 @@ namespace Slang
         // Query capacity
         //
 
-        // TODO: too small return type
         std::size_t getCount() const { return map.size(); }
 
         //
@@ -351,7 +350,7 @@ namespace Slang
             return Iterator(dict.end());
         }
     public:
-        int getCount() const
+        auto getCount() const
         {
             return dict.getCount();
         }
