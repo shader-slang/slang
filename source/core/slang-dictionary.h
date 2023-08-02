@@ -89,8 +89,8 @@ namespace Slang
         //
         // Types
         //
-        using Iterator = InnerMap::iterator;
-        using ConstIterator = InnerMap::const_iterator;
+        using Iterator = typename InnerMap::iterator;
+        using ConstIterator = typename InnerMap::const_iterator;
         using KeyType = TKey;
         using ValueType = TValue;
 
@@ -188,7 +188,7 @@ namespace Slang
         // Tries to insert the given element, if a value was already present at
         // the given key then returns a pointer to that element instead.
         // Returns nullptr if insertion was successful.
-        TValue* tryGetValueOrAdd(const InnerMap::value_type& kvPair)
+        TValue* tryGetValueOrAdd(const typename InnerMap::value_type& kvPair)
         {
             const auto& [iterator, inserted] = map.insert(kvPair);
             return inserted ? nullptr : std::addressof(iterator->second);
@@ -196,7 +196,7 @@ namespace Slang
         // Tries to insert the given element, if a value was already present at
         // the given key then returns a pointer to that element instead.
         // Returns nullptr if insertion was successful.
-        TValue* tryGetValueOrAdd(InnerMap::value_type&& kvPair)
+        TValue* tryGetValueOrAdd(typename InnerMap::value_type&& kvPair)
         {
             const auto& [iterator, inserted] = map.insert(std::move(kvPair));
             return inserted ? nullptr : std::addressof(iterator->second);
@@ -227,10 +227,10 @@ namespace Slang
 
         // Returns true if the value was inserted, returns false if the map
         // already has a value associated with this key
-        bool addIfNotExists(InnerMap::value_type&& kvPair) { return !tryGetValueOrAdd(std::move(kvPair)); }
+        bool addIfNotExists(typename InnerMap::value_type&& kvPair) { return !tryGetValueOrAdd(std::move(kvPair)); }
         // Returns true if the value was inserted, returns false if the map
         // already has a value associated with this key
-        bool addIfNotExists(const InnerMap::value_type& kvPair) { return !tryGetValueOrAdd(kvPair); }
+        bool addIfNotExists(const typename InnerMap::value_type& kvPair) { return !tryGetValueOrAdd(kvPair); }
         // Returns true if the value was inserted, returns false if the map
         // already has a value associated with this key
         bool addIfNotExists(const TKey& k, const TValue& v) { return addIfNotExists({k, v}); }
@@ -239,13 +239,13 @@ namespace Slang
         bool addIfNotExists(TKey&& k, TValue&& v) { return addIfNotExists({std::move(k), std::move(v)}); }
 
         // Asserts if the key already exists in the dictionary
-        void add(InnerMap::value_type&& kvPair)
+        void add(typename InnerMap::value_type&& kvPair)
         {
             if (!addIfNotExists(std::move(kvPair)))
                 SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
         }
         // Asserts if the key already exists in the dictionary
-        void add(const InnerMap::value_type& kvPair)
+        void add(const typename InnerMap::value_type& kvPair)
         {
             if (!addIfNotExists(kvPair))
                 SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
@@ -305,7 +305,7 @@ namespace Slang
         class Iterator
         {
         private:
-            DictionaryType::ConstIterator iter;
+            typename DictionaryType::ConstIterator iter;
         public:
             Iterator() = default;
             const T& operator*() const
@@ -337,7 +337,7 @@ namespace Slang
             {
                 return iter == that.iter;
             }
-            Iterator(const DictionaryType::ConstIterator& _iter)
+            Iterator(const typename DictionaryType::ConstIterator& _iter)
             {
                 this->iter = _iter;
             }
@@ -545,8 +545,8 @@ namespace Slang
         }
 
     public:
-        using Iterator = LinkedList<KeyValuePair<TKey, TValue>>::Iterator;
-        using ConstIterator = LinkedList<KeyValuePair<TKey, TValue>>::ConstIterator;
+        using Iterator = typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator;
+        using ConstIterator = typename LinkedList<KeyValuePair<TKey, TValue>>::ConstIterator;
 
         Iterator begin() { return m_kvPairs.begin(); }
         Iterator end() { return m_kvPairs.end(); }

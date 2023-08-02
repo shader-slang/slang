@@ -106,8 +106,8 @@ public:
         }
         GenIterator() { current = next = nullptr; }
         GenIterator(Node* cur) { setCurrent(cur); }
-        const T& operator*() const requires Const { return current->value; }
-        T& operator*() const requires (!Const) { return current->value; }
+        std::conditional_t<Const, const T&, T&>
+            operator*() const { return current->value; }
         GenIterator& operator++()
         {
             setCurrent(next);

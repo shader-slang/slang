@@ -33,31 +33,39 @@ namespace Slang
     // Forward declare Hash
     template<typename T> struct Hash;
 
-    // "Do we have a suitable member function 'getHashCode'?"
-    template <typename T>
-    concept HasSlangHash = requires(const T &t)
-    {
-        { t.getHashCode() } -> std::convertible_to<HashCode64>;
-    };
-
-    // Have we marked 'getHashCode' as having good uniformity properties.
-    template <typename T>
-    concept HasUniformHash = T::kHasUniformHash;
+    template<typename T, typename = void>
+    constexpr static bool HasSlangHash = false;
+    template<typename T>
+    constexpr static bool HasSlangHash<
+        T,
+        std::enable_if_t<std::is_convertible_v<
+            decltype((std::declval<const T&>()).getHashCode()),
+            HashCode64>>>
+        = true;
 
     // Does the hashmap implementation provide a uniform hash for this type.
-    template <typename T>
-    concept HasWyhash = requires { typename ankerl::unordered_dense::hash<T>::is_avalanching; };
+    template<typename T, typename = void>
+    constexpr static bool HasWyhash = false;
+    template<typename T>
+    constexpr static bool HasWyhash<T, typename ankerl::unordered_dense::hash<T>::is_avalanching> = true;
 
     // We want to have an associated type 'is_avalanching = void' iff we have a
     // hash with good uniformity, the two specializations here add that member
     // when appropriate (since we can't declare an associated type with
     // constexpr if or something terse like that)
-    template<typename T>
+    template <typename T, typename = void>
     struct DetectAvalanchingHash {};
-    template<HasWyhash T>
-    struct DetectAvalanchingHash<T> { using is_avalanching = void; };
-    template<HasUniformHash T>
-    struct DetectAvalanchingHash<T> { using is_avalanching = void; };
+    template <typename T>
+    struct DetectAvalanchingHash<T, std::enable_if_t<HasWyhash<T>>>
+    {
+        using is_avalanching = void;
+    };
+    // Have we marked 'getHashCode' as having good uniformity properties.
+    template <typename T>
+    struct DetectAvalanchingHash<T, std::enable_if_t<T::kHasUniformHash>>
+    {
+        using is_avalanching = void;
+    };
 
     // A helper for hashing according to the bit representation
     template<typename T, typename U>
@@ -65,7 +73,17 @@ namespace Slang
     {
         auto operator()(const T& t) const
         {
-            return Hash<U>{}(std::bit_cast<U>(t));
+            // Doesn't discard or invent bits
+            static_assert(sizeof(T) == sizeof(U));
+            // Can we copy bytes to and fro
+            static_assert(std::is_trivially_copyable_v<T>);
+            static_assert(std::is_trivially_copyable_v<U>);
+            // Because we construct a U to memcpy into
+            static_assert(std::is_trivially_constructible_v<U>);
+
+            U u;
+            memcpy(&u, &t, sizeof(T));
+            return Hash<U>{}(u);
         }
     };
 

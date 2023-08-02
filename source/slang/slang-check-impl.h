@@ -125,7 +125,10 @@ namespace Slang
     {
         intptr_t operatorName;
         BasicTypeKey args[2];
-        bool operator==(const OperatorOverloadCacheKey&) const = default;
+        bool operator == (OperatorOverloadCacheKey key) const
+        {
+            return operatorName == key.operatorName && args[0] == key.args[0] && args[1] == key.args[1];
+        }
         HashCode getHashCode() const
         {
             return combineHash((int)(UInt64)(void*)(operatorName), args[0].getRaw(), args[1].getRaw());

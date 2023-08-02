@@ -499,11 +499,10 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 struct ImplicationParams
 {
     IRInst *condition, *induction, *block;
-    HashCode getHashCode() const { return getHashCodeBytewise(*this); }
-    // C++20: friend auto operator<=>(const ImplicationParams&, const ImplicationParams&) = default;
-    friend bool operator==(const ImplicationParams& x, const ImplicationParams& y)
+    SLANG_BYTEWISE_HASHABLE;
+    bool operator==(const ImplicationParams& other) const
     {
-        return x.condition == y.condition && x.induction == y.induction && x.block == y.block;
+        return condition == other.condition && induction == other.induction && block == other.block;
     }
 };
 

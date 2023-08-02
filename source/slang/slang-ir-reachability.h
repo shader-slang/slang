@@ -13,7 +13,10 @@ struct ReachabilityContext
     {
         IRBlock* first;
         IRBlock* second;
-        bool operator==(const BlockPair&) const = default;
+        bool operator == (const BlockPair& other) const
+        {
+            return first == other.first && second == other.second;
+        }
         HashCode getHashCode() const
         {
             Hasher h;
