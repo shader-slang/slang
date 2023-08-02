@@ -119,6 +119,8 @@ public:
         /// True if the compiler should invert the Y coordinate of any SV_Position output.
     bool shouldInvertY() const { return m_invertY; }
 
+    bool getUseOriginalEntryPointName() const { return m_useOriginalEntryPointName; }
+
         /// Given an kind and a binding infer the vulkan binding.
         /// Will return an invalid binding if one is not found
     Binding inferBinding(Kind kind, const Binding& inBinding) const;
@@ -144,6 +146,8 @@ public:
     const Binding& getGlobalsBinding() const { return m_globalsBinding; }
 
     void setInvertY(bool value) { m_invertY = value; }
+
+    void setUseOriginalEntryPointName(bool value) { m_useOriginalEntryPointName = value; }
 
         /// Ctor
     HLSLToVulkanLayoutOptions();
@@ -171,6 +175,9 @@ protected:
 
         /// Whether to invert the Y coordinate of SV_Position output.
     bool m_invertY = false;
+
+        /// If set, will use the original entry point name in the generated SPIRV instead of "main".
+    bool m_useOriginalEntryPointName = false;
 };
 
 } // namespace Slang

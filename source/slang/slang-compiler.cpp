@@ -1222,11 +1222,18 @@ namespace Slang
                 auto entryPoint = getEntryPoint(entryPointIndex);
                 profile = getEffectiveProfile(entryPoint, targetReq);
 
-                options.entryPointName = allocator.allocate(getText(entryPoint->getName()));
-                auto entryPointNameOverride = getProgram()->getEntryPointNameOverride(entryPointIndex);
-                if (entryPointNameOverride.getLength() != 0)
+                if (getTargetReq()->getHLSLToVulkanLayoutOptions() && getTargetReq()->getHLSLToVulkanLayoutOptions()->getUseOriginalEntryPointName())
                 {
-                    options.entryPointName = allocator.allocate(entryPointNameOverride);
+                }
+                else
+                {
+
+                    options.entryPointName = allocator.allocate(getText(entryPoint->getName()));
+                    auto entryPointNameOverride = getProgram()->getEntryPointNameOverride(entryPointIndex);
+                    if (entryPointNameOverride.getLength() != 0)
+                    {
+                        options.entryPointName = allocator.allocate(entryPointNameOverride);
+                    }
                 }
             }
             else 
