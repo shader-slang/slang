@@ -103,26 +103,21 @@ namespace Slang
         RefPtr<HoistedPrimalsInfo> applyMap(IRCloneEnv* env)
         {
             RefPtr<HoistedPrimalsInfo> newPrimalsInfo = new HoistedPrimalsInfo();
+
+            const auto goSet = [&env](const auto& inSet, auto& outSet){
+                for (auto inst : inSet)
+                    if (const auto newKey = env->mapOldValToNew.tryGetValue(inst))
+                        outSet.add(*newKey);
+            };
             
-            for (auto inst : this->storeSet)
-                if (env->mapOldValToNew.containsKey(inst))
-                    newPrimalsInfo->storeSet.add(env->mapOldValToNew[inst]);
-            
-            for (auto inst : this->recomputeSet)
-                if (env->mapOldValToNew.containsKey(inst))
-                    newPrimalsInfo->recomputeSet.add(env->mapOldValToNew[inst]);
-                
-            for (auto inst : this->invertSet)
-                if (env->mapOldValToNew.containsKey(inst))
-                    newPrimalsInfo->invertSet.add(env->mapOldValToNew[inst]);
-            
-            for (auto inst : this->instsToInvert)
-                if (env->mapOldValToNew.containsKey(inst))
-                    newPrimalsInfo->instsToInvert.add(env->mapOldValToNew[inst]);
+            goSet(this->storeSet, newPrimalsInfo->storeSet);
+            goSet(this->recomputeSet, newPrimalsInfo->recomputeSet);
+            goSet(this->invertSet, newPrimalsInfo->invertSet);
+            goSet(this->instsToInvert, newPrimalsInfo->instsToInvert);
 
             for (auto [key, value] : this->invertInfoMap)
-                if (env->mapOldValToNew.containsKey(key))
-                    newPrimalsInfo->invertInfoMap[env->mapOldValToNew[key]] = value.applyMap(env);
+                if (const auto newKey = env->mapOldValToNew.tryGetValue(key))
+                    newPrimalsInfo->invertInfoMap.set(*newKey, value.applyMap(env));
             
             return newPrimalsInfo;
         }
@@ -141,8 +136,8 @@ namespace Slang
             for (auto inst : info->instsToInvert)
                 instsToInvert.add(inst);
 
-            for (auto [key, value] : info->invertInfoMap)
-                invertInfoMap[key] = value;
+            for (auto info : info->invertInfoMap)
+                invertInfoMap.add(info);
         }
     };
 
