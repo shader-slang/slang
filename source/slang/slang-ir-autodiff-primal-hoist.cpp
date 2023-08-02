@@ -108,7 +108,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         recomputeBlock->insertAtEnd(func);
         builder.addDecoration(recomputeBlock, kIROp_RecomputeBlockDecoration);
         recomputeBlockMap.add(primalBlock, recomputeBlock);
-        indexedBlockInfo[recomputeBlock] = indexedBlockInfo.at(primalBlock);
+        indexedBlockInfo.set(recomputeBlock, indexedBlockInfo.at(primalBlock));
         return recomputeBlock;
     };
     
