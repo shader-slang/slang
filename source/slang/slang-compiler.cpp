@@ -1222,7 +1222,7 @@ namespace Slang
                 auto entryPoint = getEntryPoint(entryPointIndex);
                 profile = getEffectiveProfile(entryPoint, targetReq);
 
-                if (getTargetReq()->getHLSLToVulkanLayoutOptions() && getTargetReq()->getHLSLToVulkanLayoutOptions()->getUseOriginalEntryPointName())
+                if (getTargetReq()->getHLSLToVulkanLayoutOptions() && !getTargetReq()->getHLSLToVulkanLayoutOptions()->getUseOriginalEntryPointName())
                 {
                 }
                 else

@@ -598,9 +598,6 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_2& request)
         &request.sourcePath,
         1);
 
-    if (request.entryPointName)
-        shader->setEntryPoint(request.entryPointName);
-
     {
         const EShMessages messages = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
 
@@ -609,6 +606,9 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_2& request)
             dumpDiagnostics(request, shader->getInfoLog());
             return 1;
         }
+
+        if (request.entryPointName)
+            shader->setEntryPoint(request.entryPointName);
 
         program->addShader(shader);
 
