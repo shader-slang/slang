@@ -10,8 +10,10 @@
 #include "slang-common.h"
 #include "slang-hash.h"
 #include "slang-secure-crt.h"
+#include "slang-stable-hash.h"
 
 #include <new>
+#include <type_traits>
 
 namespace Slang
 {
@@ -32,8 +34,10 @@ namespace Slang
         }
     }
     template<typename IntType>
-    inline int intToAscii(char* buffer, IntType val, int radix)
+    inline int intToAscii(char* buffer, IntType val, int radix, int padTo = 0)
     {
+        static_assert(std::is_integral_v<IntType>);
+
         int i = 0;
         IntType sign;
         
@@ -51,6 +55,9 @@ namespace Slang
             else
                 buffer[i++] = (char)(digit - 10 + 'A');
         } while ((val /= radix) > 0);
+
+        while(i < padTo)
+            buffer[i++] = '0';
 
         if (sign < 0)
             buffer[i++] = '-';
@@ -509,6 +516,10 @@ namespace Slang
         void append(float val, const char* format = "%g");
         void append(double val, const char* format = "%g");
 
+        // Padded hex representations
+        void append(StableHashCode32 val);
+        void append(StableHashCode64 val);
+
         void append(char const* str);
         void append(char const* str, size_t len);
         void append(const char* textBegin, char const* textEnd);
@@ -549,6 +560,14 @@ namespace Slang
         explicit String(uint64_t val, int radix = 10)
         {
             append(val, radix);
+        }
+        explicit String(StableHashCode32 val)
+        {
+            append(val);
+        }
+        explicit String(StableHashCode64 val)
+        {
+            append(val);
         }
         explicit String(float val, const char* format = "%g")
         {

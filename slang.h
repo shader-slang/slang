@@ -2412,7 +2412,7 @@ extern "C"
 
         /// Compute a string hash.
         /// Count should *NOT* include terminating zero.
-    SLANG_API int spComputeStringHash(const char* chars, size_t count);
+    SLANG_API SlangUInt32 spComputeStringHash(const char* chars, size_t count);
 
         /// Get a type layout representing reflection information for the global-scope prameters.
     SLANG_API SlangReflectionTypeLayout* spReflection_getGlobalParamsTypeLayout(

@@ -4,8 +4,6 @@
 #include "../../slang.h"
 #include "slang-math.h"
 #include "../../external/unordered_dense/include/ankerl/unordered_dense.h"
-#include <bit>
-#include <concepts>
 #include <cstring>
 #include <type_traits>
 
@@ -15,16 +13,11 @@ namespace Slang
     // Types
     //
 
-    // Ideally Hash codes should be unsigned types - makes accumulation simpler (as overflow/underflow behavior are defined)
-    // Only downside is around multiply, where unsigned multiply can be slightly slower on some targets.
-
-    // HashCode - size may vary by platform. Typically has 'best' combination of bits/performance. Should not be exposed externally as value from same input may change depending on compilation platform.
-    typedef unsigned int HashCode;
-
     // A fixed 64bit wide hash on all targets.
     typedef uint64_t HashCode64;
     // A fixed 32bit wide hash on all targets.
     typedef uint32_t HashCode32;
+    typedef HashCode32 HashCode;
 
     //
     // Some helpers to determine which hash to use for a type
@@ -154,47 +147,25 @@ namespace Slang
             return ::Slang::hashObjectBytes(*this); \
         }
 
-
-    /* The 'Stable' hash code functions produce hashes that must be
-
-    * The same result for the same inputs on all targets
-    * Rarely change - as their values can change the output of the Slang API/Serialization
-
-    Hash value used from the 'Stable' functions can also be used as part of serialization -
-    so it is in effect part of the API.
-
-    In effect this means changing a 'Stable' algorithm will typically require doing a new release.
-    */
-    inline HashCode32 getStableHashCode32(const char* buffer, size_t numChars)
-    {
-        HashCode32 hash = 0;
-        for (size_t i = 0; i < numChars; ++i)
-        {
-            hash = HashCode32(buffer[i]) + (hash << 6) + (hash << 16) - hash;
-        }
-        return hash;
-    }
-
-    inline HashCode64 getStableHashCode64(const char* buffer, size_t numChars)
-    {
-        // Use HashCode64 is assumed unsigned because hash requires wrap around behavior and int is undefined on over/underflows
-        HashCode64 hash = 0;
-        for (size_t i = 0; i < numChars; ++i)
-        {
-            hash = HashCode64(HashCode64(buffer[i])) + (hash << 6) + (hash << 16) - hash;
-        }
-        return hash;
-    }
-
-    inline HashCode combineHash(HashCode h)
+    inline HashCode64 combineHash(HashCode64 h)
     {
         return h;
     }
 
-    template<typename... Hs>
-    HashCode combineHash(HashCode n, Hs... args)
+    inline HashCode32 combineHash(HashCode32 h)
     {
-        return (n * 16777619) ^ combineHash(args...);
+        return h;
+    }
+
+    // A left fold of a mixing operation
+    template<typename H1, typename H2, typename... Hs>
+    auto combineHash(H1 n, H2 m, Hs... args)
+    {
+        // TODO: restrict the types here more, currently we tend to throw
+        // unhashed integers in here along with proper hashes of objects.
+        static_assert(std::is_convertible_v<H1, HashCode64> || std::is_convertible_v<H1, HashCode32>);
+        static_assert(std::is_convertible_v<H2, HashCode64> || std::is_convertible_v<H2, HashCode32>);
+        return combineHash((n * 16777619) ^ m, args...);
     }
 
     struct Hasher

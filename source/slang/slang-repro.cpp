@@ -57,7 +57,7 @@ namespace Slang {
 #define SLANG_STATE_TYPE_SIZE(x) uint32_t(sizeof(x)), 
 
 // A function to calculate the hash related in list in part to how the types used are sized. Can catch crude breaking binary differences.
-static HashCode32 _calcTypeHash()
+static StableHashCode32 _calcTypeHash()
 {
     typedef ReproUtil Util;
     const uint32_t sizes[] =
@@ -67,9 +67,9 @@ static HashCode32 _calcTypeHash()
     return getStableHashCode32((const char*)&sizes, sizeof(sizes));
 }
 
-static HashCode32 _getTypeHash()
+static StableHashCode32 _getTypeHash()
 {
-    static HashCode32 s_hash = _calcTypeHash();
+    static StableHashCode32 s_hash = _calcTypeHash();
     return s_hash;
 }
 
@@ -1098,7 +1098,7 @@ struct LoadContext
     Header header;
     header.m_chunk.type = kSlangStateFourCC;
     header.m_semanticVersion = g_semanticVersion;
-    header.m_typeHash = uint32_t(_getTypeHash());
+    header.m_typeHash = _getTypeHash();
 
     return RiffUtil::writeData(&header.m_chunk, sizeof(header),container.getData(), container.getDataCount(), stream);
 }
@@ -1145,7 +1145,7 @@ struct LoadContext
         return SLANG_FAIL;
     }
 
-    if (header.m_typeHash != uint32_t(_getTypeHash()))
+    if (header.m_typeHash != _getTypeHash())
     {
         sink->diagnose(SourceLoc(), Diagnostics::riffHashMismatch);
         return SLANG_FAIL;
