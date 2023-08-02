@@ -452,9 +452,6 @@ workspace "slang"
             defines { "SLANG_CONFIG_DEFAULT_SPIRV_DIRECT" }
         end
 
-        -- Includes made available to every build target
-        includedirs { "external/unordered_dense/include" }
-
 function dump(o)
     if type(o) == 'table' then
         local s = '{ '

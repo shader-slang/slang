@@ -8,7 +8,7 @@
 #include "slang-exception.h"
 #include "slang-math.h"
 #include "slang-hash.h"
-#include "ankerl/unordered_dense.h"
+#include "../../external/unordered_dense/include/ankerl/unordered_dense.h"
 
 namespace Slang
 {
