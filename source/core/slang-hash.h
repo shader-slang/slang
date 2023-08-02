@@ -15,9 +15,9 @@ namespace Slang
 
     // A fixed 64bit wide hash on all targets.
     typedef uint64_t HashCode64;
+    typedef HashCode64 HashCode;
     // A fixed 32bit wide hash on all targets.
     typedef uint32_t HashCode32;
-    typedef HashCode32 HashCode;
 
     //
     // Some helpers to determine which hash to use for a type
