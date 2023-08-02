@@ -1757,7 +1757,7 @@ namespace Slang
             // A type used as differential type must have itself as its own differential type.
             if (witnessValue.getFlavor() != RequirementWitness::Flavor::val)
                 return;
-            auto differentialType = as<DeclRefType>(witnessValue.getVal());
+            auto differentialType = as<DeclRefType>(as<NamedExpressionType>(witnessValue.getVal())->innerType);
             if (!differentialType)
                 return;
             auto diffDiffType = tryGetDifferentialType(m_astBuilder, differentialType);
