@@ -1044,29 +1044,32 @@ struct SPIRVEmitContext
 
         // > OpTypeInt
 
-#define CASE(IROP, BITS, SIGNED) \
-        case IROP:                                                                     \
-        return emitTypeInst(inst, SpvOpTypeInt, makeArray<SpvWord>((SpvWord)BITS, (SpvWord)SIGNED).getView()); 
-
-        CASE(kIROp_IntType,     32, 1);
-        CASE(kIROp_UIntType,    32, 0);
-        CASE(kIROp_Int64Type,   64, 1);
-        CASE(kIROp_UInt64Type,  64, 0);
-
-#undef CASE
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+            {
+                const IntInfo i = getIntTypeInfo(as<IRType>(inst));
+                return emitTypeInst(
+                    inst,
+                    SpvOpTypeInt,
+                    makeArray(static_cast<SpvWord>(i.width), SpvWord{i.isSigned}).getView());
+            }
 
         // > OpTypeFloat
 
-#define CASE(IROP, BITS) \
-        case IROP:                                                                \
-        return emitTypeInst(                                                      \
-            inst, SpvOpTypeFloat, makeArray<SpvWord>(BITS).getView()); \
+        case kIROp_HalfType:
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+            {
+                const FloatInfo i = getFloatingTypeInfo(as<IRType>(inst));
+                return emitTypeInst(inst, SpvOpTypeFloat, makeArray(static_cast<SpvWord>(i.width)).getView());
+            }
 
-        CASE(kIROp_HalfType,    16);
-        CASE(kIROp_FloatType,   32);
-        CASE(kIROp_DoubleType,  64);
-
-#undef CASE
         case kIROp_PtrType:
         case kIROp_RefType:
         case kIROp_OutType:
