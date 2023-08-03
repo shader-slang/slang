@@ -1766,6 +1766,8 @@ struct SPIRVEmitContext
             return emitInst(parent, inst, SpvOpUnreachable);
         case kIROp_conditionalBranch:
             SLANG_UNEXPECTED("Unstructured branching is not supported by SPIRV.");
+        case kIROp_MakeVector:
+            return emitConstruct(parent, inst);
         }
     }
 
