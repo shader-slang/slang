@@ -1619,9 +1619,13 @@ struct SPIRVEmitContext
         case kIROp_swizzle:
             return emitSwizzle(parent, as<IRSwizzle>(inst));
         case kIROp_IntCast:
+            return emitIntCast(parent, as<IRIntCast>(inst));
         case kIROp_FloatCast:
+            return emitFloatCast(parent, as<IRFloatCast>(inst));
         case kIROp_CastIntToFloat:
+            return emitIntToFloatCast(parent, as<IRCastIntToFloat>(inst));
         case kIROp_CastFloatToInt:
+            return emitFloatToIntCast(parent, as<IRCastFloatToInt>(inst));
         case kIROp_MatrixReshape:
         case kIROp_VectorReshape:
             // TODO: break emitConstruct into separate functions for each opcode.
@@ -2660,6 +2664,101 @@ struct SPIRVEmitContext
                 }
             });
         }
+    }
+
+    IRType* dropVector(IRType* t)
+    {
+        if(const auto v = as<IRVectorType>(t))
+            return v->getElementType();
+        return t;
+    };
+
+    SpvInst* emitIntCast(SpvInstParent* parent, IRIntCast* inst)
+    {
+        const auto fromTypeV = inst->getOperand(0)->getDataType();
+        const auto toTypeV = inst->getDataType();
+        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
+        const auto fromType = dropVector(fromTypeV);
+        const auto toType = dropVector(toTypeV);
+        SLANG_ASSERT(isIntegralType(fromType));
+        SLANG_ASSERT(isIntegralType(toType));
+
+        const auto fromInfo = getIntTypeInfo(fromType);
+        const auto toInfo = getIntTypeInfo(toType);
+
+        const auto convertWith = [&](auto op){
+            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
+        };
+        if(fromInfo == toInfo)
+            return convertWith(SpvOpCopyObject);
+        else if(fromInfo.width == toInfo.width)
+            return convertWith(SpvOpBitcast);
+        else if(!fromInfo.isSigned && !toInfo.isSigned)
+            // unsigned to unsigned, don't sign extend
+            return convertWith(SpvOpUConvert);
+        else if(toInfo.isSigned)
+            // unsigned to signed, sign extend
+            return convertWith(SpvOpSConvert);
+        else if(fromInfo.isSigned)
+            // signed to unsigned, sign extend
+            return convertWith(SpvOpSConvert);
+        else if(fromInfo.isSigned && toInfo.isSigned)
+            // signed to signed, sign extend
+            return convertWith(SpvOpSConvert);
+
+        SLANG_UNREACHABLE(__func__);
+    }
+
+    SpvInst* emitFloatCast(SpvInstParent* parent, IRFloatCast* inst)
+    {
+        const auto fromTypeV = inst->getOperand(0)->getDataType();
+        const auto toTypeV = inst->getDataType();
+        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
+        const auto fromType = dropVector(fromTypeV);
+        const auto toType = dropVector(toTypeV);
+        SLANG_ASSERT(isFloatingType(fromType));
+        SLANG_ASSERT(isFloatingType(toType));
+        SLANG_ASSERT(!isTypeEqual(fromType, toType));
+
+        return emitInst(parent, inst, SpvOpFConvert, toTypeV, kResultID, inst->getOperand(0));
+    }
+
+    SpvInst* emitIntToFloatCast(SpvInstParent* parent, IRCastIntToFloat* inst)
+    {
+        const auto fromTypeV = inst->getOperand(0)->getDataType();
+        const auto toTypeV = inst->getDataType();
+        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
+        const auto fromType = dropVector(fromTypeV);
+        const auto toType = dropVector(toTypeV);
+        SLANG_ASSERT(isIntegralType(fromType));
+        SLANG_ASSERT(isFloatingType(toType));
+
+        const auto fromInfo = getIntTypeInfo(fromType);
+
+        const auto convertWith = [&](auto op){
+            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
+        };
+
+        return convertWith(fromInfo.isSigned ? SpvOpConvertSToF : SpvOpConvertUToF);
+    }
+
+    SpvInst* emitFloatToIntCast(SpvInstParent* parent, IRCastFloatToInt* inst)
+    {
+        const auto fromTypeV = inst->getOperand(0)->getDataType();
+        const auto toTypeV = inst->getDataType();
+        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
+        const auto fromType = dropVector(fromTypeV);
+        const auto toType = dropVector(toTypeV);
+        SLANG_ASSERT(isFloatingType(fromType));
+        SLANG_ASSERT(isIntegralType(toType));
+
+        const auto toInfo = getIntTypeInfo(toType);
+
+        const auto convertWith = [&](auto op){
+            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
+        };
+
+        return convertWith(toInfo.isSigned ? SpvOpConvertFToS : SpvOpConvertFToU);
     }
 
     SpvInst* emitConstruct(SpvInstParent* parent, IRInst* inst)
