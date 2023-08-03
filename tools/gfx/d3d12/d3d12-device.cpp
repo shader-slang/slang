@@ -1473,6 +1473,12 @@ Result DeviceImpl::createTextureView(
                 dsvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
             }
             break;
+        case IResource::Type::TextureCube:
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+            dsvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+            dsvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
+            dsvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+            break;
         default:
             return SLANG_FAIL;
         }
