@@ -1601,8 +1601,11 @@ struct SPIRVEmitContext
         switch( inst->getOp() )
         {
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for local instruction");
-            break;
+            {
+                String e = "Unhandled local inst in spirv-emit: "
+                    + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                SLANG_UNIMPLEMENTED_X(e.getBuffer());
+            }
         case kIROp_Specialize:
             return nullptr;
         case kIROp_Var:
