@@ -1,6 +1,6 @@
 // direct-spirv-emit.slang
 
-//TEST:SIMPLE:-target spirv -entry computeMain -stage compute -emit-spirv-directly
+//TEST:SIMPLE:-target spirv -entry computeMain -stage compute
 
 // Test ability to directly output SPIR-V
 

@@ -1530,13 +1530,13 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        if (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
+        if (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_VIA_GLSL)
         {
-            atoms.add(CapabilityAtom::SPIRV_DIRECT);
+            atoms.add(CapabilityAtom::GLSL);
         }
         else
         {
-            atoms.add(CapabilityAtom::GLSL);
+            atoms.add(CapabilityAtom::SPIRV_DIRECT);
         }
         break;
 

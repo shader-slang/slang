@@ -1597,7 +1597,7 @@ namespace Slang
 
         bool shouldEmitSPIRVDirectly()
         {
-            return (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0;
+            return (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_VIA_GLSL) == 0;
         }
 
         bool isWholeProgramRequest()

@@ -74,9 +74,10 @@ Result ShaderProgramImpl::createShaderModule(
     // to control the entry point naming behavior in SPIRV-direct path
     // so we can remove the ad-hoc logic here.
     auto realEntryPointName = entryPointInfo->getNameOverride();
-    const char* spirvBinaryEntryPointName = "main";
-    if (m_device->m_desc.slang.targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
-        spirvBinaryEntryPointName = realEntryPointName;
+    const char* spirvBinaryEntryPointName =
+        m_device->m_desc.slang.targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_VIA_GLSL
+        ? "main"
+        : realEntryPointName;
     m_stageCreateInfos.add(compileEntryPoint(
         spirvBinaryEntryPointName,
         kernelCode,

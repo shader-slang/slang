@@ -99,6 +99,8 @@ enum class OptionKind
 
     GLSLForceScalarLayout,
     EnableEffectAnnotations,
+
+    EmitSpirvViaGLSL,
     
     // Downstream
 
@@ -131,7 +133,6 @@ enum class OptionKind
 
     // Experimental
 
-    EmitSpirvDirectly,
     FileSystem,
     Heterogeneous,
     NoMangle,
@@ -506,6 +507,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
+        { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
+        "Generate SPIR-V output by compiling generated GLSL with glslang" },
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -583,9 +586,6 @@ void initCommandOptions(CommandOptions& options)
 
     const Option experimentalOpts[] = 
     {
-        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr, 
-        "Generate SPIR-V output directly (otherwise through "
-        "GLSL and using the glslang compiler)"},
         { OptionKind::FileSystem, "-file-system", "-file-system <file-system-type>", 
         "Set the filesystem hook to use for a compile request."},
         { OptionKind::Heterogeneous, "-heterogeneous", nullptr, "Output heterogeneity-related code." },
@@ -2280,7 +2280,7 @@ SlangResult OptionsParser::_parse(
                 // We retun an error so after this has successfully passed, we quit
                 return SLANG_FAIL;
             }
-            case OptionKind::EmitSpirvDirectly: getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY; break;
+            case OptionKind::EmitSpirvViaGLSL: getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_VIA_GLSL; break;
 
             case OptionKind::DefaultDownstreamCompiler:
             {

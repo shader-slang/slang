@@ -699,8 +699,8 @@ extern "C"
         /* When set, will dump out the IR between intermediate compilation steps.*/
         SLANG_TARGET_FLAG_DUMP_IR = 1 << 9,
 
-        /* When set, will generate SPIRV directly instead of going through glslang. */
-        SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
+        /* When set, will generate SPIRV via glslang rather than directly. */
+        SLANG_TARGET_FLAG_GENERATE_SPIRV_VIA_GLSL = 1 << 10,
     };
 
     /*!

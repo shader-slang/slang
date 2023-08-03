@@ -141,9 +141,9 @@ static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.useDXIL = true;
         }
-        else if (argValue == "-emit-spirv-directly")
+        else if (argValue == "-emit-spirv-via-glsl")
         {
-            outOptions.generateSPIRVDirectly = true;
+            outOptions.generateSPIRVViaGLSL= true;
         }
         else if (argValue == "-only-startup")
         {

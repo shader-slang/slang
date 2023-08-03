@@ -71,7 +71,7 @@ struct Options
 
     Slang::DownstreamArgs downstreamArgs;                    ///< Args to downstream tools. Here it's just slang
 
-    bool generateSPIRVDirectly = false;
+    bool generateSPIRVViaGLSL = false;
 
     Options() { downstreamArgs.addName("slang"); }
 

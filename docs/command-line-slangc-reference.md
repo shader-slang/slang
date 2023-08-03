@@ -550,9 +550,9 @@ Verify IR in the front-end.
 
 Experimental options (use at your own risk) 
 
-<a id="emit-spirv-directly"></a>
-## -emit-spirv-directly
-Generate SPIR-V output directly (otherwise through GLSL and using the glslang compiler) 
+<a id="emit-spirv-via-glsl"></a>
+## -emit-spirv-via-glsl
+Generate SPIR-V output by generating and compiling GLSL using glslang
 
 
 <a id="file-system"></a>
