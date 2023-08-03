@@ -165,7 +165,9 @@ void copyNameHintDecoration(IRInst* dest, IRInst* src);
 IRInst* getRootAddr(IRInst* addrInst);
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
-String dumpIRToString(IRInst* root);
+String dumpIRToString(
+    IRInst* root,
+    IRDumpOptions options = {IRDumpOptions::Mode::Simplified, IRDumpOptions::Flag::DumpDebugIds});
 
 // Returns whether a call insts can be treated as a pure functional inst, and thus can be
 // DCE'd and deduplicated.
