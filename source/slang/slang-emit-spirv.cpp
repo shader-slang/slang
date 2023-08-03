@@ -8,6 +8,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-spirv-snippet.h"
 #include "slang-ir-spirv-legalize.h"
+#include "slang-spirv-val.h"
 #include "spirv/unified1/spirv.h"
 #include "../core/slang-memory-arena.h"
 
@@ -2930,6 +2931,16 @@ SlangResult emitSPIRVFromIR(
     spirvOut.addRange(
         (uint8_t const*) context.m_words.getBuffer(),
         context.m_words.getCount() * sizeof(context.m_words[0]));
+
+    const auto validationResult = debugValidateSPIRV(spirvOut);
+    if(SLANG_FAILED(validationResult))
+    {
+        codeGenContext->getSink()->diagnoseWithoutSourceView(
+            SourceLoc{},
+            Diagnostics::spirvValidationFailed
+        );
+        return validationResult;
+    }
 
     return SLANG_OK;
 }

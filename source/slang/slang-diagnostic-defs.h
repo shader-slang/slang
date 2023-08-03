@@ -722,5 +722,6 @@ DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler erro
 DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error")
 DIAGNOSTIC(99999, Error, compilationAbortedDueToException, "Slang compilation aborted due to an exception of $0: $1")
 DIAGNOSTIC(99999, Internal, serialDebugVerificationFailed, "Verification of serial debug information failed.")
+DIAGNOSTIC(99999, Internal, spirvValidationFailed, "Validation of generated SPIR-V failed.")
 
 #undef DIAGNOSTIC
