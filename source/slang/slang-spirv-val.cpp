@@ -3,27 +3,44 @@
 namespace Slang
 {
 
-SlangResult debugDisassembleSPIRV(const List<uint8_t>& spirv, String& outDis)
+static SlangResult disassembleSPIRV(const List<uint8_t>& spirv, String& outErr, String& outDis)
 {
+    // Set up our process
     CommandLine commandLine;
     commandLine.m_executableLocation.setName("spirv-dis");
     RefPtr<Process> p;
-    const auto createResult = Process::create(commandLine, 0, p);
+
     // If we failed to even start the process, then validation isn't available
-    SLANG_RETURN_ON_FAIL(createResult);
+    SLANG_RETURN_ON_FAIL(Process::create(commandLine, 0, p));
     const auto in = p->getStream(StdStreamType::In);
     const auto out = p->getStream(StdStreamType::Out);
+    const auto err = p->getStream(StdStreamType::ErrorOut);
+
     // Write the assembly
     SLANG_RETURN_ON_FAIL(in->write(spirv.getBuffer(), spirv.getCount()));
     in->close();
+
     // Wait for it to finish
-    if (!p->waitForTermination(1000))
+    if(!p->waitForTermination(1000))
         return SLANG_FAIL;
 
+    // TODO: allow inheriting stderr in Process
     List<Byte> outData;
     SLANG_RETURN_ON_FAIL(StreamUtil::readAll(out, 0, outData));
-    outDis = String((const char*)outData.getBuffer());
-    return SLANG_OK;
+    outErr = String(
+        reinterpret_cast<const char*>(outData.begin()),
+        reinterpret_cast<const char*>(outData.end())
+    );
+
+    outData.clear();
+    SLANG_RETURN_ON_FAIL(StreamUtil::readAll(err, 0, outData));
+    outDis = String(
+        reinterpret_cast<const char*>(outData.begin()),
+        reinterpret_cast<const char*>(outData.end())
+    );
+
+    const auto ret = p->getReturnValue();
+    return ret == 0 ? SLANG_OK : SLANG_FAIL;
 }
 
 SlangResult debugValidateSPIRV(const List<uint8_t>& spirv)
@@ -57,10 +74,13 @@ SlangResult debugValidateSPIRV(const List<uint8_t>& spirv)
     SLANG_RETURN_ON_FAIL(StreamUtil::readAll(err, 0, outData));
     fwrite(outData.getBuffer(), outData.getCount(), 1, stderr);
     const auto ret = p->getReturnValue();
-    if (SLANG_FAILED(ret))
+
+    if(ret != 0)
     {
+        String spirvDisErr;
         String spirvDis;
-        debugDisassembleSPIRV(spirv, spirvDis);
+        disassembleSPIRV(spirv, spirvDisErr, spirvDis);
+        fwrite(spirvDisErr.getBuffer(), spirvDisErr.getLength(), 1, stderr);
         fwrite(spirvDis.getBuffer(), spirvDis.getLength(), 1, stderr);
     }
 
