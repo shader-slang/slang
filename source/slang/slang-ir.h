@@ -1005,6 +1005,25 @@ bool isTypeEqual(IRType* a, IRType* b);
 // True if this is an integral IRBasicType, not including Char or Ptr types
 bool isIntegralType(IRType* t);
 
+bool isFloatingType(IRType* t);
+
+struct IntInfo
+{
+    Int width;
+    bool isSigned;
+    bool operator==(const IntInfo& i) const { return width == i.width && isSigned == i.isSigned; }
+};
+
+IntInfo getIntTypeInfo(const IRType* intType);
+
+struct FloatInfo
+{
+    Int width;
+    bool operator==(const FloatInfo& i) const { return width == i.width; }
+};
+
+FloatInfo getFloatingTypeInfo(const IRType* floatType);
+
 bool isIntegralScalarOrCompositeType(IRType* t);
 
 void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
