@@ -61,5 +61,5 @@ float f(uint id, float x)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer[0] = __fwd_diff(f)(dispatchThreadID.x, DifferentialPair<float>(1.0, 2.0)).d; // A.calc, expect 12
-    outputBuffer[1] = __fwd_diff(f)(dispatchThreadID.x + 1, DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 3
+    outputBuffer[1] = __fwd_diff(f)(dispatchThreadID.x + 1, DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 18
 }

@@ -369,13 +369,17 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
                 autoDiffSharedContext->differentialAssocTypeWitnessStructKey);
         }
     }
+    
+    // Obtain the witness that primalType conforms to IDifferentiable.
     if (!witness)
         witness = tryGetDifferentiableWitness(builder, originalType);
     SLANG_RELEASE_ASSERT(witness);
 
-    return builder->getDifferentialPairType(
+    auto pairType = builder->getDifferentialPairType(
         (IRType*)primalType,
         witness);
+
+    return pairType;
 }
 
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
@@ -815,8 +819,6 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(
             // 
             SLANG_ASSERT(primalValue);
 
-            IRInst* outWitnessTable = nullptr;
-
             // Search for IDifferentiable conformance.
             // TODO: Handle the case where primalType is an associated type.
             // 
@@ -828,15 +830,15 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(
             if (lookupKeyPath.getCount())
             {
                 // `interfaceType` does conform to `IDifferentiable`.
-                outWitnessTable = builder->emitExtractExistentialWitnessTable(primalValue);
-                diffWitnessTable = outWitnessTable;
+                diffWitnessTable = builder->emitExtractExistentialWitnessTable(primalValue);
 
                 for (auto node : lookupKeyPath)
                 {
-                    outWitnessTable = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), outWitnessTable, node->getRequirementKey());
+                    diffWitnessTable = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), diffWitnessTable, node->getRequirementKey());
                 }
+
                 diffOuterType = diffType;
-                diffType = (IRType*)builder->emitLookupInterfaceMethodInst(builder->getTypeType(), outWitnessTable, autoDiffSharedContext->differentialAssocTypeStructKey);
+                diffType = (IRType*)builder->emitLookupInterfaceMethodInst(builder->getTypeType(), diffWitnessTable, autoDiffSharedContext->differentialAssocTypeStructKey);
                 builder->markInstAsDifferential(diffType, nullptr);
             }
             else

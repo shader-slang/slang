@@ -463,7 +463,7 @@ IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* b
 }
 
 IRInst* DifferentiableTypeConformanceContext::getDifferentialTypeFromDiffPairType(
-    IRBuilder* builder, IRDifferentialPairTypeBase* diffPairType)
+    IRBuilder*, IRDifferentialPairTypeBase*)
 {
     SLANG_UNIMPLEMENTED_X("");
 }
