@@ -3,6 +3,7 @@
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
 
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -1213,8 +1214,9 @@ struct SPIRVEmitContext
         // ...
 
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for global instruction");
-            UNREACHABLE_RETURN(nullptr);
+            String e = "Unhandled global inst in spirv-emit: "
+                + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+            SLANG_UNIMPLEMENTED_X(e.begin());
         }
     }
 
