@@ -972,21 +972,13 @@ struct SPIRVEmitContext
     struct SpvTypeInstKey
     {
         List<SpvWord> words;
-        bool operator==(const SpvTypeInstKey& other)
+        bool operator==(const SpvTypeInstKey& other) const { return words == other.words; }
+        const static bool kHasUniformHash = true;
+        auto getHashCode() const
         {
-            if (words.getCount() != other.words.getCount())
-                return false;
-            for (Index i = 0; i < words.getCount(); i++)
-                if (words[i] != other.words[i])
-                    return false;
-            return true;
-        }
-        HashCode getHashCode()
-        {
-            HashCode result = 0;
-            for (auto word : words)
-                result = combineHash(result, word);
-            return result;
+            return Slang::getHashCode(
+                reinterpret_cast<const char*>(words.getBuffer()),
+                words.getCount() * sizeof(SpvWord));
         }
     };
 
