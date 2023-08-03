@@ -77,8 +77,7 @@ enum class SpvLogicalSectionID
     DebugStringsAndSource,
     DebugNames,
     Annotations,
-    Types,
-    Constants,
+    ConstantsAndTypes,
     GlobalVariables,
     FunctionDeclarations,
     FunctionDefinitions,
@@ -720,7 +719,7 @@ struct SPIRVEmitContext
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
             result = emitInst(
-                getSection(SpvLogicalSectionID::Constants),
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 SpvOpConstant,
                 type,
@@ -732,7 +731,7 @@ struct SPIRVEmitContext
         default:
         {
             result = emitInst(
-                getSection(SpvLogicalSectionID::Constants),
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 SpvOpConstant,
                 type,
@@ -759,7 +758,7 @@ struct SPIRVEmitContext
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
             result = emitInst(
-                getSection(SpvLogicalSectionID::Constants),
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 SpvOpConstant,
                 type,
@@ -770,7 +769,7 @@ struct SPIRVEmitContext
         else
         {
             result = emitInst(
-                getSection(SpvLogicalSectionID::Constants),
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 SpvOpConstant,
                 type,
@@ -1006,7 +1005,7 @@ struct SPIRVEmitContext
             return result;
         }
         result = emitInstCustomOperandFunc(
-            getSection(SpvLogicalSectionID::Types), typeInst, opcode, [&]() {
+            getSection(SpvLogicalSectionID::ConstantsAndTypes), typeInst, opcode, [&]() {
                 emitOperand(kResultID);
                 for (auto op : operands)
                 {
@@ -1086,7 +1085,7 @@ struct SPIRVEmitContext
         case kIROp_StructType:
             {
                 auto spvStructType = emitInstCustomOperandFunc(
-                    getSection(SpvLogicalSectionID::Types), inst, SpvOpTypeStruct, [&]() {
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeStruct, [&]() {
                         emitOperand(kResultID);
                         for (auto field : static_cast<IRStructType*>(inst)->getFields())
                         {
@@ -1113,7 +1112,7 @@ struct SPIRVEmitContext
                     static_cast<IRIntLit*>(matrixType->getRowCount())->getValue(),
                     nullptr);
                 auto matrixSPVType = emitInst(
-                    getSection(SpvLogicalSectionID::Types),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     inst,
                     SpvOpTypeMatrix,
                     kResultID,
@@ -1151,7 +1150,7 @@ struct SPIRVEmitContext
             {
                 auto elementType = static_cast<IRUnsizedArrayType*>(inst)->getElementType();
                 auto runtimeArrayType = emitInst(
-                    getSection(SpvLogicalSectionID::Types),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
                     SpvOpTypeRuntimeArray,
                     kResultID,
@@ -1182,7 +1181,7 @@ struct SPIRVEmitContext
             // with the result-type operand coming first,
             // followed by operand sfor all the parameter types.
             //
-            return emitInst(getSection(SpvLogicalSectionID::Types), inst, SpvOpTypeFunction, kResultID, OperandsOf(inst));
+            return emitInst(getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeFunction, kResultID, OperandsOf(inst));
 
         case kIROp_RateQualifiedType:
             {
@@ -1758,7 +1757,7 @@ struct SPIRVEmitContext
                 case BaseType::IntPtr:
                 case BaseType::UIntPtr:
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstant,
                         inst->getDataType(),
@@ -1767,7 +1766,7 @@ struct SPIRVEmitContext
                         (SpvWord)((value >> 32) & 0xFFFFFFFF));
                 default:
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstant,
                         inst->getDataType(),
@@ -1782,7 +1781,7 @@ struct SPIRVEmitContext
                 {
                 case BaseType::Half:
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstant,
                         inst->getDataType(),
@@ -1790,7 +1789,7 @@ struct SPIRVEmitContext
                         (SpvWord)(FloatToHalf((float)value)));
                 case BaseType::Float:
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstant,
                         inst->getDataType(),
@@ -1800,7 +1799,7 @@ struct SPIRVEmitContext
                     {
                         auto ival = DoubleAsInt64(value);
                         return emitInst(
-                            getSection(SpvLogicalSectionID::Constants),
+                            getSection(SpvLogicalSectionID::ConstantsAndTypes),
                             inst,
                             SpvOpConstant,
                             inst->getDataType(),
@@ -1817,7 +1816,7 @@ struct SPIRVEmitContext
                 if (as<IRBoolLit>(inst)->getValue())
                 {
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstantTrue,
                         inst->getDataType(),
@@ -1826,7 +1825,7 @@ struct SPIRVEmitContext
                 else
                 {
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstantFalse,
                         inst->getDataType(),
@@ -2289,7 +2288,7 @@ struct SPIRVEmitContext
                 auto element1 = emitFloatConstant(constant.floatValues[0], floatType);
                 auto element2 = emitFloatConstant(constant.floatValues[1], floatType);
                 result = emitInst(
-                    getSection(SpvLogicalSectionID::Constants),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
                     SpvOpConstantComposite,
                     builder.getVectorType(floatType, builder.getIntValue(builder.getIntType(), 2)),
@@ -2307,7 +2306,7 @@ struct SPIRVEmitContext
                 auto element1 = emitIntConstant((IRIntegerValue)constant.intValues[0], uintType);
                 auto element2 = emitIntConstant((IRIntegerValue)constant.intValues[1], uintType);
                 result = emitInst(
-                    getSection(SpvLogicalSectionID::Constants),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
                     SpvOpConstantComposite,
                     builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 2)),
