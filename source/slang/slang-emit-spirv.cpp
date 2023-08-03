@@ -1142,15 +1142,24 @@ struct SPIRVEmitContext
                     stride);
                 return matrixSPVType;
             }
+        case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
             {
-                auto elementType = static_cast<IRUnsizedArrayType*>(inst)->getElementType();
-                auto runtimeArrayType = emitInst(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                    nullptr,
-                    SpvOpTypeRuntimeArray,
-                    kResultID,
-                    elementType);
+                auto elementType = static_cast<IRArrayTypeBase*>(inst)->getElementType();
+                auto arrayType = inst->getOp() == kIROp_ArrayType
+                    ? emitInst(
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                        nullptr,
+                        SpvOpTypeArray,
+                        kResultID,
+                        elementType,
+                        static_cast<IRArrayType*>(inst)->getElementCount())
+                    : emitInst(
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                        nullptr,
+                        SpvOpTypeRuntimeArray,
+                        kResultID,
+                        elementType);
                 // TODO: properly decorate stride.
                 IRSizeAndAlignment sizeAndAlignment;
                 getNaturalSizeAndAlignment(this->m_targetRequest, elementType, &sizeAndAlignment);
@@ -1158,10 +1167,10 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     SpvOpDecorate,
-                    runtimeArrayType,
+                    arrayType,
                     SpvDecorationArrayStride,
                     (SpvWord)sizeAndAlignment.getStride());
-                return runtimeArrayType;
+                return arrayType;
             }
         // > OpTypeImage
         // > OpTypeSampler
