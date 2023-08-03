@@ -1170,6 +1170,7 @@ struct SPIRVEmitContext
                     arrayType,
                     SpvDecorationArrayStride,
                     (SpvWord)sizeAndAlignment.getStride());
+                registerInst(inst, arrayType);
                 return arrayType;
             }
         // > OpTypeImage
