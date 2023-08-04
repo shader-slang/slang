@@ -15,7 +15,7 @@ class OverloadGroupType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
 };
 
 // The type of an initializer-list expression (before it has
@@ -26,7 +26,7 @@ class InitializerListType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
 };
 
 // The type of an expression that was erroneous
@@ -36,7 +36,7 @@ class ErrorType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -62,7 +62,7 @@ class DeclRefType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     DeclRefType(DeclRefBase* declRefBase)
@@ -400,7 +400,7 @@ class TypeType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
 
     Type* getType() { return as<Type>(getOperand(0)); }
 
@@ -573,7 +573,7 @@ class NamedExpressionType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
 
     NamedExpressionType(DeclRef<TypeDefDecl> inDeclRef)
     {
@@ -612,7 +612,7 @@ class FuncType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -633,7 +633,7 @@ class TupleType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -646,7 +646,7 @@ class GenericDeclRefType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
 
     GenericDeclRefType(DeclRef<GenericDecl> declRef)
     {
@@ -668,7 +668,7 @@ class NamespaceType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
 };
 
 // The concrete type for a value wrapped in an existential, accessible
@@ -712,7 +712,7 @@ SLANG_UNREFLECTED
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
         /// Get a witness that shows how this type is a subtype of `originalInterfaceType`.
@@ -757,7 +757,7 @@ class ExistentialSpecializedType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -788,7 +788,7 @@ class AndType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -822,7 +822,7 @@ class ModifiedType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 

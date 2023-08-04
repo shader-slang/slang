@@ -295,7 +295,7 @@ namespace Slang
             // actually names a type, because in that case we are doing
             // a static member reference.
             //
-            if (auto typeType = as<TypeType>(baseExpr->type->getCanonicalType(this)))
+            if (auto typeType = as<TypeType>(baseExpr->type->getCanonicalType()))
             {
                 // Before forming the reference, we will check if the
                 // member being referenced can even be used as a static
@@ -488,7 +488,7 @@ namespace Slang
         if (!subType)
             return nullptr;
 
-        subType = as<DeclRefType>(subType->getCanonicalType(this));
+        subType = as<DeclRefType>(subType->getCanonicalType());
         if (!subType)
             return nullptr;
 

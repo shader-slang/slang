@@ -1045,7 +1045,7 @@ namespace Slang
         Val* resolveVal(Val* val)
         {
             if (!val) return nullptr;
-            return val->resolve(this);
+            return val->resolve();
         }
         Type* resolveType(Type* type)
         {

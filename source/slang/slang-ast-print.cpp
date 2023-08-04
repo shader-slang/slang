@@ -31,7 +31,7 @@ void ASTPrinter::addType(Type* type)
         m_builder << "<error>";
         return;
     }
-    type = type->getCanonicalType(nullptr);
+    type = type->getCanonicalType();
     if (m_optionFlags & OptionFlag::SimplifiedBuiltinType)
     {
         if (auto vectorType = as<VectorExpressionType>(type))

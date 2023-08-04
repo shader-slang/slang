@@ -46,7 +46,7 @@ struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
 inline void serializePointerValue(SerialWriter* writer, Val* ptrValue, SerialIndex* outSerial)
 {
     if (ptrValue)
-        ptrValue = ptrValue->resolve(nullptr);
+        ptrValue = ptrValue->resolve();
     *(SerialIndex*)outSerial = writer->addPointer(ptrValue);
 }
 

@@ -12,26 +12,26 @@
 namespace Slang
 {
 
-Type* Type::createCanonicalType(SemanticsVisitor* semantics)
+Type* Type::createCanonicalType()
 {
-    SLANG_AST_NODE_VIRTUAL_CALL(Type, createCanonicalType, (semantics));
+    SLANG_AST_NODE_VIRTUAL_CALL(Type, createCanonicalType, ());
 }
 
-Val* Type::_resolveImplOverride(SemanticsVisitor* semantics)
+Val* Type::_resolveImplOverride()
 {
-    Val* resolvedVal = createCanonicalType(semantics);
+    Val* resolvedVal = createCanonicalType();
     return resolvedVal;
 }
 
-DeclRefBase* _resolveAsDeclRef(DeclRefBase* declRefToResolve, SemanticsVisitor* semantics);
+DeclRefBase* _resolveAsDeclRef(DeclRefBase* declRefToResolve);
 
-Type* DeclRefType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
+Type* DeclRefType::_createCanonicalTypeOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
 
     // A declaration reference is already canonical
     auto resolvedDeclRef = getDeclRef();
-    resolvedDeclRef = _resolveAsDeclRef(getDeclRef().declRefBase, semantics);
+    resolvedDeclRef = _resolveAsDeclRef(getDeclRef().declRefBase);
     if (auto satisfyingVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(astBuilder, resolvedDeclRef))
         return as<Type>(satisfyingVal);
     if (resolvedDeclRef != getDeclRef())
@@ -40,7 +40,7 @@ Type* DeclRefType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 }
 
 
-Val* SubtypeWitness::_resolveImplOverride(SemanticsVisitor*)
+Val* SubtypeWitness::_resolveImplOverride()
 {
     return as<SubtypeWitness>(defaultResolveImpl());
 }

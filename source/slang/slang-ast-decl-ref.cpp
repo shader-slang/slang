@@ -23,9 +23,8 @@ void DirectDeclRef::_toTextOverride(StringBuilder& out)
     }
 }
 
-Val* DirectDeclRef::_resolveImplOverride(SemanticsVisitor* semantics)
+Val* DirectDeclRef::_resolveImplOverride()
 {
-    SLANG_UNUSED(semantics);
     return this;
 }
 
@@ -47,9 +46,9 @@ DeclRefBase* _getDeclRefFromVal(Val* val)
     return nullptr;
 }
 
-DeclRefBase* _resolveAsDeclRef(DeclRefBase* declRefToResolve, SemanticsVisitor* semantics)
+DeclRefBase* _resolveAsDeclRef(DeclRefBase* declRefToResolve)
 {
-    if (auto rs = _getDeclRefFromVal(declRefToResolve->resolve(semantics)))
+    if (auto rs = _getDeclRefFromVal(declRefToResolve->resolve()))
         return rs;
     return declRefToResolve;
 }
@@ -77,9 +76,9 @@ void MemberDeclRef::_toTextOverride(StringBuilder& out)
     }
 }
 
-Val* MemberDeclRef::_resolveImplOverride(SemanticsVisitor* semantics)
+Val* MemberDeclRef::_resolveImplOverride()
 {
-    auto resolvedParent = _resolveAsDeclRef(getParentOperand(), semantics);
+    auto resolvedParent = _resolveAsDeclRef(getParentOperand());
     if (resolvedParent != getParentOperand())
     {
         return getCurrentASTBuilder()->getMemberDeclRef(resolvedParent, getDecl());
@@ -114,7 +113,7 @@ DeclRefBase* LookupDeclRef::_substituteImplOverride(ASTBuilder* astBuilder, Subs
     auto substSource = as<Type>(getLookupSource()->substituteImpl(astBuilder, subst, &diff));
     SLANG_ASSERT(substSource);
 
-    if (auto resolved = _getDeclRefFromVal(tryResolve(substWitness, substSource, nullptr)))
+    if (auto resolved = _getDeclRefFromVal(tryResolve(substWitness, substSource)))
         return resolved;
 
     return astBuilder->getLookupDeclRef(substSource, substWitness, getDecl());
@@ -131,18 +130,18 @@ void LookupDeclRef::_toTextOverride(StringBuilder& out)
     }
 }
 
-Val* LookupDeclRef::_resolveImplOverride(SemanticsVisitor* semantics)
+Val* LookupDeclRef::_resolveImplOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
     Val* resolved = this;
 
-    auto newLookupSource = as<Type>(getLookupSource()->resolve(semantics));
+    auto newLookupSource = as<Type>(getLookupSource()->resolve());
     SLANG_ASSERT(newLookupSource);
 
-    auto newWitness = as<SubtypeWitness>(getWitness()->resolve(semantics));
+    auto newWitness = as<SubtypeWitness>(getWitness()->resolve());
     SLANG_ASSERT(newWitness);
 
-    if (auto resolvedVal = tryResolve(newWitness, newLookupSource, semantics))
+    if (auto resolvedVal = tryResolve(newWitness, newLookupSource))
         return resolvedVal;
     if (newLookupSource != getLookupSource() || newWitness != getWitness())
         resolved = astBuilder->getLookupDeclRef(newLookupSource, newWitness, getDecl());
@@ -154,7 +153,7 @@ DeclRefBase* LookupDeclRef::_getBaseOverride()
     return nullptr;
 }
 
-Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource, SemanticsVisitor* semantics)
+Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource)
 {
     auto astBuilder = getCurrentASTBuilder();
     Decl* requirementKey = getDecl();
@@ -201,7 +200,7 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         return newWitness;
     if (innerDeclRefType->getDeclRef() != this)
     {
-        auto result = innerDeclRefType->getDeclRef().declRefBase->resolve(semantics);
+        auto result = innerDeclRefType->getDeclRef().declRefBase->resolve();
         if (result)
             return result;
     }
@@ -245,18 +244,18 @@ void GenericAppDeclRef::_toTextOverride(StringBuilder& out)
     out << ">";
 }
 
-Val* GenericAppDeclRef::_resolveImplOverride(SemanticsVisitor* semantics)
+Val* GenericAppDeclRef::_resolveImplOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
     Val* resolvedVal = this;
-    auto resolvedGenericDeclRef = _resolveAsDeclRef(getGenericDeclRef(), semantics);
+    auto resolvedGenericDeclRef = _resolveAsDeclRef(getGenericDeclRef());
     bool diff = false;
     if (resolvedGenericDeclRef != getGenericDeclRef())
         diff = true;
     List<Val*> resolvedArgs;
     for (auto arg : getArgs())
     {
-        auto resolvedArg = arg->resolve(semantics);
+        auto resolvedArg = arg->resolve();
         resolvedArgs.add(resolvedArg);
         if (resolvedArg != arg)
             diff = true;

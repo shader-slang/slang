@@ -2349,7 +2349,7 @@ namespace Slang
             // type can indeed satisfy the interface requirement.
             witnessTable->add(
                 requiredAssociatedTypeDeclRef.getDecl(),
-                RequirementWitness(satisfyingType->getCanonicalType(this)));
+                RequirementWitness(satisfyingType->getCanonicalType()));
         }
 
         return conformance;

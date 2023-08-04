@@ -146,7 +146,7 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     }
     else if (auto namedType = as<NamedExpressionType>(type))
     {
-        return calcSize(namedType->getCanonicalType(nullptr));
+        return calcSize(namedType->getCanonicalType());
     }
     else if (const auto tupleType = as<TupleType>(type))
     {

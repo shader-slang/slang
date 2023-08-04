@@ -20,7 +20,7 @@ public:
 
     DeclRefBase* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     void _toTextOverride(StringBuilder& out);
-    Val* _resolveImplOverride(SemanticsVisitor* semantics);
+    Val* _resolveImplOverride();
     DeclRefBase* _getBaseOverride();
 };
 
@@ -45,7 +45,7 @@ public:
 
     void _toTextOverride(StringBuilder& out);
 
-    Val* _resolveImplOverride(SemanticsVisitor* semantics);
+    Val* _resolveImplOverride();
 
     DeclRefBase* _getBaseOverride();
 };
@@ -82,12 +82,12 @@ public:
 
     void _toTextOverride(StringBuilder& out);
 
-    Val* _resolveImplOverride(SemanticsVisitor* semantics);
+    Val* _resolveImplOverride();
 
     DeclRefBase* _getBaseOverride();
 
 private:
-    Val* tryResolve(SubtypeWitness* newWitness, Type* newLookupSource, SemanticsVisitor* semantics);
+    Val* tryResolve(SubtypeWitness* newWitness, Type* newLookupSource);
 };
 
 // Represents a specialization of a generic decl.
@@ -128,7 +128,7 @@ public:
 
     void _toTextOverride(StringBuilder& out);
 
-    Val* _resolveImplOverride(SemanticsVisitor* semantics);
+    Val* _resolveImplOverride();
 
     DeclRefBase* _getBaseOverride();
 };
@@ -140,7 +140,7 @@ class IntVal : public Val
 
     Type* getType() { return as<Type>(getOperand(0)); }
 
-    Val* _resolveImplOverride(SemanticsVisitor*) { return this; }
+    Val* _resolveImplOverride() { return this; }
 };
 
 // Trivial case of a value that is just a constant integer
@@ -182,7 +182,7 @@ class TypeCastIntVal : public IntVal
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride(SemanticsVisitor*);
+    Val* _resolveImplOverride();
 
     Val* getBase() { return getOperand(1); }
     TypeCastIntVal(Type* inType, Val* inBase)
@@ -200,7 +200,7 @@ class FuncCallIntVal : public IntVal
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride(SemanticsVisitor*);
+    Val* _resolveImplOverride();
 
     DeclRef<Decl> getFuncDeclRef() { return as<DeclRefBase>(getOperand(1)); }
     Type* getFuncType() { return as<Type>(getOperand(2)); }
@@ -223,7 +223,7 @@ class WitnessLookupIntVal : public IntVal
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride(SemanticsVisitor*);
+    Val* _resolveImplOverride();
 
     SubtypeWitness* getWitness() { return as<SubtypeWitness>(getOperand(1)); }
     Decl* getKey() { return as<Decl>(getDeclOperand(2)); }
@@ -252,7 +252,7 @@ public:
         setOperands(inParam, inPower);
     }
 
-    Val* _resolveImplOverride(SemanticsVisitor*);
+    Val* _resolveImplOverride();
 
     // for sorting only.
     bool operator<(const PolynomialIntValFactor& other) const
@@ -308,7 +308,7 @@ public:
     IntegerLiteralValue getConstFactor() const { return getIntConstOperand(0); }
     OperandView<PolynomialIntValFactor> getParamFactors() const { return OperandView<PolynomialIntValFactor>(this, 1, getOperandCount() - 1); }
 
-    Val* _resolveImplOverride(SemanticsVisitor*);
+    Val* _resolveImplOverride();
 
     PolynomialIntValTerm(IntegerLiteralValue inConstFactor, ArrayView<PolynomialIntValFactor*> inParamFactors)
     {
@@ -376,7 +376,7 @@ public:
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride(SemanticsVisitor*);
+    Val* _resolveImplOverride();
 
     static IntVal* neg(ASTBuilder* astBuilder, IntVal* base);
     static IntVal* add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
@@ -403,7 +403,7 @@ class ErrorIntVal : public IntVal
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride(SemanticsVisitor*) { return this;  }
+    Val* _resolveImplOverride() { return this;  }
 };
 
 // A witness to the fact that some proposition is true, encoded
@@ -453,7 +453,7 @@ class SubtypeWitness : public Witness
 {
     SLANG_ABSTRACT_AST_CLASS(SubtypeWitness)
 
-    Val* _resolveImplOverride(SemanticsVisitor* visitor);
+    Val* _resolveImplOverride();
 
     Type* getSub() { return as<Type>(getOperand(0)); }
     Type* getSup() { return as<Type>(getOperand(1)); }
@@ -487,7 +487,7 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride(SemanticsVisitor* visitor);
+    Val* _resolveImplOverride();
 
     DeclaredSubtypeWitness(Type* inSub, Type* inSup, DeclRef<Decl> inDeclRef)
     {
@@ -616,7 +616,7 @@ class ModifierVal : public Val
 {
     SLANG_AST_CLASS(ModifierVal)
 
-    Val* _resolveImplOverride(SemanticsVisitor*) { return this; }
+    Val* _resolveImplOverride() { return this; }
 };
 
 class TypeModifierVal : public ModifierVal
@@ -667,7 +667,7 @@ class DifferentiateVal : public Val
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride(SemanticsVisitor*);
+    Val* _resolveImplOverride();
 };
 
 class ForwardDifferentiateVal : public DifferentiateVal

@@ -369,7 +369,7 @@ class Val : public NodeBase
 
     bool equals(Val* val) const
     {
-        return this == val || const_cast<Val*>(this)->resolve(nullptr) == val->resolve(nullptr);
+        return this == val || const_cast<Val*>(this)->resolve() == val->resolve();
     }
 
     // Appends as text to the end of the builder
@@ -386,10 +386,10 @@ class Val : public NodeBase
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     void _toTextOverride(StringBuilder& out);
 
-    Val* _resolveImplOverride(SemanticsVisitor* visitor);
+    Val* _resolveImplOverride();
 
-    Val* resolveImpl(SemanticsVisitor* visitor);
-    Val* resolve(SemanticsVisitor* visitor);
+    Val* resolveImpl();
+    Val* resolve();
     ValNodeDesc getDesc();
 
     Val* getOperand(Index index) const
@@ -526,17 +526,17 @@ class Type: public Val
 
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    Val* _resolveImplOverride(SemanticsVisitor* semantics);
+    Type* _createCanonicalTypeOverride();
+    Val* _resolveImplOverride();
 
-    Type* getCanonicalType(SemanticsVisitor* semantics)
+    Type* getCanonicalType()
     {
-        return as<Type>(resolve(semantics));
+        return as<Type>(resolve());
     }
 
     ASTBuilder* getASTBuilderForReflection() const { return m_astBuilderForReflection; }
 protected:
-    Type* createCanonicalType(SemanticsVisitor* semantics);
+    Type* createCanonicalType();
 
     // We store the ASTBuilder to support reflection API only.
     // It should not be used for anything else, especially not for constructing new AST nodes during
@@ -547,9 +547,9 @@ protected:
 };
 
 template <typename T>
-SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->getCanonicalType(nullptr)) : nullptr; }
+SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->getCanonicalType()) : nullptr; }
 template <typename T>
-SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->getCanonicalType(nullptr)) : nullptr; }
+SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->getCanonicalType()) : nullptr; }
 
 class Decl;
 
@@ -578,9 +578,8 @@ class DeclRefBase : public Val
         SLANG_UNREACHABLE("DeclRefBase::_toTextOverride not overrided.");
     }
 
-    Val* _resolveImplOverride(SemanticsVisitor* semantics)
+    Val* _resolveImplOverride()
     {
-        SLANG_UNUSED(semantics);
         SLANG_UNREACHABLE("DeclRefBase::_resolveImplOverride not overrided.");
     }
 
@@ -598,8 +597,6 @@ class DeclRefBase : public Val
     SourceLoc getNameLoc() const;
     SourceLoc getLoc() const;
     DeclRefBase* getParent();
-
-    HashCode getHashCode() const { return Slang::getHashCode(this); }
     String toString() const
     {
         StringBuilder sb;

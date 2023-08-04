@@ -1753,7 +1753,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitNamedExpressionType(NamedExpressionType* type)
     {
-        return (IRType*)getSimpleVal(context, dispatchType(type->getCanonicalType(nullptr)));
+        return (IRType*)getSimpleVal(context, dispatchType(type->getCanonicalType()));
     }
 
     IRType* visitBasicExpressionType(BasicExpressionType* type)
@@ -1969,7 +1969,7 @@ LoweredValInfo lowerVal(
 {
     ValLoweringVisitor visitor;
     visitor.context = context;
-    auto resolvedVal = val->resolve(nullptr);
+    auto resolvedVal = val->resolve();
     return visitor.dispatch(resolvedVal);
 }
 

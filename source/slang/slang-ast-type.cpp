@@ -11,7 +11,7 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Type* Type::_createCanonicalTypeOverride(SemanticsVisitor*)
+Type* Type::_createCanonicalTypeOverride()
 {
     return as<Type>(defaultResolveImpl());
 }
@@ -19,7 +19,7 @@ Type* Type::_createCanonicalTypeOverride(SemanticsVisitor*)
 Val* Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
-    auto canSubst = getCanonicalType(nullptr)->substituteImpl(astBuilder, subst, &diff);
+    auto canSubst = getCanonicalType()->substituteImpl(astBuilder, subst, &diff);
 
     // If nothing changed, then don't drop any sugar that is applied
     if (!diff)
@@ -38,7 +38,7 @@ void OverloadGroupType::_toTextOverride(StringBuilder& out)
     out << toSlice("overload group");
 }
 
-Type* OverloadGroupType::_createCanonicalTypeOverride(SemanticsVisitor*)
+Type* OverloadGroupType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -50,7 +50,7 @@ void InitializerListType::_toTextOverride(StringBuilder& out)
     out << toSlice("initializer list");
 }
 
-Type* InitializerListType::_createCanonicalTypeOverride(SemanticsVisitor*)
+Type* InitializerListType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -62,7 +62,7 @@ void ErrorType::_toTextOverride(StringBuilder& out)
     out << toSlice("error");
 }
 
-Type* ErrorType::_createCanonicalTypeOverride(SemanticsVisitor*)
+Type* ErrorType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -128,7 +128,7 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
     // the outer interface, then try to replace the type with the
     // actual value of the associated type for the given implementation.
     //
-    if (auto satisfyingVal = substDeclRef.declRefBase->resolve(nullptr))
+    if (auto satisfyingVal = substDeclRef.declRefBase->resolve())
     {
         if (satisfyingVal != getDeclRef())
         {
@@ -287,9 +287,9 @@ void TypeType::_toTextOverride(StringBuilder& out)
     out << toSlice("typeof(") << getType() << toSlice(")");
 }
 
-Type* TypeType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
+Type* TypeType::_createCanonicalTypeOverride()
 {
-    return getCurrentASTBuilder()->getTypeType(getType()->getCanonicalType(semantics));
+    return getCurrentASTBuilder()->getTypeType(getType()->getCanonicalType());
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericDeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -300,7 +300,7 @@ void GenericDeclRefType::_toTextOverride(StringBuilder& out)
     out << toSlice("<DeclRef<GenericDecl>>");
 }
 
-Type* GenericDeclRefType::_createCanonicalTypeOverride(SemanticsVisitor*)
+Type* GenericDeclRefType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -312,7 +312,7 @@ void NamespaceType::_toTextOverride(StringBuilder& out)
     out << toSlice("namespace ") << getDeclRef(); 
 }
 
-Type* NamespaceType::_createCanonicalTypeOverride(SemanticsVisitor*)
+Type* NamespaceType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -350,11 +350,11 @@ void NamedExpressionType::_toTextOverride(StringBuilder& out)
     }
 }
 
-Type* NamedExpressionType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
+Type* NamedExpressionType::_createCanonicalTypeOverride()
 {
     auto canType = getType(getCurrentASTBuilder(), getDeclRef());
     if (canType)
-        return canType->getCanonicalType(semantics);
+        return canType->getCanonicalType();
     return getCurrentASTBuilder()->getErrorType();
 }
 
@@ -427,17 +427,17 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     return substType;
 }
 
-Type* FuncType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
+Type* FuncType::_createCanonicalTypeOverride()
 {
     // result type
-    Type* canResultType = getResultType()->getCanonicalType(semantics);
-    Type* canErrorType = getErrorType()->getCanonicalType(semantics);
+    Type* canResultType = getResultType()->getCanonicalType();
+    Type* canErrorType = getErrorType()->getCanonicalType();
 
     // parameter types
     List<Type*> canParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        canParamTypes.add(getParamType(pp)->getCanonicalType(semantics));
+        canParamTypes.add(getParamType(pp)->getCanonicalType());
     }
 
     FuncType* canType = getCurrentASTBuilder()->getFuncType(canParamTypes.getArrayView(), canResultType, canErrorType);
@@ -475,13 +475,13 @@ Val* TupleType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet 
     return astBuilder->getTupleType(substMemberTypes);
 }
 
-Type* TupleType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
+Type* TupleType::_createCanonicalTypeOverride()
 {
     // member types
     List<Type*> canMemberTypes;
     for (Index m = 0; m < getMemberCount(); m++)
     {
-        canMemberTypes.add(getMember(m)->getCanonicalType(semantics));
+        canMemberTypes.add(getMember(m)->getCanonicalType());
     }
 
     return getCurrentASTBuilder()->getTupleType(canMemberTypes);
@@ -494,7 +494,7 @@ void ExtractExistentialType::_toTextOverride(StringBuilder& out)
     out << getDeclRef() << toSlice(".This");
 }
 
-Type* ExtractExistentialType::_createCanonicalTypeOverride(SemanticsVisitor*)
+Type* ExtractExistentialType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -567,14 +567,14 @@ static Val* _getCanonicalValue(Val* val)
         return nullptr;
     if (auto type = as<Type>(val))
     {
-        return type->getCanonicalType(nullptr);
+        return type->getCanonicalType();
     }
     // TODO: We may eventually need/want some sort of canonicalization
     // for non-type values, but for now there is nothing to do.
     return val;
 }
 
-Type* ExistentialSpecializedType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
+Type* ExistentialSpecializedType::_createCanonicalTypeOverride()
 {
     ExpandedSpecializationArgs newArgs;
 
@@ -588,7 +588,7 @@ Type* ExistentialSpecializedType::_createCanonicalTypeOverride(SemanticsVisitor*
     }
 
     ExistentialSpecializedType* canType = getCurrentASTBuilder()->getOrCreate<ExistentialSpecializedType>(
-        getBaseType()->getCanonicalType(semantics),
+        getBaseType()->getCanonicalType(),
         newArgs);
 
     return canType;
@@ -639,7 +639,7 @@ void AndType::_toTextOverride(StringBuilder& out)
     out << getLeft() << toSlice(" & ") << getRight();
 }
 
-Type* AndType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
+Type* AndType::_createCanonicalTypeOverride()
 {
     // TODO: proper canonicalization of an `&` type relies on
     // several different things:
@@ -674,8 +674,8 @@ Type* AndType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
     // right now, in the name of getting something up and running.
     //
 
-    auto canLeft = getLeft()->getCanonicalType(semantics);
-    auto canRight = getRight()->getCanonicalType(semantics);
+    auto canLeft = getLeft()->getCanonicalType();
+    auto canRight = getRight()->getCanonicalType();
     auto canType = getCurrentASTBuilder()->getAndType(canLeft, canRight);
     return canType;
 }
@@ -708,7 +708,7 @@ void ModifiedType::_toTextOverride(StringBuilder& out)
     getBase()->toText(out);
 }
 
-Type* ModifiedType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
+Type* ModifiedType::_createCanonicalTypeOverride()
 {
     List<Val*> modifiers;
     for (Index i = 0; i < getModifierCount(); ++i)
@@ -716,7 +716,7 @@ Type* ModifiedType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
         auto modifier = this->getModifier(i);
         modifiers.add(modifier);
     }
-    ModifiedType* canonical = getCurrentASTBuilder()->getOrCreate<ModifiedType>(getBase()->getCanonicalType(semantics), modifiers.getArrayView());
+    ModifiedType* canonical = getCurrentASTBuilder()->getOrCreate<ModifiedType>(getBase()->getCanonicalType(), modifiers.getArrayView());
     return canonical;
 }
 

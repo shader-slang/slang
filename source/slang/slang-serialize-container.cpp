@@ -593,28 +593,19 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                             auto desc = val->getDesc();
                             astBuilder->m_cachedNodes.tryGetValueOrAdd(desc, val);
                         }
-                        for (;;)
+                        for (auto& valUseList : valUses)
                         {
-                            bool changed = false;
-                            for (auto& valUseList : valUses)
+                            auto val = valUseList.key;
+                            auto newVal = val->resolve();
+                            if (val != newVal)
                             {
-                                auto val = valUseList.key;
-                                auto newVal = val->resolve(nullptr);
-                                if (val != newVal)
+                                astBuilder->m_cachedNodes[val->getDesc()] = newVal;
+                                for (auto use : valUseList.value)
                                 {
-                                    astBuilder->m_cachedNodes[val->getDesc()] = newVal;
-                                    for (auto use : valUseList.value)
-                                    {
-                                        if (*use != newVal)
-                                        {
-                                            *use = newVal;
-                                            changed = true;
-                                        }
-                                    }
+                                    if (*use != newVal)
+                                        *use = newVal;
                                 }
                             }
-                            if (!changed)
-                                break;
                         }
                     }
                 }

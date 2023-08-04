@@ -64,17 +64,17 @@ void Val::toText(StringBuilder& out)
     SLANG_AST_NODE_VIRTUAL_CALL(Val, toText, (out))
 }
 
-Val* Val::_resolveImplOverride(SemanticsVisitor*) 
+Val* Val::_resolveImplOverride() 
 {
     SLANG_UNEXPECTED("Val::_resolveImplOverride not overridden");
 }
 
-Val* Val::resolveImpl(SemanticsVisitor* visitor)
+Val* Val::resolveImpl()
 {
-    SLANG_AST_NODE_VIRTUAL_CALL(Val, resolveImpl, (visitor));
+    SLANG_AST_NODE_VIRTUAL_CALL(Val, resolveImpl, ());
 }
 
-Val* Val::resolve(SemanticsVisitor* visitor)
+Val* Val::resolve()
 {
     auto astBuilder = getCurrentASTBuilder();
 
@@ -90,7 +90,7 @@ Val* Val::resolve(SemanticsVisitor* visitor)
     // Update epoch now to avoid infinite recursion.
     m_resolvedValEpoch = getCurrentASTBuilder()->getEpoch();
     m_resolvedVal = this;
-    m_resolvedVal = resolveImpl(visitor);
+    m_resolvedVal = resolveImpl();
 
     // Check if we are resolved to an existing Val in the AST cache.
     ValNodeDesc newDesc;
@@ -102,7 +102,7 @@ Val* Val::resolve(SemanticsVisitor* visitor)
             auto valOperand = as<Val>(operand.values.nodeOperand);
             if (valOperand)
             {
-                operand.values.nodeOperand = valOperand->resolve(visitor);
+                operand.values.nodeOperand = valOperand->resolve();
             }
         }
         newDesc.operands.add(operand);
@@ -144,7 +144,7 @@ Val* Val::defaultResolveImpl()
             auto valOperand = as<Val>(operand.values.nodeOperand);
             if (valOperand)
             {
-                operand.values.nodeOperand = valOperand->resolve(nullptr);
+                operand.values.nodeOperand = valOperand->resolve();
             }
         }
         newDesc.operands.add(operand);
@@ -167,7 +167,7 @@ String Val::toString()
 
 HashCode Val::getHashCode()
 {
-    return Slang::getHashCode(resolve(nullptr));
+    return Slang::getHashCode(resolve());
 }
 
 Val* Val::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
@@ -302,14 +302,14 @@ void TypeEqualityWitness::_toTextOverride(StringBuilder& out)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Val* DeclaredSubtypeWitness::_resolveImplOverride(SemanticsVisitor* visitor)
+Val* DeclaredSubtypeWitness::_resolveImplOverride()
 {
-    auto resolvedDeclRef = getDeclRef().declRefBase->resolve(visitor);
+    auto resolvedDeclRef = getDeclRef().declRefBase->resolve();
     if (auto resolvedVal = as<SubtypeWitness>(resolvedDeclRef))
         return resolvedVal;
 
-    auto newSub = as<Type>(getSub()->resolve(visitor));
-    auto newSup = as<Type>(getSup()->resolve(visitor));
+    auto newSub = as<Type>(getSub()->resolve());
+    auto newSup = as<Type>(getSup()->resolve());
 
     // If we are trying to lookup for a witness that A<:B from a witness(A<:B), we
     // can just return the witness itself.
@@ -1114,7 +1114,7 @@ Val* TypeCastIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
     return this;
 }
 
-Val* TypeCastIntVal::_resolveImplOverride(SemanticsVisitor*)
+Val* TypeCastIntVal::_resolveImplOverride()
 {
     if (auto resolved = tryFoldImpl(getCurrentASTBuilder(), getType(), getBase(), nullptr))
         return resolved;
@@ -1177,7 +1177,7 @@ void FuncCallIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
-Val* FuncCallIntVal::_resolveImplOverride(SemanticsVisitor* v)
+Val* FuncCallIntVal::_resolveImplOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
     auto args = getArgs();
@@ -1186,14 +1186,14 @@ Val* FuncCallIntVal::_resolveImplOverride(SemanticsVisitor* v)
 
     Val* resolvedVal = this;
     
-    auto newFuncDeclRef = as<DeclRefBase>(funcDeclRef.declRefBase->resolve(v));
+    auto newFuncDeclRef = as<DeclRefBase>(funcDeclRef.declRefBase->resolve());
     if (!newFuncDeclRef)
         return this;
     bool diff = false;
     List<IntVal*> newArgs;
     for (auto arg : args)
     {
-        auto newArg = as<IntVal>(arg->resolve(v));
+        auto newArg = as<IntVal>(arg->resolve());
         if (!newArg)
             return this;
         newArgs.add(newArg);
@@ -1349,11 +1349,11 @@ void WitnessLookupIntVal::_toTextOverride(StringBuilder& out)
     out << (getKey()->getName() ? getKey()->getName()->text : "??");
 }
 
-Val* WitnessLookupIntVal::_resolveImplOverride(SemanticsVisitor* v)
+Val* WitnessLookupIntVal::_resolveImplOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
 
-    auto newWitness = as<SubtypeWitness>(getWitness()->resolve(v));
+    auto newWitness = as<SubtypeWitness>(getWitness()->resolve());
     if (!newWitness)
         return this;
 
@@ -1363,7 +1363,7 @@ Val* WitnessLookupIntVal::_resolveImplOverride(SemanticsVisitor* v)
         return witnessVal.getVal();
     }
 
-    auto newType = as<Type>(getType()->resolve(v));
+    auto newType = as<Type>(getType()->resolve());
     if (!newType)
         return this;
 
@@ -1434,24 +1434,23 @@ Val* DifferentiateVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
     return this;
 }
 
-Val* DifferentiateVal::_resolveImplOverride(SemanticsVisitor* visitor)
+Val* DifferentiateVal::_resolveImplOverride()
 {
-    SLANG_UNUSED(visitor);
     return this;
 }
 
-Val* PolynomialIntValFactor::_resolveImplOverride(SemanticsVisitor* v)
+Val* PolynomialIntValFactor::_resolveImplOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
 
-    auto newParam = as<IntVal>(getParam()->resolve(v));
+    auto newParam = as<IntVal>(getParam()->resolve());
     if (newParam && newParam != getParam())
         return astBuilder->getOrCreate<PolynomialIntValFactor>(newParam, getPower());
 
     return this;
 }
 
-Val* PolynomialIntValTerm::_resolveImplOverride(SemanticsVisitor* v)
+Val* PolynomialIntValTerm::_resolveImplOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
 
@@ -1459,7 +1458,7 @@ Val* PolynomialIntValTerm::_resolveImplOverride(SemanticsVisitor* v)
     List<PolynomialIntValFactor*> newFactors;
     for (auto factor : getParamFactors())
     {
-        auto newFactor = as<PolynomialIntValFactor>(factor->resolve(v));
+        auto newFactor = as<PolynomialIntValFactor>(factor->resolve());
         if (!newFactor)
             return this;
 
@@ -1474,7 +1473,7 @@ Val* PolynomialIntValTerm::_resolveImplOverride(SemanticsVisitor* v)
     return this;
 }
 
-Val* PolynomialIntVal::_resolveImplOverride(SemanticsVisitor* v)
+Val* PolynomialIntVal::_resolveImplOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
 
@@ -1483,7 +1482,7 @@ Val* PolynomialIntVal::_resolveImplOverride(SemanticsVisitor* v)
     builder.constantTerm = getConstantTerm();
     for (auto term : getTerms())
     {
-        auto newTerm = as<PolynomialIntValTerm>(term->resolve(v));
+        auto newTerm = as<PolynomialIntValTerm>(term->resolve());
         if (!newTerm)
             return this;
 
