@@ -56,11 +56,12 @@ public:
     
 protected:
 
-    SlangResult _invoke(glslang_CompileRequest_1_1& request);
+    SlangResult _invoke(glslang_CompileRequest_1_2& request);
 
     glslang_CompileFunc_1_0 m_compile_1_0 = nullptr; 
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr; 
-    
+    glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
+
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 };
 
@@ -68,8 +69,10 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
 {
     m_compile_1_0 = (glslang_CompileFunc_1_0)library->findFuncByName("glslang_compile");
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
+    m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
 
-    if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr)
+
+    if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
     {
         return SLANG_FAIL;
     }
@@ -80,7 +83,11 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_desc = Desc(SLANG_PASS_THROUGH_GLSLANG);
 
     Slang::String filename;
-    if (m_compile_1_1)
+    if (m_compile_1_2)
+    {
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_2);
+    }
+    else if (m_compile_1_1)
     {
         filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_1);
     }
@@ -96,17 +103,27 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_1& request)
+SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_2& request)
 {
     int err = 1;
-    if (m_compile_1_1)
+    if (m_compile_1_2)
     {
-        err = m_compile_1_1(&request);
+        err = m_compile_1_2(&request);
+    }
+    else if (m_compile_1_1)
+    {
+        glslang_CompileRequest_1_1 request_1_1;
+        memcpy(&request_1_1, &request, sizeof(request_1_1));
+        request_1_1.sizeInBytes = sizeof(request_1_1);
+        err = m_compile_1_1(&request_1_1);
     }
     else if (m_compile_1_0)
     {
+        glslang_CompileRequest_1_1 request_1_1;
+        memcpy(&request_1_1, &request, sizeof(request_1_1));
+        request_1_1.sizeInBytes = sizeof(request_1_1);
         glslang_CompileRequest_1_0 request_1_0;
-        request_1_0.set(request);
+        request_1_0.set(request_1_1);
         err = m_compile_1_0(&request_1_0);
     }
 
@@ -178,7 +195,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
 
     String sourcePath = ArtifactUtil::findPath(sourceArtifact);
 
-    glslang_CompileRequest_1_1 request;
+    glslang_CompileRequest_1_2 request;
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
 
@@ -216,6 +233,8 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
 
     request.optimizationLevel = (unsigned)options.optimizationLevel;
     request.debugInfoType = (unsigned)options.debugInfoType;
+
+    request.entryPointName = options.entryPointName.begin();
 
     const SlangResult invokeResult = _invoke(request);
 
@@ -271,7 +290,7 @@ SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDe
         (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size);
     };
 
-    glslang_CompileRequest_1_1 request;
+    glslang_CompileRequest_1_2 request;
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
 
