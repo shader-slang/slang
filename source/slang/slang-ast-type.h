@@ -16,7 +16,6 @@ class OverloadGroupType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    HashCode _getHashCodeOverride();
 };
 
 // The type of an initializer-list expression (before it has
@@ -28,7 +27,6 @@ class InitializerListType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    HashCode _getHashCodeOverride();
 };
 
 // The type of an expression that was erroneous
@@ -39,7 +37,6 @@ class ErrorType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -50,7 +47,6 @@ class BottomType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -67,7 +63,6 @@ class DeclRefType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     DeclRefType(DeclRefBase* declRefBase)
@@ -406,7 +401,6 @@ class TypeType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    HashCode _getHashCodeOverride();
 
     Type* getType() { return as<Type>(getOperand(0)); }
 
@@ -580,7 +574,6 @@ class NamedExpressionType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    HashCode _getHashCodeOverride();
 
     NamedExpressionType(DeclRef<TypeDefDecl> inDeclRef)
     {
@@ -621,7 +614,6 @@ class FuncType : public Type
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    HashCode _getHashCodeOverride();
 };
 
 // A tuple is a product of its member types
@@ -643,7 +635,6 @@ class TupleType : public Type
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    HashCode _getHashCodeOverride();
 };
 
 // The "type" of an expression that names a generic declaration.
@@ -655,7 +646,6 @@ class GenericDeclRefType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
 
     GenericDeclRefType(DeclRef<GenericDecl> declRef)
@@ -678,7 +668,6 @@ class NamespaceType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
 };
 
@@ -723,7 +712,6 @@ SLANG_UNREFLECTED
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
@@ -769,7 +757,6 @@ class ExistentialSpecializedType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
@@ -801,7 +788,6 @@ class AndType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
@@ -836,7 +822,6 @@ class ModifiedType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };

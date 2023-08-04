@@ -48,7 +48,6 @@ public:
     Val* _resolveImplOverride(SemanticsVisitor* semantics);
 
     DeclRefBase* _getBaseOverride();
-
 };
 
 
@@ -86,7 +85,6 @@ public:
     Val* _resolveImplOverride(SemanticsVisitor* semantics);
 
     DeclRefBase* _getBaseOverride();
-
 
 private:
     Val* tryResolve(SubtypeWitness* newWitness, Type* newLookupSource, SemanticsVisitor* semantics);
@@ -154,14 +152,11 @@ class ConstantIntVal : public IntVal
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
 
-protected:
     ConstantIntVal(Type* inType, IntegerLiteralValue inValue)
     {
         setOperands(inType, inValue);
     }
-
 };
 
 // The logical "value" of a reference to a generic value parameter
@@ -173,7 +168,6 @@ class GenericParamIntVal : public IntVal
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     GenericParamIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef)
@@ -187,7 +181,6 @@ class TypeCastIntVal : public IntVal
     SLANG_AST_CLASS(TypeCastIntVal)
 
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride(SemanticsVisitor*);
 
@@ -206,7 +199,6 @@ class FuncCallIntVal : public IntVal
     SLANG_AST_CLASS(FuncCallIntVal)
 
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride(SemanticsVisitor*);
 
@@ -230,7 +222,6 @@ class WitnessLookupIntVal : public IntVal
     SLANG_AST_CLASS(WitnessLookupIntVal)
 
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride(SemanticsVisitor*);
 
@@ -384,7 +375,6 @@ public:
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride(SemanticsVisitor*);
 
@@ -397,7 +387,6 @@ public:
         setOperands(inType, inConstantTerm);
         addOperands(inTerms);
     }
-
 };
 
     /// An unknown integer value indicating an erroneous sub-expression
@@ -413,7 +402,6 @@ class ErrorIntVal : public IntVal
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride(SemanticsVisitor*) { return this;  }
 };
@@ -482,9 +470,7 @@ class TypeEqualityWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-
 };
 
 // A witness that one type is a subtype of another
@@ -500,7 +486,6 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride(SemanticsVisitor* visitor);
 
@@ -529,7 +514,6 @@ class TransitiveSubtypeWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     TransitiveSubtypeWitness(Type* subType, Type* supType, SubtypeWitness* inSubToMid, SubtypeWitness* inMidToSup)
@@ -554,7 +538,6 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -596,7 +579,6 @@ class ConjunctionSubtypeWitness : public SubtypeWitness
     }
 
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -626,7 +608,6 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
     int getIndexInConjunction() { return (int)getIntConstOperand(3); };
 
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -635,7 +616,6 @@ class ModifierVal : public Val
 {
     SLANG_AST_CLASS(ModifierVal)
 
-    HashCode _getHashCodeOverride();
     Val* _resolveImplOverride(SemanticsVisitor*) { return this; }
 };
 
@@ -686,10 +666,8 @@ class DifferentiateVal : public Val
     DeclRef<Decl> getFunc() { return as<DeclRefBase>(getOperand(0)); }
 
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride(SemanticsVisitor*);
-
 };
 
 class ForwardDifferentiateVal : public DifferentiateVal

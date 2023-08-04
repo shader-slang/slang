@@ -385,7 +385,6 @@ class Val : public NodeBase
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
 
     Val* _resolveImplOverride(SemanticsVisitor* visitor);
 

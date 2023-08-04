@@ -43,11 +43,6 @@ Type* OverloadGroupType::_createCanonicalTypeOverride(SemanticsVisitor*)
     return this;
 }
 
-HashCode OverloadGroupType::_getHashCodeOverride()
-{
-    return (HashCode)(size_t(this));
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! InitializerListType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void InitializerListType::_toTextOverride(StringBuilder& out)
@@ -58,11 +53,6 @@ void InitializerListType::_toTextOverride(StringBuilder& out)
 Type* InitializerListType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
-}
-
-HashCode InitializerListType::_getHashCodeOverride()
-{
-    return (HashCode)(size_t(this));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ErrorType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -82,11 +72,6 @@ Val* ErrorType::_substituteImplOverride(ASTBuilder* /* astBuilder */, Substituti
     return this;
 }
 
-HashCode ErrorType::_getHashCodeOverride()
-{
-    return HashCode(size_t(this));
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BottomType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void BottomType::_toTextOverride(StringBuilder& out) { out << toSlice("never"); }
@@ -97,18 +82,11 @@ Val* BottomType::_substituteImplOverride(
     return this;
 }
 
-HashCode BottomType::_getHashCodeOverride() { return HashCode(size_t(this)); }
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void DeclRefType::_toTextOverride(StringBuilder& out)
 {
     out << getDeclRef();
-}
-
-HashCode DeclRefType::_getHashCodeOverride()
-{
-    return (getDeclRef().getHashCode() * 16777619) ^ (HashCode)(typeid(this).hash_code());
 }
 
 Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff);
@@ -314,23 +292,12 @@ Type* TypeType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
     return getCurrentASTBuilder()->getTypeType(getType()->getCanonicalType(semantics));
 }
 
-HashCode TypeType::_getHashCodeOverride()
-{
-    SLANG_UNEXPECTED("TypeType::_getHashCodeOverride should be unreachable");
-    //return HashCode(0);
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericDeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void GenericDeclRefType::_toTextOverride(StringBuilder& out)
 {
     // TODO: what is appropriate here?
     out << toSlice("<DeclRef<GenericDecl>>");
-}
-
-HashCode GenericDeclRefType::_getHashCodeOverride()
-{
-    return getDeclRef().getHashCode();
 }
 
 Type* GenericDeclRefType::_createCanonicalTypeOverride(SemanticsVisitor*)
@@ -343,11 +310,6 @@ Type* GenericDeclRefType::_createCanonicalTypeOverride(SemanticsVisitor*)
 void NamespaceType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("namespace ") << getDeclRef(); 
-}
-
-HashCode NamespaceType::_getHashCodeOverride()
-{
-    return getDeclRef().getHashCode();
 }
 
 Type* NamespaceType::_createCanonicalTypeOverride(SemanticsVisitor*)
@@ -394,20 +356,6 @@ Type* NamedExpressionType::_createCanonicalTypeOverride(SemanticsVisitor* semant
     if (canType)
         return canType->getCanonicalType(semantics);
     return getCurrentASTBuilder()->getErrorType();
-}
-
-HashCode NamedExpressionType::_getHashCodeOverride()
-{
-    // Type equality is based on comparing canonical types,
-    // so the hash code for a type needs to come from the
-    // canonical version of the type. This really means
-    // that `Type::getHashCode()` should dispatch out to
-    // something like `Type::getHashCodeImpl()` on the
-    // canonical version of a type, but it is less invasive
-    // for now (and hopefully equivalent) to just have any
-    // named types automaticlaly route hash-code requests
-    // to their canonical type.
-    return getCanonicalType(nullptr)->getHashCode();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -496,22 +444,6 @@ Type* FuncType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
     return canType;
 }
 
-HashCode FuncType::_getHashCodeOverride()
-{
-    HashCode hashCode = getResultType()->getHashCode();
-    Index paramCount = getParamCount();
-    hashCode = combineHash(hashCode, Slang::getHashCode(paramCount));
-    for (Index pp = 0; pp < paramCount; ++pp)
-    {
-        hashCode = combineHash(
-            hashCode,
-            getParamType(pp)->getHashCode());
-    }
-    combineHash(hashCode, getErrorType()->getHashCode());
-    return hashCode;
-}
-
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void TupleType::_toTextOverride(StringBuilder& out)
@@ -555,24 +487,11 @@ Type* TupleType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
     return getCurrentASTBuilder()->getTupleType(canMemberTypes);
 }
 
-HashCode TupleType::_getHashCodeOverride()
-{
-    HashCode hashCode = Slang::getHashCode(kType);
-    for (Index m = 0; m < getMemberCount(); m++)
-        hashCode = combineHash(hashCode, getMember(m)->getHashCode());
-    return hashCode;
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void ExtractExistentialType::_toTextOverride(StringBuilder& out)
 {
     out << getDeclRef() << toSlice(".This");
-}
-
-HashCode ExtractExistentialType::_getHashCodeOverride()
-{
-    return combineHash(getDeclRef().getHashCode(), getOriginalInterfaceType()->getHashCode(), getOriginalInterfaceDeclRef().getHashCode());
 }
 
 Type* ExtractExistentialType::_createCanonicalTypeOverride(SemanticsVisitor*)
@@ -640,20 +559,6 @@ void ExistentialSpecializedType::_toTextOverride(StringBuilder& out)
         out << toSlice(", ") << getArg(i).val;
     }
     out << toSlice(")");
-}
-
-HashCode ExistentialSpecializedType::_getHashCodeOverride()
-{
-    Hasher hasher;
-    hasher.hashObject(getBaseType());
-    for (Index ii = 0; ii < getArgCount(); ++ii)
-    {
-        auto arg = getArg(ii);
-        hasher.hashObject(arg.val);
-        if (auto witness = arg.witness)
-            hasher.hashObject(witness);
-    }
-    return hasher.getResult();
 }
 
 static Val* _getCanonicalValue(Val* val)
@@ -734,14 +639,6 @@ void AndType::_toTextOverride(StringBuilder& out)
     out << getLeft() << toSlice(" & ") << getRight();
 }
 
-HashCode AndType::_getHashCodeOverride()
-{
-    Hasher hasher;
-    hasher.hashObject(getLeft());
-    hasher.hashObject(getRight());
-    return hasher.getResult();
-}
-
 Type* AndType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     // TODO: proper canonicalization of an `&` type relies on
@@ -809,18 +706,6 @@ void ModifiedType::_toTextOverride(StringBuilder& out)
         out.appendChar(' ');
     }
     getBase()->toText(out);
-}
-
-HashCode ModifiedType::_getHashCodeOverride()
-{
-    Hasher hasher;
-    hasher.hashObject(getBase());
-    for (Index i = 0; i < getModifierCount(); ++i)
-    {
-        auto modifier = this->getModifier(i);
-        hasher.hashObject(modifier);
-    }
-    return hasher.getResult();
 }
 
 Type* ModifiedType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)

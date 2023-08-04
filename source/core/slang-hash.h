@@ -138,7 +138,7 @@ namespace Slang
 		template<typename TKey>
 		static HashCode getHashCode(TKey const& key)
 		{
-			return (HashCode)((PtrInt)key) / 16; // sizeof(typename std::remove_pointer<TKey>::type);
+			return (HashCode)((PtrInt)key) >> 2; // sizeof(typename std::remove_pointer<TKey>::type);
 		}
 	};
 	template<>

@@ -167,7 +167,7 @@ String Val::toString()
 
 HashCode Val::getHashCode()
 {
-    SLANG_AST_NODE_VIRTUAL_CALL(Val, getHashCode, ())
+    return Slang::getHashCode(resolve(nullptr));
 }
 
 Val* Val::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
@@ -185,22 +185,11 @@ void Val::_toTextOverride(StringBuilder& out)
     SLANG_UNEXPECTED("Val::_toStringOverride not overridden");
 }
 
-HashCode Val::_getHashCodeOverride()
-{
-    SLANG_UNEXPECTED("Val::_getHashCodeOverride not overridden");
-    //return HashCode(0);
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConstantIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void ConstantIntVal::_toTextOverride(StringBuilder& out)
 {
     out << getValue();
-}
-
-HashCode ConstantIntVal::_getHashCodeOverride()
-{
-    return (HashCode)getValue();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericParamIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -212,11 +201,6 @@ void GenericParamIntVal::_toTextOverride(StringBuilder& out)
     {
         out << name->text;
     }
-}
-
-HashCode GenericParamIntVal::_getHashCodeOverride()
-{
-    return getDeclRef().getHashCode() ^ HashCode(0xFFFF);
 }
 
 Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff)
@@ -296,11 +280,6 @@ void ErrorIntVal::_toTextOverride(StringBuilder& out)
     out << toSlice("<error>");
 }
 
-HashCode ErrorIntVal::_getHashCodeOverride()
-{
-    return HashCode(typeid(this).hash_code());
-}
-
 Val* ErrorIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     SLANG_UNUSED(astBuilder);
@@ -319,11 +298,6 @@ Val* TypeEqualityWitness::_substituteImplOverride(ASTBuilder* astBuilder, Substi
 void TypeEqualityWitness::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("TypeEqualityWitness(") << getSub() << toSlice(")");
-}
-
-HashCode TypeEqualityWitness::_getHashCodeOverride()
-{
-    return getSub()->getHashCode();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -475,11 +449,6 @@ void DeclaredSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << toSlice("DeclaredSubtypeWitness(") << getSub() << toSlice(", ") << getSup() << toSlice(", ") << getDeclRef() << toSlice(")");
 }
 
-HashCode DeclaredSubtypeWitness::_getHashCodeOverride()
-{
-    return getDeclRef().getHashCode();
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TransitiveSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Val* TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
@@ -513,15 +482,6 @@ void TransitiveSubtypeWitness::_toTextOverride(StringBuilder& out)
     // the starting and ending types.
     
     out << toSlice("TransitiveSubtypeWitness(") << getSubToMid() << toSlice(", ") << getMidToSup() << toSlice(")");
-}
-
-HashCode TransitiveSubtypeWitness::_getHashCodeOverride()
-{
-    auto hash = getSub()->getHashCode();
-    hash = combineHash(hash, getSup()->getHashCode());
-    hash = combineHash(hash, getSubToMid()->getHashCode());
-    hash = combineHash(hash, getMidToSup()->getHashCode());
-    return hash;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractFromConjunctionSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -562,11 +522,6 @@ void ExtractExistentialSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << toSlice("extractExistentialValue(") << getDeclRef() << toSlice(")");
 }
 
-HashCode ExtractExistentialSubtypeWitness::_getHashCodeOverride()
-{
-    return getDeclRef().getHashCode();
-}
-
 Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
@@ -596,17 +551,6 @@ void ConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
         if (w) out << w;
     }
     out << ")";
-}
-
-HashCode ConjunctionSubtypeWitness::_getHashCodeOverride()
-{
-    HashCode result = 0;
-    for (Index i = 0; i < kComponentCount; ++i)
-    {
-        auto w = getComponentWitness(i);
-        if (w) result = combineHash(result, w->getHashCode());
-    }
-    return result;
 }
 
 Val* ConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
@@ -653,24 +597,6 @@ void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
         out << getSup();
     out << "," << getIndexInConjunction();
     out << ")";
-}
-
-HashCode ExtractFromConjunctionSubtypeWitness::_getHashCodeOverride()
-{
-    return combineHash(
-        getConjunctionWitness() ? getConjunctionWitness()->getHashCode() : 0,
-        getSub() ? getSub()->getHashCode() : 0,
-        getSup() ? getSup()->getHashCode() : 0,
-        getIndexInConjunction());
-}
-
-// ModifierVal
-
-HashCode ModifierVal::_getHashCodeOverride()
-{
-    Hasher hasher;
-    hasher.hashValue((void*) this);
-    return hasher.getResult();
 }
 
 // UNormModifierVal
@@ -769,22 +695,6 @@ void PolynomialIntVal::_toTextOverride(StringBuilder& out)
     {
         out << constantTerm;
     }
-}
-
-HashCode PolynomialIntVal::_getHashCodeOverride()
-{
-    HashCode result = (HashCode)getConstantTerm();
-    for (auto& term : getTerms())
-    {
-        if (!term) continue;
-        result = combineHash(result, (HashCode)term->getConstFactor());
-        for (auto& factor : term->getParamFactors())
-        {
-            result = combineHash(result, factor->getParam()->getHashCode());
-            result = combineHash(result, (HashCode)factor->getPower());
-        }
-    }
-    return result;
 }
 
 struct PolynomialIntValBuilder
@@ -1132,13 +1042,6 @@ void TypeCastIntVal::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
-HashCode TypeCastIntVal::_getHashCodeOverride()
-{
-    HashCode result = getType()->getHashCode();
-    result = combineHash(result, getBase()->getHashCode());
-    return result;
-}
-
 Val* TypeCastIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, Val* base, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -1272,19 +1175,6 @@ void FuncCallIntVal::_toTextOverride(StringBuilder& out)
         }
         out << ")";
     }
-}
-
-HashCode FuncCallIntVal::_getHashCodeOverride()
-{
-    auto args = getArgs();
-    auto funcDeclRef = getFuncDeclRef();
-
-    HashCode result = funcDeclRef.getHashCode();
-    for (auto arg : args)
-    {
-        result = combineHash(result, arg->getHashCode());
-    }
-    return result;
 }
 
 Val* FuncCallIntVal::_resolveImplOverride(SemanticsVisitor* v)
@@ -1485,12 +1375,6 @@ Val* WitnessLookupIntVal::_resolveImplOverride(SemanticsVisitor* v)
     return this;
 }
 
-HashCode WitnessLookupIntVal::_getHashCodeOverride()
-{
-    HashCode result = getWitness()->getHashCode();
-    result = combineHash(result, Slang::getHashCode(getKey()));
-    return result;
-}
 Val* WitnessLookupIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
@@ -1533,13 +1417,6 @@ void DifferentiateVal::_toTextOverride(StringBuilder& out)
     out << "DifferentiateVal(";
     out << getFunc();
     out << ")";
-}
-
-HashCode DifferentiateVal::_getHashCodeOverride()
-{
-    HashCode result = (HashCode)astNodeType;
-    result = combineHash(result, getFunc().getHashCode());
-    return result;
 }
 
 Val* DifferentiateVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
