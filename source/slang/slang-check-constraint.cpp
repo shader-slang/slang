@@ -217,7 +217,7 @@ namespace Slang
             if(auto rightVector = as<VectorExpressionType>(right))
             {
                 // Check if the vector sizes match
-                if(!leftVector->getElementCount()->equalsVal(rightVector->getElementCount()))
+                if(!leftVector->getElementCount()->equals(rightVector->getElementCount()))
                     return nullptr;
 
                 // Try to join the element types
@@ -416,7 +416,7 @@ namespace Slang
                     }
                     else
                     {
-                        if(!val->equalsVal(cVal))
+                        if(!val->equals(cVal))
                         {
                             // failure!
                             return DeclRef<Decl>();

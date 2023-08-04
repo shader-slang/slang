@@ -153,7 +153,6 @@ class ConstantIntVal : public IntVal
     IntegerLiteralValue getValue() { return getIntConstOperand(1); }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
 
@@ -173,7 +172,6 @@ class GenericParamIntVal : public IntVal
     DeclRef<VarDeclBase> getDeclRef() { return as<DeclRefBase>(getOperand(1)); }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -188,7 +186,6 @@ class TypeCastIntVal : public IntVal
 {
     SLANG_AST_CLASS(TypeCastIntVal)
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -208,7 +205,6 @@ class FuncCallIntVal : public IntVal
 {
     SLANG_AST_CLASS(FuncCallIntVal)
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -233,7 +229,6 @@ class WitnessLookupIntVal : public IntVal
 {
     SLANG_AST_CLASS(WitnessLookupIntVal)
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -275,7 +270,7 @@ public:
         {
             if (auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
             {
-                if (thisGenParam->equalsVal(thatGenParam))
+                if (thisGenParam->equals(thatGenParam))
                     return getPower() < other.getPower();
                 else
                     return thisGenParam->getDeclRef().getDecl() < thatGenParam->getDeclRef().getDecl();
@@ -302,7 +297,7 @@ public:
         {
             if (auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
             {
-                if (thisGenParam->equalsVal(thatGenParam) && getPower() == other.getPower())
+                if (thisGenParam->equals(thatGenParam) && getPower() == other.getPower())
                     return true;
             }
             return false;
@@ -311,7 +306,7 @@ public:
     }
     bool equals(const PolynomialIntValFactor& other) const
     {
-        return getPower() == other.getPower() && getParam()->equalsVal(other.getParam());
+        return getPower() == other.getPower() && getParam()->equals(other.getParam());
     }
 
 };
@@ -388,7 +383,6 @@ public:
     bool isConstant() { return getOperandCount() == 1; }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -418,7 +412,6 @@ class ErrorIntVal : public IntVal
     // `Type` so that we can have an `ErrorVal` of any type.
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -488,7 +481,6 @@ class TypeEqualityWitness : public SubtypeWitness
     }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -507,7 +499,6 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -537,7 +528,6 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -563,7 +553,6 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -606,7 +595,6 @@ class ConjunctionSubtypeWitness : public SubtypeWitness
         return as<SubtypeWitness>(getOperand(2 + index));
     }
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -637,7 +625,6 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
         ///
     int getIndexInConjunction() { return (int)getIntConstOperand(3); };
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -648,8 +635,6 @@ class ModifierVal : public Val
 {
     SLANG_AST_CLASS(ModifierVal)
 
-    void _getDescOverride(ValNodeDesc* outDesc);
-    bool _equalsValOverride(Val* val);
     HashCode _getHashCodeOverride();
     Val* _resolveImplOverride(SemanticsVisitor*) { return this; }
 };
@@ -700,11 +685,9 @@ class DifferentiateVal : public Val
 
     DeclRef<Decl> getFunc() { return as<DeclRefBase>(getOperand(0)); }
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _getDescOverride(ValNodeDesc* outDesc);
     Val* _resolveImplOverride(SemanticsVisitor*);
 
 };

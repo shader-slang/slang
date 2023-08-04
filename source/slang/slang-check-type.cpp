@@ -400,12 +400,12 @@ namespace Slang
             }
             else if (const auto rightPoly = as<PolynomialIntVal>(right))
             {
-                return right->equalsVal(leftVar);
+                return right->equals(leftVar);
             }
         }
         if (auto leftVar = as<PolynomialIntVal>(left))
         {
-            return leftVar->equalsVal(right);
+            return leftVar->equals(right);
         }
         return false;
     }

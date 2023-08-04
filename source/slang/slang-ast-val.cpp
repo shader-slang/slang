@@ -59,11 +59,6 @@ Val* Val::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioD
     SLANG_AST_NODE_VIRTUAL_CALL(Val, substituteImpl, (astBuilder, subst, ioDiff))
 }
 
-bool Val::equalsVal(Val* val)
-{
-    SLANG_AST_NODE_VIRTUAL_CALL(Val, equalsVal, (val))
-}
-
 void Val::toText(StringBuilder& out)
 {
     SLANG_AST_NODE_VIRTUAL_CALL(Val, toText, (out))
@@ -184,13 +179,6 @@ Val* Val::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst,
     return this;
 }
 
-bool Val::_equalsValOverride(Val* val)
-{
-    SLANG_UNUSED(val);
-    SLANG_UNEXPECTED("Val::_equalsValOverride not overridden");
-    //return false;
-}
-
 void Val::_toTextOverride(StringBuilder& out)
 {
     SLANG_UNUSED(out);
@@ -205,13 +193,6 @@ HashCode Val::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConstantIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool ConstantIntVal::_equalsValOverride(Val* val)
-{
-    if (auto intVal = as<ConstantIntVal>(val))
-        return getValue() == intVal->getValue();
-    return false;
-}
-
 void ConstantIntVal::_toTextOverride(StringBuilder& out)
 {
     out << getValue();
@@ -223,15 +204,6 @@ HashCode ConstantIntVal::_getHashCodeOverride()
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericParamIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-bool GenericParamIntVal::_equalsValOverride(Val* val)
-{
-    if (auto genericParamVal = as<GenericParamIntVal>(val))
-    {
-        return getDeclRef().equals(genericParamVal->getDeclRef());
-    }
-    return false;
-}
 
 void GenericParamIntVal::_toTextOverride(StringBuilder& out)
 {
@@ -319,11 +291,6 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ErrorIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool ErrorIntVal::_equalsValOverride(Val* val)
-{
-    return as<ErrorIntVal>(val);
-}
-
 void ErrorIntVal::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("<error>");
@@ -340,14 +307,6 @@ Val* ErrorIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
     SLANG_UNUSED(subst);
     SLANG_UNUSED(ioDiff);
     return this;
-}
-
-bool TypeEqualityWitness::_equalsValOverride(Val* val)
-{
-    auto otherWitness = as<TypeEqualityWitness>(val);
-    if (!otherWitness)
-        return false;
-    return getSub()->equals(otherWitness->getSub());
 }
 
 Val* TypeEqualityWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
@@ -368,17 +327,6 @@ HashCode TypeEqualityWitness::_getHashCodeOverride()
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-bool DeclaredSubtypeWitness::_equalsValOverride(Val* val)
-{
-    auto otherWitness = as<DeclaredSubtypeWitness>(val);
-    if (!otherWitness)
-        return false;
-
-    return getSub()->equals(otherWitness->getSub())
-        && getSup()->equals(otherWitness->getSup())
-        && getDeclRef().equals(otherWitness->getDeclRef());
-}
 
 Val* DeclaredSubtypeWitness::_resolveImplOverride(SemanticsVisitor* visitor)
 {
@@ -534,18 +482,6 @@ HashCode DeclaredSubtypeWitness::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TransitiveSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool TransitiveSubtypeWitness::_equalsValOverride(Val* val)
-{
-    auto otherWitness = as<TransitiveSubtypeWitness>(val);
-    if (!otherWitness)
-        return false;
-
-    return getSub()->equals(otherWitness->getSub())
-        && getSup()->equals(otherWitness->getSup())
-        && getSubToMid()->equalsVal(otherWitness->getSubToMid())
-        && getMidToSup()->equalsVal(otherWitness->getMidToSup());
-}
-
 Val* TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
 {
     int diff = 0;
@@ -621,15 +557,6 @@ Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* a
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool ExtractExistentialSubtypeWitness::_equalsValOverride(Val* val)
-{
-    if (auto extractWitness = as<ExtractExistentialSubtypeWitness>(val))
-    {
-        return getDeclRef().equals(extractWitness->getDeclRef());
-    }
-    return false;
-}
-
 void ExtractExistentialSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("extractExistentialValue(") << getDeclRef() << toSlice(")");
@@ -656,20 +583,6 @@ Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBu
     ExtractExistentialSubtypeWitness* substValue = astBuilder->getOrCreate<ExtractExistentialSubtypeWitness>(
         substSub, substSup, substDeclRef);
     return substValue;
-}
-
-bool ConjunctionSubtypeWitness::_equalsValOverride(Val* val)
-{
-    auto other = as<ConjunctionSubtypeWitness>(val);
-    if (!other)
-        return false;
-
-    for (Index i = 0; i < getOperandCount(); ++i)
-    {
-        if (!other->getComponentWitness(i)) return false;
-        if (!other->getComponentWitness(i)->equalsVal(getComponentWitness(i))) return false;
-    }
-    return true;
 }
 
 void ConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
@@ -728,19 +641,6 @@ Val* ConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, 
     return result;
 }
 
-bool ExtractFromConjunctionSubtypeWitness::_equalsValOverride(Val* val)
-{
-    if (auto other = as<ExtractFromConjunctionSubtypeWitness>(val))
-    {
-        if(!getSub()->equals(other->getSub())) return false;
-        if(!getSup()->equals(other->getSup())) return false;
-        if(getIndexInConjunction() != other->getIndexInConjunction()) return false;
-
-        return true;
-    }
-    return false;
-}
-
 void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
     out << "ExtractFromConjunctionSubtypeWitness(";
@@ -765,21 +665,6 @@ HashCode ExtractFromConjunctionSubtypeWitness::_getHashCodeOverride()
 }
 
 // ModifierVal
-
-void ModifierVal::_getDescOverride(ValNodeDesc* outDesc)
-{
-    SLANG_UNUSED(outDesc);
-}
-
-
-bool ModifierVal::_equalsValOverride(Val* val)
-{
-    // TODO: This is assuming we can fully deduplicate the values that represent
-    // modifiers, which may not actually be the case if there are multiple modules
-    // being combined that use different `ASTBuilder`s.
-    //
-    return this == val;
-}
 
 HashCode ModifierVal::_getHashCodeOverride()
 {
@@ -833,45 +718,6 @@ Val* NoDiffModifierVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitu
 }
 
 // PolynomialIntVal
-
-bool PolynomialIntVal::_equalsValOverride(Val* val)
-{
-    auto constantTerm = getConstantTerm();
-    auto terms = getTerms();
-    if (auto genericParamVal = as<GenericParamIntVal>(val))
-    {
-        return constantTerm == 0 && terms.getCount() == 1 &&
-               terms[0]->getParamFactors().getCount() == 1 && terms[0]->getConstFactor() == 1 &&
-               terms[0]->getParamFactors()[0]->getParam()->equalsVal(genericParamVal) &&
-               terms[0]->getParamFactors()[0]->getPower() == 1;
-    }
-    else if (auto otherPolynomial = as<PolynomialIntVal>(val))
-    {
-        if (constantTerm != otherPolynomial->getConstantTerm())
-            return false;
-        auto otherTerms = otherPolynomial->getTerms();
-        if (terms.getCount() != otherTerms.getCount())
-            return false;
-        for (Index i = 0; i < terms.getCount(); i++)
-        {
-            auto& thisTerm = *(terms[i]);
-            auto& thatTerm = *(otherTerms[i]);
-            if (thisTerm.getConstFactor() != thatTerm.getConstFactor())
-                return false;
-            if (thisTerm.getParamFactors().getCount() != thatTerm.getParamFactors().getCount())
-                return false;
-            for (Index j = 0; j < thisTerm.getParamFactors().getCount(); j++)
-            {
-                if (thisTerm.getParamFactors()[j]->getPower() != thatTerm.getParamFactors()[j]->getPower())
-                    return false;
-                if (!thisTerm.getParamFactors()[j]->getParam()->equalsVal(thatTerm.getParamFactors()[j]->getParam()))
-                    return false;
-            }
-        }
-        return true;
-    }
-    return false;
-}
 
 void PolynomialIntVal::_toTextOverride(StringBuilder& out)
 {
@@ -1012,7 +858,7 @@ struct PolynomialIntValBuilder
                 for (Index j = 0; j < newFactors.getCount(); j++)
                 {
                     auto& newFactor = newFactors[j];
-                    if (factor->getParam()->equalsVal(newFactor->getParam()))
+                    if (factor->getParam()->equals(newFactor->getParam()))
                     {
                         if (!factorIsDifferent[j])
                         {
@@ -1277,18 +1123,6 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypeCastIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-bool TypeCastIntVal::_equalsValOverride(Val* val)
-{
-    if (auto typeCastIntVal = as<TypeCastIntVal>(val))
-    {
-        if (!getType()->equals(typeCastIntVal->getType()))
-            return false;
-        if (!getBase()->equalsVal(typeCastIntVal->getBase()))
-            return false;
-        return true;
-    }
-    return false;
-}
 
 void TypeCastIntVal::_toTextOverride(StringBuilder& out)
 {
@@ -1385,26 +1219,6 @@ Val* TypeCastIntVal::_resolveImplOverride(SemanticsVisitor*)
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncCallIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-bool FuncCallIntVal::_equalsValOverride(Val* val)
-{
-    if (auto funcCallIntVal = as<FuncCallIntVal>(val))
-    {
-        if (!getFuncDeclRef().equals(funcCallIntVal->getFuncDeclRef()))
-            return false;
-        if (getArgCount() != funcCallIntVal->getArgCount())
-            return false;
-        auto args = getArgs();
-        auto otherArgs = funcCallIntVal->getArgs();
-        for (Index i = 0; i < args.getCount(); i++)
-        {
-            if (!args[i]->equalsVal(otherArgs[i]))
-                return false;
-        }
-        return true;
-    }
-    return false;
-}
 
 void FuncCallIntVal::_toTextOverride(StringBuilder& out)
 {
@@ -1638,19 +1452,6 @@ Val* FuncCallIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! WitnessLookupIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool WitnessLookupIntVal::_equalsValOverride(Val* val)
-{
-    if (auto lookupIntVal = as<WitnessLookupIntVal>(val))
-    {
-        if (!getWitness()->equalsVal(lookupIntVal->getWitness()))
-            return false;
-        if (getKey() != lookupIntVal->getKey())
-            return false;
-        return true;
-    }
-    return false;
-}
-
 void WitnessLookupIntVal::_toTextOverride(StringBuilder& out)
 {
     getWitness()->getSub()->toText(out);
@@ -1725,16 +1526,6 @@ Val* WitnessLookupIntVal::tryFold(ASTBuilder* astBuilder, SubtypeWitness* witnes
         return result;
     auto witnessResult = astBuilder->getOrCreate<WitnessLookupIntVal>(type, witness, key);
     return witnessResult;
-}
-
-
-bool DifferentiateVal::_equalsValOverride(Val* val)
-{
-    if (auto other = as<DifferentiateVal>(val))
-    {
-        return other->astNodeType == astNodeType && other->getFunc() == getFunc();
-    }
-    return false;
 }
 
 void DifferentiateVal::_toTextOverride(StringBuilder& out)

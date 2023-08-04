@@ -22,7 +22,7 @@ namespace Slang
     inline bool areValsEqual(Val* left, Val* right)
     {
         if(!left || !right) return left == right;
-        return left->equalsVal(right);
+        return left->equals(right);
     }
 
     //

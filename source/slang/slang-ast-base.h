@@ -367,21 +367,23 @@ class Val : public NodeBase
     // decide whether they need to do anything).
     Val* substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-    bool equalsVal(Val* val);
+    bool equals(Val* val) const
+    {
+        return this == val || const_cast<Val*>(this)->resolve(nullptr) == val->resolve(nullptr);
+    }
 
     // Appends as text to the end of the builder
     void toText(StringBuilder& out);
     String toString();
 
     HashCode getHashCode();
-    bool operator == (const Val & v)
+    bool operator == (const Val & v) const
     {
-        return equalsVal(const_cast<Val*>(&v));
+        return equals(const_cast<Val*>(&v));
     }
 
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
 
@@ -461,9 +463,9 @@ struct ValSet
             if (val == other.val)
                 return true;
             if (val)
-                return val->equalsVal(other.val);
+                return val->equals(other.val);
             else if (other.val)
-                return other.val->equalsVal(val);
+                return other.val->equals(val);
             return false;
         }
     };
@@ -523,12 +525,8 @@ class Type: public Val
         m_astBuilderForReflection = inAstBuilder;
     }
 
-    bool equals(Type* type);
-    
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    bool _equalsValOverride(Val* val);
-    bool _equalsImplOverride(Type* type);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _resolveImplOverride(SemanticsVisitor* semantics);
 
@@ -540,7 +538,6 @@ class Type: public Val
     ASTBuilder* getASTBuilderForReflection() const { return m_astBuilderForReflection; }
 protected:
     Type* createCanonicalType(SemanticsVisitor* semantics);
-    bool equalsImpl(Type* type);
 
     // We store the ASTBuilder to support reflection API only.
     // It should not be used for anything else, especially not for constructing new AST nodes during
@@ -576,11 +573,6 @@ class DeclRefBase : public Val
         SLANG_UNREACHABLE("DeclRefBase::_substituteImplOverride not overrided.");
     }
 
-    bool _equalsValOverride(Val* val)
-    {
-        return val == this;
-    }
-
     void _toTextOverride(StringBuilder& out)
     {
         SLANG_UNUSED(out);
@@ -601,12 +593,6 @@ class DeclRefBase : public Val
     // Returns true if 'as' will return a valid cast
     template <typename T>
     bool is() const { return Slang::as<T>(getDecl()) != nullptr; }
-
-    // Check if this is an equivalent declaration reference to another
-    bool equals(DeclRefBase* declRef)
-    {
-        return declRef == this;
-    }
 
     // Convenience accessors for common properties of declarations
     Name* getName() const;
@@ -842,13 +828,6 @@ DeclRef<T> DeclRef<T>::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet su
     SLANG_UNUSED(astBuilder);
     if (!declRefBase) return *this;
     return DeclRef<T>(declRefBase->substituteImpl(astBuilder, subst, ioDiff));
-}
-
-template<typename T>
-template<typename U>
-bool DeclRef<T>::equals(DeclRef<U> other) const
-{
-    return declRefBase == other.declRefBase || (declRefBase && declRefBase->equals(other.declRefBase));
 }
 
 Val::OperandView<Val> tryGetGenericArguments(SubstitutionSet substSet, Decl* genericDecl);

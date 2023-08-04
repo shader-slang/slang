@@ -16,7 +16,6 @@ class OverloadGroupType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
 };
 
@@ -29,7 +28,6 @@ class InitializerListType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
 };
 
@@ -41,7 +39,6 @@ class ErrorType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
@@ -53,13 +50,12 @@ class BottomType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A type that takes the form of a reference to some declaration
-class DeclRefType : public Type 
+class DeclRefType : public Type
 {
     SLANG_AST_CLASS(DeclRefType)
 
@@ -71,7 +67,6 @@ class DeclRefType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
@@ -411,7 +406,6 @@ class TypeType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
 
     Type* getType() { return as<Type>(getOperand(0)); }
@@ -513,7 +507,6 @@ class PtrTypeBase : public BuiltinType
 
     // Get the type of the pointed-to value.
     Type* getValueType();
-
 };
 
 class NoneType : public BuiltinType
@@ -524,14 +517,12 @@ class NoneType : public BuiltinType
 class NullPtrType : public BuiltinType
 {
     SLANG_AST_CLASS(NullPtrType)
-
 };
 
 // A true (user-visible) pointer type, e.g., `T*`
 class PtrType : public PtrTypeBase 
 {
     SLANG_AST_CLASS(PtrType)
-
 };
 
 /// A pointer-like type used to represent a parameter "direction"
@@ -589,9 +580,7 @@ class NamedExpressionType : public Type
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    void _getDescOverride(ValNodeDesc* descOut);
 
     NamedExpressionType(DeclRef<TypeDefDecl> inDeclRef)
     {
@@ -632,7 +621,6 @@ class FuncType : public Type
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
 };
 
@@ -655,7 +643,6 @@ class TupleType : public Type
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
 };
 
@@ -668,7 +655,6 @@ class GenericDeclRefType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
 
@@ -692,7 +678,6 @@ class NamespaceType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
 };
@@ -738,11 +723,9 @@ SLANG_UNREFLECTED
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _getDescOverride(ValNodeDesc* descOut);
 
         /// Get a witness that shows how this type is a subtype of `originalInterfaceType`.
         ///
@@ -786,7 +769,6 @@ class ExistentialSpecializedType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -819,7 +801,6 @@ class AndType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -855,7 +836,6 @@ class ModifiedType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);

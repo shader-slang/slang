@@ -832,7 +832,10 @@ namespace Slang
         }
 
         template<typename U>
-        bool equals(DeclRef<U> other) const;
+        bool equals(DeclRef<U> other) const
+        {
+            return declRefBase == other.declRefBase;
+        }
 
         template<typename U>
         bool operator == (DeclRef<U> other) const

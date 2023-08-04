@@ -11,33 +11,9 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool Type::equals(Type* type)
-{
-    return getCanonicalType(nullptr)->equalsImpl(type->getCanonicalType(nullptr));
-}
-
-bool Type::equalsImpl(Type* type)
-{
-    SLANG_AST_NODE_VIRTUAL_CALL(Type, equalsImpl, (type))
-}
-
-bool Type::_equalsImplOverride(Type* type)
-{
-    SLANG_UNUSED(type)
-    SLANG_UNEXPECTED("Type::_equalsImplOverride not overridden");
-    //return false;
-}
-
 Type* Type::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return as<Type>(defaultResolveImpl());
-}
-
-bool Type::_equalsValOverride(Val* val)
-{
-    if (auto type = dynamicCast<Type>(val))
-        return const_cast<Type*>(this)->equals(type);
-    return false;
 }
 
 Val* Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
@@ -62,11 +38,6 @@ void OverloadGroupType::_toTextOverride(StringBuilder& out)
     out << toSlice("overload group");
 }
 
-bool OverloadGroupType::_equalsImplOverride(Type * /*type*/)
-{
-    return false;
-}
-
 Type* OverloadGroupType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
@@ -84,11 +55,6 @@ void InitializerListType::_toTextOverride(StringBuilder& out)
     out << toSlice("initializer list");
 }
 
-bool InitializerListType::_equalsImplOverride(Type * /*type*/)
-{
-    return false;
-}
-
 Type* InitializerListType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
@@ -104,11 +70,6 @@ HashCode InitializerListType::_getHashCodeOverride()
 void ErrorType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("error");
-}
-
-bool ErrorType::_equalsImplOverride(Type* type)
-{
-    return as<ErrorType>(type);
 }
 
 Type* ErrorType::_createCanonicalTypeOverride(SemanticsVisitor*)
@@ -130,11 +91,6 @@ HashCode ErrorType::_getHashCodeOverride()
 
 void BottomType::_toTextOverride(StringBuilder& out) { out << toSlice("never"); }
 
-bool BottomType::_equalsImplOverride(Type* type)
-{
-    return as<BottomType>(type);
-}
-
 Val* BottomType::_substituteImplOverride(
     ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
 {
@@ -153,15 +109,6 @@ void DeclRefType::_toTextOverride(StringBuilder& out)
 HashCode DeclRefType::_getHashCodeOverride()
 {
     return (getDeclRef().getHashCode() * 16777619) ^ (HashCode)(typeid(this).hash_code());
-}
-
-bool DeclRefType::_equalsImplOverride(Type * type)
-{
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        return getDeclRef().equals(declRefType->getDeclRef());
-    }
-    return false;
 }
 
 Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff);
@@ -362,15 +309,6 @@ void TypeType::_toTextOverride(StringBuilder& out)
     out << toSlice("typeof(") << getType() << toSlice(")");
 }
 
-bool TypeType::_equalsImplOverride(Type * t)
-{
-    if (auto typeType = as<TypeType>(t))
-    {
-        return t->equals(typeType->getType());
-    }
-    return false;
-}
-
 Type* TypeType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     return getCurrentASTBuilder()->getTypeType(getType()->getCanonicalType(semantics));
@@ -390,15 +328,6 @@ void GenericDeclRefType::_toTextOverride(StringBuilder& out)
     out << toSlice("<DeclRef<GenericDecl>>");
 }
 
-bool GenericDeclRefType::_equalsImplOverride(Type * type)
-{
-    if (auto genericDeclRefType = as<GenericDeclRefType>(type))
-    {
-        return getDeclRef().equals(genericDeclRefType->getDeclRef());
-    }
-    return false;
-}
-
 HashCode GenericDeclRefType::_getHashCodeOverride()
 {
     return getDeclRef().getHashCode();
@@ -414,15 +343,6 @@ Type* GenericDeclRefType::_createCanonicalTypeOverride(SemanticsVisitor*)
 void NamespaceType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("namespace ") << getDeclRef(); 
-}
-
-bool NamespaceType::_equalsImplOverride(Type * type)
-{
-    if (auto namespaceType = as<NamespaceType>(type))
-    {
-        return getDeclRef().equals(namespaceType->getDeclRef());
-    }
-    return false;
 }
 
 HashCode NamespaceType::_getHashCodeOverride()
@@ -453,6 +373,11 @@ Type* OptionalType::getValueType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
+Type* NativeRefType::getValueType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void NamedExpressionType::_toTextOverride(StringBuilder& out)
@@ -461,12 +386,6 @@ void NamedExpressionType::_toTextOverride(StringBuilder& out)
     {
         getDeclRef().declRefBase->toText(out);
     }
-}
-
-bool NamedExpressionType::_equalsImplOverride(Type * /*type*/)
-{
-    SLANG_UNEXPECTED("NamedExpressionType::_equalsImplOverride should be unreachable");
-    //return false;
 }
 
 Type* NamedExpressionType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
@@ -532,37 +451,6 @@ void FuncType::_toTextOverride(StringBuilder& out)
     {
         out << " throws " << getErrorType();
     }
-}
-
-bool FuncType::_equalsImplOverride(Type * type)
-{
-    if (auto funcType = as<FuncType>(type))
-    {
-        auto paramCount = getParamCount();
-        auto otherParamCount = funcType->getParamCount();
-        if (paramCount != otherParamCount)
-            return false;
-
-        for (Index pp = 0; pp < paramCount; ++pp)
-        {
-            auto paramType = getParamType(pp);
-            auto otherParamType = funcType->getParamType(pp);
-            if (!paramType->equals(otherParamType))
-                return false;
-        }
-
-        if (!getResultType()->equals(funcType->getResultType()))
-            return false;
-
-        if (!getErrorType()->equals(funcType->getErrorType()))
-            return false;
-
-        // TODO: if we ever introduce other kinds
-        // of qualification on function types, we'd
-        // want to consider it here.
-        return true;
-    }
-    return false;
 }
 
 Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
@@ -638,26 +526,6 @@ void TupleType::_toTextOverride(StringBuilder& out)
     out << toSlice(")");
 }
 
-bool TupleType::_equalsImplOverride(Type * type)
-{
-    if (const auto other = as<TupleType>(type))
-    {
-        auto paramCount = getOperandCount();
-        auto otherParamCount = other->getOperandCount();
-        if (paramCount != otherParamCount)
-            return false;
-
-        for (Index i = 0; i < getOperandCount(); ++i)
-        {
-            if(!as<Type>(getOperand(i))->equals(as<Type>(other->getOperand(i))))
-                return false;
-        }
-
-        return true;
-    }
-    return false;
-}
-
 Val* TupleType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
@@ -700,15 +568,6 @@ HashCode TupleType::_getHashCodeOverride()
 void ExtractExistentialType::_toTextOverride(StringBuilder& out)
 {
     out << getDeclRef() << toSlice(".This");
-}
-
-bool ExtractExistentialType::_equalsImplOverride(Type* type)
-{
-    if (auto extractExistential = as<ExtractExistentialType>(type))
-    {
-        return getDeclRef().equals(extractExistential->getDeclRef());
-    }
-    return false;
 }
 
 HashCode ExtractExistentialType::_getHashCodeOverride()
@@ -781,33 +640,6 @@ void ExistentialSpecializedType::_toTextOverride(StringBuilder& out)
         out << toSlice(", ") << getArg(i).val;
     }
     out << toSlice(")");
-}
-
-bool ExistentialSpecializedType::_equalsImplOverride(Type * type)
-{
-    auto other = as<ExistentialSpecializedType>(type);
-    if (!other)
-        return false;
-
-    if (!getBaseType()->equals(other->getBaseType()))
-        return false;
-
-    auto argCount = getArgCount();
-    if (argCount != other->getArgCount())
-        return false;
-
-    for (Index ii = 0; ii < argCount; ++ii)
-    {
-        auto arg = getArg(ii);
-        auto otherArg = other->getArg(ii);
-
-        if (!arg.val->equalsVal(otherArg.val))
-            return false;
-
-        if (!areValsEqual(arg.witness, otherArg.witness))
-            return false;
-    }
-    return true;
 }
 
 HashCode ExistentialSpecializedType::_getHashCodeOverride()
@@ -902,20 +734,6 @@ void AndType::_toTextOverride(StringBuilder& out)
     out << getLeft() << toSlice(" & ") << getRight();
 }
 
-bool AndType::_equalsImplOverride(Type * type)
-{
-    auto other = as<AndType>(type);
-    if (!other)
-        return false;
-
-    if(!getLeft()->equals(other->getLeft()))
-        return false;
-    if(!getRight()->equals(other->getRight()))
-        return false;
-
-    return true;
-}
-
 HashCode AndType::_getHashCodeOverride()
 {
     Hasher hasher;
@@ -991,45 +809,6 @@ void ModifiedType::_toTextOverride(StringBuilder& out)
         out.appendChar(' ');
     }
     getBase()->toText(out);
-}
-
-bool ModifiedType::_equalsImplOverride(Type* type)
-{
-    auto other = as<ModifiedType>(type);
-    if(!other)
-        return false;
-
-    if(!getBase()->equals(other->getBase()))
-        return false;
-
-    // TODO: Eventually we need to put the `modifiers` into
-    // a canonical ordering as part of creation of a `ModifiedType`,
-    // so that two instances that apply the same modifiers to
-    // the same type will have those modifiers in a matching order.
-    //
-    // The simplest way to achieve that ordering *for now* would
-    // be to sort the array by the integer AST node type tag.
-    // That approach would of course not scale to modifiers that
-    // have any operands of their own.
-    //
-    // Note that we would *also* need the logic that creates a
-    // `ModifiedType` to detect when the base type is itself a
-    // `ModifiedType` and produce a single `ModifiedType` with
-    // a combined list of modifiers and a non-`ModifiedType` as
-    // its base type.
-    //
-    auto modifierCount = getModifierCount();
-    if(modifierCount != other->getModifierCount())
-        return false;
-
-    for (Index i = 0; i < modifierCount; ++i)
-    {
-        auto thisModifier = this->getModifier(i);
-        auto otherModifier = other->getModifier(i);
-        if(!thisModifier->equalsVal(otherModifier))
-            return false;
-    }
-    return true;
 }
 
 HashCode ModifiedType::_getHashCodeOverride()

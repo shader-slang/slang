@@ -570,7 +570,7 @@ namespace Slang
         if( left == right )
             return true;
 
-        if( left->equalsVal(right) )
+        if( left->equals(right) )
             return true;
 
         return false;
