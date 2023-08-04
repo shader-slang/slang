@@ -620,6 +620,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-artifact-output-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ast-base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ast-builder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1202,7 +1205,6 @@
     <ClCompile Include="..\..\..\source\slang\slang.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-ast-base.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\source\slang\core.meta.slang">
