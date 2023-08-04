@@ -1219,7 +1219,7 @@ struct SPIRVEmitContext
         // ...
 
         default:
-            String e = "Unhandled global inst in spirv-emit: "
+            String e = "Unhandled global inst in spirv-emit:\n"
                 + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
             SLANG_UNIMPLEMENTED_X(e.begin());
         }
@@ -1607,7 +1607,7 @@ struct SPIRVEmitContext
         {
         default:
             {
-                String e = "Unhandled local inst in spirv-emit: "
+                String e = "Unhandled local inst in spirv-emit:\n"
                     + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
                 SLANG_UNIMPLEMENTED_X(e.getBuffer());
             }
