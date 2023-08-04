@@ -1415,6 +1415,16 @@ Result DeviceImpl::createTextureView(
                 }
             }
             break;
+        case IResource::Type::TextureCube:
+            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+            rtvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+            rtvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
+            rtvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+            rtvDesc.Texture2DArray.PlaneSlice =
+                resourceImpl
+                ? D3DUtil::getPlaneSlice(D3DUtil::getMapFormat(resourceImpl->getDesc()->format), desc.subresourceRange.aspectMask)
+                : 0;
+            break;
         case IResource::Type::Texture3D:
             rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
             rtvDesc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
@@ -1462,6 +1472,12 @@ Result DeviceImpl::createTextureView(
                 dsvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
                 dsvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
             }
+            break;
+        case IResource::Type::TextureCube:
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+            dsvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+            dsvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
+            dsvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
             break;
         default:
             return SLANG_FAIL;
