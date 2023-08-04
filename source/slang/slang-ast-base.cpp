@@ -15,6 +15,9 @@ void NodeBase::_initDebug(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder)
         _debugUID = -_debugUID;
     if (breakValue != 0 && _debugUID == breakValue)
         SLANG_BREAKPOINT(0)
+#else
+    SLANG_UNUSED(inAstNodeType);
+    SLANG_UNUSED(inAstBuilder);
 #endif
 }
 DeclRefBase* Decl::getDefaultDeclRef()

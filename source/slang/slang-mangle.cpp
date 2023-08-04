@@ -590,11 +590,15 @@ namespace Slang
 
     String getMangledName(ASTBuilder* astBuilder, DeclRefBase* declRef)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
+
         return getMangledName(astBuilder, DeclRef<Decl>(declRef));
     }
 
     String getMangledName(ASTBuilder* astBuilder, Decl* decl)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
+
         return getMangledName(astBuilder, makeDeclRef(decl));
     }
     
