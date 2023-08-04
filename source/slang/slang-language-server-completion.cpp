@@ -596,7 +596,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::createSwizzleCan
     {
         const char* memberNames[4] = {"x", "y", "z", "w"};
         Type* elementType = nullptr;
-        elementType = vectorType->elementType;
+        elementType = vectorType->getElementType();
         String typeStr;
         if (elementType)
             typeStr = elementType->toString();

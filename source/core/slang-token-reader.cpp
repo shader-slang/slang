@@ -416,7 +416,7 @@ namespace Misc {
                     tokenFlags |= TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
                     pos++;
                 }
-                else if (curChar == ' ' || curChar == '\t' || curChar == -62 || curChar == -96) // -62/-96:non-break space
+                else if (curChar == ' ' || curChar == '\t' || curChar == '\xC2' || curChar == '\xA0') // -62/-96:non-break space
                 {
                     tokenFlags |= TokenFlag::AfterWhitespace;
                     pos++;

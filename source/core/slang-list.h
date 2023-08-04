@@ -52,6 +52,11 @@ namespace Slang
         {
             this->operator=(static_cast<List<T>&&>(list));
         }
+        List(ArrayView<T> view)
+            : List()
+        {
+            addRange(view);
+        }
         static List<T> makeRepeated(const T& val, Index count)
         {
             List<T> rs;

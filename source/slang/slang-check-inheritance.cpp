@@ -220,7 +220,7 @@ namespace Slang
             DeclRef<Decl> baseDeclRef;
             if (auto baseDeclRefType = as<DeclRefType>(baseType))
             {
-                baseDeclRef = baseDeclRefType->declRef;
+                baseDeclRef = baseDeclRefType->getDeclRef();
             }
 
             addDirectBaseFacet(
@@ -239,9 +239,9 @@ namespace Slang
             // In the case where we have an aggregate type or `extension`
             // declaration, we can use the explicit list of direct bases.
             //
-            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(_getASTBuilder(), aggTypeDeclBaseRef))
+            for (auto typeConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(_getASTBuilder(), aggTypeDeclBaseRef))
             {
-                visitor.ensureDecl(inheritanceDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
+                visitor.ensureDecl(typeConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
 
                 // Note: In certain cases something takes the *syntactic* form of an inheritance
                 // clause, but it is not actually something that should be treated as implying
@@ -251,36 +251,18 @@ namespace Slang
                 // We skip such pseudo-inheritance relationships for the purposes of determining
                 // the linearized list of bases.
                 //
-                if (inheritanceDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
+                if (typeConstraintDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
                     continue;
 
                 // The base type and subtype witness can easily be determined
                 // using the `InheritanceDecl`.
                 //
-                auto baseType = getSup(astBuilder, inheritanceDeclRef);
+                auto baseType = getSup(astBuilder, typeConstraintDeclRef);
                 auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
                     selfType,
                     baseType,
-                    inheritanceDeclRef);
+                    typeConstraintDeclRef);
 
-                addDirectBaseType(baseType, satisfyingWitness);
-            }
-
-            // In the case of an `associatedtype`, the constraints on the associated
-            // type are encoded as `GenericTypeConstraintDecl`s instead of `InheritanceDecl`s.
-            //
-            // TOD(tfoley): Can we try to unify the representations of these to avoid having
-            // to iterate twice?
-            //
-            for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(astBuilder, aggTypeDeclBaseRef))
-            {
-                visitor.ensureDecl(constraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
-
-                auto baseType = getSup(astBuilder, constraintDeclRef);
-                auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
-                    selfType,
-                    baseType,
-                    constraintDeclRef);
                 addDirectBaseType(baseType, satisfyingWitness);
             }
         }
@@ -296,7 +278,7 @@ namespace Slang
             // representation would need to take into account canonicalization of
             // constraints.
 
-            auto genericDeclRef = genericTypeParamDeclRef.getParent(astBuilder).as<GenericDecl>();
+            auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
             SLANG_ASSERT(genericDeclRef);
 
             ensureDecl(&visitor, genericDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
@@ -317,7 +299,7 @@ namespace Slang
                 auto subDeclRefType = as<DeclRefType>(subType);
                 if (!subDeclRefType)
                     continue;
-                if (subDeclRefType->declRef != genericTypeParamDeclRef)
+                if (subDeclRefType->getDeclRef() != genericTypeParamDeclRef)
                     continue;
 
                 // Because the constraint is a declared inheritance relationship,
@@ -376,7 +358,7 @@ namespace Slang
                 // the extension to the type and see if we succeed in
                 // making a match.
                 //
-                auto extDeclRef = ApplyExtensionToType(&visitor, extDecl, selfType);
+                auto extDeclRef = applyExtensionToType(&visitor, extDecl, selfType);
                 if (!extDeclRef)
                     continue;
 
@@ -858,15 +840,15 @@ namespace Slang
             // bottleneck through the logic that gets shared between
             // type and `extension` declarations.
             //
-            return _getInheritanceInfo(declRefType->declRef, declRefType);
+            return _getInheritanceInfo(declRefType->getDeclRef(), declRefType);
         }
         else if (auto conjunctionType = as<AndType>(type))
         {
             // In this case, we have a type of the form `L & R`,
             // such that it is a subtype of both `L` and `R`.
             //
-            auto leftType = conjunctionType->left;
-            auto rightType = conjunctionType->right;
+            auto leftType = conjunctionType->getLeft();
+            auto rightType = conjunctionType->getRight();
 
             // The linearized inheritance list for the conjunction
             // must include all the facets from the lists for `L`

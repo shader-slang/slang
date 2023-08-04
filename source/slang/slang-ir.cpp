@@ -1004,32 +1004,6 @@ namespace Slang
     }
 
     //
-    // IRTaggedUnionTypeLayout
-    //
-
-    IRTaggedUnionTypeLayout::Builder::Builder(IRBuilder* irBuilder, LayoutSize tagOffset)
-        : Super::Builder(irBuilder)
-    {
-        m_tagOffset = irBuilder->getIntValue(irBuilder->getIntType(), tagOffset.raw);
-    }
-
-    void IRTaggedUnionTypeLayout::Builder::addCaseTypeLayout(IRTypeLayout* typeLayout)
-    {
-        m_caseTypeLayoutAttrs.add(getIRBuilder()->getCaseTypeLayoutAttr(typeLayout));
-    }
-
-    void IRTaggedUnionTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
-    {
-        ioOperands.add(m_tagOffset);
-    }
-
-    void IRTaggedUnionTypeLayout::Builder::addAttrsImpl(List<IRInst*>& ioOperands)
-    {
-        for(auto attr : m_caseTypeLayoutAttrs)
-            ioOperands.add(attr);
-    }
-
-    //
     // IRVarLayout
     //
 
@@ -2981,17 +2955,6 @@ namespace Slang
             operands);
     }
 
-    IRType* IRBuilder::getTaggedUnionType(
-        UInt            caseCount,
-        IRType* const*  caseTypes)
-    {
-        return (IRType*)createIntrinsicInst(
-            getTypeKind(),
-            kIROp_TaggedUnionType,
-            caseCount,
-            (IRInst* const*) caseTypes);
-    }
-
     IRType* IRBuilder::getBindExistentialsType(
         IRInst*         baseType,
         UInt            slotArgCount,
@@ -3335,7 +3298,6 @@ namespace Slang
         IRInst* const*  args)
     {
         auto innerReturnVal = findInnerMostGenericReturnVal(as<IRGeneric>(genericVal));
-
         if (as<IRWitnessTable>(innerReturnVal))
         {
             return createIntrinsicInst(
@@ -3371,7 +3333,7 @@ namespace Slang
         // the emit logic, but this is a reasonably early place
         // to catch it.
         //
-        SLANG_ASSERT(witnessTableVal->getOp() != kIROp_StructKey);
+        SLANG_ASSERT(witnessTableVal && witnessTableVal->getOp() != kIROp_StructKey);
 
         IRInst* args[] = {witnessTableVal, interfaceMethodVal};
 
@@ -5536,6 +5498,8 @@ namespace Slang
             return emitIntrinsicInst(
                 getNativePtrType((IRType*)valueType->getOperand(0)), kIROp_GetNativePtr, 1, &value);
             break;
+        case kIROp_ExtractExistentialType:
+            return emitGetNativePtr(value->getOperand(0));
         default:
             SLANG_UNEXPECTED("invalid operand type for `getNativePtr`.");
             UNREACHABLE_RETURN(nullptr);

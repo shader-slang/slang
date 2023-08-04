@@ -164,6 +164,8 @@ namespace Slang
         TranslationUnitRequest* translationUnit,
         LoadedModuleDictionary& loadedModules)
     {
+        SLANG_AST_BUILDER_RAII(translationUnit->compileRequest->getLinkage()->getASTBuilder());
+
         SharedSemanticsContext sharedSemanticsContext(
             translationUnit->compileRequest->getLinkage(),
             translationUnit->getModule(),

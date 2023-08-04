@@ -213,7 +213,7 @@ static bool isBoolType(Type* t)
     auto basicType = as<BasicExpressionType>(t);
     if (!basicType)
         return false;
-    return basicType->baseType == BaseType::Bool;
+    return basicType->getBaseType() == BaseType::Bool;
 }
 
 String getDeclKindString(DeclRef<Decl> declRef)
@@ -303,11 +303,11 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
                         sb << " = ";
                         if (isBoolType(varDecl->getType()))
                         {
-                            sb << (constantInt->value ? "true" : "false");
+                            sb << (constantInt->getValue() ? "true" : "false");
                         }
                         else
                         {
-                            sb << constantInt->value;
+                            sb << constantInt->getValue();
                         }
                     }
                     else
@@ -492,6 +492,8 @@ SlangResult LanguageServer::hover(
     doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
 
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
     {
@@ -741,6 +743,8 @@ SlangResult LanguageServer::gotoDefinition(
     doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
 
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
     {
@@ -1029,6 +1033,8 @@ SlangResult LanguageServer::semanticTokens(
     }
 
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
     {
@@ -1073,6 +1079,7 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
         return String();
 
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
 
     SignatureInformation sigInfo;
 
@@ -1096,7 +1103,7 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
     bool isFirst = true;
     printer.getStringBuilder() << "(";
     int paramIndex = 0;
-    for (auto param : funcType->paramTypes)
+    for (auto param : funcType->getParamTypes())
     {
         if (!isFirst)
             printer.getStringBuilder() << ", ";
@@ -1134,6 +1141,8 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
 String LanguageServer::getDeclRefSignature(DeclRef<Decl> declRef, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges)
 {
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     ASTPrinter printer(
         version->linkage->getASTBuilder(),
         ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
@@ -1169,6 +1178,8 @@ SlangResult LanguageServer::signatureHelp(
     doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
 
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
     {
@@ -1289,7 +1300,7 @@ SlangResult LanguageServer::signatureHelp(
 
         printer.getStringBuilder() << "func (";
         bool isFirst = true;
-        for (auto param : funcType->paramTypes)
+        for (auto param : funcType->getParamTypes())
         {
             if (!isFirst)
                 printer.getStringBuilder() << ", ";
@@ -1315,12 +1326,12 @@ SlangResult LanguageServer::signatureHelp(
 
     if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
     {
-        if (auto aggDecl = as<AggTypeDecl>(declRefExpr->declRef.getDecl()))
+        if (auto aggDeclRef = as<AggTypeDecl>(declRefExpr->declRef))
         {
             // Look for initializers
-            for (auto member : aggDecl->getMembersOfType<ConstructorDecl>())
+            for (auto member : getMembersOfType<ConstructorDecl>(version->linkage->getASTBuilder(), aggDeclRef))
             {
-                addDeclRef(version->linkage->getASTBuilder()->getSpecializedDeclRef<Decl>(member, declRefExpr->declRef.getSubst()));
+                addDeclRef(member);
             }
         }
         else
@@ -1379,6 +1390,8 @@ SlangResult LanguageServer::documentSymbol(
         return SLANG_OK;
     }
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
     {
@@ -1400,6 +1413,8 @@ SlangResult LanguageServer::inlayHint(const LanguageServerProtocol::InlayHintPar
         return SLANG_OK;
     }
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
     {
@@ -1518,6 +1533,8 @@ void LanguageServer::publishDiagnostics()
     m_lastDiagnosticUpdateTime = std::chrono::system_clock::now();
 
     auto version = m_workspace->getCurrentVersion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     // Send updates to clear diagnostics for files that no longer have any messages.
     List<String> filesToRemove;
     for (auto& file : m_lastPublishedDiagnostics)

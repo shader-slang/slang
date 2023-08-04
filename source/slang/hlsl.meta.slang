@@ -2,6 +2,10 @@
 
 typedef uint UINT;
 
+// Access float2/float3 as a float3
+[ForceInline] float3 __asFloat3(float2 v) { return float3(v, 0); }
+[ForceInline] float3 __asFloat3(float3 v) { return v; }
+
 __generic<T>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
@@ -5044,7 +5048,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     bool isReadOnly = (access == SLANG_RESOURCE_ACCESS_READ);
     auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, access).flavor;
     sb << "__generic<T>\n";
-    sb << "__magic_type(Texture," << int(flavor) << ")\n";
+    sb << "__magic_type(TextureType," << int(flavor) << ")\n";
     sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
     sb << "struct ";
     sb << kBaseBufferAccessLevels[aa].name;
@@ -5562,7 +5566,7 @@ static const int feedbackTexture2DFlavor = int(TextureFlavor::create(TextureFlav
 static const int feedbackTexture2DArrayFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG | SLANG_TEXTURE_ARRAY_FLAG).flavor);
 }}}}
 
-__magic_type(Texture, $(feedbackTexture2DFlavor))
+__magic_type(TextureType, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
@@ -5615,7 +5619,7 @@ struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 
 
 
-__magic_type(Texture, $(feedbackTexture2DArrayFlavor))
+__magic_type(TextureType, $(feedbackTexture2DArrayFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
@@ -7103,6 +7107,7 @@ func saturated_cooperation_using<A, B, C>(
     }
 }
 
+
 ${{{{
 //
 // Texture Footprint Queries
@@ -7299,7 +7304,7 @@ ${
             Coords          coords,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint);
+            out __FootprintData footprint);
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -7311,7 +7316,7 @@ ${
             Coords          coords,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint,
+            out __FootprintData footprint,
             float           bias);
 
     [__NoSideEffect]
@@ -7326,7 +7331,7 @@ ${
             float           lodClamp,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint);
+            out __FootprintData footprint);
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -7340,7 +7345,7 @@ ${
             float           lodClamp,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint,
+            out __FootprintData footprint,
             float           bias);
 
     [__NoSideEffect]
@@ -7355,7 +7360,7 @@ ${
             float                   lod,
             int                     granularity,
             bool                    useCoarseLevel,
-        out __FootprintData         footprint);
+            out __FootprintData         footprint);
 
 
 ${{{
@@ -7375,7 +7380,7 @@ ${{{
             Coords          dy,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint);
+            out __FootprintData footprint);
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -7391,7 +7396,7 @@ ${{{
             float           lodClamp,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint);
+            out __FootprintData footprint);
 ${{{
     }
 }}}
@@ -7440,8 +7445,9 @@ for(auto levelChoice : kLevelChoices)
         uint                    textureIndex,
         uint                    samplerSpace,
         uint                    samplerIndex,
-        Coords                  coords,
-        FootprintGranularity    granularity);
+        float3                  coords,
+        FootprintGranularity    granularity, 
+        out uint                isSingleLod);
 
     [__NoSideEffect]
     [__requiresNVAPI]
@@ -7452,9 +7458,10 @@ for(auto levelChoice : kLevelChoices)
         uint                    textureIndex,
         uint                    samplerSpace,
         uint                    samplerIndex,
-        Coords                  coords,
+        float3                  coords,
         FootprintGranularity    granularity,
-        float                   lodBias);
+        float                   lodBias, 
+        out uint                isSingleLod);
 
     [__NoSideEffect]
     [__requiresNVAPI]
@@ -7465,9 +7472,10 @@ for(auto levelChoice : kLevelChoices)
         uint                    textureIndex,
         uint                    samplerSpace,
         uint                    samplerIndex,
-        Coords                  coords,
+        float3                  coords,
         FootprintGranularity    granularity,
-        float                   lod);
+        float                   lod, 
+        out uint                isSingleLod);
 
 ${{{
     // Texture sampling with gradient is only available for 2D textures.
@@ -7482,10 +7490,11 @@ ${{{
         uint                    textureIndex,
         uint                    samplerSpace,
         uint                    samplerIndex,
-        Coords                  coords,
+        float3                  coords,
         FootprintGranularity    granularity,
-        Coords                  dx,
-        Coords                  dy);
+        float3                  dx,
+        float3                  dy, 
+        out uint                isSingleLod);
 ${{{
     }
 }}}
@@ -7534,10 +7543,13 @@ ${
             SamplerState            sampler,
             Coords                  coords)
     {
-        return { __queryFootprint$(CoarseOrFine)NVAPI(
+        uint isSingleLod = 0;
+        Footprint footprint =  {__queryFootprint$(CoarseOrFine)NVAPI(
             __getRegisterSpace(this), __getRegisterIndex(this),
             __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-            coords, granularity), false };
+            __asFloat3(coords), granularity, /* out */isSingleLod), false};
+        footprint._isSingleLevel = (isSingleLod != 0);
+        return footprint;
     }
 
     /// Query the footprint that would be accessed by a texture sampling operation.
@@ -7575,10 +7587,14 @@ ${
             Coords                  coords,
             float                   lodBias)
     {
-        return { __queryFootprint$(CoarseOrFine)BiasNVAPI(
+        uint isSingleLod = 0;
+        Footprint footprint = {__queryFootprint$(CoarseOrFine)BiasNVAPI(
             __getRegisterSpace(this), __getRegisterIndex(this),
             __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-            coords, granularity, lodBias), false };
+            __asFloat3(coords), granularity, lodBias, /* out */isSingleLod), false}; 
+            
+        footprint._isSingleLevel = (isSingleLod != 0);
+        return footprint;
     }
 
     /// Query the footprint that would be accessed by a texture sampling operation.
@@ -7657,10 +7673,14 @@ ${
             Coords                  coords,
             float                   lod)
     {
-        return { __queryFootprint$(CoarseOrFine)LevelNVAPI(
+        uint isSingleLod = 0;
+        Footprint footprint = {__queryFootprint$(CoarseOrFine)LevelNVAPI(
             __getRegisterSpace(this), __getRegisterIndex(this),
             __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-            coords, granularity, lod), false };
+            __asFloat3(coords), granularity, lod, /* out */isSingleLod), false};
+            
+        footprint._isSingleLevel = (isSingleLod != 0);
+        return footprint;
     }
 
 
@@ -7706,10 +7726,14 @@ ${{{
             Coords                  dx,
             Coords                  dy)
     {
-        return { __queryFootprint$(CoarseOrFine)GradNVAPI(
+        uint isSingleLod = 0;
+        Footprint footprint = {__queryFootprint$(CoarseOrFine)GradNVAPI(
             __getRegisterSpace(this), __getRegisterIndex(this),
             __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-            coords, granularity, dx, dy), false };
+            __asFloat3(coords), granularity, __asFloat3(dx), __asFloat3(dy), /* out */isSingleLod), false};
+
+        footprint._isSingleLevel = (isSingleLod != 0);
+        return footprint;
     }
 
     /// Query the footprint that would be accessed by a texture sampling operation.

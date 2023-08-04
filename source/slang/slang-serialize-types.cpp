@@ -48,7 +48,8 @@ struct ByteReader
         const int numPrefixBytes = encodeUnicodePointToUTF8(len, prefixBytes);
         const Index baseIndex = stringTable.getCount();
 
-        stringTable.setCount(baseIndex + numPrefixBytes + len);
+        auto newCount = baseIndex + numPrefixBytes + len;
+        stringTable.growToCount(newCount);
 
         char* dst = stringTable.begin() + baseIndex;
 

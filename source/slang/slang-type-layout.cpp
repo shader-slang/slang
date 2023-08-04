@@ -1571,9 +1571,9 @@ static LayoutSize GetElementCount(IntVal* val)
 
     if (auto constantVal = as<ConstantIntVal>(val))
     {
-        if (constantVal->value == kUnsizedArrayMagicLength)
+        if (constantVal->getValue() == kUnsizedArrayMagicLength)
             return LayoutSize::infinite();
-        return LayoutSize(LayoutSize::RawValue(constantVal->value));
+        return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
     }
     else if(const auto varRefVal = as<GenericParamIntVal>(val))
     {
@@ -2766,7 +2766,7 @@ RefPtr<TypeLayout> createParameterGroupTypeLayout(
         parameterGroupRules,
         context.targetReq);
 
-    auto elementType = parameterGroupType->elementType;
+    auto elementType = parameterGroupType->getElementType();
 
     return _createParameterGroupTypeLayout(
         context,
@@ -3642,24 +3642,6 @@ static void _addLayout(TypeLayoutContext const& context,
 
 static TypeLayoutResult _updateLayout(TypeLayoutContext const& context,
     Type* type,
-    TypeLayout* layout,
-    const SimpleLayoutInfo& info)
-{
-    auto layoutResultPtr = context.layoutMap.tryGetValue(type);
-    SLANG_ASSERT(layoutResultPtr);
-    if (layoutResultPtr)
-    {
-        // Check the layout is the same!
-        SLANG_ASSERT(layoutResultPtr->layout.get() == layout);
-        // Update the info
-        layoutResultPtr->info = info;
-    }
-
-    return TypeLayoutResult(layout, info);
-}
-
-static TypeLayoutResult _updateLayout(TypeLayoutContext const& context,
-    Type* type,
     const TypeLayoutResult& result)
 {
     auto layoutResultPtr = context.layoutMap.tryGetValue(type);
@@ -3791,7 +3773,7 @@ static TypeLayoutResult _createTypeLayout(
                 context,                                                \
                 ShaderParameterKind::KIND,                              \
                 type_##TYPE,                                            \
-                type_##TYPE->elementType);                        \
+                type_##TYPE->getElementType());                         \
         return TypeLayoutResult(typeLayout, info);                      \
     } while(0)
 
@@ -3826,14 +3808,14 @@ static TypeLayoutResult _createTypeLayout(
     else if(auto basicType = as<BasicExpressionType>(type))
     {
         return createSimpleTypeLayout(
-            rules->GetScalarLayout(basicType->baseType),
+            rules->GetScalarLayout(basicType->getBaseType()),
             type,
             rules);
     }
     else if(auto vecType = as<VectorExpressionType>(type))
     {
-        auto elementType = vecType->elementType;
-        size_t elementCount = (size_t) getIntVal(vecType->elementCount);
+        auto elementType = vecType->getElementType();
+        size_t elementCount = (size_t) getIntVal(vecType->getElementCount());
 
         auto element = _createTypeLayout(
             context,
@@ -3842,7 +3824,7 @@ static TypeLayoutResult _createTypeLayout(
         BaseType elementBaseType = BaseType::Void;
         if (auto elementBasicType = as<BasicExpressionType>(elementType))
         {
-            elementBaseType = elementBasicType->baseType;
+            elementBaseType = elementBasicType->getBaseType();
         }
 
         auto info = rules->GetVectorLayout(elementBaseType, element.info, elementCount);
@@ -3874,7 +3856,7 @@ static TypeLayoutResult _createTypeLayout(
         BaseType elementBaseType = BaseType::Void;
         if (auto elementBasicType = as<BasicExpressionType>(elementType))
         {
-            elementBaseType = elementBasicType->baseType;
+            elementBaseType = elementBasicType->getBaseType();
         }
 
         // The `GetMatrixLayout` implementation in the layout rules
@@ -3972,7 +3954,7 @@ static TypeLayoutResult _createTypeLayout(
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
-        auto declRef = declRefType->declRef;
+        auto declRef = declRefType->getDeclRef();
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
@@ -4346,99 +4328,20 @@ static TypeLayoutResult _createTypeLayout(
             errorType,
             rules);
     }
-    else if( auto taggedUnionType = as<TaggedUnionType>(type) )
-    {
-        // A tagged union type needs to be laid out as the maximum
-        // size of any constituent type.
-        //
-        // In practice, only a tagged union of uniform data will
-        // work, but for now we will compute the maximum usage
-        // for each resource kind for generality.
-        //
-        // For the uniform data we will start with a size
-        // of zero and an alignment of one for our base case
-        // (this is what a tagged union of no cases would consume).
-        //
-        UniformLayoutInfo info(0, 1);
-
-        RefPtr<TaggedUnionTypeLayout> taggedUnionLayout = new TaggedUnionTypeLayout();
-
-        _addLayout(context, type, taggedUnionLayout);
-
-        taggedUnionLayout->type = type;
-        taggedUnionLayout->rules = rules;
-
-        // Now we iterate over the case types and see if they
-        // change our computed maximum size/alignement.
-        //
-        for( auto caseType : taggedUnionType->caseTypes )
-        {
-            // Note: A tagged union type is not expected to have any existential/interface type
-            // slots; the case types that are provided must be fully specialized before the union is
-            // formed. Thus we don't need to mess around with existential type slots here the
-            // way we do for the `struct` case.
-
-            auto caseTypeResult = _createTypeLayout(context, caseType);
-            RefPtr<TypeLayout> caseTypeLayout = caseTypeResult.layout;
-            UniformLayoutInfo caseTypeInfo = caseTypeResult.info.getUniformLayout();
-
-            info.size      = maximum(info.size, caseTypeInfo.size);
-            info.alignment = std::max(info.alignment, caseTypeInfo.alignment);
-
-            // We need to remember the layout of the case type
-            // on the final `TaggedUnionTypeLayout`.
-            //
-            taggedUnionLayout->caseTypeLayouts.add(caseTypeLayout);
-
-            // We also need to consider contributions for other
-            // resource kinds beyond uniform data.
-            //
-            for( auto caseResInfo : caseTypeLayout->resourceInfos )
-            {
-                auto unionResInfo = taggedUnionLayout->findOrAddResourceInfo(caseResInfo.kind);
-                unionResInfo->count = maximum(unionResInfo->count, caseResInfo.count);
-            }
-        }
-
-        // After we've computed the size required to hold all the
-        // case types, we will allocate space for the tag field.
-        //
-        // TODO: This assumes the tag will always be allocated out
-        // of uniform storage, which means we can't support a tagged
-        // union as part of a varying input/output signature. That is
-        // probably a valid limitation, but it should get enforced
-        // somewhere along the way.
-        //
-        {
-            // The tag is always a `uint` for now.
-            //
-            auto tagInfo = context.rules->GetScalarLayout(BaseType::UInt);
-            info.size = _roundToAlignment(info.size, tagInfo.alignment);
-
-            taggedUnionLayout->tagOffset = info.size;
-
-            info.size += tagInfo.size;
-            info.alignment = std::max(info.alignment, tagInfo.alignment);
-        }
-
-        // As a final step, if we are computing a full `TypeLayout`
-        // we will make sure that its information on uniform layout
-        // matches what we've computed in the `UniformLayoutInfo` we return.
-        //
-        taggedUnionLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->count = info.size;
-        taggedUnionLayout->uniformAlignment = info.alignment;
-
-        return _updateLayout(context, type, taggedUnionLayout, info);
-    }
     else if( auto existentialSpecializedType = as<ExistentialSpecializedType>(type) )
     {
+        ExpandedSpecializationArgs args;
+        for (Index i = 0; i < existentialSpecializedType->getArgCount(); ++i)
+        {
+            args.add(existentialSpecializedType->getArg(i));
+        }
         TypeLayoutContext subContext = context.withSpecializationArgs(
-            existentialSpecializedType->args.getBuffer(),
-            existentialSpecializedType->args.getCount());
+            args.getBuffer(),
+            args.getCount());
 
         auto baseTypeLayoutResult = _createTypeLayout(
             subContext,
-            existentialSpecializedType->baseType);
+            existentialSpecializedType->getBaseType());
 
         UniformLayoutInfo info = rules->BeginStructLayout();
         rules->AddStructField(&info, baseTypeLayoutResult.info.getUniformLayout());
@@ -4534,7 +4437,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
     if(auto basicType = as<BasicExpressionType>(type))
     {
-        auto baseType = basicType->baseType;
+        auto baseType = basicType->getBaseType();
 
         RefPtr<TypeLayout> typeLayout = new TypeLayout();
         typeLayout->type = type;
@@ -4550,13 +4453,13 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if(auto vecType = as<VectorExpressionType>(type))
     {
-        auto elementType = vecType->elementType;
-        size_t elementCount = (size_t) getIntVal(vecType->elementCount);
+        auto elementType = vecType->getElementType();
+        size_t elementCount = (size_t) getIntVal(vecType->getElementCount());
 
         BaseType elementBaseType = BaseType::Void;
         if( auto elementBasicType = as<BasicExpressionType>(elementType) )
         {
-            elementBaseType = elementBasicType->baseType;
+            elementBaseType = elementBasicType->getBaseType();
         }
 
         // Note that we do *not* add any resource usage to the type
@@ -4592,7 +4495,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         BaseType elementBaseType = BaseType::Void;
         if( auto elementBasicType = as<BasicExpressionType>(elementType) )
         {
-            elementBaseType = elementBasicType->baseType;
+            elementBaseType = elementBasicType->getBaseType();
         }
 
         // Just as for `_createTypeLayout`, we need to handle row- and
@@ -4711,7 +4614,7 @@ GlobalGenericParamDecl* GenericParamTypeLayout::getGlobalGenericParamDecl()
 {
     auto declRefType = as<DeclRefType>(type);
     SLANG_ASSERT(declRefType);
-    auto rsDeclRef = declRefType->declRef.as<GlobalGenericParamDecl>();
+    auto rsDeclRef = declRefType->getDeclRef().as<GlobalGenericParamDecl>();
     return rsDeclRef.getDecl();
 }
 

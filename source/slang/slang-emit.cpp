@@ -54,7 +54,6 @@
 #include "slang-ir-strip-cached-dict.h"
 #include "slang-ir-strip-witness-tables.h"
 #include "slang-ir-synthesize-active-mask.h"
-#include "slang-ir-union.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
@@ -347,10 +346,6 @@ Result linkAndOptimizeIR(
     // Lower `Result<T,E>` types into ordinary struct types.
     lowerResultType(irModule, sink);
 
-    // Desguar any union types, since these will be illegal on
-    // various targets.
-    //
-    desugarUnionTypes(irModule);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "UNIONS DESUGARED");
 #endif

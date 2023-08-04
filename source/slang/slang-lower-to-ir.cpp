@@ -804,7 +804,7 @@ LoweredValInfo emitCallToDeclRef(
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {
-        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.getDecl()) && !as<InterfaceDecl>(ctorDeclRef.getParent(context->astBuilder).getDecl()))
+        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.getDecl()) && !as<InterfaceDecl>(ctorDeclRef.getParent().getDecl()))
         {
             SLANG_UNREACHABLE("stdlib error: __init() has no definition.");
         }
@@ -1399,7 +1399,7 @@ void getGenericTypeConformances(IRGenContext* context, ShortList<IRType*>& supTy
         {
             if (auto declRefType = as<DeclRefType>(typeConstraint->sub.type))
             {
-                if (declRefType->declRef.getDecl() == genericParamDecl)
+                if (declRefType->getDeclRef().getDecl() == genericParamDecl)
                 {
                     supTypes.add(lowerType(context, typeConstraint->getSup().type));
                 }
@@ -1407,6 +1407,36 @@ void getGenericTypeConformances(IRGenContext* context, ShortList<IRType*>& supTy
         }
     }
 }
+
+
+// Check if declRef represents a witness that `ISomeInterface.This : ISomeInterface`.
+static bool _isThisTypeSubtypeWitness(DeclRefBase* declRef)
+{
+    auto lookupDeclRef = as<LookupDeclRef>(declRef);
+    if (!lookupDeclRef)
+        return false;
+    if (!as<ThisType>(lookupDeclRef->getLookupSource()))
+        return false;
+    auto declaredWitness = as<DeclaredSubtypeWitness>(lookupDeclRef->getWitness());
+    if (!declaredWitness)
+        return false;
+    if (!as<ThisTypeConstraintDecl>(declaredWitness->getDeclRef()))
+        return false;
+    return true;
+}
+
+// Returns whether `declRef` represents a trivial lookup of an interface requirement
+// through `ThisTypeDecl` made from within the same interface Decl.
+static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase* declRef)
+{
+    if (!_isThisTypeSubtypeWitness(declRef))
+        return false;
+    // This is a lookup from an interface's This type.
+    // If the lookup is made from an interface type itself rather than an extension of it,
+    // then it is a trivial lookup and we should lower it as a struct key.
+    return context->thisTypeWitness == nullptr;
+}
+
 
 //
 
@@ -1424,24 +1454,24 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
     {
-        return emitDeclRef(context, val->declRef,
-            lowerType(context, getType(context->astBuilder, val->declRef)));
+        return emitDeclRef(context, val->getDeclRef(),
+            lowerType(context, getType(context->astBuilder, val->getDeclRef())));
     }
 
     LoweredValInfo visitFuncCallIntVal(FuncCallIntVal* val)
     {
         TryClauseEnvironment tryEnv;
         List<IRInst*> args;
-        for (auto arg : val->args)
+        for (auto arg : val->getArgs())
         {
             auto loweredArg = lowerVal(context, arg);
             args.add(loweredArg.val);
         }
-        auto funcType = lowerType(context, val->funcType);
+        auto funcType = lowerType(context, val->getFuncType());
         return emitCallToDeclRef(
             context,
             as<IRFuncType>(funcType)->getResultType(),
-            val->funcDeclRef,
+            val->getFuncDeclRef(),
             funcType,
             args,
             tryEnv);
@@ -1449,17 +1479,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
-        auto baseVal = lowerVal(context, val->base);
+        auto baseVal = lowerVal(context, val->getBase());
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-        auto type = lowerType(context, val->type);
+        auto type = lowerType(context, val->getType());
         return LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
     }
 
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
     {
-        auto witnessVal = lowerVal(context, val->witness);
-        auto key = getInterfaceRequirementKey(context, val->key);
-        auto type = lowerType(context, val->type);
+        auto witnessVal = lowerVal(context, val->getWitness());
+        auto key = getInterfaceRequirementKey(context, val->getKey());
+        auto type = lowerType(context, val->getType());
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
             type, witnessVal.val, key));
     }
@@ -1467,16 +1497,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
     {
         auto irBuilder = getBuilder();
-        auto type = lowerType(context, val->type);
-        auto constTerm = irBuilder->getIntValue(type, val->constantTerm);
+        auto type = lowerType(context, val->getType());
+        auto constTerm = irBuilder->getIntValue(type, val->getConstantTerm());
         auto resultVal = constTerm;
-        for (auto term : val->terms)
+        for (auto term : val->getTerms())
         {
-            auto termVal = irBuilder->getIntValue(type, term->constFactor);
-            for (auto factor : term->paramFactors)
+            auto termVal = irBuilder->getIntValue(type, term->getConstFactor());
+            for (auto factor : term->getParamFactors())
             {
-                auto factorVal = lowerVal(context, factor->param).val;
-                for (IntegerLiteralValue i = 0; i < factor->power; i++)
+                auto factorVal = lowerVal(context, factor->getParam()).val;
+                for (IntegerLiteralValue i = 0; i < factor->getPower(); i++)
                 {
                     termVal = irBuilder->emitMul(factorVal->getDataType(), termVal, factorVal);
                 }
@@ -1488,9 +1518,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
-        return emitDeclRef(context, val->declRef,
+        if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
+            return LoweredValInfo::simple(context->thisTypeWitness);
+
+        return emitDeclRef(context, val->getDeclRef(),
             context->irBuilder->getWitnessTableType(
-                lowerType(context, val->sup)));
+                lowerType(context, val->getSup())));
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(
@@ -1498,7 +1531,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         // The base (subToMid) will turn into a value with
         // witness-table type.
-        IRInst* baseWitnessTable = lowerSimpleVal(context, val->subToMid);
+        IRInst* baseWitnessTable = lowerSimpleVal(context, val->getSubToMid());
         IRInst* midToSup = nullptr;
 
         // The next step should map to an interface requirement
@@ -1530,17 +1563,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             return LoweredValInfo::simple(midToSup);
         }
 
-        if (auto declaredMidToSup = as<DeclaredSubtypeWitness>(val->midToSup))
+        if (auto declaredMidToSup = as<DeclaredSubtypeWitness>(val->getMidToSup()))
         {
-            midToSup = getInterfaceRequirementKey(context, declaredMidToSup->declRef.getDecl());
+            midToSup = getInterfaceRequirementKey(context, declaredMidToSup->getDeclRef().getDecl());
         }
         else
         {
-            midToSup = lowerSimpleVal(context, val->midToSup);
+            midToSup = lowerSimpleVal(context, val->getMidToSup());
         }
 
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
-            getBuilder()->getWitnessTableType(lowerType(context, val->sup)),
+            getBuilder()->getWitnessTableType(lowerType(context, val->getSup())),
             baseWitnessTable,
             midToSup));
     }
@@ -1550,7 +1583,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // TODO: properly fill in type info here.
         // We should consider fold all cases of witness table entries to `Val`, and make the `DeclRef` case a `DeclRefVal`.
         // So that we can hold the type in `DeclRefVal`.
-        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
         auto diff = getBuilder()->emitForwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
@@ -1559,7 +1592,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitBackwardDifferentiateVal(BackwardDifferentiateVal* val)
     {
-        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
         auto diff = getBuilder()->emitBackwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
@@ -1568,7 +1601,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitBackwardDifferentiatePropagateVal(BackwardDifferentiatePropagateVal* val)
     {
-        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
         auto diff = getBuilder()->emitBackwardDifferentiatePropagateInst(getBuilder()->getTypeKind(), funcVal.val);
@@ -1577,7 +1610,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitBackwardDifferentiatePrimalVal(BackwardDifferentiatePrimalVal* val)
     {
-        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
         auto diff = getBuilder()->emitBackwardDifferentiatePrimalInst(getBuilder()->getTypeKind(), funcVal.val);
@@ -1586,278 +1619,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitBackwardDifferentiateIntermediateTypeVal(BackwardDifferentiateIntermediateTypeVal* val)
     {
-        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
         auto diff = getBuilder()->getBackwardDiffIntermediateContextType(funcVal.val);
         return LoweredValInfo::simple(diff);
     }
 
-    LoweredValInfo visitTaggedUnionSubtypeWitness(
-        TaggedUnionSubtypeWitness* val)
-    {
-        // The sub-type in this case is a tagged union `A | B | ...`,
-        // and the witness holds an array of witnesses showing that each
-        // "case" (`A`, `B`, etc.) is a subtype of the super-type.
-
-        // We will start by getting the IR-level representation of the
-        // sub type (the tagged union type).
-        //
-        auto irTaggedUnionType = lowerType(context, val->sub);
-
-        // We can turn each of those per-case witnesses into a witness
-        // table value:
-        //
-        auto caseCount = val->caseWitnesses.getCount();
-        List<IRInst*> caseWitnessTables;
-        for( auto caseWitness : val->caseWitnesses )
-        {
-            auto caseWitnessTable = lowerSimpleVal(context, caseWitness);
-            caseWitnessTables.add(caseWitnessTable);
-        }
-
-        // Now we need to synthesize a witness table for the tagged union
-        // value, showing how it can implement all of the requirements
-        // of the super type by delegating to the appropriate implementation
-        // on a per-case basis.
-        //
-        // We will assume here that the super-type is an interface, and it
-        // will be left to the front-end to ensure this property.
-        //
-        auto supDeclRefType = as<DeclRefType>(val->sup);
-        if(!supDeclRefType)
-        {
-            SLANG_UNEXPECTED("super-type not a decl-ref type when generating tagged union witness table");
-            UNREACHABLE_RETURN(LoweredValInfo());
-        }
-        auto supInterfaceDeclRef = supDeclRefType->declRef.as<InterfaceDecl>();
-        if( !supInterfaceDeclRef )
-        {
-            SLANG_UNEXPECTED("super-type not an interface type when generating tagged union witness table");
-            UNREACHABLE_RETURN(LoweredValInfo());
-        }
-
-        auto subType = lowerType(context, val->sub);
-        auto irWitnessTableBaseType = lowerType(context, supDeclRefType);
-        auto irWitnessTable = getBuilder()->createWitnessTable(irWitnessTableBaseType, subType);
-
-        // Now we will iterate over the requirements (members) of the
-        // interface and try to synthesize an appropriate value for each.
-        //
-        for( auto reqDeclRef : getMembers(context->astBuilder, supInterfaceDeclRef) )
-        {
-            // TODO: if there are any members we shouldn't process as a requirement,
-            // then we should detect and skip them here.
-            //
-
-            // Every interface requirement will have a unique key that is used
-            // when looking up the requirement in a concrete witness table.
-            //
-            auto irReqKey = getInterfaceRequirementKey(context, reqDeclRef.getDecl());
-
-            if (!irReqKey)
-                continue;
-
-            // We expect that each of the witness tables in `caseWitnessTables`
-            // will have an entry to match these keys. However, we may not
-            // have a concrete `IRWitnessTable` for each of the case types, either
-            // because they are a specialization of a generic (so that the witness
-            // table reference is a `specialize` instruction at this point), or
-            // they are a type external to this module (so that we have a declaration
-            // rather than a definition of the witness table).
-
-            // Our task is to create an IR value that can satisfy the interface
-            // requirement for the tagged union type, by appropriately delegating
-            // to the implementations of the same requirement in the case types.
-            //
-            IRInst* irSatisfyingVal = nullptr;
-
-
-
-            if(auto callableDeclRef = reqDeclRef.as<CallableDecl>())
-            {
-                // We have something callable, so we need to synthesize
-                // a function to satisfy it.
-                //
-                auto irFunc = getBuilder()->createFunc();
-                irSatisfyingVal = irFunc;
-
-                IRBuilder subBuilderStorage = *getBuilder();
-                auto subBuilder = &subBuilderStorage;
-                subBuilder->setInsertInto(irFunc);
-
-                // We will start by setting up the function parameters,
-                // which live in the entry block of the IR function.
-                //
-                auto entryBlock = subBuilder->emitBlock();
-                subBuilder->setInsertInto(entryBlock);
-
-                // Create a `this` parameter of the tagged-union type.
-                //
-                // TODO: need to handle the `[mutating]` case here...
-                //
-                auto irThisType = irTaggedUnionType;
-                auto irThisParam = subBuilder->emitParam(irThisType);
-
-                List<IRType*> irParamTypes;
-                irParamTypes.add(irThisType);
-
-                // Create the remaining parameters of the callable,
-                // using a decl-ref specialized to the tagged union
-                // type (so that things like associated types are
-                // mapped to the correct witness value).
-                //
-                List<IRParam*> irParams;
-                for( auto paramDeclRef : getMembersOfType<ParamDecl>(context->astBuilder, callableDeclRef) )
-                {
-                    // TODO: need to handle `out` and `in out` here. Over all
-                    // there is a lot of duplication here with the existing logic
-                    // for emitting the signature of a `CallableDecl`, and we should
-                    // try to re-use that if at all possible.
-                    //
-                    auto irParamType = lowerType(context, getType(context->astBuilder, paramDeclRef));
-                    auto irParam = subBuilder->emitParam(irParamType);
-
-                    irParams.add(irParam);
-                    irParamTypes.add(irParamType);
-                }
-
-                auto irResultType = lowerType(context, getResultType(context->astBuilder, callableDeclRef));
-
-                auto irFuncType = subBuilder->getFuncType(
-                    irParamTypes,
-                    irResultType);
-                irFunc->setFullType(irFuncType);
-
-                // The first thing our function needs to do is extract the tag
-                // from the incoming `this` parameter.
-                //
-                auto irTagVal = subBuilder->emitExtractTaggedUnionTag(irThisParam);
-
-                // Next we want to emit a `switch` on the tag value, but before we
-                // do that we need to generate the code for each of the cases so that
-                // our `switch` has somewhere to branch to.
-                //
-                List<IRInst*> switchCaseOperands;
-
-                IRBlock* defaultLabel = nullptr;
-
-                for( Index ii = 0; ii < caseCount; ++ii )
-                {
-                    auto caseTag = subBuilder->getIntValue(irTagVal->getDataType(), ii);
-
-                    subBuilder->setInsertInto(irFunc);
-                    auto caseLabel = subBuilder->emitBlock();
-
-                    if(!defaultLabel)
-                        defaultLabel = caseLabel;
-
-                    switchCaseOperands.add(caseTag);
-                    switchCaseOperands.add(caseLabel);
-
-                    subBuilder->setInsertInto(caseLabel);
-
-                    // We need to look up the satisfying value for this interface
-                    // requirement on the witness table of the particular case value.
-                    //
-                    // We already have the witness table, and the requirement key is
-                    // just `irReqKey`.
-                    //
-                    auto caseWitnessTable = caseWitnessTables[ii];
-
-                    // The subtle bit here is determining the type we expect the
-                    // satisfying value to have, since that depends on the actual
-                    // type that is satisfying the requirement.
-                    //
-                    IRType* caseResultType = irResultType;
-                    IRType* caseFuncType = nullptr;
-                    auto caseFunc = subBuilder->emitLookupInterfaceMethodInst(
-                        caseFuncType,
-                        caseWitnessTable,
-                        irReqKey);
-
-                    // We are going to emit a `call` to the satisfying value
-                    // for the case type, so we will collect the arguments for that call.
-                    //
-                    List<IRInst*> caseArgs;
-
-                    // The `this` argument to the call will need to represent the
-                    // appropriate field of our tagged union.
-                    //
-                    IRType* caseThisType = (IRType*) irTaggedUnionType->getOperand(ii);
-                    auto caseThisArg = subBuilder->emitExtractTaggedUnionPayload(
-                        caseThisType,
-                        irThisParam, caseTag);
-                    caseArgs.add(caseThisArg);
-
-                    // The remaining arguments to the call will just be forwarded from
-                    // the parameters of the wrapper function.
-                    //
-                    // TODO: This would need to change if/when we started allowing `This` type
-                    // or associated-type parameters to be used at call sites where a tagged
-                    // union is used.
-                    //
-                    for( auto param : irParams )
-                    {
-                        caseArgs.add(param);
-                    }
-
-                    auto caseCall = subBuilder->emitCallInst(caseResultType, caseFunc, caseArgs);
-
-                    if( as<IRVoidType>(irResultType->getDataType()) )
-                    {
-                        subBuilder->emitReturn();
-                    }
-                    else
-                    {
-                        subBuilder->emitReturn(caseCall);
-                    }
-                }
-
-                // We will create a block to represent the supposedly-unreachable
-                // code that will run if no `case` matches.
-                //
-                subBuilder->setInsertInto(irFunc);
-                auto invalidLabel = subBuilder->emitBlock();
-                subBuilder->setInsertInto(invalidLabel);
-                subBuilder->emitUnreachable();
-
-                if(!defaultLabel) defaultLabel = invalidLabel;
-
-                // Now we have enough information to go back and emit the `switch` instruction
-                // into the entry block.
-                subBuilder->setInsertInto(entryBlock);
-                subBuilder->emitSwitch(
-                    irTagVal,       // value to `switch` on
-                    invalidLabel,   // `break` label (block after the `switch` statement ends)
-                    defaultLabel,   // `default` label (where to go if no `case` matches)
-                    switchCaseOperands.getCount(),
-                    switchCaseOperands.getBuffer());
-            }
-            else
-            {
-                // TODO: We need to handle other cases of interface requirements.
-                SLANG_UNEXPECTED("unexpceted interface requirement when generating tagged union witness table");
-                UNREACHABLE_RETURN(LoweredValInfo());
-            }
-
-            // Once we've generating a value to satisfying the requirement, we install
-            // it into the witness table for our tagged-union type.
-            //
-            getBuilder()->createWitnessTableEntry(irWitnessTable, irReqKey, irSatisfyingVal);
-        }
-        return LoweredValInfo::simple(irWitnessTable);
-    }
-
     LoweredValInfo visitDynamicSubtypeWitness(DynamicSubtypeWitness * /*val*/)
     {
         return LoweredValInfo::simple(nullptr);
-    }
-
-    LoweredValInfo visitThisTypeSubtypeWitness(ThisTypeSubtypeWitness* val)
-    {
-        SLANG_UNUSED(val);
-        return LoweredValInfo::simple(context->thisTypeWitness);
     }
 
     LoweredValInfo visitConjunctionSubtypeWitness(ConjunctionSubtypeWitness* val)
@@ -1892,14 +1663,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // witness that `T : L & R`, so lower that first and expect it to be
         // a value of tuple type.
         //
-        auto conjunctionWitness = lowerSimpleVal(context, val->conjunctionWitness);
+        auto conjunctionWitness = lowerSimpleVal(context, val->getConjunctionWitness());
         auto conjunctionTupleType = as<IRTupleType>(conjunctionWitness->getDataType());
         SLANG_ASSERT(conjunctionTupleType);
 
         // The `ExtractFromConjunctionSubtypeWitness` also stores the index of
         // the witness/supertype we want in the conjunction `L & R`.
         //
-        auto indexInConjunction = val->indexInConjunction;
+        auto indexInConjunction = val->getIndexInConjunction();
 
         // We want to extract the appropriate element from the tuple based on
         // the index, but to know the type of the result we need to look up
@@ -1923,8 +1694,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
-        auto type = lowerType(context, val->type);
-        return LoweredValInfo::simple(getBuilder()->getIntValue(type, val->value));
+        auto type = lowerType(context, val->getType());
+        return LoweredValInfo::simple(getBuilder()->getIntValue(type, val->getValue()));
     }
 
     IRFuncType* visitFuncType(FuncType* type)
@@ -1964,7 +1735,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitDeclRefType(DeclRefType* type)
     {
-        auto declRef = type->declRef;
+        auto declRef = type->getDeclRef();
         auto decl = declRef.getDecl();
 
         // Check for types with teh `__intrinsic_type` modifier.
@@ -1988,13 +1759,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitBasicExpressionType(BasicExpressionType* type)
     {
         return getBuilder()->getBasicType(
-            type->baseType);
+            type->getBaseType());
     }
 
     IRType* visitVectorExpressionType(VectorExpressionType* type)
     {
-        auto elementType = lowerType(context, type->elementType);
-        auto elementCount = lowerSimpleVal(context, type->elementCount);
+        auto elementType = lowerType(context, type->getElementType());
+        auto elementCount = lowerSimpleVal(context, type->getElementCount());
 
         return getBuilder()->getVectorType(
             elementType,
@@ -2030,19 +1801,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
-    // Lower substitution args and collect them into a list of IR operands.
-    void _collectSubstitutionArgs(List<IRInst*>& operands, Substitutions* subst)
-    {
-        if (!subst) return;
-        _collectSubstitutionArgs(operands, subst->getOuter());
-        if (auto genSubst = as<GenericSubstitution>(subst))
-        {
-            for (auto arg : genSubst->getArgs())
-            {
-                operands.add(lowerVal(context, arg).val);
-            }
-        }
-    }
     // Lower a type where the type declaration being referenced is assumed
     // to be an intrinsic type, which can thus be lowered to a simple IR
     // type with the appropriate opcode.
@@ -2050,13 +1808,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         SLANG_ASSERT(getBuilder()->getInsertLoc().getMode() != IRInsertLoc::Mode::None);
 
-        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
+        auto intrinsicTypeModifier = type->getDeclRef().getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         List<IRInst*> operands;
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
-        _collectSubstitutionArgs(operands, type->declRef.getSubst());
+        SubstitutionSet(type->getDeclRef()).forEachSubstitutionArg([&](Val* arg)
+            {
+                operands.add(lowerVal(context, arg).val);
+            });
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),
@@ -2095,7 +1856,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
-        auto declRef = type->declRef;
+        auto declRef = type->getDeclRef();
         auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return getBuilder()->emitExtractExistentialType(existentialVal);
@@ -2103,50 +1864,20 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitExtractExistentialSubtypeWitness(ExtractExistentialSubtypeWitness* witness)
     {
-        auto declRef = witness->declRef;
+        auto declRef = witness->getDeclRef();
         auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
     }
 
-    LoweredValInfo visitTaggedUnionType(TaggedUnionType* type)
-    {
-        // A tagged union type will lower into an IR `union` over the cases,
-        // along with an IR `struct` with a field for the union and a tag.
-        // (Note: we are placing the tag after the payload to avoid padding
-        // in the case where the payload is more aligned than the tag)
-        //
-        // TODO: should we be lowering directly like this, or have
-        // an IR-level representation of tagged unions?
-        //
-
-        List<IRType*> irCaseTypes;
-        for(auto caseType : type->caseTypes)
-        {
-            auto irCaseType = lowerType(context, caseType);
-            irCaseTypes.add(irCaseType);
-        }
-
-        auto irType = getBuilder()->getTaggedUnionType(irCaseTypes);
-        if(!irType->findDecoration<IRLinkageDecoration>())
-        {
-            // We need a way for later passes to attach layout information
-            // to this type, so we will give it a mangled name here.
-            //
-            getBuilder()->addExportDecoration(
-                irType,
-                getMangledTypeName(context->astBuilder, type).getUnownedSlice());
-        }
-        return LoweredValInfo::simple(irType);
-    }
-
     LoweredValInfo visitExistentialSpecializedType(ExistentialSpecializedType* type)
     {
-        auto irBaseType = lowerType(context, type->baseType);
+        auto irBaseType = lowerType(context, type->getBaseType());
 
         List<IRInst*> slotArgs;
-        for(auto arg : type->args)
+        for (Index i = 0; i < type->getArgCount(); i++)
         {
+            auto arg = type->getArg(i);
             auto irArgVal = lowerSimpleVal(context, arg.val);
             slotArgs.add(irArgVal);
 
@@ -2173,13 +1904,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         //
         if (context->thisType != nullptr)
             return LoweredValInfo::simple(context->thisType);
-        return emitDeclRef(context, type->interfaceDeclRef, getBuilder()->getTypeKind());
+        return emitDeclRef(context, makeDeclRef(type->getInterfaceDecl()), getBuilder()->getTypeKind());
     }
 
     LoweredValInfo visitAndType(AndType* type)
     {
-        auto left = lowerType(context, type->left);
-        auto right = lowerType(context, type->right);
+        auto left = lowerType(context, type->getLeft());
+        auto right = lowerType(context, type->getRight());
 
         auto irType = getBuilder()->getConjunctionType(left, right);
         return LoweredValInfo::simple(irType);
@@ -2187,11 +1918,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitModifiedType(ModifiedType* astType)
     {
-        IRType* irBase = lowerType(context, astType->base);
+        IRType* irBase = lowerType(context, astType->getBase());
 
         List<IRAttr*> irAttrs;
-        for(auto astModifier : astType->modifiers)
+        for(Index i = 0; i < astType->getModifierCount(); i++)
         {
+            auto astModifier = astType->getModifier(i);
             IRAttr* irAttr = (IRAttr*) lowerSimpleVal(context, astModifier);
             if(irAttr)
                 irAttrs.add(irAttr);
@@ -2237,7 +1969,8 @@ LoweredValInfo lowerVal(
 {
     ValLoweringVisitor visitor;
     visitor.context = context;
-    return visitor.dispatch(val);
+    auto resolvedVal = val->resolve();
+    return visitor.dispatch(resolvedVal);
 }
 
 IRType* lowerType(
@@ -2786,8 +2519,8 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, SemanticsVisitor* semantics, Decl* decl)
 {
-    DeclRef<Decl> declRef = context->astBuilder->getSpecializedDeclRef(
-        decl, createDefaultSubstitutions(context->astBuilder, semantics, decl));
+    DeclRef<Decl> declRef = createDefaultSubstitutionsIfNeeded(context->astBuilder, semantics,
+        makeDeclRef(decl));
     return declRef;
 }
 //
@@ -2808,7 +2541,7 @@ static Type* _findReplacementThisParamType(
         auto targetType = getTargetType(context->astBuilder, extensionDeclRef);
         if(auto targetDeclRefType = as<DeclRefType>(targetType))
         {
-            if(auto replacementType = _findReplacementThisParamType(context, targetDeclRefType->declRef))
+            if(auto replacementType = _findReplacementThisParamType(context, targetDeclRefType->getDeclRef()))
                 return replacementType;
         }
         return targetType;
@@ -2816,8 +2549,7 @@ static Type* _findReplacementThisParamType(
 
     if (auto interfaceDeclRef = parentDeclRef.as<InterfaceDecl>())
     {
-        auto thisType = context->astBuilder->create<ThisType>();
-        thisType->interfaceDeclRef = interfaceDeclRef;
+        auto thisType = DeclRefType::create(context->astBuilder, interfaceDeclRef.getDecl()->getThisTypeDecl());
         return thisType;
     }
 
@@ -2853,13 +2585,13 @@ Type* getThisParamTypeForCallable(
     IRGenContext*   context,
     DeclRef<Decl>   callableDeclRef)
 {
-    auto parentDeclRef = callableDeclRef.getParent(context->astBuilder);
+    auto parentDeclRef = callableDeclRef.getParent();
 
     if(auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
-        parentDeclRef = subscriptDeclRef.getParent(context->astBuilder);
+        parentDeclRef = subscriptDeclRef.getParent();
 
     if(auto genericDeclRef = parentDeclRef.as<GenericDecl>())
-        parentDeclRef = genericDeclRef.getParent(context->astBuilder);
+        parentDeclRef = genericDeclRef.getParent();
 
     return getThisParamTypeForContainer(context, parentDeclRef);
 }
@@ -2997,7 +2729,7 @@ void collectParameterLists(
     // The parameters introduced by any "parent" declarations
     // will need to come first, so we'll deal with that
     // logic here.
-    if( auto parentDeclRef = declRef.getParent(context->astBuilder) )
+    if( auto parentDeclRef = declRef.getParent() )
     {
         // Compute the mode to use when collecting parameters from
         // the outer declaration. The most important question here
@@ -3592,7 +3324,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         auto innerType = type;
         while (auto modifiedType = as<ModifiedType>(innerType))
-            innerType = modifiedType->base;
+            innerType = modifiedType->getBase();
         return innerType;
     }
 
@@ -3607,9 +3339,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt) getIntVal(vectorType->elementCount);
+            UInt elementCount = (UInt) getIntVal(vectorType->getElementCount());
 
-            auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->elementType));
+            auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->getElementType()));
 
             List<IRInst*> args;
             for(UInt ee = 0; ee < elementCount; ++ee)
@@ -3644,7 +3376,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
-            DeclRef<Decl> declRef = declRefType->declRef;
+            DeclRef<Decl> declRef = declRefType->getDeclRef();
             if (auto enumType = declRef.as<EnumDecl>())
             {
                 return LoweredValInfo::simple(getBuilder()->getIntValue(irType, 0));
@@ -3735,7 +3467,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt) getIntVal(vectorType->elementCount);
+            UInt elementCount = (UInt) getIntVal(vectorType->getElementCount());
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -3745,7 +3477,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
             if(elementCount > argCount)
             {
-                auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->elementType));
+                auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->getElementType()));
                 for(UInt ee = argCount; ee < elementCount; ++ee)
                 {
                     args.add(irDefaultValue);
@@ -3781,7 +3513,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
-            DeclRef<Decl> declRef = declRefType->declRef;
+            DeclRef<Decl> declRef = declRefType->getDeclRef();
             if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 UInt argCounter = 0;
@@ -3896,19 +3628,19 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    void _lowerSubstitutionArg(IRGenContext* subContext, GenericSubstitution* subst, Decl* paramDecl, Index argIndex)
+    void _lowerSubstitutionArg(IRGenContext* subContext, GenericAppDeclRef* subst, Decl* paramDecl, Index argIndex)
     {
         SLANG_ASSERT(argIndex < subst->getArgs().getCount());
         auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
         subContext->setValue(paramDecl, argVal);
     }
 
-    void _lowerSubstitutionEnv(IRGenContext* subContext, Substitutions* subst)
+    void _lowerSubstitutionEnv(IRGenContext* subContext, DeclRefBase* subst)
     {
         if(!subst) return;
-        _lowerSubstitutionEnv(subContext, subst->getOuter());
+        _lowerSubstitutionEnv(subContext, subst->getBase());
 
-        if (auto genSubst = as<GenericSubstitution>(subst))
+        if (auto genSubst = as<GenericAppDeclRef>(subst))
         {
             auto genDecl = genSubst->getGenericDecl();
 
@@ -3985,7 +3717,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             IRGenContext* subContext = &subContextStorage;
             subContext->env = subEnv;
 
-            _lowerSubstitutionEnv(subContext, argExpr.getSubsts());
+            _lowerSubstitutionEnv(subContext, argExpr.getSubsts() ? argExpr.getSubsts().declRef : nullptr);
 
             addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
 
@@ -4148,7 +3880,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         {
             if(auto declRefType = as<DeclRefType>(e->type))
             {
-                if(declRefType->declRef.as<InterfaceDecl>())
+                if(declRefType->getDeclRef().as<InterfaceDecl>())
                 {
                     e = castExpr->valueArg;
                     continue;
@@ -4387,7 +4119,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         if( auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subTypeWitness) )
         {
-            return extractField(superType, value, declaredSubtypeWitness->declRef);
+            return extractField(superType, value, declaredSubtypeWitness->getDeclRef());
         }
         else
         {
@@ -4414,7 +4146,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         //
         if( auto declRefType = as<DeclRefType>(expr->type) )
         {
-            auto declRef = declRefType->declRef;
+            auto declRef = declRefType->getDeclRef();
             if( auto interfaceDeclRef = declRef.as<InterfaceDecl>() )
             {
                 // We have an expression that is "up-casting" some concrete value
@@ -4570,12 +4302,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitSharedTypeExpr(SharedTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("shared type expression during code generation");
-        UNREACHABLE_RETURN(LoweredValInfo());
-    }
-
-    LoweredValInfo visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* /*expr*/)
-    {
-        SLANG_UNIMPLEMENTED_X("tagged union type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -6676,7 +6402,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (auto declRefType = as<DeclRefType>(type))
         {
-            if (declRefType->declRef.getDecl()->findModifier<PublicModifier>())
+            if (declRefType->getDeclRef().getDecl()->findModifier<PublicModifier>())
                 return true;
         }
         return false;
@@ -6690,7 +6416,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto subBuilder = subContext->irBuilder;
 
-        for(auto entry : astWitnessTable->requirementDictionary)
+        for(auto entry : astWitnessTable->getRequirementDictionary())
         {
             auto requiredMemberDecl = entry.key;
             auto satisfyingWitness = entry.value;
@@ -6787,7 +6513,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto targetType = parentExtensionDecl->targetType;
             if(auto targetDeclRefType = as<DeclRefType>(targetType))
             {
-                if(auto targetInterfaceDeclRef = targetDeclRefType->declRef.as<InterfaceDecl>())
+                if(auto targetInterfaceDeclRef = targetDeclRefType->getDeclRef().as<InterfaceDecl>())
                 {
                     return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
                 }
@@ -6815,7 +6541,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if(auto superDeclRefType = as<DeclRefType>(superType))
         {
-            if( superDeclRefType->declRef.as<StructDecl>() || superDeclRefType->declRef.as<ClassDecl>() )
+            if( superDeclRefType->getDeclRef().as<StructDecl>() || superDeclRefType->getDeclRef().as<ClassDecl>() )
             {
                 // TODO: the witness that a type inherits from a `struct`
                 // type should probably be a key that will be used for
@@ -7675,6 +7401,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, loweredTagType, outerGeneric));
     }
 
+    LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)
+    {
+        auto interfaceType = ensureDecl(context, decl->parentDecl).val;
+        return LoweredValInfo::simple(context->irBuilder->getThisType(as<IRInterfaceType>(interfaceType)));
+    }
+
+    LoweredValInfo visitThisTypeConstraintDecl(ThisTypeConstraintDecl* decl)
+    {
+        SLANG_UNUSED(decl);
+        return LoweredValInfo();
+    }
+
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
     {
         // Don't generate an IR `struct` for intrinsic types
@@ -7753,8 +7491,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto superType = inheritanceDecl->base;
             if(auto superDeclRefType = as<DeclRefType>(superType))
             {
-                if (superDeclRefType->declRef.as<StructDecl>() ||
-                    superDeclRefType->declRef.as<ClassDecl>())
+                if (superDeclRefType->getDeclRef().as<StructDecl>() ||
+                    superDeclRefType->getDeclRef().as<ClassDecl>())
                 {
                     auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
                     auto irSuperType = lowerType(context, superType.type);
@@ -7890,10 +7628,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     void lowerDifferentiableAttribute(IRGenContext* subContext, IRInst* inst, DifferentiableAttribute* attr)
     {
         auto irDict = getBuilder()->addDifferentiableTypeDictionaryDecoration(inst);
-        for (auto& entry : attr->m_mapTypeToIDifferentiableWitness)
+        for (auto& entry : attr->getMapTypeToIDifferentiableWitness())
         {
             // Lower type and witness.
-            IRType* irType = lowerType(subContext, entry.value->sub);
+            IRType* irType = lowerType(subContext, entry.value->getSub());
             IRInst* irWitness = lowerVal(subContext, entry.value).val;
 
             SLANG_ASSERT(irType);
@@ -8028,7 +7766,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             if (auto declRefType = as<DeclRefType>(constraintDecl->sub.type))
             {
-                auto typeParamDeclVal = subContext->findLoweredDecl(declRefType->declRef.getDecl());
+                auto typeParamDeclVal = subContext->findLoweredDecl(declRefType->getDeclRef().getDecl());
                 SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
                 subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
             }
@@ -8162,7 +7900,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 if(auto targetDeclRefType = as<DeclRefType>(extensionAncestor->targetType))
                 {
-                    if(auto interfaceDeclRef = targetDeclRefType->declRef.as<InterfaceDecl>())
+                    if(auto interfaceDeclRef = targetDeclRefType->getDeclRef().as<InterfaceDecl>())
                     {
                         return emitOuterInterfaceGeneric(subContext, extensionAncestor, targetDeclRefType, leafDecl);
                     }
@@ -8608,9 +8346,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
 
-        if (auto differentialAttr = decl->findModifier<DifferentiableAttribute>())
+        if (decl->body)
         {
-            lowerDifferentiableAttribute(subContext, irFunc, differentialAttr);
+            if (auto differentialAttr = decl->findModifier<DifferentiableAttribute>())
+            {
+                lowerDifferentiableAttribute(subContext, irFunc, differentialAttr);
+            }
         }
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
@@ -9375,7 +9116,7 @@ static void _addFlattenedTupleArgs(
 LoweredValInfo emitDeclRef(
     IRGenContext*           context,
     Decl*            decl,
-    Substitutions*   subst,
+    DeclRefBase*     subst,
     IRType*                 type)
 {
     const auto initialSubst = subst;
@@ -9383,27 +9124,28 @@ LoweredValInfo emitDeclRef(
 
     // We need to proceed by considering the specializations that
     // have been put in place.
+    subst = SubstitutionSet(subst).getInnerMostNodeWithSubstInfo();
 
     // If the declaration would not get wrapped in a `IRGeneric`,
     // even if it is nested inside of an AST `GenericDecl`, then
     // we should also ignore any generic substitutions.
     if(!canDeclLowerToAGeneric(decl))
     {
-        while(auto genericSubst = as<GenericSubstitution>(subst))
-            subst = genericSubst->getOuter();
+        while(auto genericSubst = SubstitutionSet(subst).findGenericAppDeclRef())
+            subst = genericSubst->getBase();
     }
 
     // In the simplest case, there is no specialization going
     // on, and the decl-ref turns into a reference to the
     // lowered IR value for the declaration.
-    if(!subst)
+    if(!SubstitutionSet(subst) || _isTrivialLookupFromInterfaceThis(context, subst))
     {
         LoweredValInfo loweredDecl = ensureDecl(context, decl);
         return loweredDecl;
     }
 
     // Otherwise, we look at the kind of substitution, and let it guide us.
-    if(auto genericSubst = as<GenericSubstitution>(subst))
+    if(auto genericSubst = as<GenericAppDeclRef>(subst))
     {
         // A generic substitution means we will need to output
         // a `specialize` instruction to specialize the generic.
@@ -9419,7 +9161,7 @@ LoweredValInfo emitDeclRef(
         LoweredValInfo genericVal = emitDeclRef(
             context,
             decl,
-            genericSubst->getOuter(),
+            genericSubst->getBase(),
             context->irBuilder->getGenericKind());
 
         // There's no reason to specialize something that maps to a NULL pointer.
@@ -9464,21 +9206,21 @@ LoweredValInfo emitDeclRef(
 
         return LoweredValInfo::simple(irSpecializedVal);
     }
-    else if(auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
+    else if(auto thisTypeSubst = as<LookupDeclRef>(subst))
     {
-        if(decl == thisTypeSubst->interfaceDecl)
+        if( as<ThisTypeDecl>(decl))
         {
-            // This is a reference to the interface type itself,
-            // through the this-type substitution, so it is really
-            // a reference to the this-type.
-            return lowerType(context, thisTypeSubst->witness->sub);
+            // This is a reference to the ThisType from the interface,
+            // therefore we should just lower it as the sub type.
+            return lowerType(context, thisTypeSubst->getWitness()->getSub());
         }
 
         if(isInterfaceRequirement(decl))
         {
-            // Somebody is trying to look up an interface requirement
-            // "through" some concrete type. We need to lower this decl-ref
-            // as a lookup of the corresponding member in a witness table.
+            // If we reach here, somebody is trying to look up an interface
+            // requirement "through" some concrete type. We need to lower this
+            // decl-ref as a lookup of the corresponding member in a witness
+            // table.
             //
             // The witness table itself is referenced by the this-type
             // substitution, so we can just lower that.
@@ -9491,7 +9233,7 @@ LoweredValInfo emitDeclRef(
             // `ISomething<T>`. That is because we really care about the
             // witness table for the concrete type that conforms to `ISomething<Foo>`.
             //
-            auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->witness);
+            auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
             //
             // The key to use for looking up the interface member is
             // derived from the declaration.
@@ -9517,14 +9259,14 @@ LoweredValInfo emitDeclRef(
             // are lowered as generics, where the generic parameter represents
             // the `ThisType`.
             //
-            auto genericVal = emitDeclRef(context, decl, thisTypeSubst->getOuter(), context->irBuilder->getGenericKind());
+            auto genericVal = emitDeclRef(context, decl, thisTypeSubst->getBase(), context->irBuilder->getGenericKind());
             auto irGenericVal = getSimpleVal(context, genericVal);
 
             // In order to reference the member for a particular type, we
             // specialize the generic for that type.
             //
-            IRInst* irSubType = lowerType(context, thisTypeSubst->witness->sub);
-            IRInst* irSubTypeWitness = lowerSimpleVal(context, thisTypeSubst->witness);
+            IRInst* irSubType = lowerType(context, thisTypeSubst->getWitness()->getSub());
+            IRInst* irSubTypeWitness = lowerSimpleVal(context, thisTypeSubst->getWitness());
 
             IRInst* irSpecializeArgs[] = { irSubType, irSubTypeWitness };
             auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
@@ -9550,7 +9292,7 @@ LoweredValInfo emitDeclRef(
     return emitDeclRef(
         context,
         declRef.getDecl(),
-        declRef.getSubst(),
+        declRef.declRefBase,
         type);
 }
 
@@ -9723,6 +9465,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
     SLANG_PROFILE;
+    SLANG_AST_BUILDER_RAII(astBuilder);
 
     auto session = translationUnit->getSession();
     auto compileRequest = translationUnit->compileRequest;
@@ -10082,6 +9825,8 @@ RefPtr<IRModule> generateIRForSpecializedComponentType(
     SpecializedComponentType*   componentType,
     DiagnosticSink*             sink)
 {
+    SLANG_AST_BUILDER_RAII(componentType->getLinkage()->getASTBuilder());
+
     SpecializedComponentTypeIRGenContext context;
     return context.process(componentType, sink);
 }
@@ -10135,6 +9880,8 @@ RefPtr<IRModule> generateIRForTypeConformance(
     Int conformanceIdOverride,
     DiagnosticSink* sink)
 {
+    SLANG_AST_BUILDER_RAII(typeConformance->getLinkage()->getASTBuilder());
+
     TypeConformanceIRGenContext context;
     return context.process(typeConformance, conformanceIdOverride, sink);
 }
@@ -10296,20 +10043,6 @@ IRTypeLayout* lowerTypeLayout(
         IRPointerTypeLayout::Builder builder(context->irBuilder); 
         return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
     }
-    else if( auto taggedUnionTypeLayout = as<TaggedUnionTypeLayout>(typeLayout) )
-    {
-        IRTaggedUnionTypeLayout::Builder builder(context->irBuilder, taggedUnionTypeLayout->tagOffset);
-
-        for( auto caseTypeLayout : taggedUnionTypeLayout->caseTypeLayouts )
-        {
-            builder.addCaseTypeLayout(
-                lowerTypeLayout(
-                    context,
-                    caseTypeLayout));
-        }
-
-        return _lowerTypeLayoutCommon(context, &builder, taggedUnionTypeLayout);
-    }
     else if( auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout) )
     {
         auto irElementTypeLayout = lowerTypeLayout(context, streamOutputTypeLayout->elementTypeLayout);
@@ -10453,6 +10186,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     auto program = getProgram();
     auto linkage = program->getLinkage();
+
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
     auto session = linkage->getSessionImpl();
 
     SharedIRGenContext sharedContextStorage(
@@ -10548,16 +10284,6 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);
 
         builder->addLayoutDecoration(irFunc, irEntryPointLayout);
-    }
-
-    for( auto taggedUnionTypeLayout : programLayout->taggedUnionTypeLayouts )
-    {
-        auto taggedUnionType = taggedUnionTypeLayout->getType();
-        auto irType = lowerType(context, taggedUnionType);
-
-        auto irTypeLayout = lowerTypeLayout(context, taggedUnionTypeLayout);
-
-        builder->addLayoutDecoration(irType, irTypeLayout);
     }
 
     // Lets strip and run DCE here

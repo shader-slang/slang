@@ -526,7 +526,7 @@ namespace Slang
         }
         if (!stepSize)
             return;
-        if (stepSize->value > 0)
+        if (stepSize->getValue() > 0)
         {
             if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Greater ||
                 sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Less)
@@ -535,7 +535,7 @@ namespace Slang
                 return;
             }
         }
-        else if (stepSize->value < 0)
+        else if (stepSize->getValue() < 0)
         {
             if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Less ||
                 sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Greater)
@@ -553,25 +553,25 @@ namespace Slang
         if (!initialLitVal || !finalVal)
             return;
 
-        auto absStepSize = abs(stepSize->value);
+        auto absStepSize = abs(stepSize->getValue());
         int adjustment = 0;
         if (compareOp == kIROp_Geq || compareOp == kIROp_Leq)
             adjustment = 1;
 
-        auto iterations = (Math::Max(finalVal->value, initialLitVal->value) -
-            Math::Min(finalVal->value, initialLitVal->value) + absStepSize - 1 + adjustment) /
+        auto iterations = (Math::Max(finalVal->getValue(), initialLitVal->getValue()) -
+            Math::Min(finalVal->getValue(), initialLitVal->getValue()) + absStepSize - 1 + adjustment) /
             absStepSize;
         switch (compareOp)
         {
         case kIROp_Geq:
         case kIROp_Greater:
             // Expect final value to be less than initial value.
-            if (finalVal->value > initialLitVal->value)
+            if (finalVal->getValue() > initialLitVal->getValue())
                 iterations = 0;
             break;
         case kIROp_Leq:
         case kIROp_Less:
-            if (finalVal->value < initialLitVal->value)
+            if (finalVal->getValue() < initialLitVal->getValue())
                 iterations = 0;
             break;
         }
@@ -590,7 +590,7 @@ namespace Slang
         litExpr->type.type = m_astBuilder->getIntType();
         litExpr->token.setName(getNamePool()->getName(String(iterations)));
         maxItersAttr->args.add(litExpr);
-        maxItersAttr->intArgVals.add(0, m_astBuilder->getIntVal(m_astBuilder->getIntType(), iterations));
+        maxItersAttr->intArgVals.add(m_astBuilder->getIntVal(m_astBuilder->getIntType(), iterations));
         maxItersAttr->value = (int32_t)iterations;
         maxItersAttr->inductionVar = initialVar;
         addModifier(stmt, maxItersAttr);

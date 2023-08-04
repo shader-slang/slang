@@ -1717,59 +1717,6 @@ struct IRCaseTypeLayoutAttr : IRAttr
     }
 };
 
-    /// Specialized layout information for tagged union types
-struct IRTaggedUnionTypeLayout : IRTypeLayout
-{
-    typedef IRTypeLayout Super;
-
-    IR_LEAF_ISA(TaggedUnionTypeLayout)
-
-        /// Get the (byte) offset of the tagged union's tag (aka "discriminator") field
-    LayoutSize getTagOffset()
-    {
-        return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(cast<IRIntLit>(getOperand(0)))));
-    }
-
-        /// Get all the attributes representing layouts for the difference cases
-    IROperandList<IRCaseTypeLayoutAttr> getCaseTypeLayoutAttrs()
-    {
-        return findAttrs<IRCaseTypeLayoutAttr>();
-    }
-
-        /// Get the number of cases for which layout information is stored
-    UInt getCaseCount()
-    {
-        return getCaseTypeLayoutAttrs().getCount();
-    }
-
-        /// Get the layout information for the case at the given `index`
-    IRTypeLayout* getCaseTypeLayout(UInt index)
-    {
-        return getCaseTypeLayoutAttrs()[index]->getTypeLayout();
-    }
-
-        /// Specialized builder for tagged union type layouts
-    struct Builder : Super::Builder
-    {
-        Builder(IRBuilder* irBuilder, LayoutSize tagOffset);
-
-        void addCaseTypeLayout(IRTypeLayout* typeLayout);
-
-        IRTaggedUnionTypeLayout* build()
-        {
-            return cast<IRTaggedUnionTypeLayout>(Super::Builder::build());
-        }
-
-    protected:
-        IROp getOp() SLANG_OVERRIDE { return kIROp_TaggedUnionTypeLayout; }
-        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
-        void addAttrsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
-
-        IRInst* m_tagOffset = nullptr;
-        List<IRAttr*> m_caseTypeLayoutAttrs;
-    };
-};
-
     /// Type layout for an existential/interface type.
 struct IRExistentialTypeLayout : IRTypeLayout
 {
@@ -3012,16 +2959,6 @@ public:
     IRRateQualifiedType* getRateQualifiedType(
         IRRate* rate,
         IRType* dataType);
-
-    IRType* getTaggedUnionType(
-        UInt            caseCount,
-        IRType* const*  caseTypes);
-
-    IRType* getTaggedUnionType(
-        List<IRType*> const& caseTypes)
-    {
-        return getTaggedUnionType(caseTypes.getCount(), caseTypes.getBuffer());
-    }
 
     IRType* getBindExistentialsType(
         IRInst*         baseType,

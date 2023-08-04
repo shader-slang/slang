@@ -560,17 +560,6 @@ class TreatAsDifferentiableExpr : public Expr
     Flavor flavor;
 };
 
-    /// A type expression of the form `__TaggedUnion(A, ...)`.
-    ///
-    /// An expression of this form will resolve to a `TaggedUnionType`
-    /// when checked.
-    ///
-class TaggedUnionTypeExpr: public Expr
-{
-    SLANG_AST_CLASS(TaggedUnionTypeExpr)
-    List<TypeExp> caseTypes;
-};
-
     /// A type expression of the form `This`
     ///
     /// Refers to the type of `this` in the current context.
@@ -639,7 +628,7 @@ public:
     DeclRef<GenericDecl> baseGenericDeclRef;
 
         /// A substitution that includes the generic arguments known so far
-    GenericSubstitution* substWithKnownGenericArgs = nullptr;
+    List<Val*> knownGenericArgs;
 };
 
 } // namespace Slang

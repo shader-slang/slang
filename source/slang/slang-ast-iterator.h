@@ -99,11 +99,6 @@ struct ASTIterator
             dispatchIfNotNull(expr->base.exp);
         }
 
-        void visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr)
-        {
-            iterator->maybeDispatchCallback(expr);
-        }
-
         void visitInvokeExpr(InvokeExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

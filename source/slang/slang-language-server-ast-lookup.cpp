@@ -142,11 +142,6 @@ public:
 
     bool visitSharedTypeExpr(SharedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
 
-    bool visitTaggedUnionTypeExpr(TaggedUnionTypeExpr*)
-    {
-        return false;
-    }
-
     bool visitInvokeExpr(InvokeExpr* expr)
     {
         PushNode pushNodeRAII(context, expr);

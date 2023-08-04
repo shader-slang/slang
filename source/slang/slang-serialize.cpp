@@ -2,6 +2,7 @@
 #include "slang-serialize.h"
 
 #include "slang-ast-base.h"
+#include "slang-ast-builder.h"
 
 namespace Slang {
 
@@ -204,14 +205,14 @@ bool SerialClasses::isOk() const
 
 
 SerialClasses::SerialClasses():
-    m_arena(2048)
+    m_arena(2097152)
 {
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags flags)
-    : m_arena(2048)
+    : m_arena(2097152)
     , m_classes(classes)
     , m_filter(filter)
     , m_flags(flags)

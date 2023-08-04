@@ -3,6 +3,7 @@
 #define SLANG_SERIALIZE_TYPE_INFO_H
 
 #include "slang-serialize.h"
+
 namespace Slang {
 
 /* For the serialization system to work we need to defined how native types are represented in the serialized format.
@@ -87,7 +88,6 @@ struct SerialTypeInfo<float> : public SerialBasicTypeInfo<float> {};
 template <>
 struct SerialTypeInfo<double> : public SerialBasicTypeInfo<double> {};
 
-
 // Fixed arrays
 
 template <typename T, size_t N>
@@ -154,9 +154,26 @@ struct SerialTypeInfo<T, typename std::enable_if<std::is_enum<T>::value>::type>
     : public SerialIdentityTypeInfo<T>
 {};
 
+class Val;
+
 // Pointer
-// Could handle different pointer base types with some more template magic here, but instead went with Pointer type to keep
-// things simpler.
+
+template<typename T, typename sfinae = typename std::enable_if<!IsBaseOf<Val, T>::Value>::type>
+void serializePointerValue(SerialWriter* writer, T* ptrValue, SerialIndex* outSerial)
+{
+    static_assert(!IsBaseOf<Val, T>::Value);
+    *(SerialIndex*)outSerial = writer->addPointer(ptrValue);
+}
+
+template<typename T, typename sfinae = typename std::enable_if<!IsBaseOf<Val, T>::Value>::type>
+void deserializePointerValue(SerialReader* reader, SerialIndex* inSerial, void* outPtr, T* unusedForResolution)
+{
+    static_assert(!IsBaseOf<Val, T>::Value);
+
+    SLANG_UNUSED(unusedForResolution);
+    *(T**)outPtr = reader->getPointer(*(const SerialIndex*)inSerial).dynamicCast<T>();
+}
+
 template <typename T>
 struct SerialTypeInfo<T*>
 {
@@ -166,11 +183,13 @@ struct SerialTypeInfo<T*>
 
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
-        *(SerialType*)outSerial = writer->addPointer(*(T**)inNative);
+        auto ptrToWrite = *(T**)inNative;
+        serializePointerValue(writer, ptrToWrite, (SerialIndex*)outSerial);
     }
+
     static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
     {
-        *(T**)outNative = reader->getPointer(*(const SerialType*)inSerial).dynamicCast<T>();
+        deserializePointerValue(reader, (SerialIndex*)inSerial, outNative, (T*)nullptr);
     }
 };
 
@@ -257,74 +276,8 @@ struct SerialTypeInfo<String>
 };
 
 // Dictionary
-template <typename KEY, typename VALUE>
-struct SerialTypeInfo<Dictionary<KEY, VALUE>>
-{
-    typedef Dictionary<KEY, VALUE> NativeType;
-    struct SerialType
-    {
-        SerialIndex keys;            ///< Index an array
-        SerialIndex values;          ///< Index an array
-    };
-
-    typedef typename SerialTypeInfo<KEY>::SerialType KeySerialType;
-    typedef typename SerialTypeInfo<VALUE>::SerialType ValueSerialType;
-
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        auto& dst = *(SerialType*)serial;
-
-        List<KeySerialType> keys;
-        List<ValueSerialType> values;
-
-        Index count = Index(src.getCount());
-        keys.setCount(count);
-        values.setCount(count);
-
-        if (writer->getFlags() & SerialWriter::Flag::ZeroInitialize)
-        {
-            ::memset(keys.getBuffer(), 0, count * sizeof(KeySerialType));
-            ::memset(values.getBuffer(), 0, count * sizeof(ValueSerialType));
-        }
-
-        Index i = 0;
-        for (const auto& pair : src)
-        {
-            SerialTypeInfo<KEY>::toSerial(writer, &pair.key, &keys[i]);
-            SerialTypeInfo<VALUE>::toSerial(writer, &pair.value, &values[i]);
-            i++;
-        }
-
-        // When we add the array it is already converted to a serializable type, so add as SerialArray
-        dst.keys = writer->addSerialArray<KEY>(keys.getBuffer(), count);
-        dst.values = writer->addSerialArray<VALUE>(values.getBuffer(), count);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& src = *(const SerialType*)serial;
-        auto& dst = *(NativeType*)native;
-
-        // Clear it
-        dst = NativeType();
-
-        List<KEY> keys;
-        List<VALUE> values;
-
-        reader->getArray(src.keys, keys);
-        reader->getArray(src.values, values);
-
-        SLANG_ASSERT(keys.getCount() == values.getCount());
-
-        const Index count = keys.getCount();
-        for (Index i = 0; i < count; ++i)
-        {
-            dst.add(keys[i], values[i]);
-        }
-    }
-};
+// Note: We leave out SerialTypeInfo specialization for Dictionary, because
+// it does not have determinstic ordering.
 
 // OrderedDictionary
 template <typename KEY, typename VALUE>

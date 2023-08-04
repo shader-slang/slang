@@ -17,7 +17,7 @@ namespace Slang
             auto basicType = as<BasicExpressionType>(type);
             if (basicType)
             {
-                return (basicType->baseType == BaseType::Int || basicType->baseType == BaseType::UInt);
+                return (basicType->getBaseType() == BaseType::Int || basicType->getBaseType() == BaseType::UInt);
             }
         }
         // Can be an int/uint vector from size 1 to 3
@@ -27,20 +27,21 @@ namespace Slang
             {
                 return false;
             }
-            auto elemCount = as<ConstantIntVal>(vectorType->elementCount);
-            if (elemCount->value < 1 || elemCount->value > 3)
+            auto elemCount = as<ConstantIntVal>(vectorType->getElementCount());
+            if (elemCount->getValue() < 1 || elemCount->getValue() > 3)
             {
                 return false;
             }
             // Must be a basic type
-            auto basicType = as<BasicExpressionType>(vectorType->elementType);
+            auto basicType = as<BasicExpressionType>(vectorType->getElementType());
             if (!basicType)
             {
                 return false;
             }
 
             // Must be integral
-            return (basicType->baseType == BaseType::Int || basicType->baseType == BaseType::UInt);
+            auto baseType = basicType->getBaseType();
+            return (baseType == BaseType::Int || baseType == BaseType::UInt);
         }
     }
 
@@ -83,7 +84,7 @@ namespace Slang
 
         if( auto declRefType = as<DeclRefType>(type) )
         {
-            auto typeDeclRef = declRefType->declRef;
+            auto typeDeclRef = declRefType->getDeclRef();
             if( auto interfaceDeclRef = typeDeclRef.as<InterfaceDecl>() )
             {
                 // Each leaf parameter of interface type adds a specialization
@@ -792,6 +793,8 @@ namespace Slang
     void FrontEndCompileRequest::checkEntryPoints()
     {
         auto linkage = getLinkage();
+        SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
         auto sink = getSink();
 
         // The validation of entry points here will be modal, and controlled
@@ -1025,7 +1028,7 @@ namespace Slang
                     //
                     if( auto argDeclRefType = as<DeclRefType>(argType) )
                     {
-                        auto argDeclRef = argDeclRefType->declRef;
+                        auto argDeclRef = argDeclRefType->getDeclRef();
                         if(auto argGenericParamDeclRef = argDeclRef.as<GlobalGenericParamDecl>())
                         {
                             if(argGenericParamDeclRef.getDecl() == genericTypeParamDecl)
@@ -1193,7 +1196,7 @@ namespace Slang
             // the semantic checking machinery to expand out
             // the rest of the arguments via inference...
 
-            auto genericDeclRef = m_funcDeclRef.getParent(getLinkage()->getASTBuilder()).as<GenericDecl>();
+            auto genericDeclRef = m_funcDeclRef.getParent().as<GenericDecl>();
             SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
 
             List<Val*> genericArgs;
@@ -1203,19 +1206,13 @@ namespace Slang
                 auto specializationArg = args[ii];
                 genericArgs.add(specializationArg.val);
             }
-            GenericSubstitution* genericSubst =
-                getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
-                    genericDeclRef.getSubst(),
-                    genericDeclRef.getDecl(),
-                    genericArgs.getArrayView());
+            auto genericInnerDeclRef = getLinkage()->getASTBuilder()->getGenericAppDeclRef(genericDeclRef, genericArgs.getArrayView());
             ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
             for (auto constraintDecl : getMembersOfType<GenericTypeConstraintDecl>(
                      getLinkage()->getASTBuilder(), DeclRef<ContainerDecl>(genericDeclRef)))
             {
-                DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getSpecializedDeclRef(
-                    constraintDecl.getDecl(), genericSubst);
-
+                DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getDirectDeclRef(constraintDecl.getDecl());
 
                 auto sub = getSub(astBuilder, constraintDeclRef);
                 auto sup = getSup(astBuilder, constraintDeclRef);
@@ -1233,12 +1230,8 @@ namespace Slang
                 }
             }
 
-            genericSubst =
-                getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
-                    genericDeclRef.getSubst(),
-                    genericDeclRef.getDecl(),
-                    genericArgs);
-            specializedFuncDeclRef = astBuilder->getSpecializedDeclRef(specializedFuncDeclRef.getDecl(), genericSubst);
+            specializedFuncDeclRef = getLinkage()->getASTBuilder()->getGenericAppDeclRef(genericDeclRef, genericArgs.getArrayView()).as<FuncDecl>();
+            SLANG_ASSERT(specializedFuncDeclRef);
         }
 
         info->specializedFuncDeclRef = specializedFuncDeclRef;
@@ -1418,9 +1411,8 @@ namespace Slang
             specializationArgs.add(arg);
         }
 
-        ExistentialSpecializedType* specializedType = m_astBuilder->create<ExistentialSpecializedType>();
-        specializedType->baseType = unspecializedType;
-        specializedType->args = specializationArgs;
+        ExistentialSpecializedType* specializedType = m_astBuilder->getOrCreate<ExistentialSpecializedType>(
+            unspecializedType, specializationArgs);
 
         m_specializedTypes.add(specializedType);
 
