@@ -2622,26 +2622,12 @@ struct SPIRVEmitContext
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)
     {
         auto base = inst->getBase();
-        SpvWord baseId = 0;
-        IRArrayType* baseArrayType = nullptr;
-        // Only used in debug build, but we don't want a warning/error for an unused initialized variable
-        SLANG_UNUSED(baseArrayType);
-
-        if (auto ptrLikeType = as<IRPointerLikeType>(base->getDataType()))
-        {
-            baseArrayType = as<IRArrayType>(ptrLikeType->getElementType());
-            baseId = getID(ensureInst(base));
-        }
-        else if (auto ptrType = as<IRPtrTypeBase>(base->getDataType()))
-        {
-            baseArrayType = as<IRArrayType>(ptrType->getValueType());
-            baseId = getID(ensureInst(base));
-        }
-        else
-        {
-            SLANG_ASSERT(!"invalid IR: base of getElement must be a pointer.");
-        }
-        SLANG_ASSERT(baseArrayType && "getElement require base to be an array.");
+        const auto baseTy = base->getDataType();
+        SLANG_ASSERT(
+            as<IRPointerLikeType>(baseTy) ||
+            as<IRArrayType>(baseTy) ||
+            as<IRVectorType>(baseTy) ||
+            as<IRMatrixType>(baseTy));
 
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
@@ -2652,9 +2638,15 @@ struct SPIRVEmitContext
             SpvOpAccessChain,
             builder.getPtrType(inst->getFullType()),
             kResultID,
-            baseId,
+            inst->getBase(),
             inst->getIndex());
-        return emitInst(parent, inst, SpvOpLoad, inst->getFullType(), kResultID, ptr);
+        return emitInst(
+            parent,
+            inst,
+            SpvOpLoad,
+            inst->getFullType(),
+            kResultID,
+            ptr);
     }
 
     SpvInst* emitLoad(SpvInstParent* parent, IRLoad* inst)
