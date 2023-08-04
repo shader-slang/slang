@@ -319,20 +319,6 @@ SerialIndex SerialWriter::addPointer(const NodeBase* node)
         return SerialIndex(*indexPtr);
     }
 
-    //static Dictionary<ValNodeDesc, Val*> _debugWrittenVals;
-    //if (auto val = as<Val>((NodeBase*)node))
-    //{
-    //    ValNodeDesc desc;
-    //    desc.type = node->astNodeType;
-    //    val->getDesc(&desc);
-    //    desc.init();
-    //    Val* existingVal = nullptr;
-    //    if (_debugWrittenVals.tryGetValue(desc, existingVal))
-    //    {
-    //        SLANG_ASSERT_FAILURE("duplicate val in ast");
-    //    }
-    //    _debugWrittenVals[desc] = val;
-    //}
     if (m_filter)
     {
         return m_filter->writePointer(this, node);

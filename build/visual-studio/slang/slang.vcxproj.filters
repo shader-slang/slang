@@ -24,9 +24,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-ast-builder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-ast-decl-ref.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ast-decl.h">
       <Filter>Header Files</Filter>
     </ClInclude>

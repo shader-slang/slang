@@ -660,26 +660,3 @@ struct AutoDiffTexture : public WindowedAppBase
 };
 
 PLATFORM_UI_MAIN(innerMain<AutoDiffTexture>)
-
-struct Base {};
-struct Derived : Base {};
-
-template<typename T>
-struct P
-{
-    static constexpr int val = 0;
-};
-
-template<typename T>
-struct P<T*>
-{
-    static constexpr int val = 1;
-};
-
-template<>
-struct P<Base*>
-{
-    static constexpr int val = 2;
-};
-
-static int myv = P<Derived*>::val;
