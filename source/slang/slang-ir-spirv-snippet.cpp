@@ -260,7 +260,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
     }
     catch (const Slang::Misc::TextFormatException&)
     {
-        SLANG_ASSERT(!"Invalid ASM format.");
+        return nullptr;
     }
     return snippet;
 }
