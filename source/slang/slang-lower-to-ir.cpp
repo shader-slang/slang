@@ -6790,7 +6790,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             builder->addHighLevelDeclDecoration(irParam, decl);
         }
 
-        addTargetIntrinsicDecorations(irParam, decl);
+        addTargetIntrinsicDecorations(nullptr, irParam, decl);
 
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
@@ -7401,7 +7401,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         irInterface->moveToEnd();
 
-        addTargetIntrinsicDecorations(irInterface, decl);
+        addTargetIntrinsicDecorations(subContext, irInterface, decl);
 
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
         return LoweredValInfo::simple(finalVal);
@@ -7602,7 +7602,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // type declarations later, from the top-level emit logic.
 
         irAggType->moveToEnd();
-        addTargetIntrinsicDecorations(irAggType, decl);
+        addTargetIntrinsicDecorations(subContext, irAggType, decl);
         for (auto modifier : decl->modifiers)
         {
             if (as<NonCopyableTypeAttribute>(modifier))
@@ -7747,7 +7747,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // We allow a field to be marked as a target intrinsic,
         // so that we can override its mangled name in the
         // output for the chosen target.
-        addTargetIntrinsicDecorations(irFieldKey, fieldDecl);
+        addTargetIntrinsicDecorations(nullptr, irFieldKey, fieldDecl);
 
         return LoweredValInfo::simple(irFieldKey);
     }
@@ -8152,6 +8152,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     // Attach target-intrinsic decorations to an instruction,
     // based on modifiers on an AST declaration.
     void addTargetIntrinsicDecorations(
+        IRGenContext* subContext,
         IRInst* irInst,
         Decl*   decl)
     {
@@ -8201,7 +8202,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 targetCaps = CapabilitySet(targetCap);
             }
 
-            builder->addTargetIntrinsicDecoration(irInst, targetCaps, definition.getUnownedSlice());
+            IRInst* scrutinee = nullptr;
+            UnownedStringSlice predicate;
+            if(targetMod->scrutineeDeclRef)
+            {
+                const auto s = subContext->findLoweredDecl(targetMod->scrutineeDeclRef.getDecl());
+                if(s && s->flavor == LoweredValInfo::Flavor::Simple)
+                {
+                    scrutinee = s->val;
+                    predicate = targetMod->predicateToken.getContent();
+                }
+            }
+
+            builder->addTargetIntrinsicDecoration(irInst, targetCaps, definition.getUnownedSlice(), predicate, scrutinee);
         }
 
         if(const auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
@@ -8685,7 +8698,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // If this declaration was marked as having a target-specific lowering
         // for a particular target, then handle that here.
-        addTargetIntrinsicDecorations(irFunc, decl);
+        addTargetIntrinsicDecorations(subContext, irFunc, decl);
 
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
 

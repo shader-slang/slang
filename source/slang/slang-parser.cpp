@@ -6419,6 +6419,14 @@ namespace Slang
 
             if( AdvanceIf(parser, TokenType::Comma) )
             {
+                if(parser->LookAheadToken(TokenType::LParent, 1))
+                {
+                    modifier->predicateToken = parser->ReadToken(TokenType::Identifier);
+                    parser->ReadToken();
+                    modifier->scrutinee = NameLoc(parser->ReadToken(TokenType::Identifier));
+                    parser->ReadToken(TokenType::RParent);
+                    parser->ReadToken(TokenType::Comma);
+                }
                 if( parser->LookAheadToken(TokenType::StringLiteral) )
                 {
                     modifier->definitionToken = parser->ReadToken();

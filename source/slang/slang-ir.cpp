@@ -7466,6 +7466,21 @@ namespace Slang
             if (decorationCaps.isIncompatibleWith(targetCaps))
                 continue;
 
+            if(decoration->hasPredicate())
+            {
+                const auto scrutinee = decoration->getTypeScrutinee();
+                const auto predicate = decoration->getTypePredicate();
+                const auto predicateFun =
+                      predicate == "boolean"  ? [](auto t){ return t->getOp() == kIROp_BoolType; }
+                    : predicate == "integral" ? isIntegralType
+                    : predicate == "floating" ? isFloatingType
+                    : nullptr;
+
+                SLANG_ASSERT(predicateFun);
+                if(!predicateFun(scrutinee))
+                    continue;
+            }
+
             if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps))
             {
                 bestDecoration = decoration;

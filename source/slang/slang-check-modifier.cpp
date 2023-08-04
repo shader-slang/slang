@@ -984,6 +984,37 @@ namespace Slang
             return packOffsetModifier;
         }
 
+        if(auto targetIntrinsic = as<TargetIntrinsicModifier>(m))
+        {
+            // TODO: verify that the predicate is one we understand
+            if(targetIntrinsic->scrutinee.name)
+            {
+                if(auto genDecl = as<ContainerDecl>(syntaxNode))
+                {
+                    auto scrutineeResults = lookUp(
+                        m_astBuilder,
+                        this,
+                        targetIntrinsic->scrutinee.name,
+                        genDecl->ownedScope);
+                    if(!scrutineeResults.isValid())
+                    {
+                        getSink()->diagnose(
+                            targetIntrinsic->scrutinee.loc,
+                            Diagnostics::undefinedIdentifier2,
+                            targetIntrinsic->scrutinee.name);
+                    }
+                    if(scrutineeResults.isOverloaded())
+                    {
+                        getSink()->diagnose(
+                            targetIntrinsic->scrutinee.loc,
+                            Diagnostics::ambiguousReference,
+                            targetIntrinsic->scrutinee.name);
+                    }
+                    targetIntrinsic->scrutineeDeclRef = scrutineeResults.item.declRef;
+                }
+            }
+        }
+
         // Default behavior is to leave things as they are,
         // and assume that modifiers are mostly already checked.
         //

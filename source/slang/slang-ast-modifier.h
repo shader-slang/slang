@@ -81,6 +81,11 @@ class TargetIntrinsicModifier : public Modifier
 
     // A custom definition for the operation
     Token definitionToken;
+
+    // A predicate to be used on an identifier to guard this intrinsic
+    Token predicateToken;
+    NameLoc scrutinee;
+    DeclRef<Decl> scrutineeDeclRef;
 };
 
 // A modifier that marks a declaration as representing a

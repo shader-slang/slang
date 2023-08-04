@@ -82,6 +82,27 @@ struct IRTargetSpecificDecoration : IRDecoration
     IRCapabilitySet* getTargetCapsOperand() { return cast<IRCapabilitySet>(getOperand(0)); }
 
     CapabilitySet getTargetCaps() { return getTargetCapsOperand()->getCaps(); }
+
+    bool hasPredicate()
+    {
+        return getOperandCount() >= 4;
+    }
+
+    UnownedStringSlice getTypePredicate()
+    {
+        SLANG_ASSERT(getOperandCount() == 4);
+        const auto lit = as<IRStringLit>(getOperand(2));
+        SLANG_ASSERT(lit);
+        return lit->getStringSlice();
+    }
+
+    IRType* getTypeScrutinee()
+    {
+        SLANG_ASSERT(getOperandCount() == 4);
+        const auto t = as<IRType>(getOperand(3));
+        SLANG_ASSERT(t);
+        return t;
+    }
 };
 
 struct IRTargetDecoration : IRTargetSpecificDecoration
@@ -3754,6 +3775,18 @@ public:
         return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
     }
 
+    IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand0, IRInst* operand1, IRInst* operand2)
+    {
+        IRInst* operands[] = { operand0, operand1, operand2 };
+        return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
+    }
+
+    IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand0, IRInst* operand1, IRInst* operand2, IRInst* operand3)
+    {
+        IRInst* operands[] = { operand0, operand1, operand2, operand3 };
+        return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
+    }
+
     template<typename T>
     void addSimpleDecoration(IRInst* value)
     {
@@ -3876,14 +3909,26 @@ public:
         addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
     }
 
-    void addTargetIntrinsicDecoration(IRInst* value, IRInst* caps, UnownedStringSlice const& definition)
+    void addTargetIntrinsicDecoration(IRInst* value, IRInst* caps, UnownedStringSlice const& definition, UnownedStringSlice const& predicate, IRInst* typeScrutinee)
     {
-        addDecoration(value, kIROp_TargetIntrinsicDecoration, caps, getStringValue(definition));
+        typeScrutinee
+            ? addDecoration(
+                value,
+                kIROp_TargetIntrinsicDecoration,
+                caps,
+                getStringValue(definition),
+                getStringValue(predicate),
+                typeScrutinee)
+            : addDecoration(
+                value,
+                kIROp_TargetIntrinsicDecoration,
+                caps,
+                getStringValue(definition));
     }
 
-    void addTargetIntrinsicDecoration(IRInst* value, CapabilitySet const& caps, UnownedStringSlice const& definition)
+    void addTargetIntrinsicDecoration(IRInst* value, CapabilitySet const& caps, UnownedStringSlice const& definition, UnownedStringSlice const& predicate = UnownedStringSlice{}, IRInst* typeScrutinee = nullptr)
     {
-        addTargetIntrinsicDecoration(value, getCapabilityValue(caps), definition);
+        addTargetIntrinsicDecoration(value, getCapabilityValue(caps), definition, predicate, typeScrutinee);
     }
 
     void addTargetDecoration(IRInst* value, IRInst* caps)
