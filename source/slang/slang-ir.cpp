@@ -7666,7 +7666,7 @@ namespace Slang
         {
         case kIROp_Func:
         case kIROp_Generic:
-            return val->getFirstChild() != nullptr;
+            return val->getFirstChild() != nullptr || val->findDecoration<IRTargetIntrinsicDecoration>();
 
         case kIROp_GlobalConstant:
             return cast<IRGlobalConstant>(val)->getValue() != nullptr;
