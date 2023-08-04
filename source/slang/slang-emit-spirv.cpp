@@ -3077,12 +3077,6 @@ struct SPIRVEmitContext
         }
     }
 
-    void diagnoseUnhandledInst(IRInst* inst)
-    {
-        m_sink->diagnose(
-            inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
-    }
-
     SPIRVEmitContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
         : SPIRVEmitSharedContext(module, target, sink)
         , m_irModule(module)
