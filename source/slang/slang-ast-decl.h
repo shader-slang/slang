@@ -56,6 +56,15 @@ class ContainerDecl: public Decl
         return transparentMembers;
     }
 
+    void addMember(Decl* member)
+    {
+        if (member)
+        {
+            member->parentDecl = this;
+            members.add(member);
+        }
+    }
+
     SLANG_UNREFLECTED   // We don't want to reflect the following fields
 
 private:
@@ -178,12 +187,19 @@ class EnumCaseDecl : public Decl
     Expr* tagExpr = nullptr;
 };
 
+// A member of InterfaceDecl representing the abstract ThisType.
+class ThisTypeDecl : public AggTypeDecl
+{
+    SLANG_AST_CLASS(ThisTypeDecl)
+};
+
 // An interface which other types can conform to
 class InterfaceDecl : public  AggTypeDecl
 {
     SLANG_AST_CLASS(InterfaceDecl)
-};
 
+    ThisTypeDecl* getThisTypeDecl();
+};
 
 class TypeConstraintDecl : public  Decl
 {
@@ -193,6 +209,15 @@ class TypeConstraintDecl : public  Decl
     // Overrides should be public so base classes can access
     // Implement _getSupOverride on derived classes to change behavior of getSup, as if getSup is virtual
     const TypeExp& _getSupOverride() const;
+};
+
+class ThisTypeConstraintDecl : public TypeConstraintDecl
+{
+    SLANG_AST_CLASS(ThisTypeConstraintDecl)
+
+    TypeExp base;
+    const TypeExp& _getSupOverride() const { return base; }
+    InterfaceDecl* getInterfaceDecl();
 };
 
 // A kind of pseudo-member that represents an explicit

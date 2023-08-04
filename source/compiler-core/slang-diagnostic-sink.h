@@ -310,7 +310,7 @@ private:
 class DiagnosticsLookup : public RefObject
 {
 public:
-    static const Index kArenaInitialSize = 2048;
+    static const Index kArenaInitialSize = 65536;
 
         /// Will take into account the slice name could be using different conventions
     const DiagnosticInfo* findDiagnosticByName(const UnownedStringSlice& slice) const;

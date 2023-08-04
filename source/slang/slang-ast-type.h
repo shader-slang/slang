@@ -15,7 +15,7 @@ class OverloadGroupType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
 };
@@ -28,7 +28,7 @@ class InitializerListType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
 };
@@ -40,7 +40,7 @@ class ErrorType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -53,7 +53,6 @@ class BottomType : public Type
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -64,20 +63,22 @@ class DeclRefType : public Type
 {
     SLANG_AST_CLASS(DeclRefType)
 
-    DeclRef<Decl> declRef;
-
     static DeclRefType* create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
+
+    DeclRef<Decl> getDeclRef() const { return DeclRef<Decl>(as<DeclRefBase>(getOperand(0))); }
+    DeclRefBase* getDeclRefBase() const { return as<DeclRefBase>(getOperand(0)); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     DeclRefType(DeclRefBase* declRefBase)
-        : declRef(declRefBase)
-    {}
+    {
+        setOperands(declRefBase);
+    }
 };
 
 // Base class for types that can be used in arithmetic expressions
@@ -95,18 +96,15 @@ class BasicExpressionType : public ArithmeticExpressionType
 {
     SLANG_AST_CLASS(BasicExpressionType)
 
-    BaseType baseType;
+    BaseType getBaseType() const;
 
     // Overrides should be public so base classes can access
-    Type* _createCanonicalTypeOverride();
-    bool _equalsImplOverride(Type* type);
     BasicExpressionType* _getScalarTypeOverride();
 
-protected:
-    BasicExpressionType(
-        Slang::BaseType baseType)
-        : baseType(baseType)
-    {}
+    BasicExpressionType(DeclRefBase* inDeclRef)
+    {
+        setOperands(inDeclRef);
+    }
 };
 
 // Base type for things that are built in to the compiler,
@@ -127,7 +125,7 @@ class FeedbackType : public BuiltinType
         MipRegionUsed,          /// SAMPLER_FEEDBACK_MIP_REGION_USED
     };
 
-    Kind kind;
+    Kind getKind() const;
 };
 
 // Resources that contain "elements" that can be fetched
@@ -135,37 +133,24 @@ class ResourceType : public BuiltinType
 {
     SLANG_ABSTRACT_AST_CLASS(ResourceType)
 
-    // The type that results from fetching an element from this resource
-    Type* elementType = nullptr;
-
-    // Shape and access level information for this resource type
-    TextureFlavor flavor;
+    TextureFlavor getFlavor() const;
 
     TextureFlavor::Shape getBaseShape()
     {
-        return flavor.getBaseShape();
+        return getFlavor().getBaseShape();
     }
-    bool isMultisample() { return flavor.isMultisample(); }
-    bool isArray() { return flavor.isArray(); }
-    SlangResourceShape getShape() const { return flavor.getShape(); }
-    SlangResourceAccess getAccess() { return flavor.getAccess(); }
+    bool isMultisample() { return getFlavor().isMultisample(); }
+    bool isArray() { return getFlavor().isArray(); }
+    SlangResourceShape getShape() const { return getFlavor().getShape(); }
+    SlangResourceAccess getAccess() { return getFlavor().getAccess(); }
+    Type* getElementType();
 };
 
 class TextureTypeBase : public ResourceType 
 {
     SLANG_ABSTRACT_AST_CLASS(TextureTypeBase)
 
-    // The sampleCount parameter of a RWTexture*MS resource.
-    Val* sampleCount = nullptr;
-protected:
-    TextureTypeBase(TextureFlavor inFlavor, Type* inElementType, Val* inSampleCount = nullptr)
-    {
-        elementType = inElementType;
-        flavor = inFlavor;
-        sampleCount = inSampleCount;
-    }
-
-    Val* getSampleCount() const { return sampleCount; }
+    Val* getSampleCount();
 };
 
 
@@ -173,11 +158,6 @@ protected:
 class TextureType : public TextureTypeBase 
 {
     SLANG_AST_CLASS(TextureType)
-
-protected:
-    TextureType(TextureFlavor flavor, Type* elementType, Val* inSampleCount = nullptr)
-        : TextureTypeBase(flavor, elementType, inSampleCount)
-    {}
 };
 
 
@@ -186,37 +166,20 @@ protected:
 class TextureSamplerType : public TextureTypeBase 
 {
     SLANG_AST_CLASS(TextureSamplerType)
-
-protected:
-    TextureSamplerType(TextureFlavor flavor, Type* elementType)
-        : TextureTypeBase(flavor, elementType)
-    {}
 };
 
 // This is a base type for `image*` types, as they exist in GLSL
 class GLSLImageType : public TextureTypeBase 
 {
     SLANG_AST_CLASS(GLSLImageType)
-
-protected:
-    GLSLImageType(
-        TextureFlavor flavor,
-        Type* elementType)
-        : TextureTypeBase(flavor, elementType)
-    {}
 };
 
 class SamplerStateType : public BuiltinType 
 {
     SLANG_AST_CLASS(SamplerStateType)
 
-    // What flavor of sampler state is this
-    SamplerStateFlavor flavor;
-
-    SamplerStateType(SamplerStateFlavor inFlavor)
-    {
-        flavor = inFlavor;
-    }
+    // Returns flavor of sampler state of this type.
+    SamplerStateFlavor getFlavor() const;
 };
 
 // Other cases of generic types known to the compiler
@@ -224,9 +187,7 @@ class BuiltinGenericType : public BuiltinType
 {
     SLANG_AST_CLASS(BuiltinGenericType)
 
-    Type* elementType = nullptr;
-
-    Type* getElementType() { return elementType; }
+    Type* getElementType() const;
 };
 
 // Types that behave like pointers, in that they can be
@@ -296,7 +257,6 @@ class HLSLConsumeStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
     SLANG_AST_CLASS(HLSLConsumeStructuredBufferType)
 };
-
 
 class HLSLPatchType : public BuiltinType 
 {
@@ -396,7 +356,6 @@ class VaryingParameterGroupType : public ParameterGroupType
 class ConstantBufferType : public UniformParameterGroupType 
 {
     SLANG_AST_CLASS(ConstantBufferType)
-    ConstantBufferType(Type* elementType) { SLANG_UNUSED(elementType); }
 };
 
 
@@ -435,11 +394,7 @@ class ParameterBlockType : public UniformParameterGroupType
 class ArrayExpressionType : public DeclRefType 
 {
     SLANG_AST_CLASS(ArrayExpressionType)
-    ArrayExpressionType(Type* inElementType, IntVal* inElementCount)
-    {
-        SLANG_UNUSED(inElementType);
-        SLANG_UNUSED(inElementCount);
-    }
+
     bool isUnsized();
     void _toTextOverride(StringBuilder& out);
     Type* getElementType();
@@ -453,21 +408,18 @@ class TypeType : public Type
 {
     SLANG_AST_CLASS(TypeType)
 
-    // The type that this is the type of...
-    Type* type = nullptr;
-
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
 
-protected:
-    TypeType(Type* type)
-        : type(type)
-    {}
+    Type* getType() { return as<Type>(getOperand(0)); }
 
-    
+    TypeType(Type* type)
+    {
+        setOperands(type);
+    }
 };
 
 // A differential pair type, e.g., `__DifferentialPair<T>`
@@ -487,20 +439,12 @@ class VectorExpressionType : public ArithmeticExpressionType
 {
     SLANG_AST_CLASS(VectorExpressionType)
 
-    // The type of vector elements.
-    // As an invariant, this should be a basic type or an alias.
-    Type* elementType = nullptr;
-
-    // The number of elements
-    IntVal* elementCount = nullptr;
-
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     BasicExpressionType* _getScalarTypeOverride();
 
-    VectorExpressionType(Type* inElementType, IntVal* inElementCount)
-       : elementType(inElementType), elementCount(inElementCount)
-    {}
+    Type* getElementType();
+    IntVal* getElementCount();
 };
 
 // A matrix type, e.g., `matrix<T,R,C>`
@@ -519,9 +463,7 @@ class MatrixExpressionType : public ArithmeticExpressionType
     BasicExpressionType* _getScalarTypeOverride();
 
 private:
-    Type* rowType = nullptr;
-
-    MatrixExpressionType(Type*, IntVal*, IntVal*) {}
+    SLANG_UNREFLECTED Type* rowType = nullptr;
 };
 
 class TensorViewType : public BuiltinType
@@ -529,8 +471,6 @@ class TensorViewType : public BuiltinType
     SLANG_AST_CLASS(TensorViewType)
 
     Type* getElementType();
-private:
-    TensorViewType(Type*) {}
 };
 
 // Base class for built in string types
@@ -561,6 +501,7 @@ class DynamicType : public BuiltinType
 class EnumTypeType : public BuiltinType 
 {
     SLANG_AST_CLASS(EnumTypeType)
+
     // TODO: provide accessors for the declaration, the "tag" type, etc.
 };
 
@@ -572,6 +513,7 @@ class PtrTypeBase : public BuiltinType
 
     // Get the type of the pointed-to value.
     Type* getValueType();
+
 };
 
 class NoneType : public BuiltinType
@@ -582,12 +524,14 @@ class NoneType : public BuiltinType
 class NullPtrType : public BuiltinType
 {
     SLANG_AST_CLASS(NullPtrType)
+
 };
 
 // A true (user-visible) pointer type, e.g., `T*`
 class PtrType : public PtrTypeBase 
 {
     SLANG_AST_CLASS(PtrType)
+
 };
 
 /// A pointer-like type used to represent a parameter "direction"
@@ -640,22 +584,19 @@ class NamedExpressionType : public Type
 {
     SLANG_AST_CLASS(NamedExpressionType)
 
-    DeclRef<TypeDefDecl> declRef;
-    Type* innerType = nullptr;
+    DeclRef<TypeDefDecl> getDeclRef() { return as<DeclRefBase>(getOperand(0)); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
+    void _getDescOverride(ValNodeDesc* descOut);
 
-protected:
-    NamedExpressionType(
-        DeclRef<TypeDefDecl> declRef)
-        : declRef(declRef)
-    {}
-
-
+    NamedExpressionType(DeclRef<TypeDefDecl> inDeclRef)
+    {
+        setOperands(inDeclRef);
+    }
 };
 
 // A function type is defined by its parameter types
@@ -666,33 +607,30 @@ class FuncType : public Type
 
     // Construct a unary function
     FuncType(Type* paramType, Type* resultType, Type* errorType)
-        : paramTypes{{paramType}}, resultType{resultType}, errorType{errorType}
-    {}
+    {
+        setOperands(paramType, resultType, errorType);
+    }
 
-    FuncType(List<Type*> parameters, Type* result, Type* error)
-        : paramTypes(std::move(parameters)), resultType(result), errorType(error)
-    {}
+    FuncType(ArrayView<Type*> parameters, Type* result, Type* error)
+    {
+        for (auto paramType : parameters)
+            m_operands.add(ValNodeOperand(paramType));
+        m_operands.add(ValNodeOperand(result));
+        m_operands.add(ValNodeOperand(error));
+    }
 
-    // TODO: We may want to preserve parameter names
-    // in the list here, just so that we can print
-    // out friendly names when printing a function
-    // type, even if they don't affect the actual
-    // semantic type underneath.
+    OperandView<Type> getParamTypes() { return OperandView<Type>(this, 0, getOperandCount() - 2); }
 
-    List<Type*> paramTypes;
-    Type* resultType = nullptr;
-    Type* errorType = nullptr;
-
-    Index getParamCount() { return paramTypes.getCount(); }
-    Type* getParamType(Index index) { return paramTypes[index]; }
-    Type* getResultType() { return resultType; }
-    Type* getErrorType() { return errorType; }
+    Index getParamCount() { return m_operands.getCount() - 2; }
+    Type* getParamType(Index index) { return as<Type>(getOperand(index)); }
+    Type* getResultType() { return as<Type>(getOperand(m_operands.getCount() - 2)); }
+    Type* getErrorType() { return as<Type>(getOperand(m_operands.getCount() - 1)); }
 
     ParameterDirection getParamDirection(Index index);
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -704,18 +642,18 @@ class TupleType : public Type
     SLANG_AST_CLASS(TupleType)
 
     // Construct a unary tupletion
-    TupleType(List<Type*> memberTypes)
-        : memberTypes(std::move(memberTypes))
-    {}
+    TupleType(ArrayView<Type*> memberTypes)
+    {
+        for (auto t : memberTypes)
+            m_operands.add(ValNodeOperand(t));
+    }
 
-    auto getMemberCount() { return memberTypes.getCount(); } const
-    auto& getMember(Index i) { return memberTypes[i]; }
-
-    List<Type*> memberTypes;
+    auto getMemberCount() const { return getOperandCount(); }
+    Type* getMember(Index i) const { return as<Type>(getOperand(i)); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -726,21 +664,18 @@ class GenericDeclRefType : public Type
 {
     SLANG_AST_CLASS(GenericDeclRefType)
 
-    DeclRef<GenericDecl> declRef;
-
-    DeclRef<GenericDecl> const& getDeclRef() const { return declRef; }
+    DeclRef<GenericDecl> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
 
-protected:
-    GenericDeclRefType(
-        DeclRef<GenericDecl> declRef)
-        : declRef(declRef)
-    {}
+    GenericDeclRefType(DeclRef<GenericDecl> declRef)
+    {
+        setOperands(declRef);
+    }
 };
 
 // The "type" of a reference to a module or namespace
@@ -748,15 +683,18 @@ class NamespaceType : public Type
 {
     SLANG_AST_CLASS(NamespaceType)
 
-    DeclRef<NamespaceDeclBase> declRef;
+    DeclRef<NamespaceDeclBase> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
 
-    DeclRef<NamespaceDeclBase> const& getDeclRef() const { return declRef; }
+    NamespaceType(DeclRef<NamespaceDeclBase> inDeclRef)
+    {
+        setOperands(inDeclRef);
+    }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
 };
 
 // The concrete type for a value wrapped in an existential, accessible
@@ -765,25 +703,33 @@ class ExtractExistentialType : public Type
 {
     SLANG_AST_CLASS(ExtractExistentialType)
 
-    DeclRef<VarDeclBase> declRef;
+    DeclRef<VarDeclBase> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
 
     // A reference to the original interface this type is known
     // to be a subtype of.
     //
-    Type* originalInterfaceType;
-    DeclRef<InterfaceDecl> originalInterfaceDeclRef;
+    Type* getOriginalInterfaceType() { return as<Type>(getOperand(1)); }
+    DeclRef<InterfaceDecl> getOriginalInterfaceDeclRef() { return as<DeclRefBase>(getOperand(2)); }
+
+    ExtractExistentialType(
+        DeclRef<VarDeclBase> inDeclRef,
+        Type* inOriginalInterfaceType,
+        DeclRef<InterfaceDecl> inOriginalInterfaceDeclRef)
+    {
+        setOperands(inDeclRef, inOriginalInterfaceType, inOriginalInterfaceDeclRef);
+    }
 
 // Following fields will not be reflected (and thus won't be serialized, etc.)
 SLANG_UNREFLECTED
 
-    // A cached decl-ref to the original interface above, with
-    // a this-type substitution that refers to the type extracted here.
+    // A cached decl-ref to the original interface's ThisType Decl, with
+    // a witness that refers to the type extracted here.
     //
     // This field is optional and can be filled in on-demand. It does *not*
     // represent part of the logical value of this `Type`, and should not
     // be serialized, included in hashes, etc.
     //
-    DeclRef<InterfaceDecl> cachedSpecializedInterfaceDeclRef;
+    DeclRef<ThisTypeDecl> cachedThisTypeDeclRef;
 
     // A cached pointer to a witness that shows how this type is a subtype
     // of `originalInterfaceType`.
@@ -794,8 +740,9 @@ SLANG_UNREFLECTED
     void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _getDescOverride(ValNodeDesc* descOut);
 
         /// Get a witness that shows how this type is a subtype of `originalInterfaceType`.
         ///
@@ -803,62 +750,56 @@ SLANG_UNREFLECTED
         ///
     SubtypeWitness* getSubtypeWitness();
 
-        /// Get a interface decl-ref for the original interface specialized to this type
-        /// (using a type-type substitution).
+        /// Get a decl-ref to the interface's ThisType decl, which represents a substitutable type
+        /// from which lookup can be performed.
         ///
         /// This operation may create the decl-ref on demand and cache it.
         ///
-    DeclRef<InterfaceDecl> getSpecializedInterfaceDeclRef();
-};
-
-    /// A tagged union of zero or more other types.
-class TaggedUnionType : public Type 
-{
-    SLANG_AST_CLASS(TaggedUnionType)
-
-        /// The distinct "cases" the tagged union can store.
-        ///
-        /// For each type in this array, the array index is the
-        /// tag value for that case.
-        ///
-    List<Type*> caseTypes;
-
-    // Overrides should be public so base classes can access
-    void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
-    HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    DeclRef<ThisTypeDecl> getThisTypeDeclRef();
 };
 
 class ExistentialSpecializedType : public Type 
 {
     SLANG_AST_CLASS(ExistentialSpecializedType)
 
-    Type* baseType = nullptr;
-    ExpandedSpecializationArgs args;
+    Type* getBaseType() { return as<Type>(getOperand(0)); }
+    ExpandedSpecializationArg getArg(Index i)
+    {
+        ExpandedSpecializationArg arg;
+        arg.val = getOperand(i * 2 + 1);
+        arg.witness = getOperand(i * 2 + 2);
+        return arg;
+    }
+    Index getArgCount() { return (getOperandCount() - 1) / 2; }
+
+    ExistentialSpecializedType(
+        Type* inBaseType,
+        ExpandedSpecializationArgs const& inArgs)
+    {
+        m_operands.add(ValNodeOperand(inBaseType));
+        for (auto arg : inArgs)
+        {
+            m_operands.add(ValNodeOperand(arg.val));
+            m_operands.add(ValNodeOperand(arg.witness));
+        }
+    }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
     /// The type of `this` within a polymorphic declaration
-class ThisType : public Type 
+class ThisType : public DeclRefType
 {
     SLANG_AST_CLASS(ThisType)
 
-    DeclRef<InterfaceDecl> interfaceDeclRef;
+    ThisType(DeclRefBase* declRef) : DeclRefType(declRef) {}
 
-    // Overrides should be public so base classes can access
-    void _toTextOverride(StringBuilder& out);
-    bool _equalsImplOverride(Type* type);
-    HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    InterfaceDecl* getInterfaceDecl();
 };
 
     /// The type of `A & B` where `A` and `B` are types
@@ -868,18 +809,19 @@ class AndType : public Type
 {
     SLANG_AST_CLASS(AndType)
 
-    Type* left;
-    Type* right;
-
+    Type* getLeft() { return as<Type>(getOperand(0)); }
+    Type* getRight() { return as<Type>(getOperand(1)); }
+    
     AndType(Type* leftType, Type* rightType)
-        : left(leftType), right(rightType)
-    {}
+    {
+        setOperands(leftType, rightType);
+    }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -887,14 +829,26 @@ class ModifiedType : public Type
 {
     SLANG_AST_CLASS(ModifiedType)
 
-    Type* base;
-    List<Val*> modifiers;
+    Type* getBase()
+    {
+        return as<Type>(getOperand(0));
+    }
+
+    Index getModifierCount() { return getOperandCount() - 1; }
+    Val* getModifier(Index index) { return getOperand(index + 1); }
+
+    ModifiedType(Type* inBase, ArrayView<Val*> inModifiers)
+    {
+        m_operands.add(ValNodeOperand(inBase));
+        for (auto modifier : inModifiers)
+            m_operands.add(ValNodeOperand(modifier));
+    }
 
     template<typename T>
     T* findModifier()
     {
-        for (auto v : modifiers)
-            if (auto rs = as<T>(v))
+        for (Index i = 1; i < getOperandCount(); i++)
+            if (auto rs = as<T>(getOperand(i)))
                 return rs;
         return nullptr;
     }
@@ -903,7 +857,7 @@ class ModifiedType : public Type
     void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride(SemanticsVisitor* semantics);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 

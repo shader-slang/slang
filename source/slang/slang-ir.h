@@ -1749,11 +1749,6 @@ struct IRInterfaceType : IRType
     IR_LEAF_ISA(InterfaceType)
 };
 
-struct IRTaggedUnionType : IRType
-{
-    IR_LEAF_ISA(TaggedUnionType)
-};
-
 struct IRConjunctionType : IRType
 {
     IR_LEAF_ISA(ConjunctionType)

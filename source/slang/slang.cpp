@@ -161,11 +161,9 @@ void Session::init()
     m_sharedASTBuilder = new SharedASTBuilder;
     m_sharedASTBuilder->init(this);
 
-    //  Use to create a ASTBuilder
-    RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder, "m_builtInLinkage::m_astBuilder"));
-
     // And the global ASTBuilder
-    globalAstBuilder = new ASTBuilder(m_sharedASTBuilder, "globalAstBuilder");
+    auto builtinAstBuilder = m_sharedASTBuilder->getInnerASTBuilder();
+    globalAstBuilder = builtinAstBuilder;
 
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
@@ -367,6 +365,8 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
         return SLANG_FAIL;
     }
 
+    SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
+
     // Make a file system to read it from
     ComPtr<ISlangFileSystemExt> fileSystem;
     SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
@@ -396,6 +396,8 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
     {
         return SLANG_FAIL;
     }
+
+    SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {
@@ -463,6 +465,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
     options.namePool = linkageNamePool;
     options.session = this;
     options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
+    options.astBuilder = linkage->getASTBuilder();
     options.sourceManager = sourceManger;
     options.linkage = linkage;
 
@@ -920,6 +923,9 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     , m_sourceManager(&m_defaultSourceManager)
     , m_astBuilder(astBuilder)
 {
+    if (builtinLinkage)
+        m_astBuilder->m_cachedNodes = builtinLinkage->getASTBuilder()->m_cachedNodes;
+
     getNamePool()->setRootNamePool(session->getRootNamePool());
 
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
@@ -990,6 +996,8 @@ SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL Linkage::getGlobalSession()
 void Linkage::addTarget(
     slang::TargetDesc const&  desc)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     auto targetIndex = addTarget(CodeGenTarget(desc.format));
     auto target = targets[targetIndex];
 
@@ -1018,6 +1026,8 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     const char*     moduleName,
     slang::IBlob**  outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
 
     if (isInLanguageServer())
@@ -1048,6 +1058,8 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     slang::IBlob* source,
     slang::IBlob** outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     if (isInLanguageServer())
     {
@@ -1096,6 +1108,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     slang::IComponentType**         outCompositeComponentType,
     ISlangBlob**                    outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     // Attempting to create a "composite" of just one component type should
     // just return the component type itself, to avoid redundant work.
     //
@@ -1131,6 +1145,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     SlangInt                        specializationArgCount,
     ISlangBlob**                    outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     auto unspecializedType = asInternal(inUnspecializedType);
 
     List<Type*> typeArgs;
@@ -1157,6 +1173,8 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     slang::LayoutRules      rules,
     ISlangBlob**            outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     auto type = asInternal(inType);
 
     if(targetIndex < 0 || targetIndex >= targets.getCount())
@@ -1187,6 +1205,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
     slang::ContainerType containerType,
     ISlangBlob** outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     auto type = asInternal(inType);
 
     Type* containerTypeReflection = nullptr;
@@ -1197,29 +1217,20 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
         {
         case slang::ContainerType::ConstantBuffer:
             {
-                ConstantBufferType* cbType = getASTBuilder()->create<ConstantBufferType>();
-                cbType->elementType = type;
-                cbType->declRef = getASTBuilder()->getBuiltinDeclRef(
-                    "ConstantBuffer", static_cast<Val*>(type));
+                ConstantBufferType* cbType = getASTBuilder()->getConstantBufferType(type);
                 containerTypeReflection = cbType;
             }
             break;
         case slang::ContainerType::ParameterBlock:
             {
-                ParameterBlockType* pbType = getASTBuilder()->create<ParameterBlockType>();
-                pbType->elementType = type;
-                pbType->declRef = getASTBuilder()->getBuiltinDeclRef(
-                    "ParameterBlock", static_cast<Val*>(type));
+                ParameterBlockType* pbType = getASTBuilder()->getParameterBlockType(type);
                 containerTypeReflection = pbType;
             }
             break;
         case slang::ContainerType::StructuredBuffer:
             {
                 HLSLStructuredBufferType* sbType =
-                    getASTBuilder()->create<HLSLStructuredBufferType>();
-                sbType->elementType = type;
-                sbType->declRef = getASTBuilder()->getBuiltinDeclRef(
-                    "HLSLStructuredBufferType", static_cast<Val*>(type));
+                    getASTBuilder()->getStructuredBufferType(type);
                 containerTypeReflection = sbType;
             }
             break;
@@ -1244,16 +1255,20 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
 
 SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getDynamicType()
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     return asExternal(getASTBuilder()->getSharedASTBuilder()->getDynamicType());
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeRTTIMangledName(
     slang::TypeReflection* type, ISlangBlob** outNameBlob)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     auto internalType = asInternal(type);
     if (auto declRefType = as<DeclRefType>(internalType))
     {
-        auto name = getMangledName(internalType->getASTBuilder(), declRefType->declRef);
+        auto name = getMangledName(m_astBuilder, declRefType->getDeclRef());
         Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(name);
         *outNameBlob = blob.detach();
         return SLANG_OK;
@@ -1264,9 +1279,11 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeRTTIMangledName(
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangledName(
     slang::TypeReflection* type, slang::TypeReflection* interfaceType, ISlangBlob** outNameBlob)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     auto subType = asInternal(type);
     auto supType = asInternal(interfaceType);
-    auto name = getMangledNameForConformanceWitness(subType->getASTBuilder(), subType, supType);
+    auto name = getMangledNameForConformanceWitness(m_astBuilder, subType, supType);
     Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(name);
     *outNameBlob = blob.detach();
     return SLANG_OK;
@@ -1277,14 +1294,16 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     slang::TypeReflection* interfaceType,
     uint32_t* outId)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     auto subType = asInternal(type);
     auto supType = asInternal(interfaceType);
 
     if (!subType || !supType)
         return SLANG_FAIL;
 
-    auto name = getMangledNameForConformanceWitness(subType->getASTBuilder(), subType, supType);
-    auto interfaceName = getMangledTypeName(supType->getASTBuilder(), supType);
+    auto name = getMangledNameForConformanceWitness(m_astBuilder, subType, supType);
+    auto interfaceName = getMangledTypeName(m_astBuilder, supType);
     uint32_t resultIndex = 0;
     if (mapMangledNameToRTTIObjectIndex.tryGetValue(name, resultIndex))
     {
@@ -1313,6 +1332,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     SlangInt conformanceIdOverride,
     ISlangBlob** outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
     RefPtr<TypeConformance> result;
     DiagnosticSink sink;
     try
@@ -1550,6 +1571,8 @@ CapabilitySet TargetRequest::getTargetCaps()
 
 TypeLayout* TargetRequest::getTypeLayout(Type* type)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
     // TODO: We are not passing in a `ProgramLayout` here, although one
     // is nominally required to establish the global ordering of
     // generic type parameters, which might be referenced from field types.
@@ -1866,6 +1889,9 @@ Type* ComponentType::getTypeFromString(
     Scope* scope = _createScopeForLegacyLookup(astBuilder);
 
     auto linkage = getLinkage();
+
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
     Expr* typeExpr = linkage->parseTermString(
         typeStr, scope);
     type = checkProperType(linkage, TypeExp(typeExpr), sink);
@@ -2172,6 +2198,8 @@ void FrontEndCompileRequest::parseTranslationUnit(
 {
     auto linkage = getLinkage();
 
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
     // TODO(JS): NOTE! Here we are using the searchDirectories on the linkage. This is because
     // currently the API only allows the setting search paths on linkage.
     //
@@ -2376,6 +2404,8 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
 
 void FrontEndCompileRequest::generateIR()
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
     // Our task in this function is to generate IR code
     // for all of the declarations in the translation
     // units that were loaded.
@@ -2469,6 +2499,8 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 
 SlangResult FrontEndCompileRequest::executeActionsInner()
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
     // We currently allow GlSL files on the command line so that we can
     // drive our "pass-through" mode, but we really want to issue an error
     // message if the user is seriously asking us to compile them.
@@ -3272,7 +3304,7 @@ Module::Module(Linkage* linkage, ASTBuilder* astBuilder)
     }
     else
     {
-        m_astBuilder = new ASTBuilder(linkage->getASTBuilder()->getSharedASTBuilder(), "Module");
+        m_astBuilder = linkage->getASTBuilder();
     }
 
     addModuleDependency(this);
@@ -4091,36 +4123,28 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
         maybeAddModule(module);
     }
 
-    void collectReferencedModules(Substitutions* substitution)
+    void collectReferencedModules(SubstitutionSet substitutions)
     {
-        if(auto genericSubst = as<GenericSubstitution>(substitution))
+        substitutions.forEachGenericSubstitution([this](GenericDecl*, Val::OperandView<Val> args)
         {
-            for(auto arg : genericSubst->getArgs())
+            for (auto arg : args)
             {
                 collectReferencedModules(arg);
             }
-        }
+        });
     }
 
-    void collectReferencedModules(SubstitutionSet const& substitutions)
+    void collectReferencedModules(DeclRefBase* declRef)
     {
-        for(auto subst = substitutions.substitutions; subst; subst = subst->getOuter())
-        {
-            collectReferencedModules(subst);
-        }
-    }
-
-    void collectReferencedModules(DeclRefBase const& declRef)
-    {
-        collectReferencedModules(declRef.getDecl());
-        collectReferencedModules(declRef.getSubst());
+        collectReferencedModules(declRef->getDecl());
+        collectReferencedModules(SubstitutionSet(declRef));
     }
 
     void collectReferencedModules(Type* type)
     {
         if(auto declRefType = as<DeclRefType>(type))
         {
-            collectReferencedModules(declRefType->declRef);
+            collectReferencedModules(declRefType->getDeclRef());
         }
 
         // TODO: Handle non-decl-ref composite type cases
@@ -4135,7 +4159,7 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
         }
         else if (auto declRefVal = as<GenericParamIntVal>(val))
         {
-            collectReferencedModules(declRefVal->declRef);
+            collectReferencedModules(declRefVal->getDeclRef());
         }
 
         // TODO: other cases of values that could reference
@@ -4348,41 +4372,6 @@ SpecializedComponentType::SpecializedComponentType(
         // term, and we should ditch the entire "legacy lookup" idea.
         //
         m_moduleDependencies.add(module);
-    }
-
-    // The following is a bit of a hack.
-    //
-    // TODO: We should not need this hack any longer, since the
-    // new approach to `switch`-based dynamic dispatch has made
-    // the existing tagged-union support obsolete.
-    //
-    // Back-end code generation relies on us having computed layouts for all tagged
-    // unions that end up being used in the code, which means we need a way to find
-    // all such types that get used in a program (and the stuff it imports).
-    //
-    // For now we are assuming a tagged union type only comes into existence
-    // as a (top-level) argument for a generic type parameter, so that we
-    // can check for them here and cache them on the entry point.
-    //
-    // A longer-term strategy might need to consider any (tagged or untagged)
-    // union types that get used inside of a module, and also take
-    // those lists into account.
-    //
-    // An even longer-term strategy would be to allow type layout to
-    // be performed on IR types, so taht we don't need to have front-end
-    // code worrying about this stuff.
-    //
-    for(auto arg : specializationArgs)
-    {
-        auto argType = as<Type>(arg.val);
-        if(!argType)
-            continue;
-
-        auto taggedUnionType = as<TaggedUnionType>(argType);
-        if(!taggedUnionType)
-            continue;
-
-        m_taggedUnionTypes.add(taggedUnionType);
     }
 
     // Because we are specializing shader code, the mangled entry

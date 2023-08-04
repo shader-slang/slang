@@ -24,6 +24,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ast-builder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ast-decl-ref.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ast-decl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -450,9 +453,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-ir-union.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -623,6 +623,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ast-builder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ast-decl-ref.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ast-decl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -639,9 +642,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ast-reflect.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-ast-substitutions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ast-support-types.cpp">
@@ -681,6 +681,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-check-overload.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-check-resolve-val.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-check-shader.cpp">
@@ -1058,9 +1061,6 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-ir-union.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1202,6 +1202,7 @@
     <ClCompile Include="..\..\..\source\slang\slang.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ast-base.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\source\slang\core.meta.slang">

@@ -39,7 +39,7 @@ struct ASTConstructAccess
         static void* create(void* context)
         {
             ASTBuilder* astBuilder = (ASTBuilder*)context;
-            return astBuilder->create<T>();
+            return astBuilder->createImpl<T>();
         }
         static void destroy(void* ptr)
         {

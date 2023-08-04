@@ -31,17 +31,17 @@ void ASTPrinter::addType(Type* type)
         m_builder << "<error>";
         return;
     }
-    type = type->getCanonicalType();
+    type = type->getCanonicalType(nullptr);
     if (m_optionFlags & OptionFlag::SimplifiedBuiltinType)
     {
         if (auto vectorType = as<VectorExpressionType>(type))
         {
-            if (as<BasicExpressionType>(vectorType->elementType))
+            if (as<BasicExpressionType>(vectorType->getElementType()))
             {
-                vectorType->elementType->toText(m_builder);
-                if (as<ConstantIntVal>(vectorType->elementCount))
+                vectorType->getElementType()->toText(m_builder);
+                if (as<ConstantIntVal>(vectorType->getElementCount()))
                 {
-                    m_builder << vectorType->elementCount;
+                    m_builder << vectorType->getElementCount();
                     return;
                 }
             }
@@ -107,14 +107,14 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     auto& sb = m_builder;
 
     // Find the parent declaration
-    auto parentDeclRef = declRef.getParent(m_astBuilder);
+    auto parentDeclRef = declRef.getParent();
 
     // If the immediate parent is a generic, then we probably
     // want the declaration above that...
     auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
     if (parentGenericDeclRef)
     {
-        parentDeclRef = parentGenericDeclRef.getParent(m_astBuilder);
+        parentDeclRef = parentGenericDeclRef.getParent();
     }
 
     // Depending on what the parent is, we may want to format things specially
@@ -172,12 +172,9 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
         !declRef.as<GenericValueParamDecl>() &&
         !declRef.as<GenericTypeParamDecl>())
     {
-        auto genSubst = as<GenericSubstitution>(declRef.getSubst());
-        if (genSubst)
+        auto substArgs = tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
+        if (substArgs.getCount())
         {
-            SLANG_RELEASE_ASSERT(genSubst);
-            SLANG_RELEASE_ASSERT(genSubst->getGenericDecl() == parentGenericDeclRef.getDecl());
-
             // If the name we printed previously was an operator
             // that ends with `<`, then immediately printing the
             // generic arguments inside `<...>` may cause it to
@@ -193,7 +190,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
             sb << "<";
             bool first = true;
-            for (auto arg : genSubst->getArgs())
+            for (auto arg : substArgs)
             {
                 // When printing the representation of a specialized
                 // generic declaration we don't want to include the
@@ -331,7 +328,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
     {
         addGenericParams(genericDeclRef);
 
-        addDeclParams(m_astBuilder->getSpecializedDeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.getSubst()), outParamRange);
+        addDeclParams(m_astBuilder->getMemberDeclRef(genericDeclRef, genericDeclRef.getDecl()->inner), outParamRange);
     }
     else
     {
@@ -443,7 +440,7 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     DeclRef<Decl> declRef = inDeclRef;
     if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
-        declRef = m_astBuilder->getSpecializedDeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.getSubst());
+        declRef = m_astBuilder->getMemberDeclRef<Decl>(genericDeclRef, genericDeclRef.getDecl()->inner);
     }
 
     if (declRef.as<ConstructorDecl>())

@@ -316,7 +316,7 @@ interface __FlagsEnumType : __EnumType
 };
 
 __generic<T, let N:int>
-__magic_type(ArrayType)
+__magic_type(ArrayExpressionType)
 struct Array
 {
 }
@@ -876,7 +876,7 @@ extension int16_t
 
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
-__magic_type(Vector)
+__magic_type(VectorExpressionType)
 struct vector
 {
         /// The element type of the vector
@@ -896,7 +896,7 @@ struct vector
 
     /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 __generic<T = float, let R : int = 4, let C : int = 4>
-__magic_type(Matrix)
+__magic_type(MatrixExpressionType)
 struct matrix
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
@@ -957,12 +957,12 @@ for (int tt = 0; tt < kTypeCount; ++tt)
 
 __generic<T>
 __intrinsic_type($(kIROp_ConstantBufferType))
-__magic_type(ConstantBuffer)
+__magic_type(ConstantBufferType)
 struct ConstantBuffer {}
 
 __generic<T>
 __intrinsic_type($(kIROp_TextureBufferType))
-__magic_type(TextureBuffer)
+__magic_type(TextureBufferType)
 struct TextureBuffer {}
 
 __generic<T>
@@ -1238,14 +1238,14 @@ extension matrix<T, R, C> : IDifferentiable
 //@ public:
 
     /// Sampling state for filtered texture fetches.
-__magic_type(SamplerState, $(int(SamplerStateFlavor::SamplerState)))
+__magic_type(SamplerStateType, $(int(SamplerStateFlavor::SamplerState)))
 __intrinsic_type($(kIROp_SamplerStateType))
 struct SamplerState
 {
 }
 
     /// Sampling state for filtered texture fetches that include a comparison operation before filtering.
-__magic_type(SamplerState, $(int(SamplerStateFlavor::SamplerComparisonState)))
+__magic_type(SamplerStateType, $(int(SamplerStateFlavor::SamplerComparisonState)))
 __intrinsic_type($(kIROp_SamplerComparisonStateType))
 struct SamplerComparisonState
 {
@@ -1347,12 +1347,12 @@ struct TextureTypeInfo
             
         if(prefixInfo.combined)
         {
-            sb << "__magic_type(TextureSampler," << int(flavor) << ")\n";
+            sb << "__magic_type(TextureSamplerType," << int(flavor) << ")\n";
             sb << "__intrinsic_type(" << (kIROp_TextureSamplerType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
         }
         else
         {
-            sb << "__magic_type(Texture," << int(flavor) << ")\n";
+            sb << "__magic_type(TextureType," << int(flavor) << ")\n";
             sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
         }
         sb << "struct ";

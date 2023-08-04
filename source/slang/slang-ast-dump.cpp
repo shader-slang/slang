@@ -65,18 +65,6 @@ struct ASTDumpContext
         }
     }
 
-    void dump(Substitutions* subs)
-    {
-        if (subs == nullptr)
-        {
-            _dumpPtr(nullptr);
-        }
-        else
-        {
-            dumpObject(subs->getClassInfo(), subs);
-        }
-    }
-
     void dump(const Name* name)
     {
         if (name == nullptr)
@@ -608,12 +596,55 @@ struct ASTDumpContext
         m_writer->emit("\n");
     }
 
+    template<int N>
+    void dump(const ShortList<ValNodeOperand, N>& operands)
+    {
+        m_writer->emit("(");
+        bool isFirst = true;
+        for (auto operand : operands)
+        {
+            if (!isFirst)
+            {
+                m_writer->emit(", ");
+            }
+            isFirst = false;
+            dumpField("operand", operand);
+        }
+
+        m_writer->emit(")");
+    }
+
+    void dump(ValNodeOperand operand)
+    {
+        switch (operand.kind)
+        {
+        case ValNodeOperandKind::ConstantValue:
+            dump(operand.values.intOperand);
+            break;
+        case ValNodeOperandKind::ValNode:
+            dump(operand.values.nodeOperand);
+            break;
+        case ValNodeOperandKind::ASTNode:
+            dump(operand.values.nodeOperand);
+            break;
+        }
+    }
+
     void dump(ASTNodeType nodeType)
     {
         // Get the class
         auto info = ASTClassInfo::getInfo(nodeType);
         // Write the name
         m_writer->emit(info->m_name);
+    }
+
+    void dump(KeyValuePair<DeclRefBase*, SubtypeWitness*> pair)
+    {
+        m_writer->emit("(");
+        dump(pair.key);
+        m_writer->emit(", ");
+        dump(pair.value);
+        m_writer->emit(")");
     }
 
     void dumpObjectFull(NodeBase* node);

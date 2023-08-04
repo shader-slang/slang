@@ -1,24 +1,19 @@
 // slang-ast-type.cpp
 #include "slang-ast-builder.h"
+#include "slang-ast-modifier.h"
 #include <assert.h>
 #include <typeinfo>
 
 #include "slang-syntax.h"
 
 #include "slang-generated-ast-macro.h"
-
 namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Type* Type::createCanonicalType()
-{
-    SLANG_AST_NODE_VIRTUAL_CALL(Type, createCanonicalType, ())
-}
-
 bool Type::equals(Type* type)
 {
-    return getCanonicalType()->equalsImpl(type->getCanonicalType());
+    return getCanonicalType(nullptr)->equalsImpl(type->getCanonicalType(nullptr));
 }
 
 bool Type::equalsImpl(Type* type)
@@ -33,10 +28,9 @@ bool Type::_equalsImplOverride(Type* type)
     //return false;
 }
 
-Type* Type::_createCanonicalTypeOverride()
+Type* Type::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
-    SLANG_UNEXPECTED("Type::_createCanonicalTypeOverride not overridden");
-    //return Type*();
+    return as<Type>(defaultResolveImpl());
 }
 
 bool Type::_equalsValOverride(Val* val)
@@ -49,7 +43,7 @@ bool Type::_equalsValOverride(Val* val)
 Val* Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
-    auto canSubst = getCanonicalType()->substituteImpl(astBuilder, subst, &diff);
+    auto canSubst = getCanonicalType(nullptr)->substituteImpl(astBuilder, subst, &diff);
 
     // If nothing changed, then don't drop any sugar that is applied
     if (!diff)
@@ -59,20 +53,6 @@ Val* Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst
     // rather than try to re-construct any amount of sugar
     (*ioDiff)++;
     return canSubst;
-}
-
-Type* Type::getCanonicalType()
-{
-    Type* et = const_cast<Type*>(this);
-    if (!et->canonicalType)
-    {
-        // TODO(tfoley): worry about thread safety here?
-        auto canType = et->createCanonicalType();
-        et->canonicalType = canType;
-        if (!et->canonicalType)
-            return getASTBuilder()->getErrorType();
-    }
-    return et->canonicalType;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OverloadGroupType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -87,7 +67,7 @@ bool OverloadGroupType::_equalsImplOverride(Type * /*type*/)
     return false;
 }
 
-Type* OverloadGroupType::_createCanonicalTypeOverride()
+Type* OverloadGroupType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -109,7 +89,7 @@ bool InitializerListType::_equalsImplOverride(Type * /*type*/)
     return false;
 }
 
-Type* InitializerListType::_createCanonicalTypeOverride()
+Type* InitializerListType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -131,7 +111,7 @@ bool ErrorType::_equalsImplOverride(Type* type)
     return as<ErrorType>(type);
 }
 
-Type* ErrorType::_createCanonicalTypeOverride()
+Type* ErrorType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -155,8 +135,6 @@ bool BottomType::_equalsImplOverride(Type* type)
     return as<BottomType>(type);
 }
 
-Type* BottomType::_createCanonicalTypeOverride() { return this; }
-
 Val* BottomType::_substituteImplOverride(
     ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
 {
@@ -169,28 +147,21 @@ HashCode BottomType::_getHashCodeOverride() { return HashCode(size_t(this)); }
 
 void DeclRefType::_toTextOverride(StringBuilder& out)
 {
-    out << declRef;
+    out << getDeclRef();
 }
 
 HashCode DeclRefType::_getHashCodeOverride()
 {
-    return (declRef.getHashCode() * 16777619) ^ (HashCode)(typeid(this).hash_code());
+    return (getDeclRef().getHashCode() * 16777619) ^ (HashCode)(typeid(this).hash_code());
 }
 
 bool DeclRefType::_equalsImplOverride(Type * type)
 {
     if (auto declRefType = as<DeclRefType>(type))
     {
-        return declRef.equals(declRefType->declRef);
+        return getDeclRef().equals(declRefType->getDeclRef());
     }
     return false;
-}
-
-Type* DeclRefType::_createCanonicalTypeOverride()
-{
-    // A declaration reference is already canonical
-    declRef.substitute(this->getASTBuilder(), this);
-    return this;
 }
 
 Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff);
@@ -199,40 +170,53 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
 {
     if (!subst) return this;
 
-    // the case we especially care about is when this type references a declaration
-    // of a generic parameter, since that is what we might be substituting...
-    if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(declRef.getDecl()))
+    int diff = 0;
+    DeclRef<Decl> substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
+
+    // If this declref type is a direct reference to ThisType or a Generic parameter,
+    // and `subst` provides an argument for it, then we should just return that argument.
+    //
+    if (as<DirectDeclRef>(substDeclRef.declRefBase))
     {
-        if (auto result = maybeSubstituteGenericParam(this, genericTypeParamDecl, subst, ioDiff))
+        if (auto thisDecl = as<ThisTypeDecl>(substDeclRef.getDecl()))
         {
-            if (auto substDeclRefType = as<DeclRefType>(result))
+            auto lookupDeclRef = subst.findLookupDeclRef();
+            if (lookupDeclRef && lookupDeclRef->getSupDecl() == substDeclRef.getDecl()->parentDecl)
             {
-                // After generic substitution, we may be able to further simplify
-                // by looking up the actual type of an associated type.
-                if (auto satisfyingVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(
-                        astBuilder, substDeclRefType->declRef))
-                    return satisfyingVal;
+                (*ioDiff)++;
+                return lookupDeclRef->getLookupSource();
             }
-            return result;
+        }
+        else if (as<GenericTypeParamDecl>(substDeclRef.getDecl()) || as<GenericValueParamDecl>(substDeclRef.getDecl()))
+        {
+            auto resultVal = maybeSubstituteGenericParam(nullptr, substDeclRef.getDecl(), subst, ioDiff);
+            if (resultVal)
+            {
+                (*ioDiff)++;
+                return resultVal;
+            }
         }
     }
-
-    int diff = 0;
-    DeclRef<Decl> substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
-
-    if (!diff)
-        return this;
-
-    // Make sure to record the difference!
-    *ioDiff += diff;
 
     // If this type is a reference to an associated type declaration,
     // and the substitutions provide a "this type" substitution for
     // the outer interface, then try to replace the type with the
     // actual value of the associated type for the given implementation.
     //
-    if (auto satisfyingVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(astBuilder, substDeclRef))
-        return satisfyingVal;
+    if (auto satisfyingVal = substDeclRef.declRefBase->resolve(nullptr))
+    {
+        if (satisfyingVal != getDeclRef())
+        {
+            *ioDiff += 1;
+            return DeclRefType::create(astBuilder, substDeclRef);
+        }
+    }
+
+    if (!diff)
+        return this;
+
+    // Make sure to record the difference!
+    *ioDiff += diff;
 
     // Re-construct the type in case we are using a specialized sub-class
     return DeclRefType::create(astBuilder, substDeclRef);
@@ -254,40 +238,52 @@ BasicExpressionType* ArithmeticExpressionType::_getScalarTypeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BasicExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool BasicExpressionType::_equalsImplOverride(Type * type)
-{
-    auto basicType = as<BasicExpressionType>(type);
-    return basicType && basicType->baseType == this->baseType;
-}
-
-Type* BasicExpressionType::_createCanonicalTypeOverride()
-{
-    // A basic type is already canonical, in our setup
-    return this;
-}
-
 BasicExpressionType* BasicExpressionType::_getScalarTypeOverride()
 {
     return this;
 }
 
+static Val* _getGenericTypeArg(DeclRefBase* declRef, Index i)
+{
+    auto args = findInnerMostGenericArgs(SubstitutionSet(declRef));
+    if (args.getCount() <= i)
+        return nullptr;
+
+    return args[i];
+}
+
+static Val* _getGenericTypeArg(DeclRefType* declRefType, Index i)
+{
+    return _getGenericTypeArg(declRefType->getDeclRefBase(), i);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TensorViewType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* TensorViewType::getElementType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
+    return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VectorExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+Type* VectorExpressionType::getElementType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
+IntVal* VectorExpressionType::getElementCount()
+{
+    return as<IntVal>(_getGenericTypeArg(this, 1));
+}
+
 void VectorExpressionType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("vector<") << elementType << toSlice(",") << elementCount << toSlice(">");
+    out << toSlice("vector<") << getElementType() << toSlice(",") << getElementCount() << toSlice(">");
 }
 
 BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
 {
-    return as<BasicExpressionType>(elementType);
+    return as<BasicExpressionType>(getElementType());
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MatrixExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -304,24 +300,24 @@ BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
 
 Type* MatrixExpressionType::getElementType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
+    return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 IntVal* MatrixExpressionType::getRowCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[1]);
+    return as<IntVal>(_getGenericTypeArg(this, 1));
 }
 
 IntVal* MatrixExpressionType::getColumnCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[2]);
+    return as<IntVal>(_getGenericTypeArg(this, 2));
 }
 
 Type* MatrixExpressionType::getRowType()
 {
     if (!rowType)
     {
-        rowType = m_astBuilder->getVectorType(getElementType(), getColumnCount());
+        rowType = getCurrentASTBuilder()->getVectorType(getElementType(), getColumnCount());
     }
     return rowType;
 }
@@ -330,12 +326,12 @@ Type* MatrixExpressionType::getRowType()
 
 Type* ArrayExpressionType::getElementType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
+    return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 IntVal* ArrayExpressionType::getElementCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[1]);
+    return as<IntVal>(_getGenericTypeArg(this, 1));
 }
 
 void ArrayExpressionType::_toTextOverride(StringBuilder& out)
@@ -353,7 +349,7 @@ bool ArrayExpressionType::isUnsized()
 {
     if (auto constSize = as<ConstantIntVal>(getElementCount()))
     {
-        if (constSize->value == kUnsizedArrayMagicLength)
+        if (constSize->getValue() == kUnsizedArrayMagicLength)
             return true;
     }
     return false;
@@ -363,21 +359,21 @@ bool ArrayExpressionType::isUnsized()
 
 void TypeType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("typeof(") << type << toSlice(")");
+    out << toSlice("typeof(") << getType() << toSlice(")");
 }
 
 bool TypeType::_equalsImplOverride(Type * t)
 {
     if (auto typeType = as<TypeType>(t))
     {
-        return t->equals(typeType->type);
+        return t->equals(typeType->getType());
     }
     return false;
 }
 
-Type* TypeType::_createCanonicalTypeOverride()
+Type* TypeType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
-    return getASTBuilder()->getTypeType(type->getCanonicalType());
+    return getCurrentASTBuilder()->getTypeType(getType()->getCanonicalType(semantics));
 }
 
 HashCode TypeType::_getHashCodeOverride()
@@ -398,17 +394,17 @@ bool GenericDeclRefType::_equalsImplOverride(Type * type)
 {
     if (auto genericDeclRefType = as<GenericDeclRefType>(type))
     {
-        return declRef.equals(genericDeclRefType->declRef);
+        return getDeclRef().equals(genericDeclRefType->getDeclRef());
     }
     return false;
 }
 
 HashCode GenericDeclRefType::_getHashCodeOverride()
 {
-    return declRef.getHashCode();
+    return getDeclRef().getHashCode();
 }
 
-Type* GenericDeclRefType::_createCanonicalTypeOverride()
+Type* GenericDeclRefType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -417,31 +413,31 @@ Type* GenericDeclRefType::_createCanonicalTypeOverride()
 
 void NamespaceType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("namespace ") << declRef; 
+    out << toSlice("namespace ") << getDeclRef(); 
 }
 
 bool NamespaceType::_equalsImplOverride(Type * type)
 {
     if (auto namespaceType = as<NamespaceType>(type))
     {
-        return declRef.equals(namespaceType->declRef);
+        return getDeclRef().equals(namespaceType->getDeclRef());
     }
     return false;
 }
 
 HashCode NamespaceType::_getHashCodeOverride()
 {
-    return declRef.getHashCode();
+    return getDeclRef().getHashCode();
 }
 
-Type* NamespaceType::_createCanonicalTypeOverride()
+Type* NamespaceType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
 
 Type* DifferentialPairType::getPrimalType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
+    return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 
@@ -449,21 +445,21 @@ Type* DifferentialPairType::getPrimalType()
 
 Type* PtrTypeBase::getValueType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
+    return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 Type* OptionalType::getValueType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.getSubst())->getArgs()[0]);
+    return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void NamedExpressionType::_toTextOverride(StringBuilder& out)
 {
-    if (declRef.getDecl())
+    if (getDeclRef().getDecl())
     {
-        _printNestedDecl(declRef.getSubst(), declRef.getDecl(), out);
+        getDeclRef().declRefBase->toText(out);
     }
 }
 
@@ -473,13 +469,12 @@ bool NamedExpressionType::_equalsImplOverride(Type * /*type*/)
     //return false;
 }
 
-Type* NamedExpressionType::_createCanonicalTypeOverride()
+Type* NamedExpressionType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
-    if (!innerType)
-        innerType = getType(m_astBuilder, declRef);
-    if (innerType)
-        return innerType->getCanonicalType();
-    return nullptr;
+    auto canType = getType(getCurrentASTBuilder(), getDeclRef());
+    if (canType)
+        return canType->getCanonicalType(semantics);
+    return getCurrentASTBuilder()->getErrorType();
 }
 
 HashCode NamedExpressionType::_getHashCodeOverride()
@@ -493,7 +488,7 @@ HashCode NamedExpressionType::_getHashCodeOverride()
     // for now (and hopefully equivalent) to just have any
     // named types automaticlaly route hash-code requests
     // to their canonical type.
-    return getCanonicalType()->getHashCode();
+    return getCanonicalType(nullptr)->getHashCode();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -533,7 +528,7 @@ void FuncType::_toTextOverride(StringBuilder& out)
     }
     out << ") -> " << getResultType();
 
-    if (!getErrorType()->equals(getASTBuilder()->getBottomType()))
+    if (!getErrorType()->equals(getCurrentASTBuilder()->getBottomType()))
     {
         out << " throws " << getErrorType();
     }
@@ -556,10 +551,10 @@ bool FuncType::_equalsImplOverride(Type * type)
                 return false;
         }
 
-        if (!resultType->equals(funcType->resultType))
+        if (!getResultType()->equals(funcType->getResultType()))
             return false;
 
-        if (!errorType->equals(funcType->errorType))
+        if (!getErrorType()->equals(funcType->getErrorType()))
             return false;
 
         // TODO: if we ever introduce other kinds
@@ -575,16 +570,16 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     int diff = 0;
 
     // result type
-    Type* substResultType = as<Type>(resultType->substituteImpl(astBuilder, subst, &diff));
+    Type* substResultType = as<Type>(getResultType()->substituteImpl(astBuilder, subst, &diff));
 
     // error type
-    Type* substErrorType = as<Type>(errorType->substituteImpl(astBuilder, subst, &diff));
+    Type* substErrorType = as<Type>(getErrorType()->substituteImpl(astBuilder, subst, &diff));
 
     // parameter types
     List<Type*> substParamTypes;
-    for (auto pp : paramTypes)
+    for (Index pp = 0; pp < getParamCount(); pp++ )
     {
-        substParamTypes.add(as<Type>(pp->substituteImpl(astBuilder, subst, &diff)));
+        substParamTypes.add(as<Type>(getParamType(pp)->substituteImpl(astBuilder, subst, &diff)));
     }
 
     // early exit for no change...
@@ -592,30 +587,24 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
         return this;
 
     (*ioDiff)++;
-    FuncType* substType = astBuilder->create<FuncType>();
-    substType->resultType = substResultType;
-    substType->paramTypes = substParamTypes;
-    substType->errorType = substErrorType;
+    FuncType* substType = astBuilder->getFuncType(substParamTypes.getArrayView(), substResultType, substErrorType);
     return substType;
 }
 
-Type* FuncType::_createCanonicalTypeOverride()
+Type* FuncType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     // result type
-    Type* canResultType = resultType->getCanonicalType();
-    Type* canErrorType = errorType->getCanonicalType();
+    Type* canResultType = getResultType()->getCanonicalType(semantics);
+    Type* canErrorType = getErrorType()->getCanonicalType(semantics);
 
     // parameter types
     List<Type*> canParamTypes;
-    for (auto pp : paramTypes)
+    for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        canParamTypes.add(pp->getCanonicalType());
+        canParamTypes.add(getParamType(pp)->getCanonicalType(semantics));
     }
 
-    FuncType* canType = getASTBuilder()->create<FuncType>();
-    canType->resultType = canResultType;
-    canType->paramTypes = canParamTypes;
-    canType->errorType = canErrorType;
+    FuncType* canType = getCurrentASTBuilder()->getFuncType(canParamTypes.getArrayView(), canResultType, canErrorType);
     return canType;
 }
 
@@ -634,16 +623,17 @@ HashCode FuncType::_getHashCodeOverride()
     return hashCode;
 }
 
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void TupleType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("(");
-    for (Index pp = 0; pp < memberTypes.getCount(); ++pp)
+    for (Index pp = 0; pp < getOperandCount(); ++pp)
     {
         if (pp != 0)
             out << toSlice(", ");
-        out << memberTypes[pp];
+        out << getOperand(pp);
     }
     out << toSlice(")");
 }
@@ -652,14 +642,14 @@ bool TupleType::_equalsImplOverride(Type * type)
 {
     if (const auto other = as<TupleType>(type))
     {
-        auto paramCount = memberTypes.getCount();
-        auto otherParamCount = other->memberTypes.getCount();
+        auto paramCount = getOperandCount();
+        auto otherParamCount = other->getOperandCount();
         if (paramCount != otherParamCount)
             return false;
 
-        for (Index i = 0; i < memberTypes.getCount(); ++i)
+        for (Index i = 0; i < getOperandCount(); ++i)
         {
-            if(!memberTypes[i]->equals(other->memberTypes[i]))
+            if(!as<Type>(getOperand(i))->equals(as<Type>(other->getOperand(i))))
                 return false;
         }
 
@@ -674,34 +664,34 @@ Val* TupleType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet 
 
     // just recurse into the members
     List<Type*> substMemberTypes;
-    for (auto m : memberTypes)
-        substMemberTypes.add(as<Type>(m->substituteImpl(astBuilder, subst, &diff)));
+    for (Index m = 0; m < getMemberCount(); m++)
+        substMemberTypes.add(as<Type>(getMember(m)->substituteImpl(astBuilder, subst, &diff)));
 
     // early exit for no change...
     if (!diff)
         return this;
 
     (*ioDiff)++;
-    return astBuilder->create<TupleType>(std::move(substMemberTypes));
+    return astBuilder->getTupleType(substMemberTypes);
 }
 
-Type* TupleType::_createCanonicalTypeOverride()
+Type* TupleType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     // member types
     List<Type*> canMemberTypes;
-    for (auto m : memberTypes)
+    for (Index m = 0; m < getMemberCount(); m++)
     {
-        canMemberTypes.add(m->getCanonicalType());
+        canMemberTypes.add(getMember(m)->getCanonicalType(semantics));
     }
 
-    return getASTBuilder()->create<TupleType>(std::move(canMemberTypes));
+    return getCurrentASTBuilder()->getTupleType(canMemberTypes);
 }
 
 HashCode TupleType::_getHashCodeOverride()
 {
     HashCode hashCode = Slang::getHashCode(kType);
-    for(auto m : memberTypes)
-        hashCode = combineHash(hashCode, m->getHashCode());
+    for (Index m = 0; m < getMemberCount(); m++)
+        hashCode = combineHash(hashCode, getMember(m)->getHashCode());
     return hashCode;
 }
 
@@ -709,24 +699,24 @@ HashCode TupleType::_getHashCodeOverride()
 
 void ExtractExistentialType::_toTextOverride(StringBuilder& out)
 {
-    out << declRef << toSlice(".This");
+    out << getDeclRef() << toSlice(".This");
 }
 
 bool ExtractExistentialType::_equalsImplOverride(Type* type)
 {
     if (auto extractExistential = as<ExtractExistentialType>(type))
     {
-        return declRef.equals(extractExistential->declRef);
+        return getDeclRef().equals(extractExistential->getDeclRef());
     }
     return false;
 }
 
 HashCode ExtractExistentialType::_getHashCodeOverride()
 {
-    return combineHash(declRef.getHashCode(), originalInterfaceType->getHashCode(), originalInterfaceDeclRef.getHashCode());
+    return combineHash(getDeclRef().getHashCode(), getOriginalInterfaceType()->getHashCode(), getOriginalInterfaceDeclRef().getHashCode());
 }
 
-Type* ExtractExistentialType::_createCanonicalTypeOverride()
+Type* ExtractExistentialType::_createCanonicalTypeOverride(SemanticsVisitor*)
 {
     return this;
 }
@@ -734,18 +724,16 @@ Type* ExtractExistentialType::_createCanonicalTypeOverride()
 Val* ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
-    auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
-    auto substOriginalInterfaceType = originalInterfaceType->substituteImpl(astBuilder, subst, &diff);
-    auto substOriginalInterfaceDeclRef = originalInterfaceDeclRef.substituteImpl(astBuilder, subst, &diff);
+    auto substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
+    auto substOriginalInterfaceType = getOriginalInterfaceType()->substituteImpl(astBuilder, subst, &diff);
+    auto substOriginalInterfaceDeclRef = getOriginalInterfaceDeclRef().substituteImpl(astBuilder, subst, &diff);
     if (!diff)
         return this;
 
     (*ioDiff)++;
 
-    ExtractExistentialType* substValue = astBuilder->create<ExtractExistentialType>();
-    substValue->declRef = substDeclRef;
-    substValue->originalInterfaceType = as<Type>(substOriginalInterfaceType);
-    substValue->originalInterfaceDeclRef = substOriginalInterfaceDeclRef;
+    ExtractExistentialType* substValue = astBuilder->getOrCreate<ExtractExistentialType>(
+        substDeclRef, as<Type>(substOriginalInterfaceType), substOriginalInterfaceDeclRef);
     return substValue;
 }
 
@@ -754,121 +742,43 @@ SubtypeWitness* ExtractExistentialType::getSubtypeWitness()
     if (auto cachedValue = this->cachedSubtypeWitness)
         return cachedValue;
 
-    ExtractExistentialSubtypeWitness* openedWitness = m_astBuilder->create<ExtractExistentialSubtypeWitness>();
-    openedWitness->sub = this;
-    openedWitness->sup = originalInterfaceType;
-    openedWitness->declRef = this->declRef;
-
+    ExtractExistentialSubtypeWitness* openedWitness = getCurrentASTBuilder()->getOrCreate<ExtractExistentialSubtypeWitness>(this, getOriginalInterfaceType(), getDeclRef());
     this->cachedSubtypeWitness = openedWitness;
     return openedWitness;
 }
 
-DeclRef<InterfaceDecl> ExtractExistentialType::getSpecializedInterfaceDeclRef()
+DeclRef<ThisTypeDecl> ExtractExistentialType::getThisTypeDeclRef()
 {
-    if (auto cachedValue = this->cachedSpecializedInterfaceDeclRef)
+    if (auto cachedValue = this->cachedThisTypeDeclRef)
         return cachedValue;
 
-    auto interfaceDecl = originalInterfaceDeclRef.getDecl();
+    auto interfaceDecl = getOriginalInterfaceDeclRef().getDecl();
 
     SubtypeWitness* openedWitness = getSubtypeWitness();
 
-    ThisTypeSubstitution* openedThisType = m_astBuilder->getOrCreateThisTypeSubstitution(
-        interfaceDecl, openedWitness, originalInterfaceDeclRef.getSubst());
-
-    DeclRef<InterfaceDecl> specialiedInterfaceDeclRef = m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
-
-    this->cachedSpecializedInterfaceDeclRef = specialiedInterfaceDeclRef;
-    return specialiedInterfaceDeclRef;
-}
-
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TaggedUnionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-void TaggedUnionType::_toTextOverride(StringBuilder& out)
-{
-    out << toSlice("__TaggedUnion(");
-    bool first = true;
-    for (auto caseType : caseTypes)
-    {
-        if (!first)
+    ThisTypeDecl* thisTypeDecl = nullptr;
+    for (auto member : interfaceDecl->members)
+        if (as<ThisTypeDecl>(member))
         {
-            out << toSlice(", ");
+            thisTypeDecl = as<ThisTypeDecl>(member);
+            break;
         }
-        first = false;
+    SLANG_ASSERT(thisTypeDecl);
 
-        out << caseType;
-    }
-    out << toSlice(")");
-}
+    DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef = getCurrentASTBuilder()->getLookupDeclRef(openedWitness, thisTypeDecl);
 
-bool TaggedUnionType::_equalsImplOverride(Type* type)
-{
-    auto taggedUnion = as<TaggedUnionType>(type);
-    if (!taggedUnion)
-        return false;
-
-    auto caseCount = caseTypes.getCount();
-    if (caseCount != taggedUnion->caseTypes.getCount())
-        return false;
-
-    for (Index ii = 0; ii < caseCount; ++ii)
-    {
-        if (!caseTypes[ii]->equals(taggedUnion->caseTypes[ii]))
-            return false;
-    }
-    return true;
-}
-
-HashCode TaggedUnionType::_getHashCodeOverride()
-{
-    HashCode hashCode = 0;
-    for (auto caseType : caseTypes)
-    {
-        hashCode = combineHash(hashCode, caseType->getHashCode());
-    }
-    return hashCode;
-}
-
-Type* TaggedUnionType::_createCanonicalTypeOverride()
-{
-    TaggedUnionType* canType = m_astBuilder->create<TaggedUnionType>();
-
-    for (auto caseType : caseTypes)
-    {
-        auto canCaseType = caseType->getCanonicalType();
-        canType->caseTypes.add(canCaseType);
-    }
-
-    return canType;
-}
-
-Val* TaggedUnionType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
-{
-    int diff = 0;
-
-    List<Type*> substCaseTypes;
-    for (auto caseType : caseTypes)
-    {
-        substCaseTypes.add(as<Type>(caseType->substituteImpl(astBuilder, subst, &diff)));
-    }
-    if (!diff)
-        return this;
-
-    (*ioDiff)++;
-
-    TaggedUnionType* substType = astBuilder->create<TaggedUnionType>();
-    substType->caseTypes.swapWith(substCaseTypes);
-    return substType;
+    this->cachedThisTypeDeclRef = specialiedInterfaceDeclRef;
+    return specialiedInterfaceDeclRef;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialSpecializedType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void ExistentialSpecializedType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("__ExistentialSpecializedType(") << baseType;
-    for (auto arg : args)
+    out << toSlice("__ExistentialSpecializedType(") << getBaseType();
+    for (Index i = 0; i < getArgCount(); i++)
     {
-        out << toSlice(", ") << arg.val;
+        out << toSlice(", ") << getArg(i).val;
     }
     out << toSlice(")");
 }
@@ -879,17 +789,17 @@ bool ExistentialSpecializedType::_equalsImplOverride(Type * type)
     if (!other)
         return false;
 
-    if (!baseType->equals(other->baseType))
+    if (!getBaseType()->equals(other->getBaseType()))
         return false;
 
-    auto argCount = args.getCount();
-    if (argCount != other->args.getCount())
+    auto argCount = getArgCount();
+    if (argCount != other->getArgCount())
         return false;
 
     for (Index ii = 0; ii < argCount; ++ii)
     {
-        auto arg = args[ii];
-        auto otherArg = other->args[ii];
+        auto arg = getArg(ii);
+        auto otherArg = other->getArg(ii);
 
         if (!arg.val->equalsVal(otherArg.val))
             return false;
@@ -903,9 +813,10 @@ bool ExistentialSpecializedType::_equalsImplOverride(Type * type)
 HashCode ExistentialSpecializedType::_getHashCodeOverride()
 {
     Hasher hasher;
-    hasher.hashObject(baseType);
-    for (auto arg : args)
+    hasher.hashObject(getBaseType());
+    for (Index ii = 0; ii < getArgCount(); ++ii)
     {
+        auto arg = getArg(ii);
         hasher.hashObject(arg.val);
         if (auto witness = arg.witness)
             hasher.hashObject(witness);
@@ -919,25 +830,30 @@ static Val* _getCanonicalValue(Val* val)
         return nullptr;
     if (auto type = as<Type>(val))
     {
-        return type->getCanonicalType();
+        return type->getCanonicalType(nullptr);
     }
     // TODO: We may eventually need/want some sort of canonicalization
     // for non-type values, but for now there is nothing to do.
     return val;
 }
 
-Type* ExistentialSpecializedType::_createCanonicalTypeOverride()
+Type* ExistentialSpecializedType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
-    ExistentialSpecializedType* canType = m_astBuilder->create<ExistentialSpecializedType>();
+    ExpandedSpecializationArgs newArgs;
 
-    canType->baseType = baseType->getCanonicalType();
-    for (auto arg : args)
+    for (Index ii = 0; ii < getArgCount(); ++ii)
     {
+        auto arg = getArg(ii);
         ExpandedSpecializationArg canArg;
         canArg.val = _getCanonicalValue(arg.val);
         canArg.witness = _getCanonicalValue(arg.witness);
-        canType->args.add(canArg);
+        newArgs.add(canArg);
     }
+
+    ExistentialSpecializedType* canType = getCurrentASTBuilder()->getOrCreate<ExistentialSpecializedType>(
+        getBaseType()->getCanonicalType(semantics),
+        newArgs);
+
     return canType;
 }
 
@@ -951,11 +867,12 @@ Val* ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder,
 {
     int diff = 0;
 
-    auto substBaseType = as<Type>(baseType->substituteImpl(astBuilder, subst, &diff));
+    auto substBaseType = as<Type>(getBaseType()->substituteImpl(astBuilder, subst, &diff));
 
     ExpandedSpecializationArgs substArgs;
-    for (auto arg : args)
+    for (Index ii = 0; ii < getArgCount(); ++ii)
     {
+        auto arg = getArg(ii);
         ExpandedSpecializationArg substArg;
         substArg.val = _substituteImpl(astBuilder, arg.val, subst, &diff);
         substArg.witness = _substituteImpl(astBuilder, arg.witness, subst, &diff);
@@ -967,74 +884,22 @@ Val* ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder,
 
     (*ioDiff)++;
 
-    ExistentialSpecializedType* substType = astBuilder->create<ExistentialSpecializedType>();
-    substType->baseType = substBaseType;
-    substType->args = substArgs;
+    ExistentialSpecializedType* substType = astBuilder->getOrCreate<ExistentialSpecializedType>(substBaseType, substArgs);
     return substType;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ThisType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void ThisType::_toTextOverride(StringBuilder& out)
+InterfaceDecl* ThisType::getInterfaceDecl()
 {
-    out << interfaceDeclRef << toSlice(".This");
-}
-
-bool ThisType::_equalsImplOverride(Type * type)
-{
-    auto other = as<ThisType>(type);
-    if (!other)
-        return false;
-
-    if (!interfaceDeclRef.equals(other->interfaceDeclRef))
-        return false;
-
-    return true;
-}
-
-HashCode ThisType::_getHashCodeOverride()
-{
-    return combineHash(
-        HashCode(typeid(*this).hash_code()),
-        interfaceDeclRef.getHashCode());
-}
-
-Type* ThisType::_createCanonicalTypeOverride()
-{
-    ThisType* canType = m_astBuilder->create<ThisType>();
-
-    // TODO: need to canonicalize the decl-ref
-    canType->interfaceDeclRef = interfaceDeclRef;
-    return canType;
-}
-
-Val* ThisType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
-{
-    int diff = 0;
-
-    auto substInterfaceDeclRef = interfaceDeclRef.substituteImpl(astBuilder, subst, &diff);
-
-    auto thisTypeSubst = findThisTypeSubstitution(subst.substitutions, substInterfaceDeclRef.getDecl());
-    if (thisTypeSubst)
-    {
-        return thisTypeSubst->witness->sub;
-    }
-
-    if (!diff)
-        return this;
-
-    (*ioDiff)++;
-
-    ThisType* substType = m_astBuilder->create<ThisType>();
-    substType->interfaceDeclRef = substInterfaceDeclRef;
-    return substType;
+    return dynamicCast<InterfaceDecl>(getDeclRefBase()->getDecl()->parentDecl);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AndType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void AndType::_toTextOverride(StringBuilder& out)
 {
-    out << left << toSlice(" & ") << right;
+    out << getLeft() << toSlice(" & ") << getRight();
 }
 
 bool AndType::_equalsImplOverride(Type * type)
@@ -1043,9 +908,9 @@ bool AndType::_equalsImplOverride(Type * type)
     if (!other)
         return false;
 
-    if(!left->equals(other->left))
+    if(!getLeft()->equals(other->getLeft()))
         return false;
-    if(!right->equals(other->right))
+    if(!getRight()->equals(other->getRight()))
         return false;
 
     return true;
@@ -1054,12 +919,12 @@ bool AndType::_equalsImplOverride(Type * type)
 HashCode AndType::_getHashCodeOverride()
 {
     Hasher hasher;
-    hasher.hashObject(left);
-    hasher.hashObject(right);
+    hasher.hashObject(getLeft());
+    hasher.hashObject(getRight());
     return hasher.getResult();
 }
 
-Type* AndType::_createCanonicalTypeOverride()
+Type* AndType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
     // TODO: proper canonicalization of an `&` type relies on
     // several different things:
@@ -1094,9 +959,9 @@ Type* AndType::_createCanonicalTypeOverride()
     // right now, in the name of getting something up and running.
     //
 
-    auto canLeft = left->getCanonicalType();
-    auto canRight = right->getCanonicalType();
-    auto canType = m_astBuilder->getAndType(canLeft, canRight);
+    auto canLeft = getLeft()->getCanonicalType(semantics);
+    auto canRight = getRight()->getCanonicalType(semantics);
+    auto canType = getCurrentASTBuilder()->getAndType(canLeft, canRight);
     return canType;
 }
 
@@ -1104,15 +969,15 @@ Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet su
 {
     int diff = 0;
 
-    auto substLeft  = as<Type>(left ->substituteImpl(astBuilder, subst, &diff));
-    auto substRight = as<Type>(right->substituteImpl(astBuilder, subst, &diff));
+    auto substLeft  = as<Type>(getLeft()->substituteImpl(astBuilder, subst, &diff));
+    auto substRight = as<Type>(getRight()->substituteImpl(astBuilder, subst, &diff));
 
     if(!diff)
         return this;
 
     (*ioDiff)++;
 
-    auto substType = m_astBuilder->getAndType(substLeft, substRight);
+    auto substType = getCurrentASTBuilder()->getAndType(substLeft, substRight);
     return substType;
 }
 
@@ -1120,12 +985,12 @@ Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet su
 
 void ModifiedType::_toTextOverride(StringBuilder& out)
 {
-    for( auto modifier : modifiers )
+    for( Index i = 0; i < getModifierCount(); i++ )
     {
-        modifier->toText(out);
+        getModifier(i)->toText(out);
         out.appendChar(' ');
     }
-    base->toText(out);
+    getBase()->toText(out);
 }
 
 bool ModifiedType::_equalsImplOverride(Type* type)
@@ -1134,7 +999,7 @@ bool ModifiedType::_equalsImplOverride(Type* type)
     if(!other)
         return false;
 
-    if(!base->equals(other->base))
+    if(!getBase()->equals(other->getBase()))
         return false;
 
     // TODO: Eventually we need to put the `modifiers` into
@@ -1153,14 +1018,14 @@ bool ModifiedType::_equalsImplOverride(Type* type)
     // a combined list of modifiers and a non-`ModifiedType` as
     // its base type.
     //
-    auto modifierCount = modifiers.getCount();
-    if(modifierCount != other->modifiers.getCount())
+    auto modifierCount = getModifierCount();
+    if(modifierCount != other->getModifierCount())
         return false;
 
-    for( Index i = 0; i < modifierCount; ++i )
+    for (Index i = 0; i < modifierCount; ++i)
     {
-        auto thisModifier = this->modifiers[i];
-        auto otherModifier = other->modifiers[i];
+        auto thisModifier = this->getModifier(i);
+        auto otherModifier = other->getModifier(i);
         if(!thisModifier->equalsVal(otherModifier))
             return false;
     }
@@ -1170,33 +1035,36 @@ bool ModifiedType::_equalsImplOverride(Type* type)
 HashCode ModifiedType::_getHashCodeOverride()
 {
     Hasher hasher;
-    hasher.hashObject(base);
-    for( auto modifier : modifiers )
+    hasher.hashObject(getBase());
+    for (Index i = 0; i < getModifierCount(); ++i)
     {
+        auto modifier = this->getModifier(i);
         hasher.hashObject(modifier);
     }
     return hasher.getResult();
 }
 
-Type* ModifiedType::_createCanonicalTypeOverride()
+Type* ModifiedType::_createCanonicalTypeOverride(SemanticsVisitor* semantics)
 {
-    ModifiedType* canonical = m_astBuilder->create<ModifiedType>();
-    canonical->base = base->getCanonicalType();
-    for( auto modifier : modifiers )
+    List<Val*> modifiers;
+    for (Index i = 0; i < getModifierCount(); ++i)
     {
-        canonical->modifiers.add(modifier);
+        auto modifier = this->getModifier(i);
+        modifiers.add(modifier);
     }
+    ModifiedType* canonical = getCurrentASTBuilder()->getOrCreate<ModifiedType>(getBase()->getCanonicalType(semantics), modifiers.getArrayView());
     return canonical;
 }
 
 Val* ModifiedType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
-    Type* substBase = as<Type>(base->substituteImpl(astBuilder, subst, &diff));
+    Type* substBase = as<Type>(getBase()->substituteImpl(astBuilder, subst, &diff));
 
     List<Val*> substModifiers;
-    for( auto modifier : modifiers )
+    for (Index i = 0; i < getModifierCount(); ++i)
     {
+        auto modifier = this->getModifier(i);
         auto substModifier = modifier->substituteImpl(astBuilder, subst, &diff);
         substModifiers.add(substModifier);
     }
@@ -1206,10 +1074,47 @@ Val* ModifiedType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionS
 
     *ioDiff = 1;
 
-    ModifiedType* substType = m_astBuilder->create<ModifiedType>();
-    substType->base = substBase;
-    substType->modifiers = _Move(substModifiers);
+    ModifiedType* substType = getCurrentASTBuilder()->getOrCreate<ModifiedType>(substBase, substModifiers.getArrayView());
     return substType;
+}
+
+BaseType BasicExpressionType::getBaseType() const
+{
+    auto builtinType = getDeclRef().getDecl()->findModifier<BuiltinTypeModifier>();
+    return builtinType->tag;
+}
+
+FeedbackType::Kind FeedbackType::getKind() const
+{
+    auto magicMod = getDeclRef().getDecl()->findModifier<MagicTypeModifier>();
+    return FeedbackType::Kind(magicMod->tag);
+}
+
+TextureFlavor ResourceType::getFlavor() const
+{
+    auto magicMod = getDeclRef().getDecl()->findModifier<MagicTypeModifier>();
+    return TextureFlavor(magicMod->tag);
+}
+
+SamplerStateFlavor SamplerStateType::getFlavor() const
+{
+    auto magicMod = getDeclRef().getDecl()->findModifier<MagicTypeModifier>();
+    return SamplerStateFlavor(magicMod->tag);
+}
+
+Type* BuiltinGenericType::getElementType() const
+{
+    return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
+}
+
+Type* ResourceType::getElementType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
+Val* TextureTypeBase::getSampleCount()
+{
+    return as<Type>(_getGenericTypeArg(this, 1));
 }
 
 Type* removeParamDirType(Type* type)

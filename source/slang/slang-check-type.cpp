@@ -17,6 +17,7 @@ namespace Slang
             sink);
         SemanticsVisitor visitor(&sharedSemanticsContext);
 
+        SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
         auto typeOut = visitor.CheckProperType(typeExp);
         return typeOut.type;
@@ -49,7 +50,7 @@ namespace Slang
         if (!typeRepr) return nullptr;
         if (auto typeType = as<TypeType>(typeRepr->type))
         {
-            return typeType->type;
+            return typeType->getType();
         }
         return m_astBuilder->getErrorType();
     }
@@ -86,11 +87,17 @@ namespace Slang
 
     Type* SemanticsVisitor::getRemovedModifierType(ModifiedType* modifiedType, ModifierVal* modifier)
     {
-        if (modifiedType->modifiers.getCount() == 1)
-            return modifiedType->base;
-        auto newModifiers = modifiedType->modifiers;
-        newModifiers.remove(modifier);
-        return m_astBuilder->getModifiedType(modifiedType->base, newModifiers);
+        if (modifiedType->getModifierCount() == 1)
+            return modifiedType->getBase();
+        List<Val*> newModifiers;
+        for (Index i = 0; i < modifiedType->getModifierCount(); i++)
+        {
+            auto m = modifiedType->getModifier(i);
+            if (m == modifier)
+                continue;
+            newModifiers.add(m);
+        }
+        return m_astBuilder->getModifiedType(modifiedType->getBase(), newModifiers);
     }
 
     Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
@@ -118,7 +125,7 @@ namespace Slang
         auto typeRepr = ExpectATypeRepr(expr);
         if (auto typeType = as<TypeType>(typeRepr->type))
         {
-            return typeType->type;
+            return typeType->getType();
         }
         return m_astBuilder->getErrorType();
     }
@@ -142,7 +149,7 @@ namespace Slang
         // constant expression in context, then we will instead construct
         // a dummy "error" value to represent the result.
         //
-        val = m_astBuilder->create<ErrorIntVal>();
+        val = m_astBuilder->getOrCreate<ErrorIntVal>(m_astBuilder->getIntType());
         return val;
     }
 
@@ -160,7 +167,7 @@ namespace Slang
         }
         if (auto typeType = as<TypeType>(exp->type))
         {
-            return typeType->type;
+            return typeType->getType();
         }
         else if (const auto errorType = as<ErrorType>(exp->type))
         {
@@ -187,10 +194,7 @@ namespace Slang
             evaledArgs.add(ExtractGenericArgVal(argExpr));
         }
 
-        GenericSubstitution* subst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getSubst(), genericDeclRef.getDecl(), evaledArgs);
-
-        DeclRef<Decl> innerDeclRef = m_astBuilder->getSpecializedDeclRef(getInner(genericDeclRef), subst);
+        DeclRef<Decl> innerDeclRef = m_astBuilder->getGenericAppDeclRef(genericDeclRef, evaledArgs.getArrayView());
         return DeclRefType::create(m_astBuilder, innerDeclRef);
     }
 
@@ -198,9 +202,9 @@ namespace Slang
     {
         if (auto declRefValueType = as<DeclRefType>(type))
         {
-            if (as<ClassDecl>(declRefValueType->declRef.getDecl()))
+            if (as<ClassDecl>(declRefValueType->getDeclRef().getDecl()))
                 return true;
-            if (as<InterfaceDecl>(declRefValueType->declRef.getDecl()))
+            if (as<InterfaceDecl>(declRefValueType->getDeclRef().getDecl()))
                 return true;
         }
         return false;
@@ -221,7 +225,7 @@ namespace Slang
 
             if(auto typeType = as<TypeType>(expr->type))
             {
-                type = typeType->type;
+                type = typeType->getType();
             }
         }
 
@@ -358,7 +362,7 @@ namespace Slang
         if (auto basicType = as<BasicExpressionType>(type))
         {
             // TODO: `void` shouldn't be a basic type, to make this easier to avoid
-            if (basicType->baseType == BaseType::Void)
+            if (basicType->getBaseType() == BaseType::Void)
             {
                 // TODO(tfoley): pick the right diagnostic message
                 getSink()->diagnose(result.exp, Diagnostics::invalidTypeVoid);
@@ -384,7 +388,7 @@ namespace Slang
         {
             if(auto rightConst = as<ConstantIntVal>(right))
             {
-                return leftConst->value == rightConst->value;
+                return leftConst->getValue() == rightConst->getValue();
             }
         }
 
@@ -392,7 +396,7 @@ namespace Slang
         {
             if(auto rightVar = as<GenericParamIntVal>(right))
             {
-                return leftVar->declRef.equals(rightVar->declRef);
+                return leftVar->getDeclRef().equals(rightVar->getDeclRef());
             }
             else if (const auto rightPoly = as<PolynomialIntVal>(right))
             {
@@ -422,23 +426,5 @@ namespace Slang
         }
         return expr;
     }
-
-    Expr* SemanticsExprVisitor::visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr)
-    {
-        // We have an expression of the form `__TaggedUnion(A, B, ...)`
-        // which will evaluate to a tagged-union type over `A`, `B`, etc.
-        //
-        TaggedUnionType* type = m_astBuilder->create<TaggedUnionType>();
-        expr->type = QualType(m_astBuilder->getTypeType(type));
-
-        for( auto& caseTypeExpr : expr->caseTypes )
-        {
-            caseTypeExpr = CheckProperType(caseTypeExpr);
-            type->caseTypes.add(caseTypeExpr.type);
-        }
-
-        return expr;
-    }
-
 
 }

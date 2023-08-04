@@ -269,11 +269,14 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflect
     if (!userAttr) return SLANG_E_INVALID_ARG;
     if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_E_INVALID_ARG;
 
-    NodeBase* val = nullptr;
-    if (userAttr->intArgVals.tryGetValue(index, val))
+    if (userAttr->intArgVals.getCount() > index)
     {
-        *rs = (int)as<ConstantIntVal>(val)->value;
-        return 0;
+        auto intVal = as<ConstantIntVal>(userAttr->intArgVals[index]);
+        if (intVal)
+        {
+            *rs = (int)intVal->getValue();
+            return 0;
+        }
     }
     return SLANG_E_INVALID_ARG;
 }
@@ -387,7 +390,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     }
     else if( auto declRefType = as<DeclRefType>(type) )
     {
-        const auto& declRef = declRefType->declRef;
+        const auto& declRef = declRefType->getDeclRef();
         if(declRef.is<StructDecl>() )
         {
             return SLANG_TYPE_KIND_STRUCT;
@@ -429,7 +432,7 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
 
     if(auto declRefType = as<DeclRefType>(type))
     {
-        auto declRef = declRefType->declRef;
+        auto declRef = declRefType->getDeclRef();
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
             return (unsigned int)getFields(
@@ -452,7 +455,7 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
 
     if(auto declRefType = as<DeclRefType>(type))
     {
-        auto declRef = declRefType->declRef;
+        auto declRef = declRefType->getDeclRef();
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
             auto fields = getFields(
@@ -476,7 +479,7 @@ SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
     }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {
-        return (size_t) getIntVal(vectorType->elementCount);
+        return (size_t) getIntVal(vectorType->getElementCount());
     }
 
     return 0;
@@ -493,15 +496,15 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     }
     else if( auto parameterGroupType = as<ParameterGroupType>(type))
     {
-        return convert(parameterGroupType->elementType);
+        return convert(parameterGroupType->getElementType());
     }
     else if (auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type))
     {
-        return convert(structuredBufferType->elementType);
+        return convert(structuredBufferType->getElementType());
     }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {
-        return convert(vectorType->elementType);
+        return convert(vectorType->getElementType());
     }
     else if( auto matrixType = as<MatrixExpressionType>(type))
     {
@@ -543,7 +546,7 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
     }
     else if(auto vectorType = as<VectorExpressionType>(type))
     {
-        return (unsigned int) getIntVal(vectorType->elementCount);
+        return (unsigned int) getIntVal(vectorType->getElementCount());
     }
     else if( const auto basicType = as<BasicExpressionType>(type) )
     {
@@ -564,12 +567,12 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
     }
     else if(auto vectorType = as<VectorExpressionType>(type))
     {
-        type = vectorType->elementType;
+        type = vectorType->getElementType();
     }
 
     if(auto basicType = as<BasicExpressionType>(type))
     {
-        switch (basicType->baseType)
+        switch (basicType->getBaseType())
         {
 #define CASE(BASE, TAG) \
         case BaseType::BASE: return SLANG_SCALAR_TYPE_##TAG
@@ -606,7 +609,7 @@ SLANG_API unsigned int spReflectionType_GetUserAttributeCount(SlangReflectionTyp
     if (!type) return 0;
     if (auto declRefType = as<DeclRefType>(type))
     {
-        return getUserAttributeCount(declRefType->declRef.getDecl());
+        return getUserAttributeCount(declRefType->getDeclRef().getDecl());
     }
     return 0;
 }
@@ -616,7 +619,7 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_GetUserAttribute(SlangR
     if (!type) return 0;
     if (auto declRefType = as<DeclRefType>(type))
     {
-        return getUserAttributeByIndex(declRefType->declRef.getDecl(), index);
+        return getUserAttributeByIndex(declRefType->getDeclRef().getDecl(), index);
     }
     return 0;
 }
@@ -626,10 +629,10 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName
     if (!type) return 0;
     if (auto declRefType = as<DeclRefType>(type))
     {
-        ASTBuilder* astBuilder = declRefType->getASTBuilder();
+        ASTBuilder* astBuilder = declRefType->getASTBuilderForReflection();
         auto globalSession = astBuilder->getGlobalSession();
 
-        return findUserAttributeByName(globalSession, declRefType->declRef.getDecl(), name);
+        return findUserAttributeByName(globalSession, declRefType->getDeclRef().getDecl(), name);
     }
     return 0;
 }
@@ -714,7 +717,7 @@ SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
 
     if( auto declRefType = as<DeclRefType>(type) )
     {
-        auto declRef = declRefType->declRef;
+        auto declRef = declRefType->getDeclRef();
 
         // Don't return a name for auto-generated anonymous types
         // that represent `cbuffer` members, etc.
@@ -778,13 +781,13 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
 
     if (auto textureType = as<TextureTypeBase>(type))
     {
-        return convert(textureType->elementType);
+        return convert(textureType->getElementType());
     }
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, SHAPE, ACCESS)                                                       \
     else if(as<TYPE>(type)) do {                                                      \
-        return convert(as<TYPE>(type)->elementType);                            \
+        return convert(as<TYPE>(type)->getElementType());                            \
     } while(0)
 
     // TODO: structured buffer needs to expose type layout!
@@ -1132,7 +1135,7 @@ SLANG_API SlangInt spReflectionType_getSpecializedTypeArgCount(SlangReflectionTy
     auto specializedType = as<ExistentialSpecializedType>(type);
     if(!specializedType) return 0;
 
-    return specializedType->args.getCount();
+    return specializedType->getArgCount();
 }
 
 SLANG_API SlangReflectionType* spReflectionType_getSpecializedTypeArgType(SlangReflectionType* inType, SlangInt index)
@@ -1144,9 +1147,9 @@ SLANG_API SlangReflectionType* spReflectionType_getSpecializedTypeArgType(SlangR
     if(!specializedType) return nullptr;
 
     if(index < 0) return nullptr;
-    if(index >= specializedType->args.getCount()) return nullptr;
+    if(index >= specializedType->getArgCount()) return nullptr;
 
-    auto argType = as<Type>(specializedType->args[index].val);
+    auto argType = as<Type>(specializedType->getArg(index).val);
     return convert(argType);
 }
 
@@ -1405,7 +1408,7 @@ namespace Slang
     {
         if(auto declRefType = as<DeclRefType>(type))
         {
-            if(declRefType->declRef.as<InterfaceDecl>())
+            if(declRefType->getDeclRef().as<InterfaceDecl>())
             {
                 return declRefType;
             }

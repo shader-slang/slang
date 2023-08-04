@@ -70,9 +70,9 @@ Count ASTNaturalLayoutContext::_getCount(IntVal* intVal)
 {
     if (auto constIntVal = as<ConstantIntVal>(intVal))
     {
-        if (constIntVal->value >= 0)
+        if (constIntVal->getValue() >= 0)
         {
-            return Count(constIntVal->value);
+            return Count(constIntVal->getValue());
         }
     }
 
@@ -115,9 +115,9 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
 {
     if (VectorExpressionType* vecType = as<VectorExpressionType>(type))
     {
-        const Count elementCount = _getCount(vecType->elementCount);
+        const Count elementCount = _getCount(vecType->getElementCount());
         return (elementCount > 0) ? 
-            calcSize(vecType->elementType) * elementCount : 
+            calcSize(vecType->getElementType()) * elementCount : 
             NaturalSize::makeInvalid();
     }
     else if (auto matType = as<MatrixExpressionType>(type))
@@ -130,7 +130,7 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     }
     else if (auto basicType = as<BasicExpressionType>(type))
     {
-        return NaturalSize::makeFromBaseType(basicType->baseType);
+        return NaturalSize::makeFromBaseType(basicType->getBaseType());
     }
     else if (as<PtrTypeBase>(type) || as<NullPtrType>(type))
     {
@@ -146,7 +146,7 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     }
     else if (auto namedType = as<NamedExpressionType>(type))
     {
-        return calcSize(namedType->innerType);
+        return calcSize(namedType->getCanonicalType(nullptr));
     }
     else if (const auto tupleType = as<TupleType>(type))
     {
@@ -154,9 +154,9 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         NaturalSize size = NaturalSize::makeEmpty();
 
         // Accumulate over all the member types
-        for (auto cur : tupleType->memberTypes)
+        for (auto cur = 0; cur < tupleType->getMemberCount(); cur++)
         {
-            const auto curSize = calcSize(cur);
+            const auto curSize = calcSize(tupleType->getMember(cur));
             if (!curSize)
             {
                 return NaturalSize::makeInvalid();
@@ -166,36 +166,14 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
 
         return size;
     }
-    else if (const auto taggedUnion = as<TaggedUnionType>(type))
-    {
-        NaturalSize size = NaturalSize::makeInvalid();
-
-        for( auto caseType : taggedUnion->caseTypes )
-        {
-            const NaturalSize caseSize = calcSize(caseType);
-            if (!caseSize)
-            {
-                return NaturalSize::makeInvalid();
-            }
-            size = NaturalSize::calcUnion(size, caseSize);
-        }
-
-        // After we've computed the size required to hold all the
-        // case types, we will allocate space for the tag field.
-        
-        // Currently we assume uint32_t on all targets
-        size.append(NaturalSize::makeFromBaseType(BaseType::UInt));
-
-        return size;
-    }
     else if( auto declRefType = as<DeclRefType>(type) )
     {
-        if (const auto enumDeclRef = declRefType->declRef.as<EnumDecl>())
+        if (const auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
         {
             Type* tagType = getTagType(m_astBuilder, enumDeclRef);
             return calcSize(tagType);
         }
-        else if(const auto structDeclRef = declRefType->declRef.as<StructDecl>())
+        else if(const auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
         {
             // Poison the cache whilst we construct
             m_typeToSize.add(type, NaturalSize::makeInvalid());
@@ -208,7 +186,7 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
                 // Look for a struct type that it inherits from
                 if (auto inheritedDeclRef = as<DeclRefType>(inherited->base.type))
                 {
-                    if (auto parentDecl = inheritedDeclRef->declRef.as<StructDecl>())
+                    if (auto parentDecl = inheritedDeclRef->getDeclRef().as<StructDecl>())
                     {
                         // We can only inherit from one thing
                         size = calcSize(inherited->base.type);
@@ -237,7 +215,7 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
 
             return size; 
         }
-        else if (const auto typeDef = declRefType->declRef.as<TypeDefDecl>())
+        else if (const auto typeDef = declRefType->getDeclRef().as<TypeDefDecl>())
         {
             return calcSize(typeDef.getDecl()->type);
         }

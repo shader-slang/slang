@@ -6,6 +6,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 struct B : IDifferentiable
 {
+    typedef B Differential;
     float3 z;
     float.Differential k[10];
 };

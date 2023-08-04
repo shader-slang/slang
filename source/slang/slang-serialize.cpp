@@ -2,6 +2,7 @@
 #include "slang-serialize.h"
 
 #include "slang-ast-base.h"
+#include "slang-ast-builder.h"
 
 namespace Slang {
 
@@ -204,14 +205,14 @@ bool SerialClasses::isOk() const
 
 
 SerialClasses::SerialClasses():
-    m_arena(2048)
+    m_arena(2097152)
 {
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags flags)
-    : m_arena(2048)
+    : m_arena(2097152)
     , m_classes(classes)
     , m_filter(filter)
     , m_flags(flags)
@@ -318,6 +319,20 @@ SerialIndex SerialWriter::addPointer(const NodeBase* node)
         return SerialIndex(*indexPtr);
     }
 
+    //static Dictionary<ValNodeDesc, Val*> _debugWrittenVals;
+    //if (auto val = as<Val>((NodeBase*)node))
+    //{
+    //    ValNodeDesc desc;
+    //    desc.type = node->astNodeType;
+    //    val->getDesc(&desc);
+    //    desc.init();
+    //    Val* existingVal = nullptr;
+    //    if (_debugWrittenVals.tryGetValue(desc, existingVal))
+    //    {
+    //        SLANG_ASSERT_FAILURE("duplicate val in ast");
+    //    }
+    //    _debugWrittenVals[desc] = val;
+    //}
     if (m_filter)
     {
         return m_filter->writePointer(this, node);

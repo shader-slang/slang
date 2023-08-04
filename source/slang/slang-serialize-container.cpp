@@ -475,10 +475,6 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                     // Set the sourceLocReader before doing de-serialize, such can lookup the remapped sourceLocs
                     reader.getExtraObjects().set(sourceLocReader);
 
-                    // Go through all of the AST nodes
-                    // 1) Set the ASTBuilder on Type nodes
-                    
-
                     // TODO(JS):
                     // If modules can have more complicated relationships (like a two modules can refer to symbols
                     // from each other), then we can make this work by
@@ -492,12 +488,14 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                     // For now if we assume a module can only access symbols from another module, and not the reverse.
                     // So we just need to deserialize and we are done
                     SLANG_RETURN_ON_FAIL(reader.deserializeObjects());
-
+                    
                     // Get the root node. It's at index 1 (0 is the null value).
                     astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
 
-                    // 2) Add the extensions to the module mapTypeToCandidateExtensions cache
-                    // 3) We need to fix the callback pointers for parsing
+                    // Go through all AST nodes:
+                    // 1) Add the extensions to the module mapTypeToCandidateExtensions cache
+                    // 2) We need to fix the callback pointers for parsing
+                    // 3) Register all `Val`s to the ASTBuilder's deduplication map.
 
                     {
                         ModuleDecl* moduleDecl = as<ModuleDecl>(astRootNode);
@@ -505,6 +503,8 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                         // Maps from keyword name name to index in (syntaxParseInfos)
                         // Will be filled in lazily if needed (for SyntaxDecl setup)
                         Dictionary<Name*, Index> syntaxKeywordDict;
+                        
+                        OrderedDictionary<Val*, List<Val**>> valUses;
 
                         // Get the parse infos
                         const auto syntaxParseInfos = getSyntaxParseInfos();
@@ -512,21 +512,18 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
 
                         for (auto& obj : reader.getObjects())
                         {
+
                             if (obj.m_kind == SerialTypeKind::NodeBase)
                             {
                                 NodeBase* nodeBase = (NodeBase*)obj.m_ptr;
                                 SLANG_ASSERT(nodeBase);
 
-                                if (Type* type = dynamicCast<Type>(nodeBase))
-                                {
-                                    type->_setASTBuilder(astBuilder);
-                                }
-                                else if (ExtensionDecl* extensionDecl = dynamicCast<ExtensionDecl>(nodeBase))
+                                if (ExtensionDecl* extensionDecl = dynamicCast<ExtensionDecl>(nodeBase))
                                 {
                                     if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType))
                                     {
                                         // Attach our extension to that type as a candidate...
-                                        if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
+                                        if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
                                         {
                                             auto aggTypeDecl = aggTypeDeclRef.getDecl();
 
@@ -567,7 +564,57 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                         syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(syntaxDecl->syntaxClass.classInfo);
                                     }
                                 }
+                                else if (Val* val = dynamicCast<Val>(nodeBase))
+                                {
+                                    valUses[val] = List<Val**>();
+                                }
                             }
+                        }
+                        // Go through fixup locations and deduplicate Vals.
+                        // This is needed because we currently the same Val can be serialized multiple times
+                        // in different modules. If we have a type defined in Module A and used in Module B,
+                        // then both serialized Module A and Module B will contain a Type Val object that refers to A.
+                        // When we load B, we should resolve those type references to the existing Type val instead.
+                        // This step can be avoided if we can run deduplication while deserializing, which
+                        // requires a different way of handling Val objects.
+                        for (auto fixup : reader.getFixUps())
+                        {
+                            if (fixup.kind == PostSerializationFixUpKind::ValPtr)
+                            {
+                                auto list = valUses.tryGetValue(*(Val**)fixup.addressToModify);
+                                if (list)
+                                    list->add((Val**)fixup.addressToModify);
+                            }
+                        }
+                        SLANG_AST_BUILDER_RAII(astBuilder);
+                        for (auto& valUseList : valUses)
+                        {
+                            auto val = valUseList.key;
+                            auto desc = val->getDesc();
+                            astBuilder->m_cachedNodes.tryGetValueOrAdd(desc, val);
+                        }
+                        for (;;)
+                        {
+                            bool changed = false;
+                            for (auto& valUseList : valUses)
+                            {
+                                auto val = valUseList.key;
+                                auto newVal = val->resolve(nullptr);
+                                if (val != newVal)
+                                {
+                                    astBuilder->m_cachedNodes[val->getDesc()] = newVal;
+                                    for (auto use : valUseList.value)
+                                    {
+                                        if (*use != newVal)
+                                        {
+                                            *use = newVal;
+                                            changed = true;
+                                        }
+                                    }
+                                }
+                            }
+                            if (!changed)
+                                break;
                         }
                     }
                 }

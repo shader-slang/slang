@@ -14,7 +14,6 @@
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
-#include "slang-ir-union.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
 #include "slang-legalize-types.h"

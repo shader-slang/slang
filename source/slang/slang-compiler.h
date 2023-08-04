@@ -650,9 +650,6 @@ namespace Slang
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencies; }
         List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE { return m_fileDependencies; }
 
-                    /// Get a list of tagged-union types referenced by the specialization parameters.
-        List<TaggedUnionType*> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
-
         RefPtr<IRModule> getIRModule() { return m_irModule; }
 
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
@@ -678,9 +675,6 @@ namespace Slang
 
         List<String> m_entryPointMangledNames;
         List<String> m_entryPointNameOverrides;
-
-        // Any tagged union types that were referenced by the specialization arguments.
-        List<TaggedUnionType*> m_taggedUnionTypes;
 
         List<Module*> m_moduleDependencies;
         List<SourceFile*> m_fileDependencies;

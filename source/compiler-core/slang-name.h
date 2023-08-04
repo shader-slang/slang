@@ -68,6 +68,7 @@ struct RootNamePool
 struct NamePool
 {
     // Find or create the `Name` that represents the given `text`.
+    Name* getName(UnownedStringSlice text);
     Name* getName(String const& text);
     // Try find the `Name` that represents the given `text`.
     // If the name does not exist, return nullptr

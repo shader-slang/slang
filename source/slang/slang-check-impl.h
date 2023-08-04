@@ -70,7 +70,7 @@ namespace Slang
     {
         if (auto basicType = as<BasicExpressionType>(typeIn))
         {
-            auto rs = makeBasicTypeKey(basicType->baseType);
+            auto rs = makeBasicTypeKey(basicType->getBaseType());
             if (auto constInt = as<IntegerLiteralExpr>(exprIn))
             {
                 if (constInt->value < 0)
@@ -83,11 +83,11 @@ namespace Slang
         }
         else if (auto vectorType = as<VectorExpressionType>(typeIn))
         {
-            if (auto elemCount = as<ConstantIntVal>(vectorType->elementCount))
+            if (auto elemCount = as<ConstantIntVal>(vectorType->getElementCount()))
             {
-                if( auto elemBasicType = as<BasicExpressionType>(vectorType->elementType) )
+                if( auto elemBasicType = as<BasicExpressionType>(vectorType->getElementType()) )
                 {
-                    return makeBasicTypeKey(elemBasicType->baseType, elemCount->value);
+                    return makeBasicTypeKey(elemBasicType->getBaseType(), elemCount->getValue());
                 }
             }
         }
@@ -99,7 +99,7 @@ namespace Slang
                 {
                     if( auto elemBasicType = as<BasicExpressionType>(matrixType->getElementType()) )
                     {
-                        return makeBasicTypeKey(elemBasicType->baseType, elemCount1->value, elemCount2->value);
+                        return makeBasicTypeKey(elemBasicType->getBaseType(), elemCount1->getValue(), elemCount2->getValue());
                     }
                 }
             }
@@ -246,7 +246,7 @@ namespace Slang
         // When required, a candidate can store a pre-checked list of
         // arguments so that we don't have to repeat work across checking
         // phases. Currently this is only needed for generics.
-        Substitutions*   subst = nullptr;
+        SubstitutionSet   subst;
     };
 
     struct TypeCheckingCache
@@ -614,7 +614,7 @@ namespace Slang
         InheritanceInfo getInheritanceInfo(DeclRef<ExtensionDecl> const& extension);
 
             /// Try get subtype witness from cache, returns true if cache contains a result for the query.
-        bool tryGetSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness)
+        bool tryGetSubtypeWitnessFromCache(Type* sub, Type* sup, SubtypeWitness*& outWitness)
         {
             auto pair = TypePair{ sub, sup };
             return m_mapTypePairToSubtypeWitness.tryGetValue(pair, outWitness);
@@ -997,6 +997,21 @@ namespace Slang
 
         void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 
+        DeclRef<Decl> getDefaultDeclRef(Decl* decl)
+        {
+            return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl));
+        }
+
+        DeclRef<Decl> getSpecializedDeclRef(DeclRef<Decl> declToSpecialize, DeclRef<Decl> declRefWithSpecializationArgs)
+        {
+            return declRefWithSpecializationArgs.substitute(m_astBuilder, declToSpecialize);
+        }
+
+        DeclRef<Decl> getSpecializedDeclRef(Decl* declToSpecialize, DeclRef<Decl> declRefWithSpecializationArgs)
+        {
+            return declRefWithSpecializationArgs.substitute(m_astBuilder, getDefaultDeclRef(declToSpecialize));
+        }
+
         DeclRefExpr* ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             Expr*    baseExpr,
@@ -1025,6 +1040,18 @@ namespace Slang
             Expr*            baseExpr,
             SourceLoc loc,
             Expr*    originalExpr);
+
+
+        Val* resolveVal(Val* val)
+        {
+            if (!val) return nullptr;
+            return val->resolve(this);
+        }
+        Type* resolveType(Type* type)
+        {
+            return (Type*)resolveVal(type);
+        }
+        DeclRef<Decl> resolveDeclRef(DeclRef<Decl> declRef);
 
             /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
         LookupResult resolveOverloadedLookup(LookupResult const& lookupResult);
@@ -1651,21 +1678,18 @@ namespace Slang
             List<GenericTypeConstraintDecl*>&   outConstraints);
 
             /// Determine if `left` and `right` have matching generic signatures.
-            /// If they do, then outputs a substitution to `ioSubstRightToLeft` that
-            /// can be used to specialize `right` to the parameters of `left`.
+            /// If they do, then outputs a specialized declRef to `ioSubstRightToLeft` that
+            /// represents a reference to `right` with the parameters of `left`.
         bool doGenericSignaturesMatch(
             GenericDecl*                    left,
             GenericDecl*                    right,
-            GenericSubstitution**    outSubstRightToLeft);
+            DeclRef<Decl>*                  outSpecializedRightInner);
 
         // Check if two functions have the same signature for the purposes
         // of overload resolution.
         bool doFunctionSignaturesMatch(
             DeclRef<FuncDecl> fst,
             DeclRef<FuncDecl> snd);
-
-        List<Val*> getDefaultSubstitutionArgs(
-            GenericDecl* genericDecl);
 
         Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);
         Result checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* oldDecl);
@@ -1901,12 +1925,13 @@ namespace Slang
         // The `varSubst` argument provides the list of constraint
         // variables that were created for the system.
         //
-        // Returns a new substitution representing the values that
+        // Returns a new declref to the inner decl of `genericDeclRef`,
+        // representing the specialized generic with the values
         // we solved for along the way.
-        SubstitutionSet trySolveConstraintSystem(
+        DeclRef<Decl> trySolveConstraintSystem(
             ConstraintSystem*       system,
             DeclRef<GenericDecl>    genericDeclRef,
-            GenericSubstitution*    substWithKnownGenericArgs = nullptr);
+            ArrayView<Val*> knownGenericArgs);
 
 
         // State related to overload resolution for a call
@@ -2033,7 +2058,7 @@ namespace Slang
         Expr* createGenericDeclRef(
             Expr*            baseExpr,
             Expr*            originalExpr,
-            GenericSubstitution*   subst);
+            SubstitutionSet  substSet);
 
         // Take an overload candidate that previously got through
         // `TryCheckOverloadCandidate` above, and try to finish
@@ -2112,15 +2137,15 @@ namespace Slang
             Val*			fst,
             Val*			snd);
 
-        bool tryUnifySubstitutions(
+        bool tryUnifyDeclRef(
             ConstraintSystem&       constraints,
-            Substitutions*   fst,
-            Substitutions*   snd);
+            DeclRefBase*   fst,
+            DeclRefBase*   snd);
 
-        bool tryUnifyGenericSubstitutions(
-            ConstraintSystem&           constraints,
-            GenericSubstitution* fst,
-            GenericSubstitution* snd);
+        bool tryUnifyGenericAppDeclRef(
+            ConstraintSystem& constraints,
+            GenericAppDeclRef* fst,
+            GenericAppDeclRef* snd);
 
         bool TryUnifyTypeParam(
             ConstraintSystem&				constraints,
@@ -2153,7 +2178,7 @@ namespace Slang
             Type*               snd);
 
         // Is the candidate extension declaration actually applicable to the given type
-        DeclRef<ExtensionDecl> ApplyExtensionToType(
+        DeclRef<ExtensionDecl> applyExtensionToType(
             ExtensionDecl*  extDecl,
             Type*    type);
 
@@ -2166,7 +2191,7 @@ namespace Slang
         DeclRef<Decl> inferGenericArguments(
             DeclRef<GenericDecl>    genericDeclRef,
             OverloadResolveContext& context,
-            GenericSubstitution*    substWithKnownGenericArgs,
+            ArrayView<Val*>         knownGenericArgs,
             List<Type*>             *innerParameterTypes = nullptr);
 
         void AddTypeOverloadCandidates(
@@ -2209,7 +2234,7 @@ namespace Slang
         void addOverloadCandidatesForCallToGeneric(
             LookupResultItem        genericItem,
             OverloadResolveContext& context,
-            GenericSubstitution*    substWithKnownGenericArgs = nullptr);
+            ArrayView<Val*>     knownGenericArgs);
 
             /// Check a generic application where the operands have already been checked.
         Expr* checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr);
@@ -2283,7 +2308,7 @@ namespace Slang
         visitor->ensureDecl(decl, state);
     }
 
-    DeclRef<ExtensionDecl> ApplyExtensionToType(
+    DeclRef<ExtensionDecl> applyExtensionToType(
         SemanticsVisitor*   semantics,
         ExtensionDecl*      extDecl,
         Type*               type);
@@ -2317,8 +2342,6 @@ namespace Slang
         Expr* visitGenericAppExpr(GenericAppExpr* genericAppExpr);
 
         Expr* visitSharedTypeExpr(SharedTypeExpr* expr);
-
-        Expr* visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr);
 
         Expr* visitInvokeExpr(InvokeExpr *expr);
 

@@ -5048,7 +5048,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     bool isReadOnly = (access == SLANG_RESOURCE_ACCESS_READ);
     auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, access).flavor;
     sb << "__generic<T>\n";
-    sb << "__magic_type(Texture," << int(flavor) << ")\n";
+    sb << "__magic_type(TextureType," << int(flavor) << ")\n";
     sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
     sb << "struct ";
     sb << kBaseBufferAccessLevels[aa].name;
@@ -5566,7 +5566,7 @@ static const int feedbackTexture2DFlavor = int(TextureFlavor::create(TextureFlav
 static const int feedbackTexture2DArrayFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG | SLANG_TEXTURE_ARRAY_FLAG).flavor);
 }}}}
 
-__magic_type(Texture, $(feedbackTexture2DFlavor))
+__magic_type(TextureType, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
@@ -5619,7 +5619,7 @@ struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 
 
 
-__magic_type(Texture, $(feedbackTexture2DArrayFlavor))
+__magic_type(TextureType, $(feedbackTexture2DArrayFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
