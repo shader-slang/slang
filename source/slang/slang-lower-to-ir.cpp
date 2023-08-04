@@ -1408,6 +1408,36 @@ void getGenericTypeConformances(IRGenContext* context, ShortList<IRType*>& supTy
     }
 }
 
+
+// Check if declRef represents a witness that `ISomeInterface.This : ISomeInterface`.
+static bool _isThisTypeSubtypeWitness(DeclRefBase* declRef)
+{
+    auto lookupDeclRef = as<LookupDeclRef>(declRef);
+    if (!lookupDeclRef)
+        return false;
+    if (!as<ThisType>(lookupDeclRef->getLookupSource()))
+        return false;
+    auto declaredWitness = as<DeclaredSubtypeWitness>(lookupDeclRef->getWitness());
+    if (!declaredWitness)
+        return false;
+    if (!as<ThisTypeConstraintDecl>(declaredWitness->getDeclRef()))
+        return false;
+    return true;
+}
+
+// Returns whether `declRef` represents a trivial lookup of an interface requirement
+// through `ThisTypeDecl` made from within the same interface Decl.
+static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase* declRef)
+{
+    if (!_isThisTypeSubtypeWitness(declRef))
+        return false;
+    // This is a lookup from an interface's This type.
+    // If the lookup is made from an interface type itself rather than an extension of it,
+    // then it is a trivial lookup and we should lower it as a struct key.
+    return context->thisTypeWitness == nullptr;
+}
+
+
 //
 
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
@@ -1488,6 +1518,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
+        if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
+            return LoweredValInfo::simple(context->thisTypeWitness);
+
         return emitDeclRef(context, val->getDeclRef(),
             context->irBuilder->getWitnessTableType(
                 lowerType(context, val->getSup())));
@@ -9105,7 +9138,7 @@ LoweredValInfo emitDeclRef(
     // In the simplest case, there is no specialization going
     // on, and the decl-ref turns into a reference to the
     // lowered IR value for the declaration.
-    if(!SubstitutionSet(subst))
+    if(!SubstitutionSet(subst) || _isTrivialLookupFromInterfaceThis(context, subst))
     {
         LoweredValInfo loweredDecl = ensureDecl(context, decl);
         return loweredDecl;
@@ -9184,14 +9217,6 @@ LoweredValInfo emitDeclRef(
 
         if(isInterfaceRequirement(decl))
         {
-            if (as<ThisType>(thisTypeSubst->getLookupSource()))
-            {
-                // If we are referencing an interface requirement through a
-                // ThisType decl, this is a reference made from within the same
-                // interface type. In this case, we just lower the decl without
-                // any subst info into an IR interface requirement.
-                return ensureDecl(context, decl);
-            }
             // If we reach here, somebody is trying to look up an interface
             // requirement "through" some concrete type. We need to lower this
             // decl-ref as a lookup of the corresponding member in a witness

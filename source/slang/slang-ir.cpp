@@ -3333,7 +3333,7 @@ namespace Slang
         // the emit logic, but this is a reasonably early place
         // to catch it.
         //
-        SLANG_ASSERT(witnessTableVal->getOp() != kIROp_StructKey);
+        SLANG_ASSERT(witnessTableVal && witnessTableVal->getOp() != kIROp_StructKey);
 
         IRInst* args[] = {witnessTableVal, interfaceMethodVal};
 
