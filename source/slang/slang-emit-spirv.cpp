@@ -1145,22 +1145,20 @@ struct SPIRVEmitContext
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
             {
-                auto elementType = static_cast<IRArrayTypeBase*>(inst)->getElementType();
-                auto arrayType = inst->getOp() == kIROp_ArrayType
-                    ? emitInst(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        nullptr,
+                const auto elementType = static_cast<IRArrayTypeBase*>(inst)->getElementType();
+                const auto elementTypeSpv = getID(ensureInst(elementType));
+                const auto countSpv = getID(ensureInst(static_cast<IRArrayTypeBase*>(inst)->getElementCount()));
+                const auto arrayType = inst->getOp() == kIROp_ArrayType
+                    ? emitTypeInst(
+                        inst,
                         SpvOpTypeArray,
-                        kResultID,
-                        elementType,
-                        static_cast<IRArrayType*>(inst)->getElementCount())
-                    : emitInst(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        nullptr,
+                        makeArray(elementTypeSpv, countSpv).getView())
+                    : emitTypeInst(
+                        inst,
                         SpvOpTypeRuntimeArray,
-                        kResultID,
-                        elementType);
+                        makeArray(elementTypeSpv).getView());
                 // TODO: properly decorate stride.
+                // TODO: don't do this more than once
                 IRSizeAndAlignment sizeAndAlignment;
                 getNaturalSizeAndAlignment(this->m_targetRequest, elementType, &sizeAndAlignment);
                 emitInst(
@@ -1170,7 +1168,6 @@ struct SPIRVEmitContext
                     arrayType,
                     SpvDecorationArrayStride,
                     (SpvWord)sizeAndAlignment.getStride());
-                registerInst(inst, arrayType);
                 return arrayType;
             }
         // > OpTypeImage
