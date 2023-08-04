@@ -1625,6 +1625,8 @@ struct SPIRVEmitContext
             return emitGetElementPtr(parent, as<IRGetElementPtr>(inst));
         case kIROp_GetElement:
             return emitGetElement(parent, as<IRGetElement>(inst));
+        case kIROp_MakeStruct:
+            return emitCompositeConstruct(parent, inst);
         case kIROp_Load:
             return emitLoad(parent, as<IRLoad>(inst));
         case kIROp_Store:
@@ -2814,6 +2816,11 @@ struct SPIRVEmitContext
         return convertWith(toInfo.isSigned ? SpvOpConvertFToS : SpvOpConvertFToU);
     }
 
+    SpvInst* emitCompositeConstruct(SpvInstParent* parent, IRInst* inst)
+    {
+        return emitInst(parent, inst, SpvOpCompositeConstruct, inst->getDataType(), kResultID, OperandsOf(inst));
+    }
+
     SpvInst* emitConstruct(SpvInstParent* parent, IRInst* inst)
     {
         if (as<IRBasicType>(inst->getDataType()))
@@ -2845,13 +2852,7 @@ struct SPIRVEmitContext
         }
         else
         {
-            return emitInst(
-                parent,
-                inst,
-                SpvOpCompositeConstruct,
-                inst->getDataType(),
-                kResultID,
-                OperandsOf(inst));
+            return emitCompositeConstruct(parent, inst);
         }
     }
 
