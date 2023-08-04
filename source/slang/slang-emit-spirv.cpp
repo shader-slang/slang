@@ -287,8 +287,6 @@ struct SPIRVEmitContext
         /// The Slang IR module being translated
     IRModule* m_irModule;
 
-    DiagnosticSink* m_sink;
-
     // [2.2: Terms]
     //
     // > <id>: A numerical name; the name used to refer to an object, a type,
@@ -2237,6 +2235,7 @@ struct SPIRVEmitContext
         IRTargetIntrinsicDecoration* intrinsic)
     {
         SpvSnippet* snippet = getParsedSpvSnippet(intrinsic);
+        SLANG_ASSERT(snippet);
         SpvSnippetEmitContext context;
         context.irResultType = inst->getDataType();
         context.resultType = ensureInst(inst->getFullType());
@@ -2903,9 +2902,8 @@ struct SPIRVEmitContext
     }
 
     SPIRVEmitContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
-        : SPIRVEmitSharedContext(module, target)
+        : SPIRVEmitSharedContext(module, target, sink)
         , m_irModule(module)
-        , m_sink(sink)
         , m_memoryArena(2048)
     {
     }
