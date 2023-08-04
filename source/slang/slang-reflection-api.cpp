@@ -269,7 +269,7 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflect
     if (!userAttr) return SLANG_E_INVALID_ARG;
     if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_E_INVALID_ARG;
 
-    if (userAttr->intArgVals.getCount() > index)
+    if (userAttr->intArgVals.getCount() > (Index)index)
     {
         auto intVal = as<ConstantIntVal>(userAttr->intArgVals[index]);
         if (intVal)
