@@ -211,6 +211,17 @@ protected:
    void* m_objects[Index(SerialExtraType::CountOf)];
 };
 
+enum class PostSerializationFixUpKind
+{
+    ValPtr,
+};
+
+struct PostSerializationFixUp
+{
+    PostSerializationFixUpKind kind;
+    void* addressToModify;
+};
+
 /* This class is the interface used by toNative implementations to recreate a type. */
 class SerialReader : public RefObject
 {
@@ -239,6 +250,8 @@ public:
 
         /// Get the entries list
     const List<const Entry*>& getEntries() const { return m_entries; }
+
+    List<PostSerializationFixUp>& getFixUps() { return m_fixUps; }
 
         /// Access the objects list
         /// NOTE that if a SerialObject holding a RefObject and needs to be kept in scope, add the RefObject* via addScope
@@ -277,6 +290,8 @@ protected:
 
     SerialObjectFactory* m_objectFactory;
     SerialClasses* m_classes;           ///< Information used to deserialize 
+
+    List<PostSerializationFixUp> m_fixUps;
 };
 
 // ---------------------------------------------------------------------------

@@ -54,8 +54,6 @@ INST(Nop, nop, 0, 0)
     INST(VectorType, Vec, 2, HOISTABLE)
     INST(MatrixType, Mat, 3, HOISTABLE)
 
-    INST(TaggedUnionType, TaggedUnion, 0, HOISTABLE)
-
     INST(ConjunctionType, Conjunction, 0, HOISTABLE)
     INST(AttributedType, Attributed, 0, HOISTABLE)
     INST(ResultType, Result, 2, HOISTABLE)
@@ -985,7 +983,6 @@ INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
         INST(ArrayTypeLayout, arrayTypeLayout, 1, HOISTABLE)
         INST(StreamOutputTypeLayout, streamOutputTypeLayout, 1, HOISTABLE)
         INST(MatrixTypeLayout, matrixTypeLayout, 1, HOISTABLE)
-        INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, HOISTABLE)
         INST(ExistentialTypeLayout, existentialTypeLayout, 0, HOISTABLE)
         INST(StructTypeLayout, structTypeLayout, 0, HOISTABLE)
         // TODO(JS): Ideally we'd have the layout to the pointed to value type (ie 1 instead of 0 here). But to avoid infinite recursion we don't.

@@ -117,17 +117,17 @@ namespace Slang
             }
         };
 
-        Iterator begin()
+        Iterator begin() const
         {
             Iterator rs;
-            rs.container = this;
+            rs.container = const_cast<ThisType*>(this);
             rs.index = 0;
             return rs;
         }
-        Iterator end()
+        Iterator end() const
         {
             Iterator rs;
-            rs.container = this;
+            rs.container = const_cast<ThisType*>(this);
             rs.index = m_count;
             return rs;
         }

@@ -39,6 +39,11 @@ public:
         /// Get the `IDifferentiable` type
     Type* getDiffInterfaceType();
 
+    Type* getErrorType();
+    Type* getBottomType();
+    Type* getInitializerListType();
+    Type* getOverloadedType();
+
     const ReflectClassInfo* findClassInfo(Name* name);
     SyntaxClass<NodeBase> findSyntaxClass(Name* name);
 
@@ -64,6 +69,8 @@ public:
     SharedASTBuilder();
 
     ~SharedASTBuilder();
+
+    ASTBuilder* getInnerASTBuilder() { return m_astBuilder; }
 
 protected:
     // State shared between ASTBuilders
@@ -108,79 +115,59 @@ protected:
 class ASTBuilder : public RefObject
 {
     friend class SharedASTBuilder;
+
 public:
-    // Node cache:
-    struct NodeOperand
-    {
-        union
-        {
-            NodeBase* nodeOperand;
-            int64_t intOperand;
-        } values;
-        
-        NodeOperand()
-        {
-            values.nodeOperand = nullptr;
-        }
-        
-        NodeOperand(NodeBase* node) { values.nodeOperand = node; }
-        
-        template<typename T>
-        NodeOperand(DeclRef<T> declRef) { values.nodeOperand = declRef.declRefBase; }
-
-        template<typename EnumType>
-        NodeOperand(EnumType intVal)
-        {
-            static_assert(std::is_trivial<EnumType>::value, "Type to construct NodeOperand must be trivial.");
-            static_assert(sizeof(EnumType) <= sizeof(values), "size of operand must be less than pointer size.");
-            values.intOperand = 0;
-            memcpy(&values, &intVal, sizeof(intVal));
-        }
-    };
-    struct NodeDesc
-    {
-        ASTNodeType             type;
-        ShortList<NodeOperand, 4> operands;
-
-        bool operator==(NodeDesc const& that) const;
-        HashCode getHashCode() const { return hashCode; }
-        void init();
-    private:
-        HashCode hashCode = 0;
-    };
-
     template<typename NodeCreateFunc>
-    NodeBase* _getOrCreateImpl(NodeDesc const& desc, NodeCreateFunc createFunc)
+    NodeBase* _getOrCreateImpl(ValNodeDesc const& desc, NodeCreateFunc createFunc)
     {
         if (auto found = m_cachedNodes.tryGetValue(desc))
             return *found;
 
         auto node = createFunc();
         m_cachedNodes.add(desc, node);
+#ifdef _DEBUG
+        _verifyValDescConsistency(dynamicCast<Val>(node), desc);
+#endif
         return node;
     }
 
     /// A cache for AST nodes that are entirely defined by their node type, with
     /// no need for additional state.
-    Dictionary<NodeDesc, NodeBase*> m_cachedNodes;
+    Dictionary<ValNodeDesc, NodeBase*> m_cachedNodes;
 
-    template<int N>
-    static void addOrAppendToNodeList(ShortList<NodeOperand, N>&)
-    {}
+    Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
 
-    template<int N, typename T, typename... Ts>
-    static void addOrAppendToNodeList(ShortList<NodeOperand, N>& list, T t, Ts... ts)
+    /// Create AST types
+    template <typename T>
+    T* createImpl()
     {
-        list.add(t);
-        addOrAppendToNodeList(list, ts...);
+        auto alloced = m_arena.allocate(sizeof(T));
+        memset(alloced, 0, sizeof(T));
+        auto result = _initAndAdd(new (alloced) T);
+        return result;
     }
 
-    template<int N, typename T, typename... Ts>
-    static void addOrAppendToNodeList(ShortList<NodeOperand, N>& list, const List<T>& l, Ts... ts )
+    template<typename T, typename... TArgs>
+    T* createImpl(TArgs&&... args)
     {
-        for(auto t : l)
-            list.add(t);
-        addOrAppendToNodeList(list, ts...);
+        auto alloced = m_arena.allocate(sizeof(T));
+        memset(alloced, 0, sizeof(T));
+        auto result = _initAndAdd(new (alloced) T(std::forward<TArgs>(args)...));
+        return result;
+    }
+
+    template <typename T>
+    T* create()
+    {
+        static_assert(!IsBaseOf<Val, T>::Value, "ASTBuilder::create cannot be used to create a Val, use getOrCreate instead.");
+        return createImpl<T>();
+    }
+
+    template<typename T, typename... TArgs>
+    T* create(TArgs&&... args)
+    {
+        static_assert(!IsBaseOf<Val, T>::Value, "ASTBuilder::create cannot be used to create a Val, use getOrCreate instead.");
+        return createImpl<T>(args...);
     }
 
 public:
@@ -195,37 +182,27 @@ public:
         };
     };
 
+    Index getEpoch();
+
+    void incrementEpoch();
+
     MemoryArena& getArena() { return m_arena; }
 
-        /// Create AST types 
-    template <typename T>
-    T* create()
-    {
-        auto alloced = m_arena.allocate(sizeof(T));
-        memset(alloced, 0, sizeof(T));
-        return _initAndAdd(new (alloced) T);
-    }
-
-    template<typename T, typename... TArgs>
-    T* create(TArgs&&... args)
-    {
-        auto alloced = m_arena.allocate(sizeof(T));
-        memset(alloced, 0, sizeof(T));
-        return _initAndAdd(new (alloced) T(std::forward<TArgs>(args)...));
-    }
+    void _verifyValDescConsistency(Val* val, const ValNodeDesc& expectedDesc);
 
     template<typename T, typename ... TArgs>
     SLANG_FORCE_INLINE T* getOrCreate(TArgs ... args)
     {
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
-        NodeDesc desc;
+        ValNodeDesc desc;
         desc.type = T::kType;
         addOrAppendToNodeList(desc.operands, args...);
         desc.init();
-        return (T*)_getOrCreateImpl(desc, [&]()
+        auto result = (T*)_getOrCreateImpl(desc, [&]()
             {
-                return create<T>(args...);
+                return createImpl<T>(args...);
             });
+        return result;
     }
 
     template<typename T>
@@ -233,63 +210,101 @@ public:
     {
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
 
-        NodeDesc desc;
+        ValNodeDesc desc;
         desc.type = T::kType;
         desc.init();
-        return (T*)_getOrCreateImpl(desc, [this]() { return create<T>(); });
+        auto result = (T*)_getOrCreateImpl(desc, [this]() { return createImpl<T>(); });
+#ifdef _DEBUG
+        _verifyValDescConsistency(dynamicCast<Val>(result), desc);
+#endif
+        return result;
     }
 
-    template<typename T, typename ... TArgs>
-    SLANG_FORCE_INLINE T* getOrCreateWithDefaultCtor(TArgs ... args)
+    InterfaceDecl* createInterfaceDecl(SourceLoc loc)
     {
-        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
-        NodeDesc desc;
-        desc.type = T::kType;
-        addOrAppendToNodeList(desc.operands, args...);
-        desc.init();
-        return (T*)_getOrCreateImpl(desc, [&]()
-            {
-                return create<T>();
-            });
+        auto interfaceDecl = create<InterfaceDecl>();
+        // Always include a `This` member and a `This:IThisInterface` member.
+        auto thisDecl = create<ThisTypeDecl>();
+        thisDecl->nameAndLoc.name = m_sharedASTBuilder->getNamePool()->getName(UnownedStringSlice("This", 4));
+        thisDecl->nameAndLoc.loc = loc;
+        interfaceDecl->addMember(thisDecl);
+        auto thisConstraint = create<ThisTypeConstraintDecl>();
+        thisConstraint->loc = loc;
+        thisConstraint->base.type = DeclRefType::create(this, getDirectDeclRef(interfaceDecl));
+        thisDecl->addMember(thisConstraint);
+        return interfaceDecl;
     }
 
     template<typename T>
-    SLANG_FORCE_INLINE T* getOrCreateWithDefaultCtor(ConstArrayView<NodeOperand> operands)
+    DeclRef<T> getDirectDeclRef(T* decl)
     {
-        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
-        NodeDesc desc;
-        desc.type = T::kType;
-        desc.operands.addRange(operands);
-        desc.init();
-        return (T*)_getOrCreateImpl(desc, [&]()
-            {
-                return create<T>();
-            });
-    }
-
-    // This is the bottlneck through which all DeclRefs are created.
-    template<typename T>
-    DeclRef<T> getSpecializedDeclRef(T* decl, Substitutions* subst)
-    {
-        // We never create an actual DeclRefBase node to point to a null decl.
         if (!decl)
             return DeclRef<T>();
-
-        // If we don't have substitutions, use the default decl ref if it is created.
-        if (!subst)
-        {
-            auto defaultDeclRef = static_cast<Decl*>(decl)->defaultDeclRef;
-            if (defaultDeclRef)
-                return defaultDeclRef;
-        }
-
-        return getOrCreate<DeclRefBase>(decl, subst);
+        
+        auto result = DeclRef<T>(getOrCreate<DirectDeclRef>(decl));
+        return result;
     }
 
     template<typename T>
-    DeclRef<T> getSpecializedDeclRef(T* decl, SubstitutionSet subst)
+    DeclRef<T> getMemberDeclRef(DeclRef<Decl> parent, T* memberDecl)
     {
-        return getSpecializedDeclRef(decl, subst.substitutions);
+        if (!parent)
+            return getDirectDeclRef(memberDecl);
+        // A Generic value/type ParamDecl is always referred to directly.
+        if (as<GenericTypeParamDecl>(memberDecl) || as<GenericValueParamDecl>(memberDecl))
+            return getDirectDeclRef(memberDecl);
+        if (as<ThisTypeDecl>(memberDecl) && !as<InterfaceDecl>(memberDecl->parentDecl))
+            return as<T>(parent);
+
+        if (auto parentMemberDeclRef = as<MemberDeclRef>(parent.declRefBase))
+        {
+            return DeclRef<T>(getMemberDeclRef(parentMemberDeclRef->getParent(), memberDecl));
+        }
+        else if (auto lookupDeclRef = as<LookupDeclRef>(parent.declRefBase))
+        {
+            // Handle some specicial case rules due to the way some of our builtin decls are
+            // represented.
+            // - Member(Lookup(w, This), x) ==> Lookup(w, X)
+            //   Lookup of x from This is a lookup from w directly.
+            // - Member(Lookup(w, someExtension), x) ==> Lookup(w, X)
+            //   Lookup of a decl defined in an extension is to lookup directly.
+            // - Member(Lookup(w, AssociatedType), TypeConstraintDecl) ==> Lookup(w, TypeConstraintDecl)
+            //   Type constraint of an associated type is defined directly in w.
+
+            auto parentDeclKind = lookupDeclRef->getDecl()->astNodeType;
+            switch (parentDeclKind)
+            {
+            case ASTNodeType::ThisTypeDecl:
+            case ASTNodeType::ExtensionDecl:
+            case ASTNodeType::AssocTypeDecl:
+                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl);
+            default:
+                break;
+            }
+        }
+        else if (auto directDeclRef = as<DirectDeclRef>(parent.declRefBase))
+        {
+            return DeclRef<T>(getOrCreate<DirectDeclRef>(memberDecl));
+        }
+
+#if _DEBUG
+        // Verify that member is indeed a member of parent.
+        auto parentDecl = parent.getDecl();
+        while (as<ThisTypeDecl>(parentDecl))
+            parentDecl = parentDecl->parentDecl;
+        bool foundParent = false;
+        for (Decl* dd = memberDecl; dd; dd = dd->parentDecl)
+        {
+            if (dd == parentDecl)
+            {
+                foundParent = true;
+                break;
+            }
+        }
+        SLANG_ASSERT(foundParent);
+#endif
+
+        return DeclRef<T>(getOrCreate<MemberDeclRef>(memberDecl, parent.declRefBase));
     }
 
     ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
@@ -297,59 +312,36 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, ArrayView<Val*> args)
+    DeclRef<Decl> getGenericAppDeclRef(DeclRef<GenericDecl> genericDeclRef, ConstArrayView<Val*> args, Decl* innerDecl = nullptr)
     {
-        NodeDesc desc;
-        desc.type = GenericSubstitution::kType;
-        desc.operands.add(decl);
-        for (auto arg : args)
-            desc.operands.add(arg);
-        if (outer)
-        {
-            desc.operands.add(outer);
-        }
+        if (!innerDecl)
+            innerDecl = genericDeclRef.getDecl()->inner;
+
+        return getOrCreate<GenericAppDeclRef>(innerDecl, genericDeclRef, args);
+    }
+
+    DeclRef<Decl> getGenericAppDeclRef(DeclRef<GenericDecl> genericDeclRef, Val::OperandView<Val> args, Decl* innerDecl = nullptr)
+    {
+        if (!innerDecl)
+            innerDecl = genericDeclRef.getDecl()->inner;
+
+        return getOrCreate<GenericAppDeclRef>(innerDecl, genericDeclRef, args);
+    }
+
+    LookupDeclRef* getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
+    {
+        ValNodeDesc desc;
+        desc.type = LookupDeclRef::kType;
+        desc.operands.add(ValNodeOperand(subtypeWitness));
+        desc.operands.add(ValNodeOperand(declToLookup));
         desc.init();
-        auto result = (GenericSubstitution*)_getOrCreateImpl(desc, [this]() {return create<GenericSubstitution>(); });
-        if (result->args.getCount() != args.getCount())
-        {
-            SLANG_RELEASE_ASSERT(result->args.getCount() == 0);
-            result->args.addRange(args);
-            result->genericDecl = decl;
-            result->outer = outer;
-        }
+        auto result = getOrCreate<LookupDeclRef>(declToLookup, base, subtypeWitness);
         return result;
     }
 
-    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, const List<Val*>& args)
+    LookupDeclRef* getLookupDeclRef(SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
-        return getOrCreateGenericSubstitution(outer, decl, args.getArrayView());
-    }
-
-    template<typename... Args>
-    GenericSubstitution* getOrCreateGenericSubstitution(Substitutions* outer, GenericDecl* decl, Args... args)
-    {
-        List<Val*> vals;
-        addToList(vals, args...);
-        return getOrCreateGenericSubstitution(outer, decl, vals.getArrayView());
-    }
-
-
-    ThisTypeSubstitution* getOrCreateThisTypeSubstitution(InterfaceDecl* interfaceDecl, SubtypeWitness* subtypeWitness, Substitutions* outer)
-    {
-        NodeDesc desc;
-        desc.type = ThisTypeSubstitution::kType;
-        desc.operands.add(interfaceDecl);
-        desc.operands.add(subtypeWitness);
-        if (outer)
-        {
-            desc.operands.add(outer);
-        }
-        desc.init();
-        auto result = (ThisTypeSubstitution*)_getOrCreateImpl(desc, [this]() {return create<ThisTypeSubstitution>(); });
-        result->interfaceDecl = interfaceDecl;
-        result->witness = subtypeWitness;
-        result->outer = outer;
-        return result;
+        return getLookupDeclRef(subtypeWitness->getSub(), subtypeWitness, declToLookup);
     }
 
     NodeBase* createByNodeType(ASTNodeType nodeType);
@@ -371,11 +363,12 @@ public:
     SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor) { return m_sharedASTBuilder->m_builtinTypes[Index(flavor)]; }
 
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
+    Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
 
-    Type* getInitializerListType() { return m_sharedASTBuilder->m_initializerListType; }
-    Type* getOverloadedType() { return m_sharedASTBuilder->m_overloadedType; }
-    Type* getErrorType() { return m_sharedASTBuilder->m_errorType; }
-    Type* getBottomType() { return m_sharedASTBuilder->m_bottomType; }
+    Type* getInitializerListType() { return m_sharedASTBuilder->getInitializerListType(); }
+    Type* getOverloadedType() { return m_sharedASTBuilder->getOverloadedType(); }
+    Type* getErrorType() { return m_sharedASTBuilder->getErrorType(); }
+    Type* getBottomType() { return m_sharedASTBuilder->getBottomType(); }
     Type* getStringType() { return m_sharedASTBuilder->getStringType(); }
     Type* getNullPtrType() { return m_sharedASTBuilder->getNullPtrType(); }
     Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
@@ -407,13 +400,18 @@ public:
 
     ConstantBufferType* getConstantBufferType(Type* elementType);
 
+    ParameterBlockType* getParameterBlockType(Type* elementType);
+
+    HLSLStructuredBufferType* getStructuredBufferType(Type* elementType);
+
+    SamplerStateType* getSamplerStateType();
+
     DifferentialPairType* getDifferentialPairType(
         Type* valueType,
         Witness* primalIsDifferentialWitness);
 
     DeclRef<InterfaceDecl> getDifferentiableInterfaceDecl();
     Type* getDifferentiableInterfaceType();
-    Decl* getDifferentiableAssociatedTypeRequirement();
 
     bool isDifferentiableInterfaceAvailable();
 
@@ -423,6 +421,7 @@ public:
         IntVal* maxElementCount);
 
     DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg);
+    DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, ArrayView<Val*> genericArgs);
 
     Type* getAndType(Type* left, Type* right);
 
@@ -435,9 +434,9 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
-    Type* getTupleType(List<Type*>& types);
+    TupleType* getTupleType(List<Type*>& types);
 
-    Type* getFuncType(List<Type*> parameters, Type* result);
+    FuncType* getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType = nullptr);
 
     TypeType* getTypeType(Type* type);
 
@@ -445,7 +444,7 @@ public:
     TypeEqualityWitness* getTypeEqualityWitness(
         Type* type);
 
-    SubtypeWitness* getDeclaredSubtypeWitness(
+    DeclaredSubtypeWitness* getDeclaredSubtypeWitness(
         Type*                   subType,
         Type*                   superType,
         DeclRef<Decl> const&    declRef);
@@ -454,9 +453,6 @@ public:
     SubtypeWitness* getTransitiveSubtypeWitness(
         SubtypeWitness*    aIsSubtypeOfBWitness,
         SubtypeWitness*    bIsSubtypeOfCWitness);
-
-        /// Produce a witness that `ThisType(IFoo) <: IFoo`.
-    ThisTypeSubtypeWitness* getThisTypeSubtypeWitness(Type* subType, Type* superType);
 
         /// Produce a witness that `T <: L` or `T <: R` given `T <: L&R`
     SubtypeWitness* getExtractFromConjunctionSubtypeWitness(
@@ -487,13 +483,13 @@ public:
         /// Get the global session
     Session* getGlobalSession() { return m_sharedASTBuilder->m_session; }
 
+    Index getId() { return m_id; }
+
         /// Ctor
     ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name);
 
         /// Dtor
     ~ASTBuilder();
-
-    Dictionary<Decl*, GenericSubstitution*> m_genericDefaultSubst;
 
 protected:
     // Special default Ctor that can only be used by SharedASTBuilder
@@ -512,11 +508,12 @@ protected:
             // Keep such that dtor can be run on ASTBuilder being dtored
             m_dtorNodes.add(node);
         }
-        if (node->getClassInfo().isSubClassOf(*ASTClassInfo::getInfo(Decl::kType)))
+        if (node->getClassInfo().isSubClassOf(*ASTClassInfo::getInfo(Val::kType)))
         {
-            auto decl = (Decl*)(node);
-            decl->defaultDeclRef = getSpecializedDeclRef(decl, nullptr);
+            auto val = (Val*)(node);
+            val->m_resolvedValEpoch = getEpoch();
         }
+
         return node;
     }
 
@@ -529,8 +526,29 @@ protected:
     SharedASTBuilder* m_sharedASTBuilder;
 
     MemoryArena m_arena;
-
 };
+
+// Retrieves the ASTBuilder for the current compilation session.
+ASTBuilder* getCurrentASTBuilder();
+
+// Sets the ASTBuilder for the current compilation session.
+void setCurrentASTBuilder(ASTBuilder* astBuilder);
+
+struct SetASTBuilderContextRAII
+{
+    ASTBuilder* previousASTBuilder = nullptr;
+    SetASTBuilderContextRAII(ASTBuilder* astBuilder)
+    {
+        previousASTBuilder = getCurrentASTBuilder();
+        setCurrentASTBuilder(astBuilder);
+    }
+    ~SetASTBuilderContextRAII()
+    {
+        setCurrentASTBuilder(previousASTBuilder);
+    }
+};
+
+#define SLANG_AST_BUILDER_RAII(astBuilder) SetASTBuilderContextRAII _setASTBuilderContextRAII(astBuilder)
 
 } // namespace Slang
 

@@ -265,7 +265,7 @@ namespace Slang
     {
         if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
         {
-            auto declModule = getModule(declaredWitness->declRef.getDecl());
+            auto declModule = getModule(declaredWitness->getDeclRef().getDecl());
             m_moduleDependencyList.addDependency(declModule);
             m_fileDependencyList.addDependency(declModule);
             if (m_requirementSet.add(declModule))
@@ -276,8 +276,8 @@ namespace Slang
         }
         else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(witness))
         {
-            addDepedencyFromWitness(transitiveWitness->midToSup);
-            addDepedencyFromWitness(transitiveWitness->subToMid);
+            addDepedencyFromWitness(transitiveWitness->getMidToSup());
+            addDepedencyFromWitness(transitiveWitness->getSubToMid());
         }
         else if (auto conjunctionWitness = as<ConjunctionSubtypeWitness>(witness))
         {

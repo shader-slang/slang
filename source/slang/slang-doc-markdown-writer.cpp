@@ -1119,7 +1119,7 @@ void DocMarkdownWriter::writeDescription(const ASTMarkup::Entry& entry)
 void DocMarkdownWriter::writeDecl(const ASTMarkup::Entry& entry, Decl* decl)
 {
     // Skip these they will be output as part of their respective 'containers'
-    if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl) || as<AssocTypeDecl>(decl) || as<InheritanceDecl>(decl))
+    if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl) || as<AssocTypeDecl>(decl) || as<InheritanceDecl>(decl) || as<ThisTypeDecl>(decl))
     {
         return; 
     }

@@ -28,7 +28,6 @@ namespace Slang
     class Module;
     class Name;
     class Session;
-    class Substitutions;
     class SyntaxVisitor;
     class FuncDecl;
     class Layout;
@@ -50,6 +49,8 @@ namespace Slang
     class Val;
 
     class NodeBase;
+    class LookupDeclRef;
+    class GenericAppDeclRef;
 
 
     template <typename T>
@@ -625,19 +626,27 @@ namespace Slang
 
     struct SubstitutionSet
     {
-        Substitutions* substitutions = nullptr;
-        operator Substitutions*() const
-        {
-            return substitutions;
-        }
+        DeclRefBase* declRef = nullptr;
+        SubstitutionSet() = default;
+        SubstitutionSet(DeclRefBase* declRefBase)
+            :declRef(declRefBase)
+        {}
+        explicit operator bool() const;
 
-        SubstitutionSet() {}
-        SubstitutionSet(Substitutions* subst)
-            : substitutions(subst)
-        {
-        }
-        bool equals(const SubstitutionSet& substSet) const;
-        HashCode getHashCode() const;
+        template<typename F>
+        void forEachGenericSubstitution(F func) const;
+
+        template<typename F>
+        void forEachSubstitutionArg(F func) const;
+
+        Type* applyToType(ASTBuilder* astBuilder, Type* type) const;
+        DeclRefBase* applyToDeclRef(ASTBuilder* astBuilder, DeclRefBase* declRef) const;
+
+        LookupDeclRef* findLookupDeclRef() const;
+        GenericAppDeclRef* findGenericAppDeclRef(GenericDecl* genericDecl) const;
+        GenericAppDeclRef* findGenericAppDeclRef() const;
+        DeclRefBase* getInnerMostNodeWithSubstInfo() const;
+
     };
 
         /// An expression together with (optional) substutions to apply to it
@@ -741,6 +750,8 @@ namespace Slang
         }
     };
 
+    SubstExpr<Expr> applySubstitutionToExpr(SubstitutionSet substSet, Expr* expr);
+
     class ASTBuilder;
 
     template<typename T>
@@ -752,7 +763,6 @@ namespace Slang
     // try to find the concrete decl that satisfies the associatedtype requirement from the
     // concrete type supplied by ThisTypeSubstittution.
     Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef);
-    void _printNestedDecl(const Substitutions* substitutions, const Decl* decl, StringBuilder& out);
 
     template<typename T = Decl>
     struct DeclRef
@@ -780,13 +790,12 @@ namespace Slang
         {}
 
         T* getDecl() const;
-        Substitutions* getSubst() const;
 
         Name* getName() const;
         
         SourceLoc getNameLoc() const;
         SourceLoc getLoc() const;
-        DeclRef<ContainerDecl> getParent(ASTBuilder* astBuilder) const;
+        DeclRef<ContainerDecl> getParent() const;
         HashCode getHashCode() const;
         Type* substitute(ASTBuilder* astBuilder, Type* type) const;
 
@@ -823,7 +832,10 @@ namespace Slang
         }
 
         template<typename U>
-        bool equals(DeclRef<U> other) const;
+        bool equals(DeclRef<U> other) const
+        {
+            return declRefBase == other.declRefBase;
+        }
 
         template<typename U>
         bool operator == (DeclRef<U> other) const
@@ -979,17 +991,17 @@ namespace Slang
     struct FilteredMemberRefList
     {
         List<Decl*> const&	m_decls;
-        SubstitutionSet		m_substitutions;
+        DeclRef<Decl>		m_parent;
         MemberFilterStyle   m_filterStyle;
         ASTBuilder* m_astBuilder;
 
         FilteredMemberRefList(
             ASTBuilder* astBuilder,
             List<Decl*> const&	decls,
-            SubstitutionSet		substitutions,
+            DeclRef<Decl>		parent,
             MemberFilterStyle   filterStyle = MemberFilterStyle::All)
             : m_decls(decls)
-            , m_substitutions(substitutions)
+            , m_parent(parent)
             , m_filterStyle(filterStyle)
             , m_astBuilder(astBuilder)
         {}
@@ -1007,7 +1019,7 @@ namespace Slang
         {
              Decl*const* decl = getFilterCursorByIndex<T>(m_filterStyle, m_decls.begin(), m_decls.end(), index);
              SLANG_ASSERT(decl);
-             return _getSpecializedDeclRef(m_astBuilder, (T*)*decl, m_substitutions).template as<T>();
+             return _getMemberDeclRef(m_astBuilder, m_parent, (T*)*decl).template as<T>();
         }
 
         List<DeclRef<T>> toArray() const
@@ -1042,7 +1054,7 @@ namespace Slang
 
             void operator++() { m_ptr = adjustFilterCursor<T>(m_filterStyle, m_ptr + 1, m_end); }
 
-            DeclRef<T> operator*() { return _getSpecializedDeclRef(m_list->m_astBuilder, (T*)*m_ptr, m_list->m_substitutions).template as<T>(); }
+            DeclRef<T> operator*() { return _getMemberDeclRef(m_list->m_astBuilder, m_list->m_parent, (T*)*m_ptr).template as<T>(); }
         };
 
         Iterator begin() const { return Iterator(this, adjustFilterCursor<T>(m_filterStyle, m_decls.begin(), m_decls.end()), m_decls.end(), m_filterStyle); }
@@ -1431,7 +1443,18 @@ namespace Slang
     {
         SLANG_OBJ_CLASS(WitnessTable)
 
-        RequirementDictionary requirementDictionary;
+        const RequirementDictionary& getRequirementDictionary()
+        {
+            if (m_requirementDictionary.getCount() != m_requirements.getCount())
+            {
+                for (Index i = m_requirementDictionary.getCount(); i < m_requirements.getCount(); i++)
+                {
+                    auto& r = m_requirements[i];
+                    m_requirementDictionary.add(r.key, r.value);
+                }
+            }
+            return m_requirementDictionary;
+        }
 
         void add(Decl* decl, RequirementWitness const& witness);
 
@@ -1440,9 +1463,13 @@ namespace Slang
 
         // The type witnessesd by the witness table (a concrete type).
         Type* witnessedType;
-    };
 
-    typedef Dictionary<unsigned int, NodeBase*> AttributeArgumentValueDict;
+        // Satisfying values of each requirement.
+        List<KeyValuePair<Decl*, RequirementWitness>> m_requirements;
+
+        // Cached dictionary for looking up satisfying values.
+        SLANG_UNREFLECTED RequirementDictionary m_requirementDictionary;
+    };
 
     struct SpecializationParam
     {
@@ -1550,6 +1577,7 @@ namespace Slang
 
     /// Get the operator name from the higher order invoke expr.
     UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr);
+
 
 } // namespace Slang
 

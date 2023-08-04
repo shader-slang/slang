@@ -2064,7 +2064,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // otherwise they will include all of the above cases...
     else if( auto declRefType = as<DeclRefType>(type) )
     {
-        auto declRef = declRefType->declRef;
+        auto declRef = declRefType->getDeclRef();
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
@@ -2777,7 +2777,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
 
         // Any generic specialization applied to the entry-point function
         // must also be applied to its parameters.
-        paramDeclRef = context->getASTBuilder()->getSpecializedDeclRef(paramDeclRef.getDecl(), entryPointFuncDeclRef.getSubst());
+        paramDeclRef = context->getASTBuilder()->getMemberDeclRef(entryPointFuncDeclRef, paramDeclRef.getDecl());
 
         // When computing layout for an entry-point parameter,
         // we want to make sure that the layout context has access
@@ -3033,24 +3033,6 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         // along.
         //
         visitChildren(specialized);
-
-        // While we are at it, we will also make note of any
-        // tagged-union types that were used as part of the
-        // specialization arguments, since we need to make
-        // sure that their layout information is computed
-        // and made available for IR code generation.
-        //
-        // Note: this isn't really the best place for this logic to sit,
-        // but it is the simplest place where we can collect all the tagged
-        // union types that get referenced by a program.
-        //
-        for( auto taggedUnionType : specialized->getTaggedUnionTypes() )
-        {
-            SLANG_ASSERT(taggedUnionType);
-            auto substType = taggedUnionType;
-            auto typeLayout = createTypeLayout(m_context->layoutContext, substType);
-            m_context->shared->programLayout->taggedUnionTypeLayouts.add(typeLayout);
-        }
     }
 
 
@@ -3755,6 +3737,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram*  targetProgram,
     DiagnosticSink* sink)
 {
+    SLANG_AST_BUILDER_RAII(targetProgram->getProgram()->getLinkage()->getASTBuilder());
+
     auto program = targetProgram->getProgram();
     auto targetReq = targetProgram->getTargetReq();
 

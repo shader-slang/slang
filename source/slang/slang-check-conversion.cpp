@@ -61,7 +61,7 @@ namespace Slang
 
         if(auto declRefType = as<DeclRefType>(type))
         {
-            if(as<StructDecl>(declRefType->declRef))
+            if(as<StructDecl>(declRefType->getDeclRef()))
                 return false;
         }
 
@@ -174,7 +174,7 @@ namespace Slang
         if(!baseDeclRefType)
             return nullptr;
 
-        auto baseDeclRef = baseDeclRefType->declRef;
+        auto baseDeclRef = baseDeclRefType->getDeclRef();
         auto baseStructDeclRef = baseDeclRef.as<StructDecl>();
         if(!baseStructDeclRef)
             return nullptr;
@@ -193,7 +193,7 @@ namespace Slang
         if (!baseDeclRefType)
             return DeclRef<StructDecl>();
 
-        auto baseDeclRef = baseDeclRefType->declRef;
+        auto baseDeclRef = baseDeclRefType->getDeclRef();
         auto baseStructDeclRef = baseDeclRef.as<StructDecl>();
         if (!baseStructDeclRef)
             return DeclRef<StructDecl>();
@@ -244,13 +244,13 @@ namespace Slang
         }
         else if (auto toVecType = as<VectorExpressionType>(toType))
         {
-            auto toElementCount = toVecType->elementCount;
-            auto toElementType = toVecType->elementType;
+            auto toElementCount = toVecType->getElementCount();
+            auto toElementType = toVecType->getElementType();
 
             UInt elementCount = 0;
             if (auto constElementCount = as<ConstantIntVal>(toElementCount))
             {
-                elementCount = (UInt) constElementCount->value;
+                elementCount = (UInt) constElementCount->getValue();
             }
             else
             {
@@ -299,7 +299,7 @@ namespace Slang
                 UInt elementCount = 0;
                 if (auto constElementCount = as<ConstantIntVal>(toElementCount))
                 {
-                    elementCount = (UInt) constElementCount->value;
+                    elementCount = (UInt) constElementCount->getValue();
                 }
                 else
                 {
@@ -388,7 +388,7 @@ namespace Slang
 
             if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
             {
-                rowCount = (UInt) constRowCount->value;
+                rowCount = (UInt) constRowCount->getValue();
             }
             else
             {
@@ -423,7 +423,7 @@ namespace Slang
         }
         else if(auto toDeclRefType = as<DeclRefType>(toType))
         {
-            auto toTypeDeclRef = toDeclRefType->declRef;
+            auto toTypeDeclRef = toDeclRefType->getDeclRef();
             if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
             {
                 // Trying to initialize a `struct` type given an initializer list.
@@ -570,7 +570,7 @@ namespace Slang
         if( left == right )
             return true;
 
-        if( left->equalsVal(right) )
+        if( left->equals(right) )
             return true;
 
         return false;
@@ -581,9 +581,9 @@ namespace Slang
     {
         if(!type) return false;
 
-        for( auto m : type->modifiers )
+        for (Index m = 0; m < type->getModifierCount(); m++)
         {
-            if(_doModifiersMatch(m, modifier))
+            if(_doModifiersMatch(type->getModifier(m), modifier))
                 return true;
         }
 
@@ -632,7 +632,7 @@ namespace Slang
     {
         auto basicType = as<BasicExpressionType>(t);
         if (!basicType) return false;
-        switch (basicType->baseType)
+        switch (basicType->getBaseType())
         {
         case BaseType::Int8:
         case BaseType::Int16:
@@ -650,7 +650,7 @@ namespace Slang
         auto basicType = as<BasicExpressionType>(t);
         if (!basicType) return 0;
 
-        switch (basicType->baseType)
+        switch (basicType->getBaseType())
         {
         case BaseType::Int8:
         case BaseType::UInt8:
@@ -770,10 +770,10 @@ namespace Slang
             // on it, but the underlying types are otherwise the same.
             //
             auto toModified = as<ModifiedType>(toType);
-            auto toBase = toModified ? toModified->base : toType;
+            auto toBase = toModified ? toModified->getBase() : toType;
             //
             auto fromModified = as<ModifiedType>(fromType);
-            auto fromBase = fromModified ? fromModified->base : fromType;
+            auto fromBase = fromModified ? fromModified->getBase() : fromType;
 
 
             if((toModified || fromModified) && toBase->equals(fromBase))
@@ -787,8 +787,9 @@ namespace Slang
                 //
                 if( toModified )
                 {
-                    for( auto modifier : toModified->modifiers )
+                    for (Index m = 0; m < toModified->getModifierCount(); m++)
                     {
+                        auto modifier = toModified->getModifier(m);
                         if(_hasMatchingModifier(fromModified, modifier))
                             continue;
 
@@ -804,8 +805,10 @@ namespace Slang
                 }
                 if( fromModified )
                 {
-                    for( auto modifier : fromModified->modifiers )
+                    for (Index m = 0; m < fromModified->getModifierCount(); m++)
                     {
+                        auto modifier = fromModified->getModifier(m);
+
                         if(_hasMatchingModifier(toModified, modifier))
                             continue;
 
@@ -923,7 +926,7 @@ namespace Slang
         //
         // TODO(tfoley): Under what circumstances would this check ever be needed?
         //
-        if (auto toParameterGroupType = as<ParameterGroupType>(toType))
+        if (as<ParameterGroupType>(toType))
         {
             return _failedCoercion(toType, outToExpr, fromExpr);
         }
@@ -1141,7 +1144,7 @@ namespace Slang
                         {
                             if (auto val = as<ConstantIntVal>(intVal))
                             {
-                                if (isIntValueInRangeOfType(val->value, toType))
+                                if (isIntValueInRangeOfType(val->getValue(), toType))
                                 {
                                     // OK.
                                     shouldEmitGeneralWarning = false;

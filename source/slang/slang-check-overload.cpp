@@ -70,7 +70,7 @@ namespace Slang
         {
             if (auto resultType = as<DeclRefType>(candidate.resultType))
             {
-                if (resultType->declRef.as<ClassDecl>())
+                if (resultType->getDeclRef().as<ClassDecl>())
                 {
                     isClassType = true;
                 }
@@ -373,7 +373,7 @@ namespace Slang
                 //
                 if( !val )
                 {
-                    val = m_astBuilder->create<ErrorIntVal>();
+                    val = m_astBuilder->getOrCreate<ErrorIntVal>(m_astBuilder->getIntType());
                 }
                 checkedArgs.add(val);
             }
@@ -383,8 +383,8 @@ namespace Slang
             }
         }
 
-        auto genSubst = m_astBuilder->getOrCreateGenericSubstitution(nullptr, genericDeclRef.getDecl(), checkedArgs.getArrayView());
-        candidate.subst = genSubst;
+        auto genSubst = m_astBuilder->getGenericAppDeclRef(genericDeclRef, checkedArgs.getArrayView());
+        candidate.subst = SubstitutionSet(genSubst);
 
         // Once we are done processing the parameters of the generic,
         // we will have build up a usable `checkedArgs` array and
@@ -550,19 +550,17 @@ namespace Slang
 
         // We should have the existing arguments to the generic
         // handy, so that we can construct a substitution list.
-        auto subst = as<GenericSubstitution>(candidate.subst);
-        SLANG_ASSERT(subst);
+        auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
+        SLANG_ASSERT(substArgs.getCount());
 
-        subst = getASTBuilder()->getOrCreateGenericSubstitution(
-            genericDeclRef.getSubst(), genericDeclRef.getDecl(), subst->getArgs());
-
-        List<Val*> newArgs = subst->getArgs();
+        List<Val*> newArgs;
+        for (auto arg : substArgs)
+            newArgs.add(arg);
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
-            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getSpecializedDeclRef(
-                constraintDecl, subst);
-
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getGenericAppDeclRef(genericDeclRef, substArgs, constraintDecl).as<GenericTypeConstraintDecl>();
+            
             auto sub = getSub(m_astBuilder, constraintDeclRef);
             auto sup = getSup(m_astBuilder, constraintDeclRef);
 
@@ -575,14 +573,14 @@ namespace Slang
             {
                 if(context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
-                    subTypeWitness = tryGetSubtypeWitness(sub, sup);
+                    subTypeWitness = isSubtype(sub, sup);
                     getSink()->diagnose(context.loc, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
                 }
                 return false;
             }
         }
 
-        candidate.subst = m_astBuilder->getOrCreateGenericSubstitution(nullptr, genericDeclRef.getDecl(), newArgs);
+        candidate.subst = SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView()));
 
         // Done checking all the constraints, hooray.
         return true;
@@ -617,7 +615,7 @@ namespace Slang
     Expr* SemanticsVisitor::createGenericDeclRef(
         Expr*                baseExpr,
         Expr*                originalExpr,
-        GenericSubstitution* subst)
+        SubstitutionSet      substArgs)
     {
         auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
         if (!baseDeclRefExpr)
@@ -631,10 +629,9 @@ namespace Slang
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), baseExpr, "expected a reference to a generic declaration");
             return CreateErrorExpr(originalExpr);
         }
-
-        subst = m_astBuilder->getOrCreateGenericSubstitution(baseGenericRef.getSubst(), baseGenericRef.getDecl(), subst->getArgs());
-
-        DeclRef<Decl> innerDeclRef = m_astBuilder->getSpecializedDeclRef<Decl>(getInner(baseGenericRef), subst);
+        auto genSubst = substArgs.findGenericAppDeclRef(baseGenericRef.getDecl());
+        SLANG_ASSERT(genSubst);
+        DeclRef<Decl> innerDeclRef = m_astBuilder->getGenericAppDeclRef(baseGenericRef, genSubst->getArgs());
 
         Expr* base = nullptr;
         if (auto mbrExpr = as<MemberExpr>(baseExpr))
@@ -768,14 +765,16 @@ namespace Slang
                     expr->loc = context.loc;
                     expr->originalExpr = baseExpr;
                     expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
-                    expr->substWithKnownGenericArgs = (GenericSubstitution*)candidate.subst;
+                    auto args = tryGetGenericArguments(candidate.subst, expr->baseGenericDeclRef.getDecl());
+                    for (auto arg : args)
+                        expr->knownGenericArgs.add(arg);
                     return expr;
                 }
 
                 return createGenericDeclRef(
                     baseExpr,
                     context.originalExpr,
-                    as<GenericSubstitution>(candidate.subst));
+                    candidate.subst);
                 break;
 
             default:
@@ -801,12 +800,14 @@ namespace Slang
         /// Does the given `declRef` represent an interface requirement?
     bool isInterfaceRequirement(ASTBuilder* builder, DeclRef<Decl> const& declRef)
     {
+        SLANG_UNUSED(builder);
+
         if(!declRef)
             return false;
 
-        auto parent = declRef.getParent(builder);
+        auto parent = declRef.getParent();
         if(parent.as<GenericDecl>())
-            parent = parent.getParent(builder);
+            parent = parent.getParent();
 
         if(parent.as<InterfaceDecl>())
             return true;
@@ -826,7 +827,7 @@ namespace Slang
         // "inner" declaration of a generic. That means that
         // the parent of the decl ref must be a generic.
         //
-        auto parentGeneric = declRef.getParent(m_astBuilder).as<GenericDecl>();
+        auto parentGeneric = declRef.getParent().as<GenericDecl>();
         if(!parentGeneric)
             return 0;
         //
@@ -863,7 +864,18 @@ namespace Slang
         if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
             return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
 
-        // TODO: We should always have rules such that in a tie a declaration
+        // If both are interface requirements, prefer to more derived interface.
+        if (leftIsInterfaceRequirement && rightIsInterfaceRequirement)
+        {
+            auto leftType = DeclRefType::create(m_astBuilder, left.declRef.getParent());
+            auto rightType = DeclRefType::create(m_astBuilder, right.declRef.getParent());
+            if (isSubtype(leftType, rightType))
+                return -1;
+            if (isSubtype(rightType, leftType))
+                return 1;
+        }
+
+        // TODO: We should generalize above rules such that in a tie a declaration
         // A::m is better than B::m when all other factors are equal and
         // A inherits from B.
 
@@ -1227,7 +1239,7 @@ namespace Slang
     DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         DeclRef<GenericDecl>    genericDeclRef,
         OverloadResolveContext& context,
-        GenericSubstitution*    substWithKnownGenericArgs,
+        ArrayView<Val*>         knownGenericArgs,
         List<Type*>             *innerParameterTypes)
     {
         // We have been asked to infer zero or more arguments to
@@ -1265,28 +1277,10 @@ namespace Slang
         // the "inner" declaration of the generic (e.g., the `FuncitonDecl`
         // under the `GenericDecl`).
         //
-        // In the case where no explicit arguments are available, we will
-        // use any substitutions that were in place for referring to the
-        // generic itself.
-        //
-        Substitutions* substForInnerDecl = genericDeclRef.getSubst();
-        //
-        // In the case where we have explicit/known arguments,
-        // we will use those as our baseline substitutions.
-        //
-        if (substWithKnownGenericArgs)
-        {
-            substForInnerDecl = substWithKnownGenericArgs;
-        }
-
-        auto innerDecl = getInner(genericDeclRef);
-        DeclRef<Decl> partiallySpecializedInnerRef = m_astBuilder->getSpecializedDeclRef<Decl>(
-            innerDecl,
-            substForInnerDecl);
-
         // Check what type of declaration we are dealing with, and then try
         // to match it up with the arguments accordingly...
-        if (auto funcDeclRef = partiallySpecializedInnerRef.as<CallableDecl>())
+
+        if (auto funcDeclRef = as<CallableDecl>(genericDeclRef.getDecl()->inner))
         {
             List<Type*> paramTypes;
             if (!innerParameterTypes)
@@ -1360,28 +1354,8 @@ namespace Slang
         // TODO(tfoley): We probably need to pass along the explicit arguments here,
         // so that the solver knows to accept those arguments as-is.
         //
-        auto constraintSubst = trySolveConstraintSystem(
-            &constraints, genericDeclRef, substWithKnownGenericArgs);
-        if (!constraintSubst)
-        {
-            // In this case, the solver failed to find a solution to the constraint
-            // system, and we will signal that failure up to the client that called
-            // this operation.
-            //
-            // TODO: We really ought to be passing up some kind of representation
-            // of the failure, so that constraint-related issues can be reported to
-            // the user. This could either be a return path here (returning some
-            // diagnostics), or this code could have a "just trying" vs. "actually
-            // do things" distinction like some other steps.
-            //
-            return DeclRef<Decl>();
-        }
-
-        // If we found a solution (that is, a set of argument values that satisfy
-        // all the constraints), we can construct a reference to the inner
-        // declaration that applies the generic to those arguments.
-        //
-        return m_astBuilder->getSpecializedDeclRef<Decl>(innerDecl, constraintSubst);
+        return trySolveConstraintSystem(
+            &constraints, genericDeclRef, knownGenericArgs);
     }
 
     void SemanticsVisitor::AddTypeOverloadCandidates(
@@ -1424,13 +1398,13 @@ namespace Slang
     void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
         LookupResultItem                genericItem,
         OverloadResolveContext&         context,
-        GenericSubstitution*            substWithKnownGenericArgs)
+        ArrayView<Val*>                 knownGenericArgs)
     {
         auto genericDeclRef = genericItem.declRef.as<GenericDecl>();
         SLANG_ASSERT(genericDeclRef);
 
         // Try to infer generic arguments, based on the context
-        DeclRef<Decl> innerRef = inferGenericArguments(genericDeclRef, context, substWithKnownGenericArgs);
+        DeclRef<Decl> innerRef = inferGenericArguments(genericDeclRef, context, knownGenericArgs);
 
         if (innerRef)
         {
@@ -1475,7 +1449,7 @@ namespace Slang
             LookupResultItem innerItem;
             innerItem.breadcrumbs = item.breadcrumbs;
             innerItem.declRef = genericDeclRef;
-            addOverloadCandidatesForCallToGeneric(innerItem, context);
+            addOverloadCandidatesForCallToGeneric(innerItem, context, ArrayView<Val*>());
         }
         else if( auto typeDefDeclRef = item.declRef.as<TypeDefDecl>() )
         {
@@ -1578,7 +1552,7 @@ namespace Slang
             addOverloadCandidatesForCallToGeneric(
                 LookupResultItem(partiallyAppliedGenericExpr->baseGenericDeclRef),
                 context,
-                partiallyAppliedGenericExpr->substWithKnownGenericArgs);
+                partiallyAppliedGenericExpr->knownGenericArgs.getArrayView());
         }
         else if (auto typeType = as<TypeType>(funcExprType))
         {
@@ -1588,7 +1562,7 @@ namespace Slang
             //
             // TODO(tfoley): are there any meaningful types left
             // that aren't declaration references?
-            auto type = typeType->type;
+            auto type = typeType->getType();
             AddTypeOverloadCandidates(type, context);
             return;
         }
@@ -1633,11 +1607,15 @@ namespace Slang
                     paramTypes.add(removeParamDirType(diffFuncType->getParamType(ii)));
 
                 // Try to infer generic arguments, based on the updated context.
+                OverloadResolveContext subContext = context;
                 DeclRef<Decl> innerRef = inferGenericArguments(
                     baseFuncGenericDeclRef,
                     context,
-                    nullptr,
+                    ArrayView<Val*>(),
                     &paramTypes);
+
+                if (!innerRef)
+                    return;
 
                 OverloadCandidate candidate;
                 candidate.flavor = OverloadCandidate::Flavor::Expr;

@@ -11,6 +11,7 @@ typealias IDFloat = __BuiltinRealType & IDifferentiable;
 __generic<T : IDifferentiable, let N : int>
 struct dvector : IDifferentiable
 {
+    typedef dvector<T.Differential, N> Differential;
     T values[N];
 };
 
@@ -147,6 +148,8 @@ DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
 __generic<let N : int>
 struct lineardvector : IDifferentiable
 {
+    typedef lineardvector<N> Differential;
+
     myvector<Real, N>.Differential val;
 
     __init(vector<Real.Differential, N> a)
