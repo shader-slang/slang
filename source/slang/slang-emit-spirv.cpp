@@ -1147,12 +1147,14 @@ struct SPIRVEmitContext
             {
                 const auto elementType = static_cast<IRArrayTypeBase*>(inst)->getElementType();
                 const auto elementTypeSpv = getID(ensureInst(elementType));
-                const auto countSpv = getID(ensureInst(static_cast<IRArrayTypeBase*>(inst)->getElementCount()));
                 const auto arrayType = inst->getOp() == kIROp_ArrayType
                     ? emitTypeInst(
                         inst,
                         SpvOpTypeArray,
-                        makeArray(elementTypeSpv, countSpv).getView())
+                        makeArray(
+                            elementTypeSpv,
+                            getID(ensureInst(static_cast<IRArrayTypeBase*>(inst)->getElementCount()))
+                        ).getView())
                     : emitTypeInst(
                         inst,
                         SpvOpTypeRuntimeArray,
