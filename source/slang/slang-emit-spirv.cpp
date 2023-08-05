@@ -1914,6 +1914,41 @@ struct SPIRVEmitContext
         default:
             break;
 
+        case kIROp_LayoutDecoration:
+            {
+                // Basic offsets for structs used in buffers
+                if(const auto typeLayout = as<IRTypeLayout>(as<IRLayoutDecoration>(decoration)->getLayout()))
+                {
+                    if(const auto structTypeLayout = as<IRStructTypeLayout>(typeLayout))
+                    {
+                        auto section = getSection(SpvLogicalSectionID::Annotations);
+                        SpvWord i = 0;
+                        for(const auto fieldLayoutAttr : structTypeLayout->getFieldLayoutAttrs())
+                        {
+                            if(const auto structFieldLayoutAttr = as<IRStructFieldLayoutAttr>(fieldLayoutAttr))
+                            {
+                                const auto varLayout = structFieldLayoutAttr->getLayout();
+                                if(const auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform))
+                                {
+                                    const auto offset = static_cast<SpvWord>(varOffsetAttr->getOffset());
+                                    emitInst(
+                                        section,
+                                        fieldLayoutAttr,
+                                        SpvOpMemberDecorate,
+                                        dstID,
+                                        i,
+                                        SpvDecorationOffset,
+                                        offset
+                                    );
+                                }
+                            }
+                            ++i;
+                        }
+                    }
+                }
+            }
+            break;
+
         // [3.32.2. Debug Instructions]
         //
         // > OpName
@@ -2001,14 +2036,6 @@ struct SPIRVEmitContext
                     SpvOpDecorate,
                     dstID,
                     SpvDecorationBlock);
-                emitInst(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    SpvOpMemberDecorate,
-                    dstID,
-                    0,
-                    SpvDecorationOffset,
-                    0);
             }
             break;
         // ...

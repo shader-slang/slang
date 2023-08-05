@@ -3,10 +3,12 @@
 
 #include "slang-ir-glsl-legalize.h"
 
+#include "slang-ir-layout-on-types.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-emit-base.h"
 #include "slang-glsl-extension-tracker.h"
+#include "slang-type-layout.h"
 
 namespace Slang
 {
@@ -371,6 +373,7 @@ void legalizeIRForSPIRV(
     const List<IRFunc*>& entryPoints,
     CodeGenContext* codeGenContext)
 {
+    placeTypeLayoutsOnTypes(module, codeGenContext);
     GLSLExtensionTracker extensionTracker;
     legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
     legalizeSPIRV(context, module);
