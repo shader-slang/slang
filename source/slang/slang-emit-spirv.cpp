@@ -1351,6 +1351,7 @@ struct SPIRVEmitContext
     SpvInst* emitGlobalVar(IRGlobalVar* globalVar)
     {
         auto layout = getVarLayout(globalVar);
+        SLANG_ASSERT(layout);
         auto storageClass = SpvStorageClassUniform;
         if (auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType()))
         {
