@@ -2576,9 +2576,9 @@ struct SPIRVEmitContext
 
         IRStructType* baseStructType = as<IRStructType>(inst->getBase()->getDataType());
         SLANG_ASSERT(baseStructType && "field_extract require base to be a struct.");
-        auto fieldId = emitIntConstant(
-            getStructFieldId(baseStructType, as<IRStructKey>(inst->getField())),
-            builder.getIntType());
+        auto fieldId = static_cast<SpvWord>(getStructFieldId(
+            baseStructType,
+            as<IRStructKey>(inst->getField())));
         
         return emitInst(
             parent,
