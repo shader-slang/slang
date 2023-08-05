@@ -89,6 +89,10 @@ static Dictionary<IRType*, IRTypeLayout*> associateTypesWithLayouts(IRModule* mo
                 {
                     // todo
                 }
+                else if(const auto dec = as<IRParameterGroupTypeLayout>(varLayoutUser))
+                {
+                    // todo
+                }
                 else
                     SLANG_UNEXPECTED("Var layout was used somewhere unexpected");
            });
