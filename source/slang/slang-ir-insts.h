@@ -3488,6 +3488,9 @@ public:
 
     IRVar* emitVar(
         IRType* type);
+    IRVar* emitVar(
+        IRType* type,
+        IRIntegerValue addressSpace);
 
     IRInst* emitLoad(
         IRType* type,

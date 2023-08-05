@@ -182,6 +182,30 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Replace getElement(x, i) with, y = store(x); p = getElementPtr(y, i); load(p)
+    // SPIR-V has no support for dynamic indexing into values like we do.
+    // It may be advantageous however to do this further up the pipeline
+    void processGetElement(IRGetElement* inst)
+    {
+        const auto x = inst->getBase();
+        List<IRInst*> indices;
+        IRGetElement* c = inst;
+        do
+        {
+            indices.add(c->getIndex());
+        } while(c = as<IRGetElement>(c->getBase()));
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(inst);
+        IRInst* y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
+        builder.emitStore(y, x);
+        for(Index i = indices.getCount() - 1; i >= 0; --i)
+            y = builder.emitElementAddress(y, indices[i]);
+        const auto newInst = builder.emitLoad(y);
+        inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
+        addUsersToWorkList(newInst);
+    }
+
     void processGetElementPtrImpl(IRInst* gepInst, IRInst* base, IRInst* index)
     {
         if (auto ptrType = as<IRPtrTypeBase>(base->getDataType()))
@@ -290,6 +314,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_Call:
                 processCall(as<IRCall>(inst));
+                break;
+            case kIROp_GetElement:
+                processGetElement(as<IRGetElement>(inst));
                 break;
             case kIROp_GetElementPtr:
                 processGetElementPtr(as<IRGetElementPtr>(inst));

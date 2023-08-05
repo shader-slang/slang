@@ -4423,6 +4423,19 @@ namespace Slang
         return inst;
     }
 
+    IRVar* IRBuilder::emitVar(
+        IRType*         type,
+        IRIntegerValue  addressSpace)
+    {
+        auto allocatedType = getPtrType(kIROp_PtrType, type, addressSpace);
+        auto inst = createInst<IRVar>(
+            this,
+            kIROp_Var,
+            allocatedType);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitLoadReverseGradient(IRType* type, IRInst* diffValue)
     {
         auto inst = createInst<IRLoadReverseGradient>(
