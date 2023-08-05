@@ -1772,6 +1772,15 @@ struct SPIRVEmitContext
             SLANG_UNEXPECTED("Unstructured branching is not supported by SPIRV.");
         case kIROp_MakeVector:
             return emitConstruct(parent, inst);
+        case kIROp_MakeVectorFromScalar:
+            {
+                const auto scalar = inst->getOperand(0);
+                const auto vecTy = as<IRVectorType>(inst->getDataType());
+                SLANG_ASSERT(vecTy);
+                const auto numElems = as<IRIntLit>(vecTy->getElementCount());
+                SLANG_ASSERT(numElems);
+                return emitSplat(parent, inst, scalar, numElems->getValue());
+            }
         case kIROp_MakeArray:
             return emitConstruct(parent, inst);
         }
@@ -2880,16 +2889,17 @@ struct SPIRVEmitContext
         }
     }
 
-    SpvInst* emitSplat(SpvInstParent* parent, IRInst* scalar, IRIntegerValue numElems)
+    SpvInst* emitSplat(SpvInstParent* parent, IRInst* inst, IRInst* scalar, IRIntegerValue numElems)
     {
         const auto scalarTy = as<IRBasicType>(scalar->getDataType());
+        SLANG_ASSERT(scalarTy);
         const auto spvVecTy = ensureVectorType(
             scalarTy->getBaseType(),
             numElems,
             nullptr);
         return emitInstCustomOperandFunc(
             parent,
-            nullptr,
+            inst,
             SpvOpCompositeConstruct,
             [&](){
                 emitOperand(spvVecTy);
@@ -3056,13 +3066,13 @@ struct SPIRVEmitContext
             {
                 const auto len = as<IRIntLit>(lVec->getElementCount());
                 SLANG_ASSERT(len);
-                return go(l, emitSplat(parent, r, len->getValue()));
+                return go(l, emitSplat(parent, nullptr, r, len->getValue()));
             }
             else if (!lVec && rVec)
             {
                 const auto len = as<IRIntLit>(rVec->getElementCount());
                 SLANG_ASSERT(len);
-                return go(emitSplat(parent, l, len->getValue()), r);
+                return go(emitSplat(parent, nullptr, l, len->getValue()), r);
             }
             return go(l, r);
         }
