@@ -2318,14 +2318,16 @@ struct SPIRVEmitContext
         // different storage-class qualifier. We need to pre-create these
         // storage-class-qualified result pointer types so they can be used
         // during inlining of the snippet.
-        if (auto oldPtrType = as<IRPtrTypeBase>(inst->getDataType()))
         {
-            for (auto storageClass : snippet->usedResultTypeStorageClasses)
+            IRBuilder builder(m_irModule);
+            builder.setInsertBefore(inst);
+            for (auto storageClass : snippet->usedPtrResultTypeStorageClasses)
             {
-                IRBuilder builder(m_irModule);
-                builder.setInsertBefore(inst);
                 auto newPtrType = builder.getPtrType(
-                    oldPtrType->getOp(), oldPtrType->getValueType(), storageClass);
+                    kIROp_PtrType,
+                    inst->getDataType(),
+                    storageClass
+                );
                 context.qualifiedResultTypes[storageClass] = newPtrType;
             }
         }
