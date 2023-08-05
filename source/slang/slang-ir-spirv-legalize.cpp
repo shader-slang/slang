@@ -269,13 +269,34 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processStructuredBufferType(IRHLSLStructuredBufferTypeBase* inst)
     {
+        // const auto elementTypeLayout = inst->getElementType()->findDecoration<IRTypeLayout>();
+        // SLANG_ASSERT(elementTypeLayout);
+        const auto typeLayoutDecoration = inst->findDecoration<IRLayoutDecoration>();
+        SLANG_ASSERT(typeLayoutDecoration);
+        const auto typeLayout = as<IRStructuredBufferTypeLayout>(typeLayoutDecoration->getLayout());
+        SLANG_ASSERT(typeLayout);
+        const auto elemTypeLayout = typeLayout->getElementTypeLayout();
+        SLANG_ASSERT(elemTypeLayout);
+
         IRBuilder builder(m_sharedContext->m_irModule);
+
         builder.setInsertBefore(inst);
-        auto arrayType = builder.getUnsizedArrayType(inst->getElementType());
-        auto structType = builder.createStructType();
-        auto arrayKey = builder.createStructKey();
+        const auto arrayType = builder.getUnsizedArrayType(inst->getElementType());
+        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(&builder, elemTypeLayout);
+        const auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
+        IRVarLayout::Builder varLayoutBuilder(&builder, arrayTypeLayout);
+        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::Uniform);
+        const auto arrayFieldVarLayout = varLayoutBuilder.build();
+
+        const auto structType = builder.createStructType();
+        IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
+        const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
-        auto ptrType = builder.getPtrType(kIROp_PtrType, structType, SpvStorageClassStorageBuffer);
+        structTypeLayoutBuilder.addField(arrayKey, arrayFieldVarLayout);
+        const auto structTypeLayout = structTypeLayoutBuilder.build();
+
+        const auto ptrType = builder.getPtrType(kIROp_PtrType, structType, SpvStorageClassStorageBuffer);
+
         StringBuilder nameSb;
         switch (inst->getOp())
         {
@@ -294,6 +315,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
         builder.addDecoration(structType, kIROp_SPIRVBufferBlockDecoration);
+        SLANG_ASSERT(!structType->findDecoration<IRLayoutDecoration>());
+        builder.addLayoutDecoration(structType, structTypeLayout);
         inst->replaceUsesWith(ptrType);
         inst->removeAndDeallocate();
         addUsersToWorkList(ptrType);
