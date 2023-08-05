@@ -2802,6 +2802,25 @@ struct SPIRVEmitContext
         }
     }
 
+    SpvInst* emitSplat(SpvInstParent* parent, IRInst* scalar, IRIntegerValue numElems)
+    {
+        const auto scalarTy = as<IRBasicType>(scalar->getDataType());
+        const auto spvVecTy = ensureVectorType(
+            scalarTy->getBaseType(),
+            numElems,
+            nullptr);
+        return emitInstCustomOperandFunc(
+            parent,
+            nullptr,
+            SpvOpCompositeConstruct,
+            [&](){
+                emitOperand(spvVecTy);
+                emitOperand(kResultID);
+                for(Int i = 0; i < numElems; ++i)
+                    emitOperand(scalar);
+            });
+    }
+
     bool isSignedType(IRType* type)
     {
         switch (type->getOp())
@@ -2842,12 +2861,8 @@ struct SPIRVEmitContext
 
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
-        IRType* elementType = inst->getOperand(0)->getDataType();
-        if (auto vectorType = as<IRVectorType>(inst->getDataType()))
-        {
-            elementType = vectorType->getElementType();
-        }
-        else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
+        IRType* elementType = dropVector(inst->getOperand(0)->getDataType());
+        if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             //TODO: implement.
             SLANG_ASSERT(!"unimplemented: matrix arithemetic");
@@ -2946,7 +2961,34 @@ struct SPIRVEmitContext
             SLANG_ASSERT(!"unknown arithmetic opcode");
             break;
         }
-        return emitInst(parent, inst, opCode, inst->getDataType(), kResultID, OperandsOf(inst));
+        if(inst->getOperandCount() == 1)
+        {
+            return emitInst(parent, inst, opCode, inst->getDataType(), kResultID, OperandsOf(inst));
+        }
+        else if(inst->getOperandCount() == 2)
+        {
+            auto l = inst->getOperand(0);
+            const auto lVec = as<IRVectorType>(l->getDataType());
+            auto r = inst->getOperand(1);
+            const auto rVec = as<IRVectorType>(r->getDataType());
+            const auto go = [&](const auto l, const auto r){
+                return emitInst(parent, inst, opCode, inst->getDataType(), kResultID, l, r);
+            };
+            if(lVec && !rVec)
+            {
+                const auto len = as<IRIntLit>(lVec->getElementCount());
+                SLANG_ASSERT(len);
+                return go(l, emitSplat(parent, r, len->getValue()));
+            }
+            else if (!lVec && rVec)
+            {
+                const auto len = as<IRIntLit>(rVec->getElementCount());
+                SLANG_ASSERT(len);
+                return go(emitSplat(parent, l, len->getValue()), r);
+            }
+            return go(l, r);
+        }
+        SLANG_UNREACHABLE("Arithmetic op with 0 or more than 2 operands");
     }
 
     OrderedHashSet<SpvCapability> m_capabilities;
