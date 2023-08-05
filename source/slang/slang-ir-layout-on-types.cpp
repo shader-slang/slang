@@ -77,12 +77,18 @@ static Dictionary<IRType*, IRTypeLayout*> associateTypesWithLayouts(IRModule* mo
                     if(const auto globalParam = as<IRGlobalParam>(dec->getParent()))
                         vars.add(globalParam);
                     else
-                        ; // todo
+                    {
+                        // todo
+                    }
                 }
                 else if(const auto dec = as<IREntryPointLayout>(varLayoutUser))
-                    ; // todo
+                {
+                    // todo
+                }
                 else if(const auto dec = as<IRStructFieldLayoutAttr>(varLayoutUser))
-                    ; // todo
+                {
+                    // todo
+                }
                 else
                     SLANG_UNEXPECTED("Var layout was used somewhere unexpected");
            });
