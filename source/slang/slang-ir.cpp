@@ -967,6 +967,15 @@ namespace Slang
         ioOperands.add(m_elementTypeLayout);
     }
 
+    //
+    // IRStructuredBufferTypeLayout
+    //
+
+    void IRStructuredBufferTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
+    {
+        ioOperands.add(m_elementTypeLayout);
+    }
+
     // 
     // IRPointerTypeLayout
     //

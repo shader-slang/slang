@@ -10019,6 +10019,12 @@ IRTypeLayout* lowerTypeLayout(
 
         return _lowerTypeLayoutCommon(context, &builder, paramGroupTypeLayout);
     }
+    else if( auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+    {
+        auto irElementTypeLayout = lowerTypeLayout(context, structuredBufferTypeLayout->elementTypeLayout);
+        IRStructuredBufferTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, structuredBufferTypeLayout);
+    }
     else if( auto structTypeLayout = as<StructTypeLayout>(typeLayout) )
     {
         IRStructTypeLayout::Builder builder(context->irBuilder);

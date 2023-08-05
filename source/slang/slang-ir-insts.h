@@ -1546,6 +1546,38 @@ struct IRArrayTypeLayout : IRTypeLayout
     };
 };
 
+    /// Specialized layout information for structured buffer types
+struct IRStructuredBufferTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(StructuredBufferTypeLayout)
+
+    IRTypeLayout* getElementTypeLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(0));
+    }
+
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder, IRTypeLayout* elementTypeLayout)
+            : Super::Builder(irBuilder)
+            , m_elementTypeLayout(elementTypeLayout)
+        {}
+
+        IRStructuredBufferTypeLayout* build()
+        {
+            return cast<IRStructuredBufferTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_StructuredBufferTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) override;
+
+        IRTypeLayout* m_elementTypeLayout;
+    };
+};
+
 /* TODO(JS): 
 
 It would arguably be "more correct" if the IRPointerTypeLayout, contained a refence to the value/target
