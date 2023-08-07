@@ -67,6 +67,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     {
                         storageClass = SpvStorageClassInput;
                     }
+                    else if (semanticName == "sv_groupindex")
+                    {
+                        storageClass = SpvStorageClassInput;
+                    }
                 }
             }
             // Make a pointer type of storageClass.
