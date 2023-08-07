@@ -2707,7 +2707,7 @@ struct SPIRVEmitContext
             emitOpStore(parent, nullptr, varInst, base);
             baseId = getID(varInst);
         }
-        SLANG_ASSERT(baseStructType && "field_address require base to be a struct.");
+        SLANG_ASSERT(baseStructType && "field_address requires base to be a struct.");
         auto fieldId = emitIntConstant(
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
@@ -2726,7 +2726,7 @@ struct SPIRVEmitContext
         builder.setInsertBefore(inst);
 
         IRStructType* baseStructType = as<IRStructType>(inst->getBase()->getDataType());
-        SLANG_ASSERT(baseStructType && "field_extract require base to be a struct.");
+        SLANG_ASSERT(baseStructType && "field_extract requires base to be a struct.");
         auto fieldId = static_cast<SpvWord>(getStructFieldId(
             baseStructType,
             as<IRStructKey>(inst->getField())));
@@ -2762,7 +2762,7 @@ struct SPIRVEmitContext
         {
             SLANG_ASSERT(!"invalid IR: base of getElementPtr must be a pointer.");
         }
-        SLANG_ASSERT(baseArrayType && "getElementPtr require base to be an array.");
+        SLANG_ASSERT(baseArrayType && "getElementPtr requires base to be an array.");
         return emitOpAccessChain(
             parent,
             inst,
