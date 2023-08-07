@@ -2344,7 +2344,7 @@ struct SPIRVEmitContext
                 builder.getType(kIROp_UIntType), builder.getIntValue(builder.getIntType(), 2));
             break;
         default:
-            break;
+            SLANG_UNEXPECTED("unhandled case in emitSpvSnippetASMTypeOperand");
         }
         emitOperand(irType);
     }
