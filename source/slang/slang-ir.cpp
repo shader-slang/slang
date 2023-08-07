@@ -7679,6 +7679,7 @@ namespace Slang
         {
         case kIROp_Func:
         case kIROp_Generic:
+            // TODO: We should probably take into account our target to see if the intrinsic applies
             return val->getFirstChild() != nullptr || val->findDecoration<IRTargetIntrinsicDecoration>();
 
         case kIROp_GlobalConstant:
