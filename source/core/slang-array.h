@@ -126,6 +126,12 @@ namespace Slang
 		return rs;
 	}
 
+    template<typename T>
+	auto makeArray() -> Array<T, 0>
+    {
+        return Array<T, 0>();
+    }
+
 
     template<typename TList>
     void addToList(TList&)
