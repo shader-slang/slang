@@ -66,31 +66,7 @@ Val* Val::resolve()
     }
     // Update epoch now to avoid infinite recursion.
     m_resolvedValEpoch = getCurrentASTBuilder()->getEpoch();
-    m_resolvedVal = this;
     m_resolvedVal = resolveImpl();
-
-#if 1
-    // Check if we are resolved to an existing Val in the AST cache.
-    ValNodeDesc newDesc;
-    newDesc.type = m_resolvedVal->astNodeType;
-    for (auto operand : m_resolvedVal->m_operands)
-    {
-        if (operand.kind == ValNodeOperandKind::ValNode)
-        {
-            auto valOperand = as<Val>(operand.values.nodeOperand);
-            if (valOperand)
-            {
-                operand.values.nodeOperand = valOperand->resolve();
-            }
-        }
-        newDesc.operands.add(operand);
-    }
-    newDesc.init();
-
-    Val* existingNode = nullptr;
-    if (astBuilder->m_cachedNodes.tryGetValue(newDesc, existingNode))
-        m_resolvedVal = existingNode;
-#endif
 #ifdef _DEBUG
     if (m_resolvedVal->_debugUID > 0 && this->_debugUID < 0)
     {
