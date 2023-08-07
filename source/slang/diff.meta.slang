@@ -25,6 +25,26 @@ attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 
+// A 'none-type' that acts as a run-time sentinel for zero differentials.
+public struct NullDifferential : IDifferentiable
+{ 
+    // for now, we'll use at least one field to make sure the type is non-empty
+    uint dummy;
+    typedef NullDifferential Differential;
+
+    [Differentiable]
+    [ForceInline]
+    static Differential dzero() { return { 0 }; }
+
+    [Differentiable]
+    [ForceInline]
+    static Differential dadd(Differential, Differential) { return { 0 }; }
+
+    [Differentiable]
+    [ForceInline]
+    static Differential dmul<T: __BuiltinFloatingPointType>(T, Differential) { return { 0 }; }
+};
+
 /// Represents a GPU view of a tensor.
 __generic<T>
 __magic_type(TensorViewType)

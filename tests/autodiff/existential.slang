@@ -9,7 +9,7 @@ RWStructuredBuffer<float> outputBuffer;
 [anyValueSize(16)]
 interface IInterface : IDifferentiable
 {
-    [ForwardDifferentiable]
+    [Differentiable]
     float calc(float x);
 }
 
@@ -19,7 +19,7 @@ struct A : IInterface
 
     __init(int data1) { this.data1 = data1; }
 
-    [ForwardDifferentiable]
+    [Differentiable]
     float calc(float x) { return x * x * x * data1; }
 };
 
@@ -30,17 +30,17 @@ struct B : IInterface
 
     __init(int data1, int data2) { this.data1 = data1; this.data2 = data2; }
 
-    [ForwardDifferentiable]
+    [Differentiable]
     float calc(float x) { return x * x * data1 * data2; }
 };
 
-[ForwardDifferentiable]
+[Differentiable]
 float doThing(IInterface obj, float x)
 {
     return obj.calc(x);
 }
 
-[ForwardDifferentiable]
+[Differentiable]
 float f(uint id, float x)
 {
     IInterface obj;
@@ -56,10 +56,21 @@ float f(uint id, float x)
 //TEST_INPUT: type_conformance A:IInterface = 0
 //TEST_INPUT: type_conformance B:IInterface = 1
 
-
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    outputBuffer[0] = __fwd_diff(f)(dispatchThreadID.x, DifferentialPair<float>(1.0, 2.0)).d; // A.calc, expect 12
-    outputBuffer[1] = __fwd_diff(f)(dispatchThreadID.x + 1, DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 18
+    outputBuffer[0] = fwd_diff(f)(dispatchThreadID.x, DifferentialPair<float>(1.0, 2.0)).d; // A.calc, expect 12
+    outputBuffer[1] = fwd_diff(f)(dispatchThreadID.x + 1, DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 18
+
+    {
+        var dpx = diffPair(1.0);
+        bwd_diff(f)(dispatchThreadID.x, dpx, 2.0); // A.calc, expect 12
+        outputBuffer[2] = dpx.d;
+    }
+
+    {
+        var dpx = diffPair(1.5);
+        bwd_diff(f)(dispatchThreadID.x + 1, dpx, 1.0); // B.calc, expect 18
+        outputBuffer[3] = dpx.d;
+    }
 }

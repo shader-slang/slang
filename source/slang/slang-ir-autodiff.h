@@ -92,6 +92,16 @@ struct AutoDiffSharedContext
 
     IRStructKey* mulMethodStructKey = nullptr;
 
+    // Refernce to NullDifferential struct type. These are used
+    // as sentinel values for uninitialized existential (interface-typed) 
+    // differentials.
+    //
+    IRStructType* nullDifferentialStructType = nullptr;
+
+    // Reference to the NullDifferential : IDifferentiable witness.
+    //
+    IRInst* nullDifferentialWitness = nullptr;
+
 
     // Modules that don't use differentiable types
     // won't have the IDifferentiable interface type available. 
@@ -108,6 +118,10 @@ struct AutoDiffSharedContext
 private:
 
     IRInst* findDifferentiableInterface();
+
+    IRStructType *findNullDifferentialStructType();
+
+    IRInst *findNullDifferentialWitness();
 
     IRStructKey* findDifferentialTypeStructKey()
     {
@@ -144,9 +158,17 @@ struct DifferentiableTypeConformanceContext
     IRGlobalValueWithCode* parentFunc = nullptr;
     OrderedDictionary<IRType*, IRInst*> differentiableWitnessDictionary;
 
+    IRFunc* existentialDAddFunc = nullptr;
+
     DifferentiableTypeConformanceContext(AutoDiffSharedContext* shared)
         : sharedContext(shared)
-    {}
+    {
+        // Populate dictionary with null differential type.
+        if (sharedContext->nullDifferentialStructType)
+            differentiableWitnessDictionary.add(
+                sharedContext->nullDifferentialStructType,
+                sharedContext->nullDifferentialWitness);
+    }
 
     void setFunc(IRGlobalValueWithCode* func);
 
@@ -181,6 +203,15 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getDiffAddMethodFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
 
+    IRInst* tryExtractConformanceFromInterfaceType(
+        IRBuilder* builder,
+        IRInterfaceType* interfaceType,
+        IRWitnessTable* witnessTable);
+    
+    List<IRInterfaceRequirementEntry*> findDifferentiableInterfaceLookupPath(
+        IRInterfaceType* idiffType,
+        IRInterfaceType* type);
+
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable interface.
     // Note that inside a generic block, this will be a witness table lookup instruction
@@ -190,6 +221,13 @@ struct DifferentiableTypeConformanceContext
     {
         switch (origType->getOp())
         {
+        case kIROp_InterfaceType:
+        {
+            if (isDifferentiableType(origType))
+                return this->sharedContext->differentiableInterfaceType;
+            else
+                return nullptr;
+        }
         case kIROp_ArrayType:
         {
             auto diffElementType = (IRType*)getDifferentialForType(
@@ -249,6 +287,17 @@ struct DifferentiableTypeConformanceContext
         auto result = lookUpInterfaceMethod(builder, origType, sharedContext->addMethodStructKey);
         return result;
     }
+
+    IRInst* emitNullDifferential(IRBuilder* builder)
+    {
+        return builder->emitCallInst(
+            sharedContext->nullDifferentialStructType,
+            getZeroMethodForType(builder, sharedContext->nullDifferentialStructType),
+            List<IRInst*>());
+    }
+
+    IRFunc* getOrCreateExistentialDAddMethod();
+    
 };
 
 struct DifferentialPairTypeBuilder

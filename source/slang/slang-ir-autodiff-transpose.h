@@ -583,15 +583,21 @@ struct DiffTransposePass
                 auto nextInst = inst->getNextInst();
                 if (auto varInst = as<IRVar>(inst))
                 {
-                    if (auto diffDecor = varInst->findDecoration<IRDifferentialInstDecoration>())
+                    if (isDifferentialInst(varInst) && tryGetPrimalTypeFromDiffInst(varInst))
                     {
-                        if (auto ptrPrimalType = as<IRPtrTypeBase>(diffDecor->getPrimalType()))
+                        if (auto ptrPrimalType = as<IRPtrTypeBase>(tryGetPrimalTypeFromDiffInst(varInst)))
                         {
                             varInst->insertAtEnd(firstRevDiffBlock);
 
                             auto dzero = emitDZeroOfDiffInstType(&builder, ptrPrimalType->getValueType());
                             builder.emitStore(varInst, dzero);
                         }
+                        else
+                        {
+                            SLANG_UNEXPECTED("Expected an pointer-typed differential variable.");
+                        }
+                        //if (auto dzero = emitDZero(&builder, varInst))
+                        //    builder.emitStore(varInst, dzero);
                     }
                 }
                 inst = nextInst;
@@ -1136,21 +1142,15 @@ struct DiffTransposePass
                 // Normal differentiable input parameter will become an inout DiffPair parameter
                 // in the propagate func. The split logic has already prepared the initial value
                 // to pass in. We need to define a temp variable with this initial value and pass
-                // in the temp variable as argument to the inout parameter.
+                // in the temp variable as argument to the inout parameter. 
 
                 auto makePairArg = as<IRMakeDifferentialPair>(arg);
                 SLANG_RELEASE_ASSERT(makePairArg);
 
                 auto pairType = as<IRDifferentialPairType>(arg->getDataType());
                 auto var = builder->emitVar(arg->getDataType());
-
-                auto diffType = (IRType*)diffTypeContext.getDiffTypeFromPairType(builder, pairType);
-                auto zeroMethod = diffTypeContext.getDiffZeroMethodFromPairType(builder, pairType);
-                SLANG_ASSERT(zeroMethod);
-                auto diffZero = builder->emitCallInst(
-                    diffType,
-                    zeroMethod,
-                    List<IRInst*>());
+                
+                auto diffZero = emitDZeroOfDiffInstType(builder, pairType->getValueType());
 
                 // Initialize this var to (arg.primal, 0).
                 builder->emitStore(
@@ -1481,6 +1481,12 @@ struct DiffTransposePass
             case kIROp_FloatCast:
                 return transposeFloatCast(builder, fwdInst, revValue);
 
+            case kIROp_MakeExistential:
+                return transposeMakeExistential(builder, fwdInst, revValue);
+            
+            case kIROp_ExtractExistentialValue:
+                return transposeExtractExistentialValue(builder, fwdInst, revValue);
+
             case kIROp_LoadReverseGradient:
             case kIROp_ReverseGradientDiffPairRef:
             case kIROp_DefaultConstruct:
@@ -1492,7 +1498,6 @@ struct DiffTransposePass
             case kIROp_Switch:
             case kIROp_LookupWitness:
             case kIROp_ExtractExistentialType:
-            case kIROp_ExtractExistentialValue:
             case kIROp_ExtractExistentialWitnessTable:
             {
                 // Ignore. transposeBlock() should take care of adding the
@@ -1986,6 +1991,42 @@ struct DiffTransposePass
                         kIROp_FloatCast,
                         1,
                         &revValue),
+                    fwdInst)));
+    }
+
+    TranspositionResult transposeMakeExistential(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
+    {
+        // (A:IDiff = MakeExistential(T, B, W)) -> (dB: T += ExtractExistentialValue(dW))
+        return TranspositionResult(
+            List<RevGradient>(
+                RevGradient(
+                    RevGradient::Flavor::Simple,
+                    fwdInst->getOperand(1),
+                    builder->emitExtractExistentialValue(
+                        builder->emitExtractExistentialType(revValue),
+                        revValue),
+                    fwdInst)));
+    }
+
+    TranspositionResult transposeExtractExistentialValue(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
+    {
+        auto revTypeWitness = diffTypeContext.tryGetDifferentiableWitness(
+            builder,
+            revValue->getDataType());
+        
+        // If we reach this point, revValue must be a differentiable type.
+        SLANG_ASSERT(revTypeWitness);
+
+        // (A = ExtractExistentialValue(B)) -> (dB += MakeExistential(T, 0, A))
+        return TranspositionResult(
+            List<RevGradient>(
+                RevGradient(
+                    RevGradient::Flavor::Simple,
+                    fwdInst,
+                    builder->emitMakeExistential(
+                        revValue->getDataType(),
+                        revValue,
+                        revTypeWitness),
                     fwdInst)));
     }
 
@@ -2678,13 +2719,18 @@ struct DiffTransposePass
     {
         // Look for differential inst decoration.
         if (auto diffInstDecoration = diffInst->findDecoration<IRDifferentialInstDecoration>())
-        {
             return diffInstDecoration->getPrimalType();
-        }
-        else
-        {
-            return nullptr;
-        }
+
+        return nullptr;
+    }
+
+    IRInst* tryGetWitnessFromDiffInst(IRInst* diffInst)
+    {
+        // Look for differential inst decoration.
+        if (auto diffInstDecoration = diffInst->findDecoration<IRDifferentialInstDecoration>())
+            return diffInstDecoration->getWitness();
+        
+        return nullptr;
     }
 
     IRInst* emitDZeroOfDiffInstType(IRBuilder* builder, IRType* primalType)
@@ -2706,6 +2752,19 @@ struct DiffTransposePass
             auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
             return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primalZero, diffZero);
         }
+        else if (auto interfaceType = as<IRInterfaceType>(primalType))
+        {
+            // Pack a null value into an existential type.
+            auto existentialZero = builder->emitMakeExistential(
+                autodiffContext->differentiableInterfaceType,
+                diffTypeContext.emitNullDifferential(builder),
+                autodiffContext->nullDifferentialWitness);
+
+            return existentialZero;
+        }
+
+        // Should not see this in this method.
+        // SLANG_RELEASE_ASSERT(!as<IRInterfaceType>(primalType));
 
         auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, primalType);
 
@@ -2716,6 +2775,19 @@ struct DiffTransposePass
             (IRType*)diffTypeContext.getDifferentialForType(builder, primalType),
             zeroMethod,
             List<IRInst*>());
+    }
+    
+    IRInst* emitDAddForExistentialType(IRBuilder* builder, IRType* primalType, IRInst* op1, IRInst* op2)
+    {
+        auto existentialDAddFunc = diffTypeContext.getOrCreateExistentialDAddMethod();
+
+        // Should exist.
+        SLANG_ASSERT(existentialDAddFunc);
+
+        return builder->emitCallInst(
+            (IRType*)diffTypeContext.getDifferentialForType(builder, primalType),
+            existentialDAddFunc,
+            List<IRInst*>({ op1, op2 }));
     }
 
     IRInst* emitDAddOfDiffInstType(IRBuilder* builder, IRType* primalType, IRInst* op1, IRInst* op2)
@@ -2760,6 +2832,13 @@ struct DiffTransposePass
 
             auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
             return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primal, diff);
+        }
+        else if (auto interfaceType = as<IRInterfaceType>(primalType))
+        {
+            // If our type is existential, we need to handle the case where 
+            // one or both of our operands are null-type. 
+            // 
+            emitDAddForExistentialType(builder, interfaceType, op1, op2);
         }
 
         auto addMethod = diffTypeContext.getAddMethodForType(builder, primalType);

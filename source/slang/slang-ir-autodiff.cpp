@@ -353,6 +353,8 @@ AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
         zeroMethodStructKey = findZeroMethodStructKey();
         addMethodStructKey = findAddMethodStructKey();
         mulMethodStructKey = findMulMethodStructKey();
+        nullDifferentialStructType = findNullDifferentialStructType();
+        nullDifferentialWitness = findNullDifferentialWitness();
 
         if (differentialAssocTypeStructKey)
             isInterfaceAvailable = true;
@@ -382,6 +384,47 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
     }
     return nullptr;
 }
+
+IRStructType* AutoDiffSharedContext::findNullDifferentialStructType()
+{
+    if (auto module = as<IRModuleInst>(moduleInst))
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            // TODO: Also a particularly dangerous way to look for a struct...
+            if (auto structType = as<IRStructType>(globalInst))
+            {
+                if (auto decor = structType->findDecoration<IRNameHintDecoration>())
+                {
+                    if (decor->getName() == toSlice("NullDifferential"))
+                    {
+                        return structType;
+                    }
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+IRInst* AutoDiffSharedContext::findNullDifferentialWitness()
+{
+    if (auto module = as<IRModuleInst>(moduleInst))
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (auto witnessTable = as<IRWitnessTable>(globalInst))
+            {
+                if (witnessTable->getConformanceType() == differentiableInterfaceType
+                    && witnessTable->getConcreteType() == nullDifferentialStructType)
+                    return witnessTable;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
 
 IRStructKey* AutoDiffSharedContext::getIDifferentiableStructKeyAtIndex(UInt index)
 {
@@ -488,6 +531,178 @@ IRInst* DifferentiableTypeConformanceContext::getDiffAddMethodFromPairType(IRBui
 {
     auto witnessTable = type->getWitness();
     return _lookupWitness(builder, witnessTable, sharedContext->addMethodStructKey);
+}
+
+IRInst *DifferentiableTypeConformanceContext::tryExtractConformanceFromInterfaceType(IRBuilder *builder, IRInterfaceType *interfaceType, IRWitnessTable *witnessTable)
+{
+    SLANG_RELEASE_ASSERT(interfaceType);
+
+    List<IRInterfaceRequirementEntry*> lookupKeyPath = findDifferentiableInterfaceLookupPath(
+        sharedContext->differentiableInterfaceType, interfaceType);
+
+    IRInst* differentialTypeWitness = witnessTable;
+    if (lookupKeyPath.getCount())
+    {
+        // `interfaceType` does conform to `IDifferentiable`.
+        for (auto node : lookupKeyPath)
+        {
+            differentialTypeWitness = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), differentialTypeWitness, node->getRequirementKey());
+        }
+        return differentialTypeWitness;
+    }
+
+    return nullptr;
+}
+
+// Given an interface type, return the lookup path from a witness table of `type` to a witness table of `IDifferentiable`.
+static bool _findDifferentiableInterfaceLookupPathImpl(
+    HashSet<IRInst*>& processedTypes,
+    IRInterfaceType* idiffType,
+    IRInterfaceType* type,
+    List<IRInterfaceRequirementEntry*>& currentPath)
+{
+    if (processedTypes.contains(type))
+        return false;
+    processedTypes.add(type);
+
+    List<IRInterfaceRequirementEntry*> lookupKeyPath;
+    for (UInt i = 0; i < type->getOperandCount(); i++)
+    {
+        auto entry = as<IRInterfaceRequirementEntry>(type->getOperand(i));
+        if (!entry) continue;
+        if (auto wt = as<IRWitnessTableTypeBase>(entry->getRequirementVal()))
+        {
+            currentPath.add(entry);
+            if (wt->getConformanceType() == idiffType)
+            {
+                return true;
+            }
+            else if (auto subInterfaceType = as<IRInterfaceType>(wt->getConformanceType()))
+            {
+                if (_findDifferentiableInterfaceLookupPathImpl(processedTypes, idiffType, subInterfaceType, currentPath))
+                    return true;
+            }
+            currentPath.removeLast();
+        }
+    }
+    return false;
+}
+
+List<IRInterfaceRequirementEntry *> DifferentiableTypeConformanceContext::findDifferentiableInterfaceLookupPath(IRInterfaceType *idiffType, IRInterfaceType *type)
+{
+    List<IRInterfaceRequirementEntry*> currentPath;
+    HashSet<IRInst*> processedTypes;
+    _findDifferentiableInterfaceLookupPathImpl(processedTypes, idiffType, type, currentPath);
+    return currentPath;
+}
+
+IRFunc *DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
+{
+    if (this->existentialDAddFunc)
+        return this->existentialDAddFunc;
+
+    SLANG_ASSERT(sharedContext->differentiableInterfaceType);
+    SLANG_ASSERT(sharedContext->nullDifferentialWitness);
+    
+    auto builder = IRBuilder(this->sharedContext->moduleInst);
+
+    existentialDAddFunc = builder.createFunc();
+    existentialDAddFunc->setFullType(builder.getFuncType(
+        List<IRType*>({
+            sharedContext->differentiableInterfaceType,
+            sharedContext->differentiableInterfaceType,
+        }),
+        sharedContext->differentiableInterfaceType));
+    
+    builder.setInsertInto(existentialDAddFunc);
+    auto entryBlock = builder.emitBlock();
+
+    builder.setInsertInto(entryBlock);
+
+    // Insert parameters.
+    auto aObj = builder.emitParam(sharedContext->differentiableInterfaceType);
+    auto bObj = builder.emitParam(sharedContext->differentiableInterfaceType);
+
+    // Extract existential witness tables.
+    auto aObjWitnessTable = builder.emitExtractExistentialWitnessTable(aObj);
+    auto bObjWitnessTable = builder.emitExtractExistentialWitnessTable(bObj);
+    auto nullWitnessTable = sharedContext->nullDifferentialWitness;
+    
+    // Check if a.type == null_differential.type
+    auto aObjWitnessIsNull = builder.emitEql(aObjWitnessTable, nullWitnessTable);
+    
+    // If aObjWitnessTable is null, return bObj.
+    auto aObjWitnessIsNullBlock = builder.emitBlock();
+    builder.setInsertInto(aObjWitnessIsNullBlock);
+    builder.emitReturn(bObj);
+
+    auto aObjWitnessIsNotNullBlock = builder.emitBlock();
+    builder.setInsertInto(aObjWitnessIsNotNullBlock);
+    
+    // Check if b.type == null_differential.type
+    auto bObjWitnessIsNull = builder.emitEql(bObjWitnessTable, nullWitnessTable);
+
+    // If bObjWitnessTable is null, return aObj.
+    auto bObjWitnessIsNullBlock = builder.emitBlock();
+    builder.setInsertInto(bObjWitnessIsNullBlock);
+    builder.emitReturn(aObj);
+
+    auto bObjWitnessIsNotNullBlock = builder.emitBlock();
+
+    // Emit aObj.type::dadd(aObj, bObj)
+    //
+    // Important: we're looking up dadd on the differential type, and 
+    // not the primal type. This assumes that the two methods are identical,
+    // which (mathematically) they should be.
+    // 
+    auto concreteDiffType = builder.emitExtractExistentialType(aObj);
+    auto dAddMethod = builder.emitLookupInterfaceMethodInst(
+        builder.getFuncType(
+            List<IRType*>({concreteDiffType, concreteDiffType}),
+            concreteDiffType),
+        aObjWitnessTable,
+        sharedContext->addMethodStructKey);
+    
+    // Call
+    auto dAddResult = builder.emitCallInst(
+        concreteDiffType,
+        dAddMethod,
+        List<IRInst*>({aObj, bObj}));
+    
+    // Wrap result in existential.
+    auto existentialDiffType = builder.emitMakeExistential(
+        sharedContext->differentiableInterfaceType,
+        dAddResult,
+        aObjWitnessTable);
+    
+    builder.emitReturn(existentialDiffType);
+
+    // Emit an unreachable block to act as the after block.
+    auto unreachableBlock = builder.emitBlock();
+    builder.setInsertInto(unreachableBlock);
+    builder.emitUnreachable();
+
+    // Link up conditional blocks.
+    builder.setInsertInto(entryBlock);
+    builder.emitIfElse(
+        aObjWitnessIsNull,
+        aObjWitnessIsNullBlock,
+        aObjWitnessIsNotNullBlock,
+        unreachableBlock);
+    
+    builder.setInsertInto(aObjWitnessIsNotNullBlock);
+    builder.emitIfElse(
+        bObjWitnessIsNull,
+        bObjWitnessIsNullBlock,
+        bObjWitnessIsNotNullBlock,
+        unreachableBlock);
+
+    builder.addNameHintDecoration(existentialDAddFunc, UnownedStringSlice("__existential_dadd"));
+    builder.addBackwardDifferentiableDecoration(existentialDAddFunc);
+    builder.addForceInlineDecoration(existentialDAddFunc);
+    
+    this->existentialDAddFunc = existentialDAddFunc;
+    return existentialDAddFunc;
 }
 
 void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()

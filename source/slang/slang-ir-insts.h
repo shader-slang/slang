@@ -842,6 +842,7 @@ struct IRDifferentialInstDecoration : IRAutodiffInstDecoration
 
     IRType* getPrimalType() { return (IRType*)(getOperand(0)); }
     IRInst* getPrimalInst() { return getOperand(1); }
+    IRInst* getWitness() { return getOperand(2); }
 };
 
 struct IRPrimalInstDecoration : IRAutodiffInstDecoration
@@ -4168,6 +4169,12 @@ public:
     void markInstAsDifferential(IRInst* value, IRType* primalType, IRInst* primalInst)
     {
         addDecoration(value, kIROp_DifferentialInstDecoration, primalType, primalInst);
+    }
+
+    void markInstAsDifferential(IRInst* value, IRType* primalType, IRInst* primalInst, IRInst* witnessTable)
+    {
+        IRInst* args[] = { primalType, primalInst, witnessTable };
+        addDecoration(value, kIROp_DifferentialInstDecoration, args, 3);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

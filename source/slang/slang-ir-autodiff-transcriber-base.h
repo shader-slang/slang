@@ -87,12 +87,7 @@ struct AutoDiffTranscriberBase
 
     IRInst* maybeCloneForPrimalInst(IRBuilder* builder, IRInst* inst);
 
-    List<IRInterfaceRequirementEntry*> findDifferentiableInterfaceLookupPath(
-        IRInterfaceType* idiffType, IRInterfaceType* type);
-
     InstPair transcribeExtractExistentialWitnessTable(IRBuilder* builder, IRInst* origInst);
-
-    IRInst* tryExtractConformanceFromInterfaceType(IRBuilder* builder, IRInterfaceType* type, IRWitnessTable* WitnessTable);
 
     void maybeMigrateDifferentiableDictionaryFromDerivativeFunc(IRBuilder* builder, IRInst* origFunc);
 
@@ -112,7 +107,7 @@ struct AutoDiffTranscriberBase
 
     IRType* tryGetDiffPairType(IRBuilder* builder, IRType* primalType);
 
-    IRInst* getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType, IRInst* primalValue = nullptr);
+    IRInst* getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType);
 
     InstPair transcribeNonDiffInst(IRBuilder* builder, IRInst* origInst);
 
@@ -142,6 +137,8 @@ struct AutoDiffTranscriberBase
     IRType* _differentiateTypeImpl(IRBuilder* builder, IRType* origType);
 
     bool isExistentialType(IRType* type);
+
+    void _markInstAsDifferential(IRBuilder* builder, IRInst* diffInst, IRInst* primalInst = nullptr);
 
     virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) = 0;
 
