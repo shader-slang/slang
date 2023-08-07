@@ -111,41 +111,40 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return;
         }
 
-        auto varLayout = getVarLayout(inst);
-        if (!varLayout)
-            return;
-
         SpvStorageClass storageClass = SpvStorageClassPrivate;
-        for (auto rr : varLayout->getOffsetAttrs())
-        {
-            switch (rr->getResourceKind())
-            {
-            case LayoutResourceKind::Uniform:
-            case LayoutResourceKind::ShaderResource:
-            case LayoutResourceKind::DescriptorTableSlot:
-                storageClass = SpvStorageClassUniform;
-                break;
-            case LayoutResourceKind::VaryingInput:
-                storageClass = SpvStorageClassInput;
-                break;
-            case LayoutResourceKind::VaryingOutput:
-                storageClass = SpvStorageClassOutput;
-                break;
-            case LayoutResourceKind::UnorderedAccess:
-                storageClass = SpvStorageClassStorageBuffer;
-                break;
-            case LayoutResourceKind::PushConstantBuffer:
-                storageClass = SpvStorageClassPushConstant;
-                break;
-            default:
-                break;
-            }
-        }
-        auto rate = inst->getRate();
-        if (as<IRGroupSharedRate>(rate))
+        if (as<IRGroupSharedRate>(inst->getRate()))
         {
             storageClass = SpvStorageClassWorkgroup;
         }
+        else if (const auto varLayout = getVarLayout(inst))
+        {
+            for (auto rr : varLayout->getOffsetAttrs())
+            {
+                switch (rr->getResourceKind())
+                {
+                case LayoutResourceKind::Uniform:
+                case LayoutResourceKind::ShaderResource:
+                case LayoutResourceKind::DescriptorTableSlot:
+                    storageClass = SpvStorageClassUniform;
+                    break;
+                case LayoutResourceKind::VaryingInput:
+                    storageClass = SpvStorageClassInput;
+                    break;
+                case LayoutResourceKind::VaryingOutput:
+                    storageClass = SpvStorageClassOutput;
+                    break;
+                case LayoutResourceKind::UnorderedAccess:
+                    storageClass = SpvStorageClassStorageBuffer;
+                    break;
+                case LayoutResourceKind::PushConstantBuffer:
+                    storageClass = SpvStorageClassPushConstant;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
         IRBuilder builder(m_sharedContext->m_irModule);
         builder.setInsertBefore(inst);
         auto newPtrType =
