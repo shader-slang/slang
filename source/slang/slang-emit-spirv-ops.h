@@ -105,97 +105,132 @@ SpvInst* emitOpCapability(SpvInstParent* parent, IRInst* inst, SpvCapability cap
     return emitInst(parent, inst, SpvOpCapability, capability);
 }
 
-SpvInst* emitOpTypeVoid(SpvInstParent* parent, IRInst* inst)
+SpvInst* emitOpTypeVoid(IRInst* inst)
 {
-    return emitInst(parent, inst, SpvOpTypeVoid, kResultID);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeVoid, kResultID
+    );
 }
 
-SpvInst* emitOpTypeBool(SpvInstParent* parent, IRInst* inst)
+SpvInst* emitOpTypeBool(IRInst* inst)
 {
-    return emitInst(parent, inst, SpvOpTypeBool, kResultID);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeBool, kResultID
+    );
 }
 
 SpvInst* emitOpTypeInt(
-    SpvInstParent* parent,
     IRInst* inst,
     const SpvLiteralInteger& width,
     const SpvLiteralInteger& signedness
 )
 {
-    return emitInst(parent, inst, SpvOpTypeInt, kResultID, width, signedness);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeInt,
+        kResultID,
+        width,
+        signedness
+    );
 }
 
-SpvInst* emitOpTypeFloat(SpvInstParent* parent, IRInst* inst, const SpvLiteralInteger& width)
+SpvInst* emitOpTypeFloat(IRInst* inst, const SpvLiteralInteger& width)
 {
-    return emitInst(parent, inst, SpvOpTypeFloat, kResultID, width);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeFloat, kResultID, width
+    );
 }
 
 template<typename T>
 SpvInst* emitOpTypeVector(
-    SpvInstParent* parent,
     IRInst* inst,
     const T& componentType,
     const SpvLiteralInteger& componentCount
 )
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpTypeVector, kResultID, componentType, componentCount);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeVector,
+        kResultID,
+        componentType,
+        componentCount
+    );
 }
 
 template<typename T>
-SpvInst* emitOpTypeMatrix(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& columnType,
-    const SpvLiteralInteger& columnCount
-)
+SpvInst* emitOpTypeMatrix(IRInst* inst, const T& columnType, const SpvLiteralInteger& columnCount)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpTypeMatrix, kResultID, columnType, columnCount);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeMatrix,
+        kResultID,
+        columnType,
+        columnCount
+    );
 }
 
 template<typename T1, typename T2>
-SpvInst* emitOpTypeArray(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T1& elementType,
-    const T2& length
-)
+SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
-    return emitInst(parent, inst, SpvOpTypeArray, kResultID, elementType, length);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeArray,
+        kResultID,
+        elementType,
+        length
+    );
 }
 
 template<typename T>
-SpvInst* emitOpTypeRuntimeArray(SpvInstParent* parent, IRInst* inst, const T& elementType)
+SpvInst* emitOpTypeRuntimeArray(IRInst* inst, const T& elementType)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpTypeRuntimeArray, kResultID, elementType);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeRuntimeArray,
+        kResultID,
+        elementType
+    );
 }
 
 template<typename Ts>
-SpvInst* emitOpTypeStruct(SpvInstParent* parent, IRInst* inst, const Ts& member0TypeMember1TypeEtc)
+SpvInst* emitOpTypeStruct(IRInst* inst, const Ts& member0TypeMember1TypeEtc)
 {
     static_assert(isPlural<Ts>);
-    return emitInst(parent, inst, SpvOpTypeStruct, kResultID, member0TypeMember1TypeEtc);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeStruct,
+        kResultID,
+        member0TypeMember1TypeEtc
+    );
 }
 
 template<typename T>
-SpvInst* emitOpTypePointer(
-    SpvInstParent* parent,
-    IRInst* inst,
-    SpvStorageClass storageClass,
-    const T& type
-)
+SpvInst* emitOpTypePointer(IRInst* inst, SpvStorageClass storageClass, const T& type)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpTypePointer, kResultID, storageClass, type);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypePointer,
+        kResultID,
+        storageClass,
+        type
+    );
 }
 
 template<typename T, typename Ts>
 SpvInst* emitOpTypeFunction(
-    SpvInstParent* parent,
     IRInst* inst,
     const T& returnType,
     const Ts& parameter0TypeParameter1TypeEtc
@@ -204,54 +239,81 @@ SpvInst* emitOpTypeFunction(
     static_assert(isSingular<T>);
     static_assert(isPlural<Ts>);
     return emitInst(
-        parent, inst, SpvOpTypeFunction, kResultID, returnType, parameter0TypeParameter1TypeEtc
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeFunction,
+        kResultID,
+        returnType,
+        parameter0TypeParameter1TypeEtc
     );
 }
 
 template<typename T>
-SpvInst* emitOpConstantTrue(SpvInstParent* parent, IRInst* inst, const T& idResultType)
+SpvInst* emitOpConstantTrue(IRInst* inst, const T& idResultType)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpConstantTrue, idResultType, kResultID);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpConstantTrue,
+        idResultType,
+        kResultID
+    );
 }
 
 template<typename T>
-SpvInst* emitOpConstantFalse(SpvInstParent* parent, IRInst* inst, const T& idResultType)
+SpvInst* emitOpConstantFalse(IRInst* inst, const T& idResultType)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpConstantFalse, idResultType, kResultID);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpConstantFalse,
+        idResultType,
+        kResultID
+    );
 }
 
 template<typename T>
-SpvInst* emitOpConstant(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& idResultType,
-    const SpvLiteralBits& value
-)
+SpvInst* emitOpConstant(IRInst* inst, const T& idResultType, const SpvLiteralBits& value)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpConstant, idResultType, kResultID, value);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpConstant,
+        idResultType,
+        kResultID,
+        value
+    );
 }
 
 template<typename T, typename Ts>
-SpvInst* emitOpConstantComposite(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& idResultType,
-    const Ts& constituents
-)
+SpvInst* emitOpConstantComposite(IRInst* inst, const T& idResultType, const Ts& constituents)
 {
     static_assert(isSingular<T>);
     static_assert(isPlural<Ts>);
-    return emitInst(parent, inst, SpvOpConstantComposite, idResultType, kResultID, constituents);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpConstantComposite,
+        idResultType,
+        kResultID,
+        constituents
+    );
 }
 
 template<typename T>
-SpvInst* emitOpConstantNull(SpvInstParent* parent, IRInst* inst, const T& idResultType)
+SpvInst* emitOpConstantNull(IRInst* inst, const T& idResultType)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpConstantNull, idResultType, kResultID);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpConstantNull,
+        idResultType,
+        kResultID
+    );
 }
 
 template<typename T1, typename T2>

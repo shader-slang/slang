@@ -853,7 +853,6 @@ struct SPIRVEmitContext
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
             result = emitOpConstant(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 type,
                 SpvLiteralBits::from64(val));
@@ -862,7 +861,6 @@ struct SPIRVEmitContext
         default:
         {
             result = emitOpConstant(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 type,
                 SpvLiteralBits::from32(valWord));
@@ -887,7 +885,6 @@ struct SPIRVEmitContext
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
             result = emitOpConstant(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 type,
                 SpvLiteralBits::from64(val));
@@ -895,7 +892,6 @@ struct SPIRVEmitContext
         else
         {
             result = emitOpConstant(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 type,
                 SpvLiteralBits::from32(valWord));
@@ -1191,7 +1187,6 @@ struct SPIRVEmitContext
                 for (auto field : static_cast<IRStructType*>(inst)->getFields())
                     types.add(field->getFieldType());
                 auto spvStructType = emitOpTypeStruct(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     inst,
                     types
                 );
@@ -1215,7 +1210,6 @@ struct SPIRVEmitContext
                     nullptr);
                 const auto columnCount = static_cast<IRIntLit*>(matrixType->getColumnCount())->getValue();
                 auto matrixSPVType = emitOpTypeMatrix(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     inst,
                     vectorSpvType,
                     SpvLiteralInteger::from32(columnCount)
@@ -1292,7 +1286,6 @@ struct SPIRVEmitContext
             // followed by operand sfor all the parameter types.
             //
             return emitOpTypeFunction(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 inst,
                 static_cast<IRFuncType*>(inst)->getResultType(),
                 static_cast<IRFuncType*>(inst)->getParamTypes()
@@ -1901,14 +1894,12 @@ struct SPIRVEmitContext
                 case BaseType::IntPtr:
                 case BaseType::UIntPtr:
                     return emitOpConstant(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         inst->getDataType(),
                         SpvLiteralBits::from64(value)
                     );
                 default:
                     return emitOpConstant(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         inst->getDataType(),
                         SpvLiteralBits::from32(value)
@@ -1922,21 +1913,18 @@ struct SPIRVEmitContext
                 {
                 case BaseType::Half:
                     return emitOpConstant(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         inst->getDataType(),
                         SpvLiteralBits::from32(FloatToHalf((float)value))
                     );
                 case BaseType::Float:
                     return emitOpConstant(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         inst->getDataType(),
                         SpvLiteralBits::from32(FloatAsInt((float)value))
                     );
                 case BaseType::Double:
                     return emitOpConstant(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         inst->getDataType(),
                         SpvLiteralBits::from64(DoubleAsInt64(value))
@@ -1950,7 +1938,6 @@ struct SPIRVEmitContext
                 if (as<IRBoolLit>(inst)->getValue())
                 {
                     return emitOpConstantTrue(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         inst->getDataType()
                     );
@@ -1958,7 +1945,6 @@ struct SPIRVEmitContext
                 else
                 {
                     return emitOpConstantFalse(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         inst->getDataType()
                     );
@@ -2459,7 +2445,6 @@ struct SPIRVEmitContext
                 auto element1 = emitFloatConstant(constant.floatValues[0], floatType);
                 auto element2 = emitFloatConstant(constant.floatValues[1], floatType);
                 result = emitOpConstantComposite(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
                     builder.getVectorType(floatType, builder.getIntValue(builder.getIntType(), 2)),
                     makeArray(element1, element2)
@@ -2475,7 +2460,6 @@ struct SPIRVEmitContext
                 auto element1 = emitIntConstant((IRIntegerValue)constant.intValues[0], uintType);
                 auto element2 = emitIntConstant((IRIntegerValue)constant.intValues[1], uintType);
                 result = emitOpConstantComposite(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
                     builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 2)),
                     makeArray(element1, element2)
