@@ -1164,6 +1164,8 @@ struct SPIRVEmitContext
                     inst->getOperand(0)
                 );
             }
+        case kIROp_ConstantBufferType:
+            SLANG_UNEXPECTED("Constant buffer type remaining in spirv emit");
         case kIROp_StructType:
             {
                 List<IRType*> types;

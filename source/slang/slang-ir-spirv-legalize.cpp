@@ -74,11 +74,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         storageClass = SpvStorageClassInput;
                     }
                 }
+                else if(const auto parameterGroupTypeLayout =
+                        as<IRParameterGroupTypeLayout>(layout->getTypeLayout()))
+                {
+                    storageClass = SpvStorageClassUniform;
+                }
             }
+
+            // Strip any HLSL wrappers
+            auto innerType = inst->getFullType();
+            if(const auto constantBufferType = as<IRConstantBufferType>(innerType))
+            {
+                innerType = constantBufferType->getElementType();
+            }
+
             // Make a pointer type of storageClass.
             IRBuilder builder(m_sharedContext->m_irModule);
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(kIROp_PtrType, inst->getFullType(), storageClass);
+            ptrType = builder.getPtrType(kIROp_PtrType, innerType, storageClass);
             inst->setFullType(ptrType);
             // Insert an explicit load at each use site.
             List<IRUse*> uses;
