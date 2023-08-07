@@ -1074,6 +1074,7 @@ struct SPIRVEmitContext
             {
                 SpvStorageClass storageClass = SpvStorageClassFunction;
                 auto ptrType = as<IRPtrTypeBase>(inst);
+                SLANG_ASSERT(ptrType);
                 if (ptrType->hasAddressSpace())
                     storageClass = (SpvStorageClass)ptrType->getAddressSpace();
                 if (storageClass == SpvStorageClassStorageBuffer)
