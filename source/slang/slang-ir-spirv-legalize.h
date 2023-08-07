@@ -18,21 +18,11 @@ struct SPIRVEmitSharedContext
     IRModule* m_irModule;
     TargetRequest* m_targetRequest;
     Dictionary<IRTargetIntrinsicDecoration*, RefPtr<SpvSnippet>> m_parsedSpvSnippets;
-    SPIRVEmitSharedContext(IRModule* module, TargetRequest* target)
-        : m_irModule(module), m_targetRequest(target)
+    DiagnosticSink* m_sink;
+    SPIRVEmitSharedContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+        : m_irModule(module), m_targetRequest(target), m_sink(sink)
     {}
-
-    SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic)
-    {
-        RefPtr<SpvSnippet> snippet;
-        if (m_parsedSpvSnippets.tryGetValue(intrinsic, snippet))
-        {
-            return snippet.Ptr();
-        }
-        snippet = SpvSnippet::parse(intrinsic->getDefinition());
-        m_parsedSpvSnippets[intrinsic] = snippet;
-        return snippet;
-    }
+    SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
 };
 
 void legalizeIRForSPIRV(

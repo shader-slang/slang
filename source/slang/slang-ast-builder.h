@@ -117,23 +117,24 @@ class ASTBuilder : public RefObject
     friend class SharedASTBuilder;
 
 public:
-    template<typename NodeCreateFunc>
-    NodeBase* _getOrCreateImpl(ValNodeDesc const& desc, NodeCreateFunc createFunc)
+
+    Val* _getOrCreateImpl(ValNodeDesc const& desc)
     {
         if (auto found = m_cachedNodes.tryGetValue(desc))
             return *found;
 
-        auto node = createFunc();
+        auto node = as<Val>(createByNodeType(desc.type));
+        SLANG_ASSERT(node);
+        for (auto& operand : desc.operands)
+            node->m_operands.add(operand);
+
         m_cachedNodes.add(desc, node);
-#ifdef _DEBUG
-        _verifyValDescConsistency(dynamicCast<Val>(node), desc);
-#endif
         return node;
     }
 
     /// A cache for AST nodes that are entirely defined by their node type, with
     /// no need for additional state.
-    Dictionary<ValNodeDesc, NodeBase*> m_cachedNodes;
+    Dictionary<ValNodeDesc, Val*> m_cachedNodes;
 
     Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
 
@@ -198,10 +199,10 @@ public:
         desc.type = T::kType;
         addOrAppendToNodeList(desc.operands, args...);
         desc.init();
-        auto result = (T*)_getOrCreateImpl(desc, [&]()
-            {
-                return createImpl<T>(args...);
-            });
+        auto result = (T*)_getOrCreateImpl(desc);
+#ifdef _DEBUG
+        _verifyValDescConsistency(dynamicCast<Val>(result), desc);
+#endif
         return result;
     }
 
@@ -213,7 +214,7 @@ public:
         ValNodeDesc desc;
         desc.type = T::kType;
         desc.init();
-        auto result = (T*)_getOrCreateImpl(desc, [this]() { return createImpl<T>(); });
+        auto result = (T*)_getOrCreateImpl(desc);
 #ifdef _DEBUG
         _verifyValDescConsistency(dynamicCast<Val>(result), desc);
 #endif

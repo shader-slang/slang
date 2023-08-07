@@ -258,14 +258,10 @@ void moveInstChildren(IRInst* dest, IRInst* src)
     }
 }
 
-String dumpIRToString(IRInst* root)
+String dumpIRToString(IRInst* root, IRDumpOptions options)
 {
     StringBuilder sb;
     StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
-    IRDumpOptions options = {};
-#if 1
-    options.flags = IRDumpOptions::Flag::DumpDebugIds;
-#endif
     dumpIR(root, options, nullptr, &writer);
     return sb.toString();
 }
