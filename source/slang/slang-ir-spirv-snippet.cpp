@@ -37,6 +37,48 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
     return SpvSnippet::ASMType::None;
 }
 
+// Read an unsigned integer (a SPIR-V word) or a SPIR-V enum (currently those
+// which are coded into this function).
+//
+// This also 'or's together a list of these words/enums separated by '|'
+SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
+{
+    SpvWord ret = 0;
+    do
+    {
+        switch(reader.NextToken().Type)
+        {
+            case Slang::Misc::TokenType::IntLiteral:
+                ret = reader.ReadUInt();
+                break;
+            case Slang::Misc::TokenType::Identifier:
+                {
+                    const auto i = reader.ReadWord();
+#define GO(x) if(i == #x) ret |= Spv ## x
+                         GO(ScopeWorkgroup);
+                    else GO(ScopeDevice);
+                    else GO(MemorySemanticsMaskNone);
+                    else GO(MemorySemanticsAcquireReleaseMask);
+                    else GO(MemorySemanticsUniformMemoryMask);
+                    else GO(MemorySemanticsImageMemoryMask);
+                    else GO(MemorySemanticsAtomicCounterMemoryMask);
+                    else GO(MemorySemanticsWorkgroupMemoryMask);
+#undef GO
+                    else
+                    {
+                        reader.Back(1);
+                        throw Misc::TextFormatException(
+                            "Text parsing error: Unrecognized SPIR-V enum: " + i);
+                    }
+                }
+                break;
+            default:
+                throw Misc::TextFormatException("Text parsing error: Expected int or SPIR-V enum");
+        }
+    } while(reader.AdvanceIf(Misc::TokenType::OpBitOr));
+    return ret;
+}
+
 RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
 {
     RefPtr<SpvSnippet> snippet = new SpvSnippet();
@@ -226,7 +268,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                                     break;
                                     
                                 default:
-                                    constant.intValues[i] = tokenReader.ReadInt();
+                                    constant.intValues[i] = readWordOrWordLiteral(tokenReader);
                                     ++i;
                                     break;
                                 }
@@ -246,7 +288,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                         }
                         else
                         {
-                            SLANG_ASSERT(!"Invalid SPV ASM operand.");
+                            SLANG_UNEXPECTED(("Invalid SPV ASM operand: \"" + identifier + "\"").getBuffer());
                         }
                     }
                     break;
@@ -260,7 +302,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
     }
     catch (const Slang::Misc::TextFormatException&)
     {
-        SLANG_ASSERT(!"Invalid ASM format.");
+        return nullptr;
     }
     return snippet;
 }

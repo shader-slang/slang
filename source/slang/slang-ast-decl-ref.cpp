@@ -166,7 +166,7 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
 
     case RequirementWitness::Flavor::val:
     {
-        auto satisfyingVal = requirementWitness.getVal();
+        auto satisfyingVal = requirementWitness.getVal()->resolve();
         return satisfyingVal;
     }
     break;

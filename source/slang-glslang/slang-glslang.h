@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 #include <memory>
+#include <cstring>
 
 typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 

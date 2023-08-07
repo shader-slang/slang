@@ -3,6 +3,7 @@
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
 
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -286,8 +287,6 @@ struct SPIRVEmitContext
 {
         /// The Slang IR module being translated
     IRModule* m_irModule;
-
-    DiagnosticSink* m_sink;
 
     // [2.2: Terms]
     //
@@ -972,21 +971,13 @@ struct SPIRVEmitContext
     struct SpvTypeInstKey
     {
         List<SpvWord> words;
-        bool operator==(const SpvTypeInstKey& other)
+        bool operator==(const SpvTypeInstKey& other) const { return words == other.words; }
+        const static bool kHasUniformHash = true;
+        auto getHashCode() const
         {
-            if (words.getCount() != other.words.getCount())
-                return false;
-            for (Index i = 0; i < words.getCount(); i++)
-                if (words[i] != other.words[i])
-                    return false;
-            return true;
-        }
-        HashCode getHashCode()
-        {
-            HashCode result = 0;
-            for (auto word : words)
-                result = combineHash(result, word);
-            return result;
+            return Slang::getHashCode(
+                reinterpret_cast<const char*>(words.getBuffer()),
+                words.getCount() * sizeof(SpvWord));
         }
     };
 
@@ -1077,6 +1068,7 @@ struct SPIRVEmitContext
             {
                 SpvStorageClass storageClass = SpvStorageClassFunction;
                 auto ptrType = as<IRPtrTypeBase>(inst);
+                SLANG_ASSERT(ptrType);
                 if (ptrType->hasAddressSpace())
                     storageClass = (SpvStorageClass)ptrType->getAddressSpace();
                 if (storageClass == SpvStorageClassStorageBuffer)
@@ -1217,8 +1209,9 @@ struct SPIRVEmitContext
         // ...
 
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for global instruction");
-            UNREACHABLE_RETURN(nullptr);
+            String e = "Unhandled global inst in spirv-emit: "
+                + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+            SLANG_UNIMPLEMENTED_X(e.begin());
         }
     }
 
@@ -1353,6 +1346,7 @@ struct SPIRVEmitContext
     SpvInst* emitGlobalVar(IRGlobalVar* globalVar)
     {
         auto layout = getVarLayout(globalVar);
+        SLANG_ASSERT(layout);
         auto storageClass = SpvStorageClassUniform;
         if (auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType()))
         {
@@ -1409,6 +1403,9 @@ struct SPIRVEmitContext
         /// Emit a SPIR-V function definition for the Slang IR function `irFunc`.
     SpvInst* emitFuncDefinition(IRFunc* irFunc)
     {
+        if(!irFunc->getFirstBlock())
+            m_sink->diagnose(irFunc, Diagnostics::noBlocksOrIntrinsic, "spirv");
+
         // [2.4: Logical Layout of a Module]
         //
         // > All function definitions (functions with a body).
@@ -1599,8 +1596,11 @@ struct SPIRVEmitContext
         switch( inst->getOp() )
         {
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for local instruction");
-            break;
+            {
+                String e = "Unhandled local inst in spirv-emit: "
+                    + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                SLANG_UNIMPLEMENTED_X(e.getBuffer());
+            }
         case kIROp_Specialize:
             return nullptr;
         case kIROp_Var:
@@ -2058,6 +2058,10 @@ struct SPIRVEmitContext
                 {
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInGlobalInvocationId);
                 }
+                else if (semanticName == "sv_groupindex")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLocalInvocationIndex);
+                }
             }
         }
         return nullptr;
@@ -2239,6 +2243,7 @@ struct SPIRVEmitContext
         IRTargetIntrinsicDecoration* intrinsic)
     {
         SpvSnippet* snippet = getParsedSpvSnippet(intrinsic);
+        SLANG_ASSERT(snippet);
         SpvSnippetEmitContext context;
         context.irResultType = inst->getDataType();
         context.resultType = ensureInst(inst->getFullType());
@@ -2351,7 +2356,7 @@ struct SPIRVEmitContext
                 builder.getType(kIROp_UIntType), builder.getIntValue(builder.getIntType(), 2));
             break;
         default:
-            break;
+            SLANG_UNEXPECTED("unhandled case in emitSpvSnippetASMTypeOperand");
         }
         emitOperand(irType);
     }
@@ -3042,9 +3047,8 @@ struct SPIRVEmitContext
     }
 
     SPIRVEmitContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
-        : SPIRVEmitSharedContext(module, target)
+        : SPIRVEmitSharedContext(module, target, sink)
         , m_irModule(module)
-        , m_sink(sink)
         , m_memoryArena(2048)
     {
     }
