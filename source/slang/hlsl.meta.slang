@@ -2361,11 +2361,23 @@ float2 GetRenderTargetSamplePosition(int Index);
 // Group memory barrier
 __target_intrinsic(glsl, "groupMemoryBarrier")
 __target_intrinsic(cuda, "__threadfence_block")
+__target_intrinsic(spirv, "OpMemoryBarrier const(int,ScopeWorkgroup)"
+                            "const(int, MemorySemanticsAcquireReleaseMask"
+                                     "| MemorySemanticsUniformMemoryMask"
+                                     "| MemorySemanticsImageMemoryMask"
+                                     "| MemorySemanticsAtomicCounterMemoryMask"
+                                     "| MemorySemanticsWorkgroupMemoryMask)")
 void GroupMemoryBarrier();
 
 
 __target_intrinsic(glsl, "groupMemoryBarrier(), barrier()")
 __target_intrinsic(cuda, "__syncthreads()")
+__target_intrinsic(spirv, "OpControlBarrier const(int,ScopeWorkgroup) const(int, ScopeWorkgroup)"
+                            "const(int, MemorySemanticsAcquireReleaseMask"
+                                     "| MemorySemanticsUniformMemoryMask"
+                                     "| MemorySemanticsImageMemoryMask"
+                                     "| MemorySemanticsAtomicCounterMemoryMask"
+                                     "| MemorySemanticsWorkgroupMemoryMask)")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics
@@ -2388,6 +2400,9 @@ void InterlockedAdd(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
 __target_intrinsic(cuda, "(*$2 = (uint)atomicAdd((uint*)$0, $1))")
+__target_intrinsic(spirv, "%old = OpAtomicIAdd _type(uint) resultId _0"
+                                "const(int, ScopeDevice) const(int, MemorySemanticsMaskNone) _1;"
+                          "OpStore _2 %old;")
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicAnd($A, $1)")
