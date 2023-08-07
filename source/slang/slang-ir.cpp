@@ -959,6 +959,19 @@ namespace Slang
     }
 
     //
+    // IRTupleTypeLayout
+    //
+
+    void IRTupleTypeLayout::Builder::addAttrsImpl(List<IRInst*>& ioOperands)
+    {
+        auto irBuilder = getIRBuilder();
+        for(auto field : m_fields)
+        {
+            ioOperands.add(irBuilder->getTupleFieldLayoutAttr(field.layout));
+        }
+    }
+
+    //
     // IRArrayTypeLayout
     //
 
@@ -5687,6 +5700,18 @@ namespace Slang
         return cast<IRStructFieldLayoutAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_StructFieldLayoutAttr,
+            SLANG_COUNT_OF(operands),
+            operands));
+    }
+
+    IRTupleFieldLayoutAttr* IRBuilder::getTupleFieldLayoutAttr(
+        IRTypeLayout*    layout)
+    {
+        IRInst* operands[] = { layout };
+
+        return cast<IRTupleFieldLayoutAttr>(createIntrinsicInst(
+            getVoidType(),
+            kIROp_TupleFieldLayoutAttr,
             SLANG_COUNT_OF(operands),
             operands));
     }

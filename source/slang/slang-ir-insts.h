@@ -1781,6 +1781,74 @@ struct IRStructTypeLayout : IRTypeLayout
     };
 };
 
+    /// Attribute that specifies the layout for one field of a structure type.
+struct IRTupleFieldLayoutAttr : IRAttr
+{
+    IR_LEAF_ISA(TupleFieldLayoutAttr)
+
+    IRTypeLayout* getLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(1));
+    }
+};
+
+    /// Specialized layout information for tuple types.
+struct IRTupleTypeLayout : IRTypeLayout
+{
+    IR_LEAF_ISA(TupleTypeLayout)
+
+    typedef IRTypeLayout Super;
+
+        /// Get all of the attributes that represent field layouts.
+    IROperandList<IRTupleFieldLayoutAttr> getFieldLayoutAttrs()
+    {
+        return findAttrs<IRTupleFieldLayoutAttr>();
+    }
+
+        /// Get the number of fields for which layout information is stored.
+    UInt getFieldCount()
+    {
+        return getFieldLayoutAttrs().getCount();
+    }
+
+        /// Get the layout information for a field by `index`
+    IRTypeLayout* getFieldLayout(UInt index)
+    {
+        return getFieldLayoutAttrs()[index]->getLayout();
+    }
+
+        /// Specialized builder for tuple type layouts.
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder)
+            : Super::Builder(irBuilder)
+        {}
+
+        void addField(IRTypeLayout* layout)
+        {
+            FieldInfo info;
+            info.layout = layout;
+            m_fields.add(info);
+        }
+
+        IRTupleTypeLayout* build()
+        {
+            return cast<IRTupleTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_TupleTypeLayout; }
+        void addAttrsImpl(List<IRInst*>& ioOperands) override;
+
+        struct FieldInfo
+        {
+            IRTypeLayout* layout;
+        };
+
+        List<FieldInfo> m_fields;
+    };
+};
+
     /// Attribute that represents the layout for one case of a union type
 struct IRCaseTypeLayoutAttr : IRAttr
 {
@@ -3819,6 +3887,8 @@ public:
     IRStructFieldLayoutAttr* getFieldLayoutAttr(
         IRInst*         key,
         IRVarLayout*    layout);
+    IRTupleFieldLayoutAttr* getTupleFieldLayoutAttr(
+        IRTypeLayout*    layout);
     IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(
         IRTypeLayout*   layout);
 
