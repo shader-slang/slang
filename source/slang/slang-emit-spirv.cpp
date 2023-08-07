@@ -12,6 +12,7 @@
 #include "slang-spirv-val.h"
 #include "spirv/unified1/spirv.h"
 #include "../core/slang-memory-arena.h"
+#include <type_traits>
 
 namespace Slang
 {
@@ -275,6 +276,78 @@ struct SpvSnippetEmitContext
     List<SpvWord> argumentIds;
 };
 
+// A structure which can hold an integer literal, either one word or several
+struct SpvLiteralInteger
+{
+    static SpvLiteralInteger from32(uint32_t value) { return SpvLiteralInteger{{value}}; }
+    static SpvLiteralInteger from64(uint64_t value) { return SpvLiteralInteger{{SpvWord(value), SpvWord(value >> 32)}}; }
+    List<SpvWord> value; // Words, stored low words to hig (TODO, SmallArray or something here)
+};
+
+// A structure which can hold bitwise literal, either one word or several
+struct SpvLiteralBits
+{
+    static SpvLiteralBits from32(uint32_t value) { return SpvLiteralBits{{value}}; }
+    static SpvLiteralBits from64(uint64_t value) { return SpvLiteralBits{{SpvWord(value), SpvWord(value >> 32)}}; }
+    List<SpvWord> value; // Words, stored low words to high (TODO, SmallArray or something here)
+};
+
+// As a convenience, there are often cases where
+// we will want to emit all of the operands of some
+// IR instruction as <id> operands of a SPIR-V
+// instruction. This is handy in cases where the
+// Slang IR and SPIR-V instructions agree on the
+// number, order, and meaning of their operands.
+/// Helper type for emitting all the operands of the current IR instruction
+struct OperandsOf
+{
+    OperandsOf(IRInst* irInst)
+        : irInst(irInst)
+    {}
+
+    IRInst* irInst = nullptr;
+};
+
+/// Helper type for not emitting an operand in this position
+struct SkipThisOptionalOperand {};
+
+template<typename T>
+struct OptionalOperand
+{
+    static_assert(std::is_trivial_v<T>);
+    OptionalOperand(SkipThisOptionalOperand) : present(false) {}
+    OptionalOperand(T value) : present(true), value(value) {}
+    bool present;
+    T value;
+};
+
+template<typename T>
+OptionalOperand<T> nullOptionOperand()
+{
+    return OptionalOperand<T>{false};
+}
+
+template<typename T>
+OptionalOperand<T> someOptionOperand(T t)
+{
+    return OptionalOperand<T>{true, t};
+}
+
+template<typename T>
+constexpr bool isPlural = false;
+template<typename T>
+constexpr bool isPlural<List<T>> = true;
+template<typename T>
+constexpr bool isPlural<IROperandList<T>> = true;
+template<typename T, Index N>
+constexpr bool isPlural<Array<T, N>> = true;
+template<>
+constexpr bool isPlural<OperandsOf> = true;
+template<>
+constexpr bool isPlural<IRUse*> = true;
+template<typename T>
+constexpr bool isSingular = !isPlural<T>;
+
 // Now that we've defined the intermediate data structures we will
 // use to represent SPIR-V code during emission, we will move on
 // to defining the main context type that will drive SPIR-V
@@ -471,10 +544,12 @@ struct SPIRVEmitContext
 
     // Holds a stack of instructions operands *BEFORE* they added to the instruction.
     List<SpvWord> m_operandStack;
-    // The current instruction being constructed. Cannot add operands unless it is set.
+    // The current instruction being constructed. Cannot add operands unless it
+    // is set, or we are peeking at some operands to see if we have them memoized
     SpvInst* m_currentInst = nullptr;
+    bool m_peekingOperands = false;
 
-    // Operands can only be added when inside of a InstConstructScope 
+    // Operands can only be added when inside of a InstConstructScope or...
     struct InstConstructScope
     {
         SLANG_FORCE_INLINE operator SpvInst*() const { return m_inst; }
@@ -493,6 +568,28 @@ struct SPIRVEmitContext
         SPIRVEmitContext* m_context;        ///< The context
         SpvInst* m_previousInst;            ///< The previously live inst
         Index m_operandsStartIndex;         ///< The start index for operands of m_inst
+    };
+
+    // ...If we're speculatively adding them to see if we have a memoized results
+    struct OperandMemoizeScope
+    {
+        OperandMemoizeScope(SPIRVEmitContext* context) : m_context(context)
+        {
+            m_tmpOperandStack.swapWith(m_context->m_operandStack);
+            std::swap(m_tmpPeeking, m_context->m_peekingOperands);
+            std::swap(m_tmpInst, m_context->m_currentInst);
+        }
+        ~OperandMemoizeScope()
+        {
+            std::swap(m_tmpInst, m_context->m_currentInst);
+            std::swap(m_tmpPeeking, m_context->m_peekingOperands);
+            m_tmpOperandStack.swapWith(m_context->m_operandStack);
+        }
+
+        SPIRVEmitContext* m_context;
+        List<SpvWord> m_tmpOperandStack;
+        bool m_tmpPeeking = true;
+        SpvInst* m_tmpInst = nullptr;
     };
 
         /// Holds memory for instructions and operands.
@@ -586,7 +683,7 @@ struct SPIRVEmitContext
     void emitOperand(SpvWord word)
     {
         // Can only add operands if we are constructing an instruction (ie in _beginInst/_endInst)
-        SLANG_ASSERT(m_currentInst);
+        SLANG_ASSERT(m_currentInst || m_peekingOperands);
         m_operandStack.add(word);
     }
 
@@ -623,7 +720,7 @@ struct SPIRVEmitContext
     void emitOperand(UnownedStringSlice const& text)
     {
         // Can only emitOperands if we are in an instruction
-        SLANG_ASSERT(m_currentInst);
+        SLANG_ASSERT(m_currentInst || m_peekingOperands);
         SLANG_COMPILE_TIME_ASSERT(sizeof(SpvWord) == 4);
 
         // Assert that `text` doesn't contain any embedded nul bytes, since they
@@ -670,16 +767,53 @@ struct SPIRVEmitContext
 
     void emitOperand(ResultIDToken)
     {
+        // This is the one case we shouldn't be peeking at operands, as it
+        // depends on having an instruction under construction
         SLANG_ASSERT(m_currentInst);
 
         // A result <id> operand uses the <id> of the instruction itself (which is m_currentInst)
         emitOperand(getID(m_currentInst));
     }
 
-    void emitOperand(SpvDecoration decoration) { emitOperand((SpvWord)decoration); }
+    void emitOperand(const SpvLiteralBits& bits)
+    {
+        for(const auto v : bits.value)
+            emitOperand(v);
+    }
 
-    void emitOperand(SpvBuiltIn builtin) { emitOperand((SpvWord)builtin); }
-    void emitOperand(SpvStorageClass val) { emitOperand((SpvWord)val); }
+    void emitOperand(const SpvLiteralInteger& integer)
+    {
+        for(const auto v : integer.value)
+            emitOperand(v);
+    }
+
+    template<typename T>
+    void emitOperand(const List<T>& os)
+    {
+        for(const auto& o : os)
+            emitOperand(o);
+    }
+
+    template<typename T>
+    void emitOperand(const IROperandList<T>& os)
+    {
+        for(const auto& o : os)
+            emitOperand(o);
+    }
+
+    template<typename T, Index N>
+    void emitOperand(const Array<T, N>& os)
+    {
+        for(const auto& o : os)
+            emitOperand(o);
+    }
+
+    template<typename T>
+    void emitOperand(const ArrayView<T>& os)
+    {
+        for(const auto& o : os)
+            emitOperand(o);
+    }
 
     template<typename TConstant>
     struct ConstantValueKey
@@ -718,25 +852,20 @@ struct SPIRVEmitContext
         {
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
-            result = emitInst(
+            result = emitOpConstant(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
-                SpvOpConstant,
                 type,
-                kResultID,
-                valWord,
-                valHighWord);
+                SpvLiteralBits::from64(val));
             break;
         }
         default:
         {
-            result = emitInst(
+            result = emitOpConstant(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
-                SpvOpConstant,
                 type,
-                kResultID,
-                valWord);
+                SpvLiteralBits::from32(valWord));
             break;
         }
         }
@@ -757,44 +886,23 @@ struct SPIRVEmitContext
         {
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
-            result = emitInst(
+            result = emitOpConstant(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
-                SpvOpConstant,
                 type,
-                kResultID,
-                valWord,
-                valHighWord);
+                SpvLiteralBits::from64(val));
         }
         else
         {
-            result = emitInst(
+            result = emitOpConstant(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
-                SpvOpConstant,
                 type,
-                kResultID,
-                valWord);
+                SpvLiteralBits::from32(valWord));
         }
         m_spvFloatConstants[key] = result;
         return result;
     }
-    // As another convenience, there are often cases where
-    // we will want to emit all of the operands of some
-    // IR instruction as <id> operands of a SPIR-V
-    // instruction. This is handy in cases where the
-    // Slang IR and SPIR-V instructions agree on the
-    // number, order, and meaning of their operands.
-
-        /// Helper type for emitting all the operands of the current IR instruction
-    struct OperandsOf
-    {
-        OperandsOf(IRInst* irInst)
-            : irInst(irInst)
-        {}
-
-        IRInst* irInst = nullptr;
-    };
 
         /// Emit operand words for all the operands of a given IR instruction
     void emitOperand(OperandsOf const& other)
@@ -807,87 +915,37 @@ struct SPIRVEmitContext
         }
     }
 
+        /// Do nothing
+    void emitOperand(SkipThisOptionalOperand) { }
+
+    template<typename T>
+    void emitOperand(OptionalOperand<T> o)
+    {
+        if(o.present)
+            emitOperand(o.value);
+    }
+
     // With the above routines, code can easily construct a SPIR-V
     // instruction with arbitrary operands over multiple lines of code.
     //
-    // In many cases, however, it is desirable to be able to emit
-    // an instruction more compactly, and for that we will introduce
-    // a number of `emitInst()` helpers that handle creating an
-    // instruction, filling in its operands, and adding it to a parent.
+    // The safe way to call these routines is encoded in the below `emitInst`
+    // function.
     //
-    // These routines are overloaded on the number of operands, and
-    // also templates to work with any of the types for which
-    // `emitOperand()` works.
+    // This allows one to generically output a SPIR-V instruction with any
+    // desired operands.
     //
-    // In all of these cases, the caller takes responsibility for
-    // correctly matching the SPIR-V encoding rules for the chosen
-    // opcode, including whether a type <id> or result <id> is
-    // required.
-
-    SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode)
+    // This function performs no checks that it is actually being used
+    // correctly with respect to the SPIR-V rules for each opcode. As such, a
+    // more type safe function for each opcode is included in
+    // 'slang-emit-spirv-ops.h', and available in this class. You are
+    // encouraged to use these instead.
+    //
+    template<typename... Operands>
+    SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, const Operands& ...ops)
     {
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        parent->addInst(spvInst);
-        return spvInst;
-    }
-
-    template<typename A>
-    SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a)
-    {
-        InstConstructScope scopeInst(this, opcode, irInst);
-        SpvInst* spvInst = scopeInst;
-        emitOperand(a);
-        parent->addInst(spvInst);
-        return spvInst;
-    }
-
-    template<typename A, typename B>
-    SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a, B const& b)
-    {
-        InstConstructScope scopeInst(this, opcode, irInst);
-        SpvInst* spvInst = scopeInst;
-        emitOperand(a);
-        emitOperand(b);
-        parent->addInst(spvInst);
-        return spvInst;
-    }
-
-    template<typename A, typename B, typename C>
-    SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a, B const& b, C const& c)
-    {
-        InstConstructScope scopeInst(this, opcode, irInst);
-        SpvInst* spvInst = scopeInst;
-        emitOperand(a);
-        emitOperand(b);
-        emitOperand(c);
-        parent->addInst(spvInst);
-        return spvInst;
-    }
-
-    template<typename A, typename B, typename C, typename D>
-    SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a, B const& b, C const& c, D const& d)
-    {
-        InstConstructScope scopeInst(this, opcode, irInst);
-        SpvInst* spvInst = scopeInst;
-        emitOperand(a);
-        emitOperand(b);
-        emitOperand(c);
-        emitOperand(d);
-        parent->addInst(spvInst);
-        return spvInst;
-    }
-
-    template<typename A, typename B, typename C, typename D, typename E>
-    SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a, B const& b, C const& c, D const& d, E const& e)
-    {
-        InstConstructScope scopeInst(this, opcode, irInst);
-        SpvInst* spvInst = scopeInst;
-        emitOperand(a);
-        emitOperand(b);
-        emitOperand(c);
-        emitOperand(d);
-        emitOperand(e);
+        (emitOperand(ops), ...);
         parent->addInst(spvInst);
         return spvInst;
     }
@@ -902,6 +960,56 @@ struct SPIRVEmitContext
         return spvInst;
     }
 
+    template<typename... Operands>
+    SpvInst* emitMemoizedInst(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        // We take the resultId here explicitly here to make sure we don't try
+        // and memoize its value.
+        ResultIDToken resultId,
+        const Operands& ...ops
+    )
+    {
+        List<SpvWord> ourOperands;
+        {
+            auto scopePeek = OperandMemoizeScope(this);
+            (emitOperand(ops), ...);
+            // Steal our operands back, so we don't have to calculate them
+            // again
+            ourOperands = std::move(m_operandStack);
+        }
+
+        // Hash the whole global stack and opcode
+        SpvTypeInstKey key;
+        key.words.add(opcode);
+        key.words.addRange(ourOperands);
+
+        // If we have seen this before, return the memoized instruction
+        if (SpvInst** memoized = m_spvTypeInsts.tryGetValue(key))
+            return *memoized;
+
+        // Otherwise, we can construct our instruction and record the result
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
+        m_spvTypeInsts[key] = spvInst;
+
+        // Emit our operands, this time with the resultId too
+        emitOperand(resultId);
+        m_operandStack.addRange(ourOperands);
+
+        parent->addInst(spvInst);
+        return spvInst;
+    }
+
+    //
+    // Specific emit funcs
+    //
+
+#   define SLANG_IN_SPIRV_EMIT_CONTEXT
+#   include "slang-emit-spirv-ops.h"
+#   undef SLANG_IN_SPIRV_EMIT_CONTEXT
+
         /// The SPIRV OpExtInstImport inst that represents the GLSL450
         /// extended instruction set.
     SpvInst* m_glsl450ExtInst = nullptr;
@@ -910,11 +1018,9 @@ struct SPIRVEmitContext
     {
         if (m_glsl450ExtInst)
             return m_glsl450ExtInst;
-        m_glsl450ExtInst = emitInst(
+        m_glsl450ExtInst = emitOpExtInstImport(
             getSection(SpvLogicalSectionID::ExtIntInstImports),
             nullptr,
-            SpvOpExtInstImport,
-            kResultID,
             UnownedStringSlice("GLSL.std.450"));
         return m_glsl450ExtInst;
     }
@@ -937,7 +1043,11 @@ struct SPIRVEmitContext
         // For now we will always emit the `Shader` capability,
         // since every Vulkan shader module will use it.
         //
-        emitInst(getSection(SpvLogicalSectionID::Capabilities), nullptr, SpvOpCapability, SpvCapabilityShader);
+        emitOpCapability(
+            getSection(SpvLogicalSectionID::Capabilities),
+            nullptr,
+            SpvCapabilityShader
+        );
 
         // [2.4: Logical Layout of a Module]
         //
@@ -953,7 +1063,12 @@ struct SPIRVEmitContext
         // a requirement, but it is what glslang produces,
         // so we will use it for now.
         //
-        emitInst(getSection(SpvLogicalSectionID::MemoryModel),  nullptr, SpvOpMemoryModel, SpvAddressingModelLogical, SpvMemoryModelGLSL450);
+        emitOpMemoryModel(
+            getSection(SpvLogicalSectionID::MemoryModel),
+            nullptr,
+            SpvAddressingModelLogical,
+            SpvMemoryModelGLSL450
+        );
     }
 
     Dictionary<UnownedStringSlice, SpvInst*> m_extensionInsts;
@@ -962,8 +1077,11 @@ struct SPIRVEmitContext
         SpvInst* result = nullptr;
         if (m_extensionInsts.tryGetValue(name, result))
             return result;
-        result =
-            emitInst(getSection(SpvLogicalSectionID::Extensions), nullptr, SpvOpExtension, name);
+        result = emitOpExtension(
+            getSection(SpvLogicalSectionID::Extensions),
+            nullptr,
+            name
+        );
         m_extensionInsts[name] = result;
         return result;
     }
@@ -987,25 +1105,13 @@ struct SPIRVEmitContext
     // our IR doesn't currently guarantee types are unique in generated SPV.
     SpvInst* emitTypeInst(IRInst* typeInst, SpvOp opcode, ArrayView<SpvWord> operands)
     {
-        SpvTypeInstKey key;
-        key.words.add((SpvWord)opcode);
-        for (auto op : operands)
-            key.words.add(op);
-        SpvInst* result = nullptr;
-        if (m_spvTypeInsts.tryGetValue(key, result))
-        {
-            return result;
-        }
-        result = emitInstCustomOperandFunc(
-            getSection(SpvLogicalSectionID::ConstantsAndTypes), typeInst, opcode, [&]() {
-                emitOperand(kResultID);
-                for (auto op : operands)
-                {
-                    emitOperand(op);
-                }
-            });
-        m_spvTypeInsts[key] = result;
-        return result;
+        return emitMemoizedInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            typeInst,
+            opcode,
+            kResultID,
+            operands
+        );
     }
 
     // Next, let's look at emitting some of the instructions
@@ -1080,15 +1186,15 @@ struct SPIRVEmitContext
             }
         case kIROp_StructType:
             {
-                auto spvStructType = emitInstCustomOperandFunc(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeStruct, [&]() {
-                        emitOperand(kResultID);
-                        for (auto field : static_cast<IRStructType*>(inst)->getFields())
-                        {
-                            emitOperand(field->getFieldType());
-                            // TODO: decorate offset
-                        }
-                    });
+                List<IRType*> types;
+                // TODO: decorate offset
+                for (auto field : static_cast<IRStructType*>(inst)->getFields())
+                    types.add(field->getFieldType());
+                auto spvStructType = emitOpTypeStruct(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    inst,
+                    types
+                );
                 emitDecorations(inst, getID(spvStructType));
                 return spvStructType;
             }
@@ -1107,15 +1213,14 @@ struct SPIRVEmitContext
                     static_cast<IRBasicType*>(matrixType->getElementType())->getBaseType(),
                     static_cast<IRIntLit*>(matrixType->getRowCount())->getValue(),
                     nullptr);
-                auto matrixSPVType = emitInst(
+                const auto columnCount = static_cast<IRIntLit*>(matrixType->getColumnCount())->getValue();
+                auto matrixSPVType = emitOpTypeMatrix(
                     getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     inst,
-                    SpvOpTypeMatrix,
-                    kResultID,
                     vectorSpvType,
-                    (SpvWord)static_cast<IRIntLit*>(matrixType->getColumnCount())->getValue());
+                    SpvLiteralInteger::from32(columnCount)
+                );
                 // TODO: properly compute matrix stride.
-                auto columnCount = static_cast<IRIntLit*>(matrixType->getRowCount())->getValue();
                 uint32_t stride = 0;
                 switch (columnCount)
                 {
@@ -1132,14 +1237,16 @@ struct SPIRVEmitContext
                 default:
                     break;
                 }
-                emitInst(
+                emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
-                    SpvOpDecorate,
                     matrixSPVType,
-                    SpvDecorationRowMajor,
-                    SpvDecorationMatrixStride,
-                    stride);
+                    SpvDecorationRowMajor);
+                emitOpDecorateMatrixStride(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    matrixSPVType,
+                    SpvLiteralInteger::from32(stride));
                 return matrixSPVType;
             }
         case kIROp_ArrayType:
@@ -1163,13 +1270,11 @@ struct SPIRVEmitContext
                 // TODO: don't do this more than once
                 IRSizeAndAlignment sizeAndAlignment;
                 getNaturalSizeAndAlignment(this->m_targetRequest, elementType, &sizeAndAlignment);
-                emitInst(
+                emitOpDecorateArrayStride(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
-                    SpvOpDecorate,
                     arrayType,
-                    SpvDecorationArrayStride,
-                    (SpvWord)sizeAndAlignment.getStride());
+                    SpvLiteralInteger::from32(sizeAndAlignment.getStride()));
                 return arrayType;
             }
         // > OpTypeImage
@@ -1186,7 +1291,12 @@ struct SPIRVEmitContext
             // with the result-type operand coming first,
             // followed by operand sfor all the parameter types.
             //
-            return emitInst(getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeFunction, kResultID, OperandsOf(inst));
+            return emitOpTypeFunction(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                inst,
+                static_cast<IRFuncType*>(inst)->getResultType(),
+                static_cast<IRFuncType*>(inst)->getParamTypes()
+            );
 
         case kIROp_RateQualifiedType:
             {
@@ -1217,6 +1327,15 @@ struct SPIRVEmitContext
             return emitGlobalVar(as<IRGlobalVar>(inst));
         // ...
 
+        case kIROp_Specialize:
+            {
+                const auto s = as<IRSpecialize>(inst);
+                const auto g = s->getBase();
+                const auto e =
+                    "Specialize instruction remains in IR for SPIR-V emit, is something undefined?\n" +
+                    dumpIRToString(g);
+                SLANG_UNEXPECTED(e.getBuffer());
+            }
         default:
             {
                 String e = "Unhandled global inst in spirv-emit:\n"
@@ -1257,49 +1376,44 @@ struct SPIRVEmitContext
                 break;
 
             case LayoutResourceKind::VaryingInput:
-                emitInst(
+                emitOpDecorateLocation(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
-                    SpvOpDecorate,
                     varInst,
-                    SpvDecorationLocation,
-                    (SpvWord)index);
-                emitInst(
+                    SpvLiteralInteger::from32(index)
+                );
+                emitOpDecorateIndex(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
-                    SpvOpDecorate,
                     varInst,
-                    SpvDecorationIndex,
-                    (SpvWord)space);
+                    SpvLiteralInteger::from32(space)
+                );
                 break;
             case LayoutResourceKind::VaryingOutput:
-                emitInst(
+                emitOpDecorateLocation(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
-                    SpvOpDecorate,
                     varInst,
-                    SpvDecorationLocation,
-                    (SpvWord)index);
+                    SpvLiteralInteger::from32(index)
+                );
                 if (space)
                 {
-                    emitInst(
+                    emitOpDecorateIndex(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
-                        SpvOpDecorate,
                         varInst,
-                        SpvDecorationIndex,
-                        (SpvWord)space);
+                        SpvLiteralInteger::from32(space)
+                    );
                 }
                 break;
 
             case LayoutResourceKind::SpecializationConstant:
-                emitInst(
+                emitOpDecorateSpecId(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
-                    SpvOpDecorate,
                     varInst,
-                    SpvDecorationSpecId,
-                    (SpvWord)index);
+                    SpvLiteralInteger::from32(index)
+                );
                 break;
 
             case LayoutResourceKind::ConstantBuffer:
@@ -1307,20 +1421,18 @@ struct SPIRVEmitContext
             case LayoutResourceKind::UnorderedAccess:
             case LayoutResourceKind::SamplerState:
             case LayoutResourceKind::DescriptorTableSlot:
-                emitInst(
+                emitOpDecorateBinding(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
-                    SpvOpDecorate,
                     varInst,
-                    SpvDecorationBinding,
-                    (SpvWord)index);
-                emitInst(
+                    SpvLiteralInteger::from32(index)
+                );
+                emitOpDecorateDescriptorSet(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
-                    SpvOpDecorate,
                     varInst,
-                    SpvDecorationDescriptorSet,
-                    (SpvWord)space);
+                    SpvLiteralInteger::from32(space)
+                );
                 break;
             default:
                 break;
@@ -1342,13 +1454,12 @@ struct SPIRVEmitContext
             registerInst(param, systemValInst);
             return systemValInst;
         }
-        auto varInst = emitInst(
+        auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
             param,
-            SpvOpVariable,
             param->getDataType(),
-            kResultID,
-            storageClass);
+            storageClass
+        );
         emitVarLayout(varInst, layout);
         return varInst;   
     }
@@ -1364,13 +1475,12 @@ struct SPIRVEmitContext
             if (ptrType->hasAddressSpace())
                 storageClass = (SpvStorageClass)ptrType->getAddressSpace();
         }
-        auto varInst = emitInst(
+        auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
             globalVar,
-            SpvOpVariable,
             globalVar->getDataType(),
-            kResultID,
-            storageClass);
+            storageClass
+        );
         emitVarLayout(varInst, layout);
         return varInst;
     }
@@ -1449,11 +1559,13 @@ struct SPIRVEmitContext
         // type is given as a later operand. Slan IR instead uses
         // the type of a function instruction store, you know, its *type*.
         //
-        SpvInst* spvFunc = emitInst(section, irFunc, SpvOpFunction,
+        SpvInst* spvFunc = emitOpFunction(
+            section,
+            irFunc,
             irFunc->getDataType()->getResultType(),
-            kResultID,
             spvFunctionControl,
-            irFunc->getDataType());
+            irFunc->getDataType()
+        );
 
         // > OpFunctionParameter
         //
@@ -1484,7 +1596,7 @@ struct SPIRVEmitContext
         //
         for( auto irBlock : irFunc->getBlocks() )
         {
-            auto spvBlock = emitInst(spvFunc, irBlock, SpvOpLabel, kResultID);
+            auto spvBlock = emitOpLabel(spvFunc, irBlock);
             if (irBlock == irFunc->getFirstBlock())
             {
                 // OpVariable
@@ -1505,7 +1617,7 @@ struct SPIRVEmitContext
             {
                 if (irInst->getOp() == kIROp_loop)
                 {
-                    emitInst(spvFunc, irInst, SpvOpLabel, kResultID);
+                    emitOpLabel(spvFunc, irInst);
                 }
             }
         }
@@ -1568,7 +1680,7 @@ struct SPIRVEmitContext
         // structure we will make the `OpFunctionEnd` be the last child of
         // the `OpFunction`.
         //
-        emitInst(spvFunc, nullptr, SpvOpFunctionEnd);
+        emitOpFunctionEnd(spvFunc, nullptr);
 
         // We will emit any decorations pertinent to the function to the
         // appropriate section of the module.
@@ -1617,7 +1729,7 @@ struct SPIRVEmitContext
         case kIROp_Var:
             return emitVar(parent, inst);
         case kIROp_Call:
-            return emitCall(parent, inst);
+            return emitCall(parent, static_cast<IRCall*>(inst));
         case kIROp_FieldAddress:
             return emitFieldAddress(parent, as<IRFieldAddress>(inst));
         case kIROp_FieldExtract:
@@ -1656,8 +1768,12 @@ struct SPIRVEmitContext
             // TODO: break emitConstruct into separate functions for each opcode.
             return emitConstruct(parent, inst);
         case kIROp_BitCast:
-            return emitInst(
-                parent, inst, SpvOpBitcast, inst->getDataType(), kResultID, inst->getOperand(0));
+            return emitOpBitcast(
+                parent,
+                inst,
+                inst->getDataType(),
+                inst->getOperand(0)
+            );
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
@@ -1683,16 +1799,11 @@ struct SPIRVEmitContext
             return emitArithmetic(parent, inst);
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
-            {
-                return emitInst(parent, inst, SpvOpReturn);
-            }
+                return emitOpReturn(parent, inst);
             else
-            {
-                return emitInst(
-                    parent, inst, SpvOpReturnValue, as<IRReturn>(inst)->getVal());
-            }
+                return emitOpReturnValue(parent, inst, as<IRReturn>(inst)->getVal());
         case kIROp_discard:
-            return emitInst(parent, inst, SpvOpKill);
+            return emitOpKill(parent, inst);
         case kIROp_unconditionalBranch:
             {
                 // If we are jumping to the main block of a loop,
@@ -1701,15 +1812,9 @@ struct SPIRVEmitContext
                 auto targetBlock = as<IRUnconditionalBranch>(inst)->getTargetBlock();
                 IRInst* loopInst = nullptr;
                 if (isLoopTargetBlock(targetBlock, loopInst))
-                {
-                    return emitInst(parent, inst, SpvOpBranch, getIRInstSpvID(loopInst));
-                }
+                    return emitOpBranch(parent, inst, getIRInstSpvID(loopInst));
                 // Otherwise, emit a normal branch inst into the target block.
-                return emitInst(
-                    parent,
-                    inst,
-                    SpvOpBranch,
-                    getIRInstSpvID(targetBlock));
+                return emitOpBranch(parent, inst, getIRInstSpvID(targetBlock));
             }
         case kIROp_loop:
             {
@@ -1723,7 +1828,7 @@ struct SPIRVEmitContext
                 // Note: the body of the loop header block is emitted
                 // after everything else to ensure Phi instructions (which come
                 // from the actual loop target block) are emitted first.
-                emitInst(parent, nullptr, SpvOpBranch, blockId);
+                emitOpBranch(parent, nullptr, blockId);
         
                 return block;
             }
@@ -1731,26 +1836,22 @@ struct SPIRVEmitContext
             {
                 auto ifelseInst = as<IRIfElse>(inst);
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
-                emitInst(
-                    parent,
-                    nullptr,
-                    SpvOpSelectionMerge,
-                    afterBlockID,
-                    0);
+                emitOpSelectionMerge(parent, nullptr, afterBlockID, SpvSelectionControlMaskNone);
                 auto falseLabel = ifelseInst->getFalseBlock();
-                return emitInst(
+                return emitOpBranchConditional(
                     parent,
                     inst,
-                    SpvOpBranchConditional,
                     ifelseInst->getCondition(),
                     ifelseInst->getTrueBlock(),
-                    falseLabel ? getID(ensureInst(falseLabel)) : afterBlockID);
+                    falseLabel ? getID(ensureInst(falseLabel)) : afterBlockID,
+                    makeArray<SpvLiteralInteger>()
+                );
             }
         case kIROp_Switch:
             {
                 auto switchInst = as<IRSwitch>(inst);
                 auto mergeBlockID = getIRInstSpvID(switchInst->getBreakLabel());
-                emitInst(parent, nullptr, SpvOpSelectionMerge, mergeBlockID, 0);
+                emitOpSelectionMerge(parent, nullptr, mergeBlockID, SpvSelectionControlMaskNone);
                 return emitInstCustomOperandFunc(parent, inst, SpvOpSwitch, [&]() {
                     emitOperand(switchInst->getCondition());
                     auto defaultLabel = switchInst->getDefaultLabel();
@@ -1767,7 +1868,7 @@ struct SPIRVEmitContext
                 });
             }
         case kIROp_Unreachable:
-            return emitInst(parent, inst, SpvOpUnreachable);
+            return emitOpUnreachable(parent, inst);
         case kIROp_conditionalBranch:
             SLANG_UNEXPECTED("Unstructured branching is not supported by SPIRV.");
         case kIROp_MakeVector:
@@ -1799,22 +1900,19 @@ struct SPIRVEmitContext
                 case BaseType::UInt64:
                 case BaseType::IntPtr:
                 case BaseType::UIntPtr:
-                    return emitInst(
+                    return emitOpConstant(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
-                        SpvOpConstant,
                         inst->getDataType(),
-                        kResultID,
-                        (SpvWord)(value & 0xFFFFFFFF),
-                        (SpvWord)((value >> 32) & 0xFFFFFFFF));
+                        SpvLiteralBits::from64(value)
+                    );
                 default:
-                    return emitInst(
+                    return emitOpConstant(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
-                        SpvOpConstant,
                         inst->getDataType(),
-                        kResultID,
-                        (SpvWord)value);
+                        SpvLiteralBits::from32(value)
+                    );
                 }
             }
         case kIROp_FloatLit:
@@ -1823,33 +1921,26 @@ struct SPIRVEmitContext
                 switch (as<IRBasicType>(inst->getDataType())->getBaseType())
                 {
                 case BaseType::Half:
-                    return emitInst(
+                    return emitOpConstant(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
-                        SpvOpConstant,
                         inst->getDataType(),
-                        kResultID,
-                        (SpvWord)(FloatToHalf((float)value)));
+                        SpvLiteralBits::from32(FloatToHalf((float)value))
+                    );
                 case BaseType::Float:
-                    return emitInst(
+                    return emitOpConstant(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
-                        SpvOpConstant,
                         inst->getDataType(),
-                        kResultID,
-                        (SpvWord)(FloatAsInt((float)value)));
+                        SpvLiteralBits::from32(FloatAsInt((float)value))
+                    );
                 case BaseType::Double:
-                    {
-                        auto ival = DoubleAsInt64(value);
-                        return emitInst(
-                            getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                            inst,
-                            SpvOpConstant,
-                            inst->getDataType(),
-                            kResultID,
-                            (SpvWord)(ival&0xFFFFFFFF),
-                            (SpvWord)(ival>>32));
-                    }
+                    return emitOpConstant(
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                        inst,
+                        inst->getDataType(),
+                        SpvLiteralBits::from64(DoubleAsInt64(value))
+                    );
                 default:
                     return nullptr;
                 }
@@ -1858,21 +1949,19 @@ struct SPIRVEmitContext
             {
                 if (as<IRBoolLit>(inst)->getValue())
                 {
-                    return emitInst(
+                    return emitOpConstantTrue(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
-                        SpvOpConstantTrue,
-                        inst->getDataType(),
-                        kResultID);
+                        inst->getDataType()
+                    );
                 }
                 else
                 {
-                    return emitInst(
+                    return emitOpConstantFalse(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
-                        SpvOpConstantFalse,
-                        inst->getDataType(),
-                        kResultID);
+                        inst->getDataType()
+                    );
                 }
             }
         default:
@@ -1940,14 +2029,12 @@ struct SPIRVEmitContext
                                 if(const auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform))
                                 {
                                     const auto offset = static_cast<SpvWord>(varOffsetAttr->getOffset());
-                                    emitInst(
+                                    emitOpMemberDecorateOffset(
                                         section,
                                         fieldLayoutAttr,
-                                        SpvOpMemberDecorate,
                                         dstID,
-                                        i,
-                                        SpvDecorationOffset,
-                                        offset
+                                        SpvLiteralInteger::from32(i),
+                                        SpvLiteralInteger::from32(offset)
                                     );
                                 }
                             }
@@ -1966,7 +2053,7 @@ struct SPIRVEmitContext
             {
                 auto section = getSection(SpvLogicalSectionID::DebugNames);
                 auto nameHint = cast<IRNameHintDecoration>(decoration);
-                emitInst(section, decoration, SpvOpName, dstID, nameHint->getName());
+                emitOpName(section, decoration, dstID, nameHint->getName());
             }
             break;
 
@@ -2030,21 +2117,25 @@ struct SPIRVEmitContext
                 // in those positions in the Slang IR).
                 //
                 auto numThreads = cast<IRNumThreadsDecoration>(decoration);
-                emitInst(section, decoration, SpvOpExecutionMode, dstID, SpvExecutionModeLocalSize,
-                    SpvWord(numThreads->getX()->getValue()),
-                    SpvWord(numThreads->getY()->getValue()),
-                    SpvWord(numThreads->getZ()->getValue()));
+                emitOpExecutionModeLocalSize(
+                    section,
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(numThreads->getX()->getValue()),
+                    SpvLiteralInteger::from32(numThreads->getY()->getValue()),
+                    SpvLiteralInteger::from32(numThreads->getZ()->getValue())
+                );
             }
             break;
 
         case kIROp_SPIRVBufferBlockDecoration:
             {
-                emitInst(
+                emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
-                    SpvOpDecorate,
                     dstID,
-                    SpvDecorationBlock);
+                    SpvDecorationBlock
+                );
             }
             break;
         // ...
@@ -2088,20 +2179,18 @@ struct SPIRVEmitContext
         builder.setInsertBefore(type);
         auto ptrType = as<IRPtrTypeBase>(type);
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
-        auto varInst = emitInst(
+        auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
             nullptr,
-            SpvOpVariable,
             type,
-            kResultID,
-            (SpvStorageClass)ptrType->getAddressSpace());
-        emitInst(
+            static_cast<SpvStorageClass>(ptrType->getAddressSpace())
+        );
+        emitOpDecorateBuiltIn(
             getSection(SpvLogicalSectionID::Annotations),
             nullptr,
-            SpvOpDecorate,
             varInst,
-            SpvDecorationBuiltIn,
-            builtinVal);
+            builtinVal
+        );
         m_builtinGlobalVars[builtinVal] = varInst;
         return varInst;
     }
@@ -2131,7 +2220,7 @@ struct SPIRVEmitContext
 
     SpvInst* emitParam(SpvInstParent* parent, IRInst* inst)
     {
-        return emitInst(parent, inst, SpvOpFunctionParameter, inst->getFullType(), kResultID);
+        return emitOpFunctionParameter(parent, inst, inst->getFullType());
     }
 
     SpvInst* emitVar(SpvInstParent* parent, IRInst* inst)
@@ -2143,7 +2232,7 @@ struct SPIRVEmitContext
         {
             storageClass = (SpvStorageClass)ptrType->getAddressSpace();
         }
-        return emitInst(parent, inst, SpvOpVariable, inst->getFullType(), kResultID, storageClass);
+        return emitOpVariable(parent, inst, inst->getFullType(), storageClass);
     }
 
         /// Cached `IRParam` indices in an `IRBlock`. For use in `getParamIndexInBlock`.
@@ -2196,29 +2285,29 @@ struct SPIRVEmitContext
 
     void emitLoopHeaderBlock(IRLoop* loopInst, SpvInst* loopHeaderBlock)
     {
-        SpvWord loopControl = 0;
+        SpvLoopControlMask loopControl = SpvLoopControlMaskNone;
         if (auto loopControlDecoration = loopInst->findDecoration<IRLoopControlDecoration>())
         {
             switch (loopControlDecoration->getMode())
             {
             case IRLoopControl::kIRLoopControl_Unroll:
-                loopControl = 0x1;
+                loopControl = SpvLoopControlUnrollMask;
                 break;
             case IRLoopControl::kIRLoopControl_Loop:
-                loopControl = 0x2;
+                loopControl = SpvLoopControlDontUnrollMask;
                 break;
             default:
                 break;
             }
         }
-        emitInst(
+        emitOpLoopMerge(
             loopHeaderBlock,
             nullptr,
-            SpvOpLoopMerge,
             getIRInstSpvID(loopInst->getBreakBlock()),
             getIRInstSpvID(loopInst->getContinueBlock()),
-            loopControl);
-        emitInst(loopHeaderBlock, nullptr, SpvOpBranch, loopInst->getTargetBlock());
+            loopControl
+        );
+        emitOpBranch(loopHeaderBlock, nullptr, loopInst->getTargetBlock());
     }
 
     SpvInst* emitPhi(SpvInstParent* parent, IRParam* inst)
@@ -2278,9 +2367,9 @@ struct SPIRVEmitContext
         });
     }
 
-    SpvInst* emitCall(SpvInstParent* parent, IRInst* inst)
+    SpvInst* emitCall(SpvInstParent* parent, IRCall* inst)
     {
-        auto funcValue = inst->getOperand(0);
+        auto funcValue = inst->getCallee();
 
         // Does this function declare any requirements.
         handleRequiredCapabilities(funcValue);
@@ -2294,8 +2383,13 @@ struct SPIRVEmitContext
         }
         else
         {
-            return emitInst(
-                parent, inst, SpvOpFunctionCall, inst->getFullType(), kResultID, OperandsOf(inst));
+            return emitOpFunctionCall(
+                parent,
+                inst,
+                inst->getFullType(),
+                funcValue,
+                inst->getArgsList()
+            );
         }
     }
 
@@ -2364,14 +2458,12 @@ struct SPIRVEmitContext
                 auto floatType = builder.getType(kIROp_FloatType);
                 auto element1 = emitFloatConstant(constant.floatValues[0], floatType);
                 auto element2 = emitFloatConstant(constant.floatValues[1], floatType);
-                result = emitInst(
+                result = emitOpConstantComposite(
                     getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
-                    SpvOpConstantComposite,
                     builder.getVectorType(floatType, builder.getIntValue(builder.getIntType(), 2)),
-                    kResultID,
-                    element1,
-                    element2);
+                    makeArray(element1, element2)
+                );
             }
             break;
         case SpvSnippet::ASMType::Int:
@@ -2382,14 +2474,12 @@ struct SPIRVEmitContext
                 auto uintType = builder.getType(kIROp_UIntType);
                 auto element1 = emitIntConstant((IRIntegerValue)constant.intValues[0], uintType);
                 auto element2 = emitIntConstant((IRIntegerValue)constant.intValues[1], uintType);
-                result = emitInst(
+                result = emitOpConstantComposite(
                     getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
-                    SpvOpConstantComposite,
                     builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 2)),
-                    kResultID,
-                    element1,
-                    element2);
+                    makeArray(element1, element2)
+                );
             }
             break;
         }
@@ -2588,23 +2678,26 @@ struct SPIRVEmitContext
             baseStructType = as<IRStructType>(base->getDataType());
             
             auto structPtrType = builder.getPtrType(baseStructType);
-            auto varInst = emitInst(
-                parent, nullptr, SpvOpVariable, structPtrType, kResultID, SpvStorageClassFunction);
-            emitInst(parent, nullptr, SpvOpStore, varInst, base);
+            auto varInst = emitOpVariable(
+                parent,
+                nullptr,
+                structPtrType,
+                SpvStorageClassFunction
+            );
+            emitOpStore(parent, nullptr, varInst, base);
             baseId = getID(varInst);
         }
         SLANG_ASSERT(baseStructType && "field_address require base to be a struct.");
         auto fieldId = emitIntConstant(
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
-        return emitInst(
+        return emitOpAccessChain(
             parent,
             fieldAddress,
-            SpvOpAccessChain,
             fieldAddress->getFullType(),
-            kResultID,
             baseId,
-            fieldId);
+            makeArray(fieldId)
+        );
     }
 
     SpvInst* emitFieldExtract(SpvInstParent* parent, IRFieldExtract* inst)
@@ -2618,14 +2711,13 @@ struct SPIRVEmitContext
             baseStructType,
             as<IRStructKey>(inst->getField())));
         
-        return emitInst(
+        return emitOpCompositeExtract(
             parent,
             inst,
-            SpvOpCompositeExtract,
             inst->getDataType(),
-            kResultID,
             inst->getBase(),
-            fieldId);
+            makeArray(SpvLiteralInteger::from32(fieldId))
+        );
     }
 
     SpvInst* emitGetElementPtr(SpvInstParent* parent, IRGetElementPtr* inst)
@@ -2651,14 +2743,13 @@ struct SPIRVEmitContext
             SLANG_ASSERT(!"invalid IR: base of getElementPtr must be a pointer.");
         }
         SLANG_ASSERT(baseArrayType && "getElementPtr require base to be an array.");
-        return emitInst(
+        return emitOpAccessChain(
             parent,
             inst,
-            SpvOpAccessChain,
             inst->getFullType(),
-            kResultID,
             baseId,
-            inst->getIndex());
+            makeArray(inst->getIndex())
+        );
     }
 
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)
@@ -2674,31 +2765,29 @@ struct SPIRVEmitContext
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
 
-        auto ptr = emitInst(
+        auto ptr = emitOpAccessChain(
             parent,
             nullptr,
-            SpvOpAccessChain,
             builder.getPtrType(inst->getFullType()),
-            kResultID,
             inst->getBase(),
-            inst->getIndex());
-        return emitInst(
+            makeArray(inst->getIndex())
+        );
+        return emitOpLoad(
             parent,
             inst,
-            SpvOpLoad,
             inst->getFullType(),
-            kResultID,
-            ptr);
+            ptr
+        );
     }
 
     SpvInst* emitLoad(SpvInstParent* parent, IRLoad* inst)
     {
-        return emitInst(parent, inst, SpvOpLoad, inst->getDataType(), kResultID, inst->getPtr());
+        return emitOpLoad(parent, inst, inst->getDataType(), inst->getPtr());
     }
 
     SpvInst* emitStore(SpvInstParent* parent, IRStore* inst)
     {
-        return emitInst(parent, inst, SpvOpStore, inst->getPtr(), inst->getVal());
+        return emitOpStore(parent, inst, inst->getPtr(), inst->getVal());
     }
 
     SpvInst* emitStructuredBufferLoad(SpvInstParent* parent, IRInst* inst)
@@ -2729,14 +2818,13 @@ struct SPIRVEmitContext
     {
         if (inst->getElementCount() == 1)
         {
-            return emitInst(
+            return emitOpCompositeExtract(
                 parent,
                 inst,
-                SpvOpCompositeExtract,
                 inst->getDataType(),
-                kResultID,
                 inst->getBase(),
-                (SpvWord)as<IRIntLit>(inst->getElementIndex(0))->getValue());
+                makeArray(SpvLiteralInteger::from32(as<IRIntLit>(inst->getElementIndex(0))->getValue()))
+            );
         }
         else
         {
@@ -2774,25 +2862,22 @@ struct SPIRVEmitContext
         const auto fromInfo = getIntTypeInfo(fromType);
         const auto toInfo = getIntTypeInfo(toType);
 
-        const auto convertWith = [&](auto op){
-            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
-        };
         if(fromInfo == toInfo)
-            return convertWith(SpvOpCopyObject);
+            return emitOpCopyObject(parent, inst, toTypeV, inst->getOperand(0));
         else if(fromInfo.width == toInfo.width)
-            return convertWith(SpvOpBitcast);
+            return emitOpBitcast(parent, inst, toTypeV, inst->getOperand(0));
         else if(!fromInfo.isSigned && !toInfo.isSigned)
             // unsigned to unsigned, don't sign extend
-            return convertWith(SpvOpUConvert);
+            return emitOpUConvert(parent, inst, toTypeV, inst->getOperand(0));
         else if(toInfo.isSigned)
             // unsigned to signed, sign extend
-            return convertWith(SpvOpSConvert);
+            return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
         else if(fromInfo.isSigned)
             // signed to unsigned, sign extend
-            return convertWith(SpvOpSConvert);
+            return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
         else if(fromInfo.isSigned && toInfo.isSigned)
             // signed to signed, sign extend
-            return convertWith(SpvOpSConvert);
+            return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
 
         SLANG_UNREACHABLE(__func__);
     }
@@ -2808,7 +2893,7 @@ struct SPIRVEmitContext
         SLANG_ASSERT(isFloatingType(toType));
         SLANG_ASSERT(!isTypeEqual(fromType, toType));
 
-        return emitInst(parent, inst, SpvOpFConvert, toTypeV, kResultID, inst->getOperand(0));
+        return emitOpFConvert(parent, inst, toTypeV, inst->getOperand(0));
     }
 
     SpvInst* emitIntToFloatCast(SpvInstParent* parent, IRCastIntToFloat* inst)
@@ -2823,11 +2908,9 @@ struct SPIRVEmitContext
 
         const auto fromInfo = getIntTypeInfo(fromType);
 
-        const auto convertWith = [&](auto op){
-            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
-        };
-
-        return convertWith(fromInfo.isSigned ? SpvOpConvertSToF : SpvOpConvertUToF);
+        return fromInfo.isSigned
+            ? emitOpConvertSToF(parent, inst, toTypeV, inst->getOperand(0))
+            : emitOpConvertUToF(parent, inst, toTypeV, inst->getOperand(0));
     }
 
     SpvInst* emitFloatToIntCast(SpvInstParent* parent, IRCastFloatToInt* inst)
@@ -2842,16 +2925,14 @@ struct SPIRVEmitContext
 
         const auto toInfo = getIntTypeInfo(toType);
 
-        const auto convertWith = [&](auto op){
-            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
-        };
-
-        return convertWith(toInfo.isSigned ? SpvOpConvertFToS : SpvOpConvertFToU);
+        return toInfo.isSigned
+            ? emitOpConvertFToS(parent, inst, toTypeV, inst->getOperand(0))
+            : emitOpConvertFToU(parent, inst, toTypeV, inst->getOperand(0));
     }
 
     SpvInst* emitCompositeConstruct(SpvInstParent* parent, IRInst* inst)
     {
-        return emitInst(parent, inst, SpvOpCompositeConstruct, inst->getDataType(), kResultID, OperandsOf(inst));
+        return emitOpCompositeConstruct(parent, inst, inst->getDataType(), OperandsOf(inst));
     }
 
     SpvInst* emitConstruct(SpvInstParent* parent, IRInst* inst)
@@ -2861,20 +2942,16 @@ struct SPIRVEmitContext
             if (inst->getOperandCount() == 1)
             {
                 if (inst->getDataType() == inst->getOperand(0)->getDataType())
-                    return emitInst(
+                    return emitOpCopyObject(
                         parent,
                         inst,
-                        SpvOpCopyObject,
                         inst->getFullType(),
-                        kResultID,
                         inst->getOperand(0));
                 else
-                    return emitInst(
+                    return emitOpBitcast(
                         parent,
                         inst,
-                        SpvOpBitcast,
                         inst->getFullType(),
-                        kResultID,
                         inst->getOperand(0));
             }
             else
@@ -2897,16 +2974,12 @@ struct SPIRVEmitContext
             scalarTy->getBaseType(),
             numElems,
             nullptr);
-        return emitInstCustomOperandFunc(
+        return emitOpCompositeConstruct(
             parent,
             inst,
-            SpvOpCompositeConstruct,
-            [&](){
-                emitOperand(spvVecTy);
-                emitOperand(kResultID);
-                for(Int i = 0; i < numElems; ++i)
-                    emitOperand(scalar);
-            });
+            spvVecTy,
+            List<IRInst*>::makeRepeated(scalar, numElems)
+        );
     }
 
     bool isSignedType(IRType* type)
@@ -3085,11 +3158,11 @@ struct SPIRVEmitContext
     {
         if (m_capabilities.add(capability))
         {
-            emitInst(
+            emitOpCapability(
                 getSection(SpvLogicalSectionID::Capabilities),
                 nullptr,
-                SpvOpCapability,
-                capability);
+                capability
+            );
         }
     }
 

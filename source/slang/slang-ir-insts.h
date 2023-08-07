@@ -2011,6 +2011,10 @@ struct IRCall : IRInst
 
     UInt getArgCount() { return getOperandCount() - 1; }
     IRUse* getArgs() { return getOperands() + 1; }
+    IROperandList<IRInst> getArgsList()
+    {
+        return IROperandList<IRInst>(getOperands() + 1, getOperands() + getOperandCount());
+    }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
 };
 

@@ -1672,6 +1672,10 @@ struct IRFuncType : IRType
     IRType* getResultType() { return (IRType*) getOperand(0); }
     UInt getParamCount() { return getOperandCount() - 1; }
     IRType* getParamType(UInt index) { return (IRType*)getOperand(1 + index); }
+    IROperandList<IRType> getParamTypes()
+    {
+        return IROperandList<IRType>(getOperands() + 1, getOperands() + getOperandCount());
+    }
 
     IR_LEAF_ISA(FuncType)
 };
