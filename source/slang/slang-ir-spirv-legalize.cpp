@@ -67,6 +67,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     {
                         storageClass = SpvStorageClassInput;
                     }
+                    else if (semanticName == "sv_groupindex")
+                    {
+                        storageClass = SpvStorageClassInput;
+                    }
                 }
             }
             // Make a pointer type of storageClass.
@@ -296,6 +300,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 };
+
+SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic)
+{
+    RefPtr<SpvSnippet> snippet;
+    if (m_parsedSpvSnippets.tryGetValue(intrinsic, snippet))
+    {
+        return snippet.Ptr();
+    }
+    snippet = SpvSnippet::parse(intrinsic->getDefinition());
+    if(!snippet)
+    {
+        m_sink->diagnose(intrinsic, Diagnostics::snippetParsingFailed, intrinsic->getDefinition());
+        return nullptr;
+    }
+    m_parsedSpvSnippets[intrinsic] = snippet;
+    return snippet;
+}
 
 void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
 {
