@@ -1109,7 +1109,7 @@ struct SPIRVEmitContext
         ///
     SpvInst* emitGlobalInst(IRInst* inst)
     {
-        switch( inst->getOp() )
+        switch( inst->getOp() & kIROpMask_OpMask )
         {
         // [3.32.6: Type-Declaration Instructions]
         //
@@ -1245,8 +1245,53 @@ struct SPIRVEmitContext
                     SpvLiteralInteger::from32(sizeAndAlignment.getStride()));
                 return arrayType;
             }
-        // > OpTypeImage
-        // > OpTypeSampler
+
+        case kIROp_TextureType:
+            {
+                const auto texTypeInst = as<IRTextureType>(inst);
+                const auto sampledType = texTypeInst->getElementType();
+                SpvDim dim;
+                switch(texTypeInst->GetBaseShape())
+                {
+                    case TextureFlavor::Shape1D:
+                    case TextureFlavor::Shape1DArray:
+                        dim = SpvDim1D;
+                        break;
+                    case TextureFlavor::Shape2D:
+                    case TextureFlavor::Shape2DArray:
+                        dim = SpvDim2D;
+                        break;
+                    case TextureFlavor::Shape3D:
+                        dim = SpvDim3D;
+                        break;
+                    case TextureFlavor::ShapeCube:
+                    case TextureFlavor::ShapeCubeArray:
+                        dim = SpvDimCube;
+                        break;
+                    case TextureFlavor::ShapeBuffer:
+                        dim = SpvDimBuffer;
+                        break;
+                }
+                bool arrayed = texTypeInst->isArray();
+                SpvWord depth = 2; // No knowledge of if this is a depth image
+                bool ms = texTypeInst->isMultisample();
+                // TODO: can we do better here?
+                SpvWord sampled = 0; // Only known at run time
+                // TODO: can we do better?
+                SpvImageFormat format = SpvImageFormatUnknown;
+                return emitOpTypeImage(
+                    inst,
+                    sampledType,
+                    dim,
+                    SpvLiteralInteger::from32(depth),
+                    SpvLiteralInteger::from32(arrayed),
+                    SpvLiteralInteger::from32(ms),
+                    SpvLiteralInteger::from32(sampled),
+                    format
+                );
+            }
+        case kIROp_SamplerStateType:
+                return emitOpTypeSampler(inst);
         // > OpTypeArray
         // > OpTypeRuntimeArray
         // > OpTypeOpaque
