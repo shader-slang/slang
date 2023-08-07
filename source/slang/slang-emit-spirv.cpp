@@ -2095,23 +2095,27 @@ struct SPIRVEmitContext
                 auto entryPointDecor = cast<IREntryPointDecoration>(decoration);
                 auto spvStage = mapStageToExecutionModel(entryPointDecor->getProfile().getStage());
                 auto name = entryPointDecor->getName()->getStringSlice();
-                emitInstCustomOperandFunc(section, decoration, SpvOpEntryPoint, [&]() {
-                    emitOperand(spvStage);
-                    emitOperand(dstID);
-                    emitOperand(name);
-                    // `interface` part: reference all global variables that are used by this entrypoint.
-                    // TODO: we may want to perform more accurate tracking.
-                    for (auto globalInst : m_irModule->getModuleInst()->getChildren())
+                List<IRInst*> params;
+                // `interface` part: reference all global variables that are used by this entrypoint.
+                // TODO: we may want to perform more accurate tracking.
+                for (auto globalInst : m_irModule->getModuleInst()->getChildren())
+                {
+                    switch (globalInst->getOp())
                     {
-                        switch (globalInst->getOp())
-                        {
-                        case kIROp_GlobalVar:
-                        case kIROp_GlobalParam:
-                            emitOperand(getIRInstSpvID(globalInst));
-                            break;
-                        }
+                    case kIROp_GlobalVar:
+                    case kIROp_GlobalParam:
+                        params.add(globalInst);
+                        break;
                     }
-                });
+                }
+                emitOpEntryPoint(
+                    section,
+                    decoration,
+                    spvStage,
+                    dstID,
+                    name,
+                    params
+                );
             }
             break;
 
