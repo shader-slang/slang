@@ -2711,6 +2711,7 @@ struct SPIRVEmitContext
         auto fieldId = emitIntConstant(
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
+        SLANG_ASSERT(as<IRPtrTypeBase>(fieldAddress->getFullType()));
         return emitOpAccessChain(
             parent,
             fieldAddress,
