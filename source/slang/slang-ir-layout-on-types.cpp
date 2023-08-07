@@ -54,6 +54,14 @@ static void zipPreorderTypeAndTypeLayout(
 
             go(go, arrayType->getElementType(), arrayTypeLayout->getElementTypeLayout());
         }
+        else if(const auto existentialTypeLayout = as<IRExistentialTypeLayout>(layout))
+        {
+            // TODO: To resolve this we should
+            // - Record the interface width in each IRExistentialTypeLayout
+            // - To allow us to replace them with IRTupleTypeLayout when we lower existentials
+            // - To allow us to replace them with IRStructTypeLayout when we lower tuples
+            SLANG_UNEXPECTED("Existentials (or their layouts) have not been erased before SPIR-V emit");
+        }
         else
         {
             base((IRType*)type, (IRTypeLayout*)layout);
