@@ -262,6 +262,15 @@ namespace Misc {
             }
             return false;
         }
+        bool AdvanceIf(TokenType token)
+        {
+            if( LookAhead(token) )
+            {
+                ReadToken();
+                return true;
+            }
+            return false;
+        }
         bool IsEnd()
         {
             return tokenPtr == (int)tokens.getCount();
