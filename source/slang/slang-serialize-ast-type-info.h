@@ -54,14 +54,6 @@ inline void deserializeValPointerValue(SerialReader* reader, const SerialIndex* 
 {
     auto val = reader->getPointer(*(const SerialIndex*)inSerial).dynamicCast<Val>();
     *(Val**)outPtr = val;
-    if (val)
-    {
-        SLANG_ASSERT(as<Val>(val));
-        PostSerializationFixUp fixup;
-        fixup.kind = PostSerializationFixUpKind::ValPtr;
-        fixup.addressToModify = outPtr;
-        reader->getFixUps().add(fixup);
-    }
 }
 
 template<typename T>

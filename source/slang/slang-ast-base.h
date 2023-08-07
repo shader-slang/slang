@@ -446,6 +446,10 @@ class Val : public NodeBase
             m_operands.add(ValNodeOperand(v));
     }
     List<ValNodeOperand> m_operands;
+
+    // Private use by stdlib deserialization only. Since we know the Vals serialized into stdlib is already
+    // unique, we can just use `this` pointer as the `m_resolvedVal` so we don't need to resolve them again.
+    void _setUnique();
 protected:
     Val* defaultResolveImpl();
 private:

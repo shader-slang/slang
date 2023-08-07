@@ -110,6 +110,12 @@ ValNodeDesc Val::getDesc()
     return desc;
 }
 
+void Val::_setUnique()
+{
+    m_resolvedVal = this;
+    m_resolvedValEpoch = getCurrentASTBuilder()->getEpoch();
+}
+
 Val* Val::defaultResolveImpl()
 {
     // Default resolve implementation is to recursively resolve all operands, and lookup in deduplication cache.

@@ -566,43 +566,9 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 }
                                 else if (Val* val = dynamicCast<Val>(nodeBase))
                                 {
-                                    valUses[val] = List<Val**>();
-                                }
-                            }
-                        }
-                        // Go through fixup locations and deduplicate Vals.
-                        // This is needed because we currently the same Val can be serialized multiple times
-                        // in different modules. If we have a type defined in Module A and used in Module B,
-                        // then both serialized Module A and Module B will contain a Type Val object that refers to A.
-                        // When we load B, we should resolve those type references to the existing Type val instead.
-                        // This step can be avoided if we can run deduplication while deserializing, which
-                        // requires a different way of handling Val objects.
-                        for (auto fixup : reader.getFixUps())
-                        {
-                            if (fixup.kind == PostSerializationFixUpKind::ValPtr)
-                            {
-                                auto list = valUses.tryGetValue(*(Val**)fixup.addressToModify);
-                                if (list)
-                                    list->add((Val**)fixup.addressToModify);
-                            }
-                        }
-                        SLANG_AST_BUILDER_RAII(astBuilder);
-                        for (auto& valUseList : valUses)
-                        {
-                            auto val = valUseList.key;
-                            auto desc = val->getDesc();
-                            astBuilder->m_cachedNodes.tryGetValueOrAdd(desc, val);
-                        }
-                        for (auto& valUseList : valUses)
-                        {
-                            auto val = valUseList.key;
-                            auto newVal = val->resolve();
-                            if (val != newVal)
-                            {
-                                astBuilder->m_cachedNodes[val->getDesc()] = newVal;
-                                for (auto use : valUseList.value)
-                                {
-                                    *use = newVal;
+                                    val->_setUnique();
+                                    auto desc = val->getDesc();
+                                    astBuilder->m_cachedNodes.tryGetValueOrAdd(desc, val);
                                 }
                             }
                         }

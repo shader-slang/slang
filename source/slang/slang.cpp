@@ -311,9 +311,13 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     }
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
-    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
-    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
-    addBuiltinSource(autodiffLanguageScope, "diff", getAutodiffLibraryCode());
+    StringBuilder stdLibSrcBuilder;
+    stdLibSrcBuilder
+        << (const char*)getCoreLibraryCode()->getBufferPointer()
+        << (const char*)getHLSLLibraryCode()->getBufferPointer()
+        << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+    auto stdLibSrcBlob = StringBlob::moveCreate(stdLibSrcBuilder.produceString());
+    addBuiltinSource(coreLanguageScope, "core", stdLibSrcBlob);
 
     if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
     {
@@ -359,6 +363,8 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
 SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 {
+    SLANG_PROFILE;
+
     if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
         // Already have a StdLib loaded
@@ -373,8 +379,6 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
-    SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, hlslLanguageScope, "hlsl"));
-    SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, autodiffLanguageScope, "diff"));
     return SLANG_OK;
 }
 
