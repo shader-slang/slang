@@ -1,4 +1,5 @@
 #ifdef SLANG_IN_SPIRV_EMIT_CONTEXT
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpUndef
 template<typename T>
 SpvInst* emitOpUndef(SpvInstParent* parent, IRInst* inst, const T& idResultType)
 {
@@ -6,6 +7,7 @@ SpvInst* emitOpUndef(SpvInstParent* parent, IRInst* inst, const T& idResultType)
     return emitInst(parent, inst, SpvOpUndef, idResultType, kResultID);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpName
 template<typename T>
 SpvInst* emitOpName(
     SpvInstParent* parent,
@@ -18,16 +20,19 @@ SpvInst* emitOpName(
     return emitInst(parent, inst, SpvOpName, target, name);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExtension
 SpvInst* emitOpExtension(SpvInstParent* parent, IRInst* inst, const UnownedStringSlice& name)
 {
     return emitInst(parent, inst, SpvOpExtension, name);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExtInstImport
 SpvInst* emitOpExtInstImport(SpvInstParent* parent, IRInst* inst, const UnownedStringSlice& name)
 {
     return emitInst(parent, inst, SpvOpExtInstImport, kResultID, name);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemoryModel
 SpvInst* emitOpMemoryModel(
     SpvInstParent* parent,
     IRInst* inst,
@@ -38,6 +43,7 @@ SpvInst* emitOpMemoryModel(
     return emitInst(parent, inst, SpvOpMemoryModel, addressingModel, memoryModel);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpEntryPoint
 template<typename T, typename Ts>
 SpvInst* emitOpEntryPoint(
     SpvInstParent* parent,
@@ -53,6 +59,7 @@ SpvInst* emitOpEntryPoint(
     return emitInst(parent, inst, SpvOpEntryPoint, executionModel, entryPoint, name, interfaces);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
 template<typename T>
 SpvInst* emitOpExecutionMode(
     SpvInstParent* parent,
@@ -65,6 +72,7 @@ SpvInst* emitOpExecutionMode(
     return emitInst(parent, inst, SpvOpExecutionMode, entryPoint, mode);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
 template<typename T>
 SpvInst* emitOpExecutionModeLocalSize(
     SpvInstParent* parent,
@@ -81,6 +89,7 @@ SpvInst* emitOpExecutionModeLocalSize(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
 template<typename T1, typename T2, typename T3, typename T4>
 SpvInst* emitOpExecutionModeLocalSizeId(
     SpvInstParent* parent,
@@ -100,11 +109,13 @@ SpvInst* emitOpExecutionModeLocalSizeId(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCapability
 SpvInst* emitOpCapability(SpvInstParent* parent, IRInst* inst, SpvCapability capability)
 {
     return emitInst(parent, inst, SpvOpCapability, capability);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeVoid
 SpvInst* emitOpTypeVoid(IRInst* inst)
 {
     return emitInstMemoized(
@@ -112,6 +123,7 @@ SpvInst* emitOpTypeVoid(IRInst* inst)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeBool
 SpvInst* emitOpTypeBool(IRInst* inst)
 {
     return emitInstMemoized(
@@ -119,6 +131,7 @@ SpvInst* emitOpTypeBool(IRInst* inst)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeInt
 SpvInst* emitOpTypeInt(
     IRInst* inst,
     const SpvLiteralInteger& width,
@@ -135,6 +148,7 @@ SpvInst* emitOpTypeInt(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeFloat
 SpvInst* emitOpTypeFloat(IRInst* inst, const SpvLiteralInteger& width)
 {
     return emitInstMemoized(
@@ -142,6 +156,7 @@ SpvInst* emitOpTypeFloat(IRInst* inst, const SpvLiteralInteger& width)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeVector
 template<typename T>
 SpvInst* emitOpTypeVector(
     IRInst* inst,
@@ -160,6 +175,7 @@ SpvInst* emitOpTypeVector(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeMatrix
 template<typename T>
 SpvInst* emitOpTypeMatrix(IRInst* inst, const T& columnType, const SpvLiteralInteger& columnCount)
 {
@@ -174,6 +190,47 @@ SpvInst* emitOpTypeMatrix(IRInst* inst, const T& columnType, const SpvLiteralInt
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
+template<typename T>
+SpvInst* emitOpTypeImage(
+    IRInst* inst,
+    const T& sampledType,
+    SpvDim dim,
+    const SpvLiteralInteger& depth,
+    const SpvLiteralInteger& arrayed,
+    const SpvLiteralInteger& mS,
+    const SpvLiteralInteger& sampled,
+    SpvImageFormat imageFormat,
+    OptionalOperand<SpvAccessQualifier> accessQualifier = SkipThisOptionalOperand{}
+)
+{
+    static_assert(isSingular<T>);
+    requireSPIRVCapability(SpvCapabilitySampledBuffer);
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeImage,
+        kResultID,
+        sampledType,
+        dim,
+        depth,
+        arrayed,
+        mS,
+        sampled,
+        imageFormat,
+        accessQualifier
+    );
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeSampler
+SpvInst* emitOpTypeSampler(IRInst* inst)
+{
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeSampler, kResultID
+    );
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeArray
 template<typename T1, typename T2>
 SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)
 {
@@ -189,6 +246,7 @@ SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeRuntimeArray
 template<typename T>
 SpvInst* emitOpTypeRuntimeArray(IRInst* inst, const T& elementType)
 {
@@ -202,6 +260,7 @@ SpvInst* emitOpTypeRuntimeArray(IRInst* inst, const T& elementType)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeStruct
 template<typename Ts>
 SpvInst* emitOpTypeStruct(IRInst* inst, const Ts& member0TypeMember1TypeEtc)
 {
@@ -215,6 +274,7 @@ SpvInst* emitOpTypeStruct(IRInst* inst, const Ts& member0TypeMember1TypeEtc)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypePointer
 template<typename T>
 SpvInst* emitOpTypePointer(IRInst* inst, SpvStorageClass storageClass, const T& type)
 {
@@ -229,6 +289,7 @@ SpvInst* emitOpTypePointer(IRInst* inst, SpvStorageClass storageClass, const T& 
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeFunction
 template<typename T, typename Ts>
 SpvInst* emitOpTypeFunction(
     IRInst* inst,
@@ -248,6 +309,7 @@ SpvInst* emitOpTypeFunction(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstantTrue
 template<typename T>
 SpvInst* emitOpConstantTrue(IRInst* inst, const T& idResultType)
 {
@@ -261,6 +323,7 @@ SpvInst* emitOpConstantTrue(IRInst* inst, const T& idResultType)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstantFalse
 template<typename T>
 SpvInst* emitOpConstantFalse(IRInst* inst, const T& idResultType)
 {
@@ -274,6 +337,7 @@ SpvInst* emitOpConstantFalse(IRInst* inst, const T& idResultType)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstant
 template<typename T>
 SpvInst* emitOpConstant(IRInst* inst, const T& idResultType, const SpvLiteralBits& value)
 {
@@ -288,6 +352,7 @@ SpvInst* emitOpConstant(IRInst* inst, const T& idResultType, const SpvLiteralBit
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstantComposite
 template<typename T, typename Ts>
 SpvInst* emitOpConstantComposite(IRInst* inst, const T& idResultType, const Ts& constituents)
 {
@@ -303,6 +368,7 @@ SpvInst* emitOpConstantComposite(IRInst* inst, const T& idResultType, const Ts& 
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstantNull
 template<typename T>
 SpvInst* emitOpConstantNull(IRInst* inst, const T& idResultType)
 {
@@ -316,6 +382,7 @@ SpvInst* emitOpConstantNull(IRInst* inst, const T& idResultType)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFunction
 template<typename T1, typename T2>
 SpvInst* emitOpFunction(
     SpvInstParent* parent,
@@ -332,6 +399,7 @@ SpvInst* emitOpFunction(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFunctionParameter
 template<typename T>
 SpvInst* emitOpFunctionParameter(SpvInstParent* parent, IRInst* inst, const T& idResultType)
 {
@@ -339,11 +407,13 @@ SpvInst* emitOpFunctionParameter(SpvInstParent* parent, IRInst* inst, const T& i
     return emitInst(parent, inst, SpvOpFunctionParameter, idResultType, kResultID);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFunctionEnd
 SpvInst* emitOpFunctionEnd(SpvInstParent* parent, IRInst* inst)
 {
     return emitInst(parent, inst, SpvOpFunctionEnd);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFunctionCall
 template<typename T1, typename T2, typename Ts>
 SpvInst* emitOpFunctionCall(
     SpvInstParent* parent,
@@ -361,6 +431,7 @@ SpvInst* emitOpFunctionCall(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpVariable
 template<typename T, typename Opt = SkipThisOptionalOperand>
 SpvInst* emitOpVariable(
     SpvInstParent* parent,
@@ -377,6 +448,7 @@ SpvInst* emitOpVariable(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoad
 template<typename T1, typename T2>
 SpvInst* emitOpLoad(
     SpvInstParent* parent,
@@ -391,6 +463,7 @@ SpvInst* emitOpLoad(
     return emitInst(parent, inst, SpvOpLoad, idResultType, kResultID, pointer, memoryAccess);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoad
 template<typename T1, typename T2>
 SpvInst* emitOpLoadAligned(
     SpvInstParent* parent,
@@ -414,6 +487,7 @@ SpvInst* emitOpLoadAligned(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpStore
 template<typename T1, typename T2>
 SpvInst* emitOpStore(
     SpvInstParent* parent,
@@ -428,6 +502,7 @@ SpvInst* emitOpStore(
     return emitInst(parent, inst, SpvOpStore, pointer, object, memoryAccess);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpStore
 template<typename T1, typename T2>
 SpvInst* emitOpStoreAligned(
     SpvInstParent* parent,
@@ -444,6 +519,7 @@ SpvInst* emitOpStoreAligned(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpAccessChain
 template<typename T1, typename T2, typename Ts>
 SpvInst* emitOpAccessChain(
     SpvInstParent* parent,
@@ -459,6 +535,7 @@ SpvInst* emitOpAccessChain(
     return emitInst(parent, inst, SpvOpAccessChain, idResultType, kResultID, base, indexes);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorate(
     SpvInstParent* parent,
@@ -471,6 +548,7 @@ SpvInst* emitOpDecorate(
     return emitInst(parent, inst, SpvOpDecorate, target, decoration);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateSpecId(
     SpvInstParent* parent,
@@ -485,6 +563,7 @@ SpvInst* emitOpDecorateSpecId(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateArrayStride(
     SpvInstParent* parent,
@@ -497,6 +576,7 @@ SpvInst* emitOpDecorateArrayStride(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationArrayStride, arrayStride);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateMatrixStride(
     SpvInstParent* parent,
@@ -509,6 +589,7 @@ SpvInst* emitOpDecorateMatrixStride(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationMatrixStride, matrixStride);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateBuiltIn(
     SpvInstParent* parent,
@@ -521,6 +602,7 @@ SpvInst* emitOpDecorateBuiltIn(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationBuiltIn, builtIn);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T1, typename T2>
 SpvInst* emitOpDecorateUniformId(
     SpvInstParent* parent,
@@ -534,6 +616,7 @@ SpvInst* emitOpDecorateUniformId(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationUniformId, execution);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateLocation(
     SpvInstParent* parent,
@@ -546,6 +629,7 @@ SpvInst* emitOpDecorateLocation(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationLocation, location);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateComponent(
     SpvInstParent* parent,
@@ -558,6 +642,7 @@ SpvInst* emitOpDecorateComponent(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationComponent, component);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateIndex(
     SpvInstParent* parent,
@@ -570,6 +655,7 @@ SpvInst* emitOpDecorateIndex(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationIndex, index);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateBinding(
     SpvInstParent* parent,
@@ -582,6 +668,7 @@ SpvInst* emitOpDecorateBinding(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationBinding, bindingPoint);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateDescriptorSet(
     SpvInstParent* parent,
@@ -594,6 +681,7 @@ SpvInst* emitOpDecorateDescriptorSet(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationDescriptorSet, descriptorSet);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateOffset(
     SpvInstParent* parent,
@@ -606,6 +694,7 @@ SpvInst* emitOpDecorateOffset(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationOffset, byteOffset);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateFPRoundingMode(
     SpvInstParent* parent,
@@ -620,6 +709,7 @@ SpvInst* emitOpDecorateFPRoundingMode(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T1, typename T2>
 SpvInst* emitOpDecorateCounterBuffer(
     SpvInstParent* parent,
@@ -633,6 +723,7 @@ SpvInst* emitOpDecorateCounterBuffer(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationCounterBuffer, counterBuffer);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateUserSemantic(
     SpvInstParent* parent,
@@ -645,6 +736,7 @@ SpvInst* emitOpDecorateUserSemantic(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationUserSemantic, semantic);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorate(
     SpvInstParent* parent,
@@ -658,6 +750,7 @@ SpvInst* emitOpMemberDecorate(
     return emitInst(parent, inst, SpvOpMemberDecorate, structureType, member, decoration);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateSpecId(
     SpvInstParent* parent,
@@ -679,6 +772,7 @@ SpvInst* emitOpMemberDecorateSpecId(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateArrayStride(
     SpvInstParent* parent,
@@ -700,6 +794,7 @@ SpvInst* emitOpMemberDecorateArrayStride(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateMatrixStride(
     SpvInstParent* parent,
@@ -721,6 +816,7 @@ SpvInst* emitOpMemberDecorateMatrixStride(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateBuiltIn(
     SpvInstParent* parent,
@@ -736,6 +832,7 @@ SpvInst* emitOpMemberDecorateBuiltIn(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T1, typename T2>
 SpvInst* emitOpMemberDecorateUniformId(
     SpvInstParent* parent,
@@ -752,6 +849,7 @@ SpvInst* emitOpMemberDecorateUniformId(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateLocation(
     SpvInstParent* parent,
@@ -767,6 +865,7 @@ SpvInst* emitOpMemberDecorateLocation(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateComponent(
     SpvInstParent* parent,
@@ -782,6 +881,7 @@ SpvInst* emitOpMemberDecorateComponent(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateIndex(
     SpvInstParent* parent,
@@ -797,6 +897,7 @@ SpvInst* emitOpMemberDecorateIndex(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateBinding(
     SpvInstParent* parent,
@@ -812,6 +913,7 @@ SpvInst* emitOpMemberDecorateBinding(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateDescriptorSet(
     SpvInstParent* parent,
@@ -833,6 +935,7 @@ SpvInst* emitOpMemberDecorateDescriptorSet(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateOffset(
     SpvInstParent* parent,
@@ -848,6 +951,7 @@ SpvInst* emitOpMemberDecorateOffset(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateFPRoundingMode(
     SpvInstParent* parent,
@@ -869,6 +973,7 @@ SpvInst* emitOpMemberDecorateFPRoundingMode(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T1, typename T2>
 SpvInst* emitOpMemberDecorateCounterBuffer(
     SpvInstParent* parent,
@@ -891,6 +996,7 @@ SpvInst* emitOpMemberDecorateCounterBuffer(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
 template<typename T>
 SpvInst* emitOpMemberDecorateUserSemantic(
     SpvInstParent* parent,
@@ -906,6 +1012,7 @@ SpvInst* emitOpMemberDecorateUserSemantic(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpVectorShuffle
 template<typename T1, typename T2, typename T3, Index N>
 SpvInst* emitOpVectorShuffle(
     SpvInstParent* parent,
@@ -924,6 +1031,7 @@ SpvInst* emitOpVectorShuffle(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCompositeConstruct
 template<typename T, typename Ts>
 SpvInst* emitOpCompositeConstruct(
     SpvInstParent* parent,
@@ -937,6 +1045,7 @@ SpvInst* emitOpCompositeConstruct(
     return emitInst(parent, inst, SpvOpCompositeConstruct, idResultType, kResultID, constituents);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCompositeExtract
 template<typename T1, typename T2, Index N>
 SpvInst* emitOpCompositeExtract(
     SpvInstParent* parent,
@@ -953,6 +1062,7 @@ SpvInst* emitOpCompositeExtract(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCopyObject
 template<typename T1, typename T2>
 SpvInst* emitOpCopyObject(
     SpvInstParent* parent,
@@ -966,6 +1076,7 @@ SpvInst* emitOpCopyObject(
     return emitInst(parent, inst, SpvOpCopyObject, idResultType, kResultID, operand);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConvertFToU
 template<typename T1, typename T2>
 SpvInst* emitOpConvertFToU(
     SpvInstParent* parent,
@@ -979,6 +1090,7 @@ SpvInst* emitOpConvertFToU(
     return emitInst(parent, inst, SpvOpConvertFToU, idResultType, kResultID, floatValue);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConvertFToS
 template<typename T1, typename T2>
 SpvInst* emitOpConvertFToS(
     SpvInstParent* parent,
@@ -992,6 +1104,7 @@ SpvInst* emitOpConvertFToS(
     return emitInst(parent, inst, SpvOpConvertFToS, idResultType, kResultID, floatValue);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConvertSToF
 template<typename T1, typename T2>
 SpvInst* emitOpConvertSToF(
     SpvInstParent* parent,
@@ -1005,6 +1118,7 @@ SpvInst* emitOpConvertSToF(
     return emitInst(parent, inst, SpvOpConvertSToF, idResultType, kResultID, signedValue);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConvertUToF
 template<typename T1, typename T2>
 SpvInst* emitOpConvertUToF(
     SpvInstParent* parent,
@@ -1018,6 +1132,7 @@ SpvInst* emitOpConvertUToF(
     return emitInst(parent, inst, SpvOpConvertUToF, idResultType, kResultID, unsignedValue);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpUConvert
 template<typename T1, typename T2>
 SpvInst* emitOpUConvert(
     SpvInstParent* parent,
@@ -1031,6 +1146,7 @@ SpvInst* emitOpUConvert(
     return emitInst(parent, inst, SpvOpUConvert, idResultType, kResultID, unsignedValue);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSConvert
 template<typename T1, typename T2>
 SpvInst* emitOpSConvert(
     SpvInstParent* parent,
@@ -1044,6 +1160,7 @@ SpvInst* emitOpSConvert(
     return emitInst(parent, inst, SpvOpSConvert, idResultType, kResultID, signedValue);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFConvert
 template<typename T1, typename T2>
 SpvInst* emitOpFConvert(
     SpvInstParent* parent,
@@ -1057,6 +1174,7 @@ SpvInst* emitOpFConvert(
     return emitInst(parent, inst, SpvOpFConvert, idResultType, kResultID, floatValue);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpBitcast
 template<typename T1, typename T2>
 SpvInst* emitOpBitcast(
     SpvInstParent* parent,
@@ -1070,6 +1188,7 @@ SpvInst* emitOpBitcast(
     return emitInst(parent, inst, SpvOpBitcast, idResultType, kResultID, operand);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSNegate
 template<typename T1, typename T2>
 SpvInst* emitOpSNegate(
     SpvInstParent* parent,
@@ -1083,6 +1202,7 @@ SpvInst* emitOpSNegate(
     return emitInst(parent, inst, SpvOpSNegate, idResultType, kResultID, operand);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFNegate
 template<typename T1, typename T2>
 SpvInst* emitOpFNegate(
     SpvInstParent* parent,
@@ -1096,6 +1216,7 @@ SpvInst* emitOpFNegate(
     return emitInst(parent, inst, SpvOpFNegate, idResultType, kResultID, operand);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpIAdd
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpIAdd(
     SpvInstParent* parent,
@@ -1111,6 +1232,7 @@ SpvInst* emitOpIAdd(
     return emitInst(parent, inst, SpvOpIAdd, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFAdd
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFAdd(
     SpvInstParent* parent,
@@ -1126,6 +1248,7 @@ SpvInst* emitOpFAdd(
     return emitInst(parent, inst, SpvOpFAdd, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpISub
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpISub(
     SpvInstParent* parent,
@@ -1141,6 +1264,7 @@ SpvInst* emitOpISub(
     return emitInst(parent, inst, SpvOpISub, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFSub
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFSub(
     SpvInstParent* parent,
@@ -1156,6 +1280,7 @@ SpvInst* emitOpFSub(
     return emitInst(parent, inst, SpvOpFSub, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpIMul
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpIMul(
     SpvInstParent* parent,
@@ -1171,6 +1296,7 @@ SpvInst* emitOpIMul(
     return emitInst(parent, inst, SpvOpIMul, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFMul
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFMul(
     SpvInstParent* parent,
@@ -1186,6 +1312,7 @@ SpvInst* emitOpFMul(
     return emitInst(parent, inst, SpvOpFMul, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpUDiv
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpUDiv(
     SpvInstParent* parent,
@@ -1201,6 +1328,7 @@ SpvInst* emitOpUDiv(
     return emitInst(parent, inst, SpvOpUDiv, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSDiv
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpSDiv(
     SpvInstParent* parent,
@@ -1216,6 +1344,7 @@ SpvInst* emitOpSDiv(
     return emitInst(parent, inst, SpvOpSDiv, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFDiv
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFDiv(
     SpvInstParent* parent,
@@ -1231,6 +1360,7 @@ SpvInst* emitOpFDiv(
     return emitInst(parent, inst, SpvOpFDiv, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpUMod
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpUMod(
     SpvInstParent* parent,
@@ -1246,6 +1376,7 @@ SpvInst* emitOpUMod(
     return emitInst(parent, inst, SpvOpUMod, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSRem
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpSRem(
     SpvInstParent* parent,
@@ -1261,6 +1392,7 @@ SpvInst* emitOpSRem(
     return emitInst(parent, inst, SpvOpSRem, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFRem
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFRem(
     SpvInstParent* parent,
@@ -1276,6 +1408,7 @@ SpvInst* emitOpFRem(
     return emitInst(parent, inst, SpvOpFRem, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpIAddCarry
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpIAddCarry(
     SpvInstParent* parent,
@@ -1291,6 +1424,7 @@ SpvInst* emitOpIAddCarry(
     return emitInst(parent, inst, SpvOpIAddCarry, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpISubBorrow
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpISubBorrow(
     SpvInstParent* parent,
@@ -1306,6 +1440,7 @@ SpvInst* emitOpISubBorrow(
     return emitInst(parent, inst, SpvOpISubBorrow, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLogicalEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpLogicalEqual(
     SpvInstParent* parent,
@@ -1321,6 +1456,7 @@ SpvInst* emitOpLogicalEqual(
     return emitInst(parent, inst, SpvOpLogicalEqual, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLogicalNotEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpLogicalNotEqual(
     SpvInstParent* parent,
@@ -1338,6 +1474,7 @@ SpvInst* emitOpLogicalNotEqual(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLogicalOr
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpLogicalOr(
     SpvInstParent* parent,
@@ -1353,6 +1490,7 @@ SpvInst* emitOpLogicalOr(
     return emitInst(parent, inst, SpvOpLogicalOr, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLogicalAnd
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpLogicalAnd(
     SpvInstParent* parent,
@@ -1368,6 +1506,7 @@ SpvInst* emitOpLogicalAnd(
     return emitInst(parent, inst, SpvOpLogicalAnd, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLogicalNot
 template<typename T1, typename T2>
 SpvInst* emitOpLogicalNot(
     SpvInstParent* parent,
@@ -1381,6 +1520,7 @@ SpvInst* emitOpLogicalNot(
     return emitInst(parent, inst, SpvOpLogicalNot, idResultType, kResultID, operand);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpIEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpIEqual(
     SpvInstParent* parent,
@@ -1396,6 +1536,7 @@ SpvInst* emitOpIEqual(
     return emitInst(parent, inst, SpvOpIEqual, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpINotEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpINotEqual(
     SpvInstParent* parent,
@@ -1411,6 +1552,7 @@ SpvInst* emitOpINotEqual(
     return emitInst(parent, inst, SpvOpINotEqual, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpUGreaterThan
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpUGreaterThan(
     SpvInstParent* parent,
@@ -1426,6 +1568,7 @@ SpvInst* emitOpUGreaterThan(
     return emitInst(parent, inst, SpvOpUGreaterThan, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSGreaterThan
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpSGreaterThan(
     SpvInstParent* parent,
@@ -1441,6 +1584,7 @@ SpvInst* emitOpSGreaterThan(
     return emitInst(parent, inst, SpvOpSGreaterThan, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpUGreaterThanEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpUGreaterThanEqual(
     SpvInstParent* parent,
@@ -1458,6 +1602,7 @@ SpvInst* emitOpUGreaterThanEqual(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSGreaterThanEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpSGreaterThanEqual(
     SpvInstParent* parent,
@@ -1475,6 +1620,7 @@ SpvInst* emitOpSGreaterThanEqual(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpULessThan
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpULessThan(
     SpvInstParent* parent,
@@ -1490,6 +1636,7 @@ SpvInst* emitOpULessThan(
     return emitInst(parent, inst, SpvOpULessThan, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSLessThan
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpSLessThan(
     SpvInstParent* parent,
@@ -1505,6 +1652,7 @@ SpvInst* emitOpSLessThan(
     return emitInst(parent, inst, SpvOpSLessThan, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpULessThanEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpULessThanEqual(
     SpvInstParent* parent,
@@ -1520,6 +1668,7 @@ SpvInst* emitOpULessThanEqual(
     return emitInst(parent, inst, SpvOpULessThanEqual, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSLessThanEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpSLessThanEqual(
     SpvInstParent* parent,
@@ -1535,6 +1684,7 @@ SpvInst* emitOpSLessThanEqual(
     return emitInst(parent, inst, SpvOpSLessThanEqual, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFOrdEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFOrdEqual(
     SpvInstParent* parent,
@@ -1550,6 +1700,7 @@ SpvInst* emitOpFOrdEqual(
     return emitInst(parent, inst, SpvOpFOrdEqual, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFOrdNotEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFOrdNotEqual(
     SpvInstParent* parent,
@@ -1565,6 +1716,7 @@ SpvInst* emitOpFOrdNotEqual(
     return emitInst(parent, inst, SpvOpFOrdNotEqual, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFOrdLessThan
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFOrdLessThan(
     SpvInstParent* parent,
@@ -1580,6 +1732,7 @@ SpvInst* emitOpFOrdLessThan(
     return emitInst(parent, inst, SpvOpFOrdLessThan, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFOrdGreaterThan
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFOrdGreaterThan(
     SpvInstParent* parent,
@@ -1597,6 +1750,7 @@ SpvInst* emitOpFOrdGreaterThan(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFOrdLessThanEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFOrdLessThanEqual(
     SpvInstParent* parent,
@@ -1614,6 +1768,7 @@ SpvInst* emitOpFOrdLessThanEqual(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFOrdGreaterThanEqual
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpFOrdGreaterThanEqual(
     SpvInstParent* parent,
@@ -1631,6 +1786,7 @@ SpvInst* emitOpFOrdGreaterThanEqual(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpShiftRightLogical
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpShiftRightLogical(
     SpvInstParent* parent,
@@ -1646,6 +1802,7 @@ SpvInst* emitOpShiftRightLogical(
     return emitInst(parent, inst, SpvOpShiftRightLogical, idResultType, kResultID, base, shift);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpShiftRightArithmetic
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpShiftRightArithmetic(
     SpvInstParent* parent,
@@ -1661,6 +1818,7 @@ SpvInst* emitOpShiftRightArithmetic(
     return emitInst(parent, inst, SpvOpShiftRightArithmetic, idResultType, kResultID, base, shift);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpShiftLeftLogical
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpShiftLeftLogical(
     SpvInstParent* parent,
@@ -1676,6 +1834,7 @@ SpvInst* emitOpShiftLeftLogical(
     return emitInst(parent, inst, SpvOpShiftLeftLogical, idResultType, kResultID, base, shift);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpBitwiseOr
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpBitwiseOr(
     SpvInstParent* parent,
@@ -1691,6 +1850,7 @@ SpvInst* emitOpBitwiseOr(
     return emitInst(parent, inst, SpvOpBitwiseOr, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpBitwiseXor
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpBitwiseXor(
     SpvInstParent* parent,
@@ -1706,6 +1866,7 @@ SpvInst* emitOpBitwiseXor(
     return emitInst(parent, inst, SpvOpBitwiseXor, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpBitwiseAnd
 template<typename T1, typename T2, typename T3>
 SpvInst* emitOpBitwiseAnd(
     SpvInstParent* parent,
@@ -1721,6 +1882,7 @@ SpvInst* emitOpBitwiseAnd(
     return emitInst(parent, inst, SpvOpBitwiseAnd, idResultType, kResultID, operand1, operand2);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpBitReverse
 template<typename T1, typename T2>
 SpvInst* emitOpBitReverse(
     SpvInstParent* parent,
@@ -1736,6 +1898,7 @@ SpvInst* emitOpBitReverse(
 
 // OpPhi elided, please use emitInst directly
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
 template<typename T1, typename T2>
 SpvInst* emitOpLoopMerge(
     SpvInstParent* parent,
@@ -1750,6 +1913,7 @@ SpvInst* emitOpLoopMerge(
     return emitInst(parent, inst, SpvOpLoopMerge, mergeBlock, continueTarget, loopControl);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
 template<typename T1, typename T2>
 SpvInst* emitOpLoopMergeDependencyLength(
     SpvInstParent* parent,
@@ -1772,6 +1936,7 @@ SpvInst* emitOpLoopMergeDependencyLength(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
 template<typename T1, typename T2>
 SpvInst* emitOpLoopMergeMinIterations(
     SpvInstParent* parent,
@@ -1794,6 +1959,7 @@ SpvInst* emitOpLoopMergeMinIterations(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
 template<typename T1, typename T2>
 SpvInst* emitOpLoopMergeMaxIterations(
     SpvInstParent* parent,
@@ -1816,6 +1982,7 @@ SpvInst* emitOpLoopMergeMaxIterations(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
 template<typename T1, typename T2>
 SpvInst* emitOpLoopMergeIterationMultiple(
     SpvInstParent* parent,
@@ -1838,6 +2005,7 @@ SpvInst* emitOpLoopMergeIterationMultiple(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
 template<typename T1, typename T2>
 SpvInst* emitOpLoopMergePeelCount(
     SpvInstParent* parent,
@@ -1860,6 +2028,7 @@ SpvInst* emitOpLoopMergePeelCount(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
 template<typename T1, typename T2>
 SpvInst* emitOpLoopMergePartialCount(
     SpvInstParent* parent,
@@ -1882,6 +2051,7 @@ SpvInst* emitOpLoopMergePartialCount(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSelectionMerge
 template<typename T>
 SpvInst* emitOpSelectionMerge(
     SpvInstParent* parent,
@@ -1894,11 +2064,13 @@ SpvInst* emitOpSelectionMerge(
     return emitInst(parent, inst, SpvOpSelectionMerge, mergeBlock, selectionControl);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLabel
 SpvInst* emitOpLabel(SpvInstParent* parent, IRInst* inst)
 {
     return emitInst(parent, inst, SpvOpLabel, kResultID);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpBranch
 template<typename T>
 SpvInst* emitOpBranch(SpvInstParent* parent, IRInst* inst, const T& targetLabel)
 {
@@ -1906,6 +2078,7 @@ SpvInst* emitOpBranch(SpvInstParent* parent, IRInst* inst, const T& targetLabel)
     return emitInst(parent, inst, SpvOpBranch, targetLabel);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpBranchConditional
 template<typename T1, typename T2, typename T3, Index N>
 SpvInst* emitOpBranchConditional(
     SpvInstParent* parent,
@@ -1926,16 +2099,19 @@ SpvInst* emitOpBranchConditional(
 
 // OpSwitch elided, please use emitInst directly
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpKill
 SpvInst* emitOpKill(SpvInstParent* parent, IRInst* inst)
 {
     return emitInst(parent, inst, SpvOpKill);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpReturn
 SpvInst* emitOpReturn(SpvInstParent* parent, IRInst* inst)
 {
     return emitInst(parent, inst, SpvOpReturn);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpReturnValue
 template<typename T>
 SpvInst* emitOpReturnValue(SpvInstParent* parent, IRInst* inst, const T& value)
 {
@@ -1943,11 +2119,13 @@ SpvInst* emitOpReturnValue(SpvInstParent* parent, IRInst* inst, const T& value)
     return emitInst(parent, inst, SpvOpReturnValue, value);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpUnreachable
 SpvInst* emitOpUnreachable(SpvInstParent* parent, IRInst* inst)
 {
     return emitInst(parent, inst, SpvOpUnreachable);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionModeId
 template<typename T>
 SpvInst* emitOpExecutionModeId(
     SpvInstParent* parent,
@@ -1960,6 +2138,7 @@ SpvInst* emitOpExecutionModeId(
     return emitInst(parent, inst, SpvOpExecutionModeId, entryPoint, mode);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionModeId
 template<typename T>
 SpvInst* emitOpExecutionModeIdLocalSize(
     SpvInstParent* parent,
@@ -1976,6 +2155,7 @@ SpvInst* emitOpExecutionModeIdLocalSize(
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionModeId
 template<typename T1, typename T2, typename T3, typename T4>
 SpvInst* emitOpExecutionModeIdLocalSizeId(
     SpvInstParent* parent,
