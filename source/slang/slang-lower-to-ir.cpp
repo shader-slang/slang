@@ -8161,14 +8161,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto targetMod : decl->getModifiersOfType<TargetIntrinsicModifier>())
         {
             String definition;
-            auto definitionToken = targetMod->definitionToken;
-            if (definitionToken.type == TokenType::StringLiteral)
+            if (targetMod->definitionIdent.type == TokenType::Identifier)
             {
-                definition = getStringLiteralTokenValue(definitionToken);
+                definition = targetMod->definitionIdent.getContent();
             }
-            else if(definitionToken.type == TokenType::Identifier)
+            else if(targetMod->definitionString.getLength())
             {
-                definition = definitionToken.getContent();
+                definition = targetMod->definitionString;
             }
             else
             {

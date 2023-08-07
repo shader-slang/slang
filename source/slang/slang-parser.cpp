@@ -6429,11 +6429,17 @@ namespace Slang
                 }
                 if( parser->LookAheadToken(TokenType::StringLiteral) )
                 {
-                    modifier->definitionToken = parser->ReadToken();
+                    do
+                    {
+                        const auto t = parser->ReadToken();
+                        modifier->definitionString.append(" ");
+                        modifier->definitionString.append(getStringLiteralTokenValue(t));
+                    }
+                    while(parser->LookAheadToken(TokenType::StringLiteral));
                 }
                 else
                 {
-                    modifier->definitionToken = parser->ReadToken(TokenType::Identifier);
+                    modifier->definitionIdent = parser->ReadToken(TokenType::Identifier);
                 }
             }
 
