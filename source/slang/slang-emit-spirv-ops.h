@@ -107,14 +107,14 @@ SpvInst* emitOpCapability(SpvInstParent* parent, IRInst* inst, SpvCapability cap
 
 SpvInst* emitOpTypeVoid(IRInst* inst)
 {
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeVoid, kResultID
     );
 }
 
 SpvInst* emitOpTypeBool(IRInst* inst)
 {
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeBool, kResultID
     );
 }
@@ -125,7 +125,7 @@ SpvInst* emitOpTypeInt(
     const SpvLiteralInteger& signedness
 )
 {
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeInt,
@@ -137,7 +137,7 @@ SpvInst* emitOpTypeInt(
 
 SpvInst* emitOpTypeFloat(IRInst* inst, const SpvLiteralInteger& width)
 {
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeFloat, kResultID, width
     );
 }
@@ -150,7 +150,7 @@ SpvInst* emitOpTypeVector(
 )
 {
     static_assert(isSingular<T>);
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeVector,
@@ -164,7 +164,7 @@ template<typename T>
 SpvInst* emitOpTypeMatrix(IRInst* inst, const T& columnType, const SpvLiteralInteger& columnCount)
 {
     static_assert(isSingular<T>);
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeMatrix,
@@ -179,7 +179,7 @@ SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeArray,
@@ -193,7 +193,7 @@ template<typename T>
 SpvInst* emitOpTypeRuntimeArray(IRInst* inst, const T& elementType)
 {
     static_assert(isSingular<T>);
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeRuntimeArray,
@@ -206,7 +206,7 @@ template<typename Ts>
 SpvInst* emitOpTypeStruct(IRInst* inst, const Ts& member0TypeMember1TypeEtc)
 {
     static_assert(isPlural<Ts>);
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeStruct,
@@ -219,7 +219,7 @@ template<typename T>
 SpvInst* emitOpTypePointer(IRInst* inst, SpvStorageClass storageClass, const T& type)
 {
     static_assert(isSingular<T>);
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypePointer,
@@ -238,7 +238,7 @@ SpvInst* emitOpTypeFunction(
 {
     static_assert(isSingular<T>);
     static_assert(isPlural<Ts>);
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeFunction,

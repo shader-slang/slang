@@ -956,8 +956,11 @@ struct SPIRVEmitContext
         return spvInst;
     }
 
+    // Emits a SPV Inst with deduplication
+    // This is used where our IR doesn't guarantee uniqueness but SPIR-V
+    // requires it
     template<typename... Operands>
-    SpvInst* emitMemoizedInst(
+    SpvInst* emitInstMemoized(
         SpvInstParent* parent,
         IRInst* irInst,
         SpvOp opcode,
@@ -1097,19 +1100,6 @@ struct SPIRVEmitContext
 
     Dictionary<SpvTypeInstKey, SpvInst*> m_spvTypeInsts;
 
-    // Emits a SPV Inst that represents a type, with deduplications since
-    // our IR doesn't currently guarantee types are unique in generated SPV.
-    SpvInst* emitTypeInst(IRInst* typeInst, SpvOp opcode, ArrayView<SpvWord> operands)
-    {
-        return emitMemoizedInst(
-            getSection(SpvLogicalSectionID::ConstantsAndTypes),
-            typeInst,
-            opcode,
-            kResultID,
-            operands
-        );
-    }
-
     // Next, let's look at emitting some of the instructions
     // that can occur at global scope.
 
@@ -1124,16 +1114,8 @@ struct SPIRVEmitContext
         // [3.32.6: Type-Declaration Instructions]
         //
 
-#define CASE(IROP, SPVOP) \
-        case IROP: return emitTypeInst(inst, SPVOP, ArrayView<SpvWord>());
-
-        // > OpTypeVoid
-        CASE(kIROp_VoidType, SpvOpTypeVoid);
-
-        // > OpTypeBool
-        CASE(kIROp_BoolType, SpvOpTypeBool);
-
-#undef CASE
+        case kIROp_VoidType: return emitOpTypeVoid(inst);
+        case kIROp_BoolType: return emitOpTypeBool(inst);
 
         // > OpTypeInt
 
@@ -1147,10 +1129,11 @@ struct SPIRVEmitContext
         case kIROp_Int64Type:
             {
                 const IntInfo i = getIntTypeInfo(as<IRType>(inst));
-                return emitTypeInst(
+                return emitOpTypeInt(
                     inst,
-                    SpvOpTypeInt,
-                    makeArray(static_cast<SpvWord>(i.width), SpvWord{i.isSigned}).getView());
+                    SpvLiteralInteger::from32(i.width),
+                    SpvLiteralInteger::from32(i.isSigned)
+                );
             }
 
         // > OpTypeFloat
@@ -1160,7 +1143,7 @@ struct SPIRVEmitContext
         case kIROp_DoubleType:
             {
                 const FloatInfo i = getFloatingTypeInfo(as<IRType>(inst));
-                return emitTypeInst(inst, SpvOpTypeFloat, makeArray(static_cast<SpvWord>(i.width)).getView());
+                return emitOpTypeFloat(inst, SpvLiteralInteger::from32(i.width));
             }
 
         case kIROp_PtrType:
@@ -1175,10 +1158,11 @@ struct SPIRVEmitContext
                     storageClass = (SpvStorageClass)ptrType->getAddressSpace();
                 if (storageClass == SpvStorageClassStorageBuffer)
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_storage_buffer_storage_class"));
-                auto operands = makeArray<SpvWord>(
-                    (SpvWord)storageClass, getID(ensureInst(inst->getOperand(0))));
-                return emitTypeInst(
-                    inst, SpvOpTypePointer, operands.getView());
+                return emitOpTypePointer(
+                    inst,
+                    storageClass,
+                    inst->getOperand(0)
+                );
             }
         case kIROp_StructType:
             {
@@ -1247,19 +1231,9 @@ struct SPIRVEmitContext
         case kIROp_UnsizedArrayType:
             {
                 const auto elementType = static_cast<IRArrayTypeBase*>(inst)->getElementType();
-                const auto elementTypeSpv = getID(ensureInst(elementType));
                 const auto arrayType = inst->getOp() == kIROp_ArrayType
-                    ? emitTypeInst(
-                        inst,
-                        SpvOpTypeArray,
-                        makeArray(
-                            elementTypeSpv,
-                            getID(ensureInst(static_cast<IRArrayTypeBase*>(inst)->getElementCount()))
-                        ).getView())
-                    : emitTypeInst(
-                        inst,
-                        SpvOpTypeRuntimeArray,
-                        makeArray(elementTypeSpv).getView());
+                    ? emitOpTypeArray(inst, elementType, static_cast<IRArrayTypeBase*>(inst)->getElementCount())
+                    : emitOpTypeRuntimeArray(inst, elementType);
                 // TODO: properly decorate stride.
                 // TODO: don't do this more than once
                 IRSizeAndAlignment sizeAndAlignment;
@@ -1351,9 +1325,11 @@ struct SPIRVEmitContext
                 builder.getBasicType(baseType),
                 builder.getIntValue(builder.getIntType(), elementCount));
         }
-        auto operands =
-            makeArray<SpvWord>(getID(ensureInst(inst->getElementType())), (SpvWord)elementCount);
-        auto result = emitTypeInst(inst, SpvOpTypeVector, operands.getView());
+        auto result = emitOpTypeVector(
+            inst,
+            inst->getElementType(),
+            SpvLiteralInteger::from32(elementCount)
+        );
         return result;
     }
 
