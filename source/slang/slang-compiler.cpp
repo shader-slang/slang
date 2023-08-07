@@ -938,6 +938,17 @@ namespace Slang
         return desc.style == ArtifactStyle::Host;
     }
 
+    static bool _shouldSetEntryPointName(TargetRequest* targetReq)
+    {
+        if (!isKhronosTarget(targetReq))
+            return true;
+        if (!targetReq->getHLSLToVulkanLayoutOptions())
+            return false;
+        if (targetReq->getHLSLToVulkanLayoutOptions()->getUseOriginalEntryPointName())
+            return true;
+        return false;
+    }
+
     SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
         outArtifact.setNull();
@@ -1222,12 +1233,8 @@ namespace Slang
                 auto entryPoint = getEntryPoint(entryPointIndex);
                 profile = getEffectiveProfile(entryPoint, targetReq);
 
-                if (getTargetReq()->getHLSLToVulkanLayoutOptions() && !getTargetReq()->getHLSLToVulkanLayoutOptions()->getUseOriginalEntryPointName())
+                if (_shouldSetEntryPointName(getTargetReq()))
                 {
-                }
-                else
-                {
-
                     options.entryPointName = allocator.allocate(getText(entryPoint->getName()));
                     auto entryPointNameOverride = getProgram()->getEntryPointNameOverride(entryPointIndex);
                     if (entryPointNameOverride.getLength() != 0)

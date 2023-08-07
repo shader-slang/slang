@@ -359,6 +359,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
 SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 {
+    SLANG_PROFILE;
     if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
         // Already have a StdLib loaded

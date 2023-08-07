@@ -91,7 +91,7 @@ Index HLSLToVulkanLayoutOptions::getShift(Kind kind, Index set) const
 
 bool HLSLToVulkanLayoutOptions::hasState() const
 {
-    return canInferBindings() || hasGlobalsBinding() || shouldInvertY();
+    return canInferBindings() || hasGlobalsBinding() || shouldInvertY() || getUseOriginalEntryPointName();
 }
 
 HLSLToVulkanLayoutOptions::Binding HLSLToVulkanLayoutOptions::inferBinding(Kind kind, const Binding& inBinding) const
