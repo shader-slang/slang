@@ -3,7 +3,6 @@
 
 #include "../core/slang-text-io.h"
 #include "../core/slang-byte-encode-util.h"
-#include "../core/slang-performance-profiler.h"
 
 #include "../core/slang-math.h"
 
@@ -16,6 +15,7 @@
 #include "slang-parser.h"
 
 #include "slang-mangled-lexer.h"
+
 namespace Slang {
 
 /* static */SlangResult SerialContainerUtil::write(Module* module, const WriteOptions& options, Stream* stream)
