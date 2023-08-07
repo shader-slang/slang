@@ -12,6 +12,9 @@ SlangResult SPIRVDisDownstreamCompilerUtil::locateCompilers(
     ISlangSharedLibraryLoader*,
     DownstreamCompilerSet* set)
 {
+    // TODO: We could check that the compiler is actually present in PATH (or
+    // explicitly given)
+
     ComPtr<IDownstreamCompiler> com(
         new SPIRVDisDownstreamCompiler(DownstreamCompilerDesc(SLANG_PASS_THROUGH_SPIRV_DIS)));
     set->addCompiler(com);
