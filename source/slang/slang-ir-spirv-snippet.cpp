@@ -37,6 +37,10 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
     return SpvSnippet::ASMType::None;
 }
 
+// Read an unsigned integer (a SPIR-V word) or a SPIR-V enum (currently those
+// which are coded into this function).
+//
+// This also 'or's together a list of these words/enums separated by '|'
 SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
 {
     SpvWord ret = 0;
