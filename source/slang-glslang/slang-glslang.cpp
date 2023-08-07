@@ -607,7 +607,7 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_2& request)
             return 1;
         }
 
-        if (request.entryPointName)
+        if (request.entryPointName && strlen(request.entryPointName))
             shader->setEntryPoint(request.entryPointName);
 
         program->addShader(shader);
