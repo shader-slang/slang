@@ -205,7 +205,6 @@ SpvInst* emitOpTypeImage(
 )
 {
     static_assert(isSingular<T>);
-    requireSPIRVCapability(SpvCapabilitySampledBuffer);
     return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
