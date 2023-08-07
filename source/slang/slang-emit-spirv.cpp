@@ -1217,6 +1217,8 @@ struct SPIRVEmitContext
                 default:
                     break;
                 }
+                // TODO: This decoration is not legal here. It must be placed
+                // on a struct member (which may entail wrapping matrices)
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
