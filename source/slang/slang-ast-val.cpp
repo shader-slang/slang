@@ -10,27 +10,6 @@
 
 namespace Slang {
 
-
-bool ValNodeDesc::operator==(ValNodeDesc const& that) const
-{
-    if (hashCode != that.hashCode) return false;
-    if (type != that.type) return false;
-    if (operands.getCount() != that.operands.getCount()) return false;
-    for (Index i = 0; i < operands.getCount(); ++i)
-    {
-        // Note: we are comparing the operands directly for identity
-        // (pointer equality) rather than doing the `Val`-level
-        // equality check.
-        //
-        // The rationale here is that nodes that will be created
-        // via a `NodeDesc` *should* all be going through the
-        // deduplication path anyway, as should their operands.
-        // 
-        if (operands[i].values.nodeOperand != that.operands[i].values.nodeOperand) return false;
-    }
-    return true;
-}
-
 void ValNodeDesc::init()
 {
     Hasher hasher;
@@ -77,7 +56,6 @@ Val* Val::resolveImpl()
 Val* Val::resolve()
 {
     auto astBuilder = getCurrentASTBuilder();
-
     // If we are not in a proper checking context, just return the previously resolved val.
     if (!astBuilder)
         return m_resolvedVal? m_resolvedVal : this;
@@ -86,12 +64,12 @@ Val* Val::resolve()
         SLANG_ASSERT(as<Val>(m_resolvedVal));
         return m_resolvedVal;
     }
-
     // Update epoch now to avoid infinite recursion.
     m_resolvedValEpoch = getCurrentASTBuilder()->getEpoch();
     m_resolvedVal = this;
     m_resolvedVal = resolveImpl();
 
+#if 1
     // Check if we are resolved to an existing Val in the AST cache.
     ValNodeDesc newDesc;
     newDesc.type = m_resolvedVal->astNodeType;
@@ -109,14 +87,14 @@ Val* Val::resolve()
     }
     newDesc.init();
 
-    NodeBase* existingNode = nullptr;
+    Val* existingNode = nullptr;
     if (astBuilder->m_cachedNodes.tryGetValue(newDesc, existingNode))
-        m_resolvedVal = as<Val>(existingNode);
-
+        m_resolvedVal = existingNode;
+#endif
 #ifdef _DEBUG
     if (m_resolvedVal->_debugUID > 0 && this->_debugUID < 0)
     {
-        //SLANG_ASSERT_FAILURE("should not be modifying stdlib vals outside of stdlib checking.");
+        SLANG_ASSERT_FAILURE("should not be modifying stdlib vals outside of stdlib checking.");
     }
 #endif
     return m_resolvedVal;
@@ -137,6 +115,7 @@ Val* Val::defaultResolveImpl()
     // Default resolve implementation is to recursively resolve all operands, and lookup in deduplication cache.
     ValNodeDesc newDesc;
     newDesc.type = astNodeType;
+    bool diff = false;
     for (auto operand : m_operands)
     {
         if (operand.kind == ValNodeOperandKind::ValNode)
@@ -144,7 +123,12 @@ Val* Val::defaultResolveImpl()
             auto valOperand = as<Val>(operand.values.nodeOperand);
             if (valOperand)
             {
-                operand.values.nodeOperand = valOperand->resolve();
+                auto newOperand = valOperand->resolve();
+                if (newOperand != valOperand)
+                {
+                    diff = true;
+                    operand.values.nodeOperand = newOperand;
+                }
             }
         }
         newDesc.operands.add(operand);
@@ -152,10 +136,10 @@ Val* Val::defaultResolveImpl()
     newDesc.init();
     auto astBuilder = getCurrentASTBuilder();
 
-    NodeBase* existingNode = nullptr;
+    Val* existingNode = nullptr;
     if (astBuilder->m_cachedNodes.tryGetValue(newDesc, existingNode))
-        return as<Val>(existingNode);
-    return this;
+        return existingNode;
+    return astBuilder->_getOrCreateImpl(newDesc);
 }
 
 String Val::toString()

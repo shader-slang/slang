@@ -602,8 +602,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 astBuilder->m_cachedNodes[val->getDesc()] = newVal;
                                 for (auto use : valUseList.value)
                                 {
-                                    if (*use != newVal)
-                                        *use = newVal;
+                                    *use = newVal;
                                 }
                             }
                         }

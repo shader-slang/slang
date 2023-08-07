@@ -437,12 +437,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             nodeDesc.type = (ASTNodeType)classInfo.classInfo->m_classId;
             nodeDesc.operands.add(ValNodeOperand(declRef));
             nodeDesc.init();
-            NodeBase* type = astBuilder->_getOrCreateImpl(nodeDesc, [&]()
-                {
-                    auto resultNode = as<DeclRefType>(classInfo.createInstance(astBuilder));
-                    resultNode->setOperands(declRef);
-                    return resultNode;
-                });
+            NodeBase* type = astBuilder->_getOrCreateImpl(nodeDesc);
             if (!type)
             {
                 SLANG_UNEXPECTED("constructor failure");
