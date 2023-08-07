@@ -2051,6 +2051,10 @@ struct SPIRVEmitContext
                 {
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInGlobalInvocationId);
                 }
+                else if (semanticName == "sv_groupindex")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLocalInvocationIndex);
+                }
             }
         }
         return nullptr;
