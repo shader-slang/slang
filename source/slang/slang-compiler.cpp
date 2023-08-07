@@ -485,7 +485,7 @@ namespace Slang
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
-                return PassThroughMode::SpirvDis;
+                return PassThroughMode::Glslang;
             }
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::DXBytecodeAssembly:
