@@ -1406,6 +1406,9 @@ struct SPIRVEmitContext
         /// Emit a SPIR-V function definition for the Slang IR function `irFunc`.
     SpvInst* emitFuncDefinition(IRFunc* irFunc)
     {
+        if(!irFunc->getFirstBlock())
+            m_sink->diagnose(irFunc, Diagnostics::noBlocksOrIntrinsic, "spirv");
+
         // [2.4: Logical Layout of a Module]
         //
         // > All function definitions (functions with a body).
