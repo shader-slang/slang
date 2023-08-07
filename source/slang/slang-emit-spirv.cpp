@@ -2506,6 +2506,9 @@ struct SPIRVEmitContext
         case SpvSnippet::ASMType::Int:
             irType = builder.getIntType();
             break;
+        case SpvSnippet::ASMType::UInt:
+            irType = builder.getUIntType();
+            break;
         case SpvSnippet::ASMType::Float2:
             irType = builder.getVectorType(
                 builder.getType(kIROp_FloatType), builder.getIntValue(builder.getIntType(), 2));

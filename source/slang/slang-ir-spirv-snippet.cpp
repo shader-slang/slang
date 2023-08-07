@@ -32,6 +32,8 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
         return SpvSnippet::ASMType::Float2;
     else if (word == "int")
         return SpvSnippet::ASMType::Int;
+    else if (word == "uint")
+        return SpvSnippet::ASMType::UInt;
     else if (word == "_p")
         return SpvSnippet::ASMType::FloatOrDouble;
     return SpvSnippet::ASMType::None;
