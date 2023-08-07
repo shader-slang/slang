@@ -488,6 +488,58 @@ namespace Slang
         return false;
     }
 
+    ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(
+        Expr* inExpr)
+    {
+        auto expr = inExpr;
+        for (;;)
+        {
+            if (auto declRefExpr = as<DeclRefExpr>(expr))
+            {
+                auto declRef = declRefExpr->declRef;
+                if(auto paramDeclRef = declRef.as<ParamDecl>())
+                {
+                    if (paramDeclRef.as<ModernParamDecl>())
+                    {
+                        // functions declared in our "modern" style (using
+                        // the `func` keyword) never have mutable `in`
+                        // parameters.
+                        //
+                        return nullptr;
+                    }
+
+                    if (paramDeclRef.getDecl()->findModifier<OutModifier>())
+                    {
+                        // Function parameters marked with `out`, `inout`,
+                        // or `in out` are all mutable in a way where
+                        // the result of mutations will be visible to the
+                        // caller.
+                        //
+                        return nullptr;
+                    }
+
+                    // At this point we have an l-value decl-ref to a
+                    // function parameter that is (implicitly or
+                    // explicitly) declared `in`.
+                    //
+                    return paramDeclRef.getDecl();
+                }
+            }
+            else if (auto memberExpr = as<MemberExpr>(expr))
+            {
+                expr = memberExpr->baseExpression;
+                continue;
+            }
+            else if (auto indexExpr = as<IndexExpr>(expr))
+            {
+                expr = indexExpr->baseExpression;
+                continue;
+            }
+
+            return nullptr;
+        }
+    }
+
     bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
         OverloadResolveContext&     context,
         OverloadCandidate const&    candidate)
@@ -518,6 +570,25 @@ namespace Slang
                         maybeDiagnoseThisNotLValue(context.baseExpr);
                     }
                     return false;
+                }
+
+                // The parameters of functions declared using traditional/legacy
+                // syntax are currently exposed as mutable locals within the body
+                // of the relevant function. As such, it is legal to call `[mutating]`
+                // methods on such a function parameter. However, doing so is typically
+                // indicative of an error on the programmer's part.
+                //
+                // We will detect such cases here and issue a diagnostic that explains
+                // the situation.
+                //
+                if(context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
+                {
+                    if(auto paramDecl = isReferenceIntoFunctionInputParameter(context.baseExpr))
+                    {
+                        getSink()->diagnose(context.loc, Diagnostics::mutatingMethodOnFunctionInputParameter,
+                            funcDeclRef.getName(),
+                            paramDecl->getName());
+                    }
                 }
             }
         }

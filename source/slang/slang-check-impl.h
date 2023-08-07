@@ -2031,6 +2031,16 @@ namespace Slang
             OverloadResolveContext&		/*context*/,
             OverloadCandidate const&	/*candidate*/);
 
+            /// Check if the given `expr` refers to an `in` function
+            /// parameter, or part of one (through field reference, etc.).
+            ///
+            /// If the expression refers into a parameter, returns
+            /// the declaration of the parameter. Otherwise returns
+            /// null.
+            ///
+        ParamDecl* isReferenceIntoFunctionInputParameter(
+            Expr* expr);
+
         // Create a witness that attests to the fact that `type`
         // is equal to itself.
         TypeEqualityWitness* createTypeEqualityWitness(
