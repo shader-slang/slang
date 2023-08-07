@@ -1181,7 +1181,9 @@ namespace Slang
             if (auto nodiffModifier = modifiedType->findModifier<NoDiffModifierVal>())
             {
                 varDecl->type.type = getRemovedModifierType(modifiedType, nodiffModifier);
-                addModifier(varDecl, m_astBuilder->getOrCreate<NoDiffModifier>());
+                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                noDiffModifier->loc = varDecl->loc;
+                addModifier(varDecl, noDiffModifier);
             }
         }
 

@@ -2673,6 +2673,25 @@ struct IRGetRegisterSpace : IRBindingQuery
     IR_LEAF_ISA(GetRegisterSpace);
 };
 
+struct IRIntCast : IRInst
+{
+    IR_LEAF_ISA(IntCast)
+};
+
+struct IRFloatCast : IRInst
+{
+    IR_LEAF_ISA(FloatCast)
+};
+
+struct IRCastIntToFloat : IRInst
+{
+    IR_LEAF_ISA(CastIntToFloat)
+};
+
+struct IRCastFloatToInt : IRInst
+{
+    IR_LEAF_ISA(CastFloatToInt)
+};
 
 struct IRBuilderSourceLocRAII;
 

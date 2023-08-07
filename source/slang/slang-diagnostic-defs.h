@@ -238,6 +238,10 @@ DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword 
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
+// 29xxx - Snippet parsing
+DIAGNOSTIC(29000, Error, snippetParsingFailed, "unable to parse target intrinsic snippet: $0")
+
+
 //
 // 3xxxx - Semantic analysis
 //
@@ -722,5 +726,8 @@ DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler erro
 DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error")
 DIAGNOSTIC(99999, Error, compilationAbortedDueToException, "Slang compilation aborted due to an exception of $0: $1")
 DIAGNOSTIC(99999, Internal, serialDebugVerificationFailed, "Verification of serial debug information failed.")
+DIAGNOSTIC(99999, Internal, spirvValidationFailed, "Validation of generated SPIR-V failed.")
+
+DIAGNOSTIC(99999, Internal, noBlocksOrIntrinsic, "no blocks found for function definition, is there a '$0' intrinsic missing?")
 
 #undef DIAGNOSTIC
