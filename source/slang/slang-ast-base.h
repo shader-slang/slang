@@ -46,8 +46,6 @@ class NodeBase
         /// The actual type is set when constructed on the ASTBuilder. 
     ASTNodeType astNodeType = ASTNodeType(-1);
 
-    // Handy when debugging, shouldn't be checked in though!
-    // virtual ~NodeBase() {}
 #ifdef _DEBUG
     SLANG_UNREFLECTED int32_t _debugUID = 0;
 #endif
@@ -197,7 +195,25 @@ struct ValNodeDesc
     ASTNodeType             type;
     ShortList<ValNodeOperand, 4> operands;
 
-    bool operator==(ValNodeDesc const& that) const;
+    inline bool operator==(ValNodeDesc const& that) const
+    {
+        if (hashCode != that.hashCode) return false;
+        if (type != that.type) return false;
+        if (operands.getCount() != that.operands.getCount()) return false;
+        for (Index i = 0; i < operands.getCount(); ++i)
+        {
+            // Note: we are comparing the operands directly for identity
+            // (pointer equality) rather than doing the `Val`-level
+            // equality check.
+            //
+            // The rationale here is that nodes that will be created
+            // via a `NodeDesc` *should* all be going through the
+            // deduplication path anyway, as should their operands.
+            // 
+            if (operands[i].values.nodeOperand != that.operands[i].values.nodeOperand) return false;
+        }
+        return true;
+    }
     HashCode getHashCode() const { return hashCode; }
     void init();
 private:
@@ -430,6 +446,10 @@ class Val : public NodeBase
             m_operands.add(ValNodeOperand(v));
     }
     List<ValNodeOperand> m_operands;
+
+    // Private use by stdlib deserialization only. Since we know the Vals serialized into stdlib is already
+    // unique, we can just use `this` pointer as the `m_resolvedVal` so we don't need to resolve them again.
+    void _setUnique();
 protected:
     Val* defaultResolveImpl();
 private:

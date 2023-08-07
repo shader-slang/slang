@@ -43,28 +43,37 @@ struct SerialTypeInfo<SyntaxClass<T>>
 template <>
 struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
 
-inline void serializePointerValue(SerialWriter* writer, Val* ptrValue, SerialIndex* outSerial)
+inline void serializeValPointerValue(SerialWriter* writer, Val* ptrValue, SerialIndex* outSerial)
 {
     if (ptrValue)
         ptrValue = ptrValue->resolve();
     *(SerialIndex*)outSerial = writer->addPointer(ptrValue);
 }
 
-inline void deserializePointerValue(SerialReader* reader, const SerialIndex* inSerial, void* outPtr, Val* unusedForResolution)
+inline void deserializeValPointerValue(SerialReader* reader, const SerialIndex* inSerial, void* outPtr)
 {
-    SLANG_UNUSED(unusedForResolution);
-
     auto val = reader->getPointer(*(const SerialIndex*)inSerial).dynamicCast<Val>();
     *(Val**)outPtr = val;
-    if (val)
-    {
-        SLANG_ASSERT(as<Val>(val));
-        PostSerializationFixUp fixup;
-        fixup.kind = PostSerializationFixUpKind::ValPtr;
-        fixup.addressToModify = outPtr;
-        reader->getFixUps().add(fixup);
-    }
 }
+
+template<typename T>
+struct PtrSerialTypeInfo<T, std::enable_if_t<std::is_base_of_v<Val, T>>>
+{
+    typedef T* NativeType;
+    typedef SerialIndex SerialType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
+    {
+        auto ptrValue = *(T**)inNative;
+        serializeValPointerValue(writer, ptrValue, (SerialIndex*)outSerial);
+    }
+
+    static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
+    {
+        deserializeValPointerValue(reader, (SerialIndex*)inSerial, outNative);
+    }
+};
 
 template <typename T>
 struct SerialTypeInfo<DeclRef<T>> : public SerialTypeInfo<DeclRefBase*> {};
@@ -89,9 +98,9 @@ struct SerialTypeInfo<ValNodeOperand>
         if (src.kind == ValNodeOperandKind::ConstantValue)
             dst.val = src.values.intOperand;
         else if (src.kind == ValNodeOperandKind::ValNode)
-            serializePointerValue(writer, (Val*)src.values.nodeOperand, (SerialIndex*)&dst.val);
+            serializeValPointerValue(writer, (Val*)src.values.nodeOperand, (SerialIndex*)&dst.val);
         else
-            serializePointerValue(writer, src.values.nodeOperand, (SerialIndex*)&dst.val);
+            SerialTypeInfo<NodeBase*>::toSerial(writer, &src.values.nodeOperand, (SerialIndex*)&dst.val);
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
@@ -104,9 +113,9 @@ struct SerialTypeInfo<ValNodeOperand>
         if (dst.kind == ValNodeOperandKind::ConstantValue)
             dst.values.intOperand = int64_t(src.val);
         else if (dst.kind == ValNodeOperandKind::ValNode)
-            deserializePointerValue(reader, (SerialIndex*)&src.val, (Val**)&dst.values.nodeOperand, (Val*)nullptr);
+            deserializeValPointerValue(reader, (SerialIndex*)&src.val, (Val**)&dst.values.nodeOperand);
         else
-            deserializePointerValue(reader, (SerialIndex*)&src.val, &dst.values.nodeOperand, (NodeBase*)nullptr);
+            SerialTypeInfo<NodeBase*>::toNative(reader, (SerialIndex*)&src.val, (NodeBase**)&dst.values.nodeOperand);
     }
 };
 
