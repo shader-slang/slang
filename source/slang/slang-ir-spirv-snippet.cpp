@@ -288,7 +288,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                         }
                         else
                         {
-                            SLANG_ASSERT(!"Invalid SPV ASM operand.");
+                            SLANG_UNEXPECTED(("Invalid SPV ASM operand: \"" + identifier + "\"").getBuffer());
                         }
                     }
                     break;
@@ -302,7 +302,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
     }
     catch (const Slang::Misc::TextFormatException&)
     {
-        SLANG_ASSERT(!"Invalid ASM format.");
+        return nullptr;
     }
     return snippet;
 }
