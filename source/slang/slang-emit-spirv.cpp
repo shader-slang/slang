@@ -2064,7 +2064,11 @@ struct SPIRVEmitContext
             {
                 auto section = getSection(SpvLogicalSectionID::DebugNames);
                 auto nameHint = cast<IRNameHintDecoration>(decoration);
-                emitOpName(section, decoration, dstID, nameHint->getName());
+                // We can't associate this spirv instruction with our
+                // irInstruction, our instruction may be a hint on several
+                // values, however this decoration is specific to a single
+                // dstID.
+                emitOpName(section, nullptr, dstID, nameHint->getName());
             }
             break;
 
