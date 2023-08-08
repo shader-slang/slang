@@ -8276,19 +8276,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         definition.append(getText(declForName->getName()));
 
-        for(const auto cap : {
-            CapabilityAtom::HLSL,
-            CapabilityAtom::GLSL,
-            CapabilityAtom::C,
-            CapabilityAtom::CPP,
-            CapabilityAtom::CUDA})
-        {
-            getBuilder()->addTargetIntrinsicDecoration(
-                irInst,
-                CapabilitySet(cap),
-                definition.getUnownedSlice()
-            );
-        }
+        getBuilder()->addTargetIntrinsicDecoration(
+            irInst,
+            CapabilitySet(CapabilityAtom::TEXTUAL_SOURCE),
+            definition.getUnownedSlice()
+        );
     }
 
     void addParamNameHint(IRInst* inst, IRLoweringParameterInfo const& info)
