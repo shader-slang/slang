@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -render-feature hardware-device
+//TEST(compute, vulkan):COMPARE_COMPUTE:-vk -compute -shaderobj -output-using-type
 
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D
 Texture2D<float> t2D;
