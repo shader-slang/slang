@@ -57,7 +57,7 @@ SLANG_CAPABILITY_ATOM1(C,        c,         Concrete,TargetFormat,0,TEXTUAL_SOUR
 SLANG_CAPABILITY_ATOM1(CPP,      cpp,       Concrete,TargetFormat,0,TEXTUAL_SOURCE)
 SLANG_CAPABILITY_ATOM1(CUDA,     cuda,      Concrete,TargetFormat,0,TEXTUAL_SOURCE)
 
-SLANG_CAPABILITY_ATOM0(SPIRV_DIRECT, spirv_direct, Concrete, TargetFormat, 0)
+SLANG_CAPABILITY_ATOM0(SPIRV_DIRECT, spirv, Concrete, TargetFormat, 0)
 
 // We have multiple capabilities for the various SPIR-V versions,
 // arranged so that they inherit from one another to represent which versions

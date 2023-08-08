@@ -852,7 +852,7 @@ A capability describes an optional feature that a target may or may not support.
 * `c` 
 * `cpp` 
 * `cuda` 
-* `spirv_direct` 
+* `spirv`
 * `GL_NV_ray_tracing` : enables the GL_NV_ray_tracing extension 
 * `GL_EXT_ray_tracing` : enables the GL_EXT_ray_tracing extension 
 * `GL_NV_fragment_shader_barycentric` : enables the GL_NV_fragment_shader_barycentric extension 
