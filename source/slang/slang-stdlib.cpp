@@ -112,6 +112,22 @@ namespace Slang
 
     };
 
+    void Session::finalizeSharedASTBuilder()
+    {
+        globalAstBuilder->getNoneType();
+        globalAstBuilder->getNullPtrType();
+        globalAstBuilder->getBottomType();
+        globalAstBuilder->getErrorType();
+        globalAstBuilder->getInitializerListType();
+        globalAstBuilder->getOverloadedType();
+        globalAstBuilder->getStringType();
+        globalAstBuilder->getEnumTypeType();
+        globalAstBuilder->getDiffInterfaceType();
+        for (auto& baseType : kBaseTypes)
+            globalAstBuilder->getBuiltinType(baseType.tag);
+    }
+
+
     // Given two base types, we need to be able to compute the cost of converting between them.
     ConversionCost getBaseTypeConversionCost(
         BaseTypeConversionInfo const& toInfo,

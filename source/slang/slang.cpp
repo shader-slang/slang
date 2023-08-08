@@ -358,6 +358,8 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         }
     }
 
+    finalizeSharedASTBuilder();
+
     return SLANG_OK;
 }
 
@@ -379,6 +381,8 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
+
+    finalizeSharedASTBuilder();
     return SLANG_OK;
 }
 
