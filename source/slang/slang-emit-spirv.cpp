@@ -2745,25 +2745,21 @@ struct SPIRVEmitContext
     {
         auto base = inst->getBase();
         SpvWord baseId = 0;
-        IRArrayType* baseArrayType = nullptr;
         // Only used in debug build, but we don't want a warning/error for an unused initialized variable
-        SLANG_UNUSED(baseArrayType);
 
         if (auto ptrLikeType = as<IRPointerLikeType>(base->getDataType()))
         {
-            baseArrayType = as<IRArrayType>(ptrLikeType->getElementType());
             baseId = getID(ensureInst(base));
         }
         else if (auto ptrType = as<IRPtrTypeBase>(base->getDataType()))
         {
-            baseArrayType = as<IRArrayType>(ptrType->getValueType());
             baseId = getID(ensureInst(base));
         }
         else
         {
             SLANG_ASSERT(!"invalid IR: base of getElementPtr must be a pointer.");
         }
-        SLANG_ASSERT(baseArrayType && "getElementPtr requires base to be an array.");
+        SLANG_ASSERT(as<IRPtrTypeBase>(inst->getFullType()));
         return emitOpAccessChain(
             parent,
             inst,
