@@ -207,7 +207,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         do
         {
             indices.add(c->getIndex());
-        } while(c = as<IRGetElement>(c->getBase()));
+        } while(c = as<IRGetElement>(c->getBase()), c);
         IRBuilder builder(m_sharedContext->m_irModule);
         builder.setInsertBefore(inst);
         IRInst* y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
