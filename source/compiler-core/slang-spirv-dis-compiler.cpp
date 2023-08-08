@@ -22,7 +22,10 @@ SlangResult SPIRVDisDownstreamCompilerUtil::locateCompilers(
     return SLANG_OK;
 }
 
-SlangResult SPIRVDisDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)
+SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
+    IArtifact* from,
+    const ArtifactDesc& to,
+    IArtifact** outArtifact) noexcept
 {
     const auto& fromDesc = from->getDesc();
     if(to.kind != ArtifactKind::Assembly ||
@@ -75,7 +78,9 @@ SlangResult SPIRVDisDownstreamCompiler::convert(IArtifact* from, const ArtifactD
     return SLANG_OK;
 }
 
-SlangResult SPIRVDisDownstreamCompiler::compile(const CompileOptions&, IArtifact**)
+SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::compile(
+    const CompileOptions&,
+    IArtifact**) noexcept
 {
     SLANG_UNIMPLEMENTED_X(__func__);
 }

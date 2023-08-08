@@ -17,10 +17,10 @@ class SPIRVDisDownstreamCompiler : public DownstreamCompilerBase
 public:
     SPIRVDisDownstreamCompiler(const Desc& desc) : DownstreamCompilerBase(desc) {}
 
-    virtual SlangResult convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) override;
+    virtual SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) noexcept override;
 
-    virtual bool isFileBased() override { return true; }
-    virtual SlangResult compile(const CompileOptions& options, IArtifact** outArtifact) override;
+    virtual bool SLANG_MCALL isFileBased() noexcept override { return true; }
+    virtual SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) noexcept override;
 };
 
 }
