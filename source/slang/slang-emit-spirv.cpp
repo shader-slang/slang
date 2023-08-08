@@ -3,11 +3,13 @@
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
 
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-spirv-snippet.h"
 #include "slang-ir-spirv-legalize.h"
+#include "slang-spirv-val.h"
 #include "spirv/unified1/spirv.h"
 #include "../core/slang-memory-arena.h"
 
@@ -77,8 +79,7 @@ enum class SpvLogicalSectionID
     DebugStringsAndSource,
     DebugNames,
     Annotations,
-    Types,
-    Constants,
+    ConstantsAndTypes,
     GlobalVariables,
     FunctionDeclarations,
     FunctionDefinitions,
@@ -286,8 +287,6 @@ struct SPIRVEmitContext
 {
         /// The Slang IR module being translated
     IRModule* m_irModule;
-
-    DiagnosticSink* m_sink;
 
     // [2.2: Terms]
     //
@@ -720,7 +719,7 @@ struct SPIRVEmitContext
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
             result = emitInst(
-                getSection(SpvLogicalSectionID::Constants),
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 SpvOpConstant,
                 type,
@@ -732,7 +731,7 @@ struct SPIRVEmitContext
         default:
         {
             result = emitInst(
-                getSection(SpvLogicalSectionID::Constants),
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 SpvOpConstant,
                 type,
@@ -759,7 +758,7 @@ struct SPIRVEmitContext
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
             result = emitInst(
-                getSection(SpvLogicalSectionID::Constants),
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 SpvOpConstant,
                 type,
@@ -770,7 +769,7 @@ struct SPIRVEmitContext
         else
         {
             result = emitInst(
-                getSection(SpvLogicalSectionID::Constants),
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 SpvOpConstant,
                 type,
@@ -998,7 +997,7 @@ struct SPIRVEmitContext
             return result;
         }
         result = emitInstCustomOperandFunc(
-            getSection(SpvLogicalSectionID::Types), typeInst, opcode, [&]() {
+            getSection(SpvLogicalSectionID::ConstantsAndTypes), typeInst, opcode, [&]() {
                 emitOperand(kResultID);
                 for (auto op : operands)
                 {
@@ -1036,29 +1035,32 @@ struct SPIRVEmitContext
 
         // > OpTypeInt
 
-#define CASE(IROP, BITS, SIGNED) \
-        case IROP:                                                                     \
-        return emitTypeInst(inst, SpvOpTypeInt, makeArray<SpvWord>((SpvWord)BITS, (SpvWord)SIGNED).getView()); 
-
-        CASE(kIROp_IntType,     32, 1);
-        CASE(kIROp_UIntType,    32, 0);
-        CASE(kIROp_Int64Type,   64, 1);
-        CASE(kIROp_UInt64Type,  64, 0);
-
-#undef CASE
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+            {
+                const IntInfo i = getIntTypeInfo(as<IRType>(inst));
+                return emitTypeInst(
+                    inst,
+                    SpvOpTypeInt,
+                    makeArray(static_cast<SpvWord>(i.width), SpvWord{i.isSigned}).getView());
+            }
 
         // > OpTypeFloat
 
-#define CASE(IROP, BITS) \
-        case IROP:                                                                \
-        return emitTypeInst(                                                      \
-            inst, SpvOpTypeFloat, makeArray<SpvWord>(BITS).getView()); \
+        case kIROp_HalfType:
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+            {
+                const FloatInfo i = getFloatingTypeInfo(as<IRType>(inst));
+                return emitTypeInst(inst, SpvOpTypeFloat, makeArray(static_cast<SpvWord>(i.width)).getView());
+            }
 
-        CASE(kIROp_HalfType,    16);
-        CASE(kIROp_FloatType,   32);
-        CASE(kIROp_DoubleType,  64);
-
-#undef CASE
         case kIROp_PtrType:
         case kIROp_RefType:
         case kIROp_OutType:
@@ -1066,6 +1068,7 @@ struct SPIRVEmitContext
             {
                 SpvStorageClass storageClass = SpvStorageClassFunction;
                 auto ptrType = as<IRPtrTypeBase>(inst);
+                SLANG_ASSERT(ptrType);
                 if (ptrType->hasAddressSpace())
                     storageClass = (SpvStorageClass)ptrType->getAddressSpace();
                 if (storageClass == SpvStorageClassStorageBuffer)
@@ -1078,7 +1081,7 @@ struct SPIRVEmitContext
         case kIROp_StructType:
             {
                 auto spvStructType = emitInstCustomOperandFunc(
-                    getSection(SpvLogicalSectionID::Types), inst, SpvOpTypeStruct, [&]() {
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeStruct, [&]() {
                         emitOperand(kResultID);
                         for (auto field : static_cast<IRStructType*>(inst)->getFields())
                         {
@@ -1105,7 +1108,7 @@ struct SPIRVEmitContext
                     static_cast<IRIntLit*>(matrixType->getRowCount())->getValue(),
                     nullptr);
                 auto matrixSPVType = emitInst(
-                    getSection(SpvLogicalSectionID::Types),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     inst,
                     SpvOpTypeMatrix,
                     kResultID,
@@ -1143,7 +1146,7 @@ struct SPIRVEmitContext
             {
                 auto elementType = static_cast<IRUnsizedArrayType*>(inst)->getElementType();
                 auto runtimeArrayType = emitInst(
-                    getSection(SpvLogicalSectionID::Types),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
                     SpvOpTypeRuntimeArray,
                     kResultID,
@@ -1174,7 +1177,7 @@ struct SPIRVEmitContext
             // with the result-type operand coming first,
             // followed by operand sfor all the parameter types.
             //
-            return emitInst(getSection(SpvLogicalSectionID::Types), inst, SpvOpTypeFunction, kResultID, OperandsOf(inst));
+            return emitInst(getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeFunction, kResultID, OperandsOf(inst));
 
         case kIROp_RateQualifiedType:
             {
@@ -1206,8 +1209,9 @@ struct SPIRVEmitContext
         // ...
 
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for global instruction");
-            UNREACHABLE_RETURN(nullptr);
+            String e = "Unhandled global inst in spirv-emit: "
+                + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+            SLANG_UNIMPLEMENTED_X(e.begin());
         }
     }
 
@@ -1342,6 +1346,7 @@ struct SPIRVEmitContext
     SpvInst* emitGlobalVar(IRGlobalVar* globalVar)
     {
         auto layout = getVarLayout(globalVar);
+        SLANG_ASSERT(layout);
         auto storageClass = SpvStorageClassUniform;
         if (auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType()))
         {
@@ -1398,6 +1403,9 @@ struct SPIRVEmitContext
         /// Emit a SPIR-V function definition for the Slang IR function `irFunc`.
     SpvInst* emitFuncDefinition(IRFunc* irFunc)
     {
+        if(!irFunc->getFirstBlock())
+            m_sink->diagnose(irFunc, Diagnostics::noBlocksOrIntrinsic, "spirv");
+
         // [2.4: Logical Layout of a Module]
         //
         // > All function definitions (functions with a body).
@@ -1588,8 +1596,11 @@ struct SPIRVEmitContext
         switch( inst->getOp() )
         {
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for local instruction");
-            break;
+            {
+                String e = "Unhandled local inst in spirv-emit: "
+                    + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                SLANG_UNIMPLEMENTED_X(e.getBuffer());
+            }
         case kIROp_Specialize:
             return nullptr;
         case kIROp_Var:
@@ -1611,9 +1622,13 @@ struct SPIRVEmitContext
         case kIROp_swizzle:
             return emitSwizzle(parent, as<IRSwizzle>(inst));
         case kIROp_IntCast:
+            return emitIntCast(parent, as<IRIntCast>(inst));
         case kIROp_FloatCast:
+            return emitFloatCast(parent, as<IRFloatCast>(inst));
         case kIROp_CastIntToFloat:
+            return emitIntToFloatCast(parent, as<IRCastIntToFloat>(inst));
         case kIROp_CastFloatToInt:
+            return emitFloatToIntCast(parent, as<IRCastFloatToInt>(inst));
         case kIROp_MatrixReshape:
         case kIROp_VectorReshape:
             // TODO: break emitConstruct into separate functions for each opcode.
@@ -1750,7 +1765,7 @@ struct SPIRVEmitContext
                 case BaseType::IntPtr:
                 case BaseType::UIntPtr:
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstant,
                         inst->getDataType(),
@@ -1759,7 +1774,7 @@ struct SPIRVEmitContext
                         (SpvWord)((value >> 32) & 0xFFFFFFFF));
                 default:
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstant,
                         inst->getDataType(),
@@ -1774,7 +1789,7 @@ struct SPIRVEmitContext
                 {
                 case BaseType::Half:
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstant,
                         inst->getDataType(),
@@ -1782,7 +1797,7 @@ struct SPIRVEmitContext
                         (SpvWord)(FloatToHalf((float)value)));
                 case BaseType::Float:
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstant,
                         inst->getDataType(),
@@ -1792,7 +1807,7 @@ struct SPIRVEmitContext
                     {
                         auto ival = DoubleAsInt64(value);
                         return emitInst(
-                            getSection(SpvLogicalSectionID::Constants),
+                            getSection(SpvLogicalSectionID::ConstantsAndTypes),
                             inst,
                             SpvOpConstant,
                             inst->getDataType(),
@@ -1809,7 +1824,7 @@ struct SPIRVEmitContext
                 if (as<IRBoolLit>(inst)->getValue())
                 {
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstantTrue,
                         inst->getDataType(),
@@ -1818,7 +1833,7 @@ struct SPIRVEmitContext
                 else
                 {
                     return emitInst(
-                        getSection(SpvLogicalSectionID::Constants),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         SpvOpConstantFalse,
                         inst->getDataType(),
@@ -2228,6 +2243,7 @@ struct SPIRVEmitContext
         IRTargetIntrinsicDecoration* intrinsic)
     {
         SpvSnippet* snippet = getParsedSpvSnippet(intrinsic);
+        SLANG_ASSERT(snippet);
         SpvSnippetEmitContext context;
         context.irResultType = inst->getDataType();
         context.resultType = ensureInst(inst->getFullType());
@@ -2285,7 +2301,7 @@ struct SPIRVEmitContext
                 auto element1 = emitFloatConstant(constant.floatValues[0], floatType);
                 auto element2 = emitFloatConstant(constant.floatValues[1], floatType);
                 result = emitInst(
-                    getSection(SpvLogicalSectionID::Constants),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
                     SpvOpConstantComposite,
                     builder.getVectorType(floatType, builder.getIntValue(builder.getIntType(), 2)),
@@ -2303,7 +2319,7 @@ struct SPIRVEmitContext
                 auto element1 = emitIntConstant((IRIntegerValue)constant.intValues[0], uintType);
                 auto element2 = emitIntConstant((IRIntegerValue)constant.intValues[1], uintType);
                 result = emitInst(
-                    getSection(SpvLogicalSectionID::Constants),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
                     SpvOpConstantComposite,
                     builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 2)),
@@ -2658,6 +2674,101 @@ struct SPIRVEmitContext
         }
     }
 
+    IRType* dropVector(IRType* t)
+    {
+        if(const auto v = as<IRVectorType>(t))
+            return v->getElementType();
+        return t;
+    };
+
+    SpvInst* emitIntCast(SpvInstParent* parent, IRIntCast* inst)
+    {
+        const auto fromTypeV = inst->getOperand(0)->getDataType();
+        const auto toTypeV = inst->getDataType();
+        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
+        const auto fromType = dropVector(fromTypeV);
+        const auto toType = dropVector(toTypeV);
+        SLANG_ASSERT(isIntegralType(fromType));
+        SLANG_ASSERT(isIntegralType(toType));
+
+        const auto fromInfo = getIntTypeInfo(fromType);
+        const auto toInfo = getIntTypeInfo(toType);
+
+        const auto convertWith = [&](auto op){
+            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
+        };
+        if(fromInfo == toInfo)
+            return convertWith(SpvOpCopyObject);
+        else if(fromInfo.width == toInfo.width)
+            return convertWith(SpvOpBitcast);
+        else if(!fromInfo.isSigned && !toInfo.isSigned)
+            // unsigned to unsigned, don't sign extend
+            return convertWith(SpvOpUConvert);
+        else if(toInfo.isSigned)
+            // unsigned to signed, sign extend
+            return convertWith(SpvOpSConvert);
+        else if(fromInfo.isSigned)
+            // signed to unsigned, sign extend
+            return convertWith(SpvOpSConvert);
+        else if(fromInfo.isSigned && toInfo.isSigned)
+            // signed to signed, sign extend
+            return convertWith(SpvOpSConvert);
+
+        SLANG_UNREACHABLE(__func__);
+    }
+
+    SpvInst* emitFloatCast(SpvInstParent* parent, IRFloatCast* inst)
+    {
+        const auto fromTypeV = inst->getOperand(0)->getDataType();
+        const auto toTypeV = inst->getDataType();
+        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
+        const auto fromType = dropVector(fromTypeV);
+        const auto toType = dropVector(toTypeV);
+        SLANG_ASSERT(isFloatingType(fromType));
+        SLANG_ASSERT(isFloatingType(toType));
+        SLANG_ASSERT(!isTypeEqual(fromType, toType));
+
+        return emitInst(parent, inst, SpvOpFConvert, toTypeV, kResultID, inst->getOperand(0));
+    }
+
+    SpvInst* emitIntToFloatCast(SpvInstParent* parent, IRCastIntToFloat* inst)
+    {
+        const auto fromTypeV = inst->getOperand(0)->getDataType();
+        const auto toTypeV = inst->getDataType();
+        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
+        const auto fromType = dropVector(fromTypeV);
+        const auto toType = dropVector(toTypeV);
+        SLANG_ASSERT(isIntegralType(fromType));
+        SLANG_ASSERT(isFloatingType(toType));
+
+        const auto fromInfo = getIntTypeInfo(fromType);
+
+        const auto convertWith = [&](auto op){
+            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
+        };
+
+        return convertWith(fromInfo.isSigned ? SpvOpConvertSToF : SpvOpConvertUToF);
+    }
+
+    SpvInst* emitFloatToIntCast(SpvInstParent* parent, IRCastFloatToInt* inst)
+    {
+        const auto fromTypeV = inst->getOperand(0)->getDataType();
+        const auto toTypeV = inst->getDataType();
+        SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
+        const auto fromType = dropVector(fromTypeV);
+        const auto toType = dropVector(toTypeV);
+        SLANG_ASSERT(isFloatingType(fromType));
+        SLANG_ASSERT(isIntegralType(toType));
+
+        const auto toInfo = getIntTypeInfo(toType);
+
+        const auto convertWith = [&](auto op){
+            return emitInst(parent, inst, op, toTypeV, kResultID, inst->getOperand(0));
+        };
+
+        return convertWith(toInfo.isSigned ? SpvOpConvertFToS : SpvOpConvertFToU);
+    }
+
     SpvInst* emitConstruct(SpvInstParent* parent, IRInst* inst)
     {
         if (as<IRBasicType>(inst->getDataType()))
@@ -2697,6 +2808,25 @@ struct SPIRVEmitContext
                 kResultID,
                 OperandsOf(inst));
         }
+    }
+
+    SpvInst* emitSplat(SpvInstParent* parent, IRInst* scalar, IRIntegerValue numElems)
+    {
+        const auto scalarTy = as<IRBasicType>(scalar->getDataType());
+        const auto spvVecTy = ensureVectorType(
+            scalarTy->getBaseType(),
+            numElems,
+            nullptr);
+        return emitInstCustomOperandFunc(
+            parent,
+            nullptr,
+            SpvOpCompositeConstruct,
+            [&](){
+                emitOperand(spvVecTy);
+                emitOperand(kResultID);
+                for(Int i = 0; i < numElems; ++i)
+                    emitOperand(scalar);
+            });
     }
 
     bool isSignedType(IRType* type)
@@ -2739,12 +2869,8 @@ struct SPIRVEmitContext
 
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
-        IRType* elementType = inst->getOperand(0)->getDataType();
-        if (auto vectorType = as<IRVectorType>(inst->getDataType()))
-        {
-            elementType = vectorType->getElementType();
-        }
-        else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
+        IRType* elementType = dropVector(inst->getOperand(0)->getDataType());
+        if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             //TODO: implement.
             SLANG_ASSERT(!"unimplemented: matrix arithemetic");
@@ -2843,7 +2969,34 @@ struct SPIRVEmitContext
             SLANG_ASSERT(!"unknown arithmetic opcode");
             break;
         }
-        return emitInst(parent, inst, opCode, inst->getDataType(), kResultID, OperandsOf(inst));
+        if(inst->getOperandCount() == 1)
+        {
+            return emitInst(parent, inst, opCode, inst->getDataType(), kResultID, OperandsOf(inst));
+        }
+        else if(inst->getOperandCount() == 2)
+        {
+            auto l = inst->getOperand(0);
+            const auto lVec = as<IRVectorType>(l->getDataType());
+            auto r = inst->getOperand(1);
+            const auto rVec = as<IRVectorType>(r->getDataType());
+            const auto go = [&](const auto l, const auto r){
+                return emitInst(parent, inst, opCode, inst->getDataType(), kResultID, l, r);
+            };
+            if(lVec && !rVec)
+            {
+                const auto len = as<IRIntLit>(lVec->getElementCount());
+                SLANG_ASSERT(len);
+                return go(l, emitSplat(parent, r, len->getValue()));
+            }
+            else if (!lVec && rVec)
+            {
+                const auto len = as<IRIntLit>(rVec->getElementCount());
+                SLANG_ASSERT(len);
+                return go(emitSplat(parent, l, len->getValue()), r);
+            }
+            return go(l, r);
+        }
+        SLANG_UNREACHABLE("Arithmetic op with 0 or more than 2 operands");
     }
 
     OrderedHashSet<SpvCapability> m_capabilities;
@@ -2894,9 +3047,8 @@ struct SPIRVEmitContext
     }
 
     SPIRVEmitContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
-        : SPIRVEmitSharedContext(module, target)
+        : SPIRVEmitSharedContext(module, target, sink)
         , m_irModule(module)
-        , m_sink(sink)
         , m_memoryArena(2048)
     {
     }
@@ -2926,6 +3078,18 @@ SlangResult emitSPIRVFromIR(
     spirvOut.addRange(
         (uint8_t const*) context.m_words.getBuffer(),
         context.m_words.getCount() * sizeof(context.m_words[0]));
+
+    const auto validationResult = debugValidateSPIRV(spirvOut);
+    // If validation isn't available, don't say it failed, it's just a debug
+    // feature so we can skip
+    if(SLANG_FAILED(validationResult) && validationResult != SLANG_E_NOT_AVAILABLE)
+    {
+        codeGenContext->getSink()->diagnoseWithoutSourceView(
+            SourceLoc{},
+            Diagnostics::spirvValidationFailed
+        );
+        return validationResult;
+    }
 
     return SLANG_OK;
 }

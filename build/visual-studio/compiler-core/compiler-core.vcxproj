@@ -310,6 +310,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-embed-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-loc.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-map.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-spirv-dis-compiler.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-test-server-protocol.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-token-defs.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-token.h" />
@@ -356,6 +357,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-embed-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-loc.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-map.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-spirv-dis-compiler.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-test-server-protocol.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-token.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-visual-studio-compiler-util.cpp" />

@@ -158,24 +158,8 @@ class Val;
 
 // Pointer
 
-template<typename T, typename sfinae = typename std::enable_if<!IsBaseOf<Val, T>::Value>::type>
-void serializePointerValue(SerialWriter* writer, T* ptrValue, SerialIndex* outSerial)
-{
-    static_assert(!IsBaseOf<Val, T>::Value);
-    *(SerialIndex*)outSerial = writer->addPointer(ptrValue);
-}
-
-template<typename T, typename sfinae = typename std::enable_if<!IsBaseOf<Val, T>::Value>::type>
-void deserializePointerValue(SerialReader* reader, SerialIndex* inSerial, void* outPtr, T* unusedForResolution)
-{
-    static_assert(!IsBaseOf<Val, T>::Value);
-
-    SLANG_UNUSED(unusedForResolution);
-    *(T**)outPtr = reader->getPointer(*(const SerialIndex*)inSerial).dynamicCast<T>();
-}
-
-template <typename T>
-struct SerialTypeInfo<T*>
+template <typename T, typename /*sfinaeType*/ = void>
+struct PtrSerialTypeInfo
 {
     typedef T* NativeType;
     typedef SerialIndex SerialType;
@@ -184,14 +168,18 @@ struct SerialTypeInfo<T*>
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
         auto ptrToWrite = *(T**)inNative;
-        serializePointerValue(writer, ptrToWrite, (SerialIndex*)outSerial);
+        static_assert(!IsBaseOf<Val, T>::Value);
+        *(SerialIndex*)outSerial = writer->addPointer(ptrToWrite);
     }
 
     static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
     {
-        deserializePointerValue(reader, (SerialIndex*)inSerial, outNative, (T*)nullptr);
+        *(T**)outNative = reader->getPointer(*(const SerialIndex*)inSerial).dynamicCast<T>();
     }
 };
+
+template<typename T>
+struct SerialTypeInfo<T*> : public PtrSerialTypeInfo<T> {};
 
 // RefPtr (pretty much the same as T* - except for native rep)
 template <typename T>

@@ -50,11 +50,13 @@
 // and for `glsl+spirv` or even just for `spirv`, and how should all of those impact
 // overloading).
 //
-SLANG_CAPABILITY_ATOM0(HLSL,     hlsl,      Concrete,TargetFormat,0)
-SLANG_CAPABILITY_ATOM0(GLSL,     glsl,      Concrete,TargetFormat,0)
-SLANG_CAPABILITY_ATOM0(C,        c,         Concrete,TargetFormat,0)
-SLANG_CAPABILITY_ATOM0(CPP,      cpp,       Concrete,TargetFormat,0)
-SLANG_CAPABILITY_ATOM0(CUDA,     cuda,      Concrete,TargetFormat,0)
+SLANG_CAPABILITY_ATOM0(TEXTUAL_SOURCE, textual_source, Abstract,None,0)
+SLANG_CAPABILITY_ATOM1(HLSL,     hlsl,      Concrete,TargetFormat,0,TEXTUAL_SOURCE)
+SLANG_CAPABILITY_ATOM1(GLSL,     glsl,      Concrete,TargetFormat,0,TEXTUAL_SOURCE)
+SLANG_CAPABILITY_ATOM1(C,        c,         Concrete,TargetFormat,0,TEXTUAL_SOURCE)
+SLANG_CAPABILITY_ATOM1(CPP,      cpp,       Concrete,TargetFormat,0,TEXTUAL_SOURCE)
+SLANG_CAPABILITY_ATOM1(CUDA,     cuda,      Concrete,TargetFormat,0,TEXTUAL_SOURCE)
+
 SLANG_CAPABILITY_ATOM0(SPIRV_DIRECT, spirv_direct, Concrete, TargetFormat, 0)
 
 // We have multiple capabilities for the various SPIR-V versions,

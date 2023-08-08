@@ -6690,6 +6690,55 @@ namespace Slang
         return false;
     }
 
+    bool isFloatingType(IRType *t)
+    {
+        if(auto basic = as<IRBasicType>(t))
+        {
+            switch(basic->getBaseType())
+            {
+            case BaseType::Float:
+            case BaseType::Half:
+            case BaseType::Double:
+                return true;
+            default:
+                return false;
+            }
+        }
+        return false;
+    }
+
+    IntInfo getIntTypeInfo(const IRType* intType)
+    {
+        switch(intType->getOp())
+        {
+            case kIROp_UInt8Type: return {8, false};
+            case kIROp_UInt16Type: return {16, false};
+            case kIROp_UIntType: return {32, false};
+            case kIROp_UInt64Type: return {64, false};
+            case kIROp_Int8Type: return {8, true};
+            case kIROp_Int16Type: return {16, true};
+            case kIROp_IntType: return {32, true};
+            case kIROp_Int64Type: return {64, true};
+
+            case kIROp_IntPtrType: // target platform dependent
+            case kIROp_UIntPtrType: // target platform dependent
+            default:
+                SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
+        }
+    }
+
+    FloatInfo getFloatingTypeInfo(const IRType* floatType)
+    {
+        switch(floatType->getOp())
+        {
+            case kIROp_HalfType: return {16};
+            case kIROp_FloatType: return {32};
+            case kIROp_DoubleType: return {64};
+            default:
+                SLANG_UNEXPECTED("Unhandled type passed to getFloatTypeInfo");
+        }
+    }
+
     bool isIntegralScalarOrCompositeType(IRType* t)
     {
         if (!t)
