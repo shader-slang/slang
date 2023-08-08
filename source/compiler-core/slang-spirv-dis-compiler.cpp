@@ -42,6 +42,7 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     // Set up our process
     CommandLine commandLine;
     commandLine.m_executableLocation.setName("spirv-dis");
+    commandLine.addArg("--comment");
     RefPtr<Process> p;
     SLANG_RETURN_ON_FAIL(Process::create(commandLine, 0, p));
     const auto in = p->getStream(StdStreamType::In);
