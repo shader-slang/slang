@@ -192,8 +192,11 @@ struct ValNodeOperand
 
 struct ValNodeDesc
 {
+private:
+    HashCode hashCode = 0;
+public:
     ASTNodeType             type;
-    ShortList<ValNodeOperand, 4> operands;
+    ShortList<ValNodeOperand, 8> operands;
 
     inline bool operator==(ValNodeDesc const& that) const
     {
@@ -216,8 +219,7 @@ struct ValNodeDesc
     }
     HashCode getHashCode() const { return hashCode; }
     void init();
-private:
-    HashCode hashCode = 0;
+
 };
 
 template<int N>
@@ -406,7 +408,6 @@ class Val : public NodeBase
 
     Val* resolveImpl();
     Val* resolve();
-    ValNodeDesc getDesc();
 
     Val* getOperand(Index index) const
     {

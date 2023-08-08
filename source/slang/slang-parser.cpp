@@ -6659,6 +6659,12 @@ namespace Slang
         {
             modifier->tag = uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         }
+		auto classInfo = parser->astBuilder->findClassInfo(getName(parser, modifier->magicName));
+		if (classInfo)
+		{
+			modifier->magicNodeType = ASTNodeType(classInfo->m_classId);
+		}
+		// TODO: print diagnostic if the magic type name doesn't correspond to an actual ASTNodeType.
         parser->ReadToken(TokenType::RParent);
 
         return modifier;

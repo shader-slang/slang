@@ -25,7 +25,7 @@ DeclRefBase* Decl::getDefaultDeclRef()
     auto astBuilder = getCurrentASTBuilder();
     if (astBuilder->getEpoch() != m_defaultDeclRefEpoch || !m_defaultDeclRef)
     {
-        m_defaultDeclRef = astBuilder->getDirectDeclRef(this);
+        m_defaultDeclRef = astBuilder->getOrCreate<DirectDeclRef>(this);
         m_defaultDeclRefEpoch = astBuilder->getEpoch();
     }
     return m_defaultDeclRef;
