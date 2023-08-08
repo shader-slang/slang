@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: [Windows, self-hosted]
+    timeout-minutes: 100
+
     strategy:
       matrix:
         configuration: ['Release']

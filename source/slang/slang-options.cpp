@@ -94,6 +94,7 @@ enum class OptionKind
     VulkanBindGlobals,
     VulkanInvertY,
     VulkanUseEntryPointName,
+    VulkanUseGLLayout,
 
 
     GLSLForceScalarLayout,
@@ -501,6 +502,7 @@ void initCommandOptions(CommandOptions& options)
         "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
         { OptionKind::VulkanInvertY, "-fvk-invert-y", nullptr, "Negates (additively inverts) SV_Position.y before writing to stage output."},
         { OptionKind::VulkanUseEntryPointName, "-fvk-use-entrypoint-name", nullptr, "Uses the entrypoint name from the source instead of 'main' in the spirv output."},
+        { OptionKind::VulkanUseGLLayout, "-fvk-use-gl-layout", nullptr, "Use std430 layout instead of D3D buffer layout for raw buffer load/stores."},
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
@@ -2023,6 +2025,12 @@ SlangResult OptionsParser::_parse(
             {
                 // -fvk-use-entrypoint-name
                 m_hlslToVulkanLayoutOptions->setUseOriginalEntryPointName(true);
+                break;
+            }
+            case OptionKind::VulkanUseGLLayout:
+            {
+                // -fvk-use-gl-layout
+                m_hlslToVulkanLayoutOptions->setUseGLLayout(true);
                 break;
             }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;

@@ -203,6 +203,15 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
+    SlangResult getOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
+    {
+        if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
+        {
+            return getStd430Offset(target, field, outOffset);
+        }
+        return getNaturalOffset(target, field, outOffset);
+    }
+
     // The core workhorse routine for the load case is `emitLegalLoad`,
     // which tries to emit load operations that read a value of the
     // given `type` from the given `buffer` at the required `baseOffset`
@@ -256,7 +265,7 @@ struct ByteAddressBufferLegalizationContext
                 // then we fail to legalize this load.
                 //
                 IRIntegerValue fieldOffset = 0;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalOffset(m_target, field, &fieldOffset));
+                SLANG_RETURN_NULL_ON_FAIL(getOffset(m_target, field, &fieldOffset));
 
                 // Otherwise, we load the field by recursively calling this function
                 // on the field type, with an adjusted immediate offset.
@@ -803,7 +812,7 @@ struct ByteAddressBufferLegalizationContext
                 auto fieldType = field->getFieldType();
 
                 IRIntegerValue fieldOffset;
-                SLANG_RETURN_ON_FAIL(getNaturalOffset(m_target, field, &fieldOffset));
+                SLANG_RETURN_ON_FAIL(getOffset(m_target, field, &fieldOffset));
 
                 auto fieldVal = m_builder.emitFieldExtract(fieldType, value, field->getKey());
                 SLANG_RETURN_ON_FAIL(emitLegalStore(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, fieldVal));
@@ -874,7 +883,6 @@ struct ByteAddressBufferLegalizationContext
     Result emitSimpleStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOfset, IRInst* value)
     {
         IRInst* offset = emitOffsetAddIfNeeded(baseOffset, immediateOfset);
-
         if( m_options.translateToStructuredBufferOps )
         {
             if( auto structuredBuffer = getEquivalentStructuredBuffer(type, buffer) )
