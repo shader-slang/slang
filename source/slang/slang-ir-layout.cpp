@@ -486,12 +486,13 @@ static Result _calcStd430SizeAndAlignment(
     case kIROp_VectorType:
     {
         auto vecType = cast<IRVectorType>(type);
-        if (getIntegerValueFromInst(vecType->getElementCount()) == 2)
+        auto elementCount = getIntegerValueFromInst(vecType->getElementCount());
+        if (elementCount == 2 || elementCount == 4)
         {
             IRSizeAndAlignment sizeAndAlignment;
             SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, vecType->getElementType(), &sizeAndAlignment));
-            sizeAndAlignment.size *= 2;
-            sizeAndAlignment.alignment *= 2;
+            sizeAndAlignment.size *= (int)elementCount;
+            sizeAndAlignment.alignment *= (int)elementCount;
             *outSizeAndAlignment = sizeAndAlignment;
             return SLANG_OK;
         }
@@ -554,13 +555,12 @@ static Result _calcStd430SizeAndAlignment(
     case kIROp_MatrixType:
     {
         auto matType = cast<IRMatrixType>(type);
-        auto rowCount = getIntegerValueFromInst(matType->getRowCount());
-        auto colCount = getIntegerValueFromInst(matType->getColumnCount());
         IRBuilder builder(type->getModule());
-
+        builder.setInsertBefore(matType);
+        auto rowType = builder.getVectorType(matType->getElementType(), matType->getColumnCount());
         return _calcStd430ArraySizeAndAlignment(
-            target, matType->getElementType(),
-            builder.getIntValue(builder.getUIntType(), rowCount * colCount),
+            target, rowType,
+            matType->getRowCount(),
             outSizeAndAlignment);
     }
     break;
