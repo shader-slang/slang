@@ -1,6 +1,8 @@
 #include "slang-spirv-dis-compiler.h"
 
 #include "../core/slang-common.h"
+#include "../core/slang-string-util.h"
+#include "../core/slang-string.h"
 #include "slang-artifact-representation.h"
 #include "slang-artifact-util.h"
 
@@ -49,7 +51,7 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     const auto out = p->getStream(StdStreamType::Out);
     const auto err = p->getStream(StdStreamType::ErrorOut);
 
-    // Write the assembly
+    // Write the binary
     SLANG_RETURN_ON_FAIL(in->write(fromBlob->getBufferPointer(), fromBlob->getBufferSize()));
     in->close();
 
@@ -71,7 +73,12 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     SLANG_RETURN_ON_FAIL(StreamUtil::readAll(out, 0, outData));
 
     // Wobble it into an artifact
-    ComPtr<ISlangBlob> outBlob = RawBlob::create(outData.getBuffer(), outData.getCount());
+    StringBuilder outText;
+    StringUtil::appendStandardLines(
+        UnownedStringSlice(reinterpret_cast<const char*>(outData.getBuffer()), outData.getCount()),
+        outText
+    );
+    ComPtr<ISlangBlob> outBlob = StringBlob::moveCreate(outText.produceString());
     auto artifact = ArtifactUtil::createArtifact(to);
     artifact->addRepresentationUnknown(outBlob.detach());
     *outArtifact = artifact.detach();
