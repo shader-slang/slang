@@ -1138,7 +1138,7 @@ struct SPIRVEmitContext
                 const IntInfo i = getIntTypeInfo(as<IRType>(inst));
                 return emitOpTypeInt(
                     inst,
-                    SpvLiteralInteger::from32(i.width),
+                    SpvLiteralInteger::from32(int32_t(i.width)),
                     SpvLiteralInteger::from32(i.isSigned)
                 );
             }
@@ -1150,7 +1150,7 @@ struct SPIRVEmitContext
         case kIROp_DoubleType:
             {
                 const FloatInfo i = getFloatingTypeInfo(as<IRType>(inst));
-                return emitOpTypeFloat(inst, SpvLiteralInteger::from32(i.width));
+                return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
             }
 
         case kIROp_PtrType:
@@ -1205,7 +1205,7 @@ struct SPIRVEmitContext
                 auto matrixSPVType = emitOpTypeMatrix(
                     inst,
                     vectorSpvType,
-                    SpvLiteralInteger::from32(columnCount)
+                    SpvLiteralInteger::from32(int32_t(columnCount))
                 );
                 // TODO: properly compute matrix stride.
                 uint32_t stride = 0;
@@ -1253,7 +1253,7 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     arrayType,
-                    SpvLiteralInteger::from32(sizeAndAlignment.getStride()));
+                    SpvLiteralInteger::from32(int32_t(sizeAndAlignment.getStride())));
                 return arrayType;
             }
 
@@ -1384,7 +1384,7 @@ struct SPIRVEmitContext
         auto result = emitOpTypeVector(
             inst,
             inst->getElementType(),
-            SpvLiteralInteger::from32(elementCount)
+            SpvLiteralInteger::from32(int32_t(elementCount))
         );
         return result;
     }
@@ -1405,13 +1405,13 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    SpvLiteralInteger::from32(index)
+                    SpvLiteralInteger::from32(int32_t(index))
                 );
                 emitOpDecorateIndex(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    SpvLiteralInteger::from32(space)
+                    SpvLiteralInteger::from32(int32_t(space))
                 );
                 break;
             case LayoutResourceKind::VaryingOutput:
@@ -1419,7 +1419,7 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    SpvLiteralInteger::from32(index)
+                    SpvLiteralInteger::from32(int32_t(index))
                 );
                 if (space)
                 {
@@ -1427,7 +1427,7 @@ struct SPIRVEmitContext
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
                         varInst,
-                        SpvLiteralInteger::from32(space)
+                        SpvLiteralInteger::from32(int32_t(space))
                     );
                 }
                 break;
@@ -1437,7 +1437,7 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    SpvLiteralInteger::from32(index)
+                    SpvLiteralInteger::from32(int32_t(index))
                 );
                 break;
 
@@ -1450,13 +1450,13 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    SpvLiteralInteger::from32(index)
+                    SpvLiteralInteger::from32(int32_t(index))
                 );
                 emitOpDecorateDescriptorSet(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    SpvLiteralInteger::from32(space)
+                    SpvLiteralInteger::from32(int32_t(space))
                 );
                 break;
             default:
@@ -1929,7 +1929,7 @@ struct SPIRVEmitContext
             }
         case kIROp_BoolLit:
             {
-                if (as<IRBoolLit>(inst)->getValue())
+                if (cast<IRBoolLit>(inst)->getValue())
                 {
                     return emitOpConstantTrue(
                         inst,
@@ -2109,9 +2109,9 @@ struct SPIRVEmitContext
                     section,
                     decoration,
                     dstID,
-                    SpvLiteralInteger::from32(numThreads->getX()->getValue()),
-                    SpvLiteralInteger::from32(numThreads->getY()->getValue()),
-                    SpvLiteralInteger::from32(numThreads->getZ()->getValue())
+                    SpvLiteralInteger::from32(int32_t(numThreads->getX()->getValue())),
+                    SpvLiteralInteger::from32(int32_t(numThreads->getY()->getValue())),
+                    SpvLiteralInteger::from32(int32_t(numThreads->getZ()->getValue()))
                 );
             }
             break;
@@ -2804,12 +2804,13 @@ struct SPIRVEmitContext
     {
         if (inst->getElementCount() == 1)
         {
+            const auto index = as<IRIntLit>(inst->getElementIndex(0))->getValue();
             return emitOpCompositeExtract(
                 parent,
                 inst,
                 inst->getDataType(),
                 inst->getBase(),
-                makeArray(SpvLiteralInteger::from32(as<IRIntLit>(inst->getElementIndex(0))->getValue()))
+                makeArray(SpvLiteralInteger::from32(int32_t(index)))
             );
         }
         else
