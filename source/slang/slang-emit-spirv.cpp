@@ -3232,6 +3232,16 @@ SlangResult emitSPIRVFromIR(
     SPIRVEmitContext context(irModule, targetRequest, sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
 
+#if 0
+    DiagnosticSinkWriter writer(codeGenContext->getSink());
+    dumpIR(
+        irModule,
+        {IRDumpOptions::Mode::Simplified, 0},
+        "BEFORE SPIR-V EMIT",
+        codeGenContext->getSourceManager(),
+        &writer);
+#endif
+
     context.emitFrontMatter();
     for (auto irEntryPoint : irEntryPoints)
     {
