@@ -1182,10 +1182,11 @@ namespace Slang
 
     enum class PassThroughMode : SlangPassThroughIntegral
     {
-        None = SLANG_PASS_THROUGH_NONE,	                    ///< don't pass through: use Slang compiler
-        Fxc = SLANG_PASS_THROUGH_FXC,	                    ///< pass through HLSL to `D3DCompile` API
-        Dxc = SLANG_PASS_THROUGH_DXC,	                    ///< pass through HLSL to `IDxcCompiler` API
-        Glslang = SLANG_PASS_THROUGH_GLSLANG,	            ///< pass through GLSL to `glslang` library
+        None = SLANG_PASS_THROUGH_NONE,                     ///< don't pass through: use Slang compiler
+        Fxc = SLANG_PASS_THROUGH_FXC,                       ///< pass through HLSL to `D3DCompile` API
+        Dxc = SLANG_PASS_THROUGH_DXC,                       ///< pass through HLSL to `IDxcCompiler` API
+        Glslang = SLANG_PASS_THROUGH_GLSLANG,               ///< pass through GLSL to `glslang` library
+        SpirvDis = SLANG_PASS_THROUGH_SPIRV_DIS,            ///< pass through spirv-dis
         Clang = SLANG_PASS_THROUGH_CLANG,                   ///< Pass through clang compiler
         VisualStudio = SLANG_PASS_THROUGH_VISUAL_STUDIO,    ///< Visual studio compiler
         Gcc = SLANG_PASS_THROUGH_GCC,                       ///< Gcc compiler

@@ -79,6 +79,7 @@ static const NamesDescriptionValue s_compilerInfos[] =
     { SLANG_PASS_THROUGH_FXC,       "fxc",      "FXC HLSL compiler" },
     { SLANG_PASS_THROUGH_DXC,       "dxc",      "DXC HLSL compiler" },
     { SLANG_PASS_THROUGH_GLSLANG,   "glslang",  "GLSLANG GLSL compiler" },
+    { SLANG_PASS_THROUGH_SPIRV_DIS, "spirv-dis",  "spirv-tools SPIRV disassembler" },
     { SLANG_PASS_THROUGH_VISUAL_STUDIO, "visualstudio,vs", "Visual Studio C/C++ compiler" },
     { SLANG_PASS_THROUGH_CLANG,     "clang",    "Clang C/C++ compiler" },
     { SLANG_PASS_THROUGH_GCC,       "gcc",      "GCC C/C++ compiler" },
