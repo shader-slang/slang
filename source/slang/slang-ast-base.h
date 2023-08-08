@@ -140,11 +140,14 @@ struct ValNodeOperand
 
     ValNodeOperand()
     {
-        values.nodeOperand = nullptr;
+        values.intOperand = 0;
     }
 
     explicit ValNodeOperand(NodeBase* node)
     {
+        if constexpr(sizeof(values.nodeOperand) < sizeof(values.intOperand))
+            values.intOperand = 0;
+
         if (as<Val>(node))
         {
             values.nodeOperand = (NodeBase*)node;
@@ -158,11 +161,18 @@ struct ValNodeOperand
     }
 
     template<typename T>
-    explicit ValNodeOperand(DeclRef<T> declRef) { values.nodeOperand = declRef.declRefBase; kind = ValNodeOperandKind::ValNode; }
+    explicit ValNodeOperand(DeclRef<T> declRef)
+    { 
+        if constexpr (sizeof(values.nodeOperand) < sizeof(values.intOperand))
+            values.intOperand = 0;
+        values.nodeOperand = declRef.declRefBase; kind = ValNodeOperandKind::ValNode;
+    }
 
     template<typename T>
     explicit ValNodeOperand(T* node)
     {
+        if constexpr (sizeof(values.nodeOperand) < sizeof(values.intOperand))
+            values.intOperand = 0;
         if constexpr (std::is_base_of<Val, T>::value)
         {
             values.nodeOperand = (NodeBase*)node;
@@ -213,7 +223,7 @@ public:
             // via a `NodeDesc` *should* all be going through the
             // deduplication path anyway, as should their operands.
             // 
-            if (operands[i].values.nodeOperand != that.operands[i].values.nodeOperand) return false;
+            if (operands[i].values.intOperand != that.operands[i].values.intOperand) return false;
         }
         return true;
     }
