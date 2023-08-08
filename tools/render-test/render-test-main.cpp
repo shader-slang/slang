@@ -1335,8 +1335,8 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         desc.deviceType = options.deviceType;
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
-        if (options.generateSPIRVViaGLSL)
-            desc.slang.targetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_VIA_GLSL;
+        if (options.generateSPIRVDirectly)
+            desc.slang.targetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 
         List<const char*> requiredFeatureList;
         for (auto& name : options.renderFeatures)

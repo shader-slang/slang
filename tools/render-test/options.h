@@ -71,7 +71,11 @@ struct Options
 
     Slang::DownstreamArgs downstreamArgs;                    ///< Args to downstream tools. Here it's just slang
 
-    bool generateSPIRVViaGLSL = false;
+#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
+    bool generateSPIRVDirectly = true;
+#else
+    bool generateSPIRVDirectly = false;
+#endif
 
     Options() { downstreamArgs.addName("slang"); }
 

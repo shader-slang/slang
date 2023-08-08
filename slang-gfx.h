@@ -2204,7 +2204,7 @@ public:
         const char* targetProfile = nullptr; // (optional) Target shader profile. If null this will be set to platform dependent default.
         SlangFloatingPointMode floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
         SlangOptimizationLevel optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
-        SlangTargetFlags targetFlags = 0;
+        SlangTargetFlags targetFlags = kDefaultTargetFlags;
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 

@@ -699,9 +699,14 @@ extern "C"
         /* When set, will dump out the IR between intermediate compilation steps.*/
         SLANG_TARGET_FLAG_DUMP_IR = 1 << 9,
 
-        /* When set, will generate SPIRV via glslang rather than directly. */
-        SLANG_TARGET_FLAG_GENERATE_SPIRV_VIA_GLSL = 1 << 10,
+        /* When set, will generate SPIRV directly rather than via glslang. */
+        SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
+#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
+    constexpr static SlangTargetFlags kDefaultTargetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+#else
+    constexpr static SlangTargetFlags kDefaultTargetFlags = 0;
+#endif
 
     /*!
     @brief Options to control floating-point precision guarantees for a target.
@@ -4152,7 +4157,7 @@ namespace slang
         SlangProfileID          profile = SLANG_PROFILE_UNKNOWN;
 
             /** Flags for the code generation target. Currently unused. */
-        SlangTargetFlags        flags = 0;
+        SlangTargetFlags        flags = kDefaultTargetFlags;
 
             /** Default mode to use for floating-point operations on the target.
             */

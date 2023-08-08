@@ -101,6 +101,7 @@ enum class OptionKind
     EnableEffectAnnotations,
 
     EmitSpirvViaGLSL,
+    EmitSpirvDirectly,
     
     // Downstream
 
@@ -507,8 +508,17 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
+#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
         { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
         "Generate SPIR-V output by compiling generated GLSL with glslang" },
+        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
+        "Generate SPIR-V output direclty (default)" },
+#else
+        { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
+        "Generate SPIR-V output by compiling generated GLSL with glslang (default)" },
+        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
+        "Generate SPIR-V output direclty rather than by compiling generated GLSL with glslang" },
+#endif
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -726,7 +736,7 @@ struct OptionsParser
     {
         CodeGenTarget       format = CodeGenTarget::Unknown;
         ProfileVersion      profileVersion = ProfileVersion::Unknown;
-        SlangTargetFlags    targetFlags = 0;
+        SlangTargetFlags    targetFlags = kDefaultTargetFlags;
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
         bool                forceGLSLScalarLayout = false;
@@ -2280,7 +2290,16 @@ SlangResult OptionsParser::_parse(
                 // We retun an error so after this has successfully passed, we quit
                 return SLANG_FAIL;
             }
-            case OptionKind::EmitSpirvViaGLSL: getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_VIA_GLSL; break;
+            case OptionKind::EmitSpirvViaGLSL:
+            {
+                getCurrentTarget()->targetFlags &= ~SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+            }
+            break;
+            case OptionKind::EmitSpirvDirectly:
+            {
+                getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+            }
+            break;
 
             case OptionKind::DefaultDownstreamCompiler:
             {
