@@ -119,6 +119,8 @@ public:
         /// True if the compiler should invert the Y coordinate of any SV_Position output.
     bool shouldInvertY() const { return m_invertY; }
 
+    bool shouldUseGLLayout() const { return m_useGLLayout; }
+
     bool getUseOriginalEntryPointName() const { return m_useOriginalEntryPointName; }
 
         /// Given an kind and a binding infer the vulkan binding.
@@ -149,6 +151,8 @@ public:
 
     void setUseOriginalEntryPointName(bool value) { m_useOriginalEntryPointName = value; }
 
+    void setUseGLLayout(bool value) { m_useGLLayout = value; }
+
         /// Ctor
     HLSLToVulkanLayoutOptions();
     
@@ -178,6 +182,9 @@ protected:
 
         /// If set, will use the original entry point name in the generated SPIRV instead of "main".
     bool m_useOriginalEntryPointName = false;
+
+        /// If set, raw buffer load/stores will follow std430 layout.
+    bool m_useGLLayout = false;
 };
 
 } // namespace Slang

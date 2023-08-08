@@ -67,5 +67,21 @@ Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAnd
     ///
 Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset);
 
+/// Compute (if necessary) and return the std430 size and alignment of `type`.
+///
+/// This operation may fail if `type` is not one that can be stored in
+/// general-purpose memory for the current target. In that case the
+/// type is considered to have no std430 layout.
+///
+Result getStd430SizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+
+/// Compute (if necessary) and return the std430 offset of `field`
+///
+/// This operation can fail if the parent type of `field` is not one
+/// that can be stored in general-purpose memory. In that case, the
+/// field is considered to have no std430 offset.
+///
+Result getStd430Offset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset);
+
 }
 

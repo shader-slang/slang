@@ -352,4 +352,316 @@ Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerVa
     return SLANG_FAIL;
 }
 
+
+//////////////////////////
+// Std430 Layout
+//////////////////////////
+
+static Result _calcStd430ArraySizeAndAlignment(
+    TargetRequest* target,
+    IRType* elementType,
+    IRInst* elementCountInst,
+    IRSizeAndAlignment* outSizeAndAlignment)
+{
+    auto elementCountLit = as<IRIntLit>(elementCountInst);
+    if (!elementCountLit)
+        return SLANG_FAIL;
+    auto elementCount = elementCountLit->getValue();
+
+    if (elementCount == 0)
+    {
+        *outSizeAndAlignment = IRSizeAndAlignment(0, 1);
+        return SLANG_OK;
+    }
+
+    IRSizeAndAlignment elementTypeLayout;
+    SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, elementType, &elementTypeLayout));
+
+    auto elementStride = elementTypeLayout.getStride();
+
+    *outSizeAndAlignment = IRSizeAndAlignment(
+        elementStride * (elementCount - 1) + elementTypeLayout.size,
+        elementTypeLayout.alignment);
+    return SLANG_OK;
+}
+
+static Result _calcStd430SizeAndAlignment(
+    TargetRequest* target,
+    IRType* type,
+    IRSizeAndAlignment* outSizeAndAlignment)
+{
+    switch (type->getOp())
+    {
+
+#define CASE(TYPE, SIZE, ALIGNMENT)                                 \
+    case kIROp_##TYPE##Type:                                        \
+        *outSizeAndAlignment = IRSizeAndAlignment(SIZE, ALIGNMENT); \
+        return SLANG_OK                                             \
+        /* end */
+
+        // Most base types are "std430 aligned" (meaning alignment and size are the same)
+#define BASE(TYPE, SIZE) CASE(TYPE, SIZE, SIZE)
+
+        BASE(Int8, 1);
+        BASE(UInt8, 1);
+
+        BASE(Int16, 2);
+        BASE(UInt16, 2);
+        BASE(Half, 2);
+
+        BASE(Int, 4);
+        BASE(UInt, 4);
+        BASE(Float, 4);
+
+        BASE(Int64, 8);
+        BASE(UInt64, 8);
+        BASE(Double, 8);
+
+        // We are currently handling `bool` following the HLSL
+        // precednet of storing it in 4 bytes.
+        //
+        // TODO: It would be good to try to make this follow
+        // per-platform conventions, or at least to be able
+        // to use a 1-byte encoding where available.
+        //
+        BASE(Bool, 4);
+
+        // The Slang `void` type is treated as a zero-byte
+        // type, so that it does not influence layout at all.
+        //
+        CASE(Void, 0, 1);
+
+#undef CASE
+
+#undef CASE
+
+    case kIROp_StructType:
+    {
+        auto structType = cast<IRStructType>(type);
+        IRSizeAndAlignment structLayout;
+        for (auto field : structType->getFields())
+        {
+            IRSizeAndAlignment fieldTypeLayout;
+            SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, field->getFieldType(), &fieldTypeLayout));
+
+            structLayout.size = align(structLayout.size, fieldTypeLayout.alignment);
+            structLayout.alignment = std::max(structLayout.alignment, fieldTypeLayout.alignment);
+
+            IRIntegerValue fieldOffset = structLayout.size;
+            if (auto module = type->getModule())
+            {
+                // If we are in a situation where attaching new
+                // decorations is possible, then we want to
+                // cache the field offset on the IR field
+                // instruction.
+                //
+                IRBuilder builder(module);
+
+                auto intType = builder.getIntType();
+                builder.addDecoration(
+                    field,
+                    kIROp_Std430OffsetDecoration,
+                    builder.getIntValue(intType, fieldOffset));
+            }
+
+            structLayout.size += fieldTypeLayout.size;
+        }
+        *outSizeAndAlignment = structLayout;
+        return SLANG_OK;
+    }
+    break;
+
+    case kIROp_ArrayType:
+    {
+        auto arrayType = cast<IRArrayType>(type);
+
+        return _calcStd430ArraySizeAndAlignment(
+            target,
+            arrayType->getElementType(),
+            arrayType->getElementCount(),
+            outSizeAndAlignment);
+    }
+    break;
+
+    case kIROp_VectorType:
+    {
+        auto vecType = cast<IRVectorType>(type);
+        if (getIntegerValueFromInst(vecType->getElementCount()) == 2)
+        {
+            IRSizeAndAlignment sizeAndAlignment;
+            SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, vecType->getElementType(), &sizeAndAlignment));
+            sizeAndAlignment.size *= 2;
+            sizeAndAlignment.alignment *= 2;
+            *outSizeAndAlignment = sizeAndAlignment;
+            return SLANG_OK;
+        }
+        else
+        {
+            return _calcStd430ArraySizeAndAlignment(
+                target,
+                vecType->getElementType(),
+                vecType->getElementCount(),
+                outSizeAndAlignment);
+        }
+    }
+    break;
+    case kIROp_AnyValueType:
+    {
+        auto anyValType = cast<IRAnyValueType>(type);
+        outSizeAndAlignment->size = getIntVal(anyValType->getSize());
+        outSizeAndAlignment->alignment = 4;
+        return SLANG_OK;
+    }
+    break;
+    case kIROp_TupleType:
+    {
+        auto tupleType = cast<IRTupleType>(type);
+        IRSizeAndAlignment resultLayout;
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            auto elementType = tupleType->getOperand(i);
+            IRSizeAndAlignment fieldTypeLayout;
+            SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, (IRType*)elementType, &fieldTypeLayout));
+            resultLayout.size = align(resultLayout.size, fieldTypeLayout.alignment);
+            resultLayout.alignment = std::max(resultLayout.alignment, fieldTypeLayout.alignment);
+        }
+        *outSizeAndAlignment = resultLayout;
+        return SLANG_OK;
+    }
+    break;
+    case kIROp_WitnessTableType:
+    case kIROp_WitnessTableIDType:
+    case kIROp_RTTIHandleType:
+    {
+        outSizeAndAlignment->size = kRTTIHandleSize;
+        outSizeAndAlignment->alignment = 4;
+        return SLANG_OK;
+    }
+    break;
+    case kIROp_InterfaceType:
+    {
+        auto interfaceType = cast<IRInterfaceType>(type);
+        auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
+        size += kRTTIHeaderSize;
+        size = align(size, 4);
+        IRSizeAndAlignment resultLayout;
+        resultLayout.size = size;
+        resultLayout.alignment = 4;
+        *outSizeAndAlignment = resultLayout;
+        return SLANG_OK;
+    }
+    break;
+    case kIROp_MatrixType:
+    {
+        auto matType = cast<IRMatrixType>(type);
+        auto rowCount = getIntegerValueFromInst(matType->getRowCount());
+        auto colCount = getIntegerValueFromInst(matType->getColumnCount());
+        IRBuilder builder(type->getModule());
+
+        return _calcStd430ArraySizeAndAlignment(
+            target, matType->getElementType(),
+            builder.getIntValue(builder.getUIntType(), rowCount * colCount),
+            outSizeAndAlignment);
+    }
+    break;
+    case kIROp_OutType:
+    case kIROp_InOutType:
+    case kIROp_RefType:
+    case kIROp_RawPointerType:
+    case kIROp_PtrType:
+    case kIROp_NativePtrType:
+    case kIROp_ComPtrType:
+    case kIROp_NativeStringType:
+    {
+        *outSizeAndAlignment = IRSizeAndAlignment(sizeof(void*), sizeof(void*));
+        return SLANG_OK;
+    }
+    break;
+    default:
+        break;
+    }
+
+    if (areResourceTypesBindlessOnTarget(target))
+    {
+        // TODO: need this to be based on target, instead of hard-coded
+        int pointerSize = sizeof(void*);
+
+        if (as<IRTextureType>(type))
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(pointerSize, pointerSize);
+            return SLANG_OK;
+        }
+        else if (as<IRSamplerStateTypeBase>(type))
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(pointerSize, pointerSize);
+            return SLANG_OK;
+        }
+        // TODO: the remaining cases for "bindless" resources on CPU/CUDA targets
+    }
+
+    return SLANG_FAIL;
+}
+
+Result getStd430SizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+{
+    if (auto decor = type->findDecoration<IRStd430SizeAndAlignmentDecoration>())
+    {
+        *outSizeAndAlignment = IRSizeAndAlignment(decor->getSize(), (int)decor->getAlignment());
+        return SLANG_OK;
+    }
+
+    IRSizeAndAlignment sizeAndAlignment;
+    SLANG_RETURN_ON_FAIL(_calcStd430SizeAndAlignment(target, type, &sizeAndAlignment));
+
+    if (auto module = type->getModule())
+    {
+        IRBuilder builder(module);
+
+        auto intType = builder.getIntType();
+        builder.addDecoration(
+            type,
+            kIROp_Std430SizeAndAlignmentDecoration,
+            builder.getIntValue(intType, sizeAndAlignment.size),
+            builder.getIntValue(intType, sizeAndAlignment.alignment));
+    }
+
+    *outSizeAndAlignment = sizeAndAlignment;
+    return SLANG_OK;
+}
+
+
+Result getStd430Offset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
+{
+    if (auto decor = field->findDecoration<IRStd430OffsetDecoration>())
+    {
+        *outOffset = decor->getOffset();
+        return SLANG_OK;
+    }
+
+    // Offsets are computed as part of layout out types,
+    // so we expect that layout of the "parent" type
+    // of the field should add an offset to it if
+    // possible.
+
+    auto structType = as<IRStructType>(field->getParent());
+    if (!structType)
+        return SLANG_FAIL;
+
+    IRSizeAndAlignment structTypeLayout;
+    SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, structType, &structTypeLayout));
+
+    if (auto decor = field->findDecoration<IRStd430OffsetDecoration>())
+    {
+        *outOffset = decor->getOffset();
+        return SLANG_OK;
+    }
+
+    // If attempting to lay out the parent type didn't
+    // cause the field to get an offset, then we are
+    // in an unexpected case with no easy answer.
+    //
+    return SLANG_FAIL;
+}
+
+
 }
