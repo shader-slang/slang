@@ -74,7 +74,7 @@ void accumulate_3D(inout uint r, TextureFootprint3D f)
     accumulate(r, f.isSingleLevel);
 }
 
-// SPRIV: Extension  "SPV_NV_shader_image_footprint"
+// SPRIV: OpExtension "SPV_NV_shader_image_footprint"
 
 void fragmentMain(
             float                       v : VARYING,

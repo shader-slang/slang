@@ -62,8 +62,8 @@ void fragmentMain(
 
     accumulate(r, texture.queryFootprintCoarse(granularity, sampler, coords));
 
-// SPIRV: Extension  "SPV_NV_shader_image_footprint"
-// SPIRV: ImageSampleFootprintNV
+// SPIRV: OpExtension "SPV_NV_shader_image_footprint"
+// SPIRV: OpImageSampleFootprintNV
 
 // HLSL: NvFootprintCoarse
 

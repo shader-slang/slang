@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -entry MainCs -stage compute -profile glsl_450 -target spirv
-//CHECK: EntryPoint
+//CHECK: OpEntryPoint
 
 RWTexture2D<float4> g_Test;
 
@@ -26,4 +26,4 @@ void MainCs(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThreadID)
     // color+= LoadSourceColor ( pixelPos , int2 ( i%3 , i/3 ) , msaaSampleIndex ) . rgb ;
     //}
     g_Test[int2(pixelPos.x / 2, pixelPos.y + 0)] = float4(color, 1.0);
-} 
+}
