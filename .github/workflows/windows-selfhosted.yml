@@ -39,6 +39,6 @@ jobs:
     - name: test
       run: |
         $slangTestBinDir = ".\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\";
-        $env:Path += ";$slangTestBinDir";
+        $spirvToolsBinDir = ".\external\slang-binaries\spirv-tools\windows-${{matrix.testPlatform}}\bin\";
+        $env:Path += ";$slangTestBinDir;$spirvToolsBinDir";
         & "$slangTestBinDir\slang-test.exe" -appveyor -bindir "$slangTestBinDir\" -platform ${{matrix.testPlatform}} -configuration ${{matrix.configuration}} -category ${{matrix.testCategory}} -api all-cpu 2>&1;
-    
