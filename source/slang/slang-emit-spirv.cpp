@@ -2965,7 +2965,7 @@ struct SPIRVEmitContext
             parent,
             inst,
             spvVecTy,
-            List<IRInst*>::makeRepeated(scalar, numElems)
+            List<IRInst*>::makeRepeated(scalar, Index(numElems))
         );
     }
 
@@ -3221,7 +3221,7 @@ SlangResult emitSPIRVFromIR(
 
     spirvOut.addRange(
         (uint8_t const*) context.m_words.getBuffer(),
-        context.m_words.getCount() * sizeof(context.m_words[0]));
+        context.m_words.getCount() * Index(sizeof(context.m_words[0])));
 
     const auto validationResult = debugValidateSPIRV(spirvOut);
     // If validation isn't available, don't say it failed, it's just a debug
