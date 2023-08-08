@@ -18,8 +18,9 @@ struct C
         a = 0;
     }
 }
-int doSomething(C d)
+int doSomething(C d_in)
 {
+    C d = d_in;
     int rs = 0;
     for (int i = 0; i < 10; i++)
         rs = d.add();
