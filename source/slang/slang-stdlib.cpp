@@ -114,6 +114,12 @@ namespace Slang
 
     void Session::finalizeSharedASTBuilder()
     {
+        // Force creation of all builtin types so we can make sure
+        // they are created by the builtin AST builder instead of
+        // some user linkage's ast builder. This avoid the problem
+        // of storing a reference to these global types that are
+        // owned by a user linkage that gets deleted with the linkage.
+        //
         globalAstBuilder->getNoneType();
         globalAstBuilder->getNullPtrType();
         globalAstBuilder->getBottomType();
@@ -123,6 +129,9 @@ namespace Slang
         globalAstBuilder->getStringType();
         globalAstBuilder->getEnumTypeType();
         globalAstBuilder->getDiffInterfaceType();
+        globalAstBuilder->getSharedASTBuilder()->getDynamicType();
+        globalAstBuilder->getSharedASTBuilder()->getDiffInterfaceType();
+        globalAstBuilder->getSharedASTBuilder()->getNativeStringType();
         for (auto& baseType : kBaseTypes)
             globalAstBuilder->getBuiltinType(baseType.tag);
     }
