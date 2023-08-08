@@ -487,23 +487,15 @@ static Result _calcStd430SizeAndAlignment(
     {
         auto vecType = cast<IRVectorType>(type);
         auto elementCount = getIntegerValueFromInst(vecType->getElementCount());
-        if (elementCount == 2 || elementCount == 4)
-        {
-            IRSizeAndAlignment sizeAndAlignment;
-            SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, vecType->getElementType(), &sizeAndAlignment));
-            sizeAndAlignment.size *= (int)elementCount;
-            sizeAndAlignment.alignment *= (int)elementCount;
-            *outSizeAndAlignment = sizeAndAlignment;
-            return SLANG_OK;
-        }
-        else
-        {
-            return _calcStd430ArraySizeAndAlignment(
-                target,
-                vecType->getElementType(),
-                vecType->getElementCount(),
-                outSizeAndAlignment);
-        }
+        auto alignmentMultiplier = elementCount;
+        if (elementCount == 3)
+            alignmentMultiplier = 4;
+        IRSizeAndAlignment sizeAndAlignment;
+        SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, vecType->getElementType(), &sizeAndAlignment));
+        sizeAndAlignment.size *= (int)elementCount;
+        sizeAndAlignment.alignment *= (int)alignmentMultiplier;
+        *outSizeAndAlignment = sizeAndAlignment;
+        return SLANG_OK;
     }
     break;
     case kIROp_AnyValueType:
