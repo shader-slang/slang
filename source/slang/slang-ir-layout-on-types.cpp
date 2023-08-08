@@ -89,15 +89,15 @@ static Dictionary<IRType*, IRTypeLayout*> associateTypesWithLayouts(IRModule* mo
                         // todo
                     }
                 }
-                else if(const auto dec = as<IREntryPointLayout>(varLayoutUser))
+                else if(as<IREntryPointLayout>(varLayoutUser))
                 {
                     // todo
                 }
-                else if(const auto dec = as<IRStructFieldLayoutAttr>(varLayoutUser))
+                else if(as<IRStructFieldLayoutAttr>(varLayoutUser))
                 {
                     // todo
                 }
-                else if(const auto dec = as<IRParameterGroupTypeLayout>(varLayoutUser))
+                else if(as<IRParameterGroupTypeLayout>(varLayoutUser))
                 {
                     // todo
                 }
