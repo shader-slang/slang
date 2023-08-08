@@ -731,6 +731,12 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A `[naturalOffset(o)]` decoration is attached to a field to indicate that it has natural offset `o` in the parent type
     INST(NaturalOffsetDecoration, naturalOffset, 1, 0)
 
+        /// A `[std430SizeAndAlignment(s,a)]` decoration is attached to a type to indicate that is has std430 size `s` and alignment `a`
+    INST(Std430SizeAndAlignmentDecoration, naturalSizeAndAlignment, 2, 0)
+
+        /// A `[std430Offset(o)]` decoration is attached to a field to indicate that it has std430 offset `o` in the parent type
+    INST(Std430OffsetDecoration, naturalOffset, 1, 0)
+
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)

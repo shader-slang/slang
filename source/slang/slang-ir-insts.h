@@ -595,6 +595,28 @@ struct IRNaturalOffsetDecoration : IRDecoration
     IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
 };
 
+struct IRStd430SizeAndAlignmentDecoration : IRDecoration
+{
+    enum { kOp = kIROp_Std430SizeAndAlignmentDecoration };
+    IR_LEAF_ISA(Std430SizeAndAlignmentDecoration)
+
+    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getAlignmentOperand() { return cast<IRIntLit>(getOperand(1)); }
+
+    IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
+    IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
+};
+
+struct IRStd430OffsetDecoration : IRDecoration
+{
+    enum { kOp = kIROp_Std430OffsetDecoration };
+    IR_LEAF_ISA(Std430OffsetDecoration)
+
+    IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(0)); }
+
+    IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
+};
+
 struct IRBuiltinDecoration : IRDecoration
 {
     enum
