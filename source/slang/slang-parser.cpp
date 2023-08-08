@@ -6412,6 +6412,7 @@ namespace Slang
     static NodeBase* parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/)
     {
         auto modifier = parser->astBuilder->create<TargetIntrinsicModifier>();
+        modifier->isString = false;
 
         if (AdvanceIf(parser, TokenType::LParent))
         {
@@ -6429,11 +6430,15 @@ namespace Slang
                 }
                 if( parser->LookAheadToken(TokenType::StringLiteral) )
                 {
+                    bool first = true;
                     do
                     {
                         const auto t = parser->ReadToken();
-                        modifier->definitionString.append(" ");
+                        first
+                            ? void(first = false)
+                            : modifier->definitionString.append(" ");
                         modifier->definitionString.append(getStringLiteralTokenValue(t));
+                        modifier->isString = true;
                     }
                     while(parser->LookAheadToken(TokenType::StringLiteral));
                 }

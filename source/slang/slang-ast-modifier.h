@@ -83,6 +83,7 @@ class TargetIntrinsicModifier : public Modifier
     // string (the concatenation of several string literals)
     Token definitionIdent;
     String definitionString;
+    bool isString;
 
     // A predicate to be used on an identifier to guard this intrinsic
     Token predicateToken;
