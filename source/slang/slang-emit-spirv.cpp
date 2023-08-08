@@ -833,7 +833,7 @@ struct SPIRVEmitContext
     };
     Dictionary<ConstantValueKey<IRIntegerValue>, SpvInst*> m_spvIntConstants;
     Dictionary<ConstantValueKey<IRFloatingPointValue>, SpvInst*> m_spvFloatConstants;
-    SpvInst* emitIntConstant(IRIntegerValue val, IRType* type)
+    SpvInst* emitIntConstant(IRIntegerValue val, IRType* type, IRInst* inst = nullptr)
     {
         ConstantValueKey<IRIntegerValue> key;
         key.value = val;
@@ -841,8 +841,6 @@ struct SPIRVEmitContext
         SpvInst* result = nullptr;
         if (m_spvIntConstants.tryGetValue(key, result))
             return result;
-        SpvWord valWord;
-        memcpy(&valWord, &val, sizeof(SpvWord));
         switch (type->getOp())
         {
         case kIROp_Int64Type:
@@ -852,27 +850,27 @@ struct SPIRVEmitContext
         case kIROp_UIntPtrType:
 #endif
         {
-            SpvWord valHighWord;
-            memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
             result = emitOpConstant(
-                nullptr,
+                inst,
                 type,
-                SpvLiteralBits::from64(val));
+                SpvLiteralBits::from64(uint64_t(val))
+            );
             break;
         }
         default:
         {
             result = emitOpConstant(
-                nullptr,
+                inst,
                 type,
-                SpvLiteralBits::from32(valWord));
+                SpvLiteralBits::from32(uint32_t(val))
+            );
             break;
         }
         }
         m_spvIntConstants[key] = result;
         return result;
     }
-    SpvInst* emitFloatConstant(IRFloatingPointValue val, IRType* type)
+    SpvInst* emitFloatConstant(IRFloatingPointValue val, IRType* type, IRInst* inst = nullptr)
     {
         ConstantValueKey<IRFloatingPointValue> key;
         key.value = val;
@@ -880,23 +878,30 @@ struct SPIRVEmitContext
         SpvInst* result = nullptr;
         if (m_spvFloatConstants.tryGetValue(key, result))
             return result;
-        SpvWord valWord;
-        memcpy(&valWord, &val, sizeof(SpvWord));
         if (type->getOp() == kIROp_DoubleType)
         {
-            SpvWord valHighWord;
-            memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
             result = emitOpConstant(
-                nullptr,
+                inst,
                 type,
-                SpvLiteralBits::from64(val));
+                SpvLiteralBits::from64(uint64_t(DoubleAsInt64(val))));
+        }
+        else if(type->getOp() == kIROp_FloatType)
+        {
+            result = emitOpConstant(
+                inst,
+                type,
+                SpvLiteralBits::from32(uint32_t(FloatAsInt(float(val)))));
+        }
+        else if(type->getOp() == kIROp_HalfType)
+        {
+            result = emitOpConstant(
+                inst,
+                type,
+                SpvLiteralBits::from32(uint32_t(FloatToHalf(float(val)))));
         }
         else
         {
-            result = emitOpConstant(
-                nullptr,
-                type,
-                SpvLiteralBits::from32(valWord));
+            SLANG_UNEXPECTED("missing case in SPIR-V emitFloatConstant");
         }
         m_spvFloatConstants[key] = result;
         return result;
@@ -1914,51 +1919,13 @@ struct SPIRVEmitContext
         case kIROp_IntLit:
             {
                 auto value = as<IRIntLit>(inst)->getValue();
-                switch (as<IRBasicType>(inst->getDataType())->getBaseType())
-                {
-                case BaseType::Int64:
-                case BaseType::UInt64:
-                case BaseType::IntPtr:
-                case BaseType::UIntPtr:
-                    return emitOpConstant(
-                        inst,
-                        inst->getDataType(),
-                        SpvLiteralBits::from64(value)
-                    );
-                default:
-                    return emitOpConstant(
-                        inst,
-                        inst->getDataType(),
-                        SpvLiteralBits::from32(value)
-                    );
-                }
+                return emitIntConstant(value, inst->getDataType(), inst);
             }
         case kIROp_FloatLit:
             {
-                auto value = as<IRConstant>(inst)->value.floatVal;
-                switch (as<IRBasicType>(inst->getDataType())->getBaseType())
-                {
-                case BaseType::Half:
-                    return emitOpConstant(
-                        inst,
-                        inst->getDataType(),
-                        SpvLiteralBits::from32(FloatToHalf((float)value))
-                    );
-                case BaseType::Float:
-                    return emitOpConstant(
-                        inst,
-                        inst->getDataType(),
-                        SpvLiteralBits::from32(FloatAsInt((float)value))
-                    );
-                case BaseType::Double:
-                    return emitOpConstant(
-                        inst,
-                        inst->getDataType(),
-                        SpvLiteralBits::from64(DoubleAsInt64(value))
-                    );
-                default:
-                    return nullptr;
-                }
+                const auto value = as<IRConstant>(inst)->value.floatVal;
+                const auto type = inst->getDataType();
+                return emitFloatConstant(value, type, inst);
             }
         case kIROp_BoolLit:
             {
