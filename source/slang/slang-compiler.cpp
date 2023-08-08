@@ -456,6 +456,10 @@ namespace Slang
             {
                 return SourceLanguage::CUDA;
             }
+            case PassThroughMode::SpirvDis:
+            {
+                return SourceLanguage::SPIRV;
+            }
             
             default: break;
         }
