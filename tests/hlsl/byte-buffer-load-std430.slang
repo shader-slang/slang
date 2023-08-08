@@ -17,5 +17,6 @@ struct MyStruct
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     var v = inBuffer.Load<MyStruct>(0);
-    outputBuffer[dispatchThreadID.x] = v.v2.x + v.v1.x; // expect 8.0
+    var g = inBuffer.Load<float4>(4);
+    outputBuffer[dispatchThreadID.x] = v.v2.x + v.v1.x + g.x; // expect 10.0
 }
