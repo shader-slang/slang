@@ -231,8 +231,6 @@ public:
 
     MemoryArena& getArena() { return m_arena; }
 
-    void _verifyValDescConsistency(Val* val, const ValNodeDesc& expectedDesc);
-
     template<typename T, typename ... TArgs>
     SLANG_FORCE_INLINE T* getOrCreate(TArgs ... args)
     {
