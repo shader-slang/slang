@@ -279,9 +279,11 @@ struct SpvSnippetEmitContext
 // A structure which can hold an integer literal, either one word or several
 struct SpvLiteralInteger
 {
+    static SpvLiteralInteger from32(int32_t value) { return from32(uint32_t(value)); }
     static SpvLiteralInteger from32(uint32_t value) { return SpvLiteralInteger{{value}}; }
+    static SpvLiteralInteger from64(int64_t value) { return from64(uint64_t(value)); }
     static SpvLiteralInteger from64(uint64_t value) { return SpvLiteralInteger{{SpvWord(value), SpvWord(value >> 32)}}; }
-    List<SpvWord> value; // Words, stored low words to hig (TODO, SmallArray or something here)
+    List<SpvWord> value; // Words, stored low words to high (TODO, SmallArray or something here)
 };
 
 // A structure which can hold bitwise literal, either one word or several
