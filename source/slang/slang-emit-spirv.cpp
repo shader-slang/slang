@@ -1261,7 +1261,7 @@ struct SPIRVEmitContext
             {
                 const auto texTypeInst = as<IRTextureType>(inst);
                 const auto sampledType = texTypeInst->getElementType();
-                SpvDim dim;
+                SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
                 switch(texTypeInst->GetBaseShape())
                 {
                     case TextureFlavor::Shape1D:
