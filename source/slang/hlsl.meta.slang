@@ -2366,6 +2366,10 @@ __target_intrinsic(glsl, "$atomicAdd($A, $1)")
 __target_intrinsic(cuda, "atomicAdd((uint*)$0, $1)")
 void InterlockedAdd(__ref uint dest, uint value);
 
+__target_intrinsic(glsl, "$atomicAdd($A, $1)")
+__target_intrinsic(cuda, "atomicAdd((uint*)$0, $1)")
+void InterlockedAdd(__ref uint dest, int value);
+
 __target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
 __target_intrinsic(cuda, "(*$2 = atomicAdd($0, $1))")
 void InterlockedAdd(__ref  int dest,  int value, out  int original_value);
