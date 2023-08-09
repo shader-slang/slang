@@ -79,26 +79,20 @@ void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
             // Here we assume the imageElementType is already lowered into float4/uint4 types from any
             // user-defined type.
             assert(imageElementType->getOp() == kIROp_VectorType);
-            auto originalValue = builder.emitImageLoad(imageElementType, imageSubscript->getImage(), legalizedCoord);
+            auto vectorBaseType = getIRVectorBaseType(imageElementType);
+            IRType* vector4Type = builder.getVectorType(vectorBaseType, 4);
+            auto originalValue = builder.emitImageLoad(vector4Type, imageSubscript->getImage(), legalizedCoord);
             Array<IRInst*, 4> indices;
             for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
             {
                 indices.add(swizzledStore->getElementIndex(i));
             }
             auto newValue = builder.emitSwizzleSet(
-                imageElementType,
+                vector4Type,
                 originalValue,
                 swizzledStore->getSource(),
                 swizzledStore->getElementCount(),
                 indices.getBuffer());
-            if (getIRVectorElementSize(imageElementType) != 4)
-            {
-                auto vectorBaseType = getIRVectorBaseType(imageElementType);
-                newValue = builder.emitVectorReshape(
-                    builder.getVectorType(
-                        vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
-                    newValue);
-            }
             auto imageStore = builder.emitImageStore(
                 builder.getVoidType(), imageSubscript->getImage(), legalizedCoord, newValue);
             storeInst->replaceUsesWith(imageStore);
