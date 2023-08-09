@@ -186,9 +186,6 @@ namespace Slang
         {
             if (auto rightBasic = as<BasicExpressionType>(right))
             {
-                auto leftFlavor = leftBasic->getBaseType();
-                auto rightFlavor = rightBasic->getBaseType();
-
                 auto costConvertRightToLeft = getConversionCost(leftBasic, rightBasic);
                 auto costConvertLeftToRight = getConversionCost(rightBasic, leftBasic);
 
