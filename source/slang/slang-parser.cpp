@@ -4425,6 +4425,24 @@ namespace Slang
             statement = ParseDefaultStmt(this);
         else if (LookAheadToken("__GPU_FOREACH"))
             statement = ParseGpuForeachStmt(this);
+        else if (LookAheadToken("struct"))
+        {
+            SLANG_ASSERT(currentScope);
+            auto structDecl = ParseStruct();
+            AddMember(currentScope, structDecl);
+        }
+        else if (AdvanceIf(this, "typedef"))
+        {
+            SLANG_ASSERT(currentScope);
+            auto typeDefDecl = parseTypeDef(this, nullptr);
+            AddMember(currentScope, (Decl*)typeDefDecl);
+        }
+        else if (AdvanceIf(this, "typealias"))
+        {
+            SLANG_ASSERT(currentScope);
+            auto typeDefDecl = parseTypeAliasDecl(this, nullptr);
+            AddMember(currentScope, (Decl*)typeDefDecl);
+        }
         else if (LookAheadToken(TokenType::Dollar))
         {
             statement = parseCompileTimeStmt(this);
@@ -4581,6 +4599,25 @@ namespace Slang
         Token closingBraceToken;
         while (!AdvanceIfMatch(this, MatchedTokenType::CurlyBraces, &closingBraceToken))
         {
+            if (LookAheadToken("struct"))
+            {
+                auto structDecl = ParseStruct();
+                AddMember(scopeDecl, structDecl);
+                continue;
+            }
+            else if (AdvanceIf(this, "typedef"))
+            {
+                auto typeDefDecl = parseTypeDef(this, nullptr);
+                AddMember(scopeDecl, (Decl*)typeDefDecl);
+                continue;
+            }
+            else if (AdvanceIf(this, "typealias"))
+            {
+                auto typeDefDecl = parseTypeAliasDecl(this, nullptr);
+                AddMember(scopeDecl, (Decl*)typeDefDecl);
+                continue;
+            }
+
             auto stmt = ParseStatement();
             if(stmt)
             {
