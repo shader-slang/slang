@@ -274,14 +274,6 @@ void ASTBuilder::incrementEpoch()
     _getGlobalASTEpochId()++;
 }
 
-void ASTBuilder::_verifyValDescConsistency(Val* val, const ValNodeDesc& expectedDesc)
-{
-    if (!val)
-        return;
-    ValNodeDesc descOut = val->getDesc();
-    SLANG_ASSERT(descOut == expectedDesc);
-}
-
 NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
 {
     const ReflectClassInfo* info = ASTClassInfo::getInfo(nodeType);

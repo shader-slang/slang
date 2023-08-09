@@ -21,7 +21,7 @@ void ValNodeDesc::init()
         // to match the semantics implemented for `==` on
         // `NodeDesc`.
         //
-        hasher.hashValue(operands[i].values.nodeOperand);
+        hasher.hashValue(operands[i].values.intOperand);
     }
     hashCode = hasher.getResult();
 }
@@ -59,13 +59,13 @@ Val* Val::resolve()
     // If we are not in a proper checking context, just return the previously resolved val.
     if (!astBuilder)
         return m_resolvedVal? m_resolvedVal : this;
-    if (m_resolvedVal && m_resolvedValEpoch == getCurrentASTBuilder()->getEpoch())
+    if (m_resolvedVal && m_resolvedValEpoch == astBuilder->getEpoch())
     {
         SLANG_ASSERT(as<Val>(m_resolvedVal));
         return m_resolvedVal;
     }
     // Update epoch now to avoid infinite recursion.
-    m_resolvedValEpoch = getCurrentASTBuilder()->getEpoch();
+    m_resolvedValEpoch = astBuilder->getEpoch();
     m_resolvedVal = resolveImpl();
 #ifdef _DEBUG
     if (m_resolvedVal->_debugUID > 0 && this->_debugUID < 0)
@@ -74,16 +74,6 @@ Val* Val::resolve()
     }
 #endif
     return m_resolvedVal;
-}
-
-ValNodeDesc Val::getDesc()
-{
-    ValNodeDesc desc;
-    desc.type = astNodeType;
-    for (auto operand : m_operands)
-        desc.operands.add(operand);
-    desc.init();
-    return desc;
 }
 
 void Val::_setUnique()
@@ -115,13 +105,13 @@ Val* Val::defaultResolveImpl()
         }
         newDesc.operands.add(operand);
     }
+    
+    if (!diff)
+        return this;
+
     newDesc.init();
     auto astBuilder = getCurrentASTBuilder();
-
-    Val* existingNode = nullptr;
-    if (astBuilder->m_cachedNodes.tryGetValue(newDesc, existingNode))
-        return existingNode;
-    return astBuilder->_getOrCreateImpl(newDesc);
+    return astBuilder->_getOrCreateImpl(_Move(newDesc));
 }
 
 String Val::toString()

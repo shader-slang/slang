@@ -423,21 +423,20 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
         else if (auto magicMod = declRef.getDecl()->findModifier<MagicTypeModifier>())
         {
+            if (magicMod->magicNodeType == ASTNodeType(-1))
+            {
+                SLANG_UNEXPECTED("unhandled type");
+            }
             // Always create builtin types in global AST builder.
             if (astBuilder->getSharedASTBuilder()->getInnerASTBuilder() != astBuilder)
                 return DeclRefType::create(astBuilder->getSharedASTBuilder()->getInnerASTBuilder(), declRef);
 
             declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
-            auto classInfo = astBuilder->findSyntaxClass(magicMod->magicName.getUnownedSlice());
-            if (!classInfo.classInfo)
-            {
-                SLANG_UNEXPECTED("unhandled type");
-            }
             ValNodeDesc nodeDesc = {};
-            nodeDesc.type = (ASTNodeType)classInfo.classInfo->m_classId;
+            nodeDesc.type = magicMod->magicNodeType;
             nodeDesc.operands.add(ValNodeOperand(declRef));
             nodeDesc.init();
-            NodeBase* type = astBuilder->_getOrCreateImpl(nodeDesc);
+            NodeBase* type = astBuilder->_getOrCreateImpl(_Move(nodeDesc));
             if (!type)
             {
                 SLANG_UNEXPECTED("constructor failure");

@@ -392,6 +392,8 @@ class MagicTypeModifier : public Modifier
 {
     SLANG_AST_CLASS(MagicTypeModifier)
 
+    ASTNodeType magicNodeType = ASTNodeType(-1);
+
         /// Modifier has a name so call this magicModifier to disambiguate
     String magicName;
     uint32_t tag = uint32_t(0);

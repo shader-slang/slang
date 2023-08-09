@@ -692,7 +692,7 @@ Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet su
 
     (*ioDiff)++;
 
-    auto substType = getCurrentASTBuilder()->getAndType(substLeft, substRight);
+    auto substType = astBuilder->getAndType(substLeft, substRight);
     return substType;
 }
 

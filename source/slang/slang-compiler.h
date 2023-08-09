@@ -3026,6 +3026,7 @@ namespace Slang
             /// This AST Builder should only be used for creating AST nodes that are global across requests
             /// not doing so could lead to memory being consumed but not used.
         ASTBuilder* getGlobalASTBuilder() { return globalAstBuilder; }
+        void finalizeSharedASTBuilder();
 
         RefPtr<ASTBuilder> globalAstBuilder;
 

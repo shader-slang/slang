@@ -567,8 +567,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 else if (Val* val = dynamicCast<Val>(nodeBase))
                                 {
                                     val->_setUnique();
-                                    auto desc = val->getDesc();
-                                    astBuilder->m_cachedNodes.tryGetValueOrAdd(desc, val);
+                                    astBuilder->m_cachedNodes.tryGetValueOrAdd(ValKey(val), val);
                                 }
                             }
                         }

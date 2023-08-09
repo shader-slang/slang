@@ -112,13 +112,55 @@ protected:
     Index m_id = 1;
 };
 
+struct ValKey
+{
+    Val* val;
+    HashCode hashCode;
+    ValKey() = default;
+    ValKey(Val* v)
+    {
+        val = v;
+        Hasher hasher;
+        hasher.hashValue(v->astNodeType);
+        for (auto& operand : v->m_operands)
+            hasher.hashValue(operand.values.intOperand);
+        hashCode = hasher.getResult();
+    }
+    bool operator==(ValKey other) const
+    {
+        if (val == other.val) return true;
+        if (hashCode != other.hashCode) return false;
+        if (val->astNodeType != other.val->astNodeType)
+            return false;
+        if (val->m_operands.getCount() != other.val->m_operands.getCount())
+            return false;
+        for (Index i = 0; i < val->m_operands.getCount(); i++)
+            if (val->m_operands[i].values.intOperand != other.val->m_operands[i].values.intOperand)
+                return false;
+        return true;
+    }
+    bool operator==(const ValNodeDesc& desc) const
+    {
+        if (hashCode != desc.getHashCode()) return false;
+        if (val->astNodeType != desc.type)
+            return false;
+        if (val->m_operands.getCount() != desc.operands.getCount())
+            return false;
+        for (Index i = 0; i < val->m_operands.getCount(); i++)
+            if (val->m_operands[i].values.intOperand != desc.operands[i].values.intOperand)
+                return false;
+        return true;
+    }
+    HashCode getHashCode() const { return hashCode; }
+};
+
 class ASTBuilder : public RefObject
 {
     friend class SharedASTBuilder;
 
 public:
 
-    Val* _getOrCreateImpl(ValNodeDesc const& desc)
+    Val* _getOrCreateImpl(ValNodeDesc&& desc)
     {
         if (auto found = m_cachedNodes.tryGetValue(desc))
             return *found;
@@ -127,14 +169,14 @@ public:
         SLANG_ASSERT(node);
         for (auto& operand : desc.operands)
             node->m_operands.add(operand);
-
-        m_cachedNodes.add(desc, node);
-        return node;
+        auto result = node;
+        m_cachedNodes.add(ValKey(node), _Move(node));
+        return result;
     }
 
     /// A cache for AST nodes that are entirely defined by their node type, with
     /// no need for additional state.
-    Dictionary<ValNodeDesc, Val*> m_cachedNodes;
+    Dictionary<ValKey, Val*> m_cachedNodes;
 
     Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
 
@@ -189,8 +231,6 @@ public:
 
     MemoryArena& getArena() { return m_arena; }
 
-    void _verifyValDescConsistency(Val* val, const ValNodeDesc& expectedDesc);
-
     template<typename T, typename ... TArgs>
     SLANG_FORCE_INLINE T* getOrCreate(TArgs ... args)
     {
@@ -199,10 +239,7 @@ public:
         desc.type = T::kType;
         addOrAppendToNodeList(desc.operands, args...);
         desc.init();
-        auto result = (T*)_getOrCreateImpl(desc);
-#ifdef _DEBUG
-        _verifyValDescConsistency(dynamicCast<Val>(result), desc);
-#endif
+        auto result = (T*)_getOrCreateImpl(_Move(desc));
         return result;
     }
 
@@ -214,10 +251,7 @@ public:
         ValNodeDesc desc;
         desc.type = T::kType;
         desc.init();
-        auto result = (T*)_getOrCreateImpl(desc);
-#ifdef _DEBUG
-        _verifyValDescConsistency(dynamicCast<Val>(result), desc);
-#endif
+        auto result = (T*)_getOrCreateImpl(_Move(desc));
         return result;
     }
 
@@ -237,13 +271,9 @@ public:
     }
 
     template<typename T>
-    DeclRef<T> getDirectDeclRef(T* decl)
+    DeclRef<T> getDirectDeclRef(T* decl, typename std::enable_if_t<std::is_base_of_v<Decl, T>>* = nullptr)
     {
-        if (!decl)
-            return DeclRef<T>();
-        
-        auto result = DeclRef<T>(getOrCreate<DirectDeclRef>(decl));
-        return result;
+        return DeclRef<T>(decl);
     }
 
     template<typename T>
@@ -285,7 +315,7 @@ public:
         }
         else if (auto directDeclRef = as<DirectDeclRef>(parent.declRefBase))
         {
-            return DeclRef<T>(getOrCreate<DirectDeclRef>(memberDecl));
+            return makeDeclRef(memberDecl);
         }
 
 #if _DEBUG
@@ -331,11 +361,6 @@ public:
 
     LookupDeclRef* getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
-        ValNodeDesc desc;
-        desc.type = LookupDeclRef::kType;
-        desc.operands.add(ValNodeOperand(subtypeWitness));
-        desc.operands.add(ValNodeOperand(declToLookup));
-        desc.init();
         auto result = getOrCreate<LookupDeclRef>(declToLookup, base, subtypeWitness);
         return result;
     }
@@ -487,7 +512,7 @@ public:
     Index getId() { return m_id; }
 
         /// Ctor
-    ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name);
+    ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name); 
 
         /// Dtor
     ~ASTBuilder();
