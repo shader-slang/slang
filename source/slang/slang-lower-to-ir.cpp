@@ -98,6 +98,7 @@ struct SwizzledLValueInfo;
 struct SwizzledMatrixLValueInfo;
 struct CopiedValInfo;
 struct ExtractedExistentialValInfo;
+struct ImplicitCastLValueInfo;
 
 // This type is our core representation of lowered values.
 // In the simple case, it just wraps an `IRInst*`.
@@ -138,6 +139,9 @@ struct LoweredValInfo
 
         // The value extracted from an opened existential
         ExtractedExistential,
+
+        // The L-Value that is an implicit cast.
+        ImplicitCastedLValue,
     };
 
     union
@@ -217,6 +221,9 @@ struct LoweredValInfo
     static LoweredValInfo swizzledMatrixLValue(
         SwizzledMatrixLValueInfo* extInfo);
 
+    static LoweredValInfo implicitCastedLValue(
+        ImplicitCastLValueInfo* extInfo);
+
     SwizzledLValueInfo* getSwizzledLValueInfo()
     {
         SLANG_ASSERT(flavor == Flavor::SwizzledLValue);
@@ -236,6 +243,12 @@ struct LoweredValInfo
     {
         SLANG_ASSERT(flavor == Flavor::ExtractedExistential);
         return (ExtractedExistentialValInfo*)ext;
+    }
+
+    ImplicitCastLValueInfo* getImplicitCastedLValue()
+    {
+        SLANG_ASSERT(flavor == Flavor::ImplicitCastedLValue);
+        return (ImplicitCastLValueInfo*)ext;
     }
 };
 
@@ -362,6 +375,18 @@ struct ExtractedExistentialValInfo : ExtendedValueInfo
     IRInst* witnessTable;
 };
 
+struct ImplicitCastLValueInfo : ExtendedValueInfo
+{
+    // The type of the expression.
+    IRType* type;
+
+    // The base expression (this should be an l-value)
+    LoweredValInfo  base;
+
+    // The type of the lvalue (inout, out, ref, etc.)
+    ParameterDirection lValueType;
+};
+
 LoweredValInfo LoweredValInfo::boundMember(
     BoundMemberInfo*    boundMemberInfo)
 {
@@ -403,6 +428,15 @@ LoweredValInfo LoweredValInfo::swizzledMatrixLValue(
 {
     LoweredValInfo info;
     info.flavor = Flavor::SwizzledMatrixLValue;
+    info.ext = extInfo;
+    return info;
+}
+
+LoweredValInfo LoweredValInfo::implicitCastedLValue(
+    ImplicitCastLValueInfo* extInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::ImplicitCastedLValue;
     info.ext = extInfo;
     return info;
 }
@@ -1124,7 +1158,13 @@ top:
 
             return LoweredValInfo::simple(info->extractedVal);
         }
-
+    case LoweredValInfo::Flavor::ImplicitCastedLValue:
+        {
+            auto info = lowered.getImplicitCastedLValue();
+            auto baseVal = materialize(context, info->base);
+            auto result = builder->emitCast(info->type, getSimpleVal(context, baseVal));
+            return LoweredValInfo::simple(result);
+        }
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
         UNREACHABLE_RETURN(LoweredValInfo());
@@ -4468,23 +4508,14 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 
         auto loweredArg = lowerLValueExpr(context, expr->arguments[0]);
 
-        // It should be a ptr, because it is a LValue
-        SLANG_ASSERT(loweredArg.flavor == LoweredValInfo::Flavor::Ptr);
-
-        // We have the irValue (which should be a Ptr because it's an LValue)
-        auto irLValue = loweredArg.val;
-
-        IRInst* irCast = nullptr;
+        RefPtr<ImplicitCastLValueInfo> lValueInfo = new ImplicitCastLValueInfo();
+        lValueInfo->type = irType;
+        lValueInfo->base = loweredArg;
+        lValueInfo->lValueType = kParameterDirection_InOut;
         if (as<OutImplicitCastExpr>(expr))
-        {
-            irCast = builder->emitOutImplicitCast(irPtrType, irLValue);
-        }
-        else
-        {
-            irCast = builder->emitInOutImplicitCast(irPtrType, irLValue);
-        }
-
-        return LoweredValInfo::ptr(irCast);
+            lValueInfo->lValueType = kParameterDirection_Out;
+        context->shared->extValues.add(lValueInfo);
+        return LoweredValInfo::implicitCastedLValue(lValueInfo);
     }
 
     // When visiting a swizzle expression in an l-value context,
@@ -5850,7 +5881,21 @@ LoweredValInfo tryGetAddress(
             return LoweredValInfo::swizzledMatrixLValue(newSwizzleInfo);
         }
         break;
-
+    case LoweredValInfo::Flavor::ImplicitCastedLValue:
+        {
+            auto info = val.getImplicitCastedLValue();
+            auto baseAddr = tryGetAddress(context, info->base, TryGetAddressMode::Aggressive);
+            if (baseAddr.flavor == LoweredValInfo::Flavor::Ptr)
+            {
+                IRInst* result = nullptr;
+                if (info->lValueType == kParameterDirection_InOut)
+                    result = context->irBuilder->emitInOutImplicitCast(context->irBuilder->getPtrType(info->type), baseAddr.val);
+                else
+                    result = context->irBuilder->emitOutImplicitCast(context->irBuilder->getPtrType(info->type), baseAddr.val);
+                return LoweredValInfo::ptr(result);
+            }
+        }
+        break;
     // TODO: are there other cases we need to handled here?
 
     default:
@@ -6238,6 +6283,16 @@ top:
                 getSimpleVal(context, right),
                 leftInfo->witnessTable));
 
+            goto top;
+        }
+        break;
+
+    case LoweredValInfo::Flavor::ImplicitCastedLValue:
+        {
+            auto leftInfo = left.getImplicitCastedLValue();
+            left = leftInfo->base;
+            auto rightVal = getSimpleVal(context, right);
+            right = LoweredValInfo::simple(builder->emitCast(rightVal->getDataType(), rightVal));
             goto top;
         }
         break;

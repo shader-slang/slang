@@ -1911,6 +1911,8 @@ namespace Slang
             Type* toType,
             Type* fromType);
 
+        ConversionCost getConversionCost(Type* toType, Type* fromType);
+
         Type* _tryJoinTypeWithInterface(
             Type*                   type,
             Type*                   interfaceType);
