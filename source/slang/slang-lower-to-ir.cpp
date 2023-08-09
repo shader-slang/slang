@@ -4501,11 +4501,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 
     LoweredValInfo visitLValueImplicitCastExpr(LValueImplicitCastExpr* expr)
     {
-        auto builder = getBuilder();
-
         auto irType = lowerType(context, expr->type);
-        auto irPtrType = builder->getPtrType(irType);
-
         auto loweredArg = lowerLValueExpr(context, expr->arguments[0]);
 
         RefPtr<ImplicitCastLValueInfo> lValueInfo = new ImplicitCastLValueInfo();
