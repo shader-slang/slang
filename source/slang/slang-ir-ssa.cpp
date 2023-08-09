@@ -379,11 +379,18 @@ static void cloneRelevantDecorations(
             break;
 
         case kIROp_PreciseDecoration:
-        case kIROp_NameHintDecoration:
             // Copy these decorations if the target doesn't already have them,
             // but don't make duplicate decorations on the target.
             //
-            if( !val->findDecorationImpl(decoration->getOp()) )
+            if (!val->findDecorationImpl(decoration->getOp()))
+            {
+                cloneDecoration(nullptr, decoration, val, var->getModule());
+            }
+            break;
+        case kIROp_NameHintDecoration:
+            // If the target already contains a linkage decoration, don't add
+            // a name decoration to avoid issues with emit logic.
+            if (!val->findDecorationImpl(decoration->getOp()) && !val->findDecoration<IRLinkageDecoration>())
             {
                 cloneDecoration(nullptr, decoration, val, var->getModule());
             }

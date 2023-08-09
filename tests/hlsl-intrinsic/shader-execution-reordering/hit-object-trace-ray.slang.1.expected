@@ -44,7 +44,7 @@ uint calcValue_0(hitObjectNV hit_0)
         uint geometryIndex_0 = (hitObjectGetGeometryIndexNV((hit_0)));
         uint primitiveIndex_0 = (hitObjectGetPrimitiveIndexNV((hit_0)));
         SomeValues_0 objSomeValues_0 = HitObject_GetAttributes_0(hit_0);
-        r_0 = instanceIndex_0 + instanceID_0 + geometryIndex_0 + primitiveIndex_0 + uint(objSomeValues_0.a_0);
+        r_0 = uint(int(instanceIndex_0 + instanceID_0 + geometryIndex_0 + primitiveIndex_0) + objSomeValues_0.a_0);
     }
     else
     {
