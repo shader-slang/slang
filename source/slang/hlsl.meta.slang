@@ -2390,6 +2390,10 @@ __target_intrinsic(glsl, "($2 = $atomicAnd($A, $1))")
 __target_intrinsic(cuda, "(*$2 = atomicAnd((int*)$0, $1))")
 void InterlockedAnd(__ref uint dest, uint value, out uint original_value);
 
+__target_intrinsic(glsl, "$atomicAnd($A, $1)")
+__target_intrinsic(cuda, "atomicAnd((int*)$0, $1)")
+void InterlockedAnd(__ref uint dest, int value);
+
 __target_intrinsic(glsl, "($3 = $atomicCompSwap($A, $1, $2))")
 __target_intrinsic(cuda, "(*$3 = atomicCAS($0, $1, $2))")
 void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value);
