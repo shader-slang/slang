@@ -952,6 +952,16 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return externCppDecoration->getName();
     }
 
+    if (as<IRGlobalParam>(inst))
+    {
+        // For global params, prefer to use linkage name over name hint.
+        if (auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
+        {
+            // Just use the linkages mangled name directly.
+            return linkageDecoration->getMangledName();
+        }
+    }
+
     // If we have a name hint on the instruction, then we will try to use that
     // to provide the basis for the actual name in the output code.
     if(auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())

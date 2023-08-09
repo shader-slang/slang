@@ -6288,7 +6288,7 @@ top:
             auto leftInfo = left.getImplicitCastedLValue();
             left = leftInfo->base;
             auto rightVal = getSimpleVal(context, right);
-            right = LoweredValInfo::simple(builder->emitCast(rightVal->getDataType(), rightVal));
+            right = LoweredValInfo::simple(builder->emitCast(leftInfo->type, rightVal));
             goto top;
         }
         break;
