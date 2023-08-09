@@ -251,6 +251,15 @@ namespace Slang
             for(Index i = 0; i < n; ++i)
                 emitType(context, tupleType->getMember(i));
         }
+        else if (auto modifiedType = dynamicCast<ModifiedType>(type))
+        {
+            emitRaw(context, "Tm");
+            emitType(context, modifiedType->getBase());
+            auto n = modifiedType->getModifierCount();
+            emit(context, n);
+            for (Index i = 0; i < n; ++i)
+                emitVal(context, modifiedType->getModifier(i));
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in type mangling");
@@ -335,6 +344,10 @@ namespace Slang
             emitRaw(context, "KK");
             emitVal(context, typecastIntVal->getType());
             emitVal(context, typecastIntVal->getBase());
+        }
+        else if (auto modifier = as<ModifierVal>(val))
+        {
+            emitNameImpl(context, UnownedStringSlice(modifier->getClassInfo().m_name));
         }
         else
         {
