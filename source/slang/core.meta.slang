@@ -1641,7 +1641,9 @@ struct TextureTypeInfo
             }
             sb << ");\n";
 
+
             // GLSL
+            glslFuncName = (access == SLANG_RESOURCE_ACCESS_READ) ? "texelFetchOffset" : "imageLoad";
             if (isMultisample)
             {
                 sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
@@ -1654,12 +1656,12 @@ struct TextureTypeInfo
                 if( needsMipLevel )
                 {
                     sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
+                    sb << ", $2)$z\")\n";
                 }
                 else
                 {
-                    sb << "$1, 0";
+                    sb << "$1, 0, $2)$z\")\n";
                 }
-                sb << ", $2)$z\")\n";
             }
 
             if (isReadOnly)
