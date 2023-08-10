@@ -186,20 +186,15 @@ namespace Slang
         {
             if (auto rightBasic = as<BasicExpressionType>(right))
             {
-                auto leftFlavor = leftBasic->getBaseType();
-                auto rightFlavor = rightBasic->getBaseType();
+                auto costConvertRightToLeft = getConversionCost(leftBasic, rightBasic);
+                auto costConvertLeftToRight = getConversionCost(rightBasic, leftBasic);
 
-                // TODO(tfoley): Need a special-case rule here that if
-                // either operand is of type `half`, then we promote
-                // to at least `float`
-
-                // Return the one that had higher rank...
-                if (leftFlavor > rightFlavor)
-                    return left;
+                // Return the one that had lower conversion cost.
+                if (costConvertRightToLeft > costConvertLeftToRight)
+                    return right;
                 else
                 {
-                    SLANG_ASSERT(rightFlavor > leftFlavor); // equality was handles at the top of this function
-                    return right;
+                    return left;
                 }
             }
 

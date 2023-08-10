@@ -1360,15 +1360,20 @@ namespace Slang
         Type* toType,
         Type* fromType)
     {
-        // Can we convert at all?
-        ConversionCost conversionCost;
-        if(!canCoerce(toType, fromType, nullptr, &conversionCost))
-            return false;
+        auto conversionCost = getConversionCost(toType, fromType);
 
         // Is the conversion cheap enough to be done implicitly?
-        if(conversionCost >= kConversionCost_GeneralConversion)
+        if (conversionCost >= kConversionCost_GeneralConversion)
             return false;
 
         return true;
+    }
+
+    ConversionCost SemanticsVisitor::getConversionCost(Type* toType, Type* fromType)
+    {
+        ConversionCost conversionCost = kConversionCost_Impossible;
+        if (!canCoerce(toType, fromType, nullptr, &conversionCost))
+            return kConversionCost_Impossible;
+        return conversionCost;
     }
 }

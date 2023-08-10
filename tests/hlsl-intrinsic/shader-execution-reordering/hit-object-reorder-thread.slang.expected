@@ -2,515 +2,120 @@ result code = 0
 standard error = {
 }
 standard output = {
-;
-; Note: shader requires additional functionality:
-;       UAVs at every shader stage
-;
-; shader hash: bddffb5dfe46c4eeab7a59533e8200ba
-;
-; Buffer Definitions:
-;
-; Resource bind info for g_NvidiaExt
-; {
-;
-;   struct struct.NvShaderExtnStruct
-;   {
-;
-;       uint opcode;                                  ; Offset:    0
-;       uint rid;                                     ; Offset:    4
-;       uint sid;                                     ; Offset:    8
-;       uint4 dst1u;                                  ; Offset:   12
-;       uint4 src3u;                                  ; Offset:   28
-;       uint4 src4u;                                  ; Offset:   44
-;       uint4 src5u;                                  ; Offset:   60
-;       uint4 src0u;                                  ; Offset:   76
-;       uint4 src1u;                                  ; Offset:   92
-;       uint4 src2u;                                  ; Offset:  108
-;       uint4 dst0u;                                  ; Offset:  124
-;       uint markUavRef;                              ; Offset:  140
-;       uint numOutputsForIncCounter;                 ; Offset:  144
-;       float padding1[27];                           ; Offset:  148
-;   
-;   } $Element;                                       ; Offset:    0 Size:   256
-;
-; }
-;
-; Resource bind info for outputBuffer_0
-; {
-;
-;   uint $Element;                                    ; Offset:    0 Size:     4
-;
-; }
-;
-;
-; Resource Bindings:
-;
-; Name                                 Type  Format         Dim      ID      HLSL Bind  Count
-; ------------------------------ ---------- ------- ----------- ------- -------------- ------
-; scene_0                           texture     i32         ras      T0             t0     1
-; g_NvidiaExt                           UAV  struct     r/w+cnt      U0             u0     1
-; outputBuffer_0                        UAV  struct         r/w      U1             u1     1
-;
-target datalayout = "e-m:e-p:32:32-i1:32-i8:8-i16:16-i32:32-i64:64-f16:16-f32:32-f64:64-n8:16:32:64"
-target triple = "dxil-ms-dx"
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_NV_shader_invocation_reorder : require
+layout(row_major) uniform;
+layout(row_major) buffer;
+layout(binding = 0)
+uniform accelerationStructureEXT scene_0;
 
-%"class.RWStructuredBuffer<NvShaderExtnStruct>" = type { %struct.NvShaderExtnStruct }
-%struct.NvShaderExtnStruct = type { i32, i32, i32, <4 x i32>, <4 x i32>, <4 x i32>, <4 x i32>, <4 x i32>, <4 x i32>, <4 x i32>, <4 x i32>, i32, i32, [27 x float] }
-%struct.RaytracingAccelerationStructure = type { i32 }
-%"class.RWStructuredBuffer<unsigned int>" = type { i32 }
-%struct.SomeValues_0 = type { i32, float }
-%dx.types.Handle = type { i8* }
+layout(std430, binding = 1) buffer _S1 {
+    uint _data[];
+} outputBuffer_0;
+struct SomeValues_0
+{
+    int a_0;
+    float b_0;
+};
 
-@"\01?g_NvidiaExt@@3V?$RWStructuredBuffer@UNvShaderExtnStruct@@@@A" = external constant %"class.RWStructuredBuffer<NvShaderExtnStruct>", align 4
-@"\01?scene_0@@3URaytracingAccelerationStructure@@A" = external constant %struct.RaytracingAccelerationStructure, align 4
-@"\01?outputBuffer_0@@3V?$RWStructuredBuffer@I@@A" = external constant %"class.RWStructuredBuffer<unsigned int>", align 4
+layout(location = 0)
+rayPayloadEXT
+SomeValues_0 p_0;
 
-; Function Attrs: nounwind
-define void @"\01?rayGenerationMain@@YAXXZ"() #0 {
-  %1 = load %struct.RaytracingAccelerationStructure, %struct.RaytracingAccelerationStructure* @"\01?scene_0@@3URaytracingAccelerationStructure@@A", align 4, !noalias !18
-  %2 = load %"class.RWStructuredBuffer<unsigned int>", %"class.RWStructuredBuffer<unsigned int>"* @"\01?outputBuffer_0@@3V?$RWStructuredBuffer@I@@A", align 4
-  %3 = load %"class.RWStructuredBuffer<NvShaderExtnStruct>", %"class.RWStructuredBuffer<NvShaderExtnStruct>"* @"\01?g_NvidiaExt@@3V?$RWStructuredBuffer@UNvShaderExtnStruct@@@@A", align 4, !noalias !22
-  %4 = alloca %struct.SomeValues_0, align 8
-  %5 = alloca %struct.SomeValues_0, align 8
-  %6 = alloca %struct.SomeValues_0, align 8
-  %7 = alloca %struct.SomeValues_0, align 8
-  %8 = alloca %struct.SomeValues_0, align 4
-  %9 = alloca %struct.SomeValues_0, align 4
-  %10 = call i32 @dx.op.dispatchRaysIndex.i32(i32 145, i8 0)  ; DispatchRaysIndex(col)
-  %11 = sitofp i32 %10 to float
-  %12 = fmul fast float %11, 2.000000e+00
-  %13 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %8, i32 0, i32 0
-  store i32 %10, i32* %13, align 4
-  %14 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %8, i32 0, i32 1
-  store float %12, float* %14, align 4
-  %15 = sitofp i32 %10 to float
-  %16 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %17 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %16, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %18 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %18, i32 %17, i32 0, i32 67, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %19 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %19, i32 %17, i32 144, i32 2, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %20 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %20, i32 %17, i32 76, i32 0, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %21 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %22 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %21, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %23 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %24 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %23, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %25 = call %dx.types.Handle @dx.op.createHandleForLib.struct.RaytracingAccelerationStructure(i32 160, %struct.RaytracingAccelerationStructure %1)  ; CreateHandleForLib(Resource)
-  call void @dx.op.traceRay.struct.SomeValues_0(i32 157, %dx.types.Handle %25, i32 20, i32 255, i32 0, i32 4, i32 %24, float %15, float 0.000000e+00, float 0.000000e+00, float 0x3F847AE140000000, float 0.000000e+00, float 1.000000e+00, float 0.000000e+00, float 1.000000e+04, %struct.SomeValues_0* nonnull %8)  ; TraceRay(AccelerationStructure,RayFlags,InstanceInclusionMask,RayContributionToHitGroupIndex,MultiplierForGeometryContributionToShaderIndex,MissShaderIndex,Origin_X,Origin_Y,Origin_Z,TMin,Direction_X,Direction_Y,Direction_Z,TMax,payload)
-  %26 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %27 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %26, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %28 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %28, i32 %27, i32 0, i32 83, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %29 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %29, i32 %27, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %30 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %31 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %30, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %32 = icmp eq i32 %31, 0
-  br i1 %32, label %70, label %33
+layout(location = 0)
+hitObjectAttributeNV
+SomeValues_0 t_0;
 
-; <label>:33                                      ; preds = %0
-  %34 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %35 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %34, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %36 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %36, i32 %35, i32 0, i32 75, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %37 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %37, i32 %35, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %38 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %39 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %38, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %40 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %41 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %40, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %42 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %42, i32 %41, i32 0, i32 74, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %43 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %43, i32 %41, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %44 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %45 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %44, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %46 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %47 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %46, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %48 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %48, i32 %47, i32 0, i32 77, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %49 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %49, i32 %47, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %50 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %51 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %50, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %52 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %53 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %52, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %54 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %54, i32 %53, i32 0, i32 76, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %55 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %55, i32 %53, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %56 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %57 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %56, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %58 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %59 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %58, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %60 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %60, i32 %59, i32 0, i32 80, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %61 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %61, i32 %59, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %62 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %63 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %62, i8 1)  ; BufferUpdateCounter(uav,inc)
-  call void @dx.op.callShader.struct.SomeValues_0(i32 159, i32 %63, %struct.SomeValues_0* nonnull %7)  ; CallShader(ShaderIndex,Parameter)
-  %64 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %7, i32 0, i32 0
-  %65 = load i32, i32* %64, align 8
-  %66 = add i32 %45, %39
-  %67 = add i32 %66, %51
-  %68 = add i32 %67, %57
-  %69 = add i32 %68, %65
-  br label %70
+layout(location = 1)
+rayPayloadEXT
+SomeValues_0 p_1;
 
-; <label>:70                                      ; preds = %33, %0
-  %71 = phi i32 [ %69, %33 ], [ 0, %0 ]
-  %72 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %73 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %72, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %74 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %74, i32 %73, i32 0, i32 71, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %75 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %75, i32 %73, i32 76, i32 1, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %76 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %76, i32 %73, i32 80, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %77 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %77, i32 %73, i32 84, i32 0, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %78 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %78, i32 %73, i32 88, i32 0, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %79 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %80 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %79, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %81 = sub nsw i32 0, %10
-  %82 = sitofp i32 %10 to float
-  %83 = fmul fast float %82, 4.000000e+00
-  %84 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %9, i32 0, i32 0
-  store i32 %81, i32* %84, align 4
-  %85 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %9, i32 0, i32 1
-  store float %83, float* %85, align 4
-  %86 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %87 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %86, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %88 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %88, i32 %87, i32 0, i32 72, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %89 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %89, i32 %87, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %90 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %91 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %90, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %92 = call %dx.types.Handle @dx.op.createHandleForLib.struct.RaytracingAccelerationStructure(i32 160, %struct.RaytracingAccelerationStructure %1)  ; CreateHandleForLib(Resource)
-  call void @dx.op.traceRay.struct.SomeValues_0(i32 157, %dx.types.Handle %92, i32 0, i32 0, i32 0, i32 0, i32 %91, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, %struct.SomeValues_0* nonnull %9)  ; TraceRay(AccelerationStructure,RayFlags,InstanceInclusionMask,RayContributionToHitGroupIndex,MultiplierForGeometryContributionToShaderIndex,MissShaderIndex,Origin_X,Origin_Y,Origin_Z,TMin,Direction_X,Direction_Y,Direction_Z,TMax,payload)
-  %93 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %94 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %93, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %95 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %95, i32 %94, i32 0, i32 83, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %96 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %96, i32 %94, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %97 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %98 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %97, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %99 = icmp eq i32 %98, 0
-  br i1 %99, label %137, label %100
-
-; <label>:100                                     ; preds = %70
-  %101 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %102 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %101, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %103 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %103, i32 %102, i32 0, i32 75, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %104 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %104, i32 %102, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %105 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %106 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %105, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %107 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %108 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %107, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %109 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %109, i32 %108, i32 0, i32 74, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %110 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %110, i32 %108, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %111 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %112 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %111, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %113 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %114 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %113, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %115 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %115, i32 %114, i32 0, i32 77, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %116 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %116, i32 %114, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %117 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %118 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %117, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %119 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %120 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %119, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %121 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %121, i32 %120, i32 0, i32 76, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %122 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %122, i32 %120, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %123 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %124 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %123, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %125 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %126 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %125, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %127 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %127, i32 %126, i32 0, i32 80, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %128 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %128, i32 %126, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %129 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %130 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %129, i8 1)  ; BufferUpdateCounter(uav,inc)
-  call void @dx.op.callShader.struct.SomeValues_0(i32 159, i32 %130, %struct.SomeValues_0* nonnull %6)  ; CallShader(ShaderIndex,Parameter)
-  %131 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %6, i32 0, i32 0
-  %132 = load i32, i32* %131, align 8
-  %133 = add i32 %112, %106
-  %134 = add i32 %133, %118
-  %135 = add i32 %134, %124
-  %136 = add i32 %135, %132
-  br label %137
-
-; <label>:137                                     ; preds = %100, %70
-  %138 = phi i32 [ %136, %100 ], [ 0, %70 ]
-  %139 = add i32 %138, %71
-  %140 = and i32 %10, 3
-  %141 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %142 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %141, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %143 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %143, i32 %142, i32 0, i32 71, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %144 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %144, i32 %142, i32 76, i32 1, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %145 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %145, i32 %142, i32 80, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %146 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %146, i32 %142, i32 84, i32 %140, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %147 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %147, i32 %142, i32 88, i32 2, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %148 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %149 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %148, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %150 = mul nsw i32 %10, -2
-  %151 = sitofp i32 %10 to float
-  %152 = fmul fast float %151, 8.000000e+00
-  %153 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %9, i32 0, i32 0
-  store i32 %150, i32* %153, align 4
-  %154 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %9, i32 0, i32 1
-  store float %152, float* %154, align 4
-  %155 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %156 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %155, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %157 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %157, i32 %156, i32 0, i32 72, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %158 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %158, i32 %156, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %159 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %160 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %159, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %161 = call %dx.types.Handle @dx.op.createHandleForLib.struct.RaytracingAccelerationStructure(i32 160, %struct.RaytracingAccelerationStructure %1)  ; CreateHandleForLib(Resource)
-  call void @dx.op.traceRay.struct.SomeValues_0(i32 157, %dx.types.Handle %161, i32 0, i32 0, i32 0, i32 0, i32 %160, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, %struct.SomeValues_0* nonnull %9)  ; TraceRay(AccelerationStructure,RayFlags,InstanceInclusionMask,RayContributionToHitGroupIndex,MultiplierForGeometryContributionToShaderIndex,MissShaderIndex,Origin_X,Origin_Y,Origin_Z,TMin,Direction_X,Direction_Y,Direction_Z,TMax,payload)
-  %162 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %163 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %162, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %164 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %164, i32 %163, i32 0, i32 83, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %165 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %165, i32 %163, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %166 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %167 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %166, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %168 = icmp eq i32 %167, 0
-  br i1 %168, label %206, label %169
-
-; <label>:169                                     ; preds = %137
-  %170 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %171 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %170, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %172 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %172, i32 %171, i32 0, i32 75, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %173 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %173, i32 %171, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %174 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %175 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %174, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %176 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %177 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %176, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %178 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %178, i32 %177, i32 0, i32 74, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %179 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %179, i32 %177, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %180 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %181 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %180, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %182 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %183 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %182, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %184 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %184, i32 %183, i32 0, i32 77, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %185 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %185, i32 %183, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %186 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %187 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %186, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %188 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %189 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %188, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %190 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %190, i32 %189, i32 0, i32 76, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %191 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %191, i32 %189, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %192 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %193 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %192, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %194 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %195 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %194, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %196 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %196, i32 %195, i32 0, i32 80, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %197 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %197, i32 %195, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %198 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %199 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %198, i8 1)  ; BufferUpdateCounter(uav,inc)
-  call void @dx.op.callShader.struct.SomeValues_0(i32 159, i32 %199, %struct.SomeValues_0* nonnull %5)  ; CallShader(ShaderIndex,Parameter)
-  %200 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %5, i32 0, i32 0
-  %201 = load i32, i32* %200, align 8
-  %202 = add i32 %181, %175
-  %203 = add i32 %202, %187
-  %204 = add i32 %203, %193
-  %205 = add i32 %204, %201
-  br label %206
-
-; <label>:206                                     ; preds = %169, %137
-  %207 = phi i32 [ %205, %169 ], [ 0, %137 ]
-  %208 = add i32 %139, %207
-  %209 = and i32 %10, 1
-  %210 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %211 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %210, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %212 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %212, i32 %211, i32 0, i32 71, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %213 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %213, i32 %211, i32 76, i32 0, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %214 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %214, i32 %211, i32 80, i32 0, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %215 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %215, i32 %211, i32 84, i32 %209, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %216 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %216, i32 %211, i32 88, i32 1, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %217 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %218 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %217, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %219 = mul nsw i32 %10, -4
-  %220 = sitofp i32 %10 to float
-  %221 = fmul fast float %220, 1.600000e+01
-  %222 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %9, i32 0, i32 0
-  store i32 %219, i32* %222, align 4
-  %223 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %9, i32 0, i32 1
-  store float %221, float* %223, align 4
-  %224 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %225 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %224, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %226 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %226, i32 %225, i32 0, i32 72, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %227 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %227, i32 %225, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %228 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %229 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %228, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %230 = call %dx.types.Handle @dx.op.createHandleForLib.struct.RaytracingAccelerationStructure(i32 160, %struct.RaytracingAccelerationStructure %1)  ; CreateHandleForLib(Resource)
-  call void @dx.op.traceRay.struct.SomeValues_0(i32 157, %dx.types.Handle %230, i32 0, i32 0, i32 0, i32 0, i32 %229, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, %struct.SomeValues_0* nonnull %9)  ; TraceRay(AccelerationStructure,RayFlags,InstanceInclusionMask,RayContributionToHitGroupIndex,MultiplierForGeometryContributionToShaderIndex,MissShaderIndex,Origin_X,Origin_Y,Origin_Z,TMin,Direction_X,Direction_Y,Direction_Z,TMax,payload)
-  %231 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %232 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %231, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %233 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %233, i32 %232, i32 0, i32 83, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %234 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %234, i32 %232, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %235 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %236 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %235, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %237 = icmp eq i32 %236, 0
-  br i1 %237, label %275, label %238
-
-; <label>:238                                     ; preds = %206
-  %239 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %240 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %239, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %241 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %241, i32 %240, i32 0, i32 75, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %242 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %242, i32 %240, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %243 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %244 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %243, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %245 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %246 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %245, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %247 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %247, i32 %246, i32 0, i32 74, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %248 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %248, i32 %246, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %249 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %250 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %249, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %251 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %252 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %251, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %253 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %253, i32 %252, i32 0, i32 77, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %254 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %254, i32 %252, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %255 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %256 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %255, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %257 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %258 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %257, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %259 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %259, i32 %258, i32 0, i32 76, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %260 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %260, i32 %258, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %261 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %262 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %261, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %263 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %264 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %263, i8 1)  ; BufferUpdateCounter(uav,inc)
-  %265 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %265, i32 %264, i32 0, i32 80, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %266 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %266, i32 %264, i32 76, i32 %22, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  %267 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  %268 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %267, i8 1)  ; BufferUpdateCounter(uav,inc)
-  call void @dx.op.callShader.struct.SomeValues_0(i32 159, i32 %268, %struct.SomeValues_0* nonnull %4)  ; CallShader(ShaderIndex,Parameter)
-  %269 = getelementptr inbounds %struct.SomeValues_0, %struct.SomeValues_0* %4, i32 0, i32 0
-  %270 = load i32, i32* %269, align 8
-  %271 = add i32 %250, %244
-  %272 = add i32 %271, %256
-  %273 = add i32 %272, %262
-  %274 = add i32 %273, %270
-  br label %275
-
-; <label>:275                                     ; preds = %238, %206
-  %276 = phi i32 [ %274, %238 ], [ 0, %206 ]
-  %277 = add i32 %208, %276
-  %278 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<unsigned int>"(i32 160, %"class.RWStructuredBuffer<unsigned int>" %2)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %278, i32 %10, i32 0, i32 %277, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
-  ret void
+SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_0)
+{
+    hitObjectGetAttributesNV((this_0), ((0)));
+    return t_0;
 }
 
-; Function Attrs: nounwind
-declare i32 @dx.op.bufferUpdateCounter(i32, %dx.types.Handle, i8) #0
+uint calcValue_0(hitObjectNV hit_0)
+{
+    bool _S2 = (hitObjectIsHitNV((hit_0)));
+    uint r_0;
+    if(_S2)
+    {
+        uint instanceIndex_0 = (hitObjectGetInstanceCustomIndexNV((hit_0)));
+        uint instanceID_0 = (hitObjectGetInstanceIdNV((hit_0)));
+        uint geometryIndex_0 = (hitObjectGetGeometryIndexNV((hit_0)));
+        uint primitiveIndex_0 = (hitObjectGetPrimitiveIndexNV((hit_0)));
+        SomeValues_0 objSomeValues_0 = HitObject_GetAttributes_0(hit_0);
+        r_0 = uint(int(instanceIndex_0 + instanceID_0 + geometryIndex_0 + primitiveIndex_0) + objSomeValues_0.a_0);
+    }
+    else
+    {
+        r_0 = 0U;
+    }
+    return r_0;
+}
 
-; Function Attrs: nounwind
-declare void @dx.op.rawBufferStore.i32(i32, %dx.types.Handle, i32, i32, i32, i32, i32, i32, i8, i32) #0
+void HitObject_Invoke_0(accelerationStructureEXT AccelerationStructure_0, hitObjectNV HitOrMiss_0, inout SomeValues_0 Payload_0)
+{
+    p_0 = Payload_0;
+    hitObjectExecuteShaderNV(HitOrMiss_0, (0));
+    Payload_0 = p_0;
+    return;
+}
 
-; Function Attrs: nounwind
-declare void @dx.op.traceRay.struct.SomeValues_0(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.SomeValues_0*) #0
+struct RayDesc_0
+{
+    vec3 Origin_0;
+    float TMin_0;
+    vec3 Direction_0;
+    float TMax_0;
+};
 
-; Function Attrs: nounwind
-declare void @dx.op.callShader.struct.SomeValues_0(i32, i32, %struct.SomeValues_0*) #0
+void main()
+{
+    uvec3 _S3 = ((gl_LaunchIDEXT));
+    ivec2 launchID_0 = ivec2(_S3.xy);
+    uvec3 _S4 = ((gl_LaunchSizeEXT));
+    int idx_0 = launchID_0.x;
+    float _S5 = float(idx_0);
+    float _S6 = _S5 * 2.0;
+    RayDesc_0 ray_0;
+    ray_0.Origin_0 = vec3(_S5, 0.0, 0.0);
+    ray_0.TMin_0 = 0.00999999977648258209;
+    ray_0.Direction_0 = vec3(0.0, 1.0, 0.0);
+    ray_0.TMax_0 = 10000.0;
+    RayDesc_0 _S7 = ray_0;
+    hitObjectNV hitObj_0;
+    p_1.a_0 = idx_0;
+    p_1.b_0 = _S6;
+    hitObjectTraceRayNV(hitObj_0, scene_0, 20U, 255U, 0U, 4U, 0U, _S7.Origin_0, _S7.TMin_0, _S7.Direction_0, _S7.TMax_0, (1));
+    uint r_1 = calcValue_0(hitObj_0);
+    reorderThreadNV(hitObj_0);
+    float _S8 = _S5 * 4.0;
+    SomeValues_0 otherValues_0;
+    otherValues_0.a_0 = idx_0 * -1;
+    otherValues_0.b_0 = _S8;
+    HitObject_Invoke_0(scene_0, hitObj_0, otherValues_0);
+    uint _S9 = calcValue_0(hitObj_0);
+    uint r_2 = r_1 + _S9;
+    reorderThreadNV(hitObj_0, uint(idx_0 & 3), 2U);
+    float _S10 = _S5 * 8.0;
+    otherValues_0.a_0 = idx_0 * -2;
+    otherValues_0.b_0 = _S10;
+    HitObject_Invoke_0(scene_0, hitObj_0, otherValues_0);
+    uint _S11 = calcValue_0(hitObj_0);
+    uint r_3 = r_2 + _S11;
+    reorderThreadNV(uint(idx_0 & 1), 1U);
+    float _S12 = _S5 * 16.0;
+    otherValues_0.a_0 = idx_0 * -4;
+    otherValues_0.b_0 = _S12;
+    HitObject_Invoke_0(scene_0, hitObj_0, otherValues_0);
+    uint _S13 = calcValue_0(hitObj_0);
+    uint r_4 = r_3 + _S13;
+    ((outputBuffer_0)._data[(uint(idx_0))]) = r_4;
+    return;
+}
 
-; Function Attrs: nounwind readnone
-declare i32 @dx.op.dispatchRaysIndex.i32(i32, i8) #1
-
-; Function Attrs: nounwind readonly
-declare %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32, %"class.RWStructuredBuffer<NvShaderExtnStruct>") #2
-
-; Function Attrs: nounwind readonly
-declare %dx.types.Handle @dx.op.createHandleForLib.struct.RaytracingAccelerationStructure(i32, %struct.RaytracingAccelerationStructure) #2
-
-; Function Attrs: nounwind readonly
-declare %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<unsigned int>"(i32, %"class.RWStructuredBuffer<unsigned int>") #2
-
-attributes #0 = { nounwind }
-attributes #1 = { nounwind readnone }
-attributes #2 = { nounwind readonly }
-
-!llvm.ident = !{!0}
-!dx.version = !{!1}
-!dx.valver = !{!2}
-!dx.shaderModel = !{!3}
-!dx.resources = !{!4}
-!dx.entryPoints = !{!13, !15}
-
-!0 = !{!"clang version 3.7 (tags/RELEASE_370/final)"}
-!1 = !{i32 1, i32 5}
-!2 = !{i32 1, i32 7}
-!3 = !{!"lib", i32 6, i32 5}
-!4 = !{!5, !8, null, null}
-!5 = !{!6}
-!6 = !{i32 0, %struct.RaytracingAccelerationStructure* @"\01?scene_0@@3URaytracingAccelerationStructure@@A", !"scene_0", i32 0, i32 0, i32 1, i32 16, i32 0, !7}
-!7 = !{i32 0, i32 4}
-!8 = !{!9, !11}
-!9 = !{i32 0, %"class.RWStructuredBuffer<NvShaderExtnStruct>"* @"\01?g_NvidiaExt@@3V?$RWStructuredBuffer@UNvShaderExtnStruct@@@@A", !"g_NvidiaExt", i32 0, i32 0, i32 1, i32 12, i1 false, i1 true, i1 false, !10}
-!10 = !{i32 1, i32 256}
-!11 = !{i32 1, %"class.RWStructuredBuffer<unsigned int>"* @"\01?outputBuffer_0@@3V?$RWStructuredBuffer@I@@A", !"outputBuffer_0", i32 0, i32 1, i32 1, i32 12, i1 false, i1 false, i1 false, !12}
-!12 = !{i32 1, i32 4}
-!13 = !{null, !"", null, !4, !14}
-!14 = !{i32 0, i64 8454160}
-!15 = !{void ()* @"\01?rayGenerationMain@@YAXXZ", !"\01?rayGenerationMain@@YAXXZ", null, null, !16}
-!16 = !{i32 8, i32 7, i32 5, !17}
-!17 = !{i32 0}
-!18 = !{!19, !21}
-!19 = distinct !{!19, !20, !"\01?HitObject_TraceRay_0@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z: %agg.result"}
-!20 = distinct !{!20, !"\01?HitObject_TraceRay_0@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z"}
-!21 = distinct !{!21, !20, !"\01?HitObject_TraceRay_0@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z: %Payload_0"}
-!22 = !{!23}
-!23 = distinct !{!23, !24, !"\01?HitObject_GetAttributes_0@@YA?AUSomeValues_0@@UNvHitObject@@@Z: %agg.result"}
-!24 = distinct !{!24, !"\01?HitObject_GetAttributes_0@@YA?AUSomeValues_0@@UNvHitObject@@@Z"}
 }
