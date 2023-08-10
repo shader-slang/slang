@@ -1617,6 +1617,39 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, 
 
 }
 
+void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* ptrType)
+{
+    _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference"));
+
+    auto constPtrType = as<IRHLSLConstBufferPointerType>(ptrType);
+    auto ptrTypeName = getName(ptrType);
+    auto alignment = getIntVal(constPtrType->getBaseAlignment());
+    m_writer->emit("layout(buffer_reference, std430, buffer_reference_align = ");
+    m_writer->emitInt64(alignment);
+    m_writer->emit(") readonly buffer ");
+    m_writer->emit(ptrTypeName);
+    m_writer->emit("\n");
+    m_writer->emit("{\n");
+    m_writer->indent();
+    emitType((IRType*)constPtrType->getValueType(), "_data");
+    m_writer->emit(";\n");
+    m_writer->dedent();
+    m_writer->emit("};\n");
+}
+
+void GLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_HLSLConstBufferPointerType:
+        emitBufferPointerTypeDefinition(inst);
+        break;
+    default:
+        Super::emitGlobalInstImpl(inst);
+        break;
+    }
+}
+
 bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->getOp())
@@ -2228,6 +2261,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
         case kIROp_StructType:
+        case kIROp_HLSLConstBufferPointerType:
             m_writer->emit(getName(type));
             return;
 
@@ -2629,3 +2663,4 @@ void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
 
 
 } // namespace Slang
+

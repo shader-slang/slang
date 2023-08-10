@@ -1641,6 +1641,12 @@ struct IRRTTIPointerType : IRRawPointerTypeBase
     IR_LEAF_ISA(RTTIPointerType)
 };
 
+struct IRHLSLConstBufferPointerType : IRPtrTypeBase
+{
+    IR_LEAF_ISA(HLSLConstBufferPointerType)
+    IRInst* getBaseAlignment() { return getOperand(1); }
+};
+
 struct IRGlobalHashedStringLiterals : IRInst
 {
     IR_LEAF_ISA(GlobalHashedStringLiterals)
