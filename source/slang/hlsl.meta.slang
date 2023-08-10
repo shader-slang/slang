@@ -7775,3 +7775,18 @@ ${{{{
 ${{{{
 }
 }}}}
+
+// Buffer Pointer
+
+__generic<T, let Alignment : int = 16>
+__intrinsic_type($(kIROp_HLSLConstBufferPointerType))
+__glsl_extension(GL_EXT_buffer_reference)
+__magic_type(ConstBufferPointerType)
+struct ConstBufferPointer
+{
+    __glsl_version(450)
+    __glsl_extension(GL_EXT_buffer_reference)
+    __target_intrinsic(glsl, "$0._data")
+    [__NoSideEffect]
+    T get();
+}

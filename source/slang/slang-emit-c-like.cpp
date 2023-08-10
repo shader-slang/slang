@@ -966,6 +966,19 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return linkageDecoration->getMangledName();
     }
 
+    switch (inst->getOp())
+    {
+    case kIROp_HLSLConstBufferPointerType:
+        {
+            StringBuilder sb;
+            sb << "BufferPointer_";
+            sb << getName(inst->getOperand(0));
+            sb << "_" << Int32(getID(inst));
+            return sb.produceString();
+        }
+    default:
+        break;
+    }
     // Otherwise fall back to a construct temporary name
     // for the instruction.
     StringBuilder sb;
@@ -3743,7 +3756,6 @@ void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
     case kIROp_InterfaceType:
         emitInterface(cast<IRInterfaceType>(inst));
         break;
-
     case kIROp_WitnessTable:
         emitWitnessTable(cast<IRWitnessTable>(inst));
         break;

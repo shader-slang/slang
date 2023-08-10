@@ -3928,7 +3928,7 @@ static TypeLayoutResult _createTypeLayout(
     {
         return createArrayLikeTypeLayout(context, arrayType, arrayType->getElementType(), arrayType->getElementCount());
     }
-    else if (auto ptrType = as<PtrType>(type))
+    else if (auto ptrType = as<PtrTypeBase>(type))
     {
         RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
 
