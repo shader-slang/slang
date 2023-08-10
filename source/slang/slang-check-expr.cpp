@@ -3574,7 +3574,12 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
     {
         expr->baseExpression = checkBaseForMemberExpr(expr->baseExpression);
-        auto & baseType = expr->baseExpression->type;
+        auto baseType = expr->baseExpression->type;
+
+        // If we are looking up through a modified type, just pass straight
+        // through the inner type.
+        if (auto modifiedType = as<ModifiedType>(baseType))
+            baseType = modifiedType->getBase();
 
         // Note: Checking for vector types before declaration-reference types,
         // because vectors are also declaration reference types...
