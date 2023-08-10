@@ -1623,7 +1623,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* ptrType)
 
     auto constPtrType = as<IRHLSLConstBufferPointerType>(ptrType);
     auto ptrTypeName = getName(ptrType);
-    auto alignment = getIntVal(constPtrType->getAlignment());
+    auto alignment = getIntVal(constPtrType->getBaseAlignment());
     m_writer->emit("layout(buffer_reference, std430, buffer_reference_align = ");
     m_writer->emitInt64(alignment);
     m_writer->emit(") readonly buffer ");
@@ -1631,7 +1631,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* ptrType)
     m_writer->emit("\n");
     m_writer->emit("{\n");
     m_writer->indent();
-    emitType((IRType*)constPtrType->getElementType(), "_data");
+    emitType((IRType*)constPtrType->getValueType(), "_data");
     m_writer->emit(";\n");
     m_writer->dedent();
     m_writer->emit("};\n");

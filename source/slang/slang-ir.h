@@ -1644,8 +1644,7 @@ struct IRRTTIPointerType : IRRawPointerTypeBase
 struct IRHLSLConstBufferPointerType : IRPtrTypeBase
 {
     IR_LEAF_ISA(HLSLConstBufferPointerType)
-    IRInst* getElementType() { return getOperand(0); }
-    IRInst* getAlignment() { return getOperand(1); }
+    IRInst* getBaseAlignment() { return getOperand(1); }
 };
 
 struct IRGlobalHashedStringLiterals : IRInst
