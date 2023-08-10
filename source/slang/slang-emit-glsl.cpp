@@ -1619,6 +1619,8 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, 
 
 void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* ptrType)
 {
+    _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference"));
+
     auto constPtrType = as<IRHLSLConstBufferPointerType>(ptrType);
     auto ptrTypeName = getName(ptrType);
     auto alignment = getIntVal(constPtrType->getAlignment());
