@@ -1,4 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -profile glsl_450 -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv -profile glsl_450 -entry main -stage compute
+
+// SPV: EntryPoint GLCompute {{.*}} "main" {{.*}}
 
 struct MyStruct
 {
