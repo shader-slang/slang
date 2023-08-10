@@ -29,9 +29,9 @@ SLANG_UNIT_TEST(lockFileOpenClose)
 
 SLANG_UNIT_TEST(lockFileSync)
 {
-    // aarch64 builds currently fail to run multi-threaded tests within the test-server.
+    // aarch64/linux builds currently fail to run multi-threaded tests within the test-server.
     // Tests work fine without the test-server, which is puzzling. For now we disable them.
-#if SLANG_PROCESSOR_ARM_64
+#if SLANG_PROCESSOR_ARM_64 || SLANG_LINUX
     SLANG_IGNORE_TEST
 #endif
 
