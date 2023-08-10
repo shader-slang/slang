@@ -4425,24 +4425,6 @@ namespace Slang
             statement = ParseDefaultStmt(this);
         else if (LookAheadToken("__GPU_FOREACH"))
             statement = ParseGpuForeachStmt(this);
-        else if (LookAheadToken("struct"))
-        {
-            SLANG_ASSERT(currentScope);
-            auto structDecl = ParseStruct();
-            AddMember(currentScope, structDecl);
-        }
-        else if (AdvanceIf(this, "typedef"))
-        {
-            SLANG_ASSERT(currentScope);
-            auto typeDefDecl = parseTypeDef(this, nullptr);
-            AddMember(currentScope, (Decl*)typeDefDecl);
-        }
-        else if (AdvanceIf(this, "typealias"))
-        {
-            SLANG_ASSERT(currentScope);
-            auto typeDefDecl = parseTypeAliasDecl(this, nullptr);
-            AddMember(currentScope, (Decl*)typeDefDecl);
-        }
         else if (LookAheadToken(TokenType::Dollar))
         {
             statement = parseCompileTimeStmt(this);
