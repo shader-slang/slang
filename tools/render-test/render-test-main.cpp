@@ -1414,6 +1414,38 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     return SLANG_OK;
 }
 
+#if SLANG_LINUX
+#include <dlfcn.h>
+#include <execinfo.h>
+
+typedef void (*cxa_throw_type)(void*, void*, void (*) (void*));
+cxa_throw_type orig_cxa_throw = 0;
+
+void load_orig_throw_code()
+{
+    orig_cxa_throw = (cxa_throw_type)dlsym(RTLD_NEXT, "__cxa_throw");
+}
+
+extern "C"
+void __cxa_throw(void* thrown_exception, void* pvtinfo, void (*dest)(void*)) {
+    printf(" ################ DETECT A THROWN !!!!! #############\n");
+    if (orig_cxa_throw == 0)
+        load_orig_throw_code();
+
+    {
+        static int throw_count = 0;
+        void* array[10];
+        size_t size;
+
+        size = backtrace(array, 10);
+        fprintf(stderr, "#### EXCEPTION THROWN (#%d) ####\n", ++throw_count);
+        backtrace_symbols_fd(array, size, 2); // 2 == stderr
+    }
+
+    orig_cxa_throw(thrown_exception, pvtinfo, dest);
+}
+#endif
+
 SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* sharedSession, int inArgc, const char*const* inArgv)
 {
     using namespace Slang;
@@ -1437,6 +1469,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     catch (const Slang::Exception& exception)
     {
         stdWriters->getOut().put(exception.Message.getUnownedSlice());
+        return SLANG_FAIL;
+    }
+    catch (const std::exception& e)
+    {
+        stdWriters->getOut().put(e.what());
         return SLANG_FAIL;
     }
     catch (...)
