@@ -4508,6 +4508,17 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    try
+    {
+        std::thread tmpThread([](){return 0;});
+        tmpThread.join();
+        std::cerr << "main(): std::thread is available\n";
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "main(): " << e.what() << '\n';
+    }
+
     const SlangResult res = innerMain(argc, argv);
 
     Slang::RttiInfo::deallocateAll();
