@@ -1781,6 +1781,13 @@ T distance(vector<T, N> x, vector<T, N> y)
     return length(x - y);
 }
 
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+T distance(T x, T y)
+{
+    return length(x - y);
+}
+
 // Vector dot product
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
