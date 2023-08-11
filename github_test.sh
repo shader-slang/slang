@@ -19,7 +19,7 @@ if [ "${ARCHITECTURE}" == "x86_64" ]; then
 fi
 
 # CONFIGURATION=release or debug
-if [ "${CC}" == "gcc" ] && [ "${CONFIGURATION}" == "release" ] && [ "${ARCHITECTURE}" == "x64" ]
+if [ "${CC}" == "clang" ] && [ "${CONFIGURATION}" == "release" ] && [ "${ARCHITECTURE}" == "x64" ]
 then
     SLANG_TEST_CATEGORY=full
 else

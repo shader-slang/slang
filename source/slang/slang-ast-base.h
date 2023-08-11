@@ -364,7 +364,7 @@ class Val : public NodeBase
             }
             T*& operator*() const
             {
-                return *(T**)&val->m_operands[i].values.nodeOperand;
+                return *(operator->());
             }
             T** operator->() const
             {
