@@ -741,7 +741,7 @@ void normalizeCFG(
 
     List<IRBlock*> workList;
     workList.add(func->getFirstBlock());
-    
+
     while (workList.getCount() > 0)
     {
         auto block = workList.getLast();
