@@ -1042,6 +1042,17 @@ struct IRBackwardDifferentiate : IRInst
     IR_LEAF_ISA(BackwardDifferentiate)
 };
 
+struct IRIsDifferentialNull : IRInst
+{
+    enum
+    {
+        kOp = kIROp_IsDifferentialNull
+    };
+    IRInst* getBase() { return getOperand(0); }
+
+    IR_LEAF_ISA(IsDifferentialNull)
+};
+
 // Retrieves the primal substitution function for the given function.
 struct IRPrimalSubstitute : IRInst
 {
@@ -3217,6 +3228,7 @@ public:
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
     IRInst* emitDetachDerivative(IRType* type, IRInst* value);
+    IRInst* emitIsDifferentialNull(IRInst* value);
 
     IRInst* emitDispatchKernelInst(IRType* type, IRInst* baseFn, IRInst* threadGroupSize, IRInst* dispatchSize, Int argCount, IRInst* const* inArgs);
     IRInst* emitCudaKernelLaunch(IRInst* baseFn, IRInst* gridDim, IRInst* blockDim, IRInst* argsArray, IRInst* cudaStream);

@@ -554,6 +554,9 @@ class DerivativeRequirementDecl : public FunctionDeclBase
     
     // The original requirement decl.
     Decl* originalRequirementDecl = nullptr;
+
+    // Type to use for 'ThisType'
+    Type* diffThisType;
 };
 
 // A reference to a synthesized decl representing a differentiable function requirement, this decl will

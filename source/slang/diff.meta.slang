@@ -45,6 +45,10 @@ public struct NullDifferential : IDifferentiable
     static Differential dmul<T: __BuiltinFloatingPointType>(T, Differential) { return { 0 }; }
 };
 
+// Existential check for null differential type
+__intrinsic_op($(kIROp_IsDifferentialNull))
+bool isDifferentialNull(IDifferentiable obj);
+
 /// Represents a GPU view of a tensor.
 __generic<T>
 __magic_type(TensorViewType)

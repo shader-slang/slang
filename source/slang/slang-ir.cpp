@@ -3228,6 +3228,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst *IRBuilder::emitIsDifferentialNull(IRInst *value)
+    {
+        auto inst = createInst<IRIsDifferentialNull>(
+            this,
+            kIROp_IsDifferentialNull,
+            getBoolType(),
+            value);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn)
     {
         auto inst = createInst<IRBackwardDifferentiate>(

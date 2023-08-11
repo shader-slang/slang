@@ -152,6 +152,23 @@ InstPair ForwardDiffTranscriber::transcribeUndefined(IRBuilder* builder, IRInst*
     return InstPair(primalVal, nullptr);
 }
 
+InstPair ForwardDiffTranscriber::transcribeReinterpret(IRBuilder* builder, IRInst* origInst)
+{
+    auto primalVal = maybeCloneForPrimalInst(builder, origInst);
+
+    IRInst* diffVal = nullptr;
+
+    if (IRType* const diffType = differentiateType(builder, origInst->getFullType()))
+    {
+        if (auto diffOperand = findOrTranscribeDiffInst(builder, origInst->getOperand(0)))
+        {
+            diffVal = builder->emitReinterpret(diffType, diffOperand);
+        }
+    }
+
+    return InstPair(primalVal, diffVal);
+}
+
 InstPair ForwardDiffTranscriber::transcribeVar(IRBuilder* builder, IRVar* origVar)
 {
     if (IRType* diffType = differentiateType(builder, origVar->getDataType()->getValueType()))
@@ -1913,10 +1930,15 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_ExtractExistentialType:
     {
         IRInst* witnessTable;
+        auto diffType = differentiateExtractExistentialType(
+                builder, as<IRExtractExistentialType>(origInst), witnessTable);
+
+        // Mark types as primal since they are not transposable.
+        builder->markInstAsPrimal(diffType);
+
         return InstPair(
             maybeCloneForPrimalInst(builder, origInst),
-            differentiateExtractExistentialType(
-                builder, as<IRExtractExistentialType>(origInst), witnessTable));
+            diffType);
     }
     case kIROp_ExtractExistentialWitnessTable:
         return transcribeExtractExistentialWitnessTable(builder, origInst);
@@ -1929,6 +1951,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_undefined:
         return transcribeUndefined(builder, origInst);
+    
+    case kIROp_Reinterpret:
+        return transcribeReinterpret(builder, origInst);
 
         // Differentiable insts that should have been lowered in a previous pass.
     case kIROp_SwizzledStore: 
@@ -1940,7 +1965,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         SLANG_RELEASE_ASSERT(lookupDiffInst(swizzledStore->getDest(), nullptr) == nullptr);
         return transcribeNonDiffInst(builder, swizzledStore);
     }
-
         // Known non-differentiable insts.
     case kIROp_Not:
     case kIROp_BitAnd:
@@ -1957,7 +1981,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_RWStructuredBufferLoadStatus:
     case kIROp_RWStructuredBufferStore:
     case kIROp_RWStructuredBufferGetElementPtr:
-    case kIROp_Reinterpret:
     case kIROp_IsType:
     case kIROp_ImageSubscript:
     case kIROp_ImageLoad:

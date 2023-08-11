@@ -2800,6 +2800,16 @@ void collectParameterLists(
                     auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
                     thisType = context->astBuilder->getModifiedType(thisType, 1, &noDiffAttr);
                 }
+                else if (auto fwdDerivDeclRef = declRef.as<ForwardDerivativeRequirementDecl>())
+                {
+                    thisType = fwdDerivDeclRef.getDecl()->diffThisType;
+                }
+                else if (auto bwdDerivDeclRef = declRef.as<BackwardDerivativeRequirementDecl>())
+                {
+                    thisType = bwdDerivDeclRef.getDecl()->diffThisType;
+                    innerThisParamDirection = kParameterDirection_InOut;
+                }
+
                 addThisParameter(innerThisParamDirection, thisType, ioParameterLists);
             }
         }

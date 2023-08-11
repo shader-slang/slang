@@ -1657,11 +1657,11 @@ namespace Slang
             auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(BuiltinRequirementKind::DifferentialType);
             if (!inheritanceDecl->witnessTable->getRequirementDictionary().tryGetValue(requirementDecl, witnessValue))
                 return;
-
+            
             // A type used as differential type must have itself as its own differential type.
             if (witnessValue.getFlavor() != RequirementWitness::Flavor::val)
                 return;
-            auto differentialType = as<DeclRefType>(as<NamedExpressionType>(witnessValue.getVal())->innerType);
+            auto differentialType = as<DeclRefType>(witnessValue.getVal());
             if (!differentialType)
                 return;
             auto diffDiffType = tryGetDifferentialType(m_astBuilder, differentialType);
@@ -5785,6 +5785,16 @@ namespace Slang
                 interfaceDecl->members.add(reqDecl);
                 reqDecl->parentDecl = interfaceDecl;
 
+                if (!decl->hasModifier<NoDiffThisAttribute>())
+                {
+                    // Build decl-ref-type from interface.
+                    auto interfaceType = DeclRefType::create(getASTBuilder(), makeDeclRef(interfaceDecl));
+
+                    // If the interface is differentiable, make the this type a pair.
+                    if (tryGetDifferentialType(getASTBuilder(), interfaceType))
+                        reqDecl->diffThisType = getDifferentialPairType(interfaceType);
+                }
+
                 auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
                 reqRef->referencedDecl = reqDecl;
                 reqRef->parentDecl = decl;
@@ -5804,6 +5814,15 @@ namespace Slang
                     setFuncTypeIntoRequirementDecl(reqDecl, diffFuncType);
                     interfaceDecl->members.add(reqDecl);
                     reqDecl->parentDecl = interfaceDecl;
+                    if (!decl->hasModifier<NoDiffThisAttribute>())
+                    {
+                        // Build decl-ref-type from interface.
+                        auto interfaceType = DeclRefType::create(getASTBuilder(), makeDeclRef(interfaceDecl));
+
+                        // If the interface is differentiable, make the this type a pair.
+                        if (tryGetDifferentialType(getASTBuilder(), interfaceType))
+                            reqDecl->diffThisType = getDifferentialPairType(interfaceType);
+                    }
 
                     auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
                     reqRef->referencedDecl = reqDecl;

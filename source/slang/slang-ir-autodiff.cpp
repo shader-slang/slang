@@ -622,14 +622,9 @@ IRFunc *DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
     // Insert parameters.
     auto aObj = builder.emitParam(sharedContext->differentiableInterfaceType);
     auto bObj = builder.emitParam(sharedContext->differentiableInterfaceType);
-
-    // Extract existential witness tables.
-    auto aObjWitnessTable = builder.emitExtractExistentialWitnessTable(aObj);
-    auto bObjWitnessTable = builder.emitExtractExistentialWitnessTable(bObj);
-    auto nullWitnessTable = sharedContext->nullDifferentialWitness;
     
     // Check if a.type == null_differential.type
-    auto aObjWitnessIsNull = builder.emitEql(aObjWitnessTable, nullWitnessTable);
+    auto aObjWitnessIsNull = builder.emitIsDifferentialNull(aObj);
     
     // If aObjWitnessTable is null, return bObj.
     auto aObjWitnessIsNullBlock = builder.emitBlock();
@@ -640,7 +635,7 @@ IRFunc *DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
     builder.setInsertInto(aObjWitnessIsNotNullBlock);
     
     // Check if b.type == null_differential.type
-    auto bObjWitnessIsNull = builder.emitEql(bObjWitnessTable, nullWitnessTable);
+    auto bObjWitnessIsNull = builder.emitIsDifferentialNull(bObj);
 
     // If bObjWitnessTable is null, return aObj.
     auto bObjWitnessIsNullBlock = builder.emitBlock();
@@ -649,31 +644,46 @@ IRFunc *DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
 
     auto bObjWitnessIsNotNullBlock = builder.emitBlock();
 
-    // Emit aObj.type::dadd(aObj, bObj)
+    // Emit aObj.type::dadd(aObj.val, bObj.val)
     //
     // Important: we're looking up dadd on the differential type, and 
     // not the primal type. This assumes that the two methods are identical,
     // which (mathematically) they should be.
     // 
-    auto concreteDiffType = builder.emitExtractExistentialType(aObj);
+    auto concreteDiffTypeWitnessTable = builder.emitExtractExistentialWitnessTable(aObj);
+
+    // Extract func type from the witness table type.
+    IRFuncType* dAddFuncType = nullptr;
+    for (auto ii = 0; ii < sharedContext->differentiableInterfaceType->getOperandCount(); ii++)
+    {
+        auto entry = cast<IRInterfaceRequirementEntry>(sharedContext->differentiableInterfaceType->getOperand(ii));
+        if (entry->getRequirementKey() == sharedContext->addMethodStructKey)
+        {
+            dAddFuncType = cast<IRFuncType>(entry->getRequirementVal());
+            break;
+        }
+    }
+
+    SLANG_ASSERT(dAddFuncType);
+
     auto dAddMethod = builder.emitLookupInterfaceMethodInst(
-        builder.getFuncType(
-            List<IRType*>({concreteDiffType, concreteDiffType}),
-            concreteDiffType),
-        aObjWitnessTable,
+        dAddFuncType,
+        concreteDiffTypeWitnessTable,
         sharedContext->addMethodStructKey);
     
     // Call
     auto dAddResult = builder.emitCallInst(
-        concreteDiffType,
+        dAddFuncType->getResultType(),
         dAddMethod,
-        List<IRInst*>({aObj, bObj}));
+        List<IRInst*>({
+            builder.emitExtractExistentialValue(dAddFuncType->getParamType(0), aObj),
+            builder.emitExtractExistentialValue(dAddFuncType->getParamType(1), bObj)}));
     
     // Wrap result in existential.
     auto existentialDiffType = builder.emitMakeExistential(
         sharedContext->differentiableInterfaceType,
         dAddResult,
-        aObjWitnessTable);
+        concreteDiffTypeWitnessTable);
     
     builder.emitReturn(existentialDiffType);
 
@@ -699,7 +709,6 @@ IRFunc *DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
 
     builder.addNameHintDecoration(existentialDAddFunc, UnownedStringSlice("__existential_dadd"));
     builder.addBackwardDifferentiableDecoration(existentialDAddFunc);
-    builder.addForceInlineDecoration(existentialDAddFunc);
     
     this->existentialDAddFunc = existentialDAddFunc;
     return existentialDAddFunc;
@@ -979,9 +988,20 @@ IRInst* DifferentiableTypeConformanceContext::getArrayWitness(IRBuilder* builder
     return table;
 }
 
-IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(IRBuilder*, IRExtractExistentialType*)
+IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(
+    IRBuilder* builder,
+    IRExtractExistentialType* extractExistentialType)
 {
-    SLANG_UNIMPLEMENTED_X("TODO: Implement");
+    // Check that the type's base is differentiable
+    if (differentiateType(builder, extractExistentialType->getOperand(0)->getDataType()))
+    {
+        return tryExtractConformanceFromInterfaceType(
+            builder,
+            cast<IRInterfaceType>(extractExistentialType->getOperand(0)->getDataType()),
+            (IRWitnessTable*)builder->emitExtractExistentialWitnessTable(extractExistentialType->getOperand(0)));
+    }
+    
+    return nullptr;
 }
 
 
@@ -1995,6 +2015,51 @@ void removeDetachInsts(IRModule* module)
     pass.processModule();
 }
 
+struct LowerNullCheckPass : InstPassBase
+{
+    LowerNullCheckPass(IRModule* module, AutoDiffSharedContext* context) :
+        InstPassBase(module), context(context)
+    {
+    }
+    void processModule()
+    {
+        List<IRInst*> nullCheckInsts;
+        processInstsOfType<IRIsDifferentialNull>(kIROp_IsDifferentialNull, [&](IRIsDifferentialNull* isDiffNullInst)
+            {
+                IRBuilder builder(module);
+                builder.setInsertBefore(isDiffNullInst);
+
+                // Extract existential type from the operand.
+                auto operand = isDiffNullInst->getBase();
+                auto operandConcreteWitness = builder.emitExtractExistentialWitnessTable(operand);
+                auto witnessID = builder.emitGetSequentialIDInst(operandConcreteWitness);
+
+                auto nullDiffWitnessTable = context->nullDifferentialWitness;
+                auto nullDiffWitnessID = builder.emitGetSequentialIDInst(nullDiffWitnessTable);
+
+                // Compare the concrete type with the null differential witness table.
+                auto isDiffNull = builder.emitEql(witnessID, nullDiffWitnessID);
+
+                isDiffNullInst->replaceUsesWith(isDiffNull);
+                nullCheckInsts.add(isDiffNullInst);
+            });
+
+        for (auto nullCheckInst : nullCheckInsts)
+        {
+            nullCheckInst->removeAndDeallocate();
+        }
+    }
+
+    private:
+    AutoDiffSharedContext* context;
+};
+
+void lowerNullCheckInsts(IRModule* module, AutoDiffSharedContext* context)
+{
+    LowerNullCheckPass pass(module, context);
+    pass.processModule();
+}
+
 bool finalizeAutoDiffPass(IRModule* module)
 {
     bool modified = false;
@@ -2011,6 +2076,8 @@ bool finalizeAutoDiffPass(IRModule* module)
 
     removeDetachInsts(module);
 
+    lowerNullCheckInsts(module, &autodiffContext);
+
     stripNoDiffTypeAttribute(module);
 
     // Remove auto-diff related decorations.
@@ -2021,7 +2088,8 @@ bool finalizeAutoDiffPass(IRModule* module)
 
 IRBlock* getBlock(IRInst* inst)
 {
-    SLANG_RELEASE_ASSERT(inst);
+    if (!inst)
+        return nullptr;
 
     if (auto block = as<IRBlock>(inst))
         return block;

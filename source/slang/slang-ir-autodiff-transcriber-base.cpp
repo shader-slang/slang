@@ -385,7 +385,7 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
 {
     // Special-case for differentiable existential types.
-    if (isExistentialType(origType))
+    if (as<IRInterfaceType>(origType))
     {
         if (differentiableTypeConformanceContext.lookUpConformanceForType(origType))
             return autoDiffSharedContext->differentiableInterfaceType;
@@ -709,6 +709,13 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(IRBuilder* bui
                 (IRType*)primalDiffType,
                 primal,
                 autoDiffSharedContext->differentialAssocTypeWitnessStructKey);
+
+            // Mark both as primal since we're working with types 
+            // (which don't need transposing)
+            // 
+            builder->markInstAsPrimal(primalDiffType);
+            builder->markInstAsPrimal(diffWitness);
+
             return InstPair(primal, diffWitness);
         }
     }
@@ -803,7 +810,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(
             // zero method from the same witness table.
             auto wt = lookupInterface->getWitnessTable();
             zeroMethod = builder->emitLookupInterfaceMethodInst(builder->getFuncType(List<IRType*>(), diffType), wt, autoDiffSharedContext->zeroMethodStructKey);
-            builder->markInstAsDifferential(zeroMethod);
+            builder->markInstAsPrimal(zeroMethod);
         }
         else
         {

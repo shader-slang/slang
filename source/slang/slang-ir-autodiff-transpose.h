@@ -1486,6 +1486,9 @@ struct DiffTransposePass
             
             case kIROp_ExtractExistentialValue:
                 return transposeExtractExistentialValue(builder, fwdInst, revValue);
+            
+            case kIROp_Reinterpret: 
+                return transposeReinterpret(builder, fwdInst, revValue);
 
             case kIROp_LoadReverseGradient:
             case kIROp_ReverseGradientDiffPairRef:
@@ -1996,37 +1999,90 @@ struct DiffTransposePass
 
     TranspositionResult transposeMakeExistential(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
-        // (A:IDiff = MakeExistential(T, B, W)) -> (dB: T += ExtractExistentialValue(dW))
-        return TranspositionResult(
-            List<RevGradient>(
-                RevGradient(
-                    RevGradient::Flavor::Simple,
-                    fwdInst->getOperand(1),
-                    builder->emitExtractExistentialValue(
-                        builder->emitExtractExistentialType(revValue),
-                        revValue),
-                    fwdInst)));
+        auto isExistentialType = [&](IRInst* type) -> bool
+        {
+            switch (type->getOp())
+            {
+            case kIROp_ExtractExistentialType:
+            case kIROp_LookupWitness:
+                return true;
+            default:
+                return false;
+            }
+        };
+
+        auto diffType = fwdInst->getOperand(0)->getDataType();
+        if (isExistentialType(diffType))
+        {
+            // (A:IDiff = MakeExistential(B, W)) -> (dB: T += ExtractExistentialValue(dW))
+            return TranspositionResult(
+                List<RevGradient>(
+                    RevGradient(
+                        RevGradient::Flavor::Simple,
+                        fwdInst->getOperand(0),
+                        builder->emitExtractExistentialValue(
+                            fwdInst->getOperand(0)->getDataType(),
+                            revValue),
+                        fwdInst)));
+        }
+        else
+        {
+            // We have a concrete type.
+            // (A:IDiff = MakeExistential(B, W)) -> 
+            // (dB: T += ExtractExistentialValue(Reinterpret(dW)))
+            auto diffValInDiffType = builder->emitReinterpret(
+                diffType,
+                builder->emitExtractExistentialValue(
+                    builder->emitExtractExistentialType(revValue),
+                    revValue));
+
+            return TranspositionResult(
+                List<RevGradient>(
+                    RevGradient(
+                        RevGradient::Flavor::Simple,
+                        fwdInst->getOperand(0),
+                        diffValInDiffType,
+                        fwdInst)));
+        }
     }
 
     TranspositionResult transposeExtractExistentialValue(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
+        auto primalType = tryGetPrimalTypeFromDiffInst(fwdInst);
+        SLANG_ASSERT(primalType);
+
+        // If we reach this point, revValue must be a differentiable type.
         auto revTypeWitness = diffTypeContext.tryGetDifferentiableWitness(
             builder,
-            revValue->getDataType());
-        
-        // If we reach this point, revValue must be a differentiable type.
+            primalType);
         SLANG_ASSERT(revTypeWitness);
 
-        // (A = ExtractExistentialValue(B)) -> (dB += MakeExistential(T, 0, A))
+        auto baseExistential = fwdInst->getOperand(0);
+
+        // (dA = ExtractExistentialValue(dB)) -> (dB += MakeExistential(T, A, ExtractExistentialWitness(B)))
         return TranspositionResult(
             List<RevGradient>(
                 RevGradient(
                     RevGradient::Flavor::Simple,
-                    fwdInst,
+                    baseExistential,
                     builder->emitMakeExistential(
-                        revValue->getDataType(),
+                        baseExistential->getDataType(),
                         revValue,
                         revTypeWitness),
+                    fwdInst)));
+    }
+
+    TranspositionResult transposeReinterpret(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
+    {
+        // (A = reinterpret<T, U>(B)) -> (dB += reinterpret<U, T>(dA))
+        return TranspositionResult(
+            List<RevGradient>(
+                RevGradient(
+                    RevGradient::Flavor::Simple,
+                    fwdInst->getOperand(0),
+                    builder->emitReinterpret(
+                        fwdInst->getOperand(0)->getDataType(),
+                        revValue),
                     fwdInst)));
     }
 
@@ -2838,7 +2894,7 @@ struct DiffTransposePass
             // If our type is existential, we need to handle the case where 
             // one or both of our operands are null-type. 
             // 
-            emitDAddForExistentialType(builder, interfaceType, op1, op2);
+            return emitDAddForExistentialType(builder, interfaceType, op1, op2);
         }
 
         auto addMethod = diffTypeContext.getAddMethodForType(builder, primalType);

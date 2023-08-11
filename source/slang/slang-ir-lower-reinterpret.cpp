@@ -3,6 +3,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-any-value-marshalling.h"
+#include "slang-ir-any-value-inference.h"
 
 namespace Slang
 {
@@ -84,6 +85,11 @@ struct ReinterpretLoweringContext
 
 void lowerReinterpret(TargetRequest* targetReq, IRModule* module, DiagnosticSink* sink)
 {
+    // Before processing reinterpret insts, ensure that existential types without 
+    // user-defined sizes have inferred sizes where possible.
+    // 
+    inferAnyValueSizeWhereNecessary(targetReq, module);
+
     ReinterpretLoweringContext context;
     context.module = module;
     context.targetReq = targetReq;
