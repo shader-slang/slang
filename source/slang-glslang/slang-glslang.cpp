@@ -616,6 +616,7 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_2& request)
     {
         spvOptions.emitNonSemanticShaderDebugSource = true;
         spvOptions.disableOptimizer = true;
+        request.optimizationLevel = SLANG_OPTIMIZATION_LEVEL_NONE;
     }
 
     // Link program
