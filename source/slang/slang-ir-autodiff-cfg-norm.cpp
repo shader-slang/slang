@@ -741,15 +741,11 @@ void normalizeCFG(
 
     List<IRBlock*> workList;
     workList.add(func->getFirstBlock());
-
-    HashSet<IRBlock*> visitedBlocks;
     
     while (workList.getCount() > 0)
     {
         auto block = workList.getLast();
         workList.removeLast();
-
-        SLANG_ASSERT(!visitedBlocks.contains(block));
 
         if (auto loop = as<IRLoop>(block->getTerminator()))
         {
@@ -766,8 +762,6 @@ void normalizeCFG(
             for (auto successor : block->getSuccessors())
                 workList.add(successor);
         }
-
-        visitedBlocks.add(block);
     }
 
     // After CFG normalization, there may be invalid uses of var/ssa values where the def
