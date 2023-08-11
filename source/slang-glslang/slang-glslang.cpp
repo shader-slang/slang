@@ -591,13 +591,34 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_2& request)
     int sourceTextLength = (int)(sourceTextEnd - sourceText);
 
     shader->setPreamble("#extension GL_GOOGLE_cpp_style_line_directive : require\n");
-
     shader->setStringsWithLengthsAndNames(
         &sourceText,
         &sourceTextLength,
         &request.sourcePath,
         1);
 
+    // Options for compilation of glsl to Spv
+
+    // spvOptions ctors with default options (this it the same as passing nullptr to GlslangToSpv)
+    glslang::SpvOptions spvOptions;
+
+    const SlangDebugInfoLevel debugLevel = (SlangDebugInfoLevel)request.debugInfoType;
+
+    // Enable generation of debug info, if any debug level other than none is requested
+    if (debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
+    {
+        spvOptions.generateDebugInfo = true;
+        spvOptions.emitNonSemanticShaderDebugInfo = true;
+        shader->setDebugInfo(true);
+    }
+
+    if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
+    {
+        spvOptions.emitNonSemanticShaderDebugSource = true;
+        spvOptions.disableOptimizer = true;
+    }
+
+    // Link program
     {
         const EShMessages messages = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
 
@@ -625,30 +646,15 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_2& request)
         }
     }
 
-    // Options for compilation of glsl to Spv
-
-    // spvOptions ctors with default options (this it the same as passing nullptr to GlslangToSpv)
-    glslang::SpvOptions spvOptions;
-
-    const SlangDebugInfoLevel debugLevel = (SlangDebugInfoLevel)request.debugInfoType;
-
-    // Enable generation of debug info, if any debug level other than none is requested
-    if (debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
-    {
-        spvOptions.generateDebugInfo = true;
-        spvOptions.emitNonSemanticShaderDebugInfo = true;
-    }
-
-    if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
-    {
-        spvOptions.emitNonSemanticShaderDebugSource = true;
-    }
-
     for(int stage = 0; stage < EShLangCount; ++stage)
     {
         auto stageIntermediate = program->getIntermediate((EShLanguage)stage);
         if(!stageIntermediate)
             continue;
+        if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
+        {
+            stageIntermediate->addSourceText(sourceText, sourceTextLength);
+        }
 
         std::vector<unsigned int> spirv;
         spv::SpvBuildLogger logger;
