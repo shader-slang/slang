@@ -1590,6 +1590,11 @@ extern "C"
         SlangCompileRequest*    request,
         SlangMatrixLayoutMode   mode);
 
+    /*! @see slang::ICompileRequest::setMatrixLayoutMode */
+    SLANG_API void spSetUseGLSLMatrixLayoutModifierFlavor(
+        SlangCompileRequest* request,
+        bool value);
+
     /*! @see slang::ICompileRequest::setDebugInfoLevel */
     SLANG_API void spSetDebugInfoLevel(
         SlangCompileRequest*    request,
@@ -4131,6 +4136,12 @@ namespace slang
 
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) = 0;
 
+        /* Sets how to interpret matrix layout qualifiers (row_major and column_major).
+           Default value is to interpret them as HLSL does, that is row_major translates to row_major in both HLSL and GLSL.
+           If set to true, then row_major will translate to column_major in resulting GLSL/SPIRV, and column_major will
+           translate to row_major. This setting has no effect when compiling to HLSL.
+        */
+        virtual SLANG_NO_THROW void SLANG_MCALL setUseGLSLMatrixLayoutModifierFlavor(bool value) = 0;
 
     };
 

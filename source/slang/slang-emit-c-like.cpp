@@ -1994,6 +1994,13 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(0), rightSide(outerPrec,prec));
         break;
     }
+    case kIROp_MatrixLayoutCast:
+    {
+        // For now we do nothing on matrix layout cast because we rely on the
+        // downstream compiler to deal with them.
+        emitOperand(inst->getOperand(0), inOuterPrec);
+        break;
+    }
     case kIROp_FieldExtract:
     {
         // Extract field from aggregate
@@ -2143,6 +2150,52 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             {
                 m_writer->emit("._data");
             }
+        }
+        break;
+
+    case kIROp_StructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoad:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".Load(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
+    case kIROp_StructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferLoadStatus:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".Load(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
+    case kIROp_RWStructuredBufferGetElementPtr:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit("[");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit("]");
+        }
+        break;
+
+    case kIROp_RWStructuredBufferStore:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, EmitOpInfo());
+            m_writer->emit(".Store(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), EmitOpInfo());
+            m_writer->emit(")");
         }
         break;
 

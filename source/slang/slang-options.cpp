@@ -58,6 +58,7 @@ enum class OptionKind
     Language,
     MatrixLayoutColumn,
     MatrixLayoutRow,
+    UseGLSLMatrixLayoutQualifierFlavor,
     ModuleName,
     Output,
     Profile,
@@ -372,11 +373,11 @@ void initCommandOptions(CommandOptions& options)
 
     const Option generalOpts[] = 
     {
-        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]", 
-        "Insert a preprocessor macro.\n" 
+        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]",
+        "Insert a preprocessor macro.\n"
         "The space between - D and <name> is optional. If no <value> is specified, Slang will define the macro with an empty value." },
         { OptionKind::DepFile,      "-depfile", "-depfile <path>", "Save the source file dependency list in a file." },
-        { OptionKind::EntryPointName, "-entry", "-entry <name>", 
+        { OptionKind::EntryPointName, "-entry", "-entry <name>",
         "Specify the name of an entry-point function.\n"
         "When compiling from a single file, this defaults to main if you specify a stage using -stage.\n"
         "Multiple -entry options may be used in a single invocation. "
@@ -386,12 +387,13 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
         { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style>", "Help formatting style" },
-        { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
+        { OptionKind::Include,      "-I?...", "-I<path>, -I <path>",
         "Add a path to be used in resolving '#include' "
         "and 'import' operations."},
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
+        { OptionKind::UseGLSLMatrixLayoutQualifierFlavor, "-use-glsl-matrix-layout-modifier", nullptr, "When set to true, will translate row_major to column_major, and column_major to row_major in when compiling to GLSL. This flag has no effect when compiling to non Khronos targets."},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 
@@ -871,6 +873,8 @@ struct OptionsParser
     FrontEndCompileRequest* m_frontEndReq = nullptr;
 
     SlangMatrixLayoutMode m_defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+
+    bool m_shouldUseGLSLMatrixLayoutModifierFlavor = false;
 
         // The default archive type is zip
     SlangArchiveType m_archiveType = SLANG_ARCHIVE_TYPE_ZIP;
@@ -2222,6 +2226,7 @@ SlangResult OptionsParser::_parse(
             }
             case OptionKind::MatrixLayoutRow:       m_defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_RowMajor); break;
             case OptionKind::MatrixLayoutColumn:    m_defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor); break;
+            case OptionKind::UseGLSLMatrixLayoutQualifierFlavor: m_shouldUseGLSLMatrixLayoutModifierFlavor = true; break;
             case OptionKind::LineDirectiveMode: 
             {
                 SlangLineDirectiveMode value;
@@ -2823,6 +2828,9 @@ SlangResult OptionsParser::_parse(
     {
         m_compileRequest->setMatrixLayoutMode(m_defaultMatrixLayoutMode);
     }
+
+    if (m_shouldUseGLSLMatrixLayoutModifierFlavor)
+        m_compileRequest->setUseGLSLMatrixLayoutModifierFlavor(true);
 
     // Next we need to sort out the output files specified with `-o`, and
     // figure out which entry point and/or target they apply to.

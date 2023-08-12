@@ -1817,11 +1817,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto elementType = lowerType(context, type->getElementType());
         auto rowCount = lowerSimpleVal(context, type->getRowCount());
         auto columnCount = lowerSimpleVal(context, type->getColumnCount());
-
+        auto layout = lowerSimpleVal(context, type->getLayout());
         return getBuilder()->getMatrixType(
             elementType,
             rowCount,
-            columnCount);
+            columnCount,
+            layout);
     }
 
     IRType* visitArrayExpressionType(ArrayExpressionType* type)

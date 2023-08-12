@@ -160,6 +160,8 @@ struct ReproUtil
         Offset32Array<EntryPointState> entryPoints;
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode;
+
+        bool shouldUseGLSLMatrixLayoutFlavor = false;
     };
 
     static SlangResult store(EndToEndCompileRequest* request, OffsetContainer& inOutContainer, Offset32Ptr<RequestState>& outRequest);

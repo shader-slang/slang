@@ -509,7 +509,7 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
     return SPV_ENV_UNIVERSAL_1_2;
 }
 
-static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_2& request)
+static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
 {
     // Check that the encoding matches
     assert(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));

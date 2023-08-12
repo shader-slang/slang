@@ -80,6 +80,9 @@ namespace Slang
         // No conversion at all
         kConversionCost_None = 0,
 
+        // Convert between matrices of different layout
+        kConversionCost_MatrixLayout = 5,
+
         // Conversion from a buffer to the type it carries needs to add a minimal
         // extra cost, just so we can distinguish an overload on `ConstantBuffer<Foo>`
         // from one on `Foo`

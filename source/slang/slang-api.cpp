@@ -367,6 +367,14 @@ SLANG_API void spSetMatrixLayoutMode(
     request->setMatrixLayoutMode(mode);
 }
 
+SLANG_API void spSetUseGLSLMatrixLayoutModifierFlavor(
+    SlangCompileRequest* request,
+    bool value)
+{
+    SLANG_ASSERT(request);
+    request->setUseGLSLMatrixLayoutModifierFlavor(value);
+}
+
 SLANG_API void spSetTargetMatrixLayoutMode(
     slang::ICompileRequest*    request,
     int                     targetIndex,

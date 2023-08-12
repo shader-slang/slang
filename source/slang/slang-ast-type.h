@@ -435,7 +435,7 @@ class VectorExpressionType : public ArithmeticExpressionType
     IntVal* getElementCount();
 };
 
-// A matrix type, e.g., `matrix<T,R,C>`
+// A matrix type, e.g., `matrix<T,R,C,L>`
 class MatrixExpressionType : public ArithmeticExpressionType 
 {
     SLANG_AST_CLASS(MatrixExpressionType)
@@ -443,6 +443,7 @@ class MatrixExpressionType : public ArithmeticExpressionType
     Type*           getElementType();
     IntVal*         getRowCount();
     IntVal*         getColumnCount();
+    IntVal*         getLayout();
 
     Type* getRowType();
 

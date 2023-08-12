@@ -1553,6 +1553,7 @@ struct IRMatrixType : IRType
     IRType* getElementType() { return (IRType*)getOperand(0); }
     IRInst* getRowCount() { return getOperand(1); }
     IRInst* getColumnCount() { return getOperand(2); }
+    IRInst* getLayout() { return getOperand(3); }
 
     IR_LEAF_ISA(MatrixType)
 };

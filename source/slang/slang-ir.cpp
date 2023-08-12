@@ -2808,9 +2808,10 @@ namespace Slang
     IRMatrixType* IRBuilder::getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
-        IRInst* columnCount)
+        IRInst* columnCount,
+        IRInst* layout)
     {
-        IRInst* operands[] = { elementType, rowCount, columnCount };
+        IRInst* operands[] = { elementType, rowCount, columnCount, layout };
         return (IRMatrixType*)getType(
             kIROp_MatrixType,
             sizeof(operands) / sizeof(operands[0]),
@@ -7285,6 +7286,7 @@ namespace Slang
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MatrixReshape:
         case kIROp_VectorReshape:
+        case kIROp_MatrixLayoutCast:
         case kIROp_MakeArray:
         case kIROp_MakeArrayFromElement:
         case kIROp_MakeStruct:
@@ -7304,6 +7306,7 @@ namespace Slang
         case kIROp_MakeDifferentialPair:
         case kIROp_MakeTuple:
         case kIROp_GetTupleElement:
+        case kIROp_StructuredBufferLoad:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
         case kIROp_LoadReverseGradient:
         case kIROp_ReverseGradientDiffPairRef:

@@ -1462,6 +1462,12 @@ SlangResult Linkage::setMatrixLayoutMode(
     return SLANG_OK;
 }
 
+SlangResult Linkage::setUseGLSLMatrixLayoutModifierFlavor(bool value)
+{
+    m_shouldUseGLSLMatrixLayoutModifierFlavor = value;
+    return SLANG_OK;
+}
+
 //
 // TargetRequest
 //
@@ -4837,6 +4843,12 @@ void EndToEndCompileRequest::setMatrixLayoutMode(SlangMatrixLayoutMode mode)
 {
     getLinkage()->setMatrixLayoutMode(mode);
 }
+
+void EndToEndCompileRequest::setUseGLSLMatrixLayoutModifierFlavor(bool value)
+{
+    getLinkage()->setUseGLSLMatrixLayoutModifierFlavor(value);
+}
+
 
 void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode  mode)
 {

@@ -49,6 +49,7 @@ struct RedundancyRemovalContext
         case kIROp_swizzle:
         case kIROp_swizzleSet:
         case kIROp_MatrixReshape:
+        case kIROp_MatrixLayoutCast:
         case kIROp_MakeString:
         case kIROp_MakeResultError:
         case kIROp_MakeResultValue:

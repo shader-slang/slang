@@ -424,6 +424,8 @@ public:
 
     VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 
+    MatrixExpressionType* getMatrixType(Type* elementType, IntVal* rowCount, IntVal* colCount, IntVal* layout);
+
     ConstantBufferType* getConstantBufferType(Type* elementType);
 
     ParameterBlockType* getParameterBlockType(Type* elementType);

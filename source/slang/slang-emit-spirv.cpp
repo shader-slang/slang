@@ -1619,6 +1619,15 @@ struct SPIRVEmitContext
             return emitLoad(parent, as<IRLoad>(inst));
         case kIROp_Store:
             return emitStore(parent, as<IRStore>(inst));
+        case kIROp_StructuredBufferLoad:
+        case kIROp_StructuredBufferLoadStatus:
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoadStatus:
+            return emitStructuredBufferLoad(parent, inst);
+        case kIROp_RWStructuredBufferStore:
+            return emitStructuredBufferStore(parent, inst);
+        case kIROp_RWStructuredBufferGetElementPtr:
+            return emitStructuredBufferGetElementPtr(parent, inst);
         case kIROp_swizzle:
             return emitSwizzle(parent, as<IRSwizzle>(inst));
         case kIROp_IntCast:
@@ -2643,6 +2652,30 @@ struct SPIRVEmitContext
     SpvInst* emitStore(SpvInstParent* parent, IRStore* inst)
     {
         return emitInst(parent, inst, SpvOpStore, inst->getPtr(), inst->getVal());
+    }
+
+    SpvInst* emitStructuredBufferLoad(SpvInstParent* parent, IRInst* inst)
+    {
+        //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;"
+        IRBuilder builder(inst);
+        auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getOperand(0)->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
+        return emitInst(parent, inst, SpvOpLoad, inst->getFullType(), kResultID, addr);
+    }
+    
+    SpvInst* emitStructuredBufferStore(SpvInstParent* parent, IRInst* inst)
+    {
+        //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpStore %addr _2;"
+        IRBuilder builder(inst);
+        auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getOperand(0)->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
+        return emitInst(parent, inst, SpvOpStore, addr, inst->getOperand(2));
+    }
+
+    SpvInst* emitStructuredBufferGetElementPtr(SpvInstParent* parent, IRInst* inst)
+    {
+        //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1;"
+        IRBuilder builder(inst);
+        auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getOperand(0)->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
+        return addr;
     }
 
     SpvInst* emitSwizzle(SpvInstParent* parent, IRSwizzle* inst)

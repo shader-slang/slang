@@ -991,6 +991,47 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
     }
 }
 
+UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
+{
+    switch (basicType->getOp())
+    {
+        case kIROp_IntType:
+            return UnownedStringSlice::fromLiteral("int");
+        case kIROp_Int8Type:
+            return UnownedStringSlice::fromLiteral("int8");
+        case kIROp_Int16Type:
+            return UnownedStringSlice::fromLiteral("int16");
+        case kIROp_Int64Type:
+            return UnownedStringSlice::fromLiteral("int64");
+        case kIROp_IntPtrType:
+            return UnownedStringSlice::fromLiteral("intptr");
+        case kIROp_UIntType:
+            return UnownedStringSlice::fromLiteral("uint");
+        case kIROp_UInt8Type:
+            return UnownedStringSlice::fromLiteral("uint8");
+        case kIROp_UInt16Type:
+            return UnownedStringSlice::fromLiteral("uint16");
+        case kIROp_UInt64Type:
+            return UnownedStringSlice::fromLiteral("uint64");
+        case kIROp_UIntPtrType:
+            return UnownedStringSlice::fromLiteral("uintptr");
+        case kIROp_FloatType:
+            return UnownedStringSlice::fromLiteral("float");
+        case kIROp_HalfType:
+            return UnownedStringSlice::fromLiteral("half");
+        case kIROp_DoubleType:
+            return UnownedStringSlice::fromLiteral("double");
+        case kIROp_BoolType:
+            return UnownedStringSlice::fromLiteral("bool");
+        case kIROp_VoidType:
+            return UnownedStringSlice::fromLiteral("void");
+        case kIROp_CharType:
+            return UnownedStringSlice::fromLiteral("char");
+        default:
+            return UnownedStringSlice();
+    }
+}
+
 struct GenericChildrenMigrationContextImpl
 {
     IRCloneEnv cloneEnv;

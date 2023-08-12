@@ -1069,6 +1069,30 @@ namespace Slang
             validateArraySizeForVariable(varDecl);
         }
 
+        // If there is a matrix layout modifier, we will modify the matrix type now.
+        if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
+        {
+            if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
+            {
+                auto matrixLayout = as<ColumnMajorLayoutModifier>(matrixLayoutModifier) ? SLANG_MATRIX_LAYOUT_COLUMN_MAJOR : SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+                if (getLinkage()->shouldUseGLSLMatrixLayoutModifierFlavor())
+                {
+                    matrixLayout = (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR) ? SLANG_MATRIX_LAYOUT_ROW_MAJOR : SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+                }
+                if (matrixLayout != SLANG_MATRIX_LAYOUT_ROW_MAJOR)
+                {
+                    auto newMatrixType = getASTBuilder()->getMatrixType(
+                        matrixType->getElementType(),
+                        matrixType->getRowCount(),
+                        matrixType->getColumnCount(),
+                        getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
+                    varDecl->type.type = newMatrixType;
+                    if (varDecl->initExpr)
+                        varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
+                }
+            }
+        }
+
         checkMeshOutputDecl(varDecl);
 
         // The NVAPI library allows user code to express extended operations

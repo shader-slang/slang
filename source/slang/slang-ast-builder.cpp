@@ -383,6 +383,21 @@ VectorExpressionType* ASTBuilder::getVectorType(
     return as<VectorExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "VectorExpressionType"));
 }
 
+MatrixExpressionType* ASTBuilder::getMatrixType(Type* elementType, IntVal* rowCount, IntVal* colCount, IntVal* layout)
+{
+    // Canonicalize constant size arguments to int.
+    if (auto rowCountConstantInt = as<ConstantIntVal>(rowCount))
+    {
+        rowCount = getIntVal(getIntType(), rowCountConstantInt->getValue());
+    }
+    if (auto colCountConstantInt = as<ConstantIntVal>(colCount))
+    {
+        colCount = getIntVal(getIntType(), colCountConstantInt->getValue());
+    }
+    Val* args[] = { elementType, rowCount, colCount, layout };
+    return as<MatrixExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "MatrixExpressionType"));
+}
+
 DifferentialPairType* ASTBuilder::getDifferentialPairType(
     Type* valueType,
     Witness* primalIsDifferentialWitness)

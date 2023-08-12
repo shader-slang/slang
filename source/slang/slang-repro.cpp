@@ -380,6 +380,7 @@ static String _scrubName(const String& in)
         dst->obfuscateCode = linkage->m_obfuscateCode;
 
         dst->defaultMatrixLayoutMode = SlangMatrixLayoutMode(linkage->defaultMatrixLayoutMode);
+        dst->shouldUseGLSLMatrixLayoutFlavor = linkage->shouldUseGLSLMatrixLayoutModifierFlavor();
     }
 
     // Entry points
@@ -924,6 +925,7 @@ struct LoadContext
         linkage->m_obfuscateCode = requestState->obfuscateCode;
 
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
+        linkage->m_shouldUseGLSLMatrixLayoutModifierFlavor = requestState->shouldUseGLSLMatrixLayoutFlavor;
     }
 
     // Add the target requests
