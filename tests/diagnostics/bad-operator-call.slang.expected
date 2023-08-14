@@ -3,40 +3,90 @@ standard error = {
 tests/diagnostics/bad-operator-call.slang(18): error 39999: no overload for '+=' applicable to arguments of type (int, S)
     a += b;
       ^~
-core.meta.slang(2655): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
-core.meta.slang(2647): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
-core.meta.slang(2639): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
-core.meta.slang(2631): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
-core.meta.slang(2623): note 39999: candidate: func +=<T>(out T, T) -> T
+core.meta.slang(2711): note 39999: candidate: func +=<T, R:int, C:int, Layout:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
+    matrix<T,R,C> operator+=(in out matrix<T,R,C, Layout> left, T right)
+                          ^~
+core.meta.slang(2703): note 39999: candidate: func +=<T, R:int, C:int, Layout:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
+    matrix<T,R,C> operator+=(in out matrix<T,R,C,Layout> left, matrix<T,R,C> right)
+                          ^~
+core.meta.slang(2695): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
+    vector<T,N> operator+=(in out vector<T,N> left, T right)
+                        ^~
+core.meta.slang(2687): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
+    vector<T,N> operator+=(in out vector<T,N> left, vector<T,N> right)
+                        ^~
+core.meta.slang(2679): note 39999: candidate: func +=<T>(out T, T) -> T
+    T operator+=(in out T left, T right)
+              ^~
 tests/diagnostics/bad-operator-call.slang(20): error 39999: no overload for '+' applicable to arguments of type (int, S)
     a = a + b;
           ^
-core.meta.slang(2481): note 39999: candidate: func +(uintptr_t, uintptr_t) -> uintptr_t
-core.meta.slang(2473): note 39999: candidate: func +(uint64_t, uint64_t) -> uint64_t
-core.meta.slang(2465): note 39999: candidate: func +(uint, uint) -> uint
-core.meta.slang(2457): note 39999: candidate: func +(uint16_t, uint16_t) -> uint16_t
-core.meta.slang(2449): note 39999: candidate: func +(uint8_t, uint8_t) -> uint8_t
-core.meta.slang(2441): note 39999: candidate: func +(double, double) -> double
-core.meta.slang(2433): note 39999: candidate: func +(float, float) -> float
-core.meta.slang(2425): note 39999: candidate: func +(half, half) -> half
-core.meta.slang(2417): note 39999: candidate: func +(intptr_t, intptr_t) -> intptr_t
-core.meta.slang(2409): note 39999: candidate: func +(int64_t, int64_t) -> int64_t
+core.meta.slang(2537): note 39999: candidate: func +(uintptr_t, uintptr_t) -> uintptr_t
+__intrinsic_op(213) uintptr_t operator+(uintptr_t left, uintptr_t right);
+                                      ^
+core.meta.slang(2529): note 39999: candidate: func +(uint64_t, uint64_t) -> uint64_t
+__intrinsic_op(213) uint64_t operator+(uint64_t left, uint64_t right);
+                                     ^
+core.meta.slang(2521): note 39999: candidate: func +(uint, uint) -> uint
+__intrinsic_op(213) uint operator+(uint left, uint right);
+                                 ^
+core.meta.slang(2513): note 39999: candidate: func +(uint16_t, uint16_t) -> uint16_t
+__intrinsic_op(213) uint16_t operator+(uint16_t left, uint16_t right);
+                                     ^
+core.meta.slang(2505): note 39999: candidate: func +(uint8_t, uint8_t) -> uint8_t
+__intrinsic_op(213) uint8_t operator+(uint8_t left, uint8_t right);
+                                    ^
+core.meta.slang(2497): note 39999: candidate: func +(double, double) -> double
+__intrinsic_op(213) double operator+(double left, double right);
+                                   ^
+core.meta.slang(2489): note 39999: candidate: func +(float, float) -> float
+__intrinsic_op(213) float operator+(float left, float right);
+                                  ^
+core.meta.slang(2481): note 39999: candidate: func +(half, half) -> half
+__intrinsic_op(213) half operator+(half left, half right);
+                                 ^
+core.meta.slang(2473): note 39999: candidate: func +(intptr_t, intptr_t) -> intptr_t
+__intrinsic_op(213) intptr_t operator+(intptr_t left, intptr_t right);
+                                     ^
+core.meta.slang(2465): note 39999: candidate: func +(int64_t, int64_t) -> int64_t
+__intrinsic_op(213) int64_t operator+(int64_t left, int64_t right);
+                                    ^
 tests/diagnostics/bad-operator-call.slang(20): note 39999: 3 more overload candidates
     a = a + b;
           ^
 tests/diagnostics/bad-operator-call.slang(22): error 39999: no overload for '~' applicable to arguments of type (S)
     a = ~b;
         ^
-core.meta.slang(2350): note 39999: candidate: __prefix func ~(uintptr_t) -> uintptr_t
-core.meta.slang(2346): note 39999: candidate: __prefix func ~(uint64_t) -> uint64_t
-core.meta.slang(2342): note 39999: candidate: __prefix func ~(uint) -> uint
-core.meta.slang(2338): note 39999: candidate: __prefix func ~(uint16_t) -> uint16_t
-core.meta.slang(2334): note 39999: candidate: __prefix func ~(uint8_t) -> uint8_t
-core.meta.slang(2330): note 39999: candidate: __prefix func ~(intptr_t) -> intptr_t
-core.meta.slang(2326): note 39999: candidate: __prefix func ~(int64_t) -> int64_t
-core.meta.slang(2322): note 39999: candidate: __prefix func ~(int) -> int
-core.meta.slang(2318): note 39999: candidate: __prefix func ~(int16_t) -> int16_t
-core.meta.slang(2314): note 39999: candidate: __prefix func ~(int8_t) -> int8_t
+core.meta.slang(2406): note 39999: candidate: __prefix func ~(uintptr_t) -> uintptr_t
+__prefix __intrinsic_op(234) uintptr_t operator~(uintptr_t value);
+                                               ^
+core.meta.slang(2402): note 39999: candidate: __prefix func ~(uint64_t) -> uint64_t
+__prefix __intrinsic_op(234) uint64_t operator~(uint64_t value);
+                                              ^
+core.meta.slang(2398): note 39999: candidate: __prefix func ~(uint) -> uint
+__prefix __intrinsic_op(234) uint operator~(uint value);
+                                          ^
+core.meta.slang(2394): note 39999: candidate: __prefix func ~(uint16_t) -> uint16_t
+__prefix __intrinsic_op(234) uint16_t operator~(uint16_t value);
+                                              ^
+core.meta.slang(2390): note 39999: candidate: __prefix func ~(uint8_t) -> uint8_t
+__prefix __intrinsic_op(234) uint8_t operator~(uint8_t value);
+                                             ^
+core.meta.slang(2386): note 39999: candidate: __prefix func ~(intptr_t) -> intptr_t
+__prefix __intrinsic_op(234) intptr_t operator~(intptr_t value);
+                                              ^
+core.meta.slang(2382): note 39999: candidate: __prefix func ~(int64_t) -> int64_t
+__prefix __intrinsic_op(234) int64_t operator~(int64_t value);
+                                             ^
+core.meta.slang(2378): note 39999: candidate: __prefix func ~(int) -> int
+__prefix __intrinsic_op(234) int operator~(int value);
+                                         ^
+core.meta.slang(2374): note 39999: candidate: __prefix func ~(int16_t) -> int16_t
+__prefix __intrinsic_op(234) int16_t operator~(int16_t value);
+                                             ^
+core.meta.slang(2370): note 39999: candidate: __prefix func ~(int8_t) -> int8_t
+__prefix __intrinsic_op(234) int8_t operator~(int8_t value);
+                                            ^
 tests/diagnostics/bad-operator-call.slang(27): error 30047: argument passed to parameter '0' must be l-value.
     a += c;
     ^
@@ -44,24 +94,54 @@ tests/diagnostics/bad-operator-call.slang(27): note 30063: argument was implicit
 tests/diagnostics/bad-operator-call.slang(31): error 39999: no overload for '+=' applicable to arguments of type (vector<float,3>, vector<int,4>)
     d += c;
       ^~
-core.meta.slang(2655): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
-core.meta.slang(2647): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
-core.meta.slang(2639): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
-core.meta.slang(2631): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
-core.meta.slang(2623): note 39999: candidate: func +=<T>(out T, T) -> T
+core.meta.slang(2711): note 39999: candidate: func +=<T, R:int, C:int, Layout:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
+    matrix<T,R,C> operator+=(in out matrix<T,R,C, Layout> left, T right)
+                          ^~
+core.meta.slang(2703): note 39999: candidate: func +=<T, R:int, C:int, Layout:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
+    matrix<T,R,C> operator+=(in out matrix<T,R,C,Layout> left, matrix<T,R,C> right)
+                          ^~
+core.meta.slang(2695): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
+    vector<T,N> operator+=(in out vector<T,N> left, T right)
+                        ^~
+core.meta.slang(2687): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
+    vector<T,N> operator+=(in out vector<T,N> left, vector<T,N> right)
+                        ^~
+core.meta.slang(2679): note 39999: candidate: func +=<T>(out T, T) -> T
+    T operator+=(in out T left, T right)
+              ^~
 tests/diagnostics/bad-operator-call.slang(33): error 39999: no overload for '+' applicable to arguments of type (vector<int,4>, vector<float,3>)
     d = c + d;
           ^
-core.meta.slang(2487): note 39999: candidate: func +<4>(uintptr_t4, uintptr_t) -> uintptr_t4
-core.meta.slang(2485): note 39999: candidate: func +<3>(uintptr_t, uintptr_t3) -> uintptr_t3
-core.meta.slang(2481): note 39999: candidate: func +(uintptr_t, uintptr_t) -> uintptr_t
-core.meta.slang(2479): note 39999: candidate: func +<4>(uint64_t4, uint64_t) -> uint64_t4
-core.meta.slang(2477): note 39999: candidate: func +<3>(uint64_t, uint64_t3) -> uint64_t3
-core.meta.slang(2473): note 39999: candidate: func +(uint64_t, uint64_t) -> uint64_t
-core.meta.slang(2471): note 39999: candidate: func +<4>(uint4, uint) -> uint4
-core.meta.slang(2469): note 39999: candidate: func +<3>(uint, uint3) -> uint3
-core.meta.slang(2465): note 39999: candidate: func +(uint, uint) -> uint
-core.meta.slang(2463): note 39999: candidate: func +<4>(uint16_t4, uint16_t) -> uint16_t4
+core.meta.slang(2543): note 39999: candidate: func +<4>(uintptr_t4, uintptr_t) -> uintptr_t4
+__generic<let N : int> __intrinsic_op(213) vector<uintptr_t,N> operator+(vector<uintptr_t,N> left, uintptr_t right);
+                                                                       ^
+core.meta.slang(2541): note 39999: candidate: func +<3>(uintptr_t, uintptr_t3) -> uintptr_t3
+__generic<let N : int> __intrinsic_op(213) vector<uintptr_t,N> operator+(uintptr_t left, vector<uintptr_t,N> right);
+                                                                       ^
+core.meta.slang(2537): note 39999: candidate: func +(uintptr_t, uintptr_t) -> uintptr_t
+__intrinsic_op(213) uintptr_t operator+(uintptr_t left, uintptr_t right);
+                                      ^
+core.meta.slang(2535): note 39999: candidate: func +<4>(uint64_t4, uint64_t) -> uint64_t4
+__generic<let N : int> __intrinsic_op(213) vector<uint64_t,N> operator+(vector<uint64_t,N> left, uint64_t right);
+                                                                      ^
+core.meta.slang(2533): note 39999: candidate: func +<3>(uint64_t, uint64_t3) -> uint64_t3
+__generic<let N : int> __intrinsic_op(213) vector<uint64_t,N> operator+(uint64_t left, vector<uint64_t,N> right);
+                                                                      ^
+core.meta.slang(2529): note 39999: candidate: func +(uint64_t, uint64_t) -> uint64_t
+__intrinsic_op(213) uint64_t operator+(uint64_t left, uint64_t right);
+                                     ^
+core.meta.slang(2527): note 39999: candidate: func +<4>(uint4, uint) -> uint4
+__generic<let N : int> __intrinsic_op(213) vector<uint,N> operator+(vector<uint,N> left, uint right);
+                                                                  ^
+core.meta.slang(2525): note 39999: candidate: func +<3>(uint, uint3) -> uint3
+__generic<let N : int> __intrinsic_op(213) vector<uint,N> operator+(uint left, vector<uint,N> right);
+                                                                  ^
+core.meta.slang(2521): note 39999: candidate: func +(uint, uint) -> uint
+__intrinsic_op(213) uint operator+(uint left, uint right);
+                                 ^
+core.meta.slang(2519): note 39999: candidate: func +<4>(uint16_t4, uint16_t) -> uint16_t4
+__generic<let N : int> __intrinsic_op(213) vector<uint16_t,N> operator+(vector<uint16_t,N> left, uint16_t right);
+                                                                      ^
 tests/diagnostics/bad-operator-call.slang(33): note 39999: 29 more overload candidates
     d = c + d;
           ^

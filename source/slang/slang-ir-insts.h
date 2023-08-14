@@ -2023,6 +2023,13 @@ struct IRGetElementPtr : IRInst
     IRInst* getIndex() { return getOperand(1); }
 };
 
+struct IRRWStructuredBufferGetElementPtr : IRInst
+{
+    IR_LEAF_ISA(RWStructuredBufferGetElementPtr);
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+};
+
 struct IRLoadReverseGradient : IRInst
 {
     IR_LEAF_ISA(LoadReverseGradient)

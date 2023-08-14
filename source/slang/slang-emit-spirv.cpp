@@ -2674,7 +2674,7 @@ struct SPIRVEmitContext
     {
         //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1;"
         IRBuilder builder(inst);
-        auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getOperand(0)->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
+        auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
         return addr;
     }
 

@@ -510,6 +510,7 @@ namespace Slang
                                             ptrVal,
                                             loweredElementTypeInfo.loweredInnerStructKey);
                                         builder.replaceOperand(use, newArrayPtrVal);
+                                        ptrValsWorkList.add(user);
                                     }
                                     else if (as<IRMatrixType>(originalElementType))
                                     {
