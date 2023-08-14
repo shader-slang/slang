@@ -94,6 +94,29 @@ static bool isTrivialSingleIterationLoop(
             }
         }
     }
+    
+    // We'll also check if there's an inner loop that is breaking out into this loop's break block.
+    // If so, we cannot remove it right away since it interferes with the multi-level break elimination
+    // logic.
+    //
+    // Track the break block backwards through the dominator tree, and see if we find a loop block
+    // that is not the current loop.
+    //
+    auto currBlock = loop->getBreakBlock();
+    for (;;)
+    {
+        auto parent = context.domTree->getImmediateDominator(currBlock);
+        if (!parent)
+            break;
+        currBlock = parent;
+        if (auto _loop = as<IRLoop>(currBlock->getTerminator()))
+        {
+            if (loop != _loop)
+                return false;
+            if (loop == _loop)
+                break;
+        }
+    }
 
     return true;
 }

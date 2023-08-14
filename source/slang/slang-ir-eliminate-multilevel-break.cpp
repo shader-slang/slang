@@ -59,6 +59,11 @@ struct EliminateMultiLevelBreakContext
         HashSet<IRBlock*> processedBlocks;
         List<MultiLevelBreakInfo> multiLevelBreaks;
 
+        bool isUnreachable(IRBlock* block)
+        {
+            return block->getPredecessors().getCount() == 0;
+        }
+
         void collectBreakableRegionBlocks(BreakableRegionInfo& info)
         {
             // Push break block to a stack so we can easily check if a block is a break block in its
@@ -92,7 +97,7 @@ struct EliminateMultiLevelBreakContext
                         collectBreakableRegionBlocks(*childRegion);
                         info.childRegions.add(childRegion);
                         block = childRegion->getBreakBlock();
-                        if (info.blockSet.add(block))
+                        if (!isUnreachable(block) && info.blockSet.add(block))
                         {
                             info.blocks.add(block);
                         }
@@ -142,7 +147,8 @@ struct EliminateMultiLevelBreakContext
                 l->forEach(
                     [&](BreakableRegionInfo* region)
                     {
-                        mapBreakBlockToRegion.add(region->getBreakBlock(), region);
+                        if(!isUnreachable(region->getBreakBlock()))
+                            mapBreakBlockToRegion.add(region->getBreakBlock(), region);
                         for (auto block : region->blocks)
                             mapBlockToRegion.add(block, region);
                     });
