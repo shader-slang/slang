@@ -1079,17 +1079,14 @@ namespace Slang
                 {
                     matrixLayout = (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR) ? SLANG_MATRIX_LAYOUT_ROW_MAJOR : SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
                 }
-                if (matrixLayout != SLANG_MATRIX_LAYOUT_ROW_MAJOR)
-                {
-                    auto newMatrixType = getASTBuilder()->getMatrixType(
-                        matrixType->getElementType(),
-                        matrixType->getRowCount(),
-                        matrixType->getColumnCount(),
-                        getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
-                    varDecl->type.type = newMatrixType;
-                    if (varDecl->initExpr)
-                        varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
-                }
+                auto newMatrixType = getASTBuilder()->getMatrixType(
+                    matrixType->getElementType(),
+                    matrixType->getRowCount(),
+                    matrixType->getColumnCount(),
+                    getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
+                varDecl->type.type = newMatrixType;
+                if (varDecl->initExpr)
+                    varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
             }
         }
 

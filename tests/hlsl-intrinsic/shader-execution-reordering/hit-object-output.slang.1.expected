@@ -86,7 +86,7 @@ void main()
     hitObjectRecordMissNV(hitObj_1, idx_1, ray_2.Origin_0, ray_2.TMin_0, ray_2.Direction_0, ray_2.TMax_0);
     accumulate_0(r_0, hitObj_1);
     accumulate_0(r_0, hitObj_0);
-    ((outputBuffer_0)._data[(idx_1)]) = r_0;
+    outputBuffer_0._data[idx_1] = r_0;
     return;
 }
 

@@ -3849,7 +3849,12 @@ static TypeLayoutResult _createTypeLayout(
         //
         size_t layoutMajorCount = rowCount;
         size_t layoutMinorCount = colCount;
-        if (context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+        auto matrixLayout = getIntVal(matType->getLayout());
+        if (matrixLayout == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        {
+            matrixLayout = context.matrixLayoutMode;
+        }
+        if (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
         {
             size_t tmp = layoutMajorCount;
             layoutMajorCount = layoutMinorCount;
@@ -3874,7 +3879,7 @@ static TypeLayoutResult _createTypeLayout(
 
         size_t rowStride = 0;
         size_t colStride = 0;
-        if(context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+        if (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
         {
             colStride = majorStride;
             rowStride = minorStride;
@@ -3901,7 +3906,7 @@ static TypeLayoutResult _createTypeLayout(
 
         typeLayout->elementTypeLayout = rowTypeLayout;
         typeLayout->uniformStride = rowStride;
-        typeLayout->mode = context.matrixLayoutMode;
+        typeLayout->mode = (MatrixLayoutMode)matrixLayout;
 
         typeLayout->addResourceUsage(info.kind, info.size);
 

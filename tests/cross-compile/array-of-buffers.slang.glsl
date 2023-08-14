@@ -36,9 +36,8 @@ out vec4 _S6;
 
 void main()
 {
-    S_0 _S7 = ((sb1_0[C_0.index_0])._data[(C_0.index_0)]);
-    vec4 _S8 = cb_0[C_0.index_0].f_0 + _S7.f_0;
-    uint _S9 = ((bb_0[C_0.index_0])._data[(int(C_0.index_0 * 4U))/4]);
-    _S6 = _S8 + ((sb2_0[C_0.index_0])._data[(C_0.index_0)]) + vec4(float(_S9));
+    vec4 _S7 = cb_0[C_0.index_0].f_0 + sb1_0[C_0.index_0]._data[C_0.index_0].f_0;
+    uint _S8 = ((bb_0[C_0.index_0])._data[(int(C_0.index_0 * 4U))/4]);
+    _S6 = _S7 + sb2_0[C_0.index_0]._data[C_0.index_0] + vec4(float(_S8));
     return;
 }
