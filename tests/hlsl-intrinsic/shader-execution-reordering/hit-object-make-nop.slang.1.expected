@@ -20,8 +20,7 @@ void main()
     hitObjectRecordEmptyNV((hitObj_0));
     uint _S4 = uint(idx_0);
     bool _S5 = (hitObjectIsEmptyNV((hitObj_0)));
-    uint _S6 = uint(_S5);
-    outputBuffer_0._data[_S4] = _S6;
+    outputBuffer_0._data[_S4] = uint(_S5);
     return;
 }
 

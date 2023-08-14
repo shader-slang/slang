@@ -32,7 +32,6 @@ void main()
     {
         innerIndex_1 = innerIndex_0;
     }
-    uint _S4 = uint(innerIndex_1);
-    ((outputBuffer_0)._data[(uint(index_0))]) = ((g_aoa_0[_S3])._data[(_S4)]);
+    outputBuffer_0._data[uint(index_0)] = g_aoa_0[_S3]._data[uint(innerIndex_1)];
     return;
 }
