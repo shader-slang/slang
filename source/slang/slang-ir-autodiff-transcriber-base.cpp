@@ -872,7 +872,7 @@ InstPair AutoDiffTranscriberBase::transcribeBlockImpl(IRBuilder* builder, IRBloc
     return InstPair(diffBlock, diffBlock);
 }
 
-InstPair AutoDiffTranscriberBase::trascribeNonDiffInst(IRBuilder* builder, IRInst* origInst)
+InstPair AutoDiffTranscriberBase::transcribeNonDiffInst(IRBuilder* builder, IRInst* origInst)
 {
     auto primal = cloneInst(&cloneEnv, builder, origInst);
     return InstPair(primal, nullptr);

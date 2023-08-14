@@ -218,7 +218,7 @@ namespace Slang
         case kIROp_WrapExistential:
         case kIROp_MakeExistential:
         case kIROp_MakeExistentialWithRTTI:
-            return trascribeNonDiffInst(builder, origInst);
+            return transcribeNonDiffInst(builder, origInst);
 
         case kIROp_StructKey:
             return InstPair(origInst, nullptr);
