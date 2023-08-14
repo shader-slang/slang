@@ -40,8 +40,8 @@ namespace Slang
             builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
             builder.setInsertInto(func);
             builder.emitBlock();
-            auto rowCount = getIntVal(matrixType->getRowCount());
-            auto colCount = getIntVal(matrixType->getColumnCount());
+            auto rowCount = (Index)getIntVal(matrixType->getRowCount());
+            auto colCount = (Index)getIntVal(matrixType->getColumnCount());
             auto packedParam = builder.emitParam(structType);
             auto vectorArray = builder.emitFieldExtract(arrayType, packedParam, dataKey);
             List<IRInst*> args;
@@ -54,7 +54,7 @@ namespace Slang
                     for (IRIntegerValue r = 0; r < rowCount; r++)
                     {
                         auto element = builder.emitElementExtract(vector, r);
-                        args[r*colCount + c] = element;
+                        args[(Index)(r*colCount + c)] = element;
                     }
                 }
             }
@@ -66,7 +66,7 @@ namespace Slang
                     for (IRIntegerValue c = 0; c < colCount; c++)
                     {
                         auto element = builder.emitElementExtract(vector, c);
-                        args[r * colCount + c] = element;
+                        args[(Index)(r * colCount + c)] = element;
                     }
                 }
             }
@@ -93,14 +93,14 @@ namespace Slang
             auto colCount = getIntVal(matrixType->getColumnCount());
             auto originalParam = builder.emitParam(matrixType);
             List<IRInst*> elements;
-            elements.setCount(rowCount * colCount);
+            elements.setCount((Index)(rowCount * colCount));
             for (IRIntegerValue r = 0; r < rowCount; r++)
             {
                 auto vector = builder.emitElementExtract(originalParam, r);
                 for (IRIntegerValue c = 0; c < colCount; c++)
                 {
                     auto element = builder.emitElementExtract(vector, c);
-                    elements[r * colCount + c] = element;
+                    elements[(Index)(r * colCount + c)] = element;
                 }
             }
             List<IRInst*> vectors;
@@ -111,7 +111,7 @@ namespace Slang
                     List<IRInst*> vecArgs;
                     for (IRIntegerValue r = 0; r < rowCount; r++)
                     {
-                        auto element = elements[r * colCount + c];
+                        auto element = elements[(Index)(r * colCount + c)];
                         vecArgs.add(element);
                     }
                     auto colVector = builder.emitMakeVector(vectorType, (UInt)vecArgs.getCount(), vecArgs.getBuffer());
@@ -125,7 +125,7 @@ namespace Slang
                     List<IRInst*> vecArgs;
                     for (IRIntegerValue c = 0; c < colCount; c++)
                     {
-                        auto element = elements[r * colCount + c];
+                        auto element = elements[(Index)(r * colCount + c)];
                         vecArgs.add(element);
                     }
                     auto rowVector = builder.emitMakeVector(vectorType, (UInt)vecArgs.getCount(), vecArgs.getBuffer());
@@ -158,12 +158,12 @@ namespace Slang
             auto packedArray = builder.emitFieldExtract(innerArrayType, packedParam, dataKey);
             auto count = getIntVal(arrayType->getElementCount());
             List<IRInst*> args;
-            args.setCount(count);
+            args.setCount((Index)count);
             for (IRIntegerValue ii = 0; ii < count; ++ii)
             {
                 auto packedElement = builder.emitElementExtract(packedArray, ii);
                 auto originalElement = builder.emitCallInst(innerTypeInfo.originalType, innerTypeInfo.convertLoweredToOriginal, 1, &packedElement);
-                args[ii] = originalElement;
+                args[(Index)ii] = originalElement;
             }
             auto result = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
             builder.emitReturn(result);
@@ -187,12 +187,12 @@ namespace Slang
             auto originalParam = builder.emitParam(arrayType);
             auto count = getIntVal(arrayType->getElementCount());
             List<IRInst*> args;
-            args.setCount(count);
+            args.setCount((Index)count);
             for (IRIntegerValue ii = 0; ii < count; ++ii)
             {
                 auto originalElement = builder.emitElementExtract(originalParam, ii);
                 auto packedElement = builder.emitCallInst(innerTypeInfo.loweredType, innerTypeInfo.convertOriginalToLowered, 1, &originalElement);
-                args[ii] = packedElement;
+                args[(Index)ii] = packedElement;
             }
             auto packedArray = builder.emitMakeArray(innerArrayType, (UInt)args.getCount(), args.getBuffer());
             auto result = builder.emitMakeStruct(structType, 1, &packedArray);
