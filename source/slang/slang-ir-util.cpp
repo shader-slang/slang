@@ -407,6 +407,8 @@ bool isPtrLikeOrHandleType(IRInst* type)
         return true;
     if (as<IRPseudoPtrType>(type))
         return true;
+    if (as<IRHLSLStructuredBufferTypeBase>(type))
+        return true;
     switch (type->getOp())
     {
     case kIROp_ComPtrType:
@@ -871,7 +873,12 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
 
     if (root)
     {
+        // If this is a global readonly resource, it is not a mutable address.
         if (as<IRParameterGroupType>(root->getDataType()))
+        {
+            return false;
+        }
+        if (as<IRHLSLStructuredBufferType>(root->getDataType()))
         {
             return false;
         }
