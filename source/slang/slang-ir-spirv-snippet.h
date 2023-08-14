@@ -128,7 +128,7 @@ struct SpvSnippet : public RefObject
     };
 
     List<ASMInst> instructions;
-    List<SpvStorageClass> usedPtrResultTypeStorageClasses;
+    HashSet<SpvStorageClass> usedPtrResultTypeStorageClasses;
     List<ASMConstant> constants;
     SpvStorageClass resultStorageClass = SpvStorageClassMax;
 
