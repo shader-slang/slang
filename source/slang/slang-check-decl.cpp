@@ -1075,10 +1075,6 @@ namespace Slang
             if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
             {
                 auto matrixLayout = as<ColumnMajorLayoutModifier>(matrixLayoutModifier) ? SLANG_MATRIX_LAYOUT_COLUMN_MAJOR : SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-                if (getLinkage()->shouldUseGLSLMatrixLayoutModifierFlavor())
-                {
-                    matrixLayout = (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR) ? SLANG_MATRIX_LAYOUT_ROW_MAJOR : SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
-                }
                 auto newMatrixType = getASTBuilder()->getMatrixType(
                     matrixType->getElementType(),
                     matrixType->getRowCount(),

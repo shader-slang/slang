@@ -58,7 +58,6 @@ enum class OptionKind
     Language,
     MatrixLayoutColumn,
     MatrixLayoutRow,
-    UseGLSLMatrixLayoutQualifierFlavor,
     ModuleName,
     Output,
     Profile,
@@ -393,7 +392,6 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
         { OptionKind::MatrixLayoutColumn, "-matrix-layout-column-major", nullptr, "Set the default matrix layout to column-major."},
         { OptionKind::MatrixLayoutRow,"-matrix-layout-row-major", nullptr, "Set the default matrix layout to row-major."},
-        { OptionKind::UseGLSLMatrixLayoutQualifierFlavor, "-use-glsl-matrix-layout-modifier", nullptr, "When set to true, will translate row_major to column_major, and column_major to row_major in when compiling to GLSL. This flag has no effect when compiling to non Khronos targets."},
         { OptionKind::ModuleName,     "-module-name", "-module-name <name>", 
         "Set the module name to use when compiling multiple .slang source files into a single module."},
         { OptionKind::Output, "-o", "-o <path>", 
@@ -873,8 +871,6 @@ struct OptionsParser
     FrontEndCompileRequest* m_frontEndReq = nullptr;
 
     SlangMatrixLayoutMode m_defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
-
-    bool m_shouldUseGLSLMatrixLayoutModifierFlavor = false;
 
         // The default archive type is zip
     SlangArchiveType m_archiveType = SLANG_ARCHIVE_TYPE_ZIP;
@@ -2226,7 +2222,6 @@ SlangResult OptionsParser::_parse(
             }
             case OptionKind::MatrixLayoutRow:       m_defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_RowMajor); break;
             case OptionKind::MatrixLayoutColumn:    m_defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor); break;
-            case OptionKind::UseGLSLMatrixLayoutQualifierFlavor: m_shouldUseGLSLMatrixLayoutModifierFlavor = true; break;
             case OptionKind::LineDirectiveMode: 
             {
                 SlangLineDirectiveMode value;
@@ -2828,9 +2823,6 @@ SlangResult OptionsParser::_parse(
     {
         m_compileRequest->setMatrixLayoutMode(m_defaultMatrixLayoutMode);
     }
-
-    if (m_shouldUseGLSLMatrixLayoutModifierFlavor)
-        m_compileRequest->setUseGLSLMatrixLayoutModifierFlavor(true);
 
     // Next we need to sort out the output files specified with `-o`, and
     // figure out which entry point and/or target they apply to.

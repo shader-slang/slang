@@ -1783,8 +1783,6 @@ namespace Slang
             char const* value);
         SlangResult setMatrixLayoutMode(
             SlangMatrixLayoutMode mode);
-        SlangResult setUseGLSLMatrixLayoutModifierFlavor(
-            bool value);
             /// Create an initially-empty linkage
         Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
 
@@ -1953,10 +1951,6 @@ namespace Slang
         /// The layout to use for matrices by default (row/column major)
         MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
         MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
-
-        bool m_shouldUseGLSLMatrixLayoutModifierFlavor = false;
-        bool shouldUseGLSLMatrixLayoutModifierFlavor() { return m_shouldUseGLSLMatrixLayoutModifierFlavor; }
-
 
         DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
         DebugInfoFormat debugInfoFormat = DebugInfoFormat::Default;
@@ -2677,7 +2671,6 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW void SLANG_MCALL setUseGLSLMatrixLayoutModifierFlavor(bool value) SLANG_OVERRIDE;
 
         void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 

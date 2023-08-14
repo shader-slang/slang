@@ -7286,7 +7286,6 @@ namespace Slang
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MatrixReshape:
         case kIROp_VectorReshape:
-        case kIROp_MatrixLayoutCast:
         case kIROp_MakeArray:
         case kIROp_MakeArrayFromElement:
         case kIROp_MakeStruct:

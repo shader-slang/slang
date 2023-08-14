@@ -1994,13 +1994,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(0), rightSide(outerPrec,prec));
         break;
     }
-    case kIROp_MatrixLayoutCast:
-    {
-        // For now we do nothing on matrix layout cast because we rely on the
-        // downstream compiler to deal with them.
-        emitOperand(inst->getOperand(0), inOuterPrec);
-        break;
-    }
     case kIROp_FieldExtract:
     {
         // Extract field from aggregate
