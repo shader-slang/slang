@@ -13,7 +13,6 @@ SlangResult debugDisassembleSPIRV(const List<uint8_t>& spirv, String& outDis)
     SLANG_RETURN_ON_FAIL(createResult);
     const auto in = p->getStream(StdStreamType::In);
     const auto out = p->getStream(StdStreamType::Out);
-    const auto err = p->getStream(StdStreamType::ErrorOut);
     // Write the assembly
     SLANG_RETURN_ON_FAIL(in->write(spirv.getBuffer(), spirv.getCount()));
     in->close();
