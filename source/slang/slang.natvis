@@ -792,4 +792,16 @@
   <Type Name="Slang::TypeEqualityWitness">
     <DisplayString>{sub,na} == {sup,na}</DisplayString>
   </Type>
+
+    <Type Name="Slang::ConstantIntVal">
+        <DisplayString>ConstantIntVal ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
+    </Type>
+
+    <Type Name="Slang::GenericParamIntVal">
+        <DisplayString>GenericParamIntVal ({*(DeclRefBase*)m_operands.m_buffer[1].values.nodeOperand})</DisplayString>
+    </Type>
+
+    <Type Name="Slang::BasicExpressionType">
+        <DisplayString>BasicExpressionType ({*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
+    </Type>
 </AutoVisualizer>

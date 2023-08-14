@@ -1783,7 +1783,6 @@ namespace Slang
             char const* value);
         SlangResult setMatrixLayoutMode(
             SlangMatrixLayoutMode mode);
-
             /// Create an initially-empty linkage
         Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
 
@@ -2672,6 +2671,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) SLANG_OVERRIDE;
+
         void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(

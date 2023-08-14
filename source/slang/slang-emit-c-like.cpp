@@ -2146,6 +2146,52 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
+    case kIROp_StructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoad:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".Load(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
+    case kIROp_StructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferLoadStatus:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".Load(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
+    case kIROp_RWStructuredBufferGetElementPtr:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit("[");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit("]");
+        }
+        break;
+
+    case kIROp_RWStructuredBufferStore:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, EmitOpInfo());
+            m_writer->emit(".Store(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
     case kIROp_Call:
         {
             emitCallExpr((IRCall*)inst, outerPrec);

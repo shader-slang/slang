@@ -372,11 +372,11 @@ void initCommandOptions(CommandOptions& options)
 
     const Option generalOpts[] = 
     {
-        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]", 
-        "Insert a preprocessor macro.\n" 
+        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]",
+        "Insert a preprocessor macro.\n"
         "The space between - D and <name> is optional. If no <value> is specified, Slang will define the macro with an empty value." },
         { OptionKind::DepFile,      "-depfile", "-depfile <path>", "Save the source file dependency list in a file." },
-        { OptionKind::EntryPointName, "-entry", "-entry <name>", 
+        { OptionKind::EntryPointName, "-entry", "-entry <name>",
         "Specify the name of an entry-point function.\n"
         "When compiling from a single file, this defaults to main if you specify a stage using -stage.\n"
         "Multiple -entry options may be used in a single invocation. "
@@ -386,7 +386,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
         { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style>", "Help formatting style" },
-        { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
+        { OptionKind::Include,      "-I?...", "-I<path>, -I <path>",
         "Add a path to be used in resolving '#include' "
         "and 'import' operations."},
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},

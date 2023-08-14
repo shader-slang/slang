@@ -238,6 +238,11 @@ IntVal* MatrixExpressionType::getColumnCount()
     return as<IntVal>(_getGenericTypeArg(this, 2));
 }
 
+IntVal* MatrixExpressionType::getLayout()
+{
+    return as<IntVal>(_getGenericTypeArg(this, 3));
+}
+
 Type* MatrixExpressionType::getRowType()
 {
     if (!rowType)

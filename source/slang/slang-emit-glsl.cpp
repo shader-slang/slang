@@ -1959,6 +1959,10 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
         case kIROp_StructuredBufferLoad:
+        case kIROp_StructuredBufferLoadStatus:
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoadStatus:
+        case kIROp_RWStructuredBufferGetElementPtr:
         {
             auto outerPrec = inOuterPrec;
             auto prec = getInfo(EmitOp::Postfix);
@@ -1972,7 +1976,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             maybeCloseParens(needClose);
             return true;
         }
-        case kIROp_StructuredBufferStore:
+        case kIROp_RWStructuredBufferStore:
         {
             auto outerPrec = inOuterPrec;
 

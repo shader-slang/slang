@@ -4131,7 +4131,6 @@ namespace slang
 
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) = 0;
 
-
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

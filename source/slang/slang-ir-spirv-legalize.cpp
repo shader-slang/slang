@@ -182,28 +182,39 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    void processGetElementPtr(IRGetElementPtr* inst)
+    void processGetElementPtrImpl(IRInst* gepInst, IRInst* base, IRInst* index)
     {
-        if (auto ptrType = as<IRPtrTypeBase>(inst->getBase()->getDataType()))
+        if (auto ptrType = as<IRPtrTypeBase>(base->getDataType()))
         {
             if (!ptrType->hasAddressSpace())
                 return;
-            auto oldResultType = as<IRPtrTypeBase>(inst->getDataType());
+            auto oldResultType = as<IRPtrTypeBase>(gepInst->getDataType());
             if (oldResultType->getAddressSpace() != ptrType->getAddressSpace())
             {
                 IRBuilder builder(m_sharedContext->m_irModule);
-                builder.setInsertBefore(inst);
+                builder.setInsertBefore(gepInst);
                 auto newPtrType = builder.getPtrType(
                     oldResultType->getOp(),
                     oldResultType->getValueType(),
                     ptrType->getAddressSpace());
+                IRInst* args[2] = { base, index };
                 auto newInst =
-                    builder.emitElementAddress(newPtrType, inst->getBase(), inst->getIndex());
-                inst->replaceUsesWith(newInst);
-                inst->removeAndDeallocate();
+                    builder.emitIntrinsicInst(newPtrType, gepInst->getOp(), 2, args);
+                gepInst->replaceUsesWith(newInst);
+                gepInst->removeAndDeallocate();
                 addUsersToWorkList(newInst);
             }
         }
+    }
+
+    void processGetElementPtr(IRGetElementPtr* gepInst)
+    {
+        processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
+    }
+
+    void processRWStructuredBufferGetElementPtr(IRRWStructuredBufferGetElementPtr* gepInst)
+    {
+        processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
     }
 
     void processFieldAddress(IRFieldAddress* inst)
@@ -285,6 +296,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_FieldAddress:
                 processFieldAddress(as<IRFieldAddress>(inst));
+                break;
+            case kIROp_RWStructuredBufferGetElementPtr:
+                processRWStructuredBufferGetElementPtr(as<IRRWStructuredBufferGetElementPtr>(inst));
                 break;
             case kIROp_HLSLStructuredBufferType:
             case kIROp_HLSLRWStructuredBufferType:

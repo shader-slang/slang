@@ -113,8 +113,7 @@ void main()
     otherValues_0.b_0 = _S12;
     HitObject_Invoke_0(scene_0, hitObj_0, otherValues_0);
     uint _S13 = calcValue_0(hitObj_0);
-    uint r_4 = r_3 + _S13;
-    ((outputBuffer_0)._data[(uint(idx_0))]) = r_4;
+    outputBuffer_0._data[uint(idx_0)] = r_3 + _S13;
     return;
 }
 
