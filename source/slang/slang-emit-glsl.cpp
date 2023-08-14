@@ -1960,6 +1960,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_StructuredBufferLoad:
         case kIROp_StructuredBufferLoadStatus:
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoadStatus:
         case kIROp_RWStructuredBufferGetElementPtr:
         {
             auto outerPrec = inOuterPrec;
