@@ -2864,7 +2864,7 @@ struct IRDebugSource : IRInst
 
 struct IRDebugLine : IRInst
 {
-    IR_LEAF_ISA(DebugSource)
+    IR_LEAF_ISA(DebugLine)
     IRInst* getSource() { return getOperand(0); }
     IRInst* getLineStart() { return getOperand(1); }
     IRInst* getLineEnd() { return getOperand(2); }

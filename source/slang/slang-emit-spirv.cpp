@@ -547,7 +547,7 @@ struct SPIRVEmitContext
         for (auto parent = inst; parent; parent = parent->getParent())
         {
             SpvInst* spvInst = nullptr;
-            if (m_mapIRInstToSpvDebugInst.tryGetValue(inst, spvInst))
+            if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
                 return spvInst;
         }
         return nullptr;

@@ -170,6 +170,7 @@ void Session::init()
 
     // Built in linkage uses the built in builder
     m_builtinLinkage = new Linkage(this, builtinAstBuilder, nullptr);
+    m_builtinLinkage->debugInfoLevel = DebugInfoLevel::None;
 
     // Because the `Session` retains the builtin `Linkage`,
     // we need to make sure that the parent pointer inside
