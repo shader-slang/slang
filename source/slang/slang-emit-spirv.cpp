@@ -77,10 +77,10 @@ enum class SpvLogicalSectionID
     MemoryModel,
     EntryPoints,
     ExecutionModes,
-    DebugStringsAndSource,
-    DebugNames,
     Annotations,
     ConstantsAndTypes,
+    DebugStringsAndSource,
+    DebugNames,
     GlobalVariables,
     FunctionDeclarations,
     FunctionDefinitions,
@@ -482,6 +482,9 @@ struct SPIRVEmitContext
     // `IRInst` may not have been emitted.
     Dictionary<IRInst*, SpvWord> m_mapIRInstToSpvID;
 
+        // Map a Slang IR instruction to the corresponding SPIR-V debug instruction.
+    Dictionary<IRInst*, SpvInst*> m_mapIRInstToSpvDebugInst;
+
         /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
     {
@@ -496,6 +499,23 @@ struct SPIRVEmitContext
             SLANG_ASSERT(spvInst->id == 0);
             spvInst->id = reservedID;
         }
+    }
+
+        /// Register that `irInst` has debug info represented by `spvDebugInst`.
+    void registerDebugInst(IRInst* irInst, SpvInst* spvDebugInst)
+    {
+        m_mapIRInstToSpvDebugInst.add(irInst, spvDebugInst);
+    }
+
+    SpvInst* findDebugScope(IRInst* inst)
+    {
+        for (auto parent = inst; parent; parent = parent->getParent())
+        {
+            SpvInst* spvInst = nullptr;
+            if (m_mapIRInstToSpvDebugInst.tryGetValue(inst, spvInst))
+                return spvInst;
+        }
+        return nullptr;
     }
 
         /// Get or reserve a SpvID for an IR value.
@@ -1014,6 +1034,7 @@ struct SPIRVEmitContext
 
 #   define SLANG_IN_SPIRV_EMIT_CONTEXT
 #   include "slang-emit-spirv-ops.h"
+    #include "slang-emit-spirv-ops-debug-info-ext.h"
 #   undef SLANG_IN_SPIRV_EMIT_CONTEXT
 
         /// The SPIRV OpExtInstImport inst that represents the GLSL450
@@ -1029,6 +1050,21 @@ struct SPIRVEmitContext
             nullptr,
             UnownedStringSlice("GLSL.std.450"));
         return m_glsl450ExtInst;
+    }
+
+    /// The SPIRV OpExtInstImport inst that represents the NonSemantic debug info
+    /// extended instruction set.
+    SpvInst* m_NonSemanticDebugInfoExtInst = nullptr;
+
+    SpvInst* getNonSemanticDebugInfoExtInst()
+    {
+        if (m_NonSemanticDebugInfoExtInst)
+            return m_NonSemanticDebugInfoExtInst;
+        m_NonSemanticDebugInfoExtInst = emitOpExtInstImport(
+            getSection(SpvLogicalSectionID::ExtIntInstImports),
+            nullptr,
+            UnownedStringSlice("NonSemantic.Shader.DebugInfo.100"));
+        return m_NonSemanticDebugInfoExtInst;
     }
 
     // Now that we've gotten the core infrastructure out of the way,
@@ -1358,6 +1394,36 @@ struct SPIRVEmitContext
                     "Specialize instruction remains in IR for SPIR-V emit, is something undefined?\n" +
                     dumpIRToString(g);
                 SLANG_UNEXPECTED(e.getBuffer());
+            }
+
+        case kIROp_DebugSource:
+            {
+                auto debugSource = as<IRDebugSource>(inst);
+                auto result = emitOpDebugSource(
+                    getSection(SpvLogicalSectionID::DebugStringsAndSource),
+                    inst,
+                    inst->getFullType(),
+                    getNonSemanticDebugInfoExtInst(),
+                    debugSource->getFileName(),
+                    debugSource->getSource());
+                registerInst(debugSource, result);
+                auto moduleInst = inst->getModule()->getModuleInst();
+                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    auto translationUnit = emitOpDebugCompilationUnit(
+                        getSection(SpvLogicalSectionID::DebugStringsAndSource),
+                        moduleInst,
+                        inst->getFullType(),
+                        getNonSemanticDebugInfoExtInst(),
+                        emitIntConstant(100, builder.getIntType()),  // ExtDebugInfo version.
+                        emitIntConstant(5, builder.getIntType()),    // DWARF version.
+                        result,
+                        emitIntConstant(6, builder.getIntType()));   // Language, use HLSL's ID for now.
+                    registerDebugInst(moduleInst, translationUnit);
+                }
+                return result;
             }
         default:
             {
@@ -1909,6 +1975,9 @@ struct SPIRVEmitContext
             }
         case kIROp_MakeArray:
             return emitConstruct(parent, inst);
+
+        case kIROp_DebugLine:
+            return emitDebugLine(parent, as<IRDebugLine>(inst));
         }
     }
 
@@ -3137,6 +3206,19 @@ struct SPIRVEmitContext
             return go(l, r);
         }
         SLANG_UNREACHABLE("Arithmetic op with 0 or more than 2 operands");
+    }
+
+    SpvInst* emitDebugLine(SpvInstParent* parent, IRDebugLine* debugLine)
+    {
+        auto scope = findDebugScope(debugLine);
+        if (!scope)
+            return nullptr;
+        return emitOpDebugLine(parent, debugLine, debugLine->getFullType(), getNonSemanticDebugInfoExtInst(),
+            debugLine->getSource(),
+            debugLine->getLineStart(),
+            debugLine->getLineEnd(),
+            debugLine->getColStart(),
+            debugLine->getColEnd());
     }
 
     OrderedHashSet<SpvCapability> m_capabilities;

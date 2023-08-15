@@ -1041,6 +1041,10 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
+/* DebugInfo */
+INST(DebugSource, DebugSource, 2, 0)
+INST(DebugLine, DebugLine, 5, 0)
+
 #undef PARENT
 #undef USE_OTHER
 #undef INST_RANGE

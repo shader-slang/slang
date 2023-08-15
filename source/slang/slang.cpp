@@ -2430,8 +2430,6 @@ void FrontEndCompileRequest::generateIR()
         // * it can generate diagnostics
 
         /// Generate IR for translation unit.
-        /// TODO(JS): Use the linkage ASTBuilder, because it seems possible that cross module constructs are possible in
-        /// ir lowering.
         RefPtr<IRModule> irModule(generateIRForTranslationUnit(getLinkage()->getASTBuilder(), translationUnit));
 
         if (verifyDebugSerialization)
