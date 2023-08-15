@@ -267,9 +267,17 @@ IRInst* cloneInst(
         env, builder, oldInst);
 
     env->mapOldValToNew.add(oldInst, newInst);
-
+    
+    // For hoistable insts, its possible that the cloned inst is the same
+    // as the original inst.
+    // Skip the decoration/children cloning in that case (which will end up 
+    // in an infinite loop)
+    // 
+    if (newInst == oldInst)
+        return newInst;
+    
     cloneInstDecorationsAndChildren(
-        env, builder->getModule(), oldInst, newInst);
+            env, builder->getModule(), oldInst, newInst);
 
     return newInst;
 }

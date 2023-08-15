@@ -1919,7 +1919,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
                 builder, as<IRExtractExistentialType>(origInst), witnessTable);
 
         // Mark types as primal since they are not transposable.
-        builder->markInstAsPrimal(diffType);
+        if (diffType)
+            builder->markInstAsPrimal(diffType);
 
         return InstPair(
             maybeCloneForPrimalInst(builder, origInst),

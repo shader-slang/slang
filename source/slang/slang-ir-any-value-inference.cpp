@@ -134,7 +134,7 @@ namespace Slang
             {
                 if (auto _witnessTableType = as<IRWitnessTableType>(use->getUser()))
                 {   
-                    if (_witnessTableType->getConformanceType() == interfaceType)
+                    if (_witnessTableType->getConformanceType() == interfaceType && _witnessTableType->hasUses())
                     {
                         witnessTableType = _witnessTableType;
                         break;
