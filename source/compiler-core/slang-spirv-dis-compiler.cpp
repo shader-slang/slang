@@ -69,10 +69,19 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     SLANG_RETURN_ON_FAIL(StreamUtil::readAll(err, 0, errData));
     fwrite(errData.getBuffer(), errData.getCount(), 1, stderr);
 
+    // If spirv-dis failed, we fail
     const auto ret = p->getReturnValue();
     if(ret != 0)
         return SLANG_FAIL;
 
+    // Normalize line endings
+    String outContents;
+    SLANG_RETURN_ON_FAIL(File::readAllText(toFile, outContents));
+    StringBuilder outBuilder;
+    StringUtil::appendStandardLines(outContents.getUnownedSlice(), outBuilder);
+    SLANG_RETURN_ON_FAIL(File::writeAllBytes(toFile, outBuilder.getBuffer(), outBuilder.getLength()));
+
+    // Return as a file artifact
     auto fileRep = OSFileArtifactRepresentation::create(
         IOSFileArtifactRepresentation::Kind::Owned,
         toFile.getUnownedSlice(),
