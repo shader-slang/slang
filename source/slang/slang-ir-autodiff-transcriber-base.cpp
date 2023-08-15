@@ -488,20 +488,6 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
         return builder->getTupleType(diffTypeList);
     }
 
-    case kIROp_InterfaceType:
-    {
-        // If interface conforms to IDifferentiable, return the abstract associated type IDifferentiable.Differential
-        if (auto structKey = cast<IRStructKey>(differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)origType)))
-        {   
-            return (IRType*)_lookupWitness(
-                builder,
-                differentiableTypeConformanceContext.sharedContext->differentiableInterfaceType,
-                differentiableTypeConformanceContext.sharedContext->differentialAssocTypeStructKey);
-        }
-        else
-            return false;
-    }
-
     default:
     return (IRType*)maybeCloneForPrimalInst(
         builder,

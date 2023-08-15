@@ -277,7 +277,7 @@ IRInst* cloneInst(
         return newInst;
     
     cloneInstDecorationsAndChildren(
-            env, builder->getModule(), oldInst, newInst);
+        env, builder->getModule(), oldInst, newInst);
 
     return newInst;
 }
