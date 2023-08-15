@@ -1514,11 +1514,6 @@ InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, I
     return InstPair(primalResult, diffResult);
 }
 
-InstPair ForwardDiffTranscriber::transcribeCreateExistentialObject(IRBuilder*, IRInst*)
-{
-    SLANG_UNIMPLEMENTED_X("transcribeCreateExistentialObject");
-}
-
 // Create an empty func to represent the transcribed func of `origFunc`.
 InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
 {
@@ -2004,7 +1999,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         // a dzero() for it's value.
         // 
     case kIROp_CreateExistentialObject:
-        return transcribeCreateExistentialObject(builder, origInst);
+        return transcribeNonDiffInst(builder, origInst);
 
     case kIROp_StructKey:
         return InstPair(origInst, nullptr);
