@@ -165,7 +165,7 @@ namespace Slang
 
         // Returns a const reference to the value at the given key. Asserts if
         // the value doesn't exist
-        const TValue& at(const TKey& key) const
+        const TValue& getValue(const TKey& key) const
         {
             if(const auto x = tryGetValue(key))
                 return *x;
@@ -174,7 +174,7 @@ namespace Slang
 
         // Returns a reference to the value at the given key. Asserts if the
         // value doesn't exist
-        TValue& at(const TKey& key)
+        TValue& getValue(const TKey& key)
         {
             if(const auto x = tryGetValue(key))
                 return *x;

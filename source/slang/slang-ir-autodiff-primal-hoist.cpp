@@ -108,7 +108,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         recomputeBlock->insertAtEnd(func);
         builder.addDecoration(recomputeBlock, kIROp_RecomputeBlockDecoration);
         recomputeBlockMap.add(primalBlock, recomputeBlock);
-        indexedBlockInfo.set(recomputeBlock, indexedBlockInfo.at(primalBlock));
+        indexedBlockInfo.set(recomputeBlock, indexedBlockInfo.getValue(primalBlock));
         return recomputeBlock;
     };
     
@@ -188,7 +188,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             // Queue work for the subregion.
             auto loop = as<IRLoop>(primalBlock->getTerminator());
             auto bodyBlock = getLoopRegionBodyBlock(loop);
-            auto diffLoop = mapPrimalLoopToDiffLoop.at(loop);
+            auto diffLoop = mapPrimalLoopToDiffLoop.getValue(loop);
             auto diffBodyBlock = getLoopRegionBodyBlock(diffLoop);
             auto bodyRecomputeBlock = createRecomputeBlock(bodyBlock);
             bodyRecomputeBlock->insertBefore(diffBodyBlock);
@@ -992,7 +992,7 @@ void applyCheckpointSet(
                 predecessorSet.add(predecessor);
                 
                 auto primalPhiArg = as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii);
-                auto recomputePredecessor = mapPrimalBlockToRecomputeBlock.at(predecessor);
+                auto recomputePredecessor = mapPrimalBlockToRecomputeBlock.getValue(predecessor);
 
                 // For now, find the primal phi argument in this predecessor,
                 // and stick it into the recompute predecessor's branch inst. We
@@ -1235,7 +1235,7 @@ static int getInstRegionNestLevel(
     IRBlock* defBlock,
     IRInst* inst)
 {
-    auto result = indexedBlockInfo.at(defBlock).getCount();
+    auto result = indexedBlockInfo.getValue(defBlock).getCount();
     // Loop counters are considered to not belong to the region started by the its loop.
     if (result > 0 && inst->findDecoration<IRLoopCounterDecoration>())
         result--;
@@ -1260,7 +1260,7 @@ static List<IndexTrackingInfo> maybeTrimIndices(
         {
             auto useInst = use->getUser();
             auto useBlock = useInst->getParent();
-            auto useBlockIndices = indexedBlockInfo.at(as<IRBlock>(useBlock));
+            auto useBlockIndices = indexedBlockInfo.getValue(as<IRBlock>(useBlock));
             if (useBlockIndices.contains(index))
             {
                 found = true;
@@ -1409,7 +1409,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 continue;
             }
 
-            auto defBlockIndices = indexedBlockInfo.at(defBlock);
+            auto defBlockIndices = indexedBlockInfo.getValue(defBlock);
             IRBlock* varBlock = defaultVarBlock;
             if (isRecomputeInst)
             {
