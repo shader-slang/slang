@@ -1641,7 +1641,7 @@ void lowerSwizzledStores(IRModule* module, IRFunc* func)
                     continue;
 
                 builder.setInsertBefore(inst);
-                for (auto ii = 0; ii < swizzledStore->getElementCount(); ii++)
+                for (UIndex ii = 0; ii < swizzledStore->getElementCount(); ii++)
                 {
                     auto indexVal = swizzledStore->getElementIndex(ii);
                     auto indexedPtr = builder.emitElementAddress(swizzledStore->getDest(), indexVal);
