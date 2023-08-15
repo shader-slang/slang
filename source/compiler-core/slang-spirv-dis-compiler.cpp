@@ -3,8 +3,10 @@
 #include "../core/slang-common.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-string.h"
+#include "slang-artifact-desc-util.h"
 #include "slang-artifact-representation.h"
 #include "slang-artifact-util.h"
+#include "slang-artifact-representation-impl.h"
 
 namespace Slang
 {
@@ -44,15 +46,18 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     ComPtr<IOSFileArtifactRepresentation> fromFile;
     SLANG_RETURN_ON_FAIL(from->requireFile(ArtifactKeep::No, fromFile.writeRef()));
 
+    String toFile;
+    File::generateTemporary(UnownedStringSlice("spv-asm"), toFile);
+
     // Set up our process
     CommandLine commandLine;
     commandLine.m_executableLocation.setName("spirv-dis");
     commandLine.addArg("--comment");
     commandLine.addArg(fromFile->getPath());
+    commandLine.addArg("-o");
+    commandLine.addArg(toFile);
     RefPtr<Process> p;
     SLANG_RETURN_ON_FAIL(Process::create(commandLine, 0, p));
-    p->getStream(StdStreamType::In)->close();
-    const auto out = p->getStream(StdStreamType::Out);
     const auto err = p->getStream(StdStreamType::ErrorOut);
 
     // Wait for it to finish
@@ -68,19 +73,13 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     if(ret != 0)
         return SLANG_FAIL;
 
-    // Read the disassembly
-    List<Byte> outData;
-    SLANG_RETURN_ON_FAIL(StreamUtil::readAll(out, 0, outData));
-
-    // Wobble it into an artifact
-    StringBuilder outText;
-    StringUtil::appendStandardLines(
-        UnownedStringSlice(reinterpret_cast<const char*>(outData.getBuffer()), outData.getCount()),
-        outText
+    auto fileRep = OSFileArtifactRepresentation::create(
+        IOSFileArtifactRepresentation::Kind::Owned,
+        toFile.getUnownedSlice(),
+        nullptr
     );
-    ComPtr<ISlangBlob> outBlob = StringBlob::moveCreate(outText.produceString());
     auto artifact = ArtifactUtil::createArtifact(to);
-    artifact->addRepresentationUnknown(outBlob.detach());
+    artifact->addRepresentation(fileRep.detach());
     *outArtifact = artifact.detach();
 
     return SLANG_OK;
