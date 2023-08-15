@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-target spirv -entry MainPs -stage fragment -profile glsl_450 -g3 -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry MainPs -stage fragment -profile glsl_450 -g3 -line-directive-mode none
 
 // make sure that the generated spirv has glsl source in it.
 //CHECK: #version 450
