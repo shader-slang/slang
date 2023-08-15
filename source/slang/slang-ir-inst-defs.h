@@ -1042,7 +1042,7 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
 /* DebugInfo */
-INST(DebugSource, DebugSource, 2, 0)
+INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 
 #undef PARENT

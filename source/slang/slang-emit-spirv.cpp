@@ -77,10 +77,10 @@ enum class SpvLogicalSectionID
     MemoryModel,
     EntryPoints,
     ExecutionModes,
-    Annotations,
-    ConstantsAndTypes,
     DebugStringsAndSource,
     DebugNames,
+    Annotations,
+    ConstantsAndTypes,
     GlobalVariables,
     FunctionDeclarations,
     FunctionDefinitions,
@@ -291,6 +291,41 @@ struct SpvLiteralBits
 {
     static SpvLiteralBits from32(uint32_t value) { return SpvLiteralBits{{value}}; }
     static SpvLiteralBits from64(uint64_t value) { return SpvLiteralBits{{SpvWord(value), SpvWord(value >> 32)}}; }
+    static SpvLiteralBits fromUnownedStringSlice(UnownedStringSlice text)
+    {
+        SpvLiteralBits result;
+
+        // [Section 2.2.1 : Instructions]
+        //
+        // > Literal String: A nul-terminated stream of characters consuming
+        // > an integral number of words. The character set is Unicode in the
+        // > UTF-8 encoding scheme. The UTF-8 octets (8-bit bytes) are packed
+        // > four per word, following the little-endian convention (i.e., the
+        // > first octet is in the lowest-order 8 bits of the word).
+        // > The final word contains the string’s nul-termination character (0), and
+        // > all contents past the end of the string in the final word are padded with 0.
+
+        // First work out the amount of words we'll need
+        const Index textCount = text.getLength();
+        // Calculate the minimum amount of bytes needed - which needs to include terminating 0
+        const Index minByteCount = textCount + 1;
+        // Calculate the amount of words including padding if necessary
+        const Index wordCount = (minByteCount + 3) >> 2;
+
+        // Make space on the operand stack, keeping the free space start in operandStartIndex
+        result.value.setCount(wordCount);
+
+        // Set dst to the start of the operand memory
+        char* dst = (char*)(result.value.getBuffer());
+
+        // Copy the text
+        memcpy(dst, text.begin(), textCount);
+
+        // Set terminating 0, and remaining buffer 0s
+        memset(dst + textCount, 0, wordCount * sizeof(SpvWord) - textCount);
+
+        return result;
+    }
     List<SpvWord> value; // Words, stored low words to high (TODO, SmallArray or something here)
 };
 
@@ -748,36 +783,7 @@ struct SPIRVEmitContext
         // Assert that `text` doesn't contain any embedded nul bytes, since they
         // could lead to invalid encoded results.
         SLANG_ASSERT(text.indexOf(0) < 0);
-
-        // [Section 2.2.1 : Instructions]
-        //
-        // > Literal String: A nul-terminated stream of characters consuming
-        // > an integral number of words. The character set is Unicode in the
-        // > UTF-8 encoding scheme. The UTF-8 octets (8-bit bytes) are packed
-        // > four per word, following the little-endian convention (i.e., the
-        // > first octet is in the lowest-order 8 bits of the word).
-        // > The final word contains the string’s nul-termination character (0), and
-        // > all contents past the end of the string in the final word are padded with 0.
-
-        // First work out the amount of words we'll need
-        const Index textCount = text.getLength();
-        // Calculate the minimum amount of bytes needed - which needs to include terminating 0
-        const Index minByteCount = textCount + 1;
-        // Calculate the amount of words including padding if necessary
-        const Index wordCount = (minByteCount + 3) >> 2;
-
-        // Make space on the operand stack, keeping the free space start in operandStartIndex
-        const Index operandStartIndex = m_operandStack.getCount();
-        m_operandStack.setCount(operandStartIndex + wordCount);
-
-        // Set dst to the start of the operand memory
-        char* dst = (char*)(m_operandStack.getBuffer() + operandStartIndex);
-
-        // Copy the text
-        memcpy(dst, text.begin(), textCount);
-
-        // Set terminating 0, and remaining buffer 0s
-        memset(dst + textCount, 0, wordCount * sizeof(SpvWord) - textCount);
+        emitOperand(SpvLiteralBits::fromUnownedStringSlice(text));
     }
 
     // Sometimes we will want to pass down an argument that
@@ -1188,7 +1194,6 @@ struct SPIRVEmitContext
                 const FloatInfo i = getFloatingTypeInfo(as<IRType>(inst));
                 return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
             }
-
         case kIROp_PtrType:
         case kIROp_RefType:
         case kIROp_OutType:
@@ -1378,6 +1383,7 @@ struct SPIRVEmitContext
          case kIROp_BoolLit:
          case kIROp_IntLit:
          case kIROp_FloatLit:
+         case kIROp_StringLit:
              return emitLit(inst);
 
         case kIROp_GlobalParam:
@@ -1398,29 +1404,29 @@ struct SPIRVEmitContext
 
         case kIROp_DebugSource:
             {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
                 auto debugSource = as<IRDebugSource>(inst);
                 auto result = emitOpDebugSource(
-                    getSection(SpvLogicalSectionID::DebugStringsAndSource),
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     inst,
                     inst->getFullType(),
                     getNonSemanticDebugInfoExtInst(),
                     debugSource->getFileName(),
                     debugSource->getSource());
-                registerInst(debugSource, result);
                 auto moduleInst = inst->getModule()->getModuleInst();
                 if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
                 {
                     IRBuilder builder(inst);
                     builder.setInsertBefore(inst);
                     auto translationUnit = emitOpDebugCompilationUnit(
-                        getSection(SpvLogicalSectionID::DebugStringsAndSource),
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         moduleInst,
                         inst->getFullType(),
                         getNonSemanticDebugInfoExtInst(),
-                        emitIntConstant(100, builder.getIntType()),  // ExtDebugInfo version.
-                        emitIntConstant(5, builder.getIntType()),    // DWARF version.
+                        emitIntConstant(100, builder.getUIntType()),  // ExtDebugInfo version.
+                        emitIntConstant(5, builder.getUIntType()),    // DWARF version.
                         result,
-                        emitIntConstant(6, builder.getIntType()));   // Language, use HLSL's ID for now.
+                        emitIntConstant(6, builder.getUIntType()));   // Language, use HLSL's ID for now.
                     registerDebugInst(moduleInst, translationUnit);
                 }
                 return result;
@@ -2013,6 +2019,11 @@ struct SPIRVEmitContext
                     );
                 }
             }
+        case kIROp_StringLit:
+        {
+            auto value = as<IRStringLit>(inst)->getStringSlice();
+            return emitInst(getSection(SpvLogicalSectionID::DebugStringsAndSource), inst, SpvOpString, kResultID, SpvLiteralBits::fromUnownedStringSlice(value));
+        }
         default:
             return nullptr;
         }
@@ -2154,6 +2165,17 @@ struct SPIRVEmitContext
                     name,
                     params
                 );
+
+                // Stage specific execution mode declarations.
+                switch (entryPointDecor->getProfile().getStage())
+                {
+                case Stage::Fragment:
+                    //OpExecutionMode %main OriginUpperLeft
+                    emitInst(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, SpvOpExecutionMode, dstID, SpvExecutionModeOriginUpperLeft);
+                    break;
+                default:
+                    break;
+                }
             }
             break;
 
@@ -3295,6 +3317,11 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     context.emitFrontMatter();
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (as<IRDebugSource>(inst))
+            context.ensureInst(inst);
+    }
     for (auto irEntryPoint : irEntryPoints)
     {
         context.ensureInst(irEntryPoint);

@@ -2506,7 +2506,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
     }
-
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -2554,6 +2553,10 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         emitInstResultDecl(inst);
         emitInstExpr(inst, getInfo(EmitOp::General));
         m_writer->emit(";\n");
+        break;
+
+    case kIROp_DebugSource:
+    case kIROp_DebugLine:
         break;
 
         // Insts that needs to be emitted as code blocks.
