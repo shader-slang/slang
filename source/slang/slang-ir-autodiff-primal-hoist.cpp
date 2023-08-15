@@ -1615,7 +1615,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 // 
 
                 List<IRInst*> pendingOperands;
-                for (auto ii = 0; ii < instToStore->getOperandCount(); ii++)
+                for (UIndex ii = 0; ii < instToStore->getOperandCount(); ii++)
                 {
                     auto operand = instToStore->getOperand(ii);
                     if (!instSet.contains(operand) && !seenInstSet.contains(operand))
@@ -1628,7 +1628,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 
                 if (pendingOperands.getCount() > 0)
                 {
-                    for (auto ii = pendingOperands.getCount() - 1; ii >= 0; --ii)
+                    for (Index ii = pendingOperands.getCount() - 1; ii >= 0; --ii)
                         workList.add(pendingOperands[ii]);
                 }
             }

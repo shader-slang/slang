@@ -37,7 +37,7 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
     }
     else if (auto interfaceType = as<IRInterfaceType>(witness))
     {
-        for (auto ii = 0; ii < interfaceType->getOperandCount(); ii++)
+        for (UIndex ii = 0; ii < interfaceType->getOperandCount(); ii++)
         {
             auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(ii));
             if (entry->getRequirementKey() == requirementKey)
@@ -655,7 +655,7 @@ IRFunc *DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
 
     // Extract func type from the witness table type.
     IRFuncType* dAddFuncType = nullptr;
-    for (auto ii = 0; ii < sharedContext->differentiableInterfaceType->getOperandCount(); ii++)
+    for (UIndex ii = 0; ii < sharedContext->differentiableInterfaceType->getOperandCount(); ii++)
     {
         auto entry = cast<IRInterfaceRequirementEntry>(sharedContext->differentiableInterfaceType->getOperand(ii));
         if (entry->getRequirementKey() == sharedContext->addMethodStructKey)

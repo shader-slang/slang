@@ -795,7 +795,7 @@ namespace Slang
                 // Walk through interface operands to find a match, the result should be an 
                 // associated type entry.
                 //
-                for (auto ii = 0; ii < interfaceType->getOperandCount(); ii++)
+                for (UIndex ii = 0; ii < interfaceType->getOperandCount(); ii++)
                 {
                     auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(ii));
                     if (entry->getRequirementKey() == key && 
