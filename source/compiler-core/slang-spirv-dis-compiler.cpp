@@ -41,19 +41,19 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     ISlangBlob* fromBlob;
     SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, &fromBlob));
 
+    ComPtr<IOSFileArtifactRepresentation> fromFile;
+    SLANG_RETURN_ON_FAIL(from->requireFile(ArtifactKeep::No, fromFile.writeRef()));
+
     // Set up our process
     CommandLine commandLine;
     commandLine.m_executableLocation.setName("spirv-dis");
     commandLine.addArg("--comment");
+    commandLine.addArg(fromFile->getPath());
     RefPtr<Process> p;
     SLANG_RETURN_ON_FAIL(Process::create(commandLine, 0, p));
-    const auto in = p->getStream(StdStreamType::In);
+    p->getStream(StdStreamType::In)->close();
     const auto out = p->getStream(StdStreamType::Out);
     const auto err = p->getStream(StdStreamType::ErrorOut);
-
-    // Write the binary
-    SLANG_RETURN_ON_FAIL(in->write(fromBlob->getBufferPointer(), fromBlob->getBufferSize()));
-    in->close();
 
     // Wait for it to finish
     if(!p->waitForTermination(1000))
