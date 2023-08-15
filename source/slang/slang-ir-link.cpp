@@ -1417,8 +1417,7 @@ static bool _isPublicOrHLSLExported(IRInst* inst)
     {
         const auto op = decoration->getOp();
         if (op == kIROp_PublicDecoration ||
-            op == kIROp_HLSLExportDecoration ||
-            op == kIROp_DebugSource)
+            op == kIROp_HLSLExportDecoration)
         {
             return true;
         }
